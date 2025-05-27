@@ -59,7 +59,7 @@ use super::{
         FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
         MATCH_ALL_UDF_NAME,
     },
-    index::{IndexCondition, get_index_condition_from_expr},
+    index::{Condition, IndexCondition, get_index_condition_from_expr},
     request::Request,
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
@@ -268,6 +268,12 @@ impl Sql {
             let _ = statement.visit(&mut index_visitor);
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
+        }
+        // use all condition for histogram without filter
+        if use_inverted_index && can_optimize && index_condition.is_none() {
+            index_condition = Some(IndexCondition {
+                conditions: vec![Condition::All()],
+            });
         }
 
         // 12. check `select * from table where match_all()` optimizer
@@ -745,6 +751,21 @@ impl VisitorMut for ColumnVisitor<'_> {
                             checking_inverted_index_inner(&index_fields, expr);
                     }
                 }
+            } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
+                // if there is no selection, but have histogram and fst_fields, also can use
+                // inverted index
+                if self.schemas.len() == 1 {
+                    for (_, schema) in self.schemas.iter() {
+                        let stream_settings = unwrap_stream_settings(schema.schema());
+                        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+                        let index_fields = get_stream_setting_index_fields(&stream_settings);
+                        let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
+                            .collect::<HashSet<_>>();
+                        if !index_fields.is_empty() {
+                            self.use_inverted_index = true;
+                        }
+                    }
+                }
             }
         }
         if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref() {
@@ -833,6 +854,9 @@ impl VisitorMut for IndexVisitor {
                 if self.is_remove_filter || can_remove_filter {
                     select.selection = other_expr;
                 }
+            } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
+                // if there is no selection, but have histogram, also can use inverted index
+                self.can_optimize = true;
             }
         }
         ControlFlow::Continue(())
@@ -1250,46 +1274,11 @@ impl VisitorMut for OtherIndexOptimizeModeVisitor {
                 return ControlFlow::Break(());
             }
 
-            // Check if the query is a simple `select sql_func(*)` without modifiers
-            let is_sql_func = |select: &SelectItem, fn_name: &str, with_star: bool| -> bool {
-                match select {
-                    SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
-                        if let Expr::Function(func) = expr {
-                            let name = trim_quotes(&func.name.to_string().to_lowercase());
-                            // Check function name matches and has no special modifiers
-                            let has_no_modifiers = func.filter.is_none()
-                                && func.over.is_none()
-                                && func.within_group.is_empty();
-
-                            // If with_start is true, check for single "*" argument
-                            let has_valid_args = if with_star {
-                                matches!(
-                                    &func.args,
-                                    FunctionArguments::List(list)
-                                        if list.args.len() == 1
-                                        && trim_quotes(&list.args[0].to_string()) == "*"
-                                )
-                            } else {
-                                true
-                            };
-
-                            name == fn_name && has_no_modifiers && has_valid_args
-                        } else {
-                            false
-                        }
-                    }
-                    _ => false,
-                }
-            };
-
             if select.projection.len() == 1
                 && matches!(select.group_by, GroupByExpr::Expressions(ref expr, _) if expr.is_empty())
             {
-                self.is_simple_count = is_sql_func(&select.projection[0], "count", true);
-            } else if select.projection.len() == 2
-                && is_sql_func(&select.projection[0], "histogram", false)
-                && is_sql_func(&select.projection[1], "count", true)
-            {
+                self.is_simple_count = is_simple_count_query(select);
+            } else if is_simple_histogram_query(select) {
                 self.is_simple_histogram = true;
             }
         }
@@ -1316,6 +1305,49 @@ fn is_complex_query(statement: &mut Statement) -> bool {
     let mut visitor = ComplexQueryVisitor::new();
     let _ = statement.visit(&mut visitor);
     visitor.is_complex
+}
+
+// check if the query is only count(*) query
+fn is_simple_count_query(select: &Select) -> bool {
+    select.projection.len() == 1 && is_sql_func(&select.projection[0], "count", true)
+}
+
+// check if the query is only histogram & count query
+fn is_simple_histogram_query(select: &Select) -> bool {
+    select.projection.len() == 2
+        && is_sql_func(&select.projection[0], "histogram", false)
+        && is_sql_func(&select.projection[1], "count", true)
+}
+
+// Check if the query is a simple `select sql_func(*)` without modifiers
+fn is_sql_func(select: &SelectItem, fn_name: &str, with_star: bool) -> bool {
+    match select {
+        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
+            if let Expr::Function(func) = expr {
+                let name = trim_quotes(&func.name.to_string().to_lowercase());
+                // Check function name matches and has no special modifiers
+                let has_no_modifiers =
+                    func.filter.is_none() && func.over.is_none() && func.within_group.is_empty();
+
+                // If with_start is true, check for single "*" argument
+                let has_valid_args = if with_star {
+                    matches!(
+                        &func.args,
+                        FunctionArguments::List(list)
+                            if list.args.len() == 1
+                            && trim_quotes(&list.args[0].to_string()) == "*"
+                    )
+                } else {
+                    true
+                };
+
+                name == fn_name && has_no_modifiers && has_valid_args
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
 }
 
 // check if the query is complex query

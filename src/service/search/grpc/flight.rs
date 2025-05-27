@@ -401,7 +401,7 @@ pub async fn search(
             query_params,
             physical_plan.schema(),
             tantivy_file_list,
-            index_condition.unwrap(),
+            index_condition,
             idx_optimize_rule.unwrap(), // guaranteed Some, if tantivy_file_list is not empty
         ));
         physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
