@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
                 tabindex="0"
                 style="width: 400px"
-                :disable="actionId && !isEditingActionScript"
+                :disable="!!actionId && !isEditingActionScript"
               >
                 <template v-slot:hint>
                   Characters like :, ?, /, #, and spaces are not allowed.
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 tabindex="0"
                 style="width: 800px"
-                :disable="actionId && !isEditingActionScript"
+                :disable="!!actionId && !isEditingActionScript"
               />
             </div>
 
@@ -126,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="actionType.label"
                   class="q-mt-sm"
                   :class="index > 0 ? 'q-ml-md' : ''"
-                  :disable="actionId && !isEditingActionScript"
-                  :readonly="actionId && !isEditingActionScript"
+                  :disable="!!actionId && !isEditingActionScript"
+                  :readonly="!!actionId && !isEditingActionScript"
                 />
               </template>
             </div>
@@ -236,9 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-stepper-navigation>
                   <q-btn
                     data-test="add-action-script-step1-continue-btn"
-                    @click="
-                      formData.type === 'scheduled' ? (step = 2) : (step = 3)
-                    "
+                    @click="step = 2"
                     color="secondary"
                     label="Continue"
                     no-caps
@@ -248,7 +246,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-step>
 
               <q-step
-                v-if="formData.type === 'scheduled'"
                 data-test="add-action-script-step-2"
                 :name="2"
                 :title="t('actions.envVariables')"
@@ -351,6 +348,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :done="step > 3"
                 class="q-mt-md"
               >
+                show file: {{ showUploadFile }}
+
                 <div
                   data-test="add-action-script-file-input"
                   class="flex tw-flex-col tw-mt-2"
@@ -367,6 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="primary"
                     filled
                     v-model="formData.codeZip"
+                    max-file-size="52428800"
                     bg-color="input-bg"
                     class="q-pb-sm showLabelOnTop action-file-uploader tw-min-h-[150px] tw-max-h-[150px] tw-h-[150px] tw-w-[244px] cursor-pointer"
                     stack-label
@@ -382,6 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         return true;
                       },
                     ]"
+                    @update:model-value="onZipFileUpload"
                   >
                     <template v-slot:prepend>
                       <div
@@ -391,12 +392,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="tw-flex tw-flex-col tw-text-[14px] tw-pt-2">
                           <div>Drag and Drop or Browse .zip file</div>
                           <div>Only .zip files are accepted.</div>
+                          <div
+                            class="tw-flex tw-justify-center tw-items-center tw-pt-2"
+                          >
+                            <p class="tw-pr-1 tw-max-w-[140px] ellipsis">
+                              {{
+                                formData.fileNameToShow || "No File Uploaded"
+                              }}
+                            </p>
+                            |
+                            <p class="tw-pl-1">
+                              {{ getZipFileSize() || "0.00 MB" }}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </template>
                   </q-file>
 
-                  <div v-if="!showUploadFile" class="tw-w-full">
+                  <div
+                    v-if="formData.codeZip && !showUploadFile"
+                    class="tw-w-full"
+                  >
                     <div class="tw-pt-2 tw-flex">
                       <div
                         data-test="action-uploaded-zip-file-name"
@@ -426,6 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t(`actions.reupload`)"
                         size="14px"
                       />
+
                       <q-btn
                         data-test="add-action-script-edit-file-btn"
                         @click="updateCodeEditorView"
@@ -434,13 +452,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dense
                         class="q-ml-sm q-mb-xs tw-h-fit tw-py-[6px] tw-pl-[8px] tw-pr-[12px]"
                         :label="t(`actions.editCode`)"
+                        :disable="!isZipFileSaved"
                         size="14px"
-                      />
+                      >
+                        <q-tooltip
+                          v-if="!isZipFileSaved"
+                          self="center right"
+                          anchor="top middle"
+                          class="tw-text-[14px]"
+                        >
+                          Save the Action first to enable editing the zip file
+                          in Code Editor.
+                        </q-tooltip>
+                      </q-btn>
                     </div>
                   </div>
 
                   <div
-                    v-if="isEditingActionScript && showUploadFile"
+                    v-if="formData.codeZip && showUploadFile"
                     class="q-pt-xs q-mt-xs"
                   >
                     <q-btn
@@ -456,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div
-                    v-if="!isEditingActionScript && showUploadFile"
+                    v-if="!formData.codeZip && showUploadFile"
                     class="q-pt-xs q-mt-xs"
                   >
                     <div
@@ -499,6 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-stepper-navigation>
               </q-step>
               <q-step
+                v-if="formData.type === 'scheduled'"
                 data-test="add-action-script-step-4"
                 :name="4"
                 :title="t('actions.schedule')"
@@ -703,7 +733,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <ActionCodeEditor
       v-model="isCodeEditorOpen"
-      :uploaded-file="formData.codeZip"
+      :uploaded-file="formData.codeZip || {}"
       :action-id="actionId"
       :form-data="formData"
       @save="onCodeSave"
@@ -795,7 +825,7 @@ const originalActionScriptData: Ref<string> = ref("");
 
 const setupFormRef: Ref<any> = ref(null);
 
-const detailsFormRef: Ref<any> = ref(null);
+const actionDetailsFormRef: Ref<any> = ref(null);
 
 const step = ref(1);
 
@@ -810,7 +840,7 @@ const formData = ref(defaultActionScript);
 
 const isCodeEditorOpen = ref(false);
 
-const showUploadFile = ref(false);
+const showUploadFile = ref(true);
 
 const q = useQuasar();
 
@@ -878,6 +908,8 @@ const isFetchingActionScript = ref(false);
 
 const environmentalVariables = ref([{ key: "", value: "", uuid: getUUID() }]);
 const cronError = ref("");
+
+const isZipFileSaved = ref(false);
 
 const frequency = ref({
   type: "once",
@@ -948,19 +980,11 @@ const saveActionSetup = async () => {
   const setupData = getFormPayload({
     name: formData.value.name,
     description: formData.value.description,
-    type: formData.value.type,
+    execution_details: formData.value.type === "scheduled" ? "once" : "service",
+    owner: store.state.userInfo.email,
   });
 
   actionDetailsExpanded.value = true;
-  formData.value.id = getUUID();
-
-  router.replace({
-    query: {
-      ...router.currentRoute.value.query,
-      action: "edit",
-      id: formData.value.id,
-    },
-  });
 
   try {
     const response = await actions.create(
@@ -968,31 +992,24 @@ const saveActionSetup = async () => {
       setupData,
     );
 
-    // Update the form data with the newly created action id
-    formData.value.id = response.data.id;
-
-    // Save original data for comparison on cancel
-    originalActionScriptData.value = JSON.stringify(formData.value);
-
-    // Auto-expand the action details section
-    actionDetailsExpanded.value = true;
-
     // Update the URL to include the action ID
     router.replace({
-      name: "editActionScript",
+      name: "actionScripts",
       query: {
-        ...router.currentRoute.value.query,
-        id: response.data.id,
+        action: "update",
+        id: response.data.uuid,
+        org_identifier: store.state.selectedOrganization.identifier,
       },
     });
 
     q.notify({
       type: "positive",
       message:
-        "Action setup created successfully. Please complete the action details.",
+        "Action created successfully. Please complete the action details.",
       timeout: 3000,
     });
   } catch (error: any) {
+    console.log(error);
     q.notify({
       type: "negative",
       message: error?.response?.data?.message || "Error creating action setup.",
@@ -1131,7 +1148,7 @@ const saveActionScript = async () => {
     validateActionScriptData();
     await nextTick();
     await nextTick();
-    const isValidForm = await detailsFormRef.value.validate();
+    const isValidForm = await actionDetailsFormRef.value.validate();
     if (!isValidForm) return;
   } catch (err) {
     console.log(err);
@@ -1277,6 +1294,10 @@ const setupEditingActionScript = async (report: any) => {
 
   // Auto-expand action details when editing
   actionDetailsExpanded.value = true;
+
+  if (formData.value.codeZip) {
+    isZipFileSaved.value = true;
+  }
 };
 
 const openCancelDialog = () => {
@@ -1291,12 +1312,9 @@ const openCancelDialog = () => {
 };
 const editFileToUpload = () => {
   showUploadFile.value = true;
-  formData.value.fileNameToShow = "";
 };
+
 const cancelUploadingNewFile = () => {
-  formData.value.fileNameToShow = JSON.parse(
-    originalActionScriptData.value,
-  ).zip_file_name;
   showUploadFile.value = false;
 };
 const addApiHeader = (key: string = "", value: string = "") => {
@@ -1412,7 +1430,7 @@ const updateCodeEditorView = () => {
   isCodeEditorOpen.value = true;
 };
 
-const onCodeSave = (data) => {
+const onCodeSave = () => {
   // Handle the saved code
   q.notify({
     type: "positive",
@@ -1436,6 +1454,23 @@ const routeToActions = () => {
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
+};
+
+const onZipFileUpload = () => {
+  if (formData.value.codeZip) {
+    showUploadFile.value = false;
+    formData.value.fileNameToShow = formData.value.codeZip.name;
+  }
+};
+
+const getZipFileSize = () => {
+  if (formData.value.codeZip) {
+    const fileSizeInBytes = formData.value.codeZip.size;
+    const fileSizeInKB = fileSizeInBytes / 1024;
+    const fileSizeInMB = fileSizeInKB / 1024;
+    return `${fileSizeInMB.toFixed(2)} MB`;
+  }
+  return "0 MB";
 };
 
 onBeforeMount(async () => {
@@ -1480,6 +1515,12 @@ onBeforeMount(async () => {
       .q-field__input {
         width: 240px !important;
         transform: translateX(-224px);
+      }
+
+      .q-field__native {
+        div {
+          display: none;
+        }
       }
     }
   }

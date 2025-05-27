@@ -37,7 +37,7 @@
         <div class="col column tw-relative tw-px-2">
           <iframe
             id="vscode-iframe"
-            :src="`${store.state.API_ENDPOINT}/web/vscode?origin=${encodeURIComponent(store.state.API_ENDPOINT + '?id=' + actionId + '&name=' + formData.name)}`"
+            :src="`${store.state.API_ENDPOINT}/web/vscode?origin=${encodeURIComponent(store.state.API_ENDPOINT + '?id=' + actionId + '&name=' + formData.name + '&org_identifier=' + store.state.selectedOrganization.identifier)}`"
             sandbox="allow-scripts allow-same-origin"
             style="width: 100%; height: max(600px, calc(100vh - 42px))"
           />
@@ -60,7 +60,7 @@ const props = defineProps({
   },
   uploadedFile: {
     type: Object,
-    default: () => null,
+    default: () => {},
   },
   actionId: {
     type: String,
