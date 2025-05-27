@@ -23,18 +23,10 @@ use datafusion::{
 use once_cell::sync::Lazy;
 
 pub const MATCH_ALL_UDF_NAME: &str = "match_all";
-pub const MATCH_ALL_RAW_UDF_NAME: &str = "match_all_raw";
-pub const MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME: &str = "match_all_raw_ignore_case";
 pub const FUZZY_MATCH_ALL_UDF_NAME: &str = "fuzzy_match_all";
 
 pub(crate) static MATCH_ALL_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(MatchAllUdf::new()));
-
-pub(crate) static MATCH_ALL_RAW_UDF: Lazy<ScalarUDF> =
-    Lazy::new(|| ScalarUDF::from(MatchAllRawUdf::new()));
-
-pub(crate) static MATCH_ALL_RAW_IGNORE_CASE_UDF: Lazy<ScalarUDF> =
-    Lazy::new(|| ScalarUDF::from(MatchAllRawIgnoreCaseUdf::new()));
 
 pub(crate) static FUZZY_MATCH_ALL_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(FuzzyMatchAllUdf::new()));
@@ -72,81 +64,6 @@ impl ScalarUDFImpl for MatchAllUdf {
     fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
         Err(DataFusionError::Internal(
             "match_all function don't support sql with multiple streams".to_string(),
-        ))
-    }
-}
-
-#[derive(Debug, Clone)]
-struct MatchAllRawUdf {
-    signature: Signature,
-}
-
-impl MatchAllRawUdf {
-    fn new() -> Self {
-        Self {
-            signature: Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
-        }
-    }
-}
-
-impl ScalarUDFImpl for MatchAllRawUdf {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn name(&self) -> &str {
-        MATCH_ALL_RAW_UDF_NAME
-    }
-
-    fn signature(&self) -> &Signature {
-        &self.signature
-    }
-
-    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Boolean)
-    }
-
-    fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        Err(DataFusionError::Internal(
-            "match_all_raw function don't support sql with multiple streams".to_string(),
-        ))
-    }
-}
-
-#[derive(Debug, Clone)]
-struct MatchAllRawIgnoreCaseUdf {
-    signature: Signature,
-}
-
-impl MatchAllRawIgnoreCaseUdf {
-    fn new() -> Self {
-        Self {
-            signature: Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
-        }
-    }
-}
-
-impl ScalarUDFImpl for MatchAllRawIgnoreCaseUdf {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn name(&self) -> &str {
-        MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-    }
-
-    fn signature(&self) -> &Signature {
-        &self.signature
-    }
-
-    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Boolean)
-    }
-
-    fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        Err(DataFusionError::Internal(
-            "match_all_raw_ignore_case function don't support sql with multiple streams"
-                .to_string(),
         ))
     }
 }
