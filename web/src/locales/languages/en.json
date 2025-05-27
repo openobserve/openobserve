@@ -491,12 +491,12 @@
     "conditionTitle": "Associate Condition",
     "query": "Associate Query",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
-    "import":"Import",
-    "export":"Export",
-    "edit":"Edit",
-    "delete":"Delete",
-    "view":"View",
-    "delay":"Delay"
+    "import": "Import",
+    "export": "Export",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "delay": "Delay"
   },
   "function": {
     "header": "Functions",
@@ -1049,7 +1049,8 @@
     "api_header_value": "Value",
     "add_template": "New Template",
     "skip_tls_verify": "Skip TLS Verify",
-    "action": "Action"
+    "action": "Action",
+    "output_format": "Output Format"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations"
@@ -1193,7 +1194,7 @@
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
   },
-  "quota":{
+  "quota": {
     "header": "Quotas",
     "api-limits": "API Limits",
     "role-limits": "Role Limits",

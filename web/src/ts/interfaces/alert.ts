@@ -91,6 +91,7 @@ export interface Destination {
   emails?: string;
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
+  output_format?: "json" | "ndjson";
 }
 
 export interface DestinationPayload {
