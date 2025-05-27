@@ -15,9 +15,9 @@
 
 use std::{
     fs::{File, Metadata, OpenOptions, create_dir_all, remove_file},
-    io,
-    io::{BufWriter, Seek, SeekFrom, Write},
-    path::PathBuf,
+    io::{self, BufWriter, Seek, SeekFrom, Write},
+    ops::Deref,
+    path::{Path, PathBuf},
 };
 
 use byteorder::{BigEndian, WriteBytesExt};
@@ -37,35 +37,23 @@ pub struct Writer {
 
 impl Writer {
     pub fn new(
-        root_dir: impl Into<PathBuf>,
-        org_id: &str,
-        stream_type: &str,
-        id: String,
+        path: impl Into<PathBuf> + Clone + Deref<Target = Path> + AsRef<Path>,
         init_size: u64,
         buffer_size: usize,
     ) -> Result<Self> {
-        Self::build(
-            root_dir,
-            org_id,
-            stream_type,
-            id,
-            init_size,
-            buffer_size,
-            None,
-        )
+        Self::build(path, init_size, buffer_size, None)
     }
 
     pub fn build(
-        root_dir: impl Into<PathBuf>,
-        org_id: &str,
-        stream_type: &str,
-        id: String,
+        path: impl Into<PathBuf> + Clone + Deref<Target = Path> + AsRef<Path>,
         init_size: u64,
         buffer_size: usize,
         header: Option<FileHeader>,
     ) -> Result<Self> {
-        let path = super::build_file_path(root_dir, org_id, stream_type, id);
-        create_dir_all(path.parent().unwrap()).context(FileOpenSnafu { path: path.clone() })?;
+        create_dir_all(path.parent().ok_or_else(|| Error::NoParentDir {
+            path: path.clone().into(),
+        })?)
+        .context(FileOpenSnafu { path: path.clone() })?;
         let mut f = OpenOptions::new()
             .write(true)
             .create(true)
@@ -109,7 +97,7 @@ impl Writer {
         }
 
         Ok(Self {
-            path,
+            path: path.into(),
             f: BufWriter::with_capacity(buffer_size, f),
             bytes_written,
             uncompressed_bytes_written: bytes_written,

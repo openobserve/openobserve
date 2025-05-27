@@ -15,7 +15,7 @@
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use tempfile::tempdir;
-use wal::Writer;
+use wal::{Writer, build_file_path};
 
 pub fn write_benchmark(c: &mut Criterion) {
     let dir = tempdir().unwrap();
@@ -24,10 +24,7 @@ pub fn write_benchmark(c: &mut Criterion) {
     for buf_size in [4096, 8192, 16384, 32768] {
         for entry_size in [4096, 16384, 32768, 65536] {
             let mut writer = Writer::new(
-                dir,
-                "org",
-                "stream",
-                entry_size.to_string(),
+                build_file_path(dir, "org", "stream", entry_size.to_string()),
                 1024_1024,
                 buf_size,
             )
