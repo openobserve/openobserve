@@ -119,7 +119,7 @@ mod sea_orm_dashboards {
         #[sea_orm(primary_key)]
         pub id: String,
         pub dashboard_id: String,
-        pub folder_id: i64,
+        pub folder_id: String,
         pub owner: String,
         pub role: Option<String>,
         pub title: String,
