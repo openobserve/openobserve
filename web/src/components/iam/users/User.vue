@@ -393,7 +393,7 @@ export default defineComponent({
             resultTotal.value = res.data.data.length;
             let users = [...res.data.data];
 
-            if (config.isCloud) {
+            if (config.isCloud == "true") {
               const invitedMembers: any = await getInvitedMembers();
               resultTotal.value += invitedMembers.length;
               users = [...res.data.data, ...invitedMembers];
@@ -419,7 +419,7 @@ export default defineComponent({
                 role: data?.status == "pending" ? data.role + " (Invited)": data.role,
                 enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
-                enableDelete: config.isCloud ? true : false,
+                enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
               };
             });
