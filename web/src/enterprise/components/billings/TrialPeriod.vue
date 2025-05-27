@@ -77,7 +77,7 @@ export default defineComponent({
 
     const showTrialPeriodMsg = ref((Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry") && store.state.organizationData.organizationSettings.free_trial_expiry != "" && store.state.organizationData.organizationSettings.free_trial_expiry != null) ? true : false);
     
-    function getDueDays(microTimestamp) {
+    function getDueDays(microTimestamp: number): number {
       // Convert microseconds to milliseconds
       const timestampMs = Math.floor(microTimestamp / 1000);
 
@@ -85,8 +85,8 @@ export default defineComponent({
       const givenDate = new Date(timestampMs);
       const currentDate = new Date();
 
-      // Calculate time difference in milliseconds
-      const timeDiffMs = givenDate - currentDate;
+      // Calculate time difference in milliseconds using getTime()
+      const timeDiffMs = givenDate.getTime() - currentDate.getTime();
 
       // Convert milliseconds to full days
       const dueDays = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
