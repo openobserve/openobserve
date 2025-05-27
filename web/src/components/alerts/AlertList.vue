@@ -718,7 +718,7 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const activeFolderId = ref(router.currentRoute.value.query.folder ?? "default");
+    const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
     const showMoveAlertDialog = ref(false);
     const expandedRow: Ref<any> = ref("");
     const triggerExpand = (props: any) => {
