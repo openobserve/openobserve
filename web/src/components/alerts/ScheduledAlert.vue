@@ -1264,8 +1264,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- this is for multi time range to select -->
                 <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
-                    <div class="tw-text-sm tw-bg-white tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
-                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : ''"
+                    <div class="tw-text-sm tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
+                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
                     >
                   {{triggerData.period  }} minute(s) ago
                 </div>
