@@ -43,8 +43,8 @@
 
 use itertools::Itertools;
 use sea_orm::{
-    sea_query::{Table, TableCreateStatement},
     DeriveIden, EntityTrait, IntoActiveModel, PaginatorTrait, QueryOrder, Set, TransactionTrait,
+    sea_query::{Table, TableCreateStatement},
 };
 use sea_orm_migration::prelude::*;
 
