@@ -641,6 +641,7 @@ pub async fn do_partitioned_search(
                 .await
                 .unwrap();
                 search_res.hits = top_k_values?;
+                search_res.total = top_k_values?.len() as i64;
                 let duration = instant.elapsed();
                 log::debug!("Top k values for partition {idx} took {:?}", duration);
             }
@@ -1103,6 +1104,7 @@ async fn process_delta(
                 .await
                 .unwrap();
                 search_res.hits = top_k_values?;
+                search_res.total = top_k_values?.len() as i64;
             }
 
             let response = StreamResponses::SearchResponse {
