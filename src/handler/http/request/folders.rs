@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -43,11 +43,16 @@ impl From<FolderError> for HttpResponse {
             FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
             FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
             FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
+            FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
+                "Folder with this name already exists in this organization",
+            ),
         }
     }
 }
 
 /// CreateFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -89,6 +94,8 @@ pub async fn create_folder(
 }
 
 /// UpdateFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -128,6 +135,8 @@ pub async fn update_folder(
 }
 
 /// ListFolders
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -169,6 +178,8 @@ pub async fn list_folders(
 }
 
 /// GetFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -198,7 +209,41 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     }
 }
 
+/// GetFolderByName
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Folders",
+    operation_id = "GetFolderByName",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder_type" = FolderType, Path, description = "Type of data the folder can contain"),
+        ("folder_name" = String, Path, description = "Folder Name"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = GetFolderResponseBody),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+    ),
+)]
+#[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
+pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -> impl Responder {
+    let (org_id, folder_type, folder_name) = path.into_inner();
+    match folders::get_folder_by_name(&org_id, &folder_name, folder_type.into()).await {
+        Ok(folder) => {
+            let body: CreateFolderResponseBody = folder.into();
+            HttpResponse::Ok().json(body)
+        }
+        Err(err) => err.into(),
+    }
+}
+
 /// DeleteFolder
+///
+/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -231,6 +276,8 @@ pub mod deprecated {
     use super::*;
 
     /// CreateFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -262,7 +309,7 @@ pub mod deprecated {
     ) -> impl Responder {
         let org_id = path.into_inner();
         let folder = body.into_inner().into();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::save_folder(&org_id, folder, folder_type, false).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
@@ -273,6 +320,8 @@ pub mod deprecated {
     }
 
     /// UpdateFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -305,7 +354,7 @@ pub mod deprecated {
     ) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
         let folder = body.into_inner().into();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::update_folder(&org_id, &folder_id, folder_type, folder).await {
             Ok(_) => HttpResponse::Ok().body("Folder updated"),
             Err(err) => err.into(),
@@ -313,6 +362,8 @@ pub mod deprecated {
     }
 
     /// ListFolders
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -341,7 +392,7 @@ pub mod deprecated {
             return HttpResponse::Forbidden().finish();
         };
 
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::list_folders(&org_id, user_id, folder_type).await {
             Ok(folders) => {
                 let body: ListFoldersResponseBody = folders.into();
@@ -352,6 +403,8 @@ pub mod deprecated {
     }
 
     /// GetFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -372,7 +425,7 @@ pub mod deprecated {
     #[get("/{org_id}/folders/{folder_id}")]
     pub async fn get_folder(path: web::Path<(String, String)>) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::get_folder(&org_id, &folder_id, folder_type).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
@@ -382,7 +435,42 @@ pub mod deprecated {
         }
     }
 
+    /// GetFolderByName
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
+    #[deprecated]
+    #[utoipa::path(
+        context_path = "/api",
+        tag = "Folders",
+        operation_id = "GetFolderByName",
+        security(
+            ("Authorization" = [])
+        ),
+        params(
+            ("org_id" = String, Path, description = "Organization name"),
+            ("folder_name" = String, Path, description = "Folder Name"),
+        ),
+        responses(
+            (status = StatusCode::OK, body = GetFolderResponseBody),
+            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+        ),
+    )]
+    #[get("/{org_id}/folders/name/{folder_name}")]
+    pub async fn get_folder_by_name(path: web::Path<(String, String)>) -> impl Responder {
+        let (org_id, folder_name) = path.into_inner();
+        let folder_type = config::meta::folder::FolderType::Dashboards;
+        match folders::get_folder_by_name(&org_id, &folder_name, folder_type).await {
+            Ok(folder) => {
+                let body: CreateFolderResponseBody = folder.into();
+                HttpResponse::Ok().json(body)
+            }
+            Err(err) => err.into(),
+        }
+    }
+
     /// DeleteFolder
+    ///
+    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -404,7 +492,7 @@ pub mod deprecated {
     #[delete("/{org_id}/folders/{folder_id}")]
     async fn delete_folder(path: web::Path<(String, String)>) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::delete_folder(&org_id, &folder_id, folder_type).await {
             Ok(()) => HttpResponse::Ok().body("Folder deleted"),
             Err(err) => err.into(),

@@ -9,10 +9,11 @@ default = ["gxhash"]
 gxhash = ["dep:gxhash"]
 
 [dependencies]
-actix-web-prometheus.workspace = true
+aes-siv.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 arc-swap.workspace = true
+argon2.workspace = true
 arrow.workspace = true
 arrow-json.workspace = true
 arrow-schema.workspace = true
@@ -27,13 +28,13 @@ byteorder.workspace = true
 chrono.workspace = true
 cityhasher.workspace = true
 chromiumoxide.workspace = true
+cron.workspace = true
 datafusion.workspace = true
 dashmap.workspace = true
 dotenv_config.workspace = true
 dotenvy.workspace = true
 faststr.workspace = true
 futures.workspace = true
-fst.workspace = true
 get_if_addrs.workspace = true
 getrandom.workspace = true
 gxhash = { version = "~3.4.1", optional = true }
@@ -47,6 +48,7 @@ md5.workspace = true
 memchr.workspace = true
 murmur3.workspace = true
 once_cell.workspace = true
+opentelemetry.workspace = true
 ordered-float.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
@@ -55,6 +57,7 @@ proto.workspace = true
 reqwest.workspace = true
 regex.workspace = true
 rand.workspace = true
+sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 segment.workspace = true
@@ -76,3 +79,6 @@ vrl.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
+
+[build-dependencies]
+chrono.workspace = true

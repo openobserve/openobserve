@@ -8,16 +8,14 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org: String,
-    pub folder_id: i64,
+    pub folder_id: String,
     pub name: String,
     pub stream_type: String,
     pub stream_name: String,
     pub is_real_time: bool,
     pub destinations: Json,
     pub context_attributes: Option<Json>,
-    #[sea_orm(column_type = "Text", nullable)]
     pub row_template: Option<String>,
-    #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub enabled: bool,
     pub tz_offset: i32,
@@ -25,13 +23,10 @@ pub struct Model {
     pub last_satisfied_at: Option<i64>,
     pub query_type: i16,
     pub query_conditions: Option<Json>,
-    #[sea_orm(column_type = "Text", nullable)]
     pub query_sql: Option<String>,
-    #[sea_orm(column_type = "Text", nullable)]
     pub query_promql: Option<String>,
     pub query_promql_condition: Option<Json>,
     pub query_aggregation: Option<Json>,
-    #[sea_orm(column_type = "Text", nullable)]
     pub query_vrl_function: Option<String>,
     pub query_search_event_type: Option<i16>,
     pub query_multi_time_range: Option<Json>,
@@ -40,7 +35,6 @@ pub struct Model {
     pub trigger_threshold_count: i64,
     pub trigger_frequency_type: i16,
     pub trigger_frequency_seconds: i64,
-    #[sea_orm(column_type = "Text", nullable)]
     pub trigger_frequency_cron: Option<String>,
     pub trigger_frequency_cron_timezone: Option<String>,
     pub trigger_silence_seconds: i64,
@@ -48,6 +42,7 @@ pub struct Model {
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,
     pub updated_at: Option<i64>,
+    pub align_time: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

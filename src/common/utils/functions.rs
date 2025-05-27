@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::function::VRLCompilerConfig, GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE,
+    GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE, meta::function::VRLCompilerConfig,
 };
 use vector_enrichment::{Table, TableRegistry};
 
@@ -76,17 +76,13 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
         .common
         .enable_enterprise_mmdb
     {
-        tables.insert(
-            o2_enterprise::enterprise::common::infra::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
-                .to_owned(),
-            Box::new(
-                crate::common::infra::config::GEOIP_ENT_TABLE
-                    .read()
-                    .as_ref()
-                    .unwrap()
-                    .clone(),
-            ),
-        );
+        let geoip_ent = crate::common::infra::config::GEOIP_ENT_TABLE.read();
+        if let Some(table) = geoip_ent.as_ref() {
+            tables.insert(
+                    o2_enterprise::enterprise::common::infra::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
+                        .to_owned(),Box::new(table.clone())
+                );
+        }
     };
 
     registry.load(tables);

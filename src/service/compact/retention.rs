@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,14 +15,12 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
-    meta::stream::{
-        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType, TimeRange,
-    },
-    utils::time::{hour_micros, BASE_TIME},
+    meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
+    utils::time::{BASE_TIME, hour_micros},
 };
 use infra::{cache, dist_lock, file_list as infra_file_list};
 use itertools::Itertools;
@@ -54,7 +52,7 @@ fn generate_time_ranges_for_deletion(
         TimeRange::flatten_overlapping_ranges(extended_retention_ranges).into_iter();
 
     log::debug!(
-        "[COMPACT] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}",
+        "[COMPACTOR] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}",
         extended_retention_ranges_iter.clone().join(", "),
         original_time_range.clone()
     );
@@ -131,7 +129,7 @@ fn generate_time_ranges_for_deletion(
     }
 
     log::debug!(
-        "[COMPACT] populate_time_ranges_for_deletion time_ranges_for_deletion: {}",
+        "[COMPACTOR] populate_time_ranges_for_deletion time_ranges_for_deletion: {}",
         time_ranges_for_deletion.iter().join(", ")
     );
 
@@ -159,7 +157,7 @@ pub async fn delete_by_stream(
     }
 
     log::debug!(
-        "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
+        "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
         org_id,
         stream_type,
         stream_name,
@@ -181,17 +179,21 @@ pub async fn delete_by_stream(
         lifecycle_end.timestamp_micros(),
     );
 
-    let final_deletion_time_ranges = generate_time_ranges_for_deletion(
-        extended_retentions.to_vec(),
-        original_deletion_time_range,
-        last_retained_time,
-    );
-
-    log::debug!(
-        "[COMPACT] extended_retentions: {}, final_deletion_time_ranges: {}",
-        extended_retentions.iter().join(", "),
-        final_deletion_time_ranges.iter().join(", ")
-    );
+    let final_deletion_time_ranges = if extended_retentions.is_empty() {
+        vec![original_deletion_time_range]
+    } else {
+        let ranges = generate_time_ranges_for_deletion(
+            extended_retentions.to_vec(),
+            original_deletion_time_range,
+            last_retained_time,
+        );
+        log::debug!(
+            "[COMPACTOR] extended_retentions: {}, final_deletion_time_ranges: {}",
+            extended_retentions.iter().join(", "),
+            ranges.iter().join(", ")
+        );
+        ranges
+    };
 
     let job_nos = final_deletion_time_ranges.len();
 
@@ -209,7 +211,7 @@ pub async fn delete_by_stream(
         }
 
         log::debug!(
-            "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
+            "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
             org_id,
             stream_type,
             stream_name,
@@ -238,7 +240,7 @@ pub async fn delete_all(
     let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::warn!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
+        log::warn!("[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
@@ -271,40 +273,13 @@ pub async fn delete_all(
             tokio::fs::remove_dir_all(path).await?;
         }
         log::info!("deleted all files: {:?}", path);
-    } else {
-        // delete files from s3
-        // first fetch file list from local cache
-        let files = file_list::query(
-            org_id,
-            stream_name,
-            stream_type,
-            PartitionTimeLevel::Unset,
-            start_time,
-            end_time,
-        )
-        .await?;
-        if cfg.compact.data_retention_history {
-            // only store the file_list into history, don't delete files
-            if let Err(e) = infra_file_list::batch_add_history(&files).await {
-                log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
-                return Err(e.into());
-            }
-        }
     }
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
+    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, stream_name).await?;
     log::info!(
         "deleted file list for: {}/{}/{}/all",
-        org_id,
-        stream_type,
-        stream_name
-    );
-
-    // delete stream stats
-    infra_file_list::del_stream_stats(org_id, stream_type, stream_name).await?;
-    log::info!(
-        "deleted stream_stats for: {}/{}/{}/all",
         org_id,
         stream_type,
         stream_name
@@ -335,7 +310,7 @@ pub async fn delete_by_date(
             .await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::warn!(
-            "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
+            "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
         );
         dist_lock::unlock(&locker).await?;
@@ -376,42 +351,38 @@ pub async fn delete_by_date(
     }
     let date_end =
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc);
-    let time_range = { (date_start.timestamp_micros(), date_end.timestamp_micros()) };
+    let time_range = {
+        (
+            date_start.timestamp_micros(),
+            date_end.timestamp_micros() - 1,
+        )
+    };
 
-    let cfg = get_config();
     if is_local_disk_storage() {
         let dirs_to_delete =
             generate_local_dirs(org_id, stream_type, stream_name, date_start, date_end);
-
         // Delete all collected directories in parallel
         let mut delete_tasks = vec![];
         for dir in dirs_to_delete {
+            log::info!(
+                "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} delete dir: {:?}",
+                dir
+            );
             delete_tasks.push(tokio::fs::remove_dir_all(dir));
         }
         futures::future::try_join_all(delete_tasks).await?;
-    } else {
-        // delete files from s3
-        // first fetch file list from local cache
-        let files = file_list::query(
-            org_id,
-            stream_name,
-            stream_type,
-            PartitionTimeLevel::Unset,
-            time_range.0,
-            time_range.1,
-        )
-        .await?;
-        if cfg.compact.data_retention_history {
-            // only store the file_list into history, don't delete files
-            if let Err(e) = infra_file_list::batch_add_history(&files).await {
-                log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
-                return Err(e.into());
-            }
-        }
     }
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, time_range).await?;
+
+    super::super::file_list_dump::delete_in_time_range(
+        org_id,
+        stream_type,
+        stream_name,
+        (date_start.timestamp_micros(), date_end.timestamp_micros()),
+    )
+    .await?;
 
     // archive old schema versions
     let mut schema_versions =
@@ -461,7 +432,15 @@ async fn delete_from_file_list(
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
+    let task_id = tokio::task::try_id()
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| rand::random::<u64>().to_string());
+    let fake_trace_id = format!(
+        "delete_from_file_list-{}-{}-{}",
+        task_id, time_range.0, time_range.1
+    );
     let files = file_list::query(
+        &fake_trace_id,
         org_id,
         stream_name,
         stream_type,
@@ -474,92 +453,64 @@ async fn delete_from_file_list(
         return Ok(());
     }
 
-    // collect stream stats
-    let mut stream_stats = StreamStats::default();
-
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
-    for file in files {
-        let index_size = file.meta.index_size;
-        stream_stats = stream_stats - file.meta;
-        let file_name = file.key.clone();
-        let columns: Vec<_> = file_name.split('/').collect();
+    for mut file in files {
+        let columns: Vec<_> = file.key.split('/').collect();
         let hour_key = format!(
             "{}/{}/{}/{}",
             columns[4], columns[5], columns[6], columns[7]
         );
         let entry = hours_files.entry(hour_key).or_default();
-        entry.push(FileKey {
-            key: file_name,
-            meta: FileMeta {
-                index_size,
-                ..Default::default()
-            },
-            deleted: true,
-            segment_ids: None,
-        });
+        file.deleted = true;
+        entry.push(file);
     }
 
     // write file list to storage
-    write_file_list(org_id, hours_files).await?;
-
-    // update stream stats
-    if stream_stats.doc_num != 0 {
-        infra_file_list::set_stream_stats(
-            org_id,
-            &[(
-                format!("{org_id}/{stream_type}/{stream_name}"),
-                stream_stats,
-            )],
-        )
-        .await?;
-    }
+    write_file_list(org_id, &hours_files).await?;
 
     Ok(())
 }
 
+// write file list to db, all the files should be deleted
 async fn write_file_list(
     org_id: &str,
-    hours_files: HashMap<String, Vec<FileKey>>,
+    hours_files: &HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
-    for (_key, events) in hours_files {
-        let put_items = events
-            .iter()
-            .filter(|v| !v.deleted)
-            .map(|v| v.to_owned())
-            .collect::<Vec<_>>();
-        let del_items = events
-            .iter()
-            .filter(|v| v.deleted)
-            .map(|v| FileListDeleted {
-                file: v.key.clone(),
-                index_file: v.meta.index_size > 0,
-                flattened: v.meta.flattened,
-            })
-            .collect::<Vec<_>>();
-        // set to external db
-        // retry 5 times
+    let cfg = get_config();
+    for events in hours_files.values() {
+        // set to db, retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
-            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
-            {
-                log::error!(
-                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
-                    e
-                );
+            // only store the file_list into history, don't delete files
+            if cfg.compact.data_retention_history {
+                if let Err(e) = infra_file_list::batch_add_history(events).await {
+                    log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
+                    return Err(e.into());
+                }
+            }
+            // delete from file_list table
+            if let Err(e) = infra_file_list::batch_process(events).await {
+                log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
-            if let Err(e) = infra_file_list::batch_add(&put_items).await {
-                log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-            if !del_items.is_empty() {
-                let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-                if let Err(e) = infra_file_list::batch_remove(&del_files).await {
+            // store to file_list_deleted table, pending delete
+            if !cfg.compact.data_retention_history {
+                let del_items = events
+                    .iter()
+                    .map(|v| FileListDeleted {
+                        account: v.account.clone(),
+                        file: v.key.clone(),
+                        index_file: v.meta.index_size > 0,
+                        flattened: v.meta.flattened,
+                    })
+                    .collect::<Vec<_>>();
+                if let Err(e) =
+                    infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
+                {
                     log::error!(
-                        "[COMPACT] batch_delete to external db failed, retrying: {}",
+                        "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
                         e
                     );
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -570,9 +521,7 @@ async fn write_file_list(
             break;
         }
         if !success {
-            return Err(anyhow::anyhow!(
-                "[COMPACT] batch_write to external db failed"
-            ));
+            return Err(anyhow::anyhow!("[COMPACTOR] batch_write to db failed"));
         }
     }
     Ok(())
@@ -588,64 +537,6 @@ fn generate_local_dirs(
     let cfg = get_config();
     let mut dirs_to_delete = Vec::new();
     while date_start <= date_end {
-        // Handle yearly chunks
-        if date_start.month() == 1
-            && date_start.day() == 1
-            && (date_start + Duration::days(365)).year() <= date_end.year()
-        {
-            // stream data
-            let year_dir = format!(
-                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y")
-            );
-            let year_path = std::path::Path::new(&year_dir);
-            if year_path.exists() {
-                dirs_to_delete.push(year_path.to_path_buf());
-            }
-            // index data
-            let year_dir = format!(
-                "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y")
-            );
-            let year_path = std::path::Path::new(&year_dir);
-            if year_path.exists() {
-                dirs_to_delete.push(year_path.to_path_buf());
-            }
-            date_start += Duration::days(365);
-            continue;
-        }
-
-        // Handle monthly chunks
-        if date_start.day() == 1 && (date_start + Duration::days(30)).month() != date_start.month()
-        {
-            // stream data
-            let month_dir = format!(
-                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y/%m")
-            );
-            let month_path = std::path::Path::new(&month_dir);
-            if month_path.exists() {
-                dirs_to_delete.push(month_path.to_path_buf());
-            }
-            // index data
-            let month_dir = format!(
-                "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y/%m")
-            );
-            let month_path = std::path::Path::new(&month_dir);
-            if month_path.exists() {
-                dirs_to_delete.push(month_path.to_path_buf());
-            }
-            date_start += Duration::days(30); // Move to the next month
-            continue;
-        }
-
-        // Handle leftover day ranges
-        // stream data
         let day_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}/{}",
             cfg.common.data_stream_dir,

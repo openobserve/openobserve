@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -64,6 +64,9 @@ fn main() -> Result<()> {
                 "proto/cluster/ingest.proto",
                 "proto/cluster/querycache.proto",
                 "proto/cluster/plan.proto",
+                "proto/cluster/node.proto",
+                "proto/cluster/cluster_info.proto",
+                "proto/cluster/stream.proto",
             ],
             &["proto"],
         )

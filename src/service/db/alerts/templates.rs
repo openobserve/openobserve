@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,44 @@
 
 use std::sync::Arc;
 
-use config::{meta::alerts::templates::Template, utils::json};
+use config::meta::destinations::{Module, Template};
+use infra::table;
 use itertools::Itertools;
 
 use crate::{
-    common::{infra::config::ALERTS_TEMPLATES, meta::organization::DEFAULT_ORG},
+    common::{
+        infra::config::{ALERTS_TEMPLATES, DESTINATIONS},
+        meta::organization::DEFAULT_ORG,
+    },
     service::db,
 };
 
-pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
+// db cache watcher prefix
+const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
+
+#[derive(Debug, thiserror::Error)]
+pub enum TemplateError {
+    #[error("InfraError# {0}")]
+    InfraError(#[from] infra::errors::Error),
+    #[error("Template name cannot be empty")]
+    EmptyName,
+    #[error(
+        "Template name cannot contain ':', '#', '?', '&', '%', '/', quotes and space characters"
+    )]
+    InvalidName,
+    #[error("Email Template cannot have empty title")]
+    EmptyTitle,
+    #[error("Template body cannot be empty")]
+    EmptyBody,
+    #[error("Template with the same name already exists")]
+    AlreadyExists,
+    #[error("Template is in use for destination {0}")]
+    DeleteWithDestination(String),
+    #[error("Template not found")]
+    NotFound,
+}
+
+pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     let map_key = format!("{org_id}/{name}");
     if let Some(v) = ALERTS_TEMPLATES.get(&map_key) {
         return Ok(v.value().clone());
@@ -33,60 +62,100 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
         return Ok(v.value().clone());
     }
 
-    let key = format!("/templates/{org_id}/{name}");
-    if let Ok(val) = db::get(&key).await {
-        return Ok(json::from_slice(&val).unwrap());
+    if let Some(template) = table::templates::get(org_id, name).await? {
+        return Ok(template);
     }
-    let key = format!("/templates/{DEFAULT_ORG}/{name}");
-    Ok(json::from_slice(&db::get(&key).await?).unwrap())
+    table::templates::get(DEFAULT_ORG, name)
+        .await?
+        .ok_or(TemplateError::NotFound)
 }
 
-pub async fn set(org_id: &str, template: &mut Template) -> Result<(), anyhow::Error> {
-    template.is_default = Some(org_id == DEFAULT_ORG);
-    let key = format!("/templates/{org_id}/{}", template.name);
-    Ok(db::put(
-        &key,
-        json::to_vec(template).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await?)
+pub async fn set(template: Template) -> Result<Template, TemplateError> {
+    let saved = table::templates::put(template).await?;
+
+    // trigger watch event to update in-memory cache
+    let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name);
+    // in-cluster
+    infra::cluster_coordinator::destinations::emit_put_event(&event_key).await?;
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
+            &event_key,
+            saved.clone(),
+        )
+        .await
+        {
+            log::error!(
+                "[Template] error triggering super cluster event to add template to cache: {e}"
+            );
+        }
+    }
+
+    Ok(saved)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let key = format!("/templates/{org_id}/{name}");
-    Ok(db::delete(&key, false, db::NEED_WATCH, None).await?)
+pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
+    for dest in DESTINATIONS.iter() {
+        let d = dest.value();
+        if (dest.key().starts_with(org_id) || dest.key().starts_with(DEFAULT_ORG))
+            && matches!(&d.module, Module::Alert { template, .. } if template.eq(name))
+        {
+            return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
+        }
+    }
+    let event_key = match table::templates::get(org_id, name).await? {
+        None => return Err(TemplateError::NotFound),
+        Some(temp) => format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", temp.org_id, temp.name),
+    };
+
+    table::templates::delete(org_id, name).await?;
+
+    // trigger watch event to update in-memory cache
+    // in-cluster
+    infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_delete(
+            &event_key, org_id, name,
+        )
+        .await
+        {
+            log::error!(
+                "[Template] error triggering super cluster event to remove template from cache: {e}"
+            );
+        }
+    }
+
+    Ok(())
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
     let cache = ALERTS_TEMPLATES.clone();
     if !cache.is_empty() {
         return Ok(cache
-            .iter()
-            .filter_map(|template| {
-                let k = template.key();
+            .into_iter()
+            .filter_map(|(k, template)| {
                 (k.starts_with(&format!("{org_id}/")) || k.starts_with(&format!("{DEFAULT_ORG}/")))
-                    .then(|| template.value().clone())
+                    .then_some(template)
             })
             .sorted_by(|a, b| a.name.cmp(&b.name))
             .collect());
     }
 
-    let key = format!("/templates/{org_id}/");
-    let ret = db::list_values(key.as_str()).await?;
-    let mut items = Vec::new();
-    for item_value in ret {
-        let json_val: Template = json::from_slice(&item_value).unwrap();
-        items.push(json_val);
-    }
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(items)
+    Ok(table::templates::list(org_id).await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/templates/";
     let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
+    let mut events = cluster_coordinator.watch(TEMPLATE_WATCHER_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alert templates");
     loop {
@@ -99,28 +168,29 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Template = if config::get_config().common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
-                        },
+                let (org_id, name) =
+                    match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, &ev.key) {
+                        Ok(parsed) => parsed,
                         Err(e) => {
-                            log::error!("Error getting value: {}", e);
+                            log::error!("{e}");
                             continue;
                         }
+                    };
+                let item_value: Template = match table::templates::get(org_id, name).await {
+                    Ok(Some(val)) => val,
+                    Ok(None) => {
+                        log::error!("Template not found in db");
+                        continue;
                     }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
+                    Err(e) => {
+                        log::error!("Error getting from db: {}", e);
+                        continue;
+                    }
                 };
-                ALERTS_TEMPLATES.insert(item_key.to_owned(), item_value);
+                ALERTS_TEMPLATES.insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
+                let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
                 ALERTS_TEMPLATES.remove(item_key);
             }
             db::Event::Empty => {}
@@ -130,13 +200,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = "/templates/";
-    let ret = db::list(key).await?;
-    for (item_key, item_value) in ret {
-        let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Template = json::from_slice(&item_value).unwrap();
-        ALERTS_TEMPLATES.insert(item_key.to_owned(), json_val);
+    let all_temps = table::templates::list_all().await?;
+    for (org, temp) in all_temps {
+        let cache_key = format!("{}/{}", org, temp.name);
+        ALERTS_TEMPLATES.insert(cache_key, temp);
     }
-    log::info!("Alert templates Cached");
+    log::info!("{} Templates Cached", ALERTS_TEMPLATES.len());
     Ok(())
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,7 @@ pub fn record_batches_to_json_rows(
     if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(Vec::new());
     }
+
     let json_buf = Vec::with_capacity(
         batches
             .iter()
@@ -35,6 +36,22 @@ pub fn record_batches_to_json_rows(
     writer.write_batches(batches)?;
     writer.finish()?;
     let json_data = writer.into_inner();
-    let ret = serde_json::from_reader(json_data.as_slice())?;
+    let ret: Vec<JsonMap<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+
+    // This effects other function, comment it for now
+    //
+    // Hack for uint64, because Chrome V8 does not support uint64
+    // for field in schema.fields() {
+    //     if field.data_type() == &DataType::UInt64 {
+    //         for row in ret.iter_mut() {
+    //             if let Some(val) = row.get_mut(field.name()) {
+    //                 if val.is_u64() {
+    //                     *val = Value::String(val.to_string());
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
     Ok(ret)
 }

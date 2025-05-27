@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,13 +16,13 @@
 use datafusion::error::Result;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 
-use crate::service::promql::{value::Value, Engine};
+use crate::service::promql::{Engine, value::Value};
 
 pub async fn topk(
     ctx: &mut Engine,
     param: Box<PromExpr>,
     modifier: &Option<LabelModifier>,
-    data: &Value,
+    data: Value,
 ) -> Result<Value> {
     super::eval_top(ctx, param, data, modifier, false).await
 }

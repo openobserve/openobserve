@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,9 +16,10 @@
 use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
 use actix_web::{
+    Error as ActixErr, HttpMessage,
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
-    web, Error as ActixErr, HttpMessage,
+    web,
 };
 use actix_web_lab::middleware::Next;
 use maxminddb::geoip2::city::Location;
@@ -27,8 +28,8 @@ use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 
 use crate::{
-    common::{infra::config::MAXMIND_DB_CLIENT, utils::http::parse_ip_addr},
     USER_AGENT_REGEX_FILE,
+    common::{infra::config::MAXMIND_DB_CLIENT, utils::http::parse_ip_addr},
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

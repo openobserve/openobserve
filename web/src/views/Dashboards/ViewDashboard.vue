@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         }`"
       >
-        <div class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0">
+        <div
+          class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0"
+        >
           <div class="tw-flex tw-flex-1 tw-overflow-hidden">
             <q-btn
               v-if="!isFullscreen"
@@ -50,7 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
             </span>
-            <q-spinner-dots v-if="!store.state.organizationData.folders.length" color="primary" size="2em" />
+            <q-spinner-dots
+              v-if="!store.state.organizationData.folders.length"
+              color="primary"
+              size="2em"
+            />
             <q-icon
               class="q-table__title tw-text-gray-400 tw-mt-1"
               name="chevron_right"
@@ -107,6 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AutoRefreshInterval
               v-model="refreshInterval"
               trigger
+              :min-refresh-interval="
+                store.state?.zoConfig?.min_auto_refresh_interval || 5
+              "
               @trigger="refreshData"
               class="dashboard-icons hideOnPrintMode"
               size="sm"
@@ -218,12 +227,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dashboard.scheduledDashboards") }}
               </q-tooltip></q-btn
             >
+            <q-btn
+              v-if="!isFullscreen"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="code"
+              data-test="dashboard-json-edit-btn"
+              @click="openJsonEditor"
+            >
+              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+            </q-btn>
           </div>
         </div>
         <q-separator></q-separator>
       </div>
 
       <RenderDashboardCharts
+        :key="currentDashboardData.data?.dashboardId"
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
@@ -284,6 +306,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :tabs="currentDashboardData?.data?.tabs || []"
         />
       </q-dialog>
+
+      <q-dialog
+        v-model="showJsonEditorDialog"
+        position="right"
+        full-height
+        maximized
+        :persistent="true"
+      >
+        <DashboardJsonEditor
+          :dashboard-data="currentDashboardData.data"
+          :save-json-dashboard="saveJsonDashboard"
+          @close="showJsonEditorDialog = false"
+        />
+      </q-dialog>
     </div>
   </q-page>
 </template>
@@ -332,6 +368,8 @@ import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import DashboardJsonEditor from "./DashboardJsonEditor.vue";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -348,6 +386,7 @@ export default defineComponent({
     RenderDashboardCharts,
     ScheduledDashboards,
     PanelLayoutSettings,
+    DashboardJsonEditor,
   },
   setup() {
     const { t } = useI18n();
@@ -511,8 +550,7 @@ export default defineComponent({
     };
 
     const isVariablesChanged = computed(() => {
-          
-      return !isEqual(variablesData, refreshedVariablesData)
+      return !isEqual(variablesData, refreshedVariablesData);
     });
     // ======= [START] default variable values
 
@@ -547,7 +585,18 @@ export default defineComponent({
                   `;
     };
 
-    const loadDashboard = async () => {
+    const loadDashboard = async (onlyIfRequired = false) => {
+      // check if drilldown or soft-refresh request
+      if (onlyIfRequired) {
+        // if current dashboard id and tab is same,  skip loading
+        if (
+          currentDashboardData?.data?.dashboardId === route.query.dashboard &&
+          // check for tab
+          selectedTabId.value === route.query.tab
+        ) {
+          return;
+        }
+      }
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
@@ -655,7 +704,7 @@ export default defineComponent({
 
       window.dispatchEvent(new Event("resize"));
 
-      await renderDashboardChartsRef.value?.saveDashboard();
+      await renderDashboardChartsRef?.value?.saveDashboardData?.execute?.();
     };
 
     // when the date changes from the picker, update the current time object for the dashboard
@@ -762,7 +811,16 @@ export default defineComponent({
       const params = route.query;
 
       if (params.refresh) {
-        refreshInterval.value = parseDuration(params.refresh);
+        const refreshInSecs = parseDuration(params.refresh);
+        if (store.state?.zoConfig?.min_auto_refresh_interval) {
+          if (
+            refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval
+          ) {
+            refreshInterval.value = 0;
+          } else {
+            refreshInterval.value = refreshInSecs;
+          }
+        }
       }
 
       // check if timezone query params exist
@@ -988,6 +1046,9 @@ export default defineComponent({
     const currentTimeObjPerPanel = ref({});
 
     const refreshPanelRequest = (panelId) => {
+      // Set the panel ID to be refreshed
+      panelIdToBeRefreshed.value = panelId;
+
       // when the date changes from the picker, update the current time object for the dashboard
       if (selectedDate.value && dateTimePicker.value) {
         const date = dateTimePicker.value?.getConsumableDateTime();
@@ -1003,6 +1064,41 @@ export default defineComponent({
         setTimeString();
       }
     };
+
+    // Add these new refs and methods
+    const showJsonEditorDialog = ref(false);
+
+    const openJsonEditor = () => {
+      showJsonEditorDialog.value = true;
+    };
+
+    const saveJsonDashboard = useLoading(async (updatedJson: any) => {
+      try {
+        // Update the dashboard data
+        currentDashboardData.data = JSON.parse(JSON.stringify(updatedJson));
+
+        // Add a wait time for state update
+        await nextTick();
+
+        // Save changes using existing renderDashboardChartsRef
+        if (renderDashboardChartsRef?.value?.saveDashboardData?.execute) {
+          await renderDashboardChartsRef.value.saveDashboardData.execute();
+
+          // Reload the dashboard to reflect changes
+          await loadDashboard();
+        } else {
+          showErrorNotification(
+            "Failed to update dashboard JSON: Save method not available",
+          );
+        }
+      } catch (error) {
+        showErrorNotification(
+          error?.message || "Failed to save dashboard changes",
+        );
+      } finally {
+        showJsonEditorDialog.value = false;
+      }
+    });
 
     return {
       currentDashboardData,
@@ -1063,6 +1159,9 @@ export default defineComponent({
       savePanelLayout,
       renderDashboardChartsRef,
       folderNameFromFolderId,
+      showJsonEditorDialog,
+      openJsonEditor,
+      saveJsonDashboard,
     };
   },
 });

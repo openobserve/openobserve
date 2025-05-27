@@ -1,4 +1,4 @@
-<!-- Copyright 2024 OpenObserve Inc.
+<!-- Copyright 2025 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -67,9 +67,17 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    const url = new URL(store.state.API_ENDPOINT);
+
+    let ingestionURL: string = store.state.API_ENDPOINT;
+    if (
+      Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
+      store.state.zoConfig.ingestion_url !== ""
+    ) {
+      ingestionURL = store.state.zoConfig.ingestion_url;
+    }
+    const url = new URL(ingestionURL);
     endpoint.value = {
-      url: store.state.API_ENDPOINT,
+      url: ingestionURL,
       host: url.hostname,
       port: url.port || (url.protocol === "https:" ? "443" : "80"),
       protocol: url.protocol.replace(":", ""),

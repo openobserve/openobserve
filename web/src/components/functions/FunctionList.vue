@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
+        dense
       >
         <template #no-data>
           <NoData />
@@ -243,60 +244,6 @@ export default defineComponent({
     const confirmForceDelete = ref<boolean>(false);
     const { searchObj } = useLogs();
     const pipelineList = ref([
-      "Pipeline Alpha",
-      "Pipeline Beta",
-      "Pipeline Gamma",
-      "Pipeline Delta",
-      "Pipeline Epsilon",
-      "Pipeline Zeta",
-      "Pipeline Eta",
-      "Pipeline Theta",
-      "Pipeline Iota",
-      "Pipeline Kappa",
-      "Pipeline Lambda",
-      "Pipeline Mu",
-      "Pipeline Nu",
-      "Pipeline Xi",
-      "Pipeline Omicron",
-      "Pipeline Pi",
-      "Pipeline Rho",
-      "Pipeline Sigma",
-      "Pipeline Tau",
-      "Pipeline Upsilon",
-      "Pipeline Phi",
-      "Pipeline Chi",
-      "Pipeline Psi",
-      "Pipeline Omega",
-      "Pipeline One",
-      "Pipeline Two",
-      "Pipeline Three",
-      "Pipeline Four",
-      "Pipeline Five",
-      "Pipeline Six",
-      "Pipeline Seven",
-      "Pipeline Eight",
-      "Pipeline Nine",
-      "Pipeline Ten",
-      "Pipeline Eleven",
-      "Pipeline Twelve",
-      "Pipeline Thirteen",
-      "Pipeline Fourteen",
-      "Pipeline Fifteen",
-      "Pipeline Sixteen",
-      "Pipeline Seventeen",
-      "Pipeline Eighteen",
-      "Pipeline Nineteen",
-      "Pipeline Twenty",
-      "Pipeline Twenty-One",
-      "Pipeline Twenty-Two",
-      "Pipeline Twenty-Three",
-      "Pipeline Twenty-Four",
-      "Pipeline Twenty-Five",
-      "Pipeline Twenty-Six",
-      "Pipeline Twenty-Seven",
-      "Pipeline Twenty-Eight",
-      "Pipeline Twenty-Nine",
-      "Pipeline Thirty",
     ]);
     const selectedPipeline = ref("");
     const columns: any = ref<QTableProps["columns"]>([
@@ -328,6 +275,7 @@ export default defineComponent({
         query: {
           id: pipeline.value,
           name: pipeline.label,
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       }).href;
 

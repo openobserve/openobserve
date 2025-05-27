@@ -2,7 +2,8 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 const Settings = () => import("@/components/settings/index.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const DestinationList = () => import("@/components/alerts/DestinationList.vue");
+const AlertsDestinationList = () =>
+  import("@/components/alerts/AlertsDestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -35,9 +36,9 @@ const useManagementRoutes = () => {
           },
         },
         {
-          path: "destinations",
+          path: "alert_destinations",
           name: "alertDestinations",
-          component: DestinationList,
+          component: AlertsDestinationList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -60,6 +61,37 @@ const useManagementRoutes = () => {
           path: "query_management",
           name: "query_management",
           component: () => import("@/components/queries/RunningQueries.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "cipher_keys",
+          name: "cipherKeys",
+          component: () => import("@/components/settings/CipherKeys.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "pipeline_destinations",
+          name: "pipelineDestinations",
+          component: () =>
+            import("@/components/alerts/PipelinesDestinationList.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "nodes",
+          name: "nodes",
+          component: () => import("@/components/settings/Nodes.vue"),
           meta: {
             keepAlive: true,
           },

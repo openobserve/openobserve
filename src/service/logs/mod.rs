@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    get_config,
+    DISTINCT_FIELDS, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -32,19 +32,20 @@ use config::{
     },
     metrics,
     utils::{
-        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
+        json::{Map, Value, estimate_json_bytes, get_string_value, pickup_string_value},
         schema_ext::SchemaExt,
+        time::now_micros,
     },
-    DISTINCT_FIELDS,
 };
-use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 
 use super::{
     db::organization::get_org_setting,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    ingestion::{TriggerAlertData, evaluate_trigger, write_file},
     metadata::{
-        distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
-        write, MetadataItem, MetadataType,
+        MetadataItem, MetadataType,
+        distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
+        write,
     },
     schema::stream_schema_exists,
 };
@@ -58,8 +59,7 @@ use crate::{
 
 pub mod bulk;
 pub mod ingest;
-pub mod otlp_grpc;
-pub mod otlp_http;
+pub mod otlp;
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
@@ -276,22 +276,23 @@ async fn write_logs(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
-        .await
-        .unwrap_or_default();
+    let schema = match stream_schema_map.get(stream_name) {
+        Some(schema) => schema.schema().clone(),
+        None => {
+            return Err(anyhow::anyhow!(
+                "Schema not found for stream: {}",
+                stream_name
+            ));
+        }
+    };
+    let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            org_id,
-            &StreamType::Logs,
-            stream_name,
-        )
-        .await;
-        partition_keys = partition_det.partition_keys;
+        partition_keys = stream_settings.partition_keys;
         partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Logs);
+            unwrap_partition_time_level(stream_settings.partition_time_level, StreamType::Logs);
     }
 
     // Start get stream alerts
@@ -352,26 +353,25 @@ async fn write_logs(
 
         // validate record
         if let Some(delta) = schema_evolution.types_delta.as_ref() {
-            let ret_val =
-                if !cfg.common.widening_schema_evolution || !schema_evolution.is_schema_changed {
-                    cast_to_type(&mut record_val, delta.to_owned())
+            let ret_val = if !schema_evolution.is_schema_changed {
+                cast_to_type(&mut record_val, delta.to_owned())
+            } else {
+                let local_delta = delta
+                    .iter()
+                    .filter_map(|x| {
+                        if x.metadata().contains_key("zo_cast") {
+                            Some(x.to_owned())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                if !local_delta.is_empty() {
+                    cast_to_type(&mut record_val, local_delta)
                 } else {
-                    let local_delta = delta
-                        .iter()
-                        .filter_map(|x| {
-                            if x.metadata().contains_key("zo_cast") {
-                                Some(x.to_owned())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    if !local_delta.is_empty() {
-                        cast_to_type(&mut record_val, local_delta)
-                    } else {
-                        Ok(())
-                    }
-                };
+                    Ok(())
+                }
+            };
             if let Err(e) = ret_val {
                 // update status(fail)
                 match status {
@@ -381,7 +381,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -393,7 +393,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -417,25 +417,29 @@ async fn write_logs(
         // start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
-                let end_time = chrono::Utc::now().timestamp_micros();
+                let end_time = now_micros();
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
                         org_id,
                         StreamType::Logs,
                         alert.stream_name,
-                        alert.name
+                        alert.get_unique_key()
                     );
                     // For one alert, only one trigger per request
                     // Trigger for this alert is already added.
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) =
-                        alert.evaluate(Some(&record_val), (None, end_time)).await
+                    match alert
+                        .evaluate(Some(&record_val), (None, end_time), None)
+                        .await
                     {
-                        triggers.push((alert.clone(), v));
-                        evaluated_alerts.insert(key);
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -504,20 +508,15 @@ async fn write_logs(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(
-        thread_id,
-        org_id,
-        &StreamType::Logs.to_string(),
-        stream_name,
-    )
-    .await;
+    let writer =
+        ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,
         write_buf,
         !cfg.common.wal_fsync_disabled,
     )
-    .await;
+    .await?;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

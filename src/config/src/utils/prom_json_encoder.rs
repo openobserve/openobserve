@@ -6,10 +6,10 @@
 use std::io::{self, Write};
 
 use prometheus::{
-    proto::{self, MetricFamily, MetricType},
     Encoder, Result,
+    proto::{self, MetricFamily, MetricType},
 };
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 /// The text format of metric family.
 pub const TEXT_FORMAT: &str = "text/plain; version=0.0.4";
@@ -104,7 +104,7 @@ impl JsonEncoder {
                             cumulative_counts.push(json!(h.get_sample_count()));
                         }
                         // individual buckets
-                        let timestamp = chrono::Utc::now().timestamp_micros();
+                        let timestamp = crate::utils::time::now_micros();
                         for (bound, value) in
                             upper_bounds.into_iter().zip(cumulative_counts.into_iter())
                         {
@@ -149,7 +149,7 @@ impl JsonEncoder {
                         }
 
                         // individual buckets
-                        let timestamp = chrono::Utc::now().timestamp_micros();
+                        let timestamp = crate::utils::time::now_micros();
                         for (quantile, value) in quantiles.into_iter().zip(values.into_iter()) {
                             let mut row = Map::new();
                             row.insert("_timestamp".to_string(), json!(timestamp));

@@ -5,18 +5,18 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "dashboards")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i64,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: String,
     pub dashboard_id: String,
-    pub folder_id: i64,
+    pub folder_id: String,
     pub owner: String,
     pub role: Option<String>,
     pub title: String,
-    #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub data: Json,
     pub version: i32,
     pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -29,11 +29,19 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     Folders,
+    #[sea_orm(has_many = "super::timed_annotations::Entity")]
+    TimedAnnotations,
 }
 
 impl Related<super::folders::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Folders.def()
+    }
+}
+
+impl Related<super::timed_annotations::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TimedAnnotations.def()
     }
 }
 

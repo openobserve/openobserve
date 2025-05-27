@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,8 @@
 
 use chrono::DateTime;
 use datafusion::{
-    catalog_common::resolve_table_references,
-    sql::{parser::DFParser, TableReference},
+    catalog::resolve_table_references,
+    sql::{TableReference, parser::DFParser},
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ use sqlparser::{
 use utoipa::ToSchema;
 
 use super::stream::StreamType;
-use crate::get_config;
+use crate::{TIMESTAMP_COL_NAME, get_config};
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
@@ -50,7 +50,7 @@ pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
     let dialect = &PostgreSqlDialect {};
     let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
         .pop_back()
-        .unwrap();
+        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {
@@ -63,7 +63,7 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
     let dialect = &PostgreSqlDialect {};
     let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
         .pop_back()
-        .unwrap();
+        .ok_or(anyhow::anyhow!("Failed to parse sql"))?;
     let (table_refs, _) = resolve_table_references(&statement, true)?;
     let mut tables = Vec::new();
     for table in table_refs {
@@ -149,6 +149,7 @@ pub struct Limit<'a>(pub &'a SqlExpr);
 pub struct Where<'a>(pub &'a Option<SqlExpr>);
 
 impl Sql {
+    #[deprecated(since = "0.14.5", note = "use service::search::Sql::new instead")]
     pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {
         if sql.is_empty() {
             return Err(anyhow::anyhow!("SQL is empty"));
@@ -392,12 +393,7 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
     fn try_from(selection: Timerange<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         if let Some(expr) = selection.0 {
-            parse_expr_for_field(
-                expr,
-                &SqlOperator::And,
-                &get_config().common.column_timestamp,
-                &mut fields,
-            )?
+            parse_expr_for_field(expr, &SqlOperator::And, TIMESTAMP_COL_NAME, &mut fields)?
         }
 
         let mut time_min = Vec::new();
@@ -566,6 +562,7 @@ fn parse_expr_for_field(
             expr,
             pattern,
             escape_char,
+            any: _,
         } => {
             parse_expr_like(negated, expr, pattern, escape_char, expr_op, field, fields).unwrap();
         }
@@ -628,10 +625,7 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
         return true;
     }
     let cfg = get_config();
-    if field == "*"
-        && s != cfg.common.column_all.as_str()
-        && s != cfg.common.column_timestamp.as_str()
-    {
+    if field == "*" && s != cfg.common.column_all.as_str() && s != TIMESTAMP_COL_NAME {
         return true;
     }
 
@@ -793,6 +787,7 @@ fn parse_expr_function(
                 }
                 _ => return Err(anyhow::anyhow!("We only support String at the moment")),
             },
+            _ => {}
         }
     }
 
@@ -850,6 +845,7 @@ fn parse_expr_fun_time_range(
                     }
                     _ => return Err(anyhow::anyhow!("We only support String at the moment")),
                 },
+                _ => unreachable!(),
             };
             vals.push(val);
         }
@@ -1075,6 +1071,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_new() {
         let table = "index.1.2022";
         let sql = format!(
@@ -1090,6 +1087,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_parse() {
         let sqls = [
             ("select * from table1", true),
@@ -1129,6 +1127,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_parse_timerange() {
         let samples = [
             ("select * from tbl where ts in (1, 2, 3)", (0,0)),
@@ -1157,6 +1156,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_sql_parse_fields() {
         let samples = [
             ("select * FROM tbl", vec![]),
@@ -1164,9 +1164,10 @@ mod tests {
             ("select a, avg(b) FROM tbl where c=1", vec!["a", "b", "c"]),
             ("select a, a + b FROM tbl where c=1", vec!["a", "b", "c"]),
             ("select a, b + 1 FROM tbl where c=1", vec!["a", "b", "c"]),
-            ("select a, (a + b) as d FROM tbl where c=1", vec![
-                "a", "b", "c",
-            ]),
+            (
+                "select a, (a + b) as d FROM tbl where c=1",
+                vec!["a", "b", "c"],
+            ),
             ("select a, COALESCE(b, c) FROM tbl", vec!["a", "b", "c"]),
             ("select a, COALESCE(b, 'c') FROM tbl", vec!["a", "b"]),
             ("select a, COALESCE(b, \"c\") FROM tbl", vec!["a", "b", "c"]),
@@ -1188,13 +1189,15 @@ mod tests {
             ("SELECT a FROM tbl WHERE b IS UNKNOWN", vec!["a", "b"]),
             ("SELECT a FROM tbl WHERE b IS NOT UNKNOWN", vec!["a", "b"]),
             ("SELECT a FROM tbl WHERE b IN (1, 2, 3)", vec!["a", "b"]),
-            ("SELECT a FROM tbl WHERE b BETWEEN 10 AND 20", vec![
-                "a", "b",
-            ]),
+            (
+                "SELECT a FROM tbl WHERE b BETWEEN 10 AND 20",
+                vec!["a", "b"],
+            ),
             ("SELECT a FROM tbl WHERE b LIKE '%pattern%'", vec!["a", "b"]),
-            ("SELECT a FROM tbl WHERE b ILIKE '%pattern%'", vec![
-                "a", "b",
-            ]),
+            (
+                "SELECT a FROM tbl WHERE b ILIKE '%pattern%'",
+                vec!["a", "b"],
+            ),
             ("SELECT CAST(a AS INTEGER) FROM tbl", vec!["a"]),
             ("SELECT TRY_CAST(a AS INTEGER) FROM tbl", vec!["a"]),
             ("SELECT a AT TIME ZONE 'UTC' FROM tbl", vec!["a"]),
@@ -1228,5 +1231,28 @@ mod tests {
         let sql = "select * from \"log\".default";
         let names = resolve_stream_names_with_type(sql).unwrap();
         println!("{:?}", names);
+    }
+
+    #[test]
+    fn test_resolve_stream_names_error() {
+        let sql = "";
+        let names = resolve_stream_names_with_type(sql);
+        assert!(names.is_err());
+        assert!(
+            names
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("Failed to parse sql")
+        );
+        let names = resolve_stream_names(sql);
+        assert!(names.is_err());
+        assert!(
+            names
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("Failed to parse sql")
+        );
     }
 }

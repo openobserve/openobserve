@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
 use std::{
     cmp::min,
     sync::{
-        atomic::{AtomicU8, Ordering},
         Arc,
+        atomic::{AtomicU8, Ordering},
     },
 };
 
@@ -29,7 +29,7 @@ use etcd_client::{
 };
 use hashbrown::HashMap;
 use tokio::{
-    sync::{mpsc, OnceCell},
+    sync::{OnceCell, mpsc},
     task::JoinHandle,
     time,
 };
@@ -258,7 +258,7 @@ impl super::Db for Etcd {
                 let item_key = item_key.strip_prefix(&self.prefix).unwrap();
                 result.insert(item_key.to_string(), Bytes::from(kv.value().to_vec()));
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;
@@ -303,7 +303,7 @@ impl super::Db for Etcd {
                 let item_key = item_key.strip_prefix(&self.prefix).unwrap();
                 result.push(item_key.to_string());
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;
@@ -347,7 +347,7 @@ impl super::Db for Etcd {
                 }
                 result.push(Bytes::from(kv.value().to_vec()));
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;
@@ -401,7 +401,7 @@ impl super::Db for Etcd {
                 }
                 let start_dt = item_key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();
@@ -409,7 +409,7 @@ impl super::Db for Etcd {
                     result.push((start_dt, Bytes::from(kv.value().to_vec())));
                 }
             }
-            tokio::task::yield_now().await; // yield to other tasks
+            tokio::task::coop::consume_budget().await;
 
             if !have_next {
                 break;
@@ -564,11 +564,12 @@ pub async fn keep_alive_connection() -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn keep_alive_lease_id<F>(id: i64, ttl: i64, stopper: F) -> Result<()>
 where
     F: Fn() -> bool,
 {
-    let mut ttl_keep_alive = min(10, (ttl / 2) as u64);
+    let mut ttl_keep_alive = min(5, (ttl / 2) as u64);
     loop {
         if stopper() {
             break;

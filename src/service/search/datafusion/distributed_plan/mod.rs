@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,8 +17,8 @@ use std::sync::Arc;
 
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
         Result,
+        tree_node::{Transformed, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     physical_plan::ExecutionPlan,
 };
@@ -55,6 +55,39 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecVisitor {
 
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if node.name() == "NewEmptyExec" {
+            self.data = Some(node.clone());
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
+    }
+}
+
+pub struct EmptyExecVisitor {
+    data: Option<Arc<dyn ExecutionPlan>>,
+}
+
+impl EmptyExecVisitor {
+    pub fn new() -> Self {
+        Self { data: None }
+    }
+
+    pub fn get_data(&self) -> Option<&Arc<dyn ExecutionPlan>> {
+        self.data.as_ref()
+    }
+}
+
+impl Default for EmptyExecVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for EmptyExecVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "EmptyExec" {
             self.data = Some(node.clone());
             Ok(TreeNodeRecursion::Stop)
         } else {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::{
-    pipeline::{components::PipelineSource, Pipeline, PipelineList},
+    pipeline::{Pipeline, PipelineList, components::PipelineSource},
     search::SearchEventType,
     stream::ListStreamParams,
 };
@@ -45,7 +45,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
     }
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
+    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         derived_stream.org_id = pipeline.org.clone();
         // save derived_stream to triggers table
@@ -53,6 +53,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
+            true,
         )
         .await
         {
@@ -60,7 +61,10 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
         }
     }
 
-    pipeline::set(&pipeline).await?;
+    if let Err(e) = pipeline::set(&pipeline).await {
+        log::error!("Failed to save pipeline: {:?}", e);
+        return Err(e);
+    }
     set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
     Ok(())
 }
@@ -100,7 +104,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
             // scheduled: delete prev. trigger
             PipelineSource::Scheduled(derived_stream) => {
                 if let Err(error) = super::alerts::derived_streams::delete(
-                    derived_stream,
+                    &derived_stream,
                     &existing_pipeline.name,
                     &existing_pipeline.id,
                 )
@@ -119,12 +123,13 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     pipeline.version += 1;
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
+    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if let Err(e) = super::alerts::derived_streams::save(
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
+            true,
         )
         .await
         {
@@ -176,6 +181,25 @@ pub async fn enable_pipeline(
     };
 
     pipeline.enabled = value;
+    // add or remove trigger if it's a scheduled pipeline
+    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
+        derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
+        if pipeline.enabled {
+            super::alerts::derived_streams::save(
+                derived_stream.clone(),
+                &pipeline.name,
+                pipeline_id,
+                false,
+            )
+            .await
+            .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
+        } else {
+            super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
+                .await
+                .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+        }
+    }
+
     pipeline::update(&pipeline, None).await?;
     Ok(())
 }
@@ -189,7 +213,7 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     // delete DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source {
         if let Err(error) = super::alerts::derived_streams::delete(
-            derived_stream,
+            &derived_stream,
             &existing_pipeline.name,
             &existing_pipeline.id,
         )

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,18 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::atomic::{AtomicI64, Ordering};
-
 use crate::service::db;
 
-static LOCAL_OFFSET: AtomicI64 = AtomicI64::new(0);
-
 pub async fn get_offset() -> (i64, String) {
-    if !config::get_config().common.meta_store_external {
-        let offset = LOCAL_OFFSET.load(Ordering::Relaxed);
-        return (offset, String::from(""));
-    }
-
     let key = "/compact/stream_stats/offset";
     let value = match db::get(key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -41,11 +32,6 @@ pub async fn get_offset() -> (i64, String) {
 }
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
-    if !config::get_config().common.meta_store_external {
-        LOCAL_OFFSET.store(offset, Ordering::Release);
-        return Ok(());
-    }
-
     let key = "/compact/stream_stats/offset";
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)

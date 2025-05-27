@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,19 +15,19 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{extrapolated_rate, ExtrapolationKind, RangeValue, Value};
+use crate::service::promql::value::{ExtrapolationKind, RangeValue, Value, extrapolated_rate};
 
-pub(crate) fn delta(data: &Value) -> Result<Value> {
+pub(crate) fn delta(data: Value) -> Result<Value> {
     super::eval_idelta(data, "delta", exec, false)
 }
 
-fn exec(series: &RangeValue) -> Option<f64> {
-    let tw = series
+fn exec(data: RangeValue) -> Option<f64> {
+    let tw = data
         .time_window
         .as_ref()
         .expect("BUG: `delta` function requires time window");
     extrapolated_rate(
-        &series.samples,
+        &data.samples,
         tw.eval_ts,
         tw.range,
         tw.offset,

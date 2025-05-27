@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm_migration::prelude::*;
+
+use crate::table::migration::get_text_type;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -64,6 +66,7 @@ impl MigrationTrait for Migration {
 
 /// Statement to create the alerts table.
 fn create_alerts_table_statement() -> TableCreateStatement {
+    let text_type = get_text_type();
     Table::create()
         .table(Alerts::Table)
         .if_not_exists()
@@ -87,7 +90,7 @@ fn create_alerts_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
         .col(ColumnDef::new(Alerts::Destinations).json().not_null())
         .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
-        .col(ColumnDef::new(Alerts::RowTemplate).text().null())
+        .col(ColumnDef::new(Alerts::RowTemplate).custom(Alias::new(&text_type)).null())
         .col(ColumnDef::new(Alerts::Description).text().null())
         .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
         .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
@@ -98,15 +101,15 @@ fn create_alerts_table_statement() -> TableCreateStatement {
             ColumnDef::new(Alerts::QueryType).small_integer().not_null(),
         )
         .col(ColumnDef::new(Alerts::QueryConditions).json().null())
-        .col(ColumnDef::new(Alerts::QuerySql).text().null())
-        .col(ColumnDef::new(Alerts::QueryPromql).text().null())
+        .col(ColumnDef::new(Alerts::QuerySql).custom(Alias::new(&text_type)) .null())
+        .col(ColumnDef::new(Alerts::QueryPromql).custom(Alias::new(&text_type)).null())
         .col(
             ColumnDef::new(Alerts::QueryPromqlCondition)
                 .json()
                 .null(),
         )
         .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
-        .col(ColumnDef::new(Alerts::QueryVrlFunction).text().null())
+        .col(ColumnDef::new(Alerts::QueryVrlFunction).custom(Alias::new(&text_type)).null())
         .col(
             ColumnDef::new(Alerts::QuerySearchEventType).small_integer().null(),
         )

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,23 +14,25 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     io,
     ops::Range,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use config::TIMESTAMP_COL_NAME;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use tantivy::{
-    directory::{error::OpenReadError, Directory, FileHandle, OwnedBytes},
     HasLen,
+    directory::{Directory, FileHandle, OwnedBytes, error::OpenReadError},
 };
 
 use crate::service::search::tantivy::{
-    puffin::{reader::PuffinBytesReader, BlobMetadata},
+    puffin::{BlobMetadata, reader::PuffinBytesReader},
     puffin_directory::{
-        get_file_from_empty_puffin_dir_with_ext, EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID,
+        EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID, get_file_from_empty_puffin_dir_with_ext,
     },
 };
 
@@ -41,8 +43,8 @@ pub struct PuffinDirReader {
 }
 
 impl PuffinDirReader {
-    pub async fn from_path(source: object_store::ObjectMeta) -> io::Result<Self> {
-        let mut source = PuffinBytesReader::new(source);
+    pub async fn from_path(account: String, source: object_store::ObjectMeta) -> io::Result<Self> {
+        let mut source = PuffinBytesReader::new(account, source);
         let Some(metadata) = source.get_metadata().await.map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -211,10 +213,13 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
+    need_fast_field: bool,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
     let mut warm_up_terms_futures = Vec::new();
+    let mut warm_up_fast_fields_futures = Vec::new();
+    let mut warmed_segments = HashSet::new();
     for (field, terms) in terms_grouped_by_field {
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
@@ -231,6 +236,18 @@ pub async fn warm_up_terms(
                 warm_up_terms_futures
                     .push(async move { inv_idx_clone.warm_postings(term, *position_needed).await });
             }
+
+            // only warm up fast fields if needed
+            if need_fast_field {
+                // only warm up fast fields once per segment
+                let segment_id = segment_reader.segment_id();
+                if !warmed_segments.contains(&segment_id) {
+                    let fast_field_reader = segment_reader.fast_fields();
+                    warm_up_fast_fields_futures
+                        .push(async move { warm_up_fastfield(fast_field_reader).await });
+                    warmed_segments.insert(segment_id);
+                }
+            }
         }
     }
     if !warm_up_fields_futures.is_empty() {
@@ -242,5 +259,23 @@ pub async fn warm_up_terms(
     if !warm_up_terms_futures.is_empty() {
         try_join_all(warm_up_terms_futures).await?;
     }
+    if !warm_up_fast_fields_futures.is_empty() {
+        try_join_all(warm_up_fast_fields_futures).await?;
+    }
+    Ok(())
+}
+
+async fn warm_up_fastfield(
+    fast_field_reader: &tantivy::fastfield::FastFieldReaders,
+) -> anyhow::Result<()> {
+    let columns = fast_field_reader
+        .list_dynamic_column_handles(TIMESTAMP_COL_NAME)
+        .await?;
+    futures::future::try_join_all(
+        columns
+            .into_iter()
+            .map(|col| async move { col.file_slice().read_bytes_async().await }),
+    )
+    .await?;
     Ok(())
 }

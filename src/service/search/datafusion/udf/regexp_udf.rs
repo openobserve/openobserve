@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,8 @@ use arrow_schema::{Field, Fields};
 use datafusion::{
     arrow::{
         array::{
-            as_large_list_array, as_list_array, as_string_array, Array, ArrayData, ArrayRef,
-            BooleanArray, StringArray, StructArray,
+            Array, ArrayData, ArrayRef, BooleanArray, StringArray, StructArray,
+            as_large_list_array, as_list_array, as_string_array,
         },
         datatypes::DataType,
     },
@@ -28,11 +28,11 @@ use datafusion::{
     error::{DataFusionError, Result},
     functions::regex::regexpmatch::regexp_match,
     logical_expr::{
-        ExprSchemable, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl, Signature,
-        TypeSignature::Exact, Volatility,
+        ReturnInfo, ReturnTypeArgs, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl,
+        Signature, TypeSignature::Exact, Volatility,
     },
     physical_plan::ColumnarValue,
-    prelude::{create_udf, Expr},
+    prelude::create_udf,
     scalar::ScalarValue,
 };
 use once_cell::sync::Lazy;
@@ -261,27 +261,30 @@ impl ScalarUDFImpl for RegxpMatchToFields {
     }
 
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
-        unreachable!() // since return_type_from_exprs is implemented
+        unreachable!() // since return_type_from_args is implemented
     }
 
-    fn return_type_from_exprs(
-        &self,
-        args: &[Expr],
-        schema: &dyn datafusion::common::ExprSchema,
-        _args_types: &[DataType],
-    ) -> Result<DataType> {
-        let regexp_pattern = match &args[1] {
-            Expr::Literal(arg2) => arg2.to_string().replace('"', ""),
-            other => {
+    fn return_type_from_args(&self, args: ReturnTypeArgs) -> Result<ReturnInfo> {
+        if args.arg_types.len() != 2 {
+            return Err(DataFusionError::Execution(
+                "regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings".to_string()
+            ));
+        }
+        let regexp_pattern = match &args.scalar_arguments[1] {
+            Some(ScalarValue::Utf8(Some(arg2))) => arg2.to_string().replace('"', ""),
+            _ => {
                 return Err(DataFusionError::Execution(format!(
                     "The second argument for regexp_match_to_fields needs to be a string, but got {}",
-                    other.get_type(schema)?
+                    args.arg_types[1]
                 )));
             }
         };
-        let ret_type = &args[0].get_type(schema)?;
+        let ret_type = &args.arg_types[0];
         let fields = regex_pattern_to_fields(&regexp_pattern, ret_type)?;
-        Ok(DataType::Struct(Fields::from_iter(fields)))
+        Ok(ReturnInfo::new(
+            DataType::Struct(Fields::from_iter(fields)),
+            false,
+        ))
     }
 
     fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
@@ -300,8 +303,8 @@ impl ScalarUDFImpl for RegxpMatchToFields {
             .collect::<Result<Vec<_>>>()?;
 
         let result = match &args_array[0].data_type() {
-            DataType::Utf8 => regexp_match::<i32>(&args_array)?,
-            DataType::LargeUtf8 => regexp_match::<i64>(&args_array)?,
+            DataType::Utf8 => regexp_match(&args_array)?,
+            DataType::LargeUtf8 => regexp_match(&args_array)?,
             other => {
                 return Err(DataFusionError::Execution(format!(
                     "Unsupported data type {other:?} for function regexp_match"

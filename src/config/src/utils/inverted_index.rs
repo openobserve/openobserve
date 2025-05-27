@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::{meta::stream::StreamType, FILE_EXT_PARQUET, FILE_EXT_TANTIVY, INDEX_MIN_CHAR_LEN};
+use crate::{FILE_EXT_PARQUET, FILE_EXT_TANTIVY, INDEX_MIN_CHAR_LEN, meta::stream::StreamType};
 
 /// Split a string into tokens based on a delimiter. if delimiter is empty, split by whitespace and
 /// punctuation. also filter out tokens that are less than INDEX_MIN_CHAR_LEN characters long.

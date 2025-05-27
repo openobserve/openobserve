@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,32 +15,34 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use config::{
-    meta::stream::StreamType,
-    utils::{json, time::BASE_TIME},
+    meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
+    utils::{
+        json,
+        time::{BASE_TIME, now_micros},
+    },
 };
-use infra::{cache::stats, db};
+use infra::{cache::stats, db as infra_db};
 use vrl::prelude::NotNan;
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{enrichment::StreamTable, search as SearchService},
+    service::{db as db_service, enrichment::StreamTable, search as SearchService},
 };
 
-pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+/// Will no longer be used as we are using the meta stream stats to store start, end time and size
+pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
+pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
-    let rec_num = if stats.doc_num == 0 {
-        100000
-    } else {
-        stats.doc_num
-    };
+pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
+    let start_time = get_start_time(org_id, name).await;
+    let end_time = now_micros();
 
     let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\" limit {rec_num}"),
-        start_time: BASE_TIME.timestamp_micros(),
-        end_time: Utc::now().timestamp_micros(),
+        sql: format!("SELECT * FROM \"{name}\""),
+        start_time,
+        end_time,
+        size: -1, // -1 means no limit, enrichment table should not be limited
         ..Default::default()
     };
 
@@ -53,7 +55,13 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: Some(true),
     };
+    log::debug!(
+        "get enrichment table {} data req start time: {}",
+        name,
+        start_time
+    );
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
@@ -95,8 +103,98 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     }
 }
 
+/// Delete the size of the enrichment table in bytes
+pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
+    db_service::delete(
+        &format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}"),
+        false,
+        false,
+        None,
+    )
+    .await
+}
+
+/// Get the size of the enrichment table in bytes
+pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
+    match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) if meta_stats.size > 0 => meta_stats.size as f64,
+        _ => match db_service::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await {
+            Ok(size) => {
+                let size = String::from_utf8_lossy(&size);
+                size.parse::<f64>().unwrap_or(0.0)
+            }
+            Err(e) => {
+                log::error!("get_table_size error: {:?}", e);
+                stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
+            }
+        },
+    }
+}
+
+/// Get the start time of the enrichment table
+pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
+    match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) => meta_stats.start_time,
+        None => {
+            let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+            if stats.doc_time_min > 0 {
+                stats.doc_time_min
+            } else {
+                BASE_TIME.timestamp_micros()
+            }
+        }
+    }
+}
+
+pub async fn get_meta_table_stats(
+    org_id: &str,
+    name: &str,
+) -> Option<EnrichmentTableMetaStreamStats> {
+    let size = match db_service::get(&format!(
+        "{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"
+    ))
+    .await
+    {
+        Ok(size) => size,
+        Err(e) => {
+            log::error!("get_table_size error: {:?}", e);
+            return None;
+        }
+    };
+    let stream_meta_stats: EnrichmentTableMetaStreamStats = serde_json::from_slice(&size)
+        .map_err(|e| {
+            log::error!("Failed to parse meta stream stats: {}", e);
+        })
+        .ok()?;
+    Some(stream_meta_stats)
+}
+
+pub async fn update_meta_table_stats(
+    org_id: &str,
+    name: &str,
+    stats: EnrichmentTableMetaStreamStats,
+) -> Result<(), infra::errors::Error> {
+    db_service::put(
+        &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
+        serde_json::to_string(&stats).unwrap().into(),
+        false,
+        None,
+    )
+    .await
+}
+
+pub async fn delete_meta_table_stats(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
+    db_service::delete(
+        &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
+        false,
+        false,
+        None,
+    )
+    .await
+}
+
 pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra_db::get_coordinator().await;
     let key: String = format!(
         "/enrichment_table/{org_id}/{}/{}",
         StreamType::EnrichmentTables,
@@ -106,7 +204,7 @@ pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra_db::get_coordinator().await;
     let key: String = format!(
         "/enrichment_table/{org_id}/{}/{}",
         StreamType::EnrichmentTables,
@@ -117,7 +215,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/enrichment_table/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra_db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching stream enrichment_table");
@@ -130,7 +228,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -139,6 +237,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let data = super::enrichment_table::get(org_id, stream_name)
                     .await
                     .unwrap();
+                log::debug!(
+                    "enrichment table: {} cache data length: {}",
+                    item_key,
+                    data.len()
+                );
                 ENRICHMENT_TABLES.insert(
                     item_key.to_owned(),
                     StreamTable {
@@ -148,8 +251,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     },
                 );
             }
-            db::Event::Delete(_) => {}
-            db::Event::Empty => {}
+            infra_db::Event::Delete(ev) => {
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                if let Some((key, _)) = ENRICHMENT_TABLES.remove(item_key) {
+                    log::info!("deleted enrichment table: {}", key);
+                }
+            }
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())

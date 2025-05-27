@@ -2,13 +2,16 @@ import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 import UnflattenedPage from "../pages/unflattened";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-//  await page.getByText("Login as internal user").click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -21,9 +24,7 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 async function toggleQuickModeIfOff(page) {
-  await page.waitForSelector(
-    '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
-  );
+  
   const toggleButton = await page.$(
     '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner'
   );
@@ -70,19 +71,8 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
-
 test.describe("Unflattened testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -103,6 +93,7 @@ test.describe("Unflattened testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
     await page.waitForTimeout(2000);
@@ -111,7 +102,7 @@ test.describe("Unflattened testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
   });
 
@@ -126,9 +117,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor(); // Wait for the search input to be ready
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
   
     await unflattenedPage.streamDetailButton.waitFor(); // Ensure the stream detail button is visible
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
   
     // Toggle 'Store Original Data' and update schema
     await unflattenedPage.storeOriginalDataToggle.waitFor(); // Wait for the toggle to be visible
@@ -193,9 +186,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
 
     // Toggle 'Store Original Data' and update schema
     await unflattenedPage.storeOriginalDataToggle.waitFor();
@@ -288,9 +283,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.storeOriginalDataToggle.waitFor();
     await unflattenedPage.storeOriginalDataToggle.click();

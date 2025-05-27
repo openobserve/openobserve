@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -91,7 +91,7 @@ impl From<UpdateFolderRequestBody> for config::meta::folder::Folder {
     }
 }
 
-impl From<FolderType> for infra::table::folders::FolderType {
+impl From<FolderType> for config::meta::folder::FolderType {
     fn from(value: FolderType) -> Self {
         match value {
             FolderType::Dashboards => Self::Dashboards,

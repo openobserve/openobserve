@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,6 @@ pub mod file_data;
 pub mod meta;
 pub mod stats;
 pub mod storage;
-pub mod tmpfs;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     file_data::init().await?;

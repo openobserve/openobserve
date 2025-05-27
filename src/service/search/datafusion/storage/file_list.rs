@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,8 @@ use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
+use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
+
 type SegmentData = HashMap<String, BitVec>;
 
 static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
@@ -28,7 +30,7 @@ static SEGMENTS: Lazy<RwLock<HashMap<String, SegmentData>>> = Lazy::new(Default:
 pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.read().get(trace_id) {
         Some(data) => data.clone(),
-        None => return Err(anyhow::anyhow!("trace_id not found")),
+        None => return Err(anyhow::anyhow!("trace_id not found: {}", trace_id)),
     };
     Ok(data)
 }
@@ -39,7 +41,14 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
     let mut segment_data = HashMap::new();
     for file in files {
         let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
-        let file_name = format!("/{}/$$/{}", key, file.key);
+        let file_name = if file.account.is_empty() {
+            format!("/{}/{}/{}", key, TRACE_ID_SEPARATOR, file.key)
+        } else {
+            format!(
+                "/{}/{}/{}/{}/{}",
+                key, TRACE_ID_SEPARATOR, file.account, ACCOUNT_SEPARATOR, file.key
+            )
+        };
         values.push(ObjectMeta {
             location: file_name.into(),
             last_modified: modified,

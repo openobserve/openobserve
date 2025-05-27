@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,11 +18,14 @@ use std::sync::Arc;
 use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
+        DataFusionError, Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
-        Result, TableReference,
     },
+    physical_expr::LexOrdering,
     physical_plan::{
-        repartition::RepartitionExec, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        repartition::RepartitionExec,
+        sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
 use hashbrown::HashMap;
@@ -50,7 +53,7 @@ impl RemoteScanRewriter {
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimizer_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -63,7 +66,7 @@ impl RemoteScanRewriter {
                 equal_keys,
                 match_all_keys,
                 index_condition,
-                index_optimizer_mode,
+                index_optimize_mode,
                 is_leader,
                 opentelemetry_context,
             ),
@@ -120,12 +123,30 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 for child in node.children() {
                     let mut visitor = TableNameVisitor::new();
                     child.visit(&mut visitor)?;
-                    let table_name = visitor.table_name.clone().unwrap();
-                    let remote_scan = Arc::new(RemoteScanExec::new(
-                        child.clone(),
-                        self.remote_scan_nodes.get_remote_node(&table_name),
-                    )?);
-                    new_children.push(remote_scan);
+                    // For sort, we should add a SortPreservingMergeExec
+                    if child.name() == "SortExec" {
+                        let table_name = visitor.table_name.clone().unwrap();
+                        let sort = child.as_any().downcast_ref::<SortExec>().unwrap();
+                        let sort_merge = Arc::new(
+                            SortPreservingMergeExec::new(
+                                LexOrdering::new(sort.expr().to_vec()),
+                                Arc::new(sort.clone()),
+                            )
+                            .with_fetch(sort.fetch()),
+                        );
+                        let remote_scan = Arc::new(RemoteScanExec::new(
+                            sort_merge,
+                            self.remote_scan_nodes.get_remote_node(&table_name),
+                        )?);
+                        new_children.push(remote_scan);
+                    } else {
+                        let table_name = visitor.table_name.clone().unwrap();
+                        let remote_scan = Arc::new(RemoteScanExec::new(
+                            child.clone(),
+                            self.remote_scan_nodes.get_remote_node(&table_name),
+                        )?);
+                        new_children.push(remote_scan);
+                    }
                 }
                 let new_node = node.with_new_children(new_children)?;
                 self.is_changed = true;
@@ -195,6 +216,12 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             && node.children().first().unwrap().name() == "AggregateExec"
             && config::get_config().common.feature_query_streaming_aggs
         {
+            if !streaming_aggs_exec::GLOBAL_ID_CACHE.exists(&self.id) {
+                return Err(DataFusionError::Plan(format!(
+                    "streaming aggregation cache not found with id: {}",
+                    self.id
+                )));
+            }
             let cached_data = streaming_aggs_exec::GLOBAL_CACHE
                 .get(&self.id)
                 .unwrap_or_default();

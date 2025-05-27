@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,14 +20,14 @@ use std::{
 
 use config::meta::search::ScanStats;
 use datafusion::error::{DataFusionError, Result};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use promql_parser::parser::EvalStmt;
 use tokio::sync::{Mutex, RwLock, Semaphore};
 
 use super::Engine;
 use crate::service::promql::{
-    micros, micros_since_epoch, selector_visitor::MetricSelectorVisitor, value::*, TableProvider,
-    DEFAULT_LOOKBACK,
+    DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
+    selector_visitor::MetricSelectorVisitor, value::*,
 };
 
 #[derive(Clone)]
@@ -47,7 +47,7 @@ pub struct PromqlContext {
     pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
     pub scan_stats: Arc<RwLock<ScanStats>>,
     pub timeout: u64, // seconds, query timeout
-    pub data_loading: Arc<Mutex<bool>>,
+    pub data_loading: Arc<Mutex<HashSet<String>>>,
 }
 
 impl PromqlContext {
@@ -66,14 +66,18 @@ impl PromqlContext {
             query_exemplars,
             lookback_delta: five_min,
             data_cache: Arc::new(RwLock::new(HashMap::default())),
-            data_loading: Arc::new(Mutex::new(false)),
+            data_loading: Arc::new(Mutex::new(HashSet::default())),
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
             timeout,
         }
     }
 
     #[tracing::instrument(name = "promql:engine:exec", skip_all)]
-    pub async fn exec(&mut self, stmt: EvalStmt) -> Result<(Value, Option<String>, ScanStats)> {
+    pub async fn exec(
+        &mut self,
+        trace_id: &str,
+        stmt: EvalStmt,
+    ) -> Result<(Value, Option<String>, ScanStats)> {
         let cfg = config::get_config();
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
@@ -93,7 +97,7 @@ impl PromqlContext {
             result_type = Some("matrix".to_string());
         } else {
             // Instant query
-            let mut engine = Engine::new(ctx, self.start);
+            let mut engine = Engine::new(trace_id, ctx, self.start);
             let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
                 value = Value::Sample(Sample::new(self.end, val));
@@ -111,12 +115,12 @@ impl PromqlContext {
         let mut string_literals = Vec::new();
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-        let nr_steps = ((self.end - self.start) / self.interval) + 1;
+        let nr_steps = (self.end - self.start + self.interval - 1) / self.interval;
         for i in 0..nr_steps {
             let time = self.start + (self.interval * i);
             let expr = expr.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let mut engine = Engine::new(ctx.clone(), time);
+            let mut engine = Engine::new(trace_id, ctx.clone(), time);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
                     let ret = engine.exec(&expr).await;
@@ -203,6 +207,7 @@ impl PromqlContext {
     #[tracing::instrument(name = "promql:engine:query_exemplars", skip_all)]
     pub async fn query_exemplars(
         &mut self,
+        trace_id: &str,
         stmt: EvalStmt,
     ) -> Result<(Value, Option<String>, ScanStats)> {
         let cfg = config::get_config();
@@ -226,7 +231,7 @@ impl PromqlContext {
             let time = self.start;
             let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let mut engine = Engine::new(ctx.clone(), time);
+            let mut engine = Engine::new(trace_id, ctx.clone(), time);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
                     let ret = engine.exec(&expr).await;

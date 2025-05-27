@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
         class="col"
         style="width: 100%; height: 100%"
       >
@@ -215,6 +215,129 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
+      
+      <div
+        v-if="dashboardPanelData.data.type == 'custom_chart'"
+        class="col column"
+        style="height: 100% "
+      >
+        <q-splitter
+          v-model="dashboardPanelData.layout.splitter"
+          @update:model-value="layoutSplitterUpdated"
+          style="width: 100%; height: 100%"
+        >
+          <template #before>
+            <div
+              class="col scroll"
+              style="height: 100%; overflow-y: auto"
+            >
+              <div
+                v-if="dashboardPanelData.layout.showFieldList"
+                class="column"
+                style="height: 100%"
+              >
+                <div class="col-auto q-pa-sm">
+                  <span class="text-weight-bold">{{ t("panel.fields") }}</span>
+                </div>
+                <div class="col" style="width: 100%">
+                  <!-- <GetFields :editMode="editMode" /> -->
+                  <FieldList :editMode="true" />
+                </div>
+              </div>
+            </div>
+          </template>
+          <template #separator>
+            <div class="splitter-vertical splitter-enabled"></div>
+            <q-btn
+              color="primary"
+              size="12px"
+              :icon="
+                dashboardPanelData.layout.showFieldList
+                  ? 'chevron_left'
+                  : 'chevron_right'
+              "
+              dense
+              round
+              style="top: 14px; z-index: 100"
+              :style="{
+                right: dashboardPanelData.layout.showFieldList
+                  ? '-20px'
+                  : '-0px',
+                left: dashboardPanelData.layout.showFieldList ? '5px' : '12px',
+              }"
+              @click="collapseFieldList"
+            />
+          </template>
+          <template #after>
+            <div
+              class="row"
+              style="height:100% ; overflow-y: auto"
+            >
+              <div class="col" style="height: 100%">
+                    <div
+                      class="layout-panel-container col"
+                      style="height: 100%"
+                    >
+                    <q-splitter
+                      class="query-editor-splitter"
+                      v-model="splitterModel"    
+                      style="height: 100%"
+                      @update:model-value="layoutSplitterUpdated"
+                    >
+                    <template #before>
+                      <CustomChartEditor
+                        v-model="dashboardPanelData.data.customChartContent"
+                        style="width: 100%; height: 100%"
+                      />
+                    </template>
+                    <template #separator>
+                      <div class="splitter-vertical splitter-enabled"></div>
+                      <q-avatar
+                        color="primary"
+                        text-color="white"
+                        size="20px"
+                        icon="drag_indicator"
+                        style="top: 10px; left: 3.5px"
+                        data-test="dashboard-markdown-editor-drag-indicator"
+                      />
+                    </template>
+                    <template #after>
+                        <PanelSchemaRenderer
+                            @metadata-update="metaDataValue"
+                            :key="dashboardPanelData.data.type"
+                            :panelSchema="chartData"
+                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                            :variablesData="{}"
+                            @updated:vrl-function-field-list="
+                              updateVrlFunctionFieldList
+                            "
+                            :width="6"
+                            @error="handleChartApiError"
+                          />
+
+                    </template>
+                     </q-splitter> 
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+                      />
+                    </div>
+
+              </div>
+              <q-separator vertical />
+              <div class="col-auto">
+                <PanelSidebar
+                  :title="t('dashboard.configLabel')"
+                  v-model="dashboardPanelData.layout.isConfigPanelOpen"
+                >
+                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
+                </PanelSidebar>
+              </div>
+            </div>
+          </template>
+        </q-splitter>
+      </div>
     </div>
     <q-dialog
       v-model="showAddToDashboardDialog"
@@ -249,6 +372,7 @@ import { computed } from "vue";
 import { isEqual } from "lodash-es";
 import { onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -289,6 +413,7 @@ export default defineComponent({
     CustomHTMLEditor,
     CustomMarkdownEditor,
     AddToDashboard,
+    CustomChartEditor,
   },
   emits: ["handleChartApiError"],
   setup(props, { emit }) {
@@ -301,6 +426,8 @@ export default defineComponent({
     const { dashboardPanelData, resetAggregationFunction, validatePanel } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const metaData = ref(null);
+    const splitterModel = ref(50);
+
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -352,6 +479,9 @@ export default defineComponent({
     );
 
     const layoutSplitterUpdated = () => {
+      if (!dashboardPanelData.layout.showFieldList) {
+        dashboardPanelData.layout.splitter = 0;
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -397,7 +527,7 @@ export default defineComponent({
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
-      validatePanel(errors);
+      validatePanel(errors,true);
 
       if (errors.length) {
         // set errors into errorData
@@ -423,138 +553,145 @@ export default defineComponent({
       // extract all panelSchema alias
       const aliasList: any = [];
 
-      // remove panelschema fields from field list
+      // currently we only support auto sql for visualization
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery === false
+      ) {
+        // remove panelschema fields from field list
 
-      // add x axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.x?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add x axis alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.x?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add breakdown alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.breakdown?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add y axis alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.y?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add z axis alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.z?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add latitude alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.latitude?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.latitude?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.latitude.alias,
+          );
         }
-      });
 
-      // add breakdown alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.breakdown?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add longitude alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.longitude?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.longitude?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.longitude.alias,
+          );
         }
-      });
 
-      // add y axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.y?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add weight alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.weight?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.weight?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.weight.alias,
+          );
         }
-      });
 
-      // add z axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.z?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add source alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.source?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.source?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.source.alias,
+          );
         }
-      });
 
-      // add latitude alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.latitude?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.latitude?.isDerived
-      ) {
-        aliasList.push(
+        // add target alias
+        if (
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude.alias
-        );
-      }
+          ]?.fields?.target?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.target?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.target.alias,
+          );
+        }
 
-      // add longitude alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.longitude?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.longitude?.isDerived
-      ) {
-        aliasList.push(
+        // add source alias
+        if (
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude.alias
-        );
-      }
-
-      // add weight alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.weight?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.weight?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
+          ]?.fields?.value?.alias &&
+          !dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight.alias
-        );
-      }
-
-      // add source alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.source?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.source?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source.alias
-        );
-      }
-
-      // add target alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.target?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.target?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target.alias
-        );
-      }
-
-      // add source alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.value?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.value?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value.alias
-        );
+          ]?.fields?.value?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.value.alias,
+          );
+        }
       }
 
       // remove custom query fields from field list
@@ -568,6 +705,15 @@ export default defineComponent({
         .map((field: any) => ({ name: field, type: "Utf8" }));
 
       dashboardPanelData.meta.stream.vrlFunctionFieldList = fieldList;
+    };
+    const collapseFieldList = () => {
+      if (dashboardPanelData.layout.showFieldList) {
+        dashboardPanelData.layout.splitter = 0;
+        dashboardPanelData.layout.showFieldList = false;
+      } else {
+        dashboardPanelData.layout.splitter = 20;
+        dashboardPanelData.layout.showFieldList = true;
+      }
     };
 
     return {
@@ -587,6 +733,8 @@ export default defineComponent({
       addToDashboard,
       isOutDated,
       updateVrlFunctionFieldList,
+      splitterModel,
+      collapseFieldList,
     };
   },
 });

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,16 +18,16 @@ use std::sync::Arc;
 use arrow_schema::{DataType, IntervalUnit};
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
         Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
     error::DataFusionError,
     functions::datetime::{
         date_bin::DateBinFunc,
         to_timestamp::{ToTimestampFunc, ToTimestampMicrosFunc},
     },
-    logical_expr::{cast, expr::ScalarFunction, Expr, LogicalPlan, ScalarUDF},
-    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
+    logical_expr::{Expr, LogicalPlan, ScalarUDF, cast, expr::ScalarFunction},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder, utils::NamePreserver},
     scalar::ScalarValue,
 };
 
@@ -73,8 +73,7 @@ impl OptimizerRule for RewriteHistogram {
         if plan
             .expressions()
             .iter()
-            .map(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
-            .any(|x| x)
+            .any(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
         {
             let mut expr_rewriter = HistogramToDatebin::new(self.start_time, self.end_time);
 

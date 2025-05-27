@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
+        dense
       >
         <template #no-data>
           <NoData />
@@ -44,6 +45,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               @click="exploreEnrichmentTable(props)"
+            />
+            <q-btn
+              icon="list_alt"
+              :title="t('logStream.schemaHeader')"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click="listSchema(props)"
             />
             <q-btn
               icon="edit"
@@ -143,6 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <q-dialog
+      v-model="showEnrichmentSchema"
+      position="right"
+      full-height
+      maximized
+    >
+      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
+    </q-dialog>
   </q-page>
 </template>
 
@@ -158,14 +178,15 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import EnrichmentSchema from "./EnrichmentSchema.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
-  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog },
+  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog, EnrichmentSchema },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -183,6 +204,7 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const showEnrichmentSchema = ref<boolean>(false);
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -198,6 +220,35 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "doc_num",
+        field: (row: any) => row.doc_num.toLocaleString(),
+        label: t("logStream.docNum"),
+        align: "left",
+        sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return parseInt(rowA.doc_num) - parseInt(rowB.doc_num);
+        },
+      },
+      {
+        name: "storage_size",
+        label: t("logStream.storageSize"),
+        field: (row: any) => formatSizeFromMB(row.storage_size),
+        align: "left",
+        sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return rowA.original_storage_size- rowB.original_storage_size
+        },
+      },
+      {
+        name: "compressed_size",
+        field: (row: any) => formatSizeFromMB(row.compressed_size),
+        label: t("logStream.compressedSize"),
+        align: "left",
+        sortable: false,
+        sort: (a, b, rowA, rowB) =>
+          rowA.original_compressed_size- rowB.original_compressed_size,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("function.actions"),
@@ -205,7 +256,7 @@ export default defineComponent({
         sortable: false,
       },
     ]);
-    const { getStreams, resetStreamType } = useStreams();
+    const { getStreams, resetStreamType, getStream } = useStreams();
 
     onBeforeMount(() => {
       getLookupTables();
@@ -219,13 +270,32 @@ export default defineComponent({
 
       getStreams("enrichment_tables", false)
         .then((res: any) => {
+
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {
+            let doc_num = "";
+            let storage_size = "";
+            let compressed_size = "";
+            let original_storage_size = "";
+            let original_compressed_size = "";
+
+            if (data.stats) {
+              doc_num = data.stats.doc_num;
+              storage_size = data.stats.storage_size + " MB";
+              compressed_size = data.stats.compressed_size + " MB";
+              original_storage_size = data.stats.storage_size;
+              original_compressed_size = data.stats.compressed_size;
+            }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.name + counter,
               name: data.name,
+              doc_num: doc_num,
+              storage_size: storage_size,
+              compressed_size: compressed_size,
+              original_storage_size: original_storage_size,
+              original_compressed_size: original_compressed_size,
               actions: "action buttons",
               stream_type: data.stream_type,
             };
@@ -235,14 +305,15 @@ export default defineComponent({
         .catch((err) => {
           console.log("--", err);
           dismiss();
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
-            type: "negative",
-            message: err.response?.data?.message || "Error while fetching functions.",
-            timeout: 2000,
-          });
+              type: "negative",
+              message:
+                err.response?.data?.message ||
+                "Error while fetching functions.",
+              timeout: 2000,
+            });
           }
-          
         });
     };
 
@@ -258,6 +329,7 @@ export default defineComponent({
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
+    const selectedEnrichmentTable = ref<any>(null);
     const pagination: any = ref({
       rowsPerPage: 20,
     });
@@ -333,7 +405,7 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           selectedDelete.value.name,
-          "enrichment_tables"
+          "enrichment_tables",
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -346,11 +418,12 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
-            color: "negative",
-            message: err.response?.data?.message || "Error while deleting stream.",
-          });
+              color: "negative",
+              message:
+                err.response?.data?.message || "Error while deleting stream.",
+            });
           }
         });
 
@@ -369,21 +442,75 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
-    const exploreEnrichmentTable = (props: any) => {
+    /**
+     * Get time range for stream explorer, for enrichment tables it will get the time range from the stream data min and max time
+     * @param stream: Stream object
+     */
+    const getTimeRange = async (stream: any) => {
+      const dateTime: { period?: string; from?: number; to?: number } = {};
+
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Redirecting to explorer...",
+        color: "secondary",
+      });
+
+      try {
+        await getStream(stream.name, stream.stream_type, true)
+          .then((streamResponse) => {
+            if (
+              streamResponse.stats.doc_time_min &&
+              streamResponse.stats.doc_time_max
+            ) {
+              //reducing the doc_time_min by 1000000 to get the exact time range
+              //previously we were subtracting 60000000 which might confuse some users so we are using 1000000 (1sec)
+              dateTime["from"] = streamResponse.stats.doc_time_min - 1000000;
+              //adding 60000000(1min)
+              dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
+            } else if (streamResponse.stats.created_at) {
+              // When enrichment table is uploaded, stats will not have doc_time_min and doc_time_max.
+              // Stats will be available asynchronously, so we can use created_at time to get the time range.
+              dateTime["from"] = streamResponse.stats.created_at - 60000000;
+              dateTime["to"] = streamResponse.stats.created_at + 3600000000;
+            } else {
+              dateTime["period"] = "15m";
+            }
+          })
+          .catch((err) => {
+            console.error("Error while getting enrichment table: ", err);
+            dateTime["period"] = "15m";
+          })
+          .finally(() => {
+            dismiss();
+          });
+      } catch (err) {
+        console.error("Error while getting enrichment table: ", err);
+        dateTime["period"] = "15m";
+        dismiss();
+      }
+
+      return dateTime;
+    };
+
+    const exploreEnrichmentTable = async (props: any) => {
+      const timestamps = await getTimeRange(props.row);
       router.push({
         name: "logs",
         query: {
           stream_type: props.row.stream_type,
           stream: props.row.name,
-          period: "15m",
           refresh: "0",
           query: "",
           type: "stream_explorer",
           org_identifier: store.state.selectedOrganization.identifier,
+          ...timestamps,
         },
       });
     };
-
+    const listSchema = async (props: any) => {
+      selectedEnrichmentTable.value = props.row.name;
+      showEnrichmentSchema.value = true;
+    };
     return {
       t,
       qTable,
@@ -424,6 +551,9 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       exploreEnrichmentTable,
+      showEnrichmentSchema,
+      listSchema,
+      selectedEnrichmentTable,
     };
   },
   computed: {
@@ -435,7 +565,7 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       this.verifyOrganizationStatus(
         this.store.state.organizations,
-        this.router
+        this.router,
       );
       if (
         (newVal != oldVal || this.jsTransforms.value == undefined) &&

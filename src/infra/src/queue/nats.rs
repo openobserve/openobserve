@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,18 +30,31 @@ pub async fn init() -> Result<()> {
 
 pub struct NatsQueue {
     prefix: String,
+    consumer_name: String,
+    is_durable: bool,
 }
 
 impl NatsQueue {
     pub fn new(prefix: &str) -> Self {
         let prefix = prefix.trim_end_matches('/');
+        let consumer_name = get_config().common.instance_name.to_string();
         Self {
             prefix: prefix.to_string(),
+            consumer_name,
+            is_durable: false,
         }
     }
 
     pub fn super_cluster() -> Self {
-        Self::new("super_cluster_queue_")
+        Self::new("super_cluster_queue_").with_consumer_name(get_cluster_name(), true)
+    }
+
+    pub fn with_consumer_name(&self, consumer_name: String, is_durable: bool) -> Self {
+        Self {
+            prefix: self.prefix.clone(),
+            consumer_name,
+            is_durable,
+        }
     }
 }
 
@@ -55,7 +68,7 @@ impl Default for NatsQueue {
 impl super::Queue for NatsQueue {
     async fn create(&self, topic: &str) -> Result<()> {
         let cfg = config::get_config();
-        let client = get_nats_client().await.clone();
+        let client = get_nats_client().await?;
         let jetstream = jetstream::new(client);
         let topic_name = format!("{}{}", self.prefix, topic);
         let config = jetstream::stream::Config {
@@ -72,7 +85,7 @@ impl super::Queue for NatsQueue {
 
     /// you can pub message with the topic or topic.* to match the topic
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()> {
-        let client = get_nats_client().await.clone();
+        let client = get_nats_client().await?;
         let jetstream = jetstream::new(client);
         // Publish a message to the stream
         let topic_name = format!("{}{}", self.prefix, topic);
@@ -84,27 +97,64 @@ impl super::Queue for NatsQueue {
     async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         let (tx, rx) = mpsc::channel(1024);
         let stream_name = format!("{}{}", self.prefix, topic);
+        let consumer_name = self.consumer_name.clone();
+        let is_durable = self.is_durable;
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            let client = get_nats_client().await.clone();
+            let client = get_nats_client().await?;
             let jetstream = jetstream::new(client);
-            let stream = jetstream.get_stream(&stream_name).await?;
-            let consumer_name = get_cluster_name();
+            let stream = jetstream.get_stream(&stream_name).await.map_err(|e| {
+                log::error!("Failed to get nats stream {}: {}", stream_name, e);
+                Error::Message(format!("Failed to get nats stream {}: {}", stream_name, e))
+            })?;
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
-                durable_name: Some(consumer_name.to_string()),
+                durable_name: if is_durable {
+                    Some(consumer_name.to_string())
+                } else {
+                    None
+                },
                 deliver_policy: get_deliver_policy(),
                 ..Default::default()
             };
             let consumer = stream
                 .get_or_create_consumer(&consumer_name, config)
-                .await?;
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "Failed to get_or_create nats for stream {}: {}",
+                        stream_name,
+                        e
+                    );
+                    Error::Message(format!(
+                        "Failed to get_or_create nats for stream {}: {}",
+                        stream_name, e
+                    ))
+                })?;
             // Consume messages from the consumer
-            let mut messages = consumer.messages().await.expect("consumer messages error");
+            let mut messages = consumer.messages().await.map_err(|e| {
+                log::error!(
+                    "Failed to get nats consumer messages for stream {}: {}",
+                    stream_name,
+                    e
+                );
+                Error::Message(format!(
+                    "Failed to get nats consumer messages for stream {}: {}",
+                    stream_name, e
+                ))
+            })?;
             while let Ok(Some(message)) = messages.try_next().await {
                 let message = super::Message::Nats(message);
-                tx.send(message)
-                    .await
-                    .map_err(|e| Error::Message(format!("nats message send error: {e}")))?;
+                tx.send(message).await.map_err(|e| {
+                    log::error!(
+                        "Failed to send nats message for stream {}: {}",
+                        stream_name,
+                        e
+                    );
+                    Error::Message(format!(
+                        "Failed to send nats message for stream {}: {}",
+                        stream_name, e
+                    ))
+                })?;
             }
             Ok(())
         });

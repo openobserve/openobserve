@@ -156,7 +156,8 @@
         "show_legends": true,
         "legends_position": null,
         "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
+        "decimals": 0
       },
       "error_config": {
         "custom_error_handeling": true,
@@ -202,7 +203,8 @@
         "show_legends": true,
         "legends_position": null,
         "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
+        "decimals": 0
       },
       "error_config": {
         "custom_error_handeling": true,
@@ -249,7 +251,8 @@
         "legends_position": null,
         "unit": "custom",
         "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
+        "decimals": 0
       },
       "error_config": {
         "custom_error_handeling": true,
@@ -295,7 +298,8 @@
         "show_legends": true,
         "legends_position": null,
         "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
+        "decimals": 0
       },
       "error_config": {
         "custom_error_handeling": true,

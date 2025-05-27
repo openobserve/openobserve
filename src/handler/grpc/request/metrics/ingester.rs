@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,8 @@
 
 use config::{meta::otlp::OtlpRequestType, metrics};
 use opentelemetry_proto::tonic::collector::metrics::v1::{
-    metrics_service_server::MetricsService, ExportMetricsServiceRequest,
-    ExportMetricsServiceResponse,
+    ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+    metrics_service_server::MetricsService,
 };
 use tonic::{Response, Status};
 
@@ -57,10 +57,10 @@ impl MetricsService for MetricsIngester {
             // metrics
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/otlp/v1/metrics", "200", "", "", ""])
+                .with_label_values(&["/otlp/v1/metrics", "200", "", "", "", ""])
                 .observe(time);
             metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/otlp/v1/metrics", "200", "", "", ""])
+                .with_label_values(&["/otlp/v1/metrics", "200", "", "", "", ""])
                 .inc();
             return Ok(Response::new(ExportMetricsServiceResponse {
                 partial_success: None,

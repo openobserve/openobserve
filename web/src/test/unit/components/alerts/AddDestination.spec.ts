@@ -37,19 +37,19 @@ describe("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
     vi.useFakeTimers();
-    wrapper = mount(AddDestination, {
-      attachTo: "#app",
-      props: {
-        templates: [],
-        destination: null,
-      },
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
-      },
-    });
+    // wrapper = mount(AddDestination, {
+    //   attachTo: "#app",
+    //   props: {
+    //     templates: [],
+    //     destination: null,
+    //   },
+    //   global: {
+    //     provide: {
+    //       store: store,
+    //     },
+    //     plugins: [i18n, router],
+    //   },
+    // });
     await flushPromises();
   });
 

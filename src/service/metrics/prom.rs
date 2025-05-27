@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use actix_web::web;
 use chrono::{TimeZone, Utc};
 use config::{
+    FxIndexMap, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -27,15 +28,18 @@ use config::{
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
-    utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
-    FxIndexMap,
+    utils::{
+        json,
+        schema_ext::SchemaExt,
+        time::{now_micros, parse_i64_to_timestamp_micros},
+    },
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashSet;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::{unwrap_partition_time_level, update_setting, SchemaCache},
+    schema::{SchemaCache, unwrap_partition_time_level},
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -49,7 +53,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+        ingestion::{TriggerAlertData, evaluate_trigger, write_file},
         metrics::format_label_name,
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
@@ -140,8 +144,13 @@ pub async fn remote_write(
             break;
         }
         if need_update {
-            if let Err(e) =
-                update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata).await
+            if let Err(e) = db::schema::update_setting(
+                org_id,
+                &metric_name,
+                StreamType::Metrics,
+                extra_metadata,
+            )
+            .await
             {
                 log::error!(
                     "Error updating metadata for stream: {}, err: {}",
@@ -160,8 +169,9 @@ pub async fn remote_write(
                 "/prometheus/api/v1/write",
                 "200",
                 org_id,
+                StreamType::Metrics.as_str(),
                 "",
-                &StreamType::Metrics.to_string(),
+                "",
             ])
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
@@ -169,8 +179,9 @@ pub async fn remote_write(
                 "/prometheus/api/v1/write",
                 "200",
                 org_id,
+                StreamType::Metrics.as_str(),
                 "",
-                &StreamType::Metrics.to_string(),
+                "",
             ])
             .inc();
         return Ok(());
@@ -264,8 +275,9 @@ pub async fn remote_write(
                         "/prometheus/api/v1/write",
                         "200",
                         org_id,
+                        StreamType::Metrics.as_str(),
                         "",
-                        &StreamType::Metrics.to_string(),
+                        "",
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -273,8 +285,9 @@ pub async fn remote_write(
                         "/prometheus/api/v1/write",
                         "200",
                         org_id,
+                        StreamType::Metrics.as_str(),
                         "",
-                        &StreamType::Metrics.to_string(),
+                        "",
                     ])
                     .inc();
                 return Ok(());
@@ -323,8 +336,12 @@ pub async fn remote_write(
                 stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
             }
 
-            let value: json::Value = json::to_value(&metric).unwrap();
+            let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+            value.as_object_mut().unwrap().insert(
+                TIMESTAMP_COL_NAME.to_string(),
+                json::Value::Number(timestamp.into()),
+            );
 
             // ready to be buffered for downstream processing
             if stream_executable_pipelines
@@ -359,7 +376,10 @@ pub async fn remote_write(
             };
             let (records, timestamps): (Vec<json::Value>, Vec<i64>) =
                 pipeline_inputs.into_iter().unzip();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     log::error!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",
@@ -411,9 +431,9 @@ pub async fn remote_write(
         for (mut value, timestamp) in json_data {
             let val_map = value.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             val_map.insert(
-                cfg.common.column_timestamp.clone(),
+                TIMESTAMP_COL_NAME.to_string(),
                 json::Value::Number(timestamp.into()),
             );
             let value_str = config::utils::json::to_string(&val_map).unwrap();
@@ -492,12 +512,16 @@ pub async fn remote_write(
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = chrono::Utc::now().timestamp_micros();
+                    let alert_end_time = now_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
+                        match alert
+                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .await
                         {
-                            trigger_alerts.push((alert.clone(), v));
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
@@ -527,10 +551,10 @@ pub async fn remote_write(
 
         // write to file
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
-        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await?;
 
         let fns_length: usize =
             stream_executable_pipelines
@@ -559,8 +583,9 @@ pub async fn remote_write(
             "/prometheus/api/v1/write",
             "200",
             org_id,
+            StreamType::Metrics.as_str(),
             "",
-            &StreamType::Metrics.to_string(),
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -568,8 +593,9 @@ pub async fn remote_write(
             "/prometheus/api/v1/write",
             "200",
             org_id,
+            StreamType::Metrics.as_str(),
             "",
-            &StreamType::Metrics.to_string(),
+            "",
         ])
         .inc();
 
@@ -685,13 +711,12 @@ pub(crate) async fn get_series(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
-    let cfg = get_config();
     // Comma-separated list of label names
     let label_names = schema
         .fields()
         .iter()
         .map(|f| f.name().as_str())
-        .filter(|&s| s != cfg.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL)
+        .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
         .collect::<Vec<_>>()
         .join("\", \"");
     if label_names.is_empty() {
@@ -702,7 +727,7 @@ pub(crate) async fn get_series(
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
-            if mat.name == cfg.common.column_timestamp
+            if mat.name == TIMESTAMP_COL_NAME
                 || mat.name == VALUE_LABEL
                 || schema.field_with_name(&mat.name).is_err()
             {
@@ -745,6 +770,7 @@ pub(crate) async fn get_series(
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -777,7 +803,6 @@ pub(crate) async fn get_labels(
         Ok(schemas) => schemas,
     };
     let mut label_names = hashbrown::HashSet::new();
-    let cfg = get_config();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name {
             if *metric_name != schema.stream_name {
@@ -793,9 +818,7 @@ pub(crate) async fn get_labels(
                 .fields()
                 .iter()
                 .map(|f| f.name())
-                .filter(|&s| {
-                    s != &cfg.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL
-                })
+                .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
                 .cloned();
             label_names.extend(field_names);
         }
@@ -891,6 +914,7 @@ pub(crate) async fn get_label_values(
         search_type: None,
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

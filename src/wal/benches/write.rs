@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use tempfile::tempdir;
 use wal::Writer;
 
@@ -23,8 +23,15 @@ pub fn write_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("wal/write");
     for buf_size in [4096, 8192, 16384, 32768] {
         for entry_size in [4096, 16384, 32768, 65536] {
-            let mut writer =
-                Writer::new(dir, "org", "stream", entry_size as u64, 1024_1024, buf_size).unwrap();
+            let mut writer = Writer::new(
+                dir,
+                "org",
+                "stream",
+                entry_size.to_string(),
+                1024_1024,
+                buf_size,
+            )
+            .unwrap();
             let data = vec![42u8; entry_size];
             group.bench_function(BenchmarkId::new(buf_size.to_string(), entry_size), |b| {
                 b.iter(|| {

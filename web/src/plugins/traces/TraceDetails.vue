@@ -18,7 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="trace-details full-width" :style="backgroundStyle">
     <div
       class="row q-px-sm"
-      v-if="traceTree.length && !searchObj.data.traceDetails.loading"
+      v-if="
+        traceTree.length &&
+        !(
+          searchObj.data.traceDetails.isLoadingTraceDetails ||
+          searchObj.data.traceDetails.isLoadingTraceMeta
+        )
+      "
     >
       <div class="full-width flex items-center toolbar flex justify-between">
         <div class="flex items-center">
@@ -149,6 +155,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex items-center">
+          <div
+            class="flex justify-center items-center tw-border tw-pl-2 tw-rounded-sm tw-border-gray-300"
+          >
+            <q-input
+              v-model="searchQuery"
+              placeholder="Search..."
+              @update:model-value="handleSearchQueryChange"
+              dense
+              borderless
+              clearable
+              debounce="500"
+              class="q-mr-sm custom-height flex items-center"
+            />
+            <p class="tw-mr-1" v-if="searchResults">
+              <small
+                ><span>{{ currentIndex + 1 }}</span> of
+                <span>{{ searchResults }}</span></small
+              >
+            </p>
+            <q-btn
+              v-if="searchResults"
+              :disable="currentIndex === 0"
+              class="tw-mr-1 download-logs-btn flex"
+              flat
+              round
+              title="Previous"
+              icon="keyboard_arrow_up"
+              @click="prevMatch"
+              dense
+              :size="`sm`"
+            />
+            <q-btn
+              v-if="searchResults"
+              :disable="currentIndex + 1 === searchResults"
+              class="tw-mr-1 download-logs-btn flex"
+              flat
+              round
+              title="Next"
+              icon="keyboard_arrow_down"
+              @click="nextMatch"
+              dense
+              :size="`sm`"
+            />
+          </div>
           <q-btn
             data-test="logs-search-bar-share-link-btn"
             class="q-mr-sm download-logs-btn"
@@ -160,7 +210,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('search.shareLink')"
             @click="shareLink"
           />
-          <q-btn round flat icon="cancel" size="md" @click="router.back()" />
+          <q-btn
+            round
+            flat
+            icon="cancel"
+            size="md"
+            @click="routeToTracesList"
+          />
         </div>
       </div>
 
@@ -228,17 +284,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
           isTimelineExpanded ? '' : 'full',
         ]"
+        ref="parentContainer"
       >
         <trace-header
           :baseTracePosition="baseTracePosition"
           :splitterWidth="leftWidth"
+          @resize-start="startResize"
         />
         <div class="relative-position full-height">
           <div
             class="trace-tree-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
           >
-            <div class="q-pt-sm position-relative">
+            <div class="position-relative">
               <div
                 :style="{
                   width: '1px',
@@ -247,10 +305,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
                   zIndex: 999,
                   top: '-28px',
-                  height: 'calc(100% + 30px) !important',
+                  height: `${parentHeight}px`,
                   cursor: 'col-resize',
                 }"
-                class="absolute full-height"
+                class="absolute resize"
                 @mousedown="startResize"
               />
               <trace-tree
@@ -260,8 +318,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :spanDimensions="spanDimensions"
                 :spanMap="spanMap"
                 :leftWidth="leftWidth"
+                ref="traceTreeRef"
+                :search-query="searchQuery"
+                :spanList="spanList"
                 @toggle-collapse="toggleSpanCollapse"
                 @select-span="updateSelectedSpan"
+                @update-current-index="handleIndexUpdate"
+                @search-result="handleSearchResult"
               />
             </div>
           </div>
@@ -276,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <trace-details-sidebar
           :span="spanMap[selectedSpanId as string]"
           :baseTracePosition="baseTracePosition"
+          :search-query="searchQuery"
           @view-logs="redirectToLogs"
           @close="closeSidebar"
           @open-trace="openTraceLink"
@@ -283,7 +347,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      v-else-if="searchObj.data.traceDetails.loading"
+      v-else-if="
+        searchObj.data.traceDetails.isLoadingTraceDetails ||
+        searchObj.data.traceDetails.isLoadingTraceMeta
+      "
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
     >
@@ -302,6 +369,7 @@ import {
   watch,
   defineAsyncComponent,
   onBeforeMount,
+  nextTick,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -348,10 +416,11 @@ export default defineComponent({
     TraceTimelineIcon,
     ServiceMapIcon,
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
   },
-  emits: ["shareLink"],
+
+  emits: ["shareLink", "searchQueryUpdated"],
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
@@ -378,6 +447,19 @@ export default defineComponent({
       dotConnectorWidth: 6,
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
+    };
+    const parentContainer = ref<HTMLElement | null>(null);
+    let parentHeight = ref(0);
+    let currentHeight = 0;
+    const updateHeight = async () => {
+      await nextTick();
+      if (parentContainer.value) {
+        const newHeight = parentContainer.value.scrollHeight;
+        if (currentHeight !== newHeight) {
+          currentHeight = newHeight;
+          parentHeight.value = currentHeight;
+        }
+      }
     };
 
     const { showErrorNotification } = useNotifications();
@@ -425,29 +507,43 @@ export default defineComponent({
     const isTimelineExpanded = ref(false);
 
     const selectedStreamsString = computed(() =>
-      searchObj.data.traceDetails.selectedLogStreams.join(", ")
+      searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
 
     const showTraceDetails = ref(false);
+    const currentIndex = ref(0);
+    const searchResults = ref(0);
+    const searchQuery = ref("");
 
-    // Disabled for now
-    // onActivated(() => {
-    //   const params = router.currentRoute.value.query;
-
-    //   // If selected trace is different from the one in the URL, reset the trace details
-    //   // If there is no selected trace, then also reset the trace details
-
-    //   if (
-    //     (searchObj.data.traceDetails.selectedTrace &&
-    //       params.trace_id !==
-    //         searchObj.data.traceDetails.selectedTrace?.trace_id) ||
-    //     !searchObj.data.traceDetails.selectedTrace
-    //   ) {
-    //     resetTraceDetails();
-    //     console.log("resetTraceDetails >>>>>>>>>>>>>");
-    //     setupTraceDetails();
-    //   }
-    // });
+    const handleSearchQueryChange = (value: any) => {
+      searchQuery.value = value;
+    };
+    const traceTreeRef = ref<InstanceType<typeof TraceTree> | null>(null);
+    const nextMatch = () => {
+      if (!traceTreeRef.value) {
+        console.warn("TraceTree component reference not found");
+        return;
+      }
+      if (traceTreeRef.value) {
+        traceTreeRef.value.nextMatch();
+      }
+    };
+    const prevMatch = () => {
+      if (!traceTreeRef.value) {
+        console.warn("TraceTree component reference not found");
+        return;
+      }
+      if (traceTreeRef.value) {
+        traceTreeRef.value.prevMatch();
+      }
+    };
+    const handleIndexUpdate = (newIndex: any) => {
+      currentIndex.value = newIndex; // Update the parent's state with the child's emitted value
+    };
+    const handleSearchResult = (newIndex: any) => {
+      searchResults.value = newIndex; // Update the parent's state with the child's emitted value
+    };
+    // Watch for changes in searchQuery
 
     onBeforeMount(async () => {
       resetTraceDetails();
@@ -462,29 +558,8 @@ export default defineComponent({
         } else {
           searchObj.meta.redirectedFromLogs = false;
         }
-      }
+      },
     );
-
-    // Disabled for now
-    // watch(
-    //   () => router.currentRoute.value.query.trace_id,
-    //   (_new, _old) => {
-    //     // If trace_id changes, reset the trace details
-    //     if (
-    //       _new &&
-    //       _old &&
-    //       _new !== _old &&
-    //       _new !== searchObj.data.traceDetails.selectedTrace?.trace_id
-    //     ) {
-    //       resetTraceDetails();
-    //       // setupTraceDetails();
-    //       const params = router.currentRoute.value.query;
-    //       if (params.span_id) {
-    //         updateSelectedSpan(params.span_id as string);
-    //       }
-    //     }
-    //   },
-    // );
 
     const backgroundStyle = computed(() => {
       return {
@@ -501,7 +576,8 @@ export default defineComponent({
         trace_end_time: 0,
       };
       searchObj.data.traceDetails.spanList = [];
-      searchObj.data.traceDetails.loading = true;
+      searchObj.data.traceDetails.isLoadingTraceDetails = false;
+      searchObj.data.traceDetails.isLoadingTraceMeta = false;
     };
 
     const setupTraceDetails = async () => {
@@ -514,12 +590,12 @@ export default defineComponent({
         .then((res: any) => {
           logStreams.value = res.list.map((option: any) => option.name);
           filteredStreamOptions.value = JSON.parse(
-            JSON.stringify(logStreams.value)
+            JSON.stringify(logStreams.value),
           );
 
           if (!searchObj.data.traceDetails.selectedLogStreams.length)
             searchObj.data.traceDetails.selectedLogStreams.push(
-              logStreams.value[0]
+              logStreams.value[0],
             );
         })
         .catch(() => Promise.reject())
@@ -531,7 +607,15 @@ export default defineComponent({
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
       }
+      nextTick(() => {
+        updateHeight();
+      });
+      // window.addEventListener("resize", updateHeight);
     });
+
+    // onBeforeUnmount(() => {
+    //   window.removeEventListener("resize", updateHeight);
+    // });
 
     // watch(
     //   () => spanList.value.length,
@@ -552,40 +636,58 @@ export default defineComponent({
     });
 
     const getTraceMeta = () => {
-      searchObj.loading = true;
+      try {
+        searchObj.data.traceDetails.isLoadingTraceMeta = true;
 
-      let filter = (router.currentRoute.value.query.filter as string) || "";
+        let filter = (router.currentRoute.value.query.filter as string) || "";
 
-      if (filter?.length)
-        filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
-      else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
+        if (filter?.length)
+          filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
+        else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
 
-      searchService
-        .get_traces({
-          org_identifier: router.currentRoute.value.query
-            .org_identifier as string,
-          start_time: Number(router.currentRoute.value.query.from),
-          end_time: Number(router.currentRoute.value.query.to),
-          filter: filter || "",
-          size: 1,
-          from: 0,
-          stream_name: router.currentRoute.value.query.stream as string,
-        })
-        .then(async (res: any) => {
-          const trace = getTracesMetaData(res.data.hits)[0];
-          if (!trace) {
+        const streamName =
+          (router.currentRoute.value.query.stream as string) ||
+          searchObj.data.stream.selectedStream.value;
+
+        const orgIdentifier =
+          (router.currentRoute.value?.query?.org_identifier as string) ||
+          store.state.selectedOrganization?.identifier;
+
+        searchService
+          .get_traces({
+            org_identifier: orgIdentifier,
+            start_time: Number(router.currentRoute.value.query.from),
+            end_time: Number(router.currentRoute.value.query.to),
+            filter: filter || "",
+            size: 1,
+            from: 0,
+            stream_name: streamName,
+          })
+          .then(async (res: any) => {
+            const trace = getTracesMetaData(res.data.hits)[0];
+            if (!trace) {
+              showTraceDetailsError();
+              return;
+            }
+            searchObj.data.traceDetails.selectedTrace = trace;
+            getTraceDetails({
+              stream: streamName,
+              trace_id: trace.trace_id,
+              from: Number(router.currentRoute.value.query.from),
+              to: Number(router.currentRoute.value.query.to),
+            });
+          })
+          .catch(() => {
             showTraceDetailsError();
-            return;
-          }
-          searchObj.data.traceDetails.selectedTrace = trace;
-          getTraceDetails();
-        })
-        .catch(() => {
-          showTraceDetailsError();
-        })
-        .finally(() => {
-          searchObj.loading = false;
-        });
+          })
+          .finally(() => {
+            searchObj.data.traceDetails.isLoadingTraceMeta = false;
+          });
+      } catch (error) {
+        console.error("Error fetching trace meta:", error);
+        searchObj.data.traceDetails.isLoadingTraceMeta = false;
+        showTraceDetailsError();
+      }
     };
 
     const getDefaultRequest = () => {
@@ -604,49 +706,49 @@ export default defineComponent({
     const buildTraceSearchQuery = (trace: any) => {
       const req = getDefaultRequest();
       req.query.from = 0;
-      req.query.size = 1000;
-      req.query.start_time =
-        Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace?.trace_start_time)
-        ) - 30000000;
-      req.query.end_time =
-        Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace?.trace_end_time)
-        ) + 30000000;
+      req.query.size = 2500;
+      req.query.start_time = trace.from;
+      req.query.end_time = trace.to;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
+        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
       ) as string;
 
       return req;
     };
 
-    const getTraceDetails = async () => {
-      searchObj.data.traceDetails.loading = true;
-      searchObj.data.traceDetails.spanList = [];
-      const req = buildTraceSearchQuery(router.currentRoute.value.query);
+    const getTraceDetails = async (data: any) => {
+      try {
+        searchObj.data.traceDetails.isLoadingTraceDetails = true;
+        searchObj.data.traceDetails.spanList = [];
+        const req = buildTraceSearchQuery(data);
 
-      searchService
-        .search(
-          {
-            org_identifier: router.currentRoute.value.query
-              ?.org_identifier as string,
-            query: req,
-            page_type: "traces",
-          },
-          "UI"
-        )
-        .then((res: any) => {
-          if (!res.data?.hits?.length) {
-            showTraceDetailsError();
-            return;
-          }
-          searchObj.data.traceDetails.spanList = res.data?.hits || [];
-          buildTracesTree();
-        })
-        .finally(() => {
-          searchObj.data.traceDetails.loading = false;
-        });
+        searchService
+          .search(
+            {
+              org_identifier: router.currentRoute.value.query
+                ?.org_identifier as string,
+              query: req,
+              page_type: "traces",
+            },
+            "ui",
+          )
+          .then((res: any) => {
+            if (!res.data?.hits?.length) {
+              showTraceDetailsError();
+              return;
+            }
+            searchObj.data.traceDetails.spanList = res.data?.hits || [];
+            buildTracesTree();
+          })
+          .finally(() => {
+            searchObj.data.traceDetails.isLoadingTraceDetails = false;
+          });
+      } catch (error) {
+        console.error("Error fetching trace details:", error);
+        searchObj.data.traceDetails.isLoadingTraceDetails = false;
+        showTraceDetailsError();
+      }
     };
 
     const getTracesMetaData = (traces: any[]) => {
@@ -683,7 +785,7 @@ export default defineComponent({
 
     const showTraceDetailsError = () => {
       showErrorNotification(
-        `Trace ${router.currentRoute.value.query.trace_id} not found`
+        `Trace ${router.currentRoute.value.query.trace_id} not found`,
       );
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
@@ -807,7 +909,7 @@ export default defineComponent({
           },
           hasChildSpans: !!span.spans.length,
           currentIndex: index,
-        })
+        }),
       );
       if (collapseMapping.value[span.spanId]) {
         if (span.spans.length) {
@@ -818,7 +920,7 @@ export default defineComponent({
           span.totalSpans = span.spans.reduce(
             (acc: number, span: any) =>
               acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
-            0
+            0,
           );
         }
         return (span?.spans?.length || 0) + (span?.totalSpans || 0);
@@ -849,7 +951,7 @@ export default defineComponent({
         currentColumn: any[],
         serviceName: string,
         depth: number,
-        height: number
+        height: number,
       ) => {
         maxHeight[depth] =
           maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
@@ -869,7 +971,7 @@ export default defineComponent({
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
-              getService(_span, children, span.serviceName, depth + 1, height)
+              getService(_span, children, span.serviceName, depth + 1, height),
             );
           } else {
             if (maxDepth < depth) maxDepth = depth;
@@ -878,7 +980,7 @@ export default defineComponent({
         }
         if (span.spans && span.spans.length) {
           span.spans.forEach((span: any) =>
-            getService(span, currentColumn, serviceName, depth + 1, height)
+            getService(span, currentColumn, serviceName, depth + 1, height),
           );
         } else {
           if (maxDepth < depth) maxDepth = depth;
@@ -889,7 +991,7 @@ export default defineComponent({
       });
       traceServiceMap.value = convertTraceServiceMapData(
         cloneDeep(serviceTree),
-        maxDepth
+        maxDepth,
       );
     };
 
@@ -965,8 +1067,8 @@ export default defineComponent({
           x0: absoluteStartTime,
           x1: Number(
             (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
-              4
-            )
+              4,
+            ),
           ),
           fillcolor: spanPositionList.value[i].style.color,
         });
@@ -978,6 +1080,7 @@ export default defineComponent({
       timeRange.value.start = data.start || 0;
       timeRange.value.end = data.end || 0;
       calculateTracePosition();
+      updateHeight();
     };
 
     onMounted(() => {
@@ -985,6 +1088,8 @@ export default defineComponent({
     });
 
     const startResize = (event: any) => {
+      console.log("called");
+
       initialX.value = event.clientX;
       initialWidth.value = leftWidth.value;
 
@@ -1037,7 +1142,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`
+        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
       );
 
       router.push({
@@ -1145,6 +1250,18 @@ export default defineComponent({
       routeToTracesList,
       openTraceLink,
       convertTimeFromNsToMs,
+      searchQuery,
+      handleSearchQueryChange,
+      traceTreeRef,
+      nextMatch,
+      prevMatch,
+      currentIndex,
+      handleIndexUpdate,
+      handleSearchResult,
+      searchResults,
+      parentContainer,
+      parentHeight,
+      updateHeight,
     };
   },
 });
@@ -1311,5 +1428,24 @@ $traceChartCollapseHeight: 42px;
       font-size: 12px;
     }
   }
+}
+.custom-height {
+  height: 34px;
+}
+
+.custom-height .q-field__control,
+.custom-height .q-field__append {
+  height: 100%; /* Ensures the input control fills the container height */
+  line-height: 36px; /* Vertically centers the text inside */
+}
+.resize::after {
+  content: " ";
+  position: absolute;
+  height: 100%;
+  left: -10px;
+  right: -10px;
+  top: 0;
+  bottom: 0;
+  z-index: 999;
 }
 </style>

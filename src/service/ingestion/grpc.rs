@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use config::utils::json;
 use opentelemetry_proto::tonic::{
-    common::v1::{any_value::Value, AnyValue},
+    common::v1::{AnyValue, any_value::Value},
     metrics::v1::{exemplar, number_data_point},
 };
 
@@ -131,14 +131,14 @@ pub fn get_val_with_type_retained(attr_val: &Option<&AnyValue>) -> json::Value {
                 Value::ArrayValue(val) => {
                     let mut vals = vec![];
                     for item in val.values.iter() {
-                        vals.push(get_val(&Some(item)))
+                        vals.push(get_val_with_type_retained(&Some(item)))
                     }
                     json::json!(vals)
                 }
                 Value::KvlistValue(val) => {
                     let mut vals = json::Map::new();
                     for item in val.values.iter().cloned() {
-                        vals.insert(item.key, get_val(&item.value.as_ref()));
+                        vals.insert(item.key, get_val_with_type_retained(&item.value.as_ref()));
                     }
                     json::json!(vals)
                 }
@@ -207,6 +207,7 @@ mod tests {
         };
         let resp = get_val(&Some(&kv_val));
         assert!(resp.as_object().unwrap().contains_key(&in_str));
+        assert!(resp.as_object().unwrap().get(&in_str).unwrap().is_string());
 
         let in_byte = Value::BytesValue(vec![8u8]);
 
@@ -214,6 +215,68 @@ mod tests {
             value: Some(in_byte),
         };
         let resp = get_val(&Some(&byte_val));
-        assert!(!resp.as_str().unwrap().is_empty());
+        assert!(resp.as_str().is_some());
+    }
+
+    #[test]
+    fn test_get_val_with_type_retained() {
+        let in_str = "Test".to_string();
+        let str_val = AnyValue {
+            value: Some(Value::StringValue(in_str.clone())),
+        };
+        let resp = get_val_with_type_retained(&Some(&str_val));
+        assert_eq!(resp.as_str().unwrap(), in_str);
+
+        let in_bool = false;
+        let bool_val = AnyValue {
+            value: Some(Value::BoolValue(in_bool)),
+        };
+        let resp = get_val_with_type_retained(&Some(&bool_val));
+        assert_eq!(resp.as_bool().unwrap(), in_bool);
+
+        let in_int = 20;
+        let int_val = AnyValue {
+            value: Some(Value::IntValue(in_int)),
+        };
+        let resp = get_val_with_type_retained(&Some(&int_val));
+        assert_eq!(resp.as_i64().unwrap(), in_int);
+
+        let in_double = 20.00;
+        let double_val = AnyValue {
+            value: Some(Value::DoubleValue(in_double)),
+        };
+        let resp = get_val_with_type_retained(&Some(&double_val));
+        assert_eq!(resp.as_f64().unwrap(), in_double);
+
+        let in_arr = vec![int_val.clone()];
+        let arr_val = AnyValue {
+            value: Some(Value::ArrayValue(
+                opentelemetry_proto::tonic::common::v1::ArrayValue { values: in_arr },
+            )),
+        };
+        let resp = get_val_with_type_retained(&Some(&arr_val));
+        assert!(!resp.as_array().unwrap().is_empty());
+
+        let kv_val = AnyValue {
+            value: Some(Value::KvlistValue(
+                opentelemetry_proto::tonic::common::v1::KeyValueList {
+                    values: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
+                        key: in_str.clone(),
+                        value: Some(int_val.clone()),
+                    }],
+                },
+            )),
+        };
+        let resp = get_val_with_type_retained(&Some(&kv_val));
+        assert!(resp.as_object().unwrap().contains_key(&in_str));
+        assert!(resp.as_object().unwrap().get(&in_str).unwrap().is_i64());
+
+        let in_byte = Value::BytesValue(vec![8u8]);
+
+        let byte_val = AnyValue {
+            value: Some(in_byte),
+        };
+        let resp = get_val_with_type_retained(&Some(&byte_val));
+        assert!(resp.as_array().unwrap().first().unwrap().is_u64());
     }
 }

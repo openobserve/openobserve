@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
 
 static IDER: Lazy<Mutex<SnowflakeIdGenerator>> = Lazy::new(|| {
@@ -34,12 +35,39 @@ pub fn init() {
 
 /// Generate a distributed unique id with snowflake.
 pub fn generate() -> String {
-    IDER.lock().generate().to_string()
+    IDER.lock().real_time_generate().to_string()
 }
 
 /// Generate a unique id like uuid.
 pub fn uuid() -> String {
     Ksuid::new(None, None).to_string()
+}
+
+/// Generate a new trace_id.
+pub fn generate_trace_id() -> String {
+    let trace_id = crate::utils::rand::get_rand_u128()
+        .unwrap_or_else(|| crate::utils::time::now_micros() as u128);
+    opentelemetry::trace::TraceId::from(trace_id).to_string()
+}
+
+/// Generate a new span_id.
+pub fn generate_span_id() -> String {
+    let mut rng = rand::thread_rng();
+    let mut bytes = [0u8; 8];
+    rng.fill(&mut bytes);
+
+    let hex = hex::encode(bytes);
+
+    if hex == "0000000000000000" {
+        return generate_span_id();
+    }
+
+    hex
+}
+
+/// Convert a snowflake id to a timestamp in milliseconds.
+pub fn to_timestamp_millis(id: i64) -> i64 {
+    id >> 22
 }
 
 /// The `SnowflakeIdGenerator` type is snowflake algorithm wrapper.
@@ -106,7 +134,7 @@ impl SnowflakeIdGenerator {
 
         // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
         // bits, idx complementing bits.
-        self.last_time_millis << 22 | ((self.machine_id << 12) as i64) | (self.idx as i64)
+        (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
     }
 
     /// The basic guarantee time punctuality.
@@ -136,7 +164,7 @@ impl SnowflakeIdGenerator {
 
         // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
         // bits, idx complementing bits.
-        self.last_time_millis << 22 | ((self.machine_id << 12) as i64) | (self.idx as i64)
+        (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
     }
 
     /// The lazy generate.
@@ -153,7 +181,7 @@ impl SnowflakeIdGenerator {
 
         // last_time_millis is 64 bits, left shift 22 bit, store 42 bits, machine_id left shift 12
         // bits, idx complementing bits.
-        self.last_time_millis << 22 | ((self.machine_id << 12) as i64) | (self.idx as i64)
+        (self.last_time_millis << 22) | ((self.machine_id << 12) as i64) | (self.idx as i64)
     }
 }
 
@@ -205,5 +233,45 @@ fn biding_time_conditions(last_time_millis: i64, epoch: SystemTime) -> i64 {
             return latest_time_millis;
         }
         spin_loop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use chrono::TimeZone;
+
+    use super::*;
+
+    #[test]
+    fn test_generate_trace_id() {
+        let trace_id = generate_trace_id();
+        println!("trace_id: {}", trace_id);
+        let trace_id1 = format!("{}-{}", trace_id, "0");
+        let trace_id2 = format!("{}-{}", trace_id1, "abcd");
+
+        let new_id = trace_id
+            .split('-')
+            .next()
+            .and_then(|id| opentelemetry::trace::TraceId::from_hex(id).ok());
+        assert!(new_id.is_some());
+        let new_id = new_id.unwrap();
+        let new_id1 = format!("{}-{}", new_id, "0");
+        let new_id2 = format!("{}-{}", new_id1, "abcd");
+        assert_eq!(new_id2, trace_id2);
+    }
+
+    #[test]
+    fn test_ider_to_timestamp_millis() {
+        let data = [
+            (7232450184620358447, "2024-08-22"),
+            (7317509042887196698, "2025-04-14"),
+        ];
+        for (id, ts) in data {
+            let id_ts = to_timestamp_millis(id);
+            let t = chrono::Utc.timestamp_nanos(id_ts * 1000_000);
+            let td = t.format("%Y-%m-%d").to_string();
+            assert_eq!(td, ts.to_string());
+        }
     }
 }

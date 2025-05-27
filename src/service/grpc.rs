@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,19 @@
 
 use std::sync::Arc;
 
-use config::{get_config, meta::cluster::NodeInfo, utils::rand::get_rand_element, RwAHashMap};
+use config::{RwAHashMap, get_config, meta::cluster::NodeInfo, utils::rand::get_rand_element};
 use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
-use proto::cluster_rpc::{self, metrics_client::MetricsClient, search_client::SearchClient};
+use proto::cluster_rpc::{
+    self, cluster_info_service_client::ClusterInfoServiceClient, metrics_client::MetricsClient,
+    node_service_client::NodeServiceClient, search_client::SearchClient,
+};
 use tonic::{
+    Request, Status,
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
     service::interceptor::InterceptedService,
     transport::{Certificate, Channel, ClientTlsConfig},
-    Request, Status,
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -41,19 +44,11 @@ pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::S
 }
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
-    let cfg = get_config();
-    let nodes = cluster::get_cached_online_ingester_nodes().await;
+    let nodes = cluster::get_cached_schedulable_ingester_nodes().await;
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        if !cfg.route.ingester_srv_url.is_empty() {
-            Ok(format!(
-                "http://{}:{}",
-                cfg.route.ingester_srv_url, cfg.grpc.port
-            ))
-        } else {
-            Err(tonic::Status::internal(
-                "No online ingester nodes".to_string(),
-            ))
-        }
+        Err(tonic::Status::internal(
+            "No online ingester nodes".to_string(),
+        ))
     } else {
         let nodes = nodes.unwrap();
         let node = get_rand_element(&nodes);
@@ -62,6 +57,11 @@ async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
 }
 
 pub(crate) async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
+    // if channel cache is disabled, create a new channel for each request
+    if get_config().grpc.channel_cache_disabled {
+        return create_channel(grpc_addr).await;
+    }
+
     // cache hit
     let r = CHANNELS.read().await;
     if let Some(channel) = r.get(grpc_addr) {
@@ -110,10 +110,13 @@ async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
 
 #[tracing::instrument(name = "grpc:search::make_client", skip_all)]
 pub async fn make_grpc_search_client<T>(
+    trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
-    SearchClient<InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>>,
+    SearchClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+    >,
     Error,
 > {
     let cfg = get_config();
@@ -134,11 +137,13 @@ pub async fn make_grpc_search_client<T>(
         .await
         .map_err(|err| {
             log::error!(
-                "search->grpc: node: {}, connect err: {:?}",
+                "[trace_id {trace_id}] search->grpc: node: {}, connect err: {:?}",
                 &node.get_grpc_addr(),
                 err
             );
-            Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
+            let err = ErrorCodes::from_json(err.message())
+                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+            Error::ErrorCode(err)
         })?;
     let client = cluster_rpc::search_client::SearchClient::with_interceptor(
         channel,
@@ -161,7 +166,9 @@ pub async fn make_grpc_metrics_client<T>(
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
-    MetricsClient<InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>>,
+    MetricsClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+    >,
     Error,
 > {
     let cfg = get_config();
@@ -194,9 +201,9 @@ pub async fn make_grpc_metrics_client<T>(
                 &node.get_grpc_addr(),
                 err
             );
-            Error::ErrorCode(ErrorCodes::ServerInternalError(
-                "connect search node error".to_string(),
-            ))
+            let err = ErrorCodes::from_json(err.message())
+                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+            Error::ErrorCode(err)
         })?;
     let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
         channel,
@@ -212,5 +219,104 @@ pub async fn make_grpc_metrics_client<T>(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    Ok(client)
+}
+
+#[tracing::instrument(name = "grpc:node:make_client", skip_all)]
+pub async fn make_grpc_node_client<T>(
+    trace_id: &str,
+    request: &mut Request<T>,
+    node: &Arc<dyn NodeInfo>,
+) -> Result<
+    NodeServiceClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+    >,
+    Error,
+> {
+    let cfg = get_config();
+    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(
+            &tracing::Span::current().context(),
+            &mut MetadataMap(request.metadata_mut()),
+        )
+    });
+
+    let token: MetadataValue<_> = node
+        .get_auth_token()
+        .parse()
+        .map_err(|_| Error::Message("invalid token".to_string()))?;
+    let channel = get_cached_channel(&node.get_grpc_addr())
+        .await
+        .map_err(|err| {
+            log::error!(
+                "[trace_id {trace_id}] node->grpc: node: {}, connect err: {:?}",
+                &node.get_grpc_addr(),
+                err
+            );
+            let err = ErrorCodes::from_json(err.message())
+                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+            Error::ErrorCode(err)
+        })?;
+    let client = cluster_rpc::node_service_client::NodeServiceClient::with_interceptor(
+        channel,
+        move |mut req: Request<()>| {
+            req.metadata_mut().insert("authorization", token.clone());
+            Ok(req)
+        },
+    );
+    Ok(client
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024))
+}
+
+#[tracing::instrument(name = "grpc:cluster_info:make_client", skip_all)]
+pub async fn make_grpc_cluster_info_client<T>(
+    trace_id: &str,
+    request: &mut Request<T>,
+    node: &Arc<dyn NodeInfo>,
+) -> Result<
+    ClusterInfoServiceClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+    >,
+    Error,
+> {
+    let cfg = get_config();
+    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(
+            &tracing::Span::current().context(),
+            &mut MetadataMap(request.metadata_mut()),
+        )
+    });
+
+    let token: MetadataValue<_> = node
+        .get_auth_token()
+        .parse()
+        .map_err(|_| Error::Message("invalid token".to_string()))?;
+    let channel = get_cached_channel(&node.get_grpc_addr())
+        .await
+        .map_err(|err| {
+            log::error!(
+                "[trace_id {trace_id}] cluster_info->grpc: node: {}, connect err: {:?}",
+                &node.get_grpc_addr(),
+                err
+            );
+            let err = ErrorCodes::from_json(err.message())
+                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+            Error::ErrorCode(err)
+        })?;
+    let client =
+        cluster_rpc::cluster_info_service_client::ClusterInfoServiceClient::with_interceptor(
+            channel,
+            move |mut req: Request<()>| {
+                req.metadata_mut().insert("authorization", token.clone());
+                Ok(req)
+            },
+        );
     Ok(client)
 }

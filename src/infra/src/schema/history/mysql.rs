@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,8 @@ use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     db::{
-        mysql::{create_index, CLIENT},
         IndexStatement,
+        mysql::{CLIENT, CLIENT_DDL, create_index},
     },
     errors::{Error, Result},
 };
@@ -60,7 +60,7 @@ impl super::SchemaHistory for MysqlSchemaHistory {
         let value = json::to_string(&schema)?;
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["insert", "schema_history"])
+            .with_label_values(&["insert", "schema_history", ""])
             .inc();
         match sqlx::query(
             r#"
@@ -69,7 +69,7 @@ INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, valu
             "#,
         )
         .bind(org_id)
-        .bind(stream_type.to_string())
+        .bind(stream_type.as_str())
         .bind(stream_name)
         .bind(start_dt)
         .bind(value)
@@ -90,9 +90,9 @@ INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, valu
 }
 
 pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     DB_QUERY_NUMS
-        .with_label_values(&["create", "schema_history"])
+        .with_label_values(&["create", "schema_history", ""])
         .inc();
     sqlx::query(
         r#"

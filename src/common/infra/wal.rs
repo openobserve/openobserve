@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,16 +17,15 @@ use std::{path::Path, sync::Arc};
 
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
-    get_config, ider,
+    FILE_EXT_JSON, get_config, ider,
     meta::stream::{PartitionTimeLevel, StreamParams, StreamType},
     metrics,
     utils::async_file::get_file_contents,
-    FILE_EXT_JSON,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{
-    fs::{create_dir_all, File, OpenOptions},
+    fs::{File, OpenOptions, create_dir_all},
     io::AsyncWriteExt,
     sync::RwLock,
 };
@@ -310,10 +309,10 @@ impl RwFile {
     pub async fn write(&self, data: &[u8]) {
         // metrics
         metrics::INGEST_WAL_USED_BYTES
-            .with_label_values(&[&self.org_id, self.stream_type.to_string().as_str()])
+            .with_label_values(&[&self.org_id, self.stream_type.as_str()])
             .add(data.len() as i64);
         metrics::INGEST_WAL_WRITE_BYTES
-            .with_label_values(&[&self.org_id, self.stream_type.to_string().as_str()])
+            .with_label_values(&[&self.org_id, self.stream_type.as_str()])
             .inc_by(data.len() as u64);
 
         self.file
@@ -405,7 +404,7 @@ pub fn clean_lock_files() {
 }
 
 pub fn lock_request(trace_id: &str, files: &[String]) {
-    log::info!("[trace_id {}] lock_request for wal files", trace_id);
+    log::info!("[trace_id: {}] lock_request for wal files", trace_id);
     let mut locker = SEARCHING_REQUESTS.write();
     locker.insert(trace_id.to_string(), files.to_vec());
 }
@@ -414,7 +413,7 @@ pub fn release_request(trace_id: &str) {
     if !config::cluster::LOCAL_NODE.is_ingester() {
         return;
     }
-    log::info!("[trace_id {}] release_request for wal files", trace_id);
+    log::info!("[trace_id: {}] release_request for wal files", trace_id);
     let mut locker = SEARCHING_REQUESTS.write();
     let files = locker.remove(trace_id);
     locker.shrink_to_fit();

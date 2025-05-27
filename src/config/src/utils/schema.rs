@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,11 +26,14 @@ use regex::Regex;
 use serde_json::{Map, Value};
 
 use super::str::find;
-use crate::{get_config, meta::stream::StreamType, FxIndexMap};
+use crate::{
+    FxIndexMap, TIMESTAMP_COL_NAME,
+    meta::{promql::HASH_LABEL, stream::StreamType},
+};
 
 const MAX_PARTITION_KEY_LENGTH: usize = 100;
 
-static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
+static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_:]+").unwrap());
 
 pub fn infer_json_schema<R: BufRead>(
     reader: R,
@@ -170,7 +173,9 @@ fn convert_data_type(
         | (DataType::Int64, DataType::Utf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
-        (DataType::Int64, DataType::Boolean) | (DataType::UInt64, DataType::Boolean) => {}
+        (DataType::UInt64, DataType::Int64)
+        | (DataType::UInt64, DataType::Boolean)
+        | (DataType::Int64, DataType::Boolean) => {}
         (DataType::UInt64, DataType::Float64) | (DataType::UInt64, DataType::Utf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
@@ -192,6 +197,7 @@ fn convert_data_type(
 }
 
 /// Fix the schema to ensure that the start_time and end_time fields are always present with uint64
+/// and the __hash__ field is always present with uint64
 /// and that null fields are removed and sort the fields by name.
 fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
     let mut fields = if stream_type == StreamType::Traces {
@@ -225,16 +231,20 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
             })
             .collect::<Vec<_>>()
     };
-    let cfg = get_config();
     fields = fields
         .into_iter()
         .map(|x| {
-            if x.name() == &cfg.common.column_timestamp {
+            if x.name() == TIMESTAMP_COL_NAME {
                 Arc::new(Field::new(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     DataType::Int64,
                     false,
                 ))
+            } else if stream_type == StreamType::Metrics
+                && x.data_type() == &DataType::Int64
+                && x.name() == HASH_LABEL
+            {
+                Arc::new(Field::new(x.name().clone(), DataType::UInt64, false))
             } else {
                 x
             }
@@ -260,10 +270,16 @@ pub fn format_partition_key(input: &str) -> String {
 
 // format stream name
 pub fn format_stream_name(stream_name: &str) -> String {
-    RE_CORRECT_STREAM_NAME
-        .replace_all(stream_name, "_")
-        .to_string()
-        .to_lowercase()
+    if crate::get_config().common.format_stream_name_to_lower {
+        RE_CORRECT_STREAM_NAME
+            .replace_all(stream_name, "_")
+            .to_string()
+            .to_lowercase()
+    } else {
+        RE_CORRECT_STREAM_NAME
+            .replace_all(stream_name, "_")
+            .to_string()
+    }
 }
 
 /// match a source is a needed file or not, return true if needed

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,8 @@ use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     db::{
-        sqlite::{create_index, CLIENT_RW},
         IndexStatement,
+        sqlite::{CLIENT_RW, create_index},
     },
     errors::{Error, Result},
 };
@@ -67,7 +67,7 @@ INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
         "#,
         )
         .bind(org_id)
-        .bind(stream_type.to_string())
+        .bind(stream_type.as_str())
         .bind(stream_name)
         .bind(start_dt)
         .bind(value)

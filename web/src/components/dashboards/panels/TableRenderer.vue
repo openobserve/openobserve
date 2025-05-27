@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       'my-sticky-virtscroll-table',
       { 'no-position-absolute': store.state.printMode },
+      { 'wrap-enabled': wrapCells },
     ]"
     virtual-scroll
     v-model:pagination="pagination"
@@ -32,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="tableRef"
     data-test="dashboard-panel-table"
     @row-click="(...args: any) => $emit('row-click', ...args)"
+    hide-no-data
   >
     <template v-slot:body-cell="props">
       <q-td :props="props" :style="getStyle(props)">
@@ -105,18 +107,18 @@ export default defineComponent({
                     ? col.field(row)
                     : row[col.field === void 0 ? col.name : col.field],
                   col.format,
-                  row
-                )
+                  row,
+                ),
               )
-              .join(",")
-          )
+              .join(","),
+          ),
         )
         .join("\r\n");
 
       const status = exportFile(
         (title ?? "table-export") + ".csv",
         content,
-        "text/csv"
+        "text/csv",
       );
 
       if (status === true) {
@@ -128,6 +130,35 @@ export default defineComponent({
       }
     };
 
+    const downloadTableAsJSON = (title?: string) => {
+      try {
+        // Create JSON structure with columns and rows
+        const jsonContent = {
+          columns: props?.data?.columns,
+          rows: tableRef?.value?.filteredSortedRows || [],
+        };
+
+        const content = JSON.stringify(jsonContent, null, 2);
+
+        const status = exportFile(
+          (title ?? "table-export") + ".json",
+          content,
+          "application/json",
+        );
+
+        if (status === true) {
+          showPositiveNotification("Table downloaded as a JSON file", {
+            timeout: 2000,
+          });
+        } else {
+          showErrorNotification("Browser denied file download...");
+        }
+      } catch (error) {
+        console.error("Error downloading JSON:", error);
+        showErrorNotification("Failed to download data as JSON");
+      }
+    };
+
     const getStyle = (rowData: any) => {
       const value = rowData?.row[rowData?.col?.field] ?? rowData?.value;
 
@@ -135,7 +166,7 @@ export default defineComponent({
       const foundValue = findFirstValidMappedValue(
         value,
         props?.valueMapping,
-        "color"
+        "color",
       );
 
       if (foundValue && foundValue?.color) {
@@ -169,6 +200,7 @@ export default defineComponent({
         rowsPerPage: 0,
       }),
       downloadTableAsCSV,
+      downloadTableAsJSON,
       tableRef,
       getStyle,
       store,
@@ -227,6 +259,14 @@ export default defineComponent({
     /* bg color is important for th; just specify one */
     //   background-color: #fff;
     background-color: $dark-page !important;
+  }
+}
+
+.wrap-enabled {
+  :deep(.q-td) {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal !important;
   }
 }
 </style>

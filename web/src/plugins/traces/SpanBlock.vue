@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       borderBottom:
         (isSpanSelected && `2px solid ${span.style.color}`) || 'none',
     }"
+    :id="span.spanId"
   >
     <div
       class="flex justify-between items-end cursor-pointer span-block relative-position"
@@ -181,7 +182,7 @@ export default defineComponent({
 
     const isSpanSelected = computed(() => {
       return searchObj.data.traceDetails.expandedSpans.includes(
-        props.span.spanId
+        props.span.spanId,
       );
     });
 
@@ -199,12 +200,27 @@ export default defineComponent({
         (
           (props.span?.durationMs / props.baseTracePosition?.durationMs) *
           100
-        ).toFixed(2)
+        ).toFixed(2),
       );
     };
 
     onMounted(async () => {
       durationStyle.value = getDurationStyle();
+      const params = router.currentRoute.value.query;
+      const spanId = Array.isArray(params.span_id)
+        ? params.span_id[0]
+        : params.span_id; // Ensure it's a single string
+
+      if (spanId) {
+        const element = document.getElementById(spanId);
+        if (element) {
+          element.scrollIntoView({
+            behavior: "smooth", // Smooth scrolling
+            block: "center", // Attempt to align the element at the center of the screen
+            inline: "nearest", // Keep horizontal alignment as close as possible
+          });
+        }
+      }
     });
 
     watch(
@@ -214,7 +230,7 @@ export default defineComponent({
       },
       {
         immediate: true,
-      }
+      },
     );
 
     watch(
@@ -225,21 +241,24 @@ export default defineComponent({
       {
         immediate: true,
         deep: true,
-      }
+      },
     );
 
     watch(
       () => props.span?.durationMs + props.baseTracePosition?.durationMs,
       () => {
         spanWidth.value = getSpanWidth();
-      }
+      },
+      {
+        immediate: true,
+      },
     );
 
     watch(
       () => spanBlockWidth.value + leftPosition.value + spanWidth.value,
       (val) => {
         durationStyle.value = getDurationStyle();
-      }
+      },
     );
 
     const getDurationStyle = () => {
@@ -285,7 +304,7 @@ export default defineComponent({
       } else {
         searchObj.data.traceDetails.expandedSpans =
           searchObj.data.traceDetails.expandedSpans.filter(
-            (val) => props.span.spanId !== val
+            (val) => props.span.spanId !== val,
           );
       }
     };

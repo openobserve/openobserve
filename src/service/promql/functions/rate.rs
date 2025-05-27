@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,13 +15,13 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{extrapolated_rate, ExtrapolationKind, RangeValue, Value};
+use crate::service::promql::value::{ExtrapolationKind, RangeValue, Value, extrapolated_rate};
 
-pub(crate) fn rate(data: &Value) -> Result<Value> {
+pub(crate) fn rate(data: Value) -> Result<Value> {
     super::eval_idelta(data, "rate", exec, false)
 }
 
-fn exec(series: &RangeValue) -> Option<f64> {
+fn exec(series: RangeValue) -> Option<f64> {
     let tw = series
         .time_window
         .as_ref()

@@ -84,7 +84,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                   style="min-width: 480px"
                 />
+                <div class="alert-select-folder-dropdown-list">
+                  <SelectFolderDropDown
+                    :disableDropdown="beingUpdated"
+                    :type="'alerts'"
+                    @folder-selected="updateActiveFolderId"
+                    :activeFolderId="activeFolderId"
+                    :style="'height: 30px'"
+                  />
+                </div>
               </div>
+
               <div
                 class="flex justify-start items-center"
                 style="padding-top: 0px"
@@ -155,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.is_real_time"
                 :checked="formData.is_real_time"
                 val="false"
-                :label="t('alerts.standard')"
+                :label="t('alerts.scheduled')"
                 class="q-ml-none"
               />
               <q-radio
@@ -349,26 +359,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="q-pl-sm">
                 <q-btn
-                data-test="create-destination-btn"
-                icon="refresh"
-                title="Refresh latest Destinations"
-                class="text-bold no-border"
-                no-caps
-                flat
-                dense
-                @click="$emit('refresh:destinations')"
-              />
+                  data-test="create-destination-btn"
+                  icon="refresh"
+                  title="Refresh latest Destinations"
+                  class="text-bold no-border"
+                  no-caps
+                  flat
+                  dense
+                  @click="$emit('refresh:destinations')"
+                />
               </div>
               <div class="q-pl-sm">
                 <q-btn
-                data-test="create-destination-btn"
-                label="Create Destination"
-                class="text-bold no-border"
-                color="secondary"
-                no-caps
-                @click="routeToCreateDestination"
-
-              />
+                  data-test="create-destination-btn"
+                  label="Create Destination"
+                  class="text-bold no-border"
+                  color="secondary"
+                  no-caps
+                  @click="routeToCreateDestination"
+                />
               </div>
             </div>
 
@@ -429,6 +438,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="add-alert-submit-btn"
                 :label="t('alerts.save')"
+                :loading="isAlertSaving"
+                :disable="isAlertSaving"
                 class="q-mb-md text-bold no-border q-ml-md"
                 color="secondary"
                 padding="sm xl"
@@ -449,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :formData="formData"
             :query="previewQuery"
             :selectedTab="scheduledAlertRef?.tab || 'custom'"
-            :aggregationEnabled="isAggregationEnabled"
+            :isAggregationEnabled="isAggregationEnabled"
           />
         </div>
       </div>
@@ -494,7 +505,9 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { convertDateToTimestamp } from "@/utils/date";
+
+import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import cronParser from "cron-parser";
 
 const defaultValue: any = () => {
   return {
@@ -547,6 +560,7 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
+    folder_id: "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -572,6 +586,7 @@ export default defineComponent({
     RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
     VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
     PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
+    SelectFolderDropDown,
   },
   setup(props) {
     const store: any = useStore();
@@ -639,6 +654,16 @@ export default defineComponent({
 
     const showTimezoneWarning = ref(false);
 
+    const activeFolderId = ref(
+      router.currentRoute.value.query.folder || "default",
+    );
+
+    const isAlertSaving = ref(false);
+
+    const updateActiveFolderId = (folderId: any) => {
+      activeFolderId.value = folderId.value;
+    };
+
     onBeforeMount(async () => {
       await importSqlParser();
       await getAllFunctions();
@@ -690,6 +715,7 @@ export default defineComponent({
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
+    const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
     onMounted(async () => {});
 
@@ -746,11 +772,14 @@ export default defineComponent({
     watch(
       () => props.destinations.length, // Watch for length changes
       (newLength, oldLength) => {
-        formData.value.destinations  = formData.value.destinations.filter((destination : any) => {
-          return props.destinations.some((dest:any) => {
-            return dest.name === destination});
-        });
-      }
+        formData.value.destinations = formData.value.destinations.filter(
+          (destination: any) => {
+            return props.destinations.some((dest: any) => {
+              return dest.name === destination;
+            });
+          },
+        );
+      },
     );
 
     watch(
@@ -1144,6 +1173,28 @@ export default defineComponent({
         return false;
       }
 
+      if (input.trigger_condition.frequency_type === "cron") {
+        try {
+          cronParser.parseExpression(input.trigger_condition.cron);
+        } catch (err) {
+          console.log(err);
+          scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
+          return;
+        }
+      }
+
+      scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
+
+      if (scheduledAlertRef.value.cronJobError) {
+        notify &&
+          q.notify({
+            type: "negative",
+            message: scheduledAlertRef.value.cronJobError,
+            timeout: 1500,
+          });
+        return false;
+      }
+
       return true;
     };
 
@@ -1166,6 +1217,10 @@ export default defineComponent({
       query.query.start_time = query.query.start_time + 780000000;
 
       query.query.sql = formData.value.query_condition.sql;
+      //removed the encoding as it is not required for the alert queries
+      if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
+        delete query.encoding;
+      }
 
       if (formData.value.query_condition.vrl_function)
         query.query.query_fn = b64EncodeUnicode(
@@ -1177,16 +1232,17 @@ export default defineComponent({
           .search({
             org_identifier: store.state.selectedOrganization.identifier,
             query,
-            page_type: "logs",
+            page_type: formData.value.stream_type,
           })
           .then((res: any) => {
             sqlQueryErrorMsg.value = "";
 
             if (res.data?.function_error) {
               vrlFunctionError.value = res.data.function_error;
+              let msg = vrlFunctionError.value || "Invalid VRL Function";
               q.notify({
                 type: "negative",
-                message: "Invalid VRL Function",
+                message: msg,
                 timeout: 3000,
               });
               reject("function_error");
@@ -1228,13 +1284,25 @@ export default defineComponent({
 
     const routeToCreateDestination = () => {
       const url = router.resolve({
-          name: "alertDestinations",
-          query: {
-            action: "add",
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }).href;
+        name: "alertDestinations",
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      }).href;
       window.open(url, "_blank");
+    };
+
+    const HTTP_FORBIDDEN = 403;
+
+    const handleAlertError = (err: any) => {
+      if (err.response?.status !== HTTP_FORBIDDEN) {
+        console.log(err);
+        q.notify({
+          type: "negative",
+          message: err.response?.data?.message || err.response?.data?.error,
+        });
+      }
     };
 
     return {
@@ -1297,11 +1365,15 @@ export default defineComponent({
       sqlQueryErrorMsg,
       vrlFunctionError,
       updateFunctionVisibility,
-      convertDateToTimestamp,
       getTimezonesByOffset,
       showTimezoneWarning,
       updateMultiTimeRange,
       routeToCreateDestination,
+      handleAlertError,
+      activeFolderId,
+      updateActiveFolderId,
+      alertType,
+      isAlertSaving,
     };
   },
 
@@ -1309,7 +1381,17 @@ export default defineComponent({
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
+    if (!this.isUpdated) {
+      this.formData.is_real_time = this.alertType === "realTime" ? true : false;
+    }
     this.formData.is_real_time = this.formData.is_real_time.toString();
+
+    // Set default frequency to min_auto_refresh_interval
+    if (this.store.state?.zoConfig?.min_auto_refresh_interval)
+      this.formData.trigger_condition.frequency = Math.ceil(
+        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 1,
+      );
+
     this.beingUpdated = this.isUpdated;
     this.updateStreams(false)?.then(() => {
       this.updateEditorContent(this.formData.stream_name);
@@ -1382,6 +1464,9 @@ export default defineComponent({
     async onSubmit() {
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
+      // made the isAlertSaving to true to disable the save button
+      // and also added a spinner to the save button
+      this.isAlertSaving = true;
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       if (
@@ -1394,6 +1479,7 @@ export default defineComponent({
           message: "Selecting all Columns in SQL query is not allowed.",
           timeout: 1500,
         });
+        this.isAlertSaving = false;
         return false;
       }
 
@@ -1403,6 +1489,7 @@ export default defineComponent({
           message: "Please select stream name.",
           timeout: 1500,
         });
+        this.isAlertSaving = false;
         return false;
       }
 
@@ -1410,39 +1497,22 @@ export default defineComponent({
         this.formData.is_real_time == "false" &&
         this.formData.trigger_condition.frequency_type == "cron"
       ) {
-        const now = new Date();
-
-        // Get the day, month, and year from the date object
-        const day = String(now.getDate()).padStart(2, "0");
-        const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
-        const year = now.getFullYear();
-
-        // Combine them in the DD-MM-YYYY format
-        const date = `${day}-${month}-${year}`;
-
-        // Get the hours and minutes, ensuring they are formatted with two digits
-        const hours = String(now.getHours()).padStart(2, "0");
-        const minutes = String(now.getMinutes()).padStart(2, "0");
-
-        // Combine them in the HH:MM format
-        const time = `${hours}:${minutes}`;
-
-        const convertedDateTime = this.convertDateToTimestamp(
-          date,
-          time,
+        this.formData.tz_offset = getTimezoneOffset(
           this.formData.trigger_condition.timezone,
         );
-
-        this.formData.tz_offset = convertedDateTime.offset;
       }
 
       this.addAlertForm.validate().then(async (valid: any) => {
         if (!valid) {
+          this.isAlertSaving = false;
           return false;
         }
 
         const payload = this.getAlertPayload();
-        if (!this.validateInputs(payload)) return;
+        if (!this.validateInputs(payload)) {
+          this.isAlertSaving = false;
+          return;
+        }
 
         const dismiss = this.q.notify({
           spinner: true,
@@ -1463,38 +1533,35 @@ export default defineComponent({
           } catch (error) {
             dismiss();
             console.log("Error while validating sql query");
+            this.isAlertSaving = false;
             return false;
           }
         }
 
         if (this.beingUpdated) {
-          callAlert = alertsService.update(
+          payload.folder_id =
+            this.router.currentRoute.value.query.folder || "default";
+          callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
-            payload.stream_name,
-            payload.stream_type,
             payload,
+            this.activeFolderId,
           );
           callAlert
             .then((res: { data: any }) => {
               this.formData = { ...defaultValue };
-              this.$emit("update:list");
+              this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
+              this.isAlertSaving = false;
               this.q.notify({
                 type: "positive",
                 message: `Alert updated successfully.`,
               });
             })
             .catch((err: any) => {
+              this.isAlertSaving = false;
               dismiss();
-              if(err.response?.status != 403){
-                this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
-                });
-              }
-              
+              this.handleAlertError(err);
             });
           segment.track("Button Click", {
             button: "Update Alert",
@@ -1506,34 +1573,29 @@ export default defineComponent({
           });
           return;
         } else {
-          callAlert = alertsService.create(
+          payload.folder_id = this.activeFolderId;
+          callAlert = alertsService.create_by_alert_id(
             this.store.state.selectedOrganization.identifier,
-            payload.stream_name,
-            payload.stream_type,
             payload,
+            this.activeFolderId,
           );
 
           callAlert
             .then((res: { data: any }) => {
               this.formData = { ...defaultValue };
-              this.$emit("update:list");
+              this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
+              this.isAlertSaving = false;
               this.q.notify({
                 type: "positive",
                 message: `Alert saved successfully.`,
               });
             })
             .catch((err: any) => {
+              this.isAlertSaving = false;
               dismiss();
-              if(err.response?.status != 403){
-                this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
-                });
-              }
-              
+              this.handleAlertError(err);
             });
           segment.track("Button Click", {
             button: "Save Alert",

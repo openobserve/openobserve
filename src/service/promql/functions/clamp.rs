@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,10 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
+use crate::service::promql::value::{InstantValue, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
-pub(crate) fn clamp(data: &Value, min: f64, max: f64) -> Result<Value> {
+pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
     let vec = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(Value::None),
@@ -30,12 +30,12 @@ pub(crate) fn clamp(data: &Value, min: f64, max: f64) -> Result<Value> {
     };
 
     let out = vec
-        .iter()
-        .map(|instant| {
+        .into_iter()
+        .map(|mut instant| {
             let value = instant.sample.value.clamp(min, max);
             InstantValue {
+                labels: std::mem::take(&mut instant.labels),
                 sample: Sample::new(instant.sample.timestamp, value),
-                labels: instant.labels.without_metric_name(),
             }
         })
         .collect();

@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                    <div class="field_overlay">
+                    <div v-if="!hideAddSearchTerm" class="field_overlay">
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
@@ -88,6 +88,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-mr-sm"
                         @click.stop="addSearchTerm(`${props.row.name}=''`)"
                         round
+                      />
+                    </div>
+                    <div v-if="!hideCopyValue" style="background-color: #E8E8E8;"  class="field_overlay">
+                      <q-btn
+                        :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
+                        icon="content_copy"
+                        size="10px"
+                        class="q-mr-sm"
+                        @click.stop="copyContentValue(props.row.name)"
+                        round
+                        flat
+                        dense
                       />
                     </div>
                   </div>
@@ -121,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         []"
                         :key="value.key"
                       >
-                        <q-list dense>
+                        <q-list  dense>
                           <q-item tag="label" class="q-pr-none">
                             <div
                               class="flex row wrap justify-between"
@@ -143,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </div>
                             </div>
                             <div
+                            v-if="!hideIncludeExlcude"
                               class="flex row"
                               :class="
                                 store.state.theme === 'dark'
@@ -179,6 +192,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <q-icon>
                                   <NotEqualIcon></NotEqualIcon>
                                 </q-icon>
+                              </q-btn>
+                            </div>
+                            <div
+                            v-if="!hideCopyValue"
+                              class="flex row"
+                              :class="
+                                store.state.theme === 'dark'
+                                  ? 'text-white'
+                                  : 'text-black'
+                              "
+                            >
+                              <q-btn
+                                class="q-ml-md"
+                                size="8px"
+                                title="Copy Value"
+                                round
+                                dense 
+                                flat
+                                @click="
+                                 copyContentValue(value.key)
+                                "
+                              >
+                                <q-icon  name="content_copy"></q-icon>
+   
                               </q-btn>
                             </div>
                           </q-item>
@@ -253,6 +290,18 @@ export default defineComponent({
       type: String,
       default: "logs",
     },
+    hideIncludeExlcude:{
+      type: Boolean,
+      default: false,
+    },
+    hideCopyValue:{
+      type: Boolean,
+      default: true,
+    },
+    hideAddSearchTerm:{
+      type: Boolean,
+      default: false,
+    }
   },
   emits: ["event-emitted"],
   setup(props, { emit }) {
@@ -332,6 +381,14 @@ export default defineComponent({
       emit("event-emitted", "add-field", term);
     };
 
+    const copyContentValue = (value: string) => {
+      navigator.clipboard.writeText(value);
+      $q.notify({
+        type: "positive",
+        message: "Value copied to clipboard",
+      });
+    };
+
     return {
       t,
       store,
@@ -343,6 +400,7 @@ export default defineComponent({
       fieldValues,
       outlinedAdd,
       filterFieldValue,
+      copyContentValue,
     };
   },
 });

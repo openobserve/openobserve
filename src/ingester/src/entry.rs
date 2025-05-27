@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,11 +21,12 @@ use std::{
 use arrow::{array::Int64Array, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use config::utils::record_batch_ext::{convert_json_to_record_batch, RecordBatchExt};
+use config::utils::record_batch_ext::{RecordBatchExt, convert_json_to_record_batch};
+use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::errors::*;
-
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Entry {
     pub stream: Arc<str>,
     pub schema: Option<Arc<Schema>>,
@@ -160,7 +161,7 @@ fn pop_time_range(
 ) -> (i64, i64) {
     let mut min_ts = 0;
     let mut max_ts = 0;
-    let time_field = config::get_config().common.column_timestamp.to_string();
+    let time_field = config::TIMESTAMP_COL_NAME.to_string();
     let min_field = min_field.unwrap_or(time_field.as_str());
     let max_field = max_field.unwrap_or(time_field.as_str());
     if min_field == max_field {

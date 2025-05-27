@@ -22,72 +22,178 @@ export enum ColorModeWithoutMinMax {
   FIXED = "fixed",
 }
 
-export const classicColorPalette = [
-  "#FFCDD2",
+// Light theme colors
+export const classicColorPaletteLightTheme = [
+  // "#FFADAD",
+  // "#FF8F8F",
+  "#FF7070",
+  "#FF5A5A",
+
+  // "#FFA0C4",
+  // "#FF82B1",
+  "#FF6B9E",
+  "#FF5394",
+
+  // "#E69AE6",
+  // "#E382D8",
+  "#DB6BCC",
+  "#D452C0",
+
+  // "#B8A5E6",
+  // "#A58CDB",
+  "#9273D1",
+  "#7E5AC2",
+
+  // "#A3B1E6",
+  // "#8A9ADA",
+  "#6F7FCB",
+  "#5766C0",
+
+  // "#A5D1F9",
+  // "#82C1F9",
+  "#66A5F6",
+  "#5AAAF5",
+
+  // "#82DCF9",
+  // "#66D1FA",
+  "#4ABEF7",
+  "#4ABEF7",
+
+  // "#82E0E8",
+  // "#66D4E0",
+  "#4ACCDA",
+  "#4ACCDA",
+
+  // "#82CABE",
+  // "#66BFB4",
+  "#4DB3A6",
+  "#4DB3A6",
+
+  // "#A5D6A7",
+  // "#8FD091",
+  "#7ACC7A",
+  "#66C266",
+
+  // "#D4E580",
+  // "#C5E36B",
+  "#BEDA66",
+  "#B3D45C",
+
+  // "#F2F480",
+  // "#EEF06B",
+  "#E6DC66",
+  "#E0D75C",
+
+  // "#FFF566",
+  // "#FFF380",
+  // "#FFF166",
+  "#FFEE5A",
+
+  // "#FFDD80",
+  // "#FFD666",
+  "#FFCC4D",
+  "#FFC740",
+
+  // "#FFCC99",
+  // "#FFC080",
+  "#FFB366",
+  "#FFA94D",
+
+  // "#FFBAA6",
+  // "#FFA682",
+  "#FF9673",
+  "#FF8F5A",
+];
+
+// Dark theme colors
+export const classicColorPaletteDarkTheme = [
+  // "#FFCDD2",
   "#EF9A9A",
   "#E57373",
-  "#EF5350",
-  "#F8BBD0",
+  // "#EF5350",
+
+  // "#F8BBD0",
   "#F48FB1",
   "#F06292",
-  "#EC407A",
-  "#E1BEE7",
+  // "#EC407A",
+
+  // "#E1BEE7",
   "#CE93D8",
   "#BA68C8",
-  "#AB47BC",
-  "#D1C4E9",
+  // "#AB47BC",
+
+  // "#D1C4E9",
   "#B39DDB",
   "#9575CD",
-  "#7E57C2",
-  "#C5CAE9",
+  // "#7E57C2",
+
+  // "#C5CAE9",
   "#9FA8DA",
   "#7986CB",
-  "#5C6BC0",
-  "#BBDEFB",
+  // "#5C6BC0",
+
+  // "#BBDEFB",
   "#90CAF9",
   "#64B5F6",
-  "#42A5F5",
-  "#B3E5FC",
+  // "#42A5F5",
+
+  // "#B3E5FC",
   "#81D4FA",
   "#4FC3F7",
-  "#29B6F6",
-  "#B2EBF2",
+  // "#29B6F6",
+
+  // "#B2EBF2",
   "#80DEEA",
   "#4DD0E1",
-  "#26C6DA",
-  "#B2DFDB",
+  // "#26C6DA",
+
+  // "#B2DFDB",
   "#80CBC4",
   "#4DB6AC",
-  "#26A69A",
-  "#C8E6C9",
+  // "#26A69A",
+
+  // "#C8E6C9",
   "#A5D6A7",
   "#81C784",
-  "#66BB6A",
-  "#DCEDC8",
+  // "#66BB6A",
+
+  // "#DCEDC8",
   "#C5E1A5",
   "#AED581",
-  "#9CCC65",
-  "#F0F4C3",
+  // "#9CCC65",
+
+  // "#F0F4C3",
   "#E6EE9C",
   "#DCE775",
-  "#D4E157",
-  "#FFF9C4",
-  "#FFF59D",
+  // "#D4E157",
+
+  // "#FFF9C4",
+  // "#FFF59D",
   "#FFF176",
-  "#FFEE58",
-  "#FFECB3",
+  // "#FFEE58",
+
+  // "#FFECB3",
   "#FFE082",
   "#FFD54F",
-  "#FFCA28",
-  "#FFE0B2",
+  // "#FFCA28",
+
+  // "#FFE0B2",
   "#FFCC80",
   "#FFB74D",
-  "#FFA726",
-  "#FFCCBC",
+  // "#FFA726",
+
+  // "#FFCCBC",
   "#FFAB91",
   "#FF8A65",
-  "#FF7043",
+  // "#FF7043",
 ];
+
+// Update the getColorPalette function to handle string theme values
+export const getColorPalette = (theme: string) => {
+  return theme === "dark"
+    ? classicColorPaletteDarkTheme
+    : classicColorPaletteLightTheme;
+};
 
 const isValidHexColor = (color: string): boolean => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
@@ -191,10 +297,10 @@ export const getSQLMinMaxValue = (
 };
 
 // need one function which will take some series name and will return hash which will be between 1 to 1000
-const getSeriesHash = (seriesName: string) => {
+const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
   // Initialize a hash variable
   let hash = 0;
-  const classicColorPaletteLength = classicColorPalette.length;
+  const classicColorPaletteLength = colorPalette.length;
   // If the seriesName is empty, return 1 as a default hash value
   if (seriesName.length === 0) return 1;
 
@@ -284,9 +390,14 @@ export const getSeriesColor = (
   value: number[],
   chartMin: number,
   chartMax: number,
+  theme: string,
 ): string | null => {
+  const colorPalette = getColorPalette(theme);
+
   if (!colorCfg) {
-    return classicColorPalette[getSeriesHash(seriesName)];
+    return colorPalette[
+      getSeriesHash(seriesName?.toString() ?? "", colorPalette)
+    ];
   } else if (colorCfg.mode === "fixed") {
     return colorCfg?.fixedColor?.[0] ?? "#53ca53";
   } else if (colorCfg.mode === "shades") {
@@ -297,7 +408,9 @@ export const getSeriesColor = (
       chartMax,
     );
   } else if (colorCfg.mode === "palette-classic-by-series") {
-    return classicColorPalette[getSeriesHash(seriesName)];
+    return colorPalette[
+      getSeriesHash(seriesName?.toString() ?? "", colorPalette)
+    ];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
   } else {
@@ -305,9 +418,9 @@ export const getSeriesColor = (
       getDomainPartitions(
         chartMin,
         chartMax,
-        colorCfg?.fixedColor?.length ?? classicColorPalette.length,
+        colorCfg?.fixedColor?.length ?? colorPalette.length,
       ),
-      colorCfg?.fixedColor?.length ? colorCfg.fixedColor : classicColorPalette,
+      colorCfg?.fixedColor?.length ? colorCfg.fixedColor : colorPalette,
     );
     return d3ColorObj(
       (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??

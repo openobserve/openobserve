@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error as StdErr;
 
-use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, post, web};
 use config::get_config;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
@@ -36,6 +36,8 @@ use crate::{
 };
 
 /// Organization specific settings
+///
+/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -95,10 +97,15 @@ async fn create(
 
     if let Some(enable_websocket_search) = settings.enable_websocket_search {
         // allow only if websocket is enabled
-        if get_config().common.websocket_enabled {
+        if get_config().websocket.enabled {
             field_found = true;
             data.enable_websocket_search = enable_websocket_search;
         }
+    }
+
+    if let Some(enable_streaming_search) = settings.enable_streaming_search {
+        field_found = true;
+        data.enable_streaming_search = enable_streaming_search;
     }
 
     if !field_found {
@@ -112,6 +119,8 @@ async fn create(
 }
 
 /// Retrieve organization specific settings
+///
+/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",

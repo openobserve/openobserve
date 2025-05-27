@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,20 +16,26 @@
 use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use actix_web::{http, web};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use config::{
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     meta::{
         alerts::alert::Alert,
-        promql::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        promql::{HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
+    utils::{
+        flatten, json,
+        schema::infer_json_schema,
+        schema_ext::SchemaExt,
+        time::{self, now_micros},
+    },
 };
 use datafusion::arrow::datatypes::Schema;
-use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 
 use super::get_exclude_labels;
 use crate::{
@@ -41,7 +47,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{evaluate_trigger, get_write_partition_key, write_file, TriggerAlertData},
+        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
         self_reporting::report_request_usage_stats,
@@ -50,7 +56,7 @@ use crate::{
 
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
 
     if !LOCAL_NODE.is_ingester() {
         return Err(anyhow::anyhow!("not an ingester"));
@@ -146,7 +152,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                         &stream_name,
                         StreamType::Metrics,
                         &schema,
-                        Some(chrono::Utc::now().timestamp_micros()),
+                        Some(now_micros()),
                     )
                     .await?;
                 }
@@ -154,6 +160,22 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             }
             continue;
         }
+
+        // check timestamp
+        let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
+            None => now_micros(),
+            Some(json::Value::Number(s)) => {
+                time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
+            }
+            Some(_) => {
+                return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
+            }
+        };
+        // reset time
+        record.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
 
         let record = json::Value::Object(record.to_owned());
 
@@ -190,7 +212,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             let (records, metric_types): (Vec<json::Value>, Vec<String>) =
                 pipeline_inputs.into_iter().unzip();
             let count = records.len();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     let err_msg = format!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",
@@ -238,7 +263,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
     }
 
-    let cfg = config::get_config();
     for (stream_name, json_data) in json_data_by_stream {
         if !stream_partitioning_map.contains_key(&stream_name) {
             let partition_det = crate::service::ingestion::get_stream_partition_keys(
@@ -272,43 +296,33 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
 
             let record = record.as_object_mut().unwrap();
 
-            // check timestamp & value
-            let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
-                None => chrono::Utc::now().timestamp_micros(),
-                Some(json::Value::Number(s)) => {
-                    time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
-                }
-                Some(_) => {
-                    return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
-                }
-            };
+            // check value
             let value: f64 = match record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))? {
                 json::Value::Number(s) => s.as_f64().unwrap(),
                 _ => {
                     return Err(anyhow::anyhow!("invalid value, need to be number"));
                 }
             };
-            // reset time & value
-            record.insert(
-                cfg.common.column_timestamp.clone(),
-                json::Value::Number(timestamp.into()),
-            );
+            // reset value
             record.insert(
                 VALUE_LABEL.to_string(),
                 json::Number::from_f64(value).unwrap().into(),
             );
+
+            let timestamp = record
+                .get(TIMESTAMP_COL_NAME)
+                .and_then(|ts| ts.as_i64())
+                .ok_or_else(|| anyhow::anyhow!("missing timestamp"))?;
+
             // remove type from labels
             record.remove(TYPE_LABEL);
             // add hash
             let hash = super::signature_without_labels(record, &get_exclude_labels());
-            record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
 
             // convert every label to string
             for (k, v) in record.iter_mut() {
-                if k == NAME_LABEL
-                    || k == TYPE_LABEL
-                    || k == VALUE_LABEL
-                    || k == &cfg.common.column_timestamp
+                if k == NAME_LABEL || k == TYPE_LABEL || k == VALUE_LABEL || k == TIMESTAMP_COL_NAME
                 {
                     continue;
                 }
@@ -351,7 +365,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     .await?;
                     crate::common::utils::auth::set_ownership(
                         org_id,
-                        &StreamType::Metrics.to_string(),
+                        StreamType::Metrics.as_str(),
                         Authz::new(&stream_name),
                     )
                     .await;
@@ -411,12 +425,16 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = chrono::Utc::now().timestamp_micros();
+                    let alert_end_time = now_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(record), (None, alert_end_time)).await
+                        match alert
+                            .evaluate(Some(record), (None, alert_end_time), None)
+                            .await
                         {
-                            trigger_alerts.push((alert.clone(), v));
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
@@ -440,10 +458,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
 
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
-        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await?;
 
         req_stats.response_time = start.elapsed().as_secs_f64();
         let fns_length: usize =
@@ -472,8 +490,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
+            StreamType::Metrics.as_str(),
             "",
-            &StreamType::Metrics.to_string(),
+            "",
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -481,8 +500,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
+            StreamType::Metrics.as_str(),
             "",
-            &StreamType::Metrics.to_string(),
+            "",
         ])
         .inc();
 

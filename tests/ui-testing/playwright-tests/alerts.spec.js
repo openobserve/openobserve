@@ -2,6 +2,7 @@ import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 const uniqueText = `${new Date().valueOf()}`
+import { LogsPage } from '../pages/logsPage.js';
 
 
 
@@ -20,7 +21,9 @@ const functionName = `automate${alphaUuid}`;
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -40,6 +43,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
         "div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
 test.describe("Alerts testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -67,6 +71,7 @@ test.describe("Alerts testcases", () => {
   // });
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(5000)
 
     // ("ingests logs via API", () => {
@@ -201,22 +206,19 @@ test.describe("Alerts testcases", () => {
 
 
   });
-
+  // at least one template is required before adding destination
   test.skip("should click on add destination button and display error if user clicks directly on save", async ({ page }) => {
     await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="alert-destinations-tab"]');
-    await page.locator(
-      '[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(
-        100);
+    await page.locator('[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(100);
     await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
-    await page.locator(
-      '[data-test="alert-destination-list-add-alert-btn"]').click({
-        force: true
-      }); await page.locator(
-
-        '[data-test="add-destination-submit-btn"]').click({ force: true }); await expect(page.locator(
-          ".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
+    await page.locator('[data-test="alert-destination-list-add-alert-btn"]').click({force: true}); 
+    await page.locator('[data-test="add-destination-submit-btn"]').click({ force: true }); 
+    await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
   })
+
+
+  
 
 });

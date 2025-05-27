@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2025 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -66,11 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   To search value 'stderr' for stream column use
                   <span class="bg-highlight">stream='stderr'</span>
-                </li>
-                <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
-                  <span class="bg-highlight">extract_ip(log) | code=200</span>
                 </li>
                 <li>
                   For additional examples,

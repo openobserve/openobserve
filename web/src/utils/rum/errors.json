@@ -13,7 +13,7 @@
       "title": "Errors by Time",
       "description": "",
       "config": {
-        "show_legends": true,
+        "show_legends": false,
         "legends_position": null,
         "base_map": { "type": "osm" },
         "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
@@ -36,7 +36,7 @@
             ],
             "y": [
               {
-                "label": "",
+                "label": " ",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": "#5960b2",

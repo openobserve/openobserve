@@ -98,7 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-red-6 q-mr-xs"
                 title="Error Span"
               />
-              <span class="text-subtitle2 text-bold q-mr-sm">
+              <span
+                class="text-subtitle2 text-bold q-mr-sm"
+                :class="{
+                  highlighted: isHighlighted(span.spanId),
+                  'tw-text-gray-900':
+                    store.state.theme === 'dark' && isHighlighted(span.spanId),
+                  'current-match': currentSelectedValue === span.spanId, // Current match class
+                }"
+              >
                 {{ span.serviceName }}
               </span>
               <span
@@ -123,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></div>
         </div>
       </div>
-
       <span-block
         :span="span"
         :depth="depth"
@@ -151,7 +158,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, ref } from "vue";
+import {
+  defineComponent,
+  onBeforeMount,
+  nextTick,
+  ref,
+  watch,
+  defineExpose,
+  computed,
+} from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -196,8 +211,21 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    searchQuery: {
+      type: String,
+      default: "",
+    },
+    spanList: {
+      type: Array,
+      default: () => [],
+    },
   },
-  emits: ["toggleCollapse", "selectSpan"],
+  emits: [
+    "toggleCollapse",
+    "selectSpan",
+    "update-current-index",
+    "search-result",
+  ],
   setup(props, { emit }) {
     const { searchObj, buildQueryDetails, navigateToLogs } = useTraces();
     const store = useStore();
@@ -220,6 +248,114 @@ export default defineComponent({
       const queryDetails = buildQueryDetails(span);
       navigateToLogs(queryDetails);
     };
+    const searchResults = ref<any[]>([]);
+    const currentIndex = ref<number | null>(null);
+    const currentSelectedValue = computed(() => {
+      if (currentIndex.value === -1 || searchResults.value.length === 0) {
+        return null;
+      }
+      return searchResults.value[currentIndex.value ?? 0];
+    });
+
+    const findMatches = (spanList: any, searchQuery: any) => {
+      const query = searchQuery.toLowerCase().trim();
+      return spanList
+        .map((span: any, index: any) => {
+          // Check if any span value matches the query
+          const matches = Object.entries(span).some(([key, value]) => {
+            if (typeof value === "string" || typeof value === "number") {
+              // Special handling for duration
+              if (key === "duration") {
+                const formattedDuration = `${value}us`; // Format duration with "us"
+                return (
+                  String(value).toLowerCase().includes(query) ||
+                  formattedDuration.toLowerCase().includes(query)
+                );
+              }
+              return String(value).toLowerCase().includes(query);
+            }
+            return false; // Skip non-string/non-number values
+          });
+          // Return the index if a match is found, otherwise return -1
+          return matches ? span.span_id : -1;
+        })
+        .filter((index: any) => index !== -1);
+    };
+    const updateSearch = () => {
+      if (props.searchQuery?.trim()) {
+        searchResults.value = findMatches(props.spanList, props.searchQuery);
+        console.log("Search Results", searchResults.value);
+        currentIndex.value = 0; // Reset to first match
+        nextTick(() => {
+          scrollToMatch(); // Wait for DOM updates before scrolling
+        });
+      } else {
+        searchResults.value = [];
+        currentIndex.value = null;
+      }
+    };
+
+    const isHighlighted = (path: any) => {
+      // If the path is an array, join it and compare with resultPath joined
+      if (Array.isArray(path)) {
+        return searchResults.value.some(
+          (resultPath: any) => resultPath.join(",") === path.join(","),
+        );
+      }
+
+      // If path is a single value (index), compare it directly
+      return searchResults.value.includes(path);
+    };
+
+    const scrollToMatch = () => {
+      if (searchResults.value.length > 0) {
+        const matchElement = document.querySelector(`.current-match`);
+        if (matchElement) {
+          matchElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }
+    };
+
+    const nextMatch = () => {
+      if (
+        currentIndex.value !== null &&
+        currentIndex.value < searchResults.value.length - 1
+      ) {
+        currentIndex.value++;
+        nextTick(() => {
+          scrollToMatch(); // Wait for DOM updates before scrolling
+        });
+      }
+    };
+
+    const prevMatch = () => {
+      if (currentIndex.value !== null && currentIndex.value > 0) {
+        currentIndex.value--;
+        nextTick(() => {
+          scrollToMatch(); // Wait for DOM updates before scrolling
+        });
+      }
+    };
+    defineExpose({
+      nextMatch,
+      prevMatch,
+    });
+
+    watch(
+      () => props.searchQuery,
+      (newValue) => {
+        updateSearch();
+      },
+    );
+    watch(currentIndex, (newValue) => {
+      emit("update-current-index", newValue);
+    });
+    watch(searchResults, (newValue) => {
+      emit("search-result", newValue.length);
+    });
 
     return {
       toggleSpanCollapse,
@@ -229,6 +365,13 @@ export default defineComponent({
       viewSpanLogs,
       t,
       spanHoveredIndex,
+      searchResults,
+      currentIndex,
+      updateSearch,
+      nextMatch,
+      prevMatch,
+      isHighlighted,
+      currentSelectedValue,
     };
   },
   components: { SpanBlock },
@@ -276,5 +419,17 @@ export default defineComponent({
     visibility: visible;
     width: auto;
   }
+}
+.border-right {
+  border-right: 1px solid rgb(236, 236, 236);
+}
+.highlighted {
+  background-color: yellow;
+  font-weight: bold;
+}
+.current-match {
+  background-color: yellow;
+  color: red;
+  font-weight: bold;
 }
 </style>

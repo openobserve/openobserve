@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>&nbsp;</span>
 
         <!-- select folder or create new folder and select -->
-        <SelectFolderDropdown @folder-selected="selectedFolder = $event" />
+        <SelectFolderDropdown @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -110,9 +110,9 @@ export default defineComponent({
       type: String,
       default: "default",
     },
-    dashboardId: {
-      type: String,
-      default: "",
+    dashboardIds: {
+      type: Array,
+      default: [],
     },
   },
   emits: ["updated"],
@@ -135,11 +135,12 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
+        // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
 
         try {
           await moveDashboardToAnotherFolder(
             store,
-            props.dashboardId,
+            props.dashboardIds,
             props.activeFolderId,
             selectedFolder.value.value
           );
@@ -151,9 +152,13 @@ export default defineComponent({
           emit("updated");
           moveFolderForm.value.resetValidation();
         } catch (err: any) {
-          showErrorNotification(err?.message ?? "Dashboard move failed.", {
+          //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
+          if(err.status !== 403){
+            showErrorNotification(err?.message ?? "Dashboard move failed.", {
             timeout: 2000,
-          });
+            });
+          }
+
         }
       });
     });

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,9 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{meta::stream::StreamType, metrics, utils::json};
+use config::{
+    meta::{otlp::OtlpRequestType, stream::StreamType},
+    metrics,
+    utils::json,
+};
 use proto::cluster_rpc::{
-    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType,
+    IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
 };
 use tonic::{Request, Response, Status};
 
@@ -75,6 +79,25 @@ impl Ingest for Ingester {
                         .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
                 }
             }
+            StreamType::Traces => {
+                let log_ingestion_type: IngestionType = req
+                    .ingestion_type
+                    .unwrap_or_default()
+                    .try_into()
+                    .unwrap_or(IngestionType::Multi); // multi is just place holder
+                if log_ingestion_type != IngestionType::Json {
+                    Err(anyhow::anyhow!(
+                        "Internal gRPC trace ingestion only supports json type data, got {:?}",
+                        log_ingestion_type
+                    ))
+                } else {
+                    let data = bytes::Bytes::from(in_data.data);
+                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name)
+                        .await
+                        .map(|_| ()) // we don't care about success response
+                        .map_err(|e| anyhow::anyhow!("error in ingesting traces {}", e))
+                }
+            }
             StreamType::EnrichmentTables => {
                 let json_records: Vec<json::Map<String, json::Value>> =
                     json::from_slice(&in_data.data).unwrap_or({
@@ -87,11 +110,19 @@ impl Ingest for Ingester {
                             })
                             .collect()
                     });
+                let append_data = match req.metadata {
+                    Some(metadata) => metadata
+                        .data
+                        .get("append_data")
+                        .and_then(|v| v.parse::<bool>().ok())
+                        .unwrap_or(true),
+                    None => true,
+                };
                 match crate::service::enrichment_table::save_enrichment_data(
                     &org_id,
                     &stream_name,
                     json_records,
-                    true,
+                    append_data,
                 )
                 .await
                 {
@@ -136,10 +167,10 @@ impl Ingest for Ingester {
         // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .with_label_values(&["/ingest/inner", "200", "", "", "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .with_label_values(&["/ingest/inner", "200", "", "", "", ""])
             .inc();
 
         Ok(Response::new(reply))

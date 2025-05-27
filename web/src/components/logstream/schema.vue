@@ -239,10 +239,11 @@ class="indexDetailsContainer" style="height: 100vh">
                 dense
               />
             </div>
-            <div class="flex justify-between items-center full-width q-mb-md">
-              <div>
+            <div class="q-mb-md">
+              <div class="flex justify-between items-center full-width">
+              <div class="flex items-center">
                 <app-tabs
-                  v-if="isSchemaEvolutionEnabled"
+                  v-if="isSchemaUDSEnabled"
                   class="schema-fields-tabs"
                   style="
                     border: 1px solid #8a8a8a;
@@ -254,6 +255,15 @@ class="indexDetailsContainer" style="height: 100vh">
                   :active-tab="activeTab"
                   @update:active-tab="updateActiveTab"
                 />
+                <div v-if="hasUserDefinedSchema" class="q-ml-sm">
+                  <q-icon name="info" class="q-mr-xs " size="16px" style="color: #F5A623; cursor: pointer;">
+                    <q-tooltip 
+                    style="font-size: 14px; width: 250px;"
+                    >
+                    Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.
+                    </q-tooltip>
+                  </q-icon>
+                </div>
               </div>
 
               <div class="flex items-center tw-gap-4">
@@ -272,6 +282,7 @@ class="indexDetailsContainer" style="height: 100vh">
                   </template>
                 </q-input>
                 <q-btn
+                  v-if="isSchemaUDSEnabled"
                   color="primary"
                   data-test="schema-add-fields-title"
                   @click="openDialog"
@@ -285,6 +296,8 @@ class="indexDetailsContainer" style="height: 100vh">
                 </q-btn>
               </div>
             </div>
+            </div>
+
             <div class="q-mb-md" v-if="isDialogOpen">
               <q-card class="add-fields-card">
                 <!-- Header Section -->
@@ -569,7 +582,7 @@ class="indexDetailsContainer" style="height: 100vh">
                 >
                 <q-btn
                   v-if="
-                    isSchemaEvolutionEnabled &&
+                    isSchemaUDSEnabled &&
                     activeMainTab == 'schemaSettings'
                   "
                   data-test="schema-add-field-button"
@@ -750,7 +763,6 @@ export default defineComponent({
     const redBtnRows = ref([]);
 
     const newSchemaFields = ref([]);
-    const activeTab = ref("allFields");
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
@@ -786,18 +798,26 @@ export default defineComponent({
     const allFieldsName = computed(() => {
       return store.state.zoConfig.all_fields_name;
     });
+    //here we are setting the active tab based on the user defined schema
+    //1. if there is UDS then it should be schemaFields
+    //2. if there is no UDS then it should be allFields
+    const activeTab = ref(hasUserDefinedSchema.value ? "schemaFields" : "allFields");
+
 
     const tabs = computed(() => [
-      {
-        value: "allFields",
-        label: `All Fields (${indexData.value.schema.length})`,
-        disabled: false,
-      },
-      {
+    {
         value: "schemaFields",
         label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
         disabled: !hasUserDefinedSchema.value,
+        hide: !hasUserDefinedSchema.value,
       },
+      {
+        value: "allFields",
+        label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
+        disabled: false,
+        hide: false,
+      }
+
     ]);
     const mainTabs = computed(() => [
       {
@@ -811,6 +831,15 @@ export default defineComponent({
         disabled: false,
       },
     ]);
+    //here we are making the schema field name dynamic based on the user defined schema 
+    //1. if there is UDS the it should be other fields 
+    //2. if there is no UDS then it should be all fields
+    const computedSchemaFieldsName = computed(()=>{
+      if(!hasUserDefinedSchema.value){
+        return 'All Fields'
+      }
+      return 'Other Fields'
+    })
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -833,8 +862,18 @@ export default defineComponent({
       storeOriginalData.value = false;
       approxPartition.value = false;
     });
+    //here we added a watcher to 
+    //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
+    //2. if user defined schema is disabled then we need to show the all fields tab and also need to make sure that it would be the active tab
+    watch(hasUserDefinedSchema, (newVal) => {
+      if(newVal){
+        activeTab.value = "schemaFields";
+      }else{
+        activeTab.value = "allFields";
+      }
+    });
 
-    const isSchemaEvolutionEnabled = computed(() => {
+    const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
@@ -1616,7 +1655,7 @@ export default defineComponent({
       activeTab,
       updateActiveTab,
       hasUserDefinedSchema,
-      isSchemaEvolutionEnabled,
+      isSchemaUDSEnabled,
       updateDefinedSchemaFields,
       selectedFields,
       allFieldsName,

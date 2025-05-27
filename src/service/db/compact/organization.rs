@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,10 +26,13 @@ fn mk_key(org_id: &str, module: &str) -> String {
 
 pub async fn get_offset(org_id: &str, module: &str) -> (i64, String) {
     let key = mk_key(org_id, module);
-    let value = match db::get(&key).await {
+    let mut value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
+    if value.is_empty() {
+        value = String::from("0");
+    }
     if value.contains(';') {
         let mut parts = value.split(';');
         let offset: i64 = parts.next().unwrap().parse().unwrap();

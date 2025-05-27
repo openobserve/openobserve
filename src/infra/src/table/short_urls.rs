@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,15 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::time::now_micros;
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
-    FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*,
+    sea_query::{Alias, DynIden},
 };
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
-    db::{connect_to_orm, mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{
+        IndexStatement, ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl, mysql,
+        postgres, sqlite,
+    },
     errors::{self, DbError, Error},
 };
 
@@ -33,9 +39,14 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_type = "String(StringLen::N(32))")]
     pub short_id: String,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(column_type = "Custom(get_text_type())")]
     pub original_url: String,
     pub created_ts: i64,
+}
+
+fn get_text_type() -> DynIden {
+    let txt_type = crate::table::migration::get_text_type();
+    SeaRc::new(Alias::new(&txt_type))
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -76,7 +87,7 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -99,7 +110,7 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["created_ts"],
     );
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     match client.get_database_backend() {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
@@ -121,7 +132,7 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     let record = ActiveModel {
         short_id: Set(short_id.to_string()),
         original_url: Set(original_url.to_string()),
-        created_ts: Set(chrono::Utc::now().timestamp_micros()),
+        created_ts: Set(now_micros()),
         ..Default::default()
     };
 

@@ -12,7 +12,7 @@ def test_pipeline_creation_and_action_realtime(create_session, base_url, pipelin
     """Running an E2E test for pipeline creation and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "org_pytest_data"
+    org_id = "default"
 
     # Payload for pipeline creation
     pipeline_payload = {
@@ -123,7 +123,7 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     """Running an E2E test for pipeline creation with scheduling and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "org_pytest_data"
+    org_id = "default"
 
     # Payload for scheduled pipeline creation
     pipeline_payload = {
@@ -224,7 +224,7 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     print(f"Pipeline ID: {pipeline_id}")
 
     # Enable/disable pipeline based on the action
-    value = "true" if action == "enable" else "false"
+    value = "True" if action == "enable" else "False"
     resp_toggle_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value={value}")
     assert resp_toggle_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_toggle_pipeline.status_code}"
     print(f"Pipeline {pipeline_id} {'enabled' if action == 'enable' else 'disabled'} successfully.")
@@ -253,7 +253,7 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     """Running an E2E test for pipeline creation with scheduling and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "org_pytest_data"
+    org_id = "default"
 
     # Payload for scheduled pipeline creation
     pipeline_payload = {
@@ -342,3 +342,747 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
     print("Create pipeline response:", resp_create_pipeline.json())
+
+
+@pytest.mark.parametrize(
+    "pipeline_name, stream_name, action, expected_status",
+    [
+        ("pipeline12222", "stream_pytest_data", None, 400),  # No action (default behavior)
+     
+    ]
+)
+ 
+def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline_name, stream_name, action, expected_status):
+    """Running an E2E test for pipeline creation and enabling/disabling the pipeline."""
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Payload for pipeline creation
+    pipeline_payload = {
+        "name": pipeline_name,
+        "description": "",
+        "source": {
+            "source_type": "realtime"
+        },
+        "nodes": [
+            {
+            "id": "b6c04033-6492-44f9-a365-00d6c6425193",
+            "type": "input",
+            "dimensions": {
+                "width": 271,
+                "height": 42
+            },
+            "computedPosition": {
+                "x": 124.5,
+                "y": 63,
+                "z": 0
+            },
+            "handleBounds": {
+                "source": [
+                {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 120.515625,
+                    "y": 36,
+                    "width": 30,
+                    "height": 10
+                }
+                ],
+                "target": []
+            },
+            "selected": False,
+            "dragging": False,
+            "resizing": False,
+            "initialized": False,
+            "isParent": False,
+            "position": {
+                "x": 124.5,
+                "y": 63
+            },
+            "data": {
+                "label": "b6c04033-6492-44f9-a365-00d6c6425193",
+                "node_type": "stream",
+                "stream_type": "logs",
+                "stream_name": "stream_pytest_data",
+                "org_id": "org_pytest_data"
+            },
+            "events": {},
+            "io_type": "input"
+            },
+            {
+            "id": "60aea6df-ec59-452e-ab52-4d1ec18391a1",
+            "type": "output",
+            "dimensions": {
+                "width": 271,
+                "height": 42
+            },
+            "computedPosition": {
+                "x": 260,
+                "y": 284,
+                "z": 0
+            },
+            "handleBounds": {
+                "source": [],
+                "target": [
+                {
+                    "id": "input",
+                    "position": "top",
+                    "x": 120.515625,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                }
+                ]
+            },
+            "selected": False,
+            "dragging": False,
+            "resizing": False,
+            "initialized": False,
+            "isParent": False,
+            "position": {
+                "x": 260,
+                "y": 284
+            },
+            "data": {
+                "label": "60aea6df-ec59-452e-ab52-4d1ec18391a1",
+                "node_type": "stream",
+                "stream_type": "logs",
+                "stream_name": "stream_pytest_data",
+                "org_id": "org_pytest_data"
+            },
+            "events": {},
+            "io_type": "output"
+            },
+            {
+            "id": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+            "type": "default",
+            "dimensions": {
+                "width": 234,
+                "height": 54
+            },
+            "computedPosition": {
+                "x": 285.66666666666674,
+                "y": 125.00000000000003,
+                "z": 0
+            },
+            "handleBounds": {
+                "source": [
+                {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 102.21875,
+                    "y": 48,
+                    "width": 30,
+                    "height": 10
+                }
+                ],
+                "target": [
+                {
+                    "id": "input",
+                    "position": "top",
+                    "x": 102.21875,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                }
+                ]
+            },
+            "selected": False,
+            "dragging": False,
+            "resizing": False,
+            "initialized": False,
+            "isParent": False,
+            "position": {
+                "x": 285.66666666666674,
+                "y": 125.00000000000003
+            },
+            "data": {
+                "label": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+                "node_type": "function",
+                "name": "pytest",
+                "after_flatten": True
+            },
+            "events": {},
+            "io_type": "default"
+            },
+            {
+            "id": "4278cc25-1699-4532-b4ef-705c63d455ee",
+            "type": "default",
+            "dimensions": {
+                "width": 244,
+                "height": 54
+            },
+            "computedPosition": {
+                "x": 53.33333333333334,
+                "y": 160.33333333333334,
+                "z": 0
+            },
+            "handleBounds": {
+                "source": [
+                {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 107.1171875,
+                    "y": 48,
+                    "width": 30,
+                    "height": 10
+                }
+                ],
+                "target": [
+                {
+                    "id": "input",
+                    "position": "top",
+                    "x": 107.1171875,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                }
+                ]
+            },
+            "selected": False,
+            "dragging": False,
+            "resizing": False,
+            "initialized": False,
+            "isParent": False,
+            "position": {
+                "x": 53.33333333333334,
+                "y": 160.33333333333334
+            },
+            "data": {
+                "label": "4278cc25-1699-4532-b4ef-705c63d455ee",
+                "node_type": "function",
+                "name": "pytest2",
+                "after_flatten": False
+            },
+            "events": {},
+            "io_type": "default"
+            },
+            {
+            "id": "9d2e796a-d424-48b8-a0b0-0d8b2143648c",
+            "type": "output",
+            "dimensions": {
+                "width": 238,
+                "height": 42
+            },
+            "computedPosition": {
+                "x": -21.666666666666686,
+                "y": 313,
+                "z": 1000
+            },
+            "handleBounds": {
+                "source": [],
+                "target": [
+                {
+                    "id": "input",
+                    "position": "top",
+                    "x": 103.828125,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                }
+                ]
+            },
+            "selected": True,
+            "dragging": False,
+            "resizing": False,
+            "initialized": False,
+            "isParent": False,
+            "position": {
+                "x": -21.666666666666686,
+                "y": 313
+            },
+            "data": {
+                "label": "9d2e796a-d424-48b8-a0b0-0d8b2143648c",
+                "node_type": "stream",
+                "stream_type": "logs",
+                "stream_name": "pyteststream2",
+                "org_id": "org_pytest_data"
+            },
+            "events": {},
+            "io_type": "output"
+            }
+        ],
+        "edges": [
+            {
+            "id": "eb6c04033-6492-44f9-a365-00d6c6425193-f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+            "type": "custom",
+            "source": "b6c04033-6492-44f9-a365-00d6c6425193",
+            "target": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+            "data": {},
+            "events": {},
+            "label": "",
+            "markerEnd": {
+                "type": "arrowclosed",
+                "width": 20,
+                "height": 20
+            },
+            "style": {
+                "strokeWidth": 2
+            },
+            "animated": True,
+            "sourceNode": {
+                "id": "b6c04033-6492-44f9-a365-00d6c6425193",
+                "type": "input",
+                "dimensions": {
+                "width": 271,
+                "height": 42
+                },
+                "computedPosition": {
+                "x": 124.5,
+                "y": 63,
+                "z": 0
+                },
+                "handleBounds": {
+                "source": [
+                    {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 120.515625,
+                    "y": 36,
+                    "width": 30,
+                    "height": 10
+                    }
+                ],
+                "target": []
+                },
+                "selected": False,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": 124.5,
+                "y": 63
+                },
+                "data": {
+                "label": "b6c04033-6492-44f9-a365-00d6c6425193",
+                "node_type": "stream",
+                "stream_type": "logs",
+                "stream_name": "stream_pytest_data",
+                "org_id": "org_pytest_data"
+                },
+                "events": {},
+                "io_type": "input"
+            },
+            "targetNode": {
+                "id": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+                "type": "default",
+                "dimensions": {
+                "width": 234,
+                "height": 54
+                },
+                "computedPosition": {
+                "x": 285.66666666666674,
+                "y": 125.00000000000003,
+                "z": 0
+                },
+                "handleBounds": {
+                "source": [
+                    {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 102.21875,
+                    "y": 48,
+                    "width": 30,
+                    "height": 10
+                    }
+                ],
+                "target": [
+                    {
+                    "id": "input",
+                    "position": "top",
+                    "x": 102.21875,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                    }
+                ]
+                },
+                "selected": False,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": 285.66666666666674,
+                "y": 125.00000000000003
+                },
+                "data": {
+                "label": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+                "node_type": "function",
+                "name": "pytest",
+                "after_flatten": True
+                },
+                "events": {},
+                "io_type": "default"
+            },
+            "sourceX": 260.015625,
+            "sourceY": 109,
+            "targetX": 402.88541666666674,
+            "targetY": 121.00000000000003
+            },
+            {
+            "id": "ef912e999-0f19-4b9a-9f9b-34c4552cdaa4-60aea6df-ec59-452e-ab52-4d1ec18391a1",
+            "type": "custom",
+            "source": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+            "target": "60aea6df-ec59-452e-ab52-4d1ec18391a1",
+            "data": {},
+            "events": {},
+            "label": "",
+            "markerEnd": {
+                "type": "arrowclosed",
+                "width": 20,
+                "height": 20
+            },
+            "style": {
+                "strokeWidth": 2
+            },
+            "animated": True,
+            "sourceNode": {
+                "id": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+                "type": "default",
+                "dimensions": {
+                "width": 234,
+                "height": 54
+                },
+                "computedPosition": {
+                "x": 285.66666666666674,
+                "y": 125.00000000000003,
+                "z": 0
+                },
+                "handleBounds": {
+                "source": [
+                    {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 102.21875,
+                    "y": 48,
+                    "width": 30,
+                    "height": 10
+                    }
+                ],
+                "target": [
+                    {
+                    "id": "input",
+                    "position": "top",
+                    "x": 102.21875,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                    }
+                ]
+                },
+                "selected": False,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": 285.66666666666674,
+                "y": 125.00000000000003
+                },
+                "data": {
+                "label": "f912e999-0f19-4b9a-9f9b-34c4552cdaa4",
+                "node_type": "function",
+                "name": "pytest",
+                "after_flatten": True
+                },
+                "events": {},
+                "io_type": "default"
+            },
+            "targetNode": {
+                "id": "60aea6df-ec59-452e-ab52-4d1ec18391a1",
+                "type": "output",
+                "dimensions": {
+                "width": 271,
+                "height": 42
+                },
+                "computedPosition": {
+                "x": 260,
+                "y": 284,
+                "z": 0
+                },
+                "handleBounds": {
+                "source": [],
+                "target": [
+                    {
+                    "id": "input",
+                    "position": "top",
+                    "x": 120.515625,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                    }
+                ]
+                },
+                "selected": False,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": 260,
+                "y": 284
+                },
+                "data": {
+                "label": "60aea6df-ec59-452e-ab52-4d1ec18391a1",
+                "node_type": "stream",
+                "stream_type": "logs",
+                "stream_name": "stream_pytest_data",
+                "org_id": "org_pytest_data"
+                },
+                "events": {},
+                "io_type": "output"
+            },
+            "sourceX": 402.88541666666674,
+            "sourceY": 183.00000000000003,
+            "targetX": 395.515625,
+            "targetY": 280
+            },
+            {
+            "id": "eb6c04033-6492-44f9-a365-00d6c6425193-4278cc25-1699-4532-b4ef-705c63d455ee",
+            "type": "custom",
+            "source": "b6c04033-6492-44f9-a365-00d6c6425193",
+            "target": "4278cc25-1699-4532-b4ef-705c63d455ee",
+            "data": {},
+            "events": {},
+            "label": "",
+            "markerEnd": {
+                "type": "arrowclosed",
+                "width": 20,
+                "height": 20
+            },
+            "style": {
+                "strokeWidth": 2
+            },
+            "animated": True,
+            "sourceNode": {
+                "id": "b6c04033-6492-44f9-a365-00d6c6425193",
+                "type": "input",
+                "dimensions": {
+                "width": 271,
+                "height": 42
+                },
+                "computedPosition": {
+                "x": 124.5,
+                "y": 63,
+                "z": 0
+                },
+                "handleBounds": {
+                "source": [
+                    {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 120.515625,
+                    "y": 36,
+                    "width": 30,
+                    "height": 10
+                    }
+                ],
+                "target": []
+                },
+                "selected": False,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": 124.5,
+                "y": 63
+                },
+                "data": {
+                "label": "b6c04033-6492-44f9-a365-00d6c6425193",
+                "node_type": "stream",
+                "stream_type": "logs",
+                "stream_name": "stream_pytest_data",
+                "org_id": "org_pytest_data"
+                },
+                "events": {},
+                "io_type": "input"
+            },
+            "targetNode": {
+                "id": "4278cc25-1699-4532-b4ef-705c63d455ee",
+                "type": "default",
+                "dimensions": {
+                "width": 244,
+                "height": 54
+                },
+                "computedPosition": {
+                "x": 53.33333333333334,
+                "y": 160.33333333333334,
+                "z": 0
+                },
+                "handleBounds": {
+                "source": [
+                    {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 107.1171875,
+                    "y": 48,
+                    "width": 30,
+                    "height": 10
+                    }
+                ],
+                "target": [
+                    {
+                    "id": "input",
+                    "position": "top",
+                    "x": 107.1171875,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                    }
+                ]
+                },
+                "selected": False,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": 53.33333333333334,
+                "y": 160.33333333333334
+                },
+                "data": {
+                "label": "4278cc25-1699-4532-b4ef-705c63d455ee",
+                "node_type": "function",
+                "name": "pytest2",
+                "after_flatten": False
+                },
+                "events": {},
+                "io_type": "default"
+            },
+            "sourceX": 260.015625,
+            "sourceY": 109,
+            "targetX": 175.45052083333334,
+            "targetY": 156.33333333333334
+            },
+            {
+            "id": "e4278cc25-1699-4532-b4ef-705c63d455ee-9d2e796a-d424-48b8-a0b0-0d8b2143648c",
+            "type": "custom",
+            "source": "4278cc25-1699-4532-b4ef-705c63d455ee",
+            "target": "9d2e796a-d424-48b8-a0b0-0d8b2143648c",
+            "data": {},
+            "events": {},
+            "label": "",
+            "markerEnd": {
+                "type": "arrowclosed",
+                "width": 20,
+                "height": 20
+            },
+            "style": {
+                "strokeWidth": 2
+            },
+            "animated": True,
+            "sourceNode": {
+                "id": "4278cc25-1699-4532-b4ef-705c63d455ee",
+                "type": "default",
+                "dimensions": {
+                "width": 244,
+                "height": 54
+                },
+                "computedPosition": {
+                "x": 53.33333333333334,
+                "y": 160.33333333333334,
+                "z": 0
+                },
+                "handleBounds": {
+                "source": [
+                    {
+                    "id": "output",
+                    "position": "bottom",
+                    "x": 107.1171875,
+                    "y": 48,
+                    "width": 30,
+                    "height": 10
+                    }
+                ],
+                "target": [
+                    {
+                    "id": "input",
+                    "position": "top",
+                    "x": 107.1171875,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                    }
+                ]
+                },
+                "selected": False,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": 53.33333333333334,
+                "y": 160.33333333333334
+                },
+                "data": {
+                "label": "4278cc25-1699-4532-b4ef-705c63d455ee",
+                "node_type": "function",
+                "name": "pytest2",
+                "after_flatten": False
+                },
+                "events": {},
+                "io_type": "default"
+            },
+            "targetNode": {
+                "id": "9d2e796a-d424-48b8-a0b0-0d8b2143648c",
+                "type": "output",
+                "dimensions": {
+                "width": 238,
+                "height": 42
+                },
+                "computedPosition": {
+                "x": -21.666666666666686,
+                "y": 313,
+                "z": 1000
+                },
+                "handleBounds": {
+                "source": [],
+                "target": [
+                    {
+                    "id": "input",
+                    "position": "top",
+                    "x": 103.828125,
+                    "y": -4,
+                    "width": 30,
+                    "height": 10
+                    }
+                ]
+                },
+                "selected": True,
+                "dragging": False,
+                "resizing": False,
+                "initialized": False,
+                "isParent": False,
+                "position": {
+                "x": -21.666666666666686,
+                "y": 313
+                },
+                "data": {
+                "label": "9d2e796a-d424-48b8-a0b0-0d8b2143648c",
+                "node_type": "stream",
+                "stream_type": "logs",
+                "stream_name": "pyteststream2",
+                "org_id": "org_pytest_data"
+                },
+                "events": {},
+                "io_type": "output"
+            },
+            "sourceX": 175.45052083333334,
+            "sourceY": 218.33333333333334,
+            "targetX": 97.16145833333331,
+            "targetY": 309
+            }
+        ],
+        "org": org_id
+        }
+
+    # Create a pipeline
+    resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
+    assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
+    print("Create pipeline response:", resp_create_pipeline.json())
+
+    assert resp_create_pipeline.status_code == 400, "Invalid pipeline: After Flatten must be checked if a previous FunctionNode already checked it in the same branch."

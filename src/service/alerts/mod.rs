@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,13 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use alert::to_float;
-use arrow_schema::DataType;
+use arrow_schema::{DataType, Schema};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    TIMESTAMP_COL_NAME, ider,
     meta::{
-        alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
+        alerts::{
+            AggFunction, Condition, ConditionList, Operator, QueryCondition, QueryType,
+            TriggerCondition, TriggerEvalResults,
+        },
+        cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -30,9 +34,12 @@ use config::{
         json::{Map, Value},
     },
 };
+use tracing::Instrument;
 
 use super::promql;
-use crate::service::search as SearchService;
+use crate::service::{
+    search as SearchService, self_reporting::http_report_metrics, setup_tracing_with_trace_id,
+};
 
 pub mod alert;
 pub mod derived_streams;
@@ -45,7 +52,7 @@ pub trait QueryConditionExt: Sync + Send + 'static {
     async fn evaluate_realtime(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 
     #[allow(clippy::too_many_arguments)]
     async fn evaluate_scheduled(
@@ -57,7 +64,8 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+        trace_id: Option<String>,
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
 #[async_trait]
@@ -65,27 +73,27 @@ impl QueryConditionExt for QueryCondition {
     async fn evaluate_realtime(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         let now = Utc::now().timestamp_micros();
+        let mut eval_results = TriggerEvalResults {
+            end_time: now,
+            ..Default::default()
+        };
         let row = match row {
             Some(row) => row,
             None => {
-                return Ok((None, now));
+                return Ok(eval_results);
             }
         };
         if self.conditions.is_none() {
-            return Ok((None, now));
+            return Ok(eval_results);
         }
         let conditions = self.conditions.as_ref().unwrap();
-        if conditions.is_empty() {
-            return Ok((None, now));
+        if !conditions.evaluate(row).await {
+            return Ok(eval_results);
         }
-        for condition in conditions.iter() {
-            if !condition.evaluate(row).await {
-                return Ok((None, now));
-            }
-        }
-        Ok((Some(vec![row.to_owned()]), now))
+        eval_results.data = Some(vec![row.to_owned()]);
+        return Ok(eval_results);
     }
 
     async fn evaluate_scheduled(
@@ -97,32 +105,45 @@ impl QueryConditionExt for QueryCondition {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+        trace_id: Option<String>,
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
+        let trace_id = trace_id.unwrap_or_else(ider::generate_trace_id);
+        // create context with trace_id
+        let eval_span = setup_tracing_with_trace_id(
+            &trace_id,
+            tracing::info_span!("service:alerts:evaluate_scheduled"),
+        )
+        .await;
+
+        let mut eval_results = TriggerEvalResults {
+            end_time,
+            ..Default::default()
+        };
         let sql = match self.query_type {
             QueryType::Custom => {
                 let (Some(stream_name), Some(v)) = (stream_name, self.conditions.as_ref()) else {
                     // CustomQuery type needs to provide source StreamName.
                     // CustomQuery is only used by Alerts' triggers.
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 build_sql(org_id, stream_name, stream_type, self, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 if v.is_empty() {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 } else {
                     v.to_string()
                 }
             }
             QueryType::PromQL => {
                 let Some(v) = self.promql.as_ref() else {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 if v.is_empty() {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 }
                 let start = if let Some(start_time) = start_time {
                     start_time
@@ -154,53 +175,46 @@ impl QueryConditionExt for QueryCondition {
                     query_exemplars: false,
                     no_cache: None,
                 };
-                let resp = match promql::search::search(org_id, &req, "", 0).await {
+                let resp = match promql::search::search(&trace_id, org_id, &req, "", 0).await {
                     Ok(v) => v,
                     Err(_) => {
-                        return Ok((None, end_time));
+                        return Ok(eval_results);
                     }
                 };
                 let promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
-                        "Alert evaluate: PromQL query {} returned unexpected response: {:?}",
+                        "Alert evaluate: trace_id: {trace_id}, PromQL query {} returned unexpected response: {:?}",
                         v,
                         resp
                     );
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 // TODO calculate the sample in a row, suddenly a sample can be ignored
                 let value = value
                     .into_iter()
                     .filter(|f| f.samples.len() >= trigger_condition.threshold as usize)
                     .collect::<Vec<_>>();
-                return if value.is_empty() {
-                    return Ok((None, end_time));
-                } else {
-                    Ok((
-                        Some(
-                            value
-                                .iter()
-                                .map(|v| {
-                                    let mut val = Map::with_capacity(v.labels.len() + 2);
-                                    for label in v.labels.iter() {
-                                        val.insert(
-                                            label.name.to_string(),
-                                            label.value.to_string().into(),
-                                        );
-                                    }
-                                    let last_sample = v.samples.last().unwrap();
+                if !value.is_empty() {
+                    eval_results.data = Some(
+                        value
+                            .iter()
+                            .map(|v| {
+                                let mut val = Map::with_capacity(v.labels.len() + 2);
+                                for label in v.labels.iter() {
                                     val.insert(
-                                        "_timestamp".to_string(),
-                                        last_sample.timestamp.into(),
+                                        label.name.to_string(),
+                                        label.value.to_string().into(),
                                     );
-                                    val.insert("value".to_string(), last_sample.value.into());
-                                    val
-                                })
-                                .collect(),
-                        ),
-                        end_time,
-                    ))
-                };
+                                }
+                                let last_sample = v.samples.last().unwrap();
+                                val.insert("_timestamp".to_string(), last_sample.timestamp.into());
+                                val.insert("value".to_string(), last_sample.value.into());
+                                val
+                            })
+                            .collect(),
+                    );
+                }
+                return Ok(eval_results);
             }
         };
 
@@ -241,8 +255,8 @@ impl QueryConditionExt for QueryCondition {
         } else {
             std::cmp::max(100, trigger_condition.threshold)
         };
-        let trace_id = ider::uuid();
 
+        let req_start = std::time::Instant::now();
         let resp = if self.multi_time_range.is_some()
             && !self.multi_time_range.as_ref().unwrap().is_empty()
         {
@@ -329,8 +343,21 @@ impl QueryConditionExt for QueryCondition {
                 index_type: "".to_string(),
                 per_query_response: false, // Will return results in single array
             };
-
-            SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
+            log::debug!(
+                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {:?}",
+                req
+            );
+            SearchService::grpc_search::grpc_search_multi(
+                &trace_id,
+                org_id,
+                stream_type,
+                None,
+                &req,
+                Some(RoleGroup::Background),
+            )
+            .instrument(eval_span)
+            .await
+            // SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
             // fire the query
             let req = config::meta::search::Request {
@@ -340,10 +367,10 @@ impl QueryConditionExt for QueryCondition {
                     size,
                     start_time: start_time.unwrap(),
                     end_time,
-                    sort_by: None,
                     quick_mode: false,
                     query_type: "".to_string(),
                     track_total_hits: false,
+                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: if self.vrl_function.is_some() {
                         match base64::decode_url(self.vrl_function.as_ref().unwrap()) {
@@ -369,8 +396,23 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: None,
+                local_mode: None,
             };
-            SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+            log::debug!(
+                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {:?}",
+                req
+            );
+            // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
+            SearchService::grpc_search::grpc_search(
+                &trace_id,
+                org_id,
+                stream_type,
+                None,
+                &req,
+                Some(RoleGroup::Background),
+            )
+            .instrument(eval_span)
+            .await
         };
 
         // Resp hits can be of two types -
@@ -378,15 +420,32 @@ impl QueryConditionExt for QueryCondition {
         // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
         let resp = match resp {
             Ok(v) => {
+                // the search request doesn't via cache layer, so need report usage separately
+                http_report_metrics(
+                    req_start,
+                    org_id,
+                    stream_type,
+                    "200",
+                    "_search",
+                    &SearchEventType::Alerts.to_string(),
+                    "",
+                );
                 if v.is_partial {
-                    return Err(anyhow::anyhow!("Partial response: {}", v.function_error));
+                    return Err(anyhow::anyhow!(
+                        "Partial response: {}",
+                        v.function_error.join(", ")
+                    ));
                 } else {
                     v
                 }
             }
             Err(e) => {
                 if let infra::errors::Error::ErrorCode(e) = e {
-                    return Err(anyhow::anyhow!("{}", e.get_message()));
+                    return Err(anyhow::anyhow!(
+                        "{} {}",
+                        e.get_message(),
+                        e.get_inner_message()
+                    ));
                 } else {
                     return Err(anyhow::anyhow!("{}", e));
                 }
@@ -405,46 +464,122 @@ impl QueryConditionExt for QueryCondition {
                 _ => {}
             }
         });
-        log::debug!("alert resp hits len:{:#?}", records.len());
-        let records = Some(records);
-        if self.search_event_type.is_none() {
+        log::debug!(
+            "alert trace_id: {trace_id}, resp hits len:{:#?}",
+            records.len()
+        );
+        eval_results.query_took = Some(resp.took as i64);
+        eval_results.data = if self.search_event_type.is_none() {
             let threshold = trigger_condition.threshold as usize;
             match trigger_condition.operator {
-                Operator::EqualTo => {
-                    if records.as_ref().unwrap().len() == threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::NotEqualTo => {
-                    if records.as_ref().unwrap().len() != threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::GreaterThan => {
-                    if records.as_ref().unwrap().len() > threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::GreaterThanEquals => {
-                    if records.as_ref().unwrap().len() >= threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::LessThan => {
-                    if records.as_ref().unwrap().len() < threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::LessThanEquals => {
-                    if records.as_ref().unwrap().len() <= threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                _ => {}
+                Operator::EqualTo => (records.len() == threshold).then_some(records),
+                Operator::NotEqualTo => (records.len() != threshold).then_some(records),
+                Operator::GreaterThan => (records.len() > threshold).then_some(records),
+                Operator::GreaterThanEquals => (records.len() >= threshold).then_some(records),
+                Operator::LessThan => (records.len() < threshold).then_some(records),
+                Operator::LessThanEquals => (records.len() <= threshold).then_some(records),
+                _ => None,
             }
-            Ok((None, end_time))
         } else {
-            Ok((records, end_time))
+            Some(records)
+        };
+
+        Ok(eval_results)
+    }
+}
+
+#[async_trait]
+pub trait ConditionListExt: Sync + Send + 'static {
+    async fn len(&self) -> u32;
+    async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error>;
+    async fn is_empty(&self) -> bool;
+}
+
+#[async_trait]
+impl ConditionListExt for ConditionList {
+    /// Returns end node count of a Condition list
+    async fn len(&self) -> u32 {
+        match self {
+            ConditionList::OrNode { or: conditions }
+            | ConditionList::AndNode { and: conditions } => {
+                let mut count = 0;
+                for condition in conditions.iter() {
+                    count += condition.len().await
+                }
+                count
+            }
+            ConditionList::NotNode { not: inner } => inner.len().await,
+            ConditionList::EndCondition(_) => 1,
+            ConditionList::LegacyConditions(conditions) => conditions.len() as u32,
+        }
+    }
+
+    /// Converts Condition list to SQL query as per schema
+    async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
+        match self {
+            ConditionList::OrNode { or: conditions } => {
+                let mut cond_sql_list = Vec::new();
+                for condition in conditions.iter() {
+                    cond_sql_list.push(condition.to_sql(schema).await?);
+                }
+                Ok(format!("({})", cond_sql_list.join(" OR ")))
+            }
+            ConditionList::LegacyConditions(conditions) => {
+                let mut cond_sql_list = Vec::new();
+                for cond in conditions {
+                    let data_type = match schema.field_with_name(&cond.column) {
+                        Ok(field) => field.data_type(),
+                        Err(_) => {
+                            return Err(anyhow::anyhow!("Column {} not found", &cond.column));
+                        }
+                    };
+                    cond_sql_list.push(build_expr(cond, "", data_type)?);
+                }
+                Ok(format!("({})", cond_sql_list.join(" AND ")))
+            }
+            ConditionList::AndNode { and: conditions } => {
+                let mut cond_sql_list = Vec::new();
+                for condition in conditions.iter() {
+                    cond_sql_list.push(condition.to_sql(schema).await?);
+                }
+                Ok(format!("({})", cond_sql_list.join(" AND ")))
+            }
+            ConditionList::NotNode { not: inner } => {
+                Ok(format!("NOT ({})", inner.to_sql(schema).await?))
+            }
+            ConditionList::EndCondition(node) => {
+                let data_type = match schema.field_with_name(&node.column) {
+                    Ok(field) => field.data_type(),
+                    Err(_) => {
+                        return Err(anyhow::anyhow!("Column {} not found", &node.column));
+                    }
+                };
+                build_expr(node, "", data_type)
+            }
+        }
+    }
+
+    async fn is_empty(&self) -> bool {
+        match self {
+            ConditionList::OrNode { or: conditions } => {
+                for condition in conditions.iter() {
+                    if condition.is_empty().await {
+                        return true;
+                    }
+                }
+                false
+            }
+            ConditionList::AndNode { and: conditions } => {
+                for condition in conditions.iter() {
+                    if !condition.is_empty().await {
+                        return false;
+                    }
+                }
+                true
+            }
+            ConditionList::NotNode { not: inner } => inner.is_empty().await,
+            ConditionList::LegacyConditions(conditions) => conditions.is_empty(),
+            ConditionList::EndCondition(_) => false,
         }
     }
 }
@@ -452,6 +587,37 @@ impl QueryConditionExt for QueryCondition {
 #[async_trait]
 pub trait ConditionExt: Sync + Send + 'static {
     async fn evaluate(&self, row: &Map<String, Value>) -> bool;
+}
+
+#[async_trait]
+impl ConditionExt for ConditionList {
+    async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        match self {
+            ConditionList::OrNode { or: conditions } => {
+                let mut eval = false;
+                for condition in conditions {
+                    eval = eval || condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::LegacyConditions(conditions) => {
+                let mut eval = true;
+                for condition in conditions {
+                    eval = eval && condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::AndNode { and: conditions } => {
+                let mut eval = true;
+                for condition in conditions {
+                    eval = eval && condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::NotNode { not: conditions } => !conditions.evaluate(row).await,
+            ConditionList::EndCondition(condition) => condition.evaluate(row).await,
+        }
+    }
 }
 
 #[async_trait]
@@ -526,31 +692,18 @@ async fn build_sql(
     stream_name: &str,
     stream_type: StreamType,
     query_condition: &QueryCondition,
-    conditions: &[Condition],
+    conditions: &ConditionList,
 ) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let mut wheres = Vec::with_capacity(conditions.len());
-    for cond in conditions.iter() {
-        let data_type = match schema.field_with_name(&cond.column) {
-            Ok(field) => field.data_type(),
-            Err(_) => {
-                return Err(anyhow::anyhow!(
-                    "Column {} not found on stream {}",
-                    &cond.column,
-                    stream_name
-                ));
-            }
-        };
-        let expr = build_expr(cond, "", data_type)?;
-        wheres.push(expr);
-    }
-    let where_sql = if !wheres.is_empty() {
-        format!("WHERE {}", wheres.join(" AND "))
-    } else {
-        String::new()
-    };
+    let where_sql = conditions
+        .to_sql(&schema)
+        .await
+        .map_err(|err| anyhow::anyhow!("Error building SQL on stream {}: {}", &stream_name, err))?;
     if query_condition.aggregation.is_none() {
-        return Ok(format!("SELECT * FROM \"{}\" {}", stream_name, where_sql));
+        return Ok(format!(
+            "SELECT * FROM \"{}\" WHERE {}",
+            stream_name, where_sql
+        ));
     }
 
     // handle aggregation
@@ -584,15 +737,14 @@ async fn build_sql(
         AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
     };
 
-    let cfg = get_config();
     if let Some(group) = agg.group_by.as_ref() {
         if !group.is_empty() {
             sql = format!(
                 "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
                 func_expr,
-                cfg.common.column_timestamp,
-                cfg.common.column_timestamp,
+                TIMESTAMP_COL_NAME,
+                TIMESTAMP_COL_NAME,
                 stream_name,
                 where_sql,
                 group.join(", "),
@@ -603,12 +755,7 @@ async fn build_sql(
     if sql.is_empty() {
         sql = format!(
             "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
-            func_expr,
-            cfg.common.column_timestamp,
-            cfg.common.column_timestamp,
-            stream_name,
-            where_sql,
-            having_expr
+            func_expr, TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, stream_name, where_sql, having_expr
         );
     }
     Ok(sql)

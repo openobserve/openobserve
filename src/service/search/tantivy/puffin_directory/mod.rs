@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,11 +30,14 @@ pub mod reader;
 pub mod reader_cache;
 pub mod writer;
 
-// We do not need all of the tantivy files, only the .term and .idx files
-// for getting doc IDs and also the meta.json file
+// We do not need all of the tantivy files, only specific ones:
+// - .term and .idx files for getting doc IDs
+// - .pos files for position information
+// - .fast files for fast fields
+// - meta.json file for index metadata
 // This might change in the future when we add more features to the index
-const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos"];
-const EMPTY_FILE_EXT: &[&str] = &["fast", "fieldnorm", "store"];
+const ALLOWED_FILE_EXT: &[&str] = &["term", "idx", "pos", "fast"];
+const EMPTY_FILE_EXT: &[&str] = &["fieldnorm", "store"];
 const META_JSON: &str = "meta.json";
 const FOOTER_CACHE: &str = "footer_cache";
 

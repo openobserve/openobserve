@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     catalog::Session,
-    common::{project_schema, Result},
+    common::{Result, project_schema},
     datasource::{TableProvider, TableType},
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
@@ -30,12 +30,12 @@ use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyEx
 
 /// An empty plan that is useful for testing and generating plans
 /// without mapping them to actual data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NewEmptyTable {
     name: String,
     schema: SchemaRef,
     partitions: usize,
-    sorted_by_time: bool,
+    pub sorted_by_time: bool,
 }
 
 impl NewEmptyTable {

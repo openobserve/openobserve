@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,19 +17,20 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use config::{
+    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{promql::METADATA_LABEL, stream::StreamType},
     metrics,
-    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
+    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
-    get_settings, unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR,
-    STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
+    unwrap_stream_settings,
 };
 use serde_json::{Map, Value};
 
@@ -43,6 +44,13 @@ pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
         "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
         get_config().limit.ingest_allowed_upto
+    )
+}
+
+pub(crate) fn get_future_discard_error() -> anyhow::Error {
+    anyhow::anyhow!(
+        "Too far data, only future {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_IN_FUTURE=<max_hours>",
+        get_config().limit.ingest_allowed_in_future
     )
 }
 
@@ -70,15 +78,6 @@ pub async fn check_for_schema(
     }
     let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
-    if !schema.schema().fields().is_empty() && cfg.common.skip_schema_validation {
-        return Ok((
-            SchemaEvolution {
-                is_schema_changed: false,
-                types_delta: None,
-            },
-            None,
-        ));
-    }
 
     // get infer schema
     let value_iter = record_vals.into_iter();
@@ -117,19 +116,24 @@ pub async fn check_for_schema(
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
             // check defined_schema_fields
-            let stream_setting = get_settings(org_id, stream_name, stream_type).await;
-            let (defined_schema_fields, need_original) = match stream_setting {
-                Some(s) => (
-                    s.defined_schema_fields.unwrap_or_default(),
-                    s.store_original_data,
-                ),
-                None => (Vec::new(), false),
-            };
+            let stream_setting = unwrap_stream_settings(schema.schema());
+            let (defined_schema_fields, need_original, index_original_data, index_all_values) =
+                match stream_setting {
+                    Some(s) => (
+                        s.defined_schema_fields.unwrap_or_default(),
+                        s.store_original_data,
+                        s.index_original_data,
+                        s.index_all_values,
+                    ),
+                    None => (Vec::new(), false, false, false),
+                };
             if !defined_schema_fields.is_empty() {
                 let schema = generate_schema_for_defined_schema_fields(
                     schema,
                     &defined_schema_fields,
                     need_original,
+                    index_original_data,
+                    index_all_values,
                 );
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
@@ -177,7 +181,7 @@ pub async fn check_for_schema(
             stream_type,
             is_new,
             &inferred_schema,
-            chrono::Utc::now().timestamp_micros(),
+            now_micros(),
             stream_schema_map,
         )
         .await?;
@@ -225,7 +229,31 @@ async fn handle_diff_schema(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Result<Option<SchemaEvolution>> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
+    log::debug!(
+        "handle_diff_schema start for [{}/{}/{}] start_dt: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts
+    );
+
+    // acquire a local_lock to ensure only one thread can update schema
+    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let local_lock = infra::local_lock::lock(&cache_key).await?;
+    let _guard = local_lock.lock().await;
+
+    // check if the schema has been updated by another thread
+    let read_cache = STREAM_SCHEMAS_LATEST.read().await;
+    if let Some(updated_schema) = read_cache.get(&cache_key) {
+        if let (false, _) = get_schema_changes(updated_schema, inferred_schema) {
+            return Ok(None);
+        }
+    }
+    drop(read_cache);
+
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
@@ -292,7 +320,7 @@ async fn handle_diff_schema(
     if is_new {
         crate::common::utils::auth::set_ownership(
             org_id,
-            &stream_type.to_string(),
+            stream_type.as_str(),
             Authz::new(stream_name),
         )
         .await;
@@ -309,38 +337,69 @@ async fn handle_diff_schema(
     // 1. allow_user_defined_schemas is enabled
     // 2. log ingestion
     // 3. user defined schema is not already enabled
-    // 4. final schema fields count exceeds udschema_max_fields
+    // 4. final schema fields count exceeds schema_max_fields_to_enable_uds
     // user-defined schema does not include _timestamp or _all columns
     if cfg.common.allow_user_defined_schemas
-        && cfg.limit.udschema_max_fields > 0
+        && cfg.limit.schema_max_fields_to_enable_uds > 0
         && stream_type == StreamType::Logs
         && defined_schema_fields.is_empty()
-        && final_schema.fields().len() > cfg.limit.udschema_max_fields
+        && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
     {
-        let mut uds_fields = HashSet::with_capacity(cfg.limit.udschema_max_fields);
-        // add fts fields
+        let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
+
+        // Helper to check if a field should be skipped
+        let should_skip = |field_name: &str| {
+            field_name == TIMESTAMP_COL_NAME
+                || field_name == ID_COL_NAME
+                || field_name == ORIGINAL_DATA_COL_NAME
+                || field_name == ALL_VALUES_COL_NAME
+                || field_name == cfg.common.column_all
+        };
+
+        // Add FTS fields first
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if final_schema.field_with_name(field).is_ok() {
-                uds_fields.insert(field.to_string());
-            }
-        }
-        for field in final_schema.fields() {
-            let field_name = field.name();
-            // skip _timestamp and _all columns
-            if field_name == &cfg.common.column_timestamp || field_name == &cfg.common.column_all {
-                continue;
-            }
-            uds_fields.insert(field_name.to_string());
-            if uds_fields.len() == cfg.limit.udschema_max_fields {
+            if final_schema.field_with_name(field).is_ok()
+                && !should_skip(field)
+                && uds_fields.insert(field.to_string())
+                && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+            {
                 break;
             }
         }
+
+        // Add fields from current schema if available
+        if let Some(stream_schema) = stream_schema_map.get(stream_name) {
+            for field in stream_schema.schema().fields() {
+                let field = field.name();
+                if !should_skip(field)
+                    && uds_fields.insert(field.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
+                }
+            }
+        }
+
+        // Add remaining fields from final schema
+        if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
+            for field in final_schema.fields() {
+                let field = field.name();
+                if !should_skip(field)
+                    && uds_fields.insert(field.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
+                }
+            }
+        }
+
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
         stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
         );
+
         // save the new settings
         if let Err(e) = super::stream::save_stream_settings(
             org_id,
@@ -362,18 +421,20 @@ async fn handle_diff_schema(
 
     // update node cache
     let final_schema = SchemaCache::new(final_schema);
-    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
     let need_original = stream_setting.store_original_data;
-    if need_original {
+    let index_original_data = stream_setting.index_original_data;
+    let index_all_values = stream_setting.index_all_values;
+    if need_original || index_original_data {
         if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
             entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
         }
     }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
+    infra::schema::set_stream_settings_atomic(w.clone());
     drop(w);
 
     // update thread cache
@@ -381,8 +442,19 @@ async fn handle_diff_schema(
         &final_schema,
         &defined_schema_fields,
         need_original,
+        index_original_data,
+        index_all_values,
     );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
+
+    log::debug!(
+        "handle_diff_schema end for [{}/{}/{}] start_dt: {}, elapsed: {} ms",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts,
+        start.elapsed().as_millis()
+    );
 
     Ok(Some(SchemaEvolution {
         is_schema_changed: true,
@@ -396,21 +468,27 @@ pub fn generate_schema_for_defined_schema_fields(
     schema: &SchemaCache,
     fields: &[String],
     need_original: bool,
+    index_original_data: bool,
+    index_all_values: bool,
 ) -> SchemaCache {
     if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
         return schema.clone();
     }
 
     let cfg = get_config();
-    let (o2_id_col, original_col) = (ID_COL_NAME.to_string(), ORIGINAL_DATA_COL_NAME.to_string());
-    let mut fields: HashSet<_> = fields.iter().collect();
-    if !fields.contains(&cfg.common.column_timestamp) {
-        fields.insert(&cfg.common.column_timestamp);
+    let timestamp_col = TIMESTAMP_COL_NAME.to_string();
+    let o2_id_col = ID_COL_NAME.to_string();
+    let original_col = ORIGINAL_DATA_COL_NAME.to_string();
+    let all_values_col = ALL_VALUES_COL_NAME.to_string();
+
+    let mut fields: HashSet<&String> = fields.iter().collect();
+    if !fields.contains(&timestamp_col) {
+        fields.insert(&timestamp_col);
     }
     if !fields.contains(&cfg.common.column_all) {
         fields.insert(&cfg.common.column_all);
     }
-    if need_original {
+    if need_original || index_original_data {
         if !fields.contains(&o2_id_col) {
             fields.insert(&o2_id_col);
         }
@@ -418,19 +496,27 @@ pub fn generate_schema_for_defined_schema_fields(
             fields.insert(&original_col);
         }
     }
+    if index_all_values && !fields.contains(&all_values_col) {
+        fields.insert(&all_values_col);
+    }
+
     let mut new_fields = Vec::with_capacity(fields.len());
     for field in fields {
         if let Some(f) = schema.fields_map().get(field) {
             new_fields.push(schema.schema().fields()[*f].clone());
         }
     }
+
+    // sort the fields by name to make sure the order is consistent
+    new_fields.sort_by(|a, b| a.name().cmp(b.name()));
+
     SchemaCache::new(Schema::new_with_metadata(
         new_fields,
         schema.schema().metadata().clone(),
     ))
 }
 
-fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
@@ -453,9 +539,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
                 if existing_field.data_type() != item_data_type {
-                    if !get_config().common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.as_ref().to_owned());
-                    } else if infra::schema::is_widening_conversion(
+                    if infra::schema::is_widening_conversion(
                         existing_field.data_type(),
                         item_data_type,
                     ) {
@@ -490,23 +574,21 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema = infra::schema::get(org_id, stream_name, stream_type)
+            let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let schema = Arc::new(schema);
-            stream_schema_map.insert(
-                stream_name.to_string(),
-                SchemaCache::new_from_arc(schema.clone()),
-            );
-            schema
+            let db_schema = schema_cache.schema().clone();
+            stream_schema_map.insert(stream_name.to_string(), schema_cache);
+            db_schema
         }
     };
     if !schema.fields().is_empty() {
         schema_chk.has_fields = true;
     }
-    if let Some(value) = schema.metadata().get("settings") {
-        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-        if settings.get("partition_keys").is_some() {
+
+    let settings = unwrap_stream_settings(&schema);
+    if let Some(stream_setting) = settings {
+        if !stream_setting.partition_keys.is_empty() {
             schema_chk.has_partition_keys = true;
         }
     }

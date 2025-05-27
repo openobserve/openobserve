@@ -3,6 +3,7 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
+import { LogsPage } from '../pages/logsPage.js';
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -14,7 +15,9 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -70,6 +73,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
 
 
 test.describe("Enrichment data testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -91,6 +95,7 @@ test.describe("Enrichment data testcases", () => {
  
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(5000);
     
 
@@ -111,7 +116,7 @@ test.describe("Enrichment data testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
     await applyQueryButton(page);
   });
 
@@ -157,7 +162,7 @@ test.describe("Enrichment data testcases", () => {
     await pipelinePage.deleteEnrichmentTableByName(fileName)
   });
 
-  test.skip("should upload an enrichment table under functions with VRL", async ({
+  test("should upload an enrichment table under functions with VRL", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -286,6 +291,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
   
     // Explore the uploaded table
     await page.getByRole("button", { name: "Explore" }).click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await expect(page.getByRole('cell', { name: 'Start time' })).toBeVisible()
     await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page.waitForTimeout(3000);

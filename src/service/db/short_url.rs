@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use chrono::Utc;
 use config::get_config;
 use infra::{db::Event, table::short_urls};
@@ -43,6 +43,7 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
 
 pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<(), anyhow::Error> {
     if let Err(e) = short_urls::add(short_id, &entry.original_url).await {
+        log::error!("Failed to add short URL to DB : {}", e);
         return Err(e).context("Failed to add short URL to DB");
     }
 
@@ -200,10 +201,9 @@ mod cluster {
 /// Helper fuunctions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::utils::json;
     use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
-    use super::{short_urls, SHORT_URL_KEY};
+    use super::{SHORT_URL_KEY, short_urls};
 
     /// Sends event to super cluster queue for a new short URL entry.
     pub async fn emit_put_event(
@@ -211,11 +211,10 @@ mod super_cluster {
         entry: short_urls::ShortUrlRecord,
     ) -> Result<(), infra::errors::Error> {
         let key = short_url_key(short_id);
-        let value = json::to_vec(&entry.original_url)?.into();
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::short_url_put(
                 &key,
-                value,
+                entry.original_url.into(),
                 infra::db::NEED_WATCH,
                 None,
             )

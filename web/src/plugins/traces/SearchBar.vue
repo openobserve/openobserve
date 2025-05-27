@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component" id="searchBarComponent">
-    <div class="row q-my-xs">
+    <div class="row q-py-xs">
       <div class="float-right col flex items-center">
         <syntax-guide
           class="q-mr-sm"
@@ -44,6 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            :queryRangeRestrictionInHour="
+              searchObj.data.datetime.queryRangeRestrictionInHour
+            "
+            :queryRangeRestrictionMsg="
+              searchObj.data.datetime.queryRangeRestrictionMsg
+            "
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -276,7 +282,41 @@ export default defineComponent({
 
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
+      if (
+        value.valueType == "absolute" &&
+        searchObj.data.stream.selectedStream.length > 0 &&
+        searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
+        value.hasOwnProperty("selectedDate") &&
+        value.hasOwnProperty("selectedTime") &&
+        value.selectedDate.hasOwnProperty("from") &&
+        value.selectedTime.hasOwnProperty("startTime")
+      ) {
+        // Convert hours to microseconds
+        let newStartTime =
+          parseInt(value.endTime) -
+          searchObj.data.datetime.queryRangeRestrictionInHour *
+            60 *
+            60 *
+            1000000;
 
+        if (parseInt(newStartTime) > parseInt(value.startTime)) {
+          value.startTime = newStartTime;
+
+          value.selectedDate.from = timestampToTimezoneDate(
+            value.startTime / 1000,
+            store.state.timezone,
+            "yyyy/MM/DD",
+          );
+          value.selectedTime.startTime = timestampToTimezoneDate(
+            value.startTime / 1000,
+            store.state.timezone,
+            "HH:mm",
+          );
+
+          dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
+          dateTimeRef.value.setDateType("absolute");
+        }
+      }
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
@@ -284,6 +324,10 @@ export default defineComponent({
           ? value.relativeTimePeriod
           : searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
+        queryRangeRestrictionMsg:
+          searchObj.data.datetime?.queryRangeRestrictionMsg || "",
+        queryRangeRestrictionInHour:
+          searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
       };
 
       await nextTick();
@@ -302,8 +346,6 @@ export default defineComponent({
           page: "Search Logs",
         });
       }
-
-      if (value.valueType === "relative") emit("searchdata");
     };
 
     const updateQuery = () => {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -78,6 +78,12 @@ pub enum Error {
     NotImplemented,
     #[error("Unknown error")]
     Unknown,
+    #[error("Error# {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("Error# {0}")]
+    WalFileError(String),
+    #[error("Error# {0}")]
+    OtherError(#[from] anyhow::Error),
 }
 
 unsafe impl Send for Error {}
@@ -108,8 +114,12 @@ pub enum DbError {
     SeaORMError(String),
     #[error("error getting dashboard")]
     GetDashboardError(#[from] GetDashboardError),
-    #[error("PutDashbord# {0}")]
+    #[error("PutDashboard# {0}")]
     PutDashboard(#[from] PutDashboardError),
+    #[error("DestinationError# {0}")]
+    DestinationError(#[from] DestinationError),
+    #[error("TemplateError# {0}")]
+    TemplateError(#[from] TemplateError),
     #[error("PutAlert# {0}")]
     PutAlert(#[from] PutAlertError),
 }
@@ -149,6 +159,22 @@ pub enum PutAlertError {
 }
 
 #[derive(ThisError, Debug)]
+pub enum DestinationError {
+    #[error("alert destination template not found")]
+    AlertDestTemplateNotFound,
+    #[error("alert destination in DB has empty template id")]
+    AlertDestEmptyTemplateId,
+    #[error("error converting destination id: {0}")]
+    ConvertingId(String),
+}
+
+#[derive(ThisError, Debug)]
+pub enum TemplateError {
+    #[error("error converting template id: {0}")]
+    ConvertingId(String),
+}
+
+#[derive(ThisError, Debug)]
 pub enum ErrorCodes {
     ServerInternalError(String),
     SearchSQLNotValid(String),
@@ -162,6 +188,7 @@ pub enum ErrorCodes {
     SearchCancelQuery(String),
     SearchTimeout(String),
     InvalidParams(String),
+    RatelimitExceeded(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -182,14 +209,21 @@ impl From<PutDashboardError> for Error {
     }
 }
 
+impl From<DestinationError> for Error {
+    fn from(value: DestinationError) -> Self {
+        Error::DbError(value.into())
+    }
+}
+
+impl From<TemplateError> for Error {
+    fn from(value: TemplateError) -> Self {
+        Error::DbError(value.into())
+    }
+}
+
 impl std::fmt::Display for ErrorCodes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            r#"{{"error_code": {}, "error_msg": "{}"}}"#,
-            self.get_code(),
-            self.get_message()
-        )
+        write!(f, "{}", self.to_json())
     }
 }
 
@@ -208,6 +242,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) => 20009,
             ErrorCodes::SearchTimeout(_) => 20010,
             ErrorCodes::InvalidParams(_) => 20011,
+            ErrorCodes::RatelimitExceeded(_) => 20012,
         }
     }
 
@@ -233,6 +268,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) => "Search query was cancelled".to_string(),
             ErrorCodes::SearchTimeout(_) => "Search query timed out".to_string(),
             ErrorCodes::InvalidParams(_) => "Invalid parameters".to_string(),
+            ErrorCodes::RatelimitExceeded(_) => "Ratelimit exceeded".to_string(),
         }
     }
 
@@ -250,6 +286,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(msg) => msg.to_owned(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
+            ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
         }
     }
 
@@ -267,6 +304,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(msg) => msg.to_string(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
+            ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
         }
     }
 

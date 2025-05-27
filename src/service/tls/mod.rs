@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert
 use itertools::Itertools as _;
 use rustls::{ClientConfig, ServerConfig};
 use rustls_pemfile::{certs, private_key};
+
 pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
     let cfg = config::get_config();
     let cert_file =
@@ -57,7 +58,7 @@ pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
     Ok(tls_config)
 }
 
-pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
+pub fn client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
     let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
         native_roots_cert_store()?
@@ -85,4 +86,8 @@ pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
     config.alpn_protocols = protos;
 
     Ok(Arc::new(config))
+}
+
+pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
+    todo!()
 }

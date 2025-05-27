@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,10 +17,11 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::datatypes::Schema;
 use arrow::array::{
-    make_builder, new_null_array, ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder,
+    ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder, make_builder, new_null_array,
 };
 use arrow_schema::{DataType, Field};
 use config::{
+    FxIndexMap,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -31,13 +32,12 @@ use config::{
         json,
         parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
     },
-    FxIndexMap,
 };
 use hashbrown::HashSet;
 use infra::{file_list as infra_file_list, storage};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{Semaphore, mpsc};
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 
@@ -139,16 +139,10 @@ pub async fn generate_by_stream(
         start.elapsed().as_millis()
     );
 
-    for (file, meta) in files {
-        if PROCESSING_FILES.read().contains(&file) {
+    for file in files {
+        if PROCESSING_FILES.read().contains(&file.key) {
             continue;
         }
-        let file = FileKey {
-            key: file,
-            meta,
-            deleted: false,
-            segment_ids: None,
-        };
         // add into queue
         PROCESSING_FILES.write().insert(file.key.clone());
         worker_tx.send(file).await?;
@@ -162,7 +156,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     log::debug!("[FLATTEN_COMPACTOR] generate flatten file for {}", file.key);
 
-    let data = storage::get(&file.key).await?;
+    let data = storage::get_bytes(&file.account, &file.key).await?;
     let (_, batches) = read_recordbatch_from_bytes(&data)
         .await
         .map_err(|e| anyhow::anyhow!("read_recordbatch_from_bytes error: {}", e))?;
@@ -170,7 +164,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
         .map_err(|e| anyhow::anyhow!("generate_vertical_partition_recordbatch error: {}", e))?;
 
     if new_batches.is_empty() {
-        storage::del(&[&file.key]).await?;
+        storage::del(vec![(&file.account, &file.key)]).await?;
         return Ok(());
     }
     let columns = file.key.splitn(9, '/').collect::<Vec<&str>>();
@@ -198,7 +192,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
             .await
             .map_err(|e| anyhow::anyhow!("write_recordbatch_to_parquet error: {}", e))?;
     // upload filee
-    storage::put(&new_file, new_data.into()).await?;
+    storage::put(&file.account, &new_file, new_data.into()).await?;
     // delete from queue
     PROCESSING_FILES.write().remove(&file.key);
     log::info!(

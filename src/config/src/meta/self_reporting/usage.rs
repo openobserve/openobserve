@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,11 +16,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    SIZE_IN_MB, get_config,
     meta::{
         search::{SearchEventContext, SearchEventType},
         stream::{FileMeta, StreamType},
     },
-    SIZE_IN_MB,
 };
 
 pub const USAGE_STREAM: &str = "usage";
@@ -53,6 +53,7 @@ pub enum TriggerDataType {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct TriggerData {
     pub _timestamp: i64,
     pub org: String,
@@ -70,6 +71,10 @@ pub struct TriggerData {
     pub is_partial: Option<bool>,
     pub delay_in_secs: Option<i64>,
     pub evaluation_took_in_secs: Option<f64>,
+    pub source_node: Option<String>,
+    pub query_took: Option<i64>,
+    pub scheduler_trace_id: Option<String>,
+    pub time_in_queue_ms: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -117,6 +122,8 @@ pub struct UsageData {
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_name: Option<String>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -128,6 +135,7 @@ pub struct GroupKey {
     pub hour: u32,
     pub event: UsageEvent,
     pub email: String,
+    pub node: String,
 }
 
 pub struct AggregatedData {
@@ -156,27 +164,14 @@ impl std::fmt::Display for UsageEvent {
 
 impl From<UsageType> for UsageEvent {
     fn from(usage: UsageType) -> UsageEvent {
-        match usage {
-            UsageType::Bulk
-            | UsageType::Json
-            | UsageType::Multi
-            | UsageType::KinesisFirehose
-            | UsageType::GCPSubscription
-            | UsageType::Logs
-            | UsageType::Traces
-            | UsageType::Metrics
-            | UsageType::PrometheusRemoteWrite
-            | UsageType::JsonMetrics
-            | UsageType::RUM
-            | UsageType::EnrichmentTable
-            | UsageType::Syslog => UsageEvent::Ingestion,
-            UsageType::Search
-            | UsageType::SearchAround
-            | UsageType::SearchTopNValues
-            | UsageType::MetricSearch
-            | UsageType::SearchHistory => UsageEvent::Search,
-            UsageType::Functions => UsageEvent::Functions,
-            UsageType::Retention => UsageEvent::Other,
+        if usage.is_ingestion() {
+            UsageEvent::Ingestion
+        } else if usage.is_search() {
+            UsageEvent::Search
+        } else if usage.is_function() {
+            UsageEvent::Functions
+        } else {
+            UsageEvent::Other
         }
     }
 }
@@ -223,6 +218,42 @@ pub enum UsageType {
     Syslog,
     #[serde(rename = "enrichment_table")]
     EnrichmentTable,
+}
+
+impl UsageType {
+    pub fn is_search(&self) -> bool {
+        matches!(
+            self,
+            UsageType::Search
+                | UsageType::SearchAround
+                | UsageType::SearchTopNValues
+                | UsageType::SearchHistory
+                | UsageType::MetricSearch
+        )
+    }
+
+    pub fn is_ingestion(&self) -> bool {
+        matches!(
+            self,
+            UsageType::Bulk
+                | UsageType::Json
+                | UsageType::Multi
+                | UsageType::KinesisFirehose
+                | UsageType::GCPSubscription
+                | UsageType::Logs
+                | UsageType::Traces
+                | UsageType::Metrics
+                | UsageType::PrometheusRemoteWrite
+                | UsageType::JsonMetrics
+                | UsageType::RUM
+                | UsageType::EnrichmentTable
+                | UsageType::Syslog
+        )
+    }
+
+    pub fn is_function(&self) -> bool {
+        matches!(self, UsageType::Functions)
+    }
 }
 
 impl std::fmt::Display for UsageType {
@@ -288,6 +319,8 @@ pub struct RequestStats {
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_name: Option<String>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -310,6 +343,7 @@ impl Default for RequestStats {
             result_cache_ratio: None,
             is_partial: false,
             work_group: None,
+            node_name: Some(get_config().common.instance_name.clone()),
         }
     }
 }
@@ -335,6 +369,7 @@ impl From<FileMeta> for RequestStats {
             result_cache_ratio: None,
             is_partial: false,
             work_group: None,
+            node_name: None,
         }
     }
 }

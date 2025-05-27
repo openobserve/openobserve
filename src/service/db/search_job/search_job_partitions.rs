@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::time::now_micros;
 use infra::{
     errors,
     table::{
@@ -31,7 +32,7 @@ use {
 };
 
 pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
-    let created_at = chrono::Utc::now().timestamp_micros();
+    let created_at = now_micros();
     let mut jobs = Vec::with_capacity(partitions.len());
     for (idx, partition) in partitions.iter().enumerate() {
         jobs.push(Model {
@@ -74,7 +75,7 @@ pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Erro
 }
 
 pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<(), errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
 
     let operator = SetOperator {
         filter: vec![
@@ -118,7 +119,7 @@ pub async fn set_partition_job_finish(
     partition_id: i64,
     path: &str,
 ) -> Result<(), errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     let operator = SetOperator {
         filter: vec![
             Filter::new(
@@ -158,7 +159,7 @@ pub async fn set_partition_job_error_message(
     partition_id: i64,
     error_message: &str,
 ) -> Result<(), errors::Error> {
-    let updated_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = now_micros();
     let operator = SetOperator {
         filter: vec![
             Filter::new(

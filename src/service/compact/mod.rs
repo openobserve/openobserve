@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,20 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
         cluster::{CompactionJobType, Role},
-        stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
+        stream::{ALL_STREAM_TYPES, PartitionTimeLevel, StreamType},
     },
 };
 use infra::{
     file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
 };
-use tokio::sync::{mpsc, Semaphore};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
+use tokio::sync::mpsc;
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 
@@ -35,6 +39,7 @@ pub mod flatten;
 pub mod merge;
 pub mod retention;
 pub mod stats;
+pub mod worker;
 
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
@@ -160,7 +165,9 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                     continue; // no compactor node
                 };
                 if LOCAL_NODE.name.ne(&node_name) {
-                    // Check if this node holds the stream
+                    // This needs to be done in the case when there is a new node in the cluster
+                    // This will change the node that holds the stream
+                    // In case this node holds the stream, we release it for the designated node
                     if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
                         &org_id,
                         stream_type,
@@ -236,10 +243,92 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
     Ok(())
 }
 
+/// Generate downsampling job for Metrics
+#[cfg(feature = "enterprise")]
+pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
+    let orgs = db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        // check backlist
+        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
+        {
+            continue;
+        }
+        let stream_type = StreamType::Metrics;
+        let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+        for stream_name in streams {
+            let Some(node_name) =
+                get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
+            else {
+                continue; // no compactor node
+            };
+            let downsampling_rules = get_matching_downsampling_rules(&stream_name);
+            for rule in downsampling_rules {
+                if LOCAL_NODE.name.ne(&node_name) {
+                    // Check if this node holds the stream
+                    if let Some((offset, _)) = db::compact::downsampling::get_offset_from_cache(
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                        (rule.offset, rule.step),
+                    )
+                    .await
+                    {
+                        // release the stream
+                        db::compact::downsampling::set_offset(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                            (rule.offset, rule.step),
+                            offset,
+                            None,
+                        )
+                        .await?;
+                    }
+                    continue; // not this node
+                }
+
+                // check if we are allowed to merge or just skip
+                if db::compact::retention::is_deleting_stream(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    None,
+                ) {
+                    log::warn!(
+                        "[DOWNSAMPLING] the stream [{}/{}/{}] is deleting, just skip",
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                    );
+                    continue;
+                }
+
+                if let Err(e) = merge::generate_downsampling_job_by_stream_and_rule(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    (rule.offset, rule.step),
+                )
+                .await
+                {
+                    log::error!(
+                        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?} error: {}",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        rule,
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// compactor merging
-pub async fn run_merge(
-    worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
-) -> Result<(), anyhow::Error> {
+pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let mut jobs =
         infra_file_list::get_pending_jobs(&LOCAL_NODE.uuid, cfg.compact.batch_size).await?;
@@ -247,20 +336,34 @@ pub async fn run_merge(
         return Ok(());
     }
 
+    let now = config::utils::time::now();
+    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+
     // check the stream, if the stream partition_time_level is daily or compact step secs less than
     // 1 hour, we only allow one compactor to working on it
     let mut need_release_ids = Vec::new();
+    let mut need_done_ids = Vec::new();
     for job in jobs.iter() {
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
         let org_id = columns[0].to_string();
         let stream_type = StreamType::from(columns[1]);
         let stream_name = columns[2].to_string();
-        let stream_setting = get_settings(&org_id, &stream_name, stream_type)
+        let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
         let partition_time_level =
-            unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        // to avoid compacting conflict with retention, need check the data retention time
+        let stream_data_retention_end = if stream_settings.data_retention > 0 {
+            now - Duration::try_days(stream_settings.data_retention).unwrap()
+        } else {
+            data_lifecycle_end
+        };
+        if job.offsets <= stream_data_retention_end.timestamp_micros() {
+            need_done_ids.push(job.id); // the data will be deleted by retention, just skip
+            continue;
+        }
         if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
@@ -273,11 +376,22 @@ pub async fn run_merge(
             }
         }
     }
+
+    if !need_done_ids.is_empty() {
+        // set those jobs to done
+        if let Err(e) = infra_file_list::set_job_done(&need_done_ids).await {
+            log::error!("[COMPACTOR] set_job_done failed: {}", e);
+        }
+        let need_done_ids = need_done_ids.into_iter().collect::<HashSet<_>>();
+        jobs.retain(|job| !need_done_ids.contains(&job.id));
+    }
+
     if !need_release_ids.is_empty() {
         // release those jobs
         if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {
-            log::error!("[COMPACT] set_job_pending failed: {}", e);
+            log::error!("[COMPACTOR] set_job_pending failed: {}", e);
         }
+        let need_release_ids = need_release_ids.into_iter().collect::<HashSet<_>>();
         jobs.retain(|job| !need_release_ids.contains(&job.id));
     }
 
@@ -296,28 +410,20 @@ pub async fn run_merge(
             tokio::select! {
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                 _ = rx.recv() => {
-                    log::debug!("[COMPACT] update_running_jobs done");
+                    log::debug!("[COMPACTOR] update_running_jobs done");
                     return;
                 }
             }
-            for id in job_ids.iter() {
-                if let Err(e) = infra_file_list::update_running_jobs(*id).await {
-                    log::error!("[COMPACT] update_job_status failed: {}", e);
-                }
+            if let Err(e) = infra_file_list::update_running_jobs(&job_ids).await {
+                log::error!("[COMPACTOR] update_job_status failed: {}", e);
             }
         }
     });
 
-    let mut tasks = Vec::with_capacity(jobs.len());
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
-    let mut min_offset = i64::MAX;
     for job in jobs {
         if job.offsets == 0 {
             log::error!("[COMPACTOR] merge job offset error: {}", job.offsets);
             continue;
-        }
-        if job.offsets < min_offset {
-            min_offset = job.offsets;
         }
 
         let columns = job.stream.split('/').collect::<Vec<&str>>();
@@ -337,35 +443,24 @@ pub async fn run_merge(
             continue;
         }
 
-        let org_id = org_id.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let worker_tx = worker_tx.clone();
-        let task = tokio::task::spawn(async move {
-            if let Err(e) = merge::merge_by_stream(
-                worker_tx,
-                &org_id,
+        if let Err(e) = job_tx
+            .send(worker::MergeJob {
+                org_id: org_id.to_string(),
                 stream_type,
-                &stream_name,
-                job.id,
-                job.offsets,
-            )
+                stream_name: stream_name.to_string(),
+                job_id: job.id,
+                offset: job.offsets,
+            })
             .await
-            {
-                log::error!(
-                    "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    e
-                );
-            }
-            drop(permit);
-        });
-        tasks.push(task);
-    }
-
-    for task in tasks {
-        task.await?;
+        {
+            log::error!(
+                "[COMPACTOR] send merge job to worker failed [{}/{}/{}] error: {}",
+                org_id,
+                stream_type,
+                stream_name,
+                e
+            );
+        }
     }
 
     Ok(())

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,11 +18,11 @@ use datafusion::error::Result;
 use crate::service::promql::value::{RangeValue, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#resets
-pub(crate) fn resets(data: &Value) -> Result<Value> {
+pub(crate) fn resets(data: Value) -> Result<Value> {
     super::eval_idelta(data, "resets", exec, false)
 }
 
-fn exec(data: &RangeValue) -> Option<f64> {
+fn exec(data: RangeValue) -> Option<f64> {
     let resets = data
         .samples
         .iter()

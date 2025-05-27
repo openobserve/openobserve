@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,13 +18,9 @@ use promql_parser::parser::LabelModifier;
 
 use crate::service::promql::{aggregations::score_to_instant_value, value::Value};
 
-pub fn min(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
+pub fn min(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
     let score_values = super::eval_arithmetic(param, data, "min", |prev, val| {
-        if prev > 0.0 && prev <= val {
-            prev
-        } else {
-            val
-        }
+        if prev > 0.0 && prev <= val { prev } else { val }
     })?;
     if score_values.is_none() {
         return Ok(Value::None);

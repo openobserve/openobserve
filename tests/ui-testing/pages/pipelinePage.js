@@ -1,4 +1,6 @@
 const { expect } = require('@playwright/test')
+
+const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 class PipelinePage {
   constructor(page) {
     this.page = page;
@@ -28,7 +30,7 @@ class PipelinePage {
     this.pipelineNameInput = page.getByLabel("Enter Pipeline Name");
     this.sourceNodeRequiredMessage = page.getByText("Source node is required");
     this.streamNameInput = page.getByLabel("Stream Name *");
-    this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" });
+    this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
     this.inputNodeStreamSaveButton = page.locator(
       '[data-test="input-node-stream-save-btn"]'
     );
@@ -65,12 +67,23 @@ class PipelinePage {
     this.fieldRequiredError = page.getByText('Field is required!')
     this.tableRowsLocator = page.locator("tbody tr");
     this.confirmButton = page.locator('[data-test="confirm-button"]');
+    this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
+    this.pipelineDestinationsTab = page.locator('[data-test="pipeline-destinations-tab"]');
+    this.searchInput = page.locator('[data-test="destination-list-search-input"]');
     this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
     this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
     this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
     this.enrichmentTableTab =
       '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label';
     this.addEnrichmentTableButton = 'text=Add Enrichment Table';
+    this.editButton = page.locator("button").filter({ hasText: "edit" });
+    this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
+    this.nameInput = page.getByLabel("Name *");
+    this.saveButton = page.getByRole("button", { name: "Save" }).last();
+    this.urlInput = page.locator('[data-test="add-destination-url-input"]');
+    this.headerKeyInput = page.locator('[data-test="add-destination-header--key-input"]');
+    this.headerValueInput = page.locator('[data-test="add-destination-header-Authorization-value-input"]');
+    this.submitButton = page.locator('[data-test="add-destination-submit-btn"]');
 
 
 
@@ -342,6 +355,52 @@ async deleteEnrichmentTableByName(fileName) {
 async navigateToEnrichmentTableTab() {
   await this.pipelineMenuLink.click();
   await this.enrichmentTableTab.click();
+}
+
+async deleteDestination(randomNodeName) {
+  await this.settingsMenu.click();
+  await this.pipelineDestinationsTab.click();
+  await this.searchInput.click();
+  await this.searchInput.fill(randomNodeName);
+  
+  const deleteButton = this.page.locator(`[data-test="alert-destination-list-${randomNodeName}-delete-destination"]`);
+  await deleteButton.click();
+  await this.confirmButton.click();
+  
+  await expect(this.page.getByText('deleted successfully')).toBeVisible();
+}
+
+async createRemoteDestination(randomNodeName, AuthorizationToken) {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "remote_automate";
+  const url = process.env.INGESTION_URL;
+
+  await this.remoteDestinationIcon.waitFor();
+  await this.remoteDestinationIcon.click();
+  await this.toggleCreateStream();
+  
+  await this.nameInput.waitFor();
+  await this.nameInput.fill(randomNodeName);
+  
+  await this.saveButton.waitFor();
+  await this.saveButton.click();
+
+  await this.urlInput.waitFor();
+  await this.urlInput.fill(`${url}/api/${orgId}/${streamName}/_json`);
+  
+  await this.headerKeyInput.waitFor();
+  await this.headerKeyInput.fill("Authorization");
+  
+  await this.headerValueInput.waitFor();
+  await this.headerValueInput.fill(`Basic ${AuthorizationToken}`);
+  console.log("this is to test", AuthorizationToken)
+
+  await this.submitButton.waitFor();
+  await this.submitButton.click();
+  await this.page.waitForTimeout(1000);
+  
+  await this.submitButton.waitFor();
+  await this.submitButton.click();
 }
 
 }

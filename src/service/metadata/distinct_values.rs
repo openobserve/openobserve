@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,17 +16,16 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    get_config,
+    FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
-    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
-    FxIndexMap,
+    utils::{json, schema::infer_json_schema_from_map, time::now_micros},
 };
 use infra::{
     errors::{Error, Result},
@@ -36,16 +35,16 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{RwLock, mpsc},
     time,
 };
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    service,
     service::{
-        ingestion,
+        db, ingestion,
         metadata::{Metadata, MetadataItem},
+        schema::get_schema_changes,
     },
 };
 
@@ -152,19 +151,18 @@ impl Metadata for DistinctValues {
         // distinct values will always have _timestamp and
         // count, rest will be dynamically determined
         Arc::new(Schema::new(vec![
-            Field::new(
-                get_config().common.column_timestamp.as_str(),
-                DataType::Int64,
-                false,
-            ),
-            Field::new("count", DataType::Int64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("count", DataType::Int64, true),
         ]))
     }
 
     async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            if let MetadataItem::DistinctValues(item) = item {
+            if let MetadataItem::DistinctValues(mut item) = item {
+                // these two are reserved, so we remove them if present
+                item.value.remove("count");
+                item.value.remove(TIMESTAMP_COL_NAME);
                 let count = group_items.entry(item).or_default();
                 *count += 1;
             }
@@ -186,7 +184,7 @@ impl Metadata for DistinctValues {
         drop(mem_table);
 
         // write to wal
-        let timestamp = chrono::Utc::now().timestamp_micros();
+        let timestamp = now_micros();
         let default_schema = self.generate_schema();
 
         // transpose the table
@@ -212,12 +210,13 @@ impl Metadata for DistinctValues {
             );
             // check for schema
             let db_schema =
-                infra::schema::get(&org_id, &distinct_stream_name, StreamType::Metadata).await?;
-            let mut _is_new = false;
-            if db_schema.fields().is_empty() {
-                _is_new = true;
+                infra::schema::get_cache(&org_id, &distinct_stream_name, StreamType::Metadata)
+                    .await?;
+            let mut is_new = false;
+            if db_schema.fields_map().is_empty() {
+                is_new = true;
                 let schema = default_schema.as_ref().clone();
-                if let Err(e) = service::db::schema::merge(
+                if let Err(e) = db::schema::merge(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
@@ -227,20 +226,18 @@ impl Metadata for DistinctValues {
                 .await
                 {
                     log::error!("[DISTINCT_VALUES] error while setting schema: {}", e);
+                    return Err(Error::Message(e.to_string()));
                 }
             }
 
             let inferred_schema =
                 infer_json_schema_from_map(items.iter().map(|(v, _)| v), stream_type)?;
-
-            let mut schema_key = db_schema.hash_key();
-            let mut schema = inferred_schema;
-            if _is_new || db_schema.fields.ne(&schema.fields) {
-                match service::db::schema::merge(
+            let schema = if is_new || get_schema_changes(&db_schema, &inferred_schema).0 {
+                match db::schema::merge(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
-                    &schema,
+                    &inferred_schema,
                     Some(timestamp),
                 )
                 .await
@@ -249,24 +246,23 @@ impl Metadata for DistinctValues {
                         log::error!(
                             "[DISTINCT_VALUES] error while updating schema for {org_id}/{stream_name} : {e}"
                         );
-                        schema_key = schema.hash_key()
+                        return Err(Error::Message(e.to_string()));
                     }
-                    Ok(None) => schema_key = schema.hash_key(),
-                    Ok(Some((s, _))) => {
-                        schema_key = s.hash_key();
-                        schema = s;
-                    }
+                    Ok(None) => db_schema.schema().clone(),
+                    Ok(Some((s, _))) => Arc::new(s),
                 }
-            }
+            } else {
+                db_schema.schema().clone()
+            };
+            let schema_key = db_schema.hash_key();
 
-            let schema = Arc::new(schema);
             let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
                 let data = data.as_object_mut().unwrap();
                 data.insert("count".to_string(), json::Value::Number(count.into()));
                 data.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
                 let hour_key = ingestion::get_write_partition_key(
@@ -274,13 +270,13 @@ impl Metadata for DistinctValues {
                     &vec![],
                     unwrap_partition_time_level(None, StreamType::Metadata),
                     data,
-                    Some(&schema_key),
+                    Some(schema_key),
                 );
                 let data = json::Value::Object(data.clone());
                 let data_size = json::to_vec(&data).unwrap_or_default().len();
 
                 let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                    schema_key: schema_key.clone(),
+                    schema_key: schema_key.to_string(),
                     schema: schema.clone(),
                     records: vec![],
                     records_size: 0,
@@ -292,7 +288,7 @@ impl Metadata for DistinctValues {
             let writer = ingester::get_writer(
                 0,
                 &org_id,
-                &StreamType::Metadata.to_string(),
+                StreamType::Metadata.as_str(),
                 &distinct_stream_name,
             )
             .await;
@@ -306,13 +302,13 @@ impl Metadata for DistinctValues {
 
             #[cfg(feature = "enterprise")]
             {
-                use o2_enterprise::enterprise::{
-                    common::infra::config::get_config as get_o2_config,
-                    openfga::authorizer::authz::set_ownership_if_not_exists,
+                use o2_openfga::{
+                    authorizer::authz::set_ownership_if_not_exists,
+                    config::get_config as get_openfga_config,
                 };
 
                 // set ownership only in the first time
-                if _is_new && get_o2_config().openfga.enabled {
+                if is_new && get_openfga_config().enabled {
                     set_ownership_if_not_exists(
                         &org_id,
                         &format!("{}:{}", StreamType::Metadata, distinct_stream_name),

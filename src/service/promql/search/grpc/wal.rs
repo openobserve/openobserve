@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use arrow::record_batch::RecordBatch;
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
 };
 use datafusion::{
@@ -25,7 +28,7 @@ use datafusion::{
     datasource::MemTable,
     error::{DataFusionError, Result},
     physical_plan::visit_execution_plan,
-    prelude::{col, lit, SessionContext},
+    prelude::{SessionContext, col, lit},
 };
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
@@ -68,6 +71,10 @@ pub(crate) async fn create_context(
                 DataFusionError::Execution(err.to_string())
             })?,
     );
+    if schema.fields().is_empty() {
+        // stream not found
+        return Ok(vec![]);
+    }
 
     // get wal record batches
     let (stats, batches, schema) = get_wal_batches(
@@ -95,8 +102,9 @@ pub(crate) async fn create_context(
         stats.original_size,
     );
 
-    let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, 0).await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
+    log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
     resp.push((ctx, schema, stats));
 
@@ -123,7 +131,7 @@ async fn get_wal_batches(
     }
     let nodes = nodes.unwrap();
 
-    let ctx = prepare_datafusion_context(None, vec![], false, cfg.limit.cpu_num).await?;
+    let ctx = prepare_datafusion_context(None, vec![], vec![], false, cfg.limit.cpu_num).await?;
     let table = Arc::new(
         NewEmptyTable::new(stream_name, Arc::clone(&schema))
             .with_partitions(ctx.state().config().target_partitions()),
@@ -134,9 +142,9 @@ async fn get_wal_batches(
     let (start, end) = time_range;
     let mut df = match ctx.table(stream_name).await {
         Ok(df) => df.filter(
-            col(&cfg.common.column_timestamp)
+            col(TIMESTAMP_COL_NAME)
                 .gt(lit(start))
-                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
             return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
@@ -189,9 +197,24 @@ async fn get_wal_batches(
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
     }?;
 
-    let mut schema = Arc::new(Schema::empty());
-    if !batches.is_empty() {
-        schema = Arc::clone(&batches[0].schema());
+    if batches.is_empty() {
+        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
     }
-    Ok((stats, batches, schema))
+
+    // remove the metadata
+    let schema = Arc::new(
+        batches[0]
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(HashMap::new()),
+    );
+    let mut new_batches = Vec::with_capacity(batches.len());
+    for batch in batches {
+        new_batches.push(RecordBatch::try_new(
+            schema.clone(),
+            batch.columns().to_vec(),
+        )?);
+    }
+    Ok((stats, new_batches, schema))
 }

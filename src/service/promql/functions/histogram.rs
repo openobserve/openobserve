@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL};
+use config::{
+    meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL},
+    utils::sort::sort_float,
+};
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
 use crate::service::promql::value::{
-    signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Signature, Value,
+    InstantValue, Labels, LabelsExt, Sample, Value, signature_without_labels,
 };
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct Bucket {
     upper_bound: f64,
     count: f64,
@@ -56,7 +59,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         }
     };
 
-    let mut metrics_with_buckets: HashMap<Signature, MetricWithBuckets> = HashMap::default();
+    let mut metrics_with_buckets: HashMap<u64, MetricWithBuckets> = HashMap::default();
     for InstantValue { mut labels, sample } in in_vec {
         // [https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile]:
         //
@@ -107,9 +110,9 @@ fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
     if phi > 1.0 {
         return f64::INFINITY;
     }
-    buckets.sort_by(|a, b| a.upper_bound.partial_cmp(&b.upper_bound).unwrap());
+    buckets.sort_by(|a, b| sort_float(&a.upper_bound, &b.upper_bound));
     // The caller of `bucket_quantile` guarantees that `buckets` is non-empty.
-    let highest_bucket = buckets[buckets.len() - 1];
+    let highest_bucket = &buckets[buckets.len() - 1];
     if !(highest_bucket.upper_bound.is_infinite() && highest_bucket.upper_bound.is_sign_positive())
     {
         return f64::NAN;
@@ -157,7 +160,7 @@ fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
     let mut st = None;
     let mut buckets = buckets
         .into_iter()
-        .filter_map(|b| match st {
+        .filter_map(|b| match st.as_mut() {
             None => {
                 st = Some(b);
                 None
@@ -165,13 +168,14 @@ fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
             Some(last) => {
                 if b.upper_bound == last.upper_bound {
                     st = Some(Bucket {
+                        upper_bound: last.upper_bound,
                         count: last.count + b.count,
-                        ..last
                     });
                     None
                 } else {
-                    st = Some(b);
-                    Some(last)
+                    let nb = last.clone();
+                    *last = b;
+                    Some(nb)
                 }
             }
         })

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,20 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::File,
-    io::{self, BufReader, Read},
+    collections::HashMap,
+    fs::{File, Metadata},
+    io::{self, BufReader, Read, Seek},
     path::PathBuf,
 };
 
 use byteorder::{BigEndian, ReadBytesExt};
 use crc32fast::Hasher;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 
-use crate::errors::*;
+use crate::{FileHeader, ReadFrom, errors::*};
 
 pub struct Reader<R> {
     path: PathBuf,
     f: R,
+    header: FileHeader,
 }
 
 impl Reader<BufReader<File>> {
@@ -42,11 +44,89 @@ impl Reader<BufReader<File>> {
             length: super::FILE_TYPE_IDENTIFIER.len(),
         })?;
         ensure!(
-            &buf == super::FILE_TYPE_IDENTIFIER,
+            &buf == super::FILE_TYPE_IDENTIFIER || &buf == super::FILE_TYPE_IDENTIFIER_WITH_HEADER,
             FileIdentifierMismatchSnafu,
         );
 
-        Ok(Self::new(path, f))
+        if &buf == super::FILE_TYPE_IDENTIFIER_WITH_HEADER {
+            // check the file header, and skip header.
+            // if we need to get header, use Reader::header
+            let mut buf = [0; super::WAL_FILE_HEADER_LEN];
+            f.read_exact(&mut buf).context(UnableToReadArraySnafu {
+                length: super::WAL_FILE_HEADER_LEN,
+            })?;
+            let mut buf = std::io::Cursor::new(buf);
+            let header_len = buf
+                .read_u32::<BigEndian>()
+                .context(UnableToReadLengthSnafu)? as usize;
+            let mut bytes = vec![0u8; header_len];
+            f.read_exact(&mut bytes)
+                .context(UnableToReadArraySnafu { length: header_len })?;
+            let header = Self::deserialize_header(&bytes)?;
+
+            Ok(Self::new(path, f, header))
+        } else {
+            Ok(Self::new(path, f, HashMap::new()))
+        }
+    }
+
+    pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<Self> {
+        let mut reader = Self::from_path(path)?;
+
+        match read_from {
+            ReadFrom::Checkpoint(file_position) if file_position > 0 => {
+                let _ = reader.f.seek(io::SeekFrom::Start(file_position)).unwrap();
+            }
+            ReadFrom::Checkpoint(_) => {
+                // do nothing because file_position is start from 0, same as ReadFrom::Beginning
+                // branch
+            }
+            ReadFrom::Beginning => {
+                // do nothing because the file is already at the beginning
+            }
+            ReadFrom::End => {
+                let _ = reader.f.seek(io::SeekFrom::End(0)).unwrap();
+            }
+        };
+
+        Ok(reader)
+    }
+
+    pub fn metadata(&self) -> io::Result<Metadata> {
+        self.f.get_ref().metadata()
+    }
+
+    pub fn current_position(&mut self) -> io::Result<u64> {
+        let position = self.f.stream_position()?;
+        Ok(position)
+    }
+
+    fn deserialize_header(bytes: &[u8]) -> Result<FileHeader> {
+        let mut header = HashMap::new();
+        let mut cursor = 0;
+
+        while cursor < bytes.len() {
+            // read key len
+            let key_len = u32::from_be_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
+            cursor += 4;
+
+            // read key value
+            let key = String::from_utf8(bytes[cursor..cursor + key_len as usize].to_vec()).unwrap();
+            cursor += key_len as usize;
+
+            // read value len
+            let value_len = u32::from_be_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
+            cursor += 4;
+
+            // read value value
+            let value =
+                String::from_utf8(bytes[cursor..cursor + value_len as usize].to_vec()).unwrap();
+            cursor += value_len as usize;
+
+            header.insert(key, value);
+        }
+
+        Ok(header)
     }
 }
 
@@ -54,8 +134,8 @@ impl<R> Reader<R>
 where
     R: Read,
 {
-    pub fn new(path: PathBuf, f: R) -> Self {
-        Self { path, f }
+    pub fn new(path: PathBuf, f: R, header: FileHeader) -> Self {
+        Self { path, f, header }
     }
 
     pub fn path(&self) -> &PathBuf {
@@ -64,12 +144,23 @@ where
 
     // read entry from the wal file
     pub fn read_entry(&mut self) -> Result<Option<Vec<u8>>> {
+        match self._read_entry() {
+            Ok((data, _)) => Ok(data),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn read_entry_with_length(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
+        self._read_entry()
+    }
+
+    pub fn _read_entry(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
         let expected_checksum = match self.f.read_u32::<BigEndian>() {
-            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok((None, 0)),
             other => other.context(UnableToReadChecksumSnafu)?,
         };
         if expected_checksum == 0 {
-            return Ok(None);
+            return Ok((None, 0));
         }
 
         let expected_len = self
@@ -78,7 +169,7 @@ where
             .context(UnableToReadLengthSnafu)?
             .into();
         if expected_len == 0 {
-            return Ok(Some(vec![]));
+            return Ok((Some(vec![]), 0));
         }
 
         let compressed_read = self.f.by_ref().take(expected_len);
@@ -106,7 +197,11 @@ where
             });
         }
 
-        Ok(Some(data))
+        Ok((Some(data), actual_compressed_len))
+    }
+
+    pub fn header(&self) -> &FileHeader {
+        &self.header
     }
 }
 

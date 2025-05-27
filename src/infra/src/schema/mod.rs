@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,16 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    get_config,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
+    RwHashMap, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
-    RwAHashMap, RwHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
-use futures::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
@@ -37,8 +37,6 @@ pub mod history;
 
 pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
     Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, Vec<(i64, bytes::Bytes)>>> =
-    Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, SchemaCache>> =
     Lazy::new(Default::default);
 pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
@@ -48,9 +46,22 @@ pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new
 pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerator>> =
     Lazy::new(Default::default);
 
+// atomic version of cache
+type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
+static STREAM_SETTINGS_ATOMIC: Lazy<ArcSwap<StreamSettingsCache>> =
+    Lazy::new(|| ArcSwap::from(Arc::new(hashbrown::HashMap::new())));
+
 pub async fn init() -> Result<()> {
     history::init().await?;
     Ok(())
+}
+
+pub fn get_stream_settings_atomic(key: &str) -> Option<StreamSettings> {
+    STREAM_SETTINGS_ATOMIC.load().get(key).cloned()
+}
+
+pub fn set_stream_settings_atomic(settings: StreamSettingsCache) {
+    STREAM_SETTINGS_ATOMIC.store(Arc::new(settings));
 }
 
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -58,16 +69,8 @@ pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> Strin
 }
 
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
-    let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
-
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.schema().as_ref().clone());
-    }
-    drop(r);
-    // if not found in cache, get from db
-    get_from_db(org_id, stream_name, stream_type).await
+    let schema = get_cache(org_id, stream_name, stream_type).await?;
+    Ok(schema.schema().as_ref().clone())
 }
 
 pub async fn get_cache(
@@ -77,15 +80,27 @@ pub async fn get_cache(
 ) -> Result<SchemaCache> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
-
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.clone());
+    if let Some(schema) = STREAM_SCHEMAS_LATEST.read().await.get(cache_key).cloned() {
+        return Ok(schema);
     }
-    drop(r);
-    // if not found in cache, get from db
-    let schema = get_from_db(org_id, stream_name, stream_type).await?;
-    Ok(SchemaCache::new(schema))
+
+    // Get from DB without holding any locks
+    let db_schema = get_from_db(org_id, stream_name, stream_type).await?;
+    // if the schema is empty, return an empty schema , Don't write to cache
+    if db_schema.fields().is_empty() && db_schema.metadata().is_empty() {
+        return Ok(SchemaCache::new(db_schema));
+    }
+    let schema = SchemaCache::new(db_schema);
+
+    // Only acquire write lock after DB read is complete
+    let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
+    // Check again before inserting in case another thread updated while we were reading DB
+    if let Some(schema) = write_guard.get(cache_key) {
+        Ok(schema.clone())
+    } else {
+        write_guard.insert(cache_key.to_string(), schema.clone());
+        Ok(schema)
+    }
 }
 
 pub async fn get_from_db(
@@ -128,78 +143,36 @@ pub async fn get_versions(
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
-    let cfg = get_config();
     let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
-    if cfg.common.schema_cache_compress_enabled {
-        let mut last_schema_index = None;
-        let r = STREAM_SCHEMAS_COMPRESSED.read().await;
-        if let Some(versions) = r.get(cache_key) {
-            let mut compressed_schemas = Vec::new();
+    let mut last_schema_index = None;
+    let r = STREAM_SCHEMAS.read().await;
+    if let Some(versions) = r.get(cache_key) {
+        let mut schemas = Vec::new();
 
-            for (index, (start_dt, data)) in versions.iter().enumerate() {
-                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
-                    compressed_schemas.push(data.clone());
-                    if last_schema_index.is_none() {
-                        last_schema_index = Some(index);
-                    }
+        for (index, (start_dt, data)) in versions.iter().enumerate() {
+            if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                schemas.push(data.clone());
+                if last_schema_index.is_none() {
+                    last_schema_index = Some(index);
                 }
             }
-
-            if let Some(last_index) = last_schema_index {
-                if last_index > 0 {
-                    if let Some((_, data)) = versions.get(last_index - 1) {
-                        // older version of schema before start_dt hence added in start
-                        compressed_schemas.insert(0, data.clone());
-                    }
-                }
-            } else {
-                // this is latest version of schema hence added in end
-                compressed_schemas.push(versions.last().unwrap().1.clone());
-            }
-            let schemas = futures::stream::iter(compressed_schemas)
-                .map(|data| async move {
-                    let de_bytes = zstd::decode_all(data.as_ref())?;
-                    let mut schemas: Vec<Schema> = json::from_slice(&de_bytes)?;
-                    Ok::<Option<Schema>, Error>(schemas.pop())
-                })
-                .buffer_unordered(cfg.limit.cpu_num)
-                .try_collect::<Vec<Option<Schema>>>()
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-            return Ok(schemas.into_iter().flatten().collect());
         }
-        drop(r);
-    } else {
-        let mut last_schema_index = None;
-        let r = STREAM_SCHEMAS.read().await;
-        if let Some(versions) = r.get(cache_key) {
-            let mut schemas = Vec::new();
 
-            for (index, (start_dt, data)) in versions.iter().enumerate() {
-                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
-                    schemas.push(data.clone());
-                    if last_schema_index.is_none() {
-                        last_schema_index = Some(index);
-                    }
+        if let Some(last_index) = last_schema_index {
+            if last_index > 0 {
+                if let Some((_, data)) = versions.get(last_index - 1) {
+                    // older version of schema before start_dt should be added in start
+                    schemas.insert(0, data.clone());
                 }
             }
-
-            if let Some(last_index) = last_schema_index {
-                if last_index > 0 {
-                    if let Some((_, data)) = versions.get(last_index - 1) {
-                        // older version of schema before start_dt should be added in start
-                        schemas.insert(0, data.clone());
-                    }
-                }
-            } else {
-                // this is latest version of schema hence added in end
-                schemas.push(versions.last().unwrap().1.clone());
-            }
-
-            return Ok(schemas);
+        } else {
+            // this is latest version of schema hence added in end
+            schemas.push(versions.last().unwrap().1.clone());
         }
-        drop(r);
+
+        return Ok(schemas);
     }
+    drop(r);
 
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
@@ -229,15 +202,30 @@ pub async fn get_settings(
     stream_type: StreamType,
 ) -> Option<StreamSettings> {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    let r = STREAM_SETTINGS.read().await;
-    if let Some(v) = r.get(&key) {
-        return Some(v.clone());
+
+    // Try to get from read lock first
+    if let Some(settings) = get_stream_settings_atomic(&key) {
+        return Some(settings);
     }
-    // if not found in cache, get from db
-    get(org_id, stream_name, stream_type)
-        .await
-        .ok()
-        .and_then(|schema| unwrap_stream_settings(&schema))
+
+    // Get from DB without holding any locks
+    let settings = match get(org_id, stream_name, stream_type).await {
+        Ok(schema) => unwrap_stream_settings(&schema),
+        Err(_) => None,
+    };
+
+    // Only acquire write lock if we have settings to update
+    if let Some(ref s) = settings {
+        // Check cache again before updating as another thread might updated while we reading DB
+        let mut w = STREAM_SETTINGS.write().await;
+        if !w.contains_key(&key) {
+            w.insert(key, s.clone());
+        }
+        set_stream_settings_atomic(w.clone());
+        drop(w);
+    }
+
+    settings
 }
 
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
@@ -279,11 +267,38 @@ pub fn unwrap_partition_time_level(
     }
 }
 
+pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    settings
+        .as_ref()
+        .map(|settings| settings.defined_schema_fields.clone().unwrap_or_default())
+        .unwrap_or_default()
+}
+
 pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     let default_fields = SQL_FULL_TEXT_SEARCH_FIELDS.clone();
     match settings {
         Some(settings) => {
             let mut fields = settings.full_text_search_keys.clone();
+            fields.extend(default_fields);
+            if settings.index_original_data {
+                fields.push(ORIGINAL_DATA_COL_NAME.to_string());
+            }
+            if settings.index_all_values {
+                fields.push(ALL_VALUES_COL_NAME.to_string());
+            }
+            fields.sort();
+            fields.dedup();
+            fields
+        }
+        None => default_fields,
+    }
+}
+
+pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    let default_fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
+    match settings {
+        Some(settings) => {
+            let mut fields = settings.index_fields.clone();
             fields.extend(default_fields);
             fields.sort();
             fields.dedup();
@@ -304,18 +319,6 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
             fields
         }
         None => default_fields,
-    }
-}
-
-pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
-    match settings {
-        Some(settings) => {
-            let mut fields = settings.index_fields.clone();
-            fields.sort();
-            fields.dedup();
-            fields
-        }
-        None => vec![],
     }
 }
 
@@ -349,6 +352,10 @@ pub async fn merge(
     schema: &Schema,
     min_ts: Option<i64>,
 ) -> Result<Option<(Schema, Vec<Field>)>> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(None);
+    }
     let start_dt = min_ts;
     let key = mk_key(org_id, stream_type, stream_name);
     let inferred_schema = schema.clone();
@@ -462,6 +469,10 @@ pub async fn update_setting(
     stream_type: StreamType,
     metadata: std::collections::HashMap<String, String>,
 ) -> Result<()> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(());
+    }
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
     db.get_for_update(
@@ -639,9 +650,7 @@ pub fn get_merge_schema_changes(
             Some(idx) => {
                 let existing_field = &merged_fields[*idx];
                 if existing_field.data_type() != item_data_type {
-                    if !get_config().common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.as_ref().clone());
-                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
+                    if is_widening_conversion(existing_field.data_type(), item_data_type) {
                         is_schema_changed = true;
                         merged_fields[*idx] = item;
                         field_datatype_delta.push((**item).clone());
@@ -658,14 +667,12 @@ pub fn get_merge_schema_changes(
     if !is_schema_changed {
         (false, field_datatype_delta, vec![])
     } else {
-        (
-            true,
-            field_datatype_delta,
-            merged_fields
-                .into_iter()
-                .map(|f| f.as_ref().clone())
-                .collect::<Vec<_>>(),
-        )
+        let mut merged_fields = merged_fields
+            .into_iter()
+            .map(|f| f.as_ref().clone())
+            .collect::<Vec<_>>();
+        merged_fields.sort_by(|a, b| a.name().cmp(b.name()));
+        (true, field_datatype_delta, merged_fields)
     }
 }
 

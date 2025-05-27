@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,43 +14,34 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
     io::{Error, ErrorKind},
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
-use actix_web::{http::header::HeaderName, web::Query};
-use awc::http::header::HeaderMap;
+use actix_web::{
+    http::header::{HeaderMap, HeaderName},
+    web::Query,
+};
 use config::meta::{
     search::{SearchEventContext, SearchEventType},
     stream::StreamType,
 };
+use hashbrown::{HashMap, HashSet};
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[inline(always)]
 pub(crate) fn get_stream_type_from_request(
     query: &Query<HashMap<String, String>>,
-) -> Result<Option<StreamType>, Error> {
-    let stream_type = match query.get("type") {
-        Some(s) => match s.to_lowercase().as_str() {
-            "logs" => Some(StreamType::Logs),
-            "metrics" => Some(StreamType::Metrics),
-            "traces" => Some(StreamType::Traces),
-            "enrichment_tables" => Some(StreamType::EnrichmentTables),
-            "metadata" => Some(StreamType::Metadata),
-            "index" => Some(StreamType::Index),
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "'type' query param with value 'logs', 'metrics', 'traces', 'enrichment_table', 'metadata' or 'index' allowed",
-                ));
-            }
-        },
-        None => None,
-    };
+) -> Option<StreamType> {
+    query.get("type").map(|s| StreamType::from(s.as_str()))
+}
 
-    Ok(stream_type)
+#[inline(always)]
+pub(crate) fn get_fallback_order_by_col_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> Option<String> {
+    query.get("fallback_order_by_col").map(|s| s.to_string())
 }
 
 #[inline(always)]
@@ -58,15 +49,8 @@ pub(crate) fn get_search_type_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Result<Option<SearchEventType>, Error> {
     let event_type = match query.get("search_type") {
-        Some(s) => match s.to_lowercase().as_str() {
-            "ui" => Some(SearchEventType::UI),
-            "dashboards" => Some(SearchEventType::Dashboards),
-            "reports" => Some(SearchEventType::Reports),
-            "alerts" => Some(SearchEventType::Alerts),
-            "values" => Some(SearchEventType::Values),
-            "rum" => Some(SearchEventType::RUM),
-            "derived_stream" => Some(SearchEventType::DerivedStream),
-            "search_job" => Some(SearchEventType::SearchJob),
+        Some(s) => match SearchEventType::try_from(s.as_str()) {
+            Ok(search_type) => Some(search_type),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,
@@ -148,12 +132,12 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
             }
             // If parsing fails or trace_id is invalid, generate a new one
             log::warn!("Failed to parse valid trace_id from received [Traceparent] header");
-            config::ider::uuid()
+            config::ider::generate_trace_id()
         }
     } else if !span.is_none() {
         span.context().span().span_context().trace_id().to_string()
     } else {
-        config::ider::uuid()
+        config::ider::generate_trace_id()
     }
 }
 
@@ -216,26 +200,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_file_from_cache() {
+    fn test_get_stream_type_from_request() {
         let key = "type".to_string();
 
         let mut map: HashMap<String, String> = HashMap::default();
         map.insert(key.clone(), key.clone());
 
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert!(resp.is_err());
+        assert_eq!(resp, Some(StreamType::default()));
 
         map.insert(key.clone(), "LOGS".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp.unwrap(), Some(StreamType::Logs));
+        assert_eq!(resp, Some(StreamType::Logs));
 
         map.insert(key.clone(), "METRICS".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp.unwrap(), Some(StreamType::Metrics));
+        assert_eq!(resp, Some(StreamType::Metrics));
 
         map.insert(key.clone(), "TRACES".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp.unwrap(), Some(StreamType::Traces));
+        assert_eq!(resp, Some(StreamType::Traces));
     }
 
     /// Test logic for IP parsing
@@ -255,10 +239,12 @@ mod tests {
             .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
             .collect();
 
-        assert!(parsed_addresses
-            .iter()
-            .zip(valid_addresses)
-            .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
-            .fold(true, |acc, x| { acc | x }));
+        assert!(
+            parsed_addresses
+                .iter()
+                .zip(valid_addresses)
+                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
+                .fold(true, |acc, x| { acc | x })
+        );
     }
 }

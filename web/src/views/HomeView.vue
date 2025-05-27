@@ -63,9 +63,34 @@ bordered class="my-card-wide my-card q-py-md">
               <div class="text-h6">{{ summary.index_size }}</div>
             </div>
           </div>
-          <div v-else>
-            <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
-            <div class="text-h6">{{ summary.ingested_data }}</div>
+          <div v-else class="row justify-center">
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.streamTotal") }}
+              </div>
+              <div class="text-h6">{{ summary.streams_count }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.docsCountLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.doc_count }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.totalDataIngested") }}
+              </div>
+              <div class="text-h6">{{ summary.ingested_data }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.indexSizeLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.index_size }}</div>
+            </div>
           </div>
         </div>
 
@@ -294,10 +319,10 @@ export default defineComponent({
           summary.value = {
             streams_count: res.data.streams?.num_streams ?? 0,
             ingested_data: formatSizeFromMB(
-              res.data.streams?.total_storage_size.toFixed(2),
+              res.data.streams?.total_storage_size,
             ),
             compressed_data: formatSizeFromMB(
-              res.data.streams?.total_compressed_size.toFixed(2),
+              res.data.streams?.total_compressed_size,
             ),
             doc_count: addCommasToNumber(res.data.streams?.total_records ?? 0),
             index_size: formatSizeFromMB(

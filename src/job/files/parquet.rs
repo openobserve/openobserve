@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
+    fs::remove_file,
     path::Path,
     sync::Arc,
     time::UNIX_EPOCH,
@@ -23,8 +24,8 @@ use std::{
 use anyhow::Context;
 use arrow::{
     array::{
-        new_null_array, Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
-        Int64Builder, StringArray, StringBuilder,
+        Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array, Int64Builder,
+        StringArray, StringBuilder, new_null_array,
     },
     datatypes::Field,
     record_batch::RecordBatch,
@@ -33,7 +34,8 @@ use arrow_schema::{DataType, Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
-    cluster, get_config,
+    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
+    TIMESTAMP_COL_NAME, cluster, get_config,
     meta::{
         bitvec::BitVec,
         inverted_index::InvertedIndexFormat,
@@ -44,30 +46,32 @@ use config::{
     utils::{
         arrow::record_batches_to_json_rows,
         async_file::get_file_meta,
-        file::scan_files_with_channel,
+        file::{get_file_size, scan_files_with_channel},
         inverted_index::{convert_parquet_idx_file_name_to_tantivy_file, split_token},
         json,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
-        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
+        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
     },
-    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
 use infra::{
     schema::{
-        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
+        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_settings,
     },
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    sync::{Mutex, RwLock},
+    task::JoinHandle,
+};
 
 use crate::{
     common::{
@@ -78,20 +82,26 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::{datafusion::exec, tantivy::puffin_directory::writer::PuffinDirWriter},
+        search::{
+            datafusion::exec::{self, MergeParquetResult},
+            tantivy::puffin_directory::writer::PuffinDirWriter,
+        },
     },
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
-static SKIPPED_LOCK_FILES: Lazy<RwLock<HashSet<String>>> =
-    Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    // add the pending delete files to processing list
+    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    for file in pending_delete_files {
+        PROCESSING_FILES.write().await.insert(file);
+    }
+
+    // start worker threads
     let cfg = get_config();
-    let (tx, rx) =
-        tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(cfg.limit.file_move_thread_num);
+    let (tx, rx) = tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(1);
     let rx = Arc::new(Mutex::new(rx));
-    // move files
     for thread_id in 0..cfg.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
@@ -121,11 +131,73 @@ pub async fn run() -> Result<(), anyhow::Error> {
             cfg.limit.file_push_interval,
         ))
         .await;
+        // check pending delete files
+        if let Err(e) = scan_pending_delete_files().await {
+            log::error!("[INGESTER:JOB] Error scan pending delete files: {}", e);
+        }
+        // scan wal files
         if let Err(e) = scan_wal_files(tx.clone()).await {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
         }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
+    Ok(())
+}
+
+// check if the file is still in pending delete
+async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+
+    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    let files_num = pending_delete_files.len();
+    for file_key in pending_delete_files {
+        if wal::lock_files_exists(&file_key) {
+            continue;
+        }
+        log::warn!(
+            "[INGESTER:JOB] the file was released, delete it: {}",
+            file_key
+        );
+        let file = wal_dir.join(&file_key);
+        let Ok(file_size) = get_file_size(&file) else {
+            continue;
+        };
+        if let Err(e) = remove_file(&file) {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
+                file_key,
+                e
+            );
+        }
+
+        // delete metadata from cache
+        WAL_PARQUET_METADATA.write().await.remove(&file_key);
+        // need release the file
+        PROCESSING_FILES.write().await.remove(&file_key);
+        // delete from pending delete list
+        if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove pending delete file: {}, {}",
+                file_key,
+                e
+            );
+        }
+        // deleted successfully then update metrics
+        let (org_id, stream_type, ..) = split_perfix(&file_key);
+        metrics::INGEST_WAL_USED_BYTES
+            .with_label_values(&[&org_id, stream_type.as_str()])
+            .sub(file_size as i64);
+    }
+
+    if files_num > 0 {
+        log::debug!(
+            "[INGESTER:JOB] scan pending delete files total: {}, took: {} ms",
+            files_num,
+            start.elapsed().as_millis()
+        );
+    }
     Ok(())
 }
 
@@ -222,26 +294,6 @@ async fn prepare_files(
         };
         // check if the file is processing
         if PROCESSING_FILES.read().await.contains(&file_key) {
-            // check if the file is still locking
-            if SKIPPED_LOCK_FILES.read().await.contains(&file_key)
-                && !wal::lock_files_exists(&file_key)
-            {
-                log::warn!(
-                    "[INGESTER:JOB] the file was released, delete it: {}",
-                    file_key
-                );
-                if tokio::fs::remove_file(&wal_dir.join(&file_key))
-                    .await
-                    .is_ok()
-                {
-                    // delete metadata from cache
-                    WAL_PARQUET_METADATA.write().await.remove(&file_key);
-                    // need release all the files
-                    PROCESSING_FILES.write().await.remove(&file_key);
-                    // delete from skip list
-                    SKIPPED_LOCK_FILES.write().await.remove(&file_key);
-                }
-            }
             continue;
         }
 
@@ -257,7 +309,7 @@ async fn prepare_files(
                 "[INGESTER:JOB] the file is empty, just delete file: {}",
                 file
             );
-            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file)).await {
+            if let Err(e) = remove_file(wal_dir.join(&file)) {
                 log::error!(
                     "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
                     file,
@@ -275,15 +327,16 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(&file_key, parquet_meta, false));
+        partition.push(FileKey::new(
+            0,
+            "".to_string(), // here we don't need it
+            file_key.clone(),
+            parquet_meta,
+            false,
+        ));
         // mark the file as processing
-        // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
     }
-    // log::debug!(
-    //     "[INGESTER:JOB] move files get partitions: {}",
-    //     partition_files_with_size.len()
-    // );
 
     Ok(partition_files_with_size)
 }
@@ -297,20 +350,9 @@ async fn move_files(
         return Ok(());
     }
 
-    let columns = prefix.split('/').collect::<Vec<&str>>();
-    // removed thread_id from prefix, so there is no thread_id in the path
-    // eg: files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/
-    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
-    // let _ = columns[0].to_string(); // files/
-    let org_id = columns[1].to_string();
-    let stream_type = StreamType::from(columns[2]);
-    let stream_name = columns[3].to_string();
-    let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
-
-    // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
-
     let cfg = get_config();
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
 
     // check if we are allowed to ingest or just delete the file
     if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
@@ -322,7 +364,7 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
-            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -366,7 +408,7 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
-            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -381,9 +423,7 @@ async fn move_files(
     }
 
     // check data retention
-    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
-        .await
-        .unwrap_or_default();
+    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema).unwrap_or_default();
     let mut stream_data_retention_days = cfg.compact.data_retention_days;
     if stream_settings.data_retention > 0 {
         stream_data_retention_days = stream_settings.data_retention;
@@ -401,7 +441,7 @@ async fn move_files(
                     &stream_name,
                     file.key,
                 );
-                if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+                if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                         file.key,
@@ -476,7 +516,7 @@ async fn move_files(
         // yield to other tasks
         tokio::task::yield_now().await;
         // merge file and get the big file key
-        let (new_file_name, new_file_meta, new_file_list) =
+        let (account, new_file_name, new_file_meta, new_file_list) =
             match merge_files(thread_id, latest_schema.clone(), &wal_dir, &files_with_size).await {
                 Ok(v) => v,
                 Err(e) => {
@@ -497,8 +537,9 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::local::set(&new_file_name, Some(new_file_meta), false).await;
-        if let Err(e) = ret {
+        if let Err(e) =
+            db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
+        {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
                 new_file_name,
@@ -513,59 +554,74 @@ async fn move_files(
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            let mut need_skip = true;
-            // wait for 5s
-            for _ in 0..50 {
-                if wal::lock_files_exists(&file.key) {
-                    log::warn!(
-                        "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
-                        file.key
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                } else {
-                    need_skip = false;
-                    break;
-                }
-            }
-            if need_skip {
+            // use same lock to combine the operations of check lock and add to removing list
+            let wal_lock = infra::local_lock::lock("wal").await?;
+            let can_delete = if wal::lock_files_exists(&file.key) {
                 log::warn!(
-                    "[INGESTER:JOB:{thread_id}] the file is still in use, add it to the skip_list: {}",
+                    "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
                     file.key
                 );
-                SKIPPED_LOCK_FILES.write().await.insert(file.key.clone());
-                continue;
-            }
-
-            let ret = tokio::fs::remove_file(&wal_dir.join(&file.key)).await;
-            if let Err(e) = ret {
-                log::error!(
-                    "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
-                    file.key,
-                    e.to_string()
-                );
-                // delete metadata from cache
-                WAL_PARQUET_METADATA.write().await.remove(&file.key);
-                // need release all the files
-                for file in files_with_size.iter() {
-                    PROCESSING_FILES.write().await.remove(&file.key);
+                // add to pending delete list
+                if let Err(e) =
+                    db::file_list::local::add_pending_delete(&org_id, &file.account, &file.key)
+                        .await
+                {
+                    log::error!(
+                        "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
+                        file.key,
+                        e.to_string()
+                    );
                 }
-                return Ok(());
+                false
+            } else {
+                db::file_list::local::add_removing(&file.key).await?;
+                true
+            };
+            drop(wal_lock);
+
+            if can_delete {
+                match remove_file(wal_dir.join(&file.key)) {
+                    Err(e) => {
+                        log::warn!(
+                            "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
+                            file.key,
+                            e.to_string()
+                        );
+                        // add to pending delete list
+                        if let Err(e) = db::file_list::local::add_pending_delete(
+                            &org_id,
+                            &file.account,
+                            &file.key,
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
+                                file.key,
+                                e.to_string()
+                            );
+                        }
+                    }
+                    Ok(_) => {
+                        // delete metadata from cache
+                        WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                        // remove the file from processing set
+                        PROCESSING_FILES.write().await.remove(&file.key);
+                        // deleted successfully then update metrics
+                        metrics::INGEST_WAL_USED_BYTES
+                            .with_label_values(&[&org_id, stream_type.as_str()])
+                            .sub(file.meta.compressed_size);
+                    }
+                }
+
+                // remove the file from removing set
+                db::file_list::local::remove_removing(&file.key).await?;
             }
-
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
-
-            // remove the file from processing set
-            // log::debug!("Processing files deleted: {:?}", file.key);
-            PROCESSING_FILES.write().await.remove(&file.key);
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
-            metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
-                .sub(file.meta.compressed_size);
         }
 
         // delete files from file list
@@ -583,9 +639,14 @@ async fn merge_files(
     latest_schema: Arc<Schema>,
     wal_dir: &Path,
     files_with_size: &[FileKey],
-) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
+) -> Result<(String, String, FileMeta, Vec<FileKey>), anyhow::Error> {
     if files_with_size.is_empty() {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+        return Ok((
+            String::from(""),
+            String::from(""),
+            FileMeta::default(),
+            Vec::new(),
+        ));
     }
 
     let cfg = get_config();
@@ -613,7 +674,12 @@ async fn merge_files(
     }
     // no files need to merge
     if new_file_list.is_empty() {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+        return Ok((
+            String::from(""),
+            String::from(""),
+            FileMeta::default(),
+            Vec::new(),
+        ));
     }
 
     let retain_file_list = new_file_list.clone();
@@ -647,37 +713,47 @@ async fn merge_files(
     let file_name = columns[4].to_string();
 
     // get latest version of schema
-    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type).await;
+    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let (defined_schema_fields, need_original) = match stream_settings {
-        Some(s) => (
-            s.defined_schema_fields.unwrap_or_default(),
-            s.store_original_data,
-        ),
-        None => (Vec::new(), false),
-    };
-    let _latest_schema = if !defined_schema_fields.is_empty() {
+    let (defined_schema_fields, need_original, index_original_data, index_all_values) =
+        match stream_settings {
+            Some(s) => (
+                s.defined_schema_fields.unwrap_or_default(),
+                s.store_original_data,
+                s.index_original_data,
+                s.index_all_values,
+            ),
+            None => (Vec::new(), false, false, false),
+        };
+    let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
             &latest_schema,
             &defined_schema_fields,
             need_original,
+            index_original_data,
+            index_all_values,
         );
         latest_schema.schema().clone()
     } else {
         latest_schema.clone()
     };
 
-    // read schema from parquet file, there files have the same schema because they are under the
-    // same prefix
-    let schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
-    let schema_key = schema
-        .as_ref()
-        .clone()
-        .with_metadata(Default::default())
-        .hash_key();
+    // we shouldn't use the latest schema, because there are too many fields, we need read schema
+    // from files only get the fields what we need
+    let mut shared_fields = HashSet::new();
+    for file in new_file_list.iter() {
+        let file_schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
+        shared_fields.extend(file_schema.fields().iter().cloned());
+    }
+    // use the shared fields to create a new schema and with empty metadata
+    let mut fields = shared_fields.into_iter().collect::<Vec<_>>();
+    fields.sort_by(|a, b| a.name().cmp(b.name()));
+    fields.dedup_by(|a, b| a.name() == b.name());
+    let schema = Arc::new(Schema::new(fields));
+    let schema_key = schema.hash_key();
 
     // generate datafusion tables
     let trace_id = config::ider::generate();
@@ -697,6 +773,7 @@ async fn merge_files(
         None,
         None,
         vec![],
+        false,
     )
     .await?;
     let tables = vec![table];
@@ -709,6 +786,7 @@ async fn merge_files(
         tables,
         &bloom_filter_fields,
         &new_file_meta,
+        true,
     )
     .await;
 
@@ -733,6 +811,15 @@ async fn merge_files(
         }
     };
 
+    // ingester should not support multiple files
+    // multiple files is for downsampling that will be handled in compactor
+    let buf = match buf {
+        MergeParquetResult::Single(v) => v,
+        MergeParquetResult::Multiple { .. } => {
+            panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
+        }
+    };
+
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
@@ -742,7 +829,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+        "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -752,13 +839,41 @@ async fn merge_files(
 
     // upload file
     let buf = Bytes::from(buf);
-    storage::put(&new_file_key, buf.clone()).await?;
+    if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+        infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+        log::debug!("merge_files {new_file_key} file_data::disk::set success");
+    }
 
+    let account = storage::get_account(&new_file_key).unwrap_or_default();
+    storage::put(&account, &new_file_key, buf.clone()).await?;
+
+    // skip index generation if not enabled or not basic type
     if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
-        return Ok((new_file_key, new_file_meta, retain_file_list));
+        return Ok((account, new_file_key, new_file_meta, retain_file_list));
+    }
+
+    // skip index generation if no fields to index
+    let latest_schema_fields = latest_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let need_index = full_text_search_fields
+        .iter()
+        .chain(index_fields.iter())
+        .any(|f| latest_schema_fields.contains(f));
+    if !need_index {
+        log::debug!(
+            "skip index generation for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name
+        );
+        return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
     // generate parquet format inverted index
+    #[allow(deprecated)]
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
         index_format,
@@ -784,21 +899,34 @@ async fn merge_files(
         index_format,
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
-        let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+        let (schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
         let index_size = create_tantivy_index(
             "INGESTER",
             &new_file_key,
             &full_text_search_fields,
             &index_fields,
             schema,
-            &mut reader,
+            reader,
         )
         .await
         .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {}", e))?;
         new_file_meta.index_size = index_size as i64;
     }
 
-    Ok((new_file_key, new_file_meta, retain_file_list))
+    Ok((account, new_file_key, new_file_meta, retain_file_list))
+}
+
+fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
+    let columns = prefix.split('/').collect::<Vec<&str>>();
+    // removed thread_id from prefix, so there is no thread_id in the path
+    // eg: files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/
+    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
+    // let _ = columns[0].to_string(); // files/
+    let org_id = columns[1].to_string();
+    let stream_type = StreamType::from(columns[2]);
+    let stream_name = columns[3].to_string();
+    let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
+    (org_id, stream_type, stream_name, prefix_date)
 }
 
 /// Create an inverted index file for the given file
@@ -820,6 +948,7 @@ pub(crate) async fn generate_index_on_ingester(
     }
 
     let cfg = get_config();
+    #[allow(deprecated)]
     let index_stream_name =
         if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -882,12 +1011,13 @@ pub(crate) async fn generate_index_on_ingester(
 
         crate::common::utils::auth::set_ownership(
             org_id,
-            &StreamType::Index.to_string(),
+            StreamType::Index.as_str(),
             Authz::new(&index_stream_name),
         )
         .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
+        #[allow(deprecated)]
         if cfg.common.inverted_index_old_format
             && stream_type == StreamType::Logs
             && !schema.fields_map().contains_key("segment_ids")
@@ -939,11 +1069,7 @@ pub(crate) async fn generate_index_on_ingester(
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     for row in json_rows {
-        let timestamp: i64 = row
-            .get(&cfg.common.column_timestamp)
-            .unwrap()
-            .as_i64()
-            .unwrap();
+        let timestamp: i64 = row.get(TIMESTAMP_COL_NAME).unwrap().as_i64().unwrap();
 
         let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
@@ -964,13 +1090,8 @@ pub(crate) async fn generate_index_on_ingester(
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
     }
-    let writer = ingester::get_writer(
-        0,
-        org_id,
-        &StreamType::Index.to_string(),
-        &index_stream_name,
-    )
-    .await;
+    let writer =
+        ingester::get_writer(0, org_id, StreamType::Index.as_str(), &index_stream_name).await;
     let _ = crate::service::ingestion::write_file(
         &writer,
         &index_stream_name,
@@ -980,7 +1101,7 @@ pub(crate) async fn generate_index_on_ingester(
     .await;
 
     log::info!(
-        "[INGESTER:JOB] Written index wal file successfully, took: {} ms",
+        "[INGESTER:JOB] Written index data successfully, took: {} ms",
         start.elapsed().as_millis(),
     );
 
@@ -999,13 +1120,14 @@ pub(crate) async fn generate_index_on_compactor(
     index_fields: &[String],
     schema: Arc<Schema>,
     reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
-) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
+) -> Result<Vec<(String, String, FileMeta)>, anyhow::Error> {
     let start = std::time::Instant::now();
 
     if full_text_search_fields.is_empty() && index_fields.is_empty() {
         return Ok(vec![]);
     }
 
+    #[allow(deprecated)]
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -1094,9 +1216,12 @@ pub(crate) async fn generate_index_on_compactor(
     .await?;
 
     log::info!(
-        "[COMPACT:JOB] generate index successfully, data file: {}, index files: {:?}, took: {} ms",
+        "[COMPACTOR:JOB] generated parquet index file: {}, index files: {:?}, took: {} ms",
         new_file_key,
-        files.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+        files
+            .iter()
+            .map(|(_account, file, _)| file)
+            .collect::<Vec<_>>(),
         start.elapsed().as_millis(),
     );
 
@@ -1122,14 +1247,14 @@ async fn prepare_index_record_batches(
         .collect::<HashMap<_, _>>();
 
     let new_schema = Arc::new(Schema::new(vec![
-        Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
+        Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
         Field::new("min_ts", DataType::Int64, true),
         Field::new("max_ts", DataType::Int64, true),
         Field::new("field", DataType::Utf8, true),
         Field::new("term", DataType::Utf8, true),
-        Field::new("file_name", DataType::Utf8, false),
-        Field::new("_count", DataType::Int64, false),
-        Field::new("deleted", DataType::Boolean, false),
+        Field::new("file_name", DataType::Utf8, true),
+        Field::new("_count", DataType::Int64, true),
+        Field::new("deleted", DataType::Boolean, true),
         Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 
@@ -1151,7 +1276,7 @@ async fn prepare_index_record_batches(
 
         // get _timestamp column
         let Some(time_data) = batch
-            .column_by_name(&cfg.common.column_timestamp)
+            .column_by_name(TIMESTAMP_COL_NAME)
             .unwrap()
             .as_any()
             .downcast_ref::<Int64Array>()
@@ -1180,6 +1305,7 @@ async fn prepare_index_record_batches(
             // split the column into terms
             let terms = (0..num_rows)
                 .flat_map(|i| {
+                    #[allow(deprecated)]
                     split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
                         .into_iter()
                         .map(|s| (s, i))
@@ -1256,10 +1382,9 @@ async fn prepare_index_record_batches(
                 }
                 ids.push(idx + prev_total_num_rows);
             }
-        }
 
-        // yield, this operation is time-consuming
-        tokio::task::yield_now().await;
+            tokio::task::coop::consume_budget().await;
+        }
     }
 
     // build record batch
@@ -1329,8 +1454,7 @@ async fn prepare_index_record_batches(
                 .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
                 indexed_record_batches_to_merge.push(record_batch);
 
-                // yield, this operation is time-consuming
-                tokio::task::yield_now().await;
+                tokio::task::coop::consume_budget().await;
             }
         }
     }
@@ -1344,7 +1468,7 @@ pub(crate) async fn create_tantivy_index(
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
-    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
 ) -> Result<usize, anyhow::Error> {
     let start = std::time::Instant::now();
     let caller = format!("[{caller}:JOB]");
@@ -1361,7 +1485,6 @@ pub(crate) async fn create_tantivy_index(
     if index.is_none() {
         return Ok(0);
     }
-
     let puffin_bytes = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 
@@ -1370,10 +1493,21 @@ pub(crate) async fn create_tantivy_index(
     else {
         return Ok(0);
     };
-    match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
+
+    if get_config().cache_latest_files.cache_index
+        && get_config().cache_latest_files.download_from_node
+    {
+        infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
+            .await?;
+        log::info!("file: {idx_file_name} file_data::disk::set success");
+    }
+
+    // the index file is stored in the same account as the parquet file
+    let account = storage::get_account(parquet_file_name).unwrap_or_default();
+    match storage::put(&account, &idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
-                "{} Written tantivy index file successfully: {}, index size {}, took: {} ms",
+                "{} generated tantivy index file: {}, size {}, took: {} ms",
                 caller,
                 idx_file_name,
                 index_size,
@@ -1382,21 +1516,20 @@ pub(crate) async fn create_tantivy_index(
         }
         Err(e) => {
             log::error!(
-                "{} Written tantivy index file error: {}",
+                "{} generated tantivy index file error: {}",
                 caller,
                 e.to_string()
             );
             return Err(e.into());
         }
     }
-
     Ok(index_size)
 }
 
 /// Create a tantivy index in the given directory for the record batch
 pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     tantivy_dir: D,
-    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
+    mut reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
     full_text_search_fields: &[String],
     index_fields: &[String],
     schema: Arc<Schema>,
@@ -1421,22 +1554,19 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .collect::<HashSet<_>>();
     let index_fields = index_fields
         .iter()
-        .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8)
-                .is_some()
-        })
         .map(|f| f.to_string())
         .collect::<HashSet<_>>();
-    let tantivy_fields = fts_fields.union(&index_fields).collect::<HashSet<_>>();
+    let tantivy_fields = fts_fields
+        .union(&index_fields)
+        .cloned()
+        .collect::<HashSet<_>>();
     // no fields need to create index, return
     if tantivy_fields.is_empty() {
         return Ok(None);
     }
 
     // add fields to tantivy schema
-    if !fts_fields.is_empty() {
+    if !full_text_search_fields.is_empty() {
         let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)
@@ -1446,6 +1576,9 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
     }
     for field in index_fields.iter() {
+        if field == TIMESTAMP_COL_NAME {
+            continue;
+        }
         let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)
@@ -1454,89 +1587,125 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         tantivy_schema_builder.add_text_field(field, index_opts);
     }
+    // add _timestamp field to tantivy schema
+    tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
     let tantivy_schema = tantivy_schema_builder.build();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
-
-    let mut total_num_rows = 0;
-    // docs per row to be added in the tantivy index
-    let mut docs = BTreeMap::new();
-
-    loop {
-        let batch = reader.try_next().await?;
-        let Some(inverted_idx_batch) = batch else {
-            break;
-        };
-        let num_rows = inverted_idx_batch.num_rows();
-        if num_rows == 0 {
-            continue;
-        }
-
-        // update total_num_rows
-        let prev_total_num_rows = total_num_rows;
-        total_num_rows += num_rows;
-
-        // process full text search fields
-        for column_name in tantivy_fields.iter() {
-            let column_data = match inverted_idx_batch
-                .column_by_name(column_name)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-            {
-                Some(column_data) => column_data,
-                None => {
-                    // generate empty array to ensure the tantivy and parquet have same rows
-                    &StringArray::from(vec![""; num_rows])
-                }
-            };
-
-            // get field
-            let field = match tantivy_schema.get_field(column_name) {
-                Ok(f) => f,
-                Err(_) => fts_field.unwrap(),
-            };
-            for i in 0..num_rows {
-                let doc = docs
-                    .entry(i + prev_total_num_rows)
-                    .or_insert(tantivy::doc!());
-                doc.add_text(field, column_data.value(i));
-            }
-        }
-
-        // yield, this operation is time-consuming
-        tokio::task::yield_now().await;
-    }
-
-    // no docs need to create index, return
-    if docs.is_empty() {
-        return Ok(None);
-    }
 
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
     tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build());
     let mut index_writer = tantivy::IndexBuilder::new()
-        .schema(tantivy_schema)
+        .schema(tantivy_schema.clone())
         .tokenizers(tokenizer_manager)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
-    for (_, doc) in docs.into_iter() {
-        if let Err(e) = index_writer.add_document(doc) {
-            log::error!(
-                "generate_tantivy_index: Failed to add document to index: {}",
-                e
-            );
-            return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
+    // docs per row to be added in the tantivy index
+    log::debug!("start write documents to tantivy index");
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(2);
+    let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
+        let mut total_num_rows = 0;
+        loop {
+            let batch = reader.try_next().await?;
+            let Some(inverted_idx_batch) = batch else {
+                break;
+            };
+            let num_rows = inverted_idx_batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // update total_num_rows
+            total_num_rows += num_rows;
+
+            // process full text search fields
+            let mut docs = vec![tantivy::doc!(); num_rows];
+            for column_name in tantivy_fields.iter() {
+                let column_data = match inverted_idx_batch.column_by_name(column_name) {
+                    Some(column_data) => match column_data.as_any().downcast_ref::<StringArray>() {
+                        Some(column_data) => column_data,
+                        None => {
+                            // generate empty array to ensure the tantivy and parquet have same rows
+                            &StringArray::from(vec![""; num_rows])
+                        }
+                    },
+                    None => {
+                        // generate empty array to ensure the tantivy and parquet have same rows
+                        &StringArray::from(vec![""; num_rows])
+                    }
+                };
+
+                // get field
+                let field = match tantivy_schema.get_field(column_name) {
+                    Ok(f) => f,
+                    Err(_) => fts_field.unwrap(),
+                };
+                for (i, doc) in docs.iter_mut().enumerate() {
+                    doc.add_text(field, column_data.value(i));
+                    tokio::task::coop::consume_budget().await;
+                }
+            }
+
+            // process _timestamp field
+            let column_data = match inverted_idx_batch.column_by_name(TIMESTAMP_COL_NAME) {
+                Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
+                    Some(column_data) => column_data,
+                    None => {
+                        // generate empty array to ensure the tantivy and parquet have same rows
+                        &Int64Array::from(vec![0; num_rows])
+                    }
+                },
+                None => {
+                    // generate empty array to ensure the tantivy and parquet have same rows
+                    &Int64Array::from(vec![0; num_rows])
+                }
+            };
+            let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap(); // unwrap directly since added above
+            const YIELD_THRESHOLD: usize = 100;
+            let mut batch_size = 0;
+            for (i, doc) in docs.iter_mut().enumerate() {
+                doc.add_i64(ts_field, column_data.value(i));
+                batch_size += 1;
+                if batch_size >= YIELD_THRESHOLD {
+                    tokio::task::coop::consume_budget().await;
+                    batch_size = 0;
+                }
+            }
+
+            tx.send(docs).await?;
+        }
+        Ok(total_num_rows)
+    });
+
+    while let Some(docs) = rx.recv().await {
+        for doc in docs {
+            if let Err(e) = index_writer.add_document(doc) {
+                log::error!(
+                    "generate_tantivy_index: Failed to add document to index: {}",
+                    e
+                );
+                return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
+            }
+            tokio::task::coop::consume_budget().await;
         }
     }
+    let total_num_rows = task.await??;
+    // no docs need to create index, return
+    if total_num_rows == 0 {
+        return Ok(None);
+    }
+    log::debug!("write documents to tantivy index success");
 
-    let index = index_writer.finalize().map_err(|e| {
-        log::error!(
-            "generate_tantivy_index: Failed to finalize the index writer: {}",
-            e
-        );
-        anyhow::anyhow!("Failed to finalize the index writer: {}", e)
-    })?;
+    let index = tokio::task::spawn_blocking(move || {
+        index_writer.finalize().map_err(|e| {
+            log::error!(
+                "generate_tantivy_index: Failed to finalize the index writer: {}",
+                e
+            );
+            anyhow::anyhow!("Failed to finalize the index writer: {}", e)
+        })
+    })
+    .await??;
 
     Ok(Some(index))
 }

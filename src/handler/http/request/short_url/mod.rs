@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,19 +15,21 @@
 
 use std::io::Error;
 
-use actix_http::StatusCode;
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use config::meta::short_url::ShortenUrlResponse;
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::http::HttpResponse as MetaHttpResponse,
         utils::redirect_response::RedirectResponseBuilder,
     },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::short_url,
 };
 
 /// Shorten a URL
+///
+/// #{"ratelimit_module":"ShortUrl", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     post,
     context_path = "/api",
@@ -70,17 +72,14 @@ pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<Http
         }
         Err(e) => {
             log::error!("Failed to shorten URL: {:?}", e);
-            Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
+            Ok(map_error_to_http_response(&e.into(), None))
         }
     }
 }
 
 /// Retrieve the original URL from a short_id
+///
+/// #{"ratelimit_module":"ShortUrl", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     get,
     context_path = "/short",

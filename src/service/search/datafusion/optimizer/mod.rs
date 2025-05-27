@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,8 +17,11 @@ use std::sync::Arc;
 
 use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
+#[cfg(feature = "enterprise")]
+use cipher::{RewriteCipherCall, RewriteCipherKey};
+use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
 use datafusion::optimizer::{
-    common_subexpr_eliminate::CommonSubexprEliminate,
+    AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
     decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
     eliminate_cross_join::EliminateCrossJoin, eliminate_duplicated_expr::EliminateDuplicatedExpr,
     eliminate_filter::EliminateFilter, eliminate_group_by_constant::EliminateGroupByConstant,
@@ -30,9 +33,11 @@ use datafusion::optimizer::{
     push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
     scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
     single_distinct_to_groupby::SingleDistinctToGroupBy,
-    unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
+    unwrap_cast_in_comparison::UnwrapCastInComparison,
 };
 use infra::schema::get_stream_setting_fts_fields;
+use limit_join_right_side::LimitJoinRightSide;
+use remove_index_fields::RemoveIndexFieldsRule;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
@@ -40,12 +45,29 @@ use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
+#[cfg(feature = "enterprise")]
+pub mod cipher;
 pub mod join_reorder;
+pub mod limit_join_right_side;
+pub mod remove_index_fields;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
+pub mod utils;
+
+pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
+    vec![Arc::new(RemoveIndexFieldsRule::new(
+        sql.columns
+            .iter()
+            .any(|(_, columns)| columns.contains(ORIGINAL_DATA_COL_NAME)),
+        sql.columns
+            .iter()
+            .any(|(_, columns)| columns.contains(ALL_VALUES_COL_NAME)),
+    ))]
+}
 
 pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
-    let limit = if sql.limit as i32 > config::QUERY_WITH_NO_LIMIT {
+    let cfg = config::get_config();
+    let limit = if sql.limit > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
             Some(sql.limit as usize)
         } else {
@@ -106,6 +128,10 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
+    #[cfg(feature = "enterprise")]
+    rules.push(Arc::new(RewriteCipherCall::new()));
+    #[cfg(feature = "enterprise")]
+    rules.push(Arc::new(RewriteCipherKey::new(&sql.org_id)));
     // ************************************
 
     // Filters can't be pushed down past Limits, we should do PushDownFilter after
@@ -120,6 +146,17 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(CommonSubexprEliminate::new()));
     rules.push(Arc::new(EliminateGroupByConstant::new()));
     rules.push(Arc::new(OptimizeProjections::new()));
+
+    // *********** custom rules ***********
+    // should after ExtractEquijoinPredicate and PushDownFilter, because LimitJoinRightSide will
+    // require the join's on columns, and if filter have join keys, it should be pushed down
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
+    {
+        rules.push(Arc::new(LimitJoinRightSide::new(
+            cfg.common.feature_join_right_side_max_rows,
+        )));
+    }
+    // ************************************
 
     rules
 }

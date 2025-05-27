@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,13 +15,14 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use components::{DerivedStream, Edge, Node, NodeData, PipelineSource};
 use serde::{Deserialize, Serialize};
 use sqlx::{Decode, Error, FromRow, Row, Type};
 use utoipa::ToSchema;
 
 use crate::{
+    get_config,
     meta::{
         function::VRLResultResolver,
         stream::{StreamParams, StreamType},
@@ -88,6 +89,7 @@ impl Pipeline {
     /// 6. all leaf nodes are of type StreamNode
     /// 7. In the same branch, unchecked `after_flattened` FunctionNode can't follow checked
     ///    `after_flattened` checked FunctionNode
+    /// 8. EnrichmentTables can only be used in Scheduled pipelines
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
     pub fn validate(&mut self) -> Result<()> {
@@ -126,11 +128,25 @@ impl Pipeline {
             _ => return Err(anyhow!("Source must be either a StreamNode or QueryNode")),
         };
 
-        // ck 4
-        if self.nodes.iter().any(|node| {
-            matches!(node.get_node_data(), NodeData::Condition(condition_params) if condition_params.conditions.is_empty())
-        }) {
-            return Err(anyhow!("ConditionNode must have non-empty conditions"));
+        let cfg = get_config();
+        for node in self.nodes.iter_mut() {
+            // ck 4
+            if matches!(&node.data, NodeData::Condition(condition_params) if condition_params.conditions.is_empty())
+            {
+                return Err(anyhow!("ConditionNode must have non-empty conditions"));
+            } else if let NodeData::Stream(stream_params) = &mut node.data {
+                // ck 8
+                if stream_params.stream_type == StreamType::EnrichmentTables
+                    && matches!(&self.source, PipelineSource::Realtime(_))
+                {
+                    return Err(anyhow!(
+                        "EnrichmentTables can only be used in Scheduled pipelines"
+                    ));
+                }
+                if !cfg.common.skip_formatting_stream_name {
+                    stream_params.stream_name = stream_params.stream_name.to_lowercase().into();
+                }
+            }
         }
 
         // ck 5
@@ -256,6 +272,33 @@ impl Pipeline {
             }
         }
     }
+
+    pub fn contains_remote_destination(&self, destination: &str) -> bool {
+        self.nodes.iter().any(|node| {
+            if let NodeData::RemoteStream(dest) = &node.data {
+                dest.destination_name == destination
+            } else {
+                false
+            }
+        })
+    }
+
+    pub fn get_metadata_by_stream_params(
+        &self,
+        other_stream_params: &StreamParams,
+    ) -> Option<HashMap<String, String>> {
+        self.nodes.iter().find_map(|node| {
+            if let NodeData::Stream(this_stream_params) = &node.data {
+                if this_stream_params == other_stream_params {
+                    node.meta.clone()
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl<'r, R: Row> FromRow<'r, R> for Pipeline
@@ -355,7 +398,7 @@ fn dfs_traversal_check(
     if !graph.contains_key(current_id) {
         // Ensure leaf nodes are Stream nodes
         if let Some(node_data) = node_map.get(current_id) {
-            if !matches!(node_data, NodeData::Stream(_)) {
+            if !matches!(node_data, NodeData::Stream(_) | NodeData::RemoteStream(_)) {
                 return Err(anyhow!("All leaf nodes must be StreamNode"));
             }
         } else {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 use config::meta::alerts::alert as meta_alerts;
 use serde::Deserialize;
+use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
 use super::{Alert, StreamType};
@@ -34,6 +35,16 @@ pub struct CreateAlertRequestBody {
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct UpdateAlertRequestBody(pub Alert);
 
+/// HTTP request body for `MoveAlerts` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct MoveAlertsRequestBody {
+    /// IDs of the alerts to move.
+    pub alert_ids: Vec<Ksuid>,
+
+    /// Indicates the folder to which alerts should be moved.
+    pub dst_folder_id: String,
+}
+
 /// HTTP URL query component that contains parameters for listing alerts.
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
 #[into_params(style = Form, parameter_in = Query)]
@@ -42,6 +53,17 @@ pub struct UpdateAlertRequestBody(pub Alert);
 pub struct ListAlertsQuery {
     /// Optional folder ID filter parameter.
     pub folder: Option<String>,
+
+    /// Optional stream type filter parameter.
+    pub stream_type: Option<StreamType>,
+
+    /// Optional stream name filter parameter.
+    ///
+    /// This parameter is only used if `stream_type` is also provided.
+    pub stream_name: Option<String>,
+
+    /// Optional case-insensitive name substring filter parameter.
+    pub alert_name_substring: Option<String>,
 
     /// Optional owner user filter parameter.
     pub owner: Option<String>,
@@ -57,14 +79,6 @@ pub struct ListAlertsQuery {
     ///
     /// This parameter is only used if `page_size` is also set.
     pub page_idx: Option<u64>,
-
-    /// Optional stream type filter parameter.
-    pub stream_type: Option<StreamType>,
-
-    /// Optional stream name filter parameter.
-    ///
-    /// This parameter is only used if `stream_type` is also provided.
-    pub stream_name: Option<String>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.
@@ -93,6 +107,7 @@ impl ListAlertsQuery {
         meta_alerts::ListAlertsParams {
             org_id: org_id.to_string(),
             folder_id: self.folder,
+            name_substring: self.alert_name_substring,
             stream_type_and_name: self
                 .stream_type
                 .map(|stream_type| (stream_type.into(), self.stream_name)),

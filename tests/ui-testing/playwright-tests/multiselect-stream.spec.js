@@ -1,16 +1,17 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import logsdata from "../../test-data/logs_data.json";
-import { toZonedTime } from "date-fns-tz";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
-const folderName = `Folder ${Date.now()}`;
-const dashboardName = `AutomatedDashboard${Date.now()}`;
+
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText("Login as internal user").click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+ 
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -21,17 +22,6 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
 
 const getHeaders = () => {
   const basicAuthCredentials = Buffer.from(
@@ -63,6 +53,7 @@ const sendRequest = async (page, url, payload, headers) => {
 };
 
 test.describe("Stream multiselect testcases", () => {
+  let logsPage;
   function removeUTFCharacters(text) {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
@@ -78,6 +69,9 @@ test.describe("Stream multiselect testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
+    
+
     await page.waitForTimeout(5000);
 
     const orgId = process.env["ORGNAME"];
@@ -103,8 +97,10 @@ test.describe("Stream multiselect testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
+    await logsPage.clickQuickModeToggle();
+
   });
 
 
@@ -131,7 +127,7 @@ async function multistreamselect(page) {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
   }
   
@@ -201,10 +197,12 @@ await page.waitForTimeout(1000);
       .click({ force: true });
     await page.getByPlaceholder("Search Stream").click();
     await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page.waitForTimeout(1000);
     await page
       .getByRole("button", { name: "Explore" })
       .first()
       .click({ force: true });
+    await page.waitForTimeout(1000);
     await expect(page.url()).toContain("logs");
   });
 
@@ -212,7 +210,6 @@ await page.waitForTimeout(1000);
     page,
   }) => {
     await multistreamselect(page);
-    await page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').first().click();
     await page
       .locator('[data-cy="index-field-search-input"]')
       .fill("job");
@@ -225,23 +222,28 @@ await page.waitForTimeout(1000);
       .click({
         force: true,
       });
-      await page
-      .locator('[data-test="table-row-expand-menu"]')
-      .first()
-      .click({ force: true });
-      // await page.getByText('{ arrow_drop_down_stream_name').click();
-      // await page.getByText('_stream_name:').click();
-      // await page.getByText('_timestamp:').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    await page.waitForTimeout(2000);
+    await page
+        .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+        .click({
+          force: true,
+        });
+
+    await page
+        .locator('[data-test="log-table-column-0-source"]')
+        .click({ force: true });
+    await expect(page.locator('text=arrow_drop_downjob:test').first()).toBeVisible();
+
     
   });
 
-  // test('should display search around in histogram mode', async ({ page }) => {
-  //   await multistreamselect(page);
-  //   await page.waitForTimeout(1000);
-  //   await page.locator('[data-test="log-table-column-0-source"]').click();
-  //   const isDisabled = await page.locator('[data-test="logs-detail-table-search-around-btn"]').isDisabled();
-  //   expect(isDisabled).toBe(true);
-  // });
-  
+  test("should display results in selected time when multiple stream selected", async ({
+    page,
+  }) => {
+    await multistreamselect(page);
+    await logsPage.setDateTimeToToday(); 
+    await expect(page.locator('[data-test="logs-search-index-list"]')).toContainText('e2e_automate, e2e_stream1');
 
+  });
 })

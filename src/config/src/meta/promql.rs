@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 use hashbrown::HashMap;
 use proto::prometheus_rpc;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
@@ -120,7 +121,7 @@ pub struct RequestQuery {
 }
 
 /// Range query.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RequestRangeQuery {
     /// PromQL expression.
     pub query: Option<String>,
@@ -217,6 +218,86 @@ pub struct RequestLabelValues {
 #[derive(Debug, Deserialize)]
 pub struct RequestFormatQuery {
     pub query: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Function {
+    Avg,
+    Sum,
+    Count,
+    Min,
+    Max,
+    Last,
+    First,
+}
+
+impl From<&str> for Function {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "avg" => Self::Avg,
+            "sum" => Self::Sum,
+            "count" => Self::Count,
+            "min" => Self::Min,
+            "max" => Self::Max,
+            "last" => Self::Last,
+            "first" => Self::First,
+            _ => panic!("invalid downsampling function: {}", s),
+        }
+    }
+}
+
+impl Function {
+    pub fn fun(&self) -> String {
+        match self {
+            Function::Avg => "avg".to_string(),
+            Function::Sum => "sum".to_string(),
+            Function::Count => "count".to_string(),
+            Function::Min => "min".to_string(),
+            Function::Max => "max".to_string(),
+            Function::Last => "last_value".to_string(),
+            Function::First => "first_value".to_string(),
+        }
+    }
+}
+
+// s -> second
+// m -> minute
+// h -> hour
+// d -> day
+#[derive(Debug, Clone)]
+pub struct DownsamplingRule {
+    pub rule: Option<Regex>,
+    pub function: Function,
+    pub offset: i64, // seconds
+    pub step: i64,   // seconds
+}
+
+impl DownsamplingRule {
+    pub fn is_match(&self, stream_name: &str) -> bool {
+        if let Some(reg) = &self.rule {
+            reg.is_match(stream_name)
+        } else {
+            true
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum HashLabelValue {
+    String(String),
+    Number(u64),
+}
+
+impl From<&str> for HashLabelValue {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<u64> for HashLabelValue {
+    fn from(value: u64) -> Self {
+        Self::Number(value)
+    }
 }
 
 #[cfg(test)]

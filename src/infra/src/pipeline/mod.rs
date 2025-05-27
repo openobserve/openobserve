@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
-    pipeline::{components::PipelineSource, Pipeline},
+    pipeline::{Pipeline, components::PipelineSource},
     stream::StreamParams,
 };
 use once_cell::sync::Lazy;
@@ -63,13 +63,11 @@ pub async fn init() -> Result<()> {
 /// Creates a pipeline entry in the table
 #[inline]
 pub async fn put(pipeline: &Pipeline) -> Result<()> {
-    CLIENT.put(pipeline).await
-}
-
-/// Updates a pipeline entry by id
-#[inline]
-pub async fn update(pipeline: &Pipeline) -> Result<()> {
-    CLIENT.update(pipeline).await
+    if CLIENT.get_by_id(&pipeline.id).await.is_ok() {
+        CLIENT.update(pipeline).await
+    } else {
+        CLIENT.put(pipeline).await
+    }
 }
 
 /// Finds the pipeline associated with the StreamParams within an organization

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
 use std::io::Error;
 
 use actix_web::{
-    http::{self, StatusCode},
     HttpResponse,
+    http::{self, StatusCode},
 };
 use config::{
     meta::{
@@ -28,10 +28,13 @@ use config::{
 };
 
 use crate::{
-    common,
     common::{
+        self,
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
+    },
+    handler::http::{
+        request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
     },
     service::{db, ingestion::compile_vrl_function, search::RESULT_ARRAY},
 };
@@ -63,12 +66,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    error.to_string(),
-                )),
-            )
+            Ok(map_error_to_http_response(&error.into(), None))
         } else {
             set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
 
@@ -109,7 +107,7 @@ pub async fn test_run_function(
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
                 e.to_string(),
-            )))
+            )));
         }
     };
 
@@ -222,12 +220,7 @@ pub async fn update_function(
     extract_num_args(&mut func);
 
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        );
+        return Ok(map_error_to_http_response(&(error.into()), None));
     }
 
     // update associated pipelines
@@ -235,15 +228,15 @@ pub async fn update_function(
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name) {
                 if let Err(e) = db::pipeline::update(&pipeline, None).await {
-                    return Ok(HttpResponse::InternalServerError().json(
-                        MetaHttpResponse::message(
+                    return Ok(HttpResponse::InternalServerError()
+                        .append_header((ERROR_HEADER, e.to_string()))
+                        .json(MetaHttpResponse::message(
                             http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                             format!(
                                 "Failed to update associated pipeline({}/{}): {}",
                                 pipeline.id, pipeline.name, e
                             ),
-                        ),
-                    ));
+                        )));
                 }
             }
         }
@@ -386,10 +379,7 @@ fn extract_num_args(func: &mut Transform) {
 }
 
 async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
-    match db::functions::get(org_id, fn_name).await {
-        Ok(function) => Some(function),
-        Err(_) => None,
-    }
+    (db::functions::get(org_id, fn_name).await).ok()
 }
 
 #[cfg(test)]
@@ -439,9 +429,11 @@ mod tests {
         let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
-            .await
-            .is_ok());
+        assert!(
+            delete_function("nexus".to_string(), "dummyfn".to_owned())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]

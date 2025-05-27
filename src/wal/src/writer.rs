@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, remove_file, File, OpenOptions},
+    fs::{File, Metadata, OpenOptions, create_dir_all, remove_file},
+    io,
     io::{BufWriter, Seek, SeekFrom, Write},
     path::PathBuf,
 };
@@ -23,7 +24,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use crc32fast::Hasher;
 use snafu::ResultExt;
 
-use crate::errors::*;
+use crate::{FileHeader, errors::*};
 
 pub struct Writer {
     path: PathBuf,
@@ -39,9 +40,29 @@ impl Writer {
         root_dir: impl Into<PathBuf>,
         org_id: &str,
         stream_type: &str,
-        id: u64,
+        id: String,
         init_size: u64,
         buffer_size: usize,
+    ) -> Result<Self> {
+        Self::build(
+            root_dir,
+            org_id,
+            stream_type,
+            id,
+            init_size,
+            buffer_size,
+            None,
+        )
+    }
+
+    pub fn build(
+        root_dir: impl Into<PathBuf>,
+        org_id: &str,
+        stream_type: &str,
+        id: String,
+        init_size: u64,
+        buffer_size: usize,
+        header: Option<FileHeader>,
     ) -> Result<Self> {
         let path = super::build_file_path(root_dir, org_id, stream_type, id);
         create_dir_all(path.parent().unwrap()).context(FileOpenSnafu { path: path.clone() })?;
@@ -59,11 +80,28 @@ impl Writer {
                 .context(FileReadSnafu { path: path.clone() })?;
         }
 
-        if let Err(e) = f.write_all(super::FILE_TYPE_IDENTIFIER) {
+        if let Err(e) = f.write_all(super::FILE_TYPE_IDENTIFIER_WITH_HEADER) {
             _ = remove_file(&path);
             return Err(Error::WriteFileType { source: e });
         }
+
         let bytes_written = super::FILE_TYPE_IDENTIFIER.len();
+
+        if let Some(header) = header {
+            let header_bytes = Self::serialize_header(&header);
+            // write header len, 4 bytes
+            let header_len = header_bytes.len() as u32;
+            f.write_all(&header_len.to_be_bytes())
+                .context(FileWriteSnafu { path: path.clone() })?;
+            // write header value
+            f.write_all(&header_bytes)
+                .context(FileWriteSnafu { path: path.clone() })?;
+        } else {
+            // write header len, 4 bytes
+            let header_len = 0u32;
+            f.write_all(&header_len.to_be_bytes())
+                .context(FileWriteSnafu { path: path.clone() })?;
+        }
 
         if let Err(e) = f.sync_all() {
             _ = remove_file(&path);
@@ -166,6 +204,37 @@ impl Writer {
 
     pub fn close(&mut self) -> Result<()> {
         self.sync()
+    }
+
+    pub fn metadata(&self) -> io::Result<Metadata> {
+        self.f.get_ref().metadata()
+    }
+
+    fn serialize_header(header: &FileHeader) -> Vec<u8> {
+        let mut bytes = Vec::new();
+
+        for (key, value) in header {
+            // write key len
+            let key_len = key.len() as u32;
+            bytes.extend_from_slice(&key_len.to_be_bytes());
+
+            // write key value
+            bytes.extend_from_slice(key.as_bytes());
+
+            // write value key
+            let value_len = value.len() as u32;
+            bytes.extend_from_slice(&value_len.to_be_bytes());
+
+            // write value value
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
+        bytes
+    }
+
+    pub fn current_position(&mut self) -> io::Result<u64> {
+        let position = self.f.stream_position()?;
+        Ok(position)
     }
 }
 

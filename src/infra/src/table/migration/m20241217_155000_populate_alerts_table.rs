@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -226,7 +226,6 @@ mod folders_table {
         pub org: String,
         pub folder_id: String,
         pub name: String,
-        #[sea_orm(column_type = "Text", nullable)]
         pub description: Option<String>,
         pub r#type: i16,
     }
@@ -255,9 +254,7 @@ mod alerts_table {
         pub is_real_time: bool,
         pub destinations: Json,
         pub context_attributes: Option<Json>,
-        #[sea_orm(column_type = "Text", nullable)]
         pub row_template: Option<String>,
-        #[sea_orm(column_type = "Text", nullable)]
         pub description: Option<String>,
         pub enabled: bool,
         pub tz_offset: i32,
@@ -265,13 +262,10 @@ mod alerts_table {
         pub last_satisfied_at: Option<i64>,
         pub query_type: i16,
         pub query_conditions: Option<Json>,
-        #[sea_orm(column_type = "Text", nullable)]
         pub query_sql: Option<String>,
-        #[sea_orm(column_type = "Text", nullable)]
         pub query_promql: Option<String>,
         pub query_promql_condition: Option<Json>,
         pub query_aggregation: Option<Json>,
-        #[sea_orm(column_type = "Text", nullable)]
         pub query_vrl_function: Option<String>,
         pub query_search_event_type: Option<i16>,
         pub query_multi_time_range: Option<Json>,
@@ -280,7 +274,6 @@ mod alerts_table {
         pub trigger_threshold_count: i64,
         pub trigger_frequency_type: i16,
         pub trigger_frequency_seconds: i64,
-        #[sea_orm(column_type = "Text", nullable)]
         pub trigger_frequency_cron: Option<String>,
         pub trigger_frequency_cron_timezone: Option<String>,
         pub trigger_silence_seconds: i64,
@@ -675,7 +668,7 @@ mod meta_table_alerts {
         DerivedStream,
     }
 
-    #[derive(Default, Deserialize, Serialize)]
+    #[derive(Default, Clone, Copy, Deserialize, Serialize)]
     #[serde(rename_all = "lowercase")]
     pub enum StreamType {
         #[default]
@@ -706,7 +699,7 @@ impl TryFrom<MetaAlertWithFolder> for alerts_table::ActiveModel {
             .ok_or("Alert in meta table references folder that does not exist")?;
         let meta_alert: meta_table_alerts::Alert = serde_json::from_str(m.alert_json())
             .map_err(|_| "Alert in meta table could not be deserialized")?;
-        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let id = ksuid_from_hash(&meta_alert).to_string();
 
         // Transform the parsed stream type from the meta table and serialize
         // into string for storage in DB.
@@ -845,6 +838,33 @@ impl TryFrom<MetaAlertWithFolder> for alerts_table::ActiveModel {
             updated_at: Set(meta_alert.updated_at.map(|t| t.timestamp())),
         })
     }
+}
+
+/// Generates a KSUID from a hash of the alert's `org`, `stream_type`,
+/// `stream_name`, and `name`.
+///
+/// To generate a KSUID this function generates the 160-bit SHA-1 hash of
+/// the alert's `org`, `stream_type`, `stream_name`, and `name` and interprets
+/// that 160-bit hash as a 160-bit KSUID. Therefore two KSUIDs generated in this
+///  manner will always be equal if the alerts have the same `org`,
+/// `stream_type`, `stream_name`, and `name`.
+///
+/// It is important to note that KSUIDs generated in this manner will have
+/// timestamp bits which are effectively random, meaning that the timestamp
+/// in any KSUID generated with this function will be random.
+fn ksuid_from_hash(alert: &meta_table_alerts::Alert) -> svix_ksuid::Ksuid {
+    use sha1::{Digest, Sha1};
+
+    let stream_type: alerts_table_ser::StreamType = alert.stream_type.into();
+    let stream_type = stream_type.to_string();
+
+    let mut hasher = Sha1::new();
+    hasher.update(alert.org_id.clone());
+    hasher.update(stream_type);
+    hasher.update(alert.stream_name.clone());
+    hasher.update(alert.name.clone());
+    let hash = hasher.finalize();
+    svix_ksuid::Ksuid::from_bytes(hash.into())
 }
 
 impl From<meta_table_alerts::CompareHistoricData> for alerts_table_ser::CompareHistoricData {
