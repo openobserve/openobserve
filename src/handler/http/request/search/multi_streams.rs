@@ -50,10 +50,7 @@ use crate::{
         },
     },
     handler::http::request::search::error_utils::map_error_to_http_response,
-    service::{
-        organization::is_org_in_free_trial_period, search as SearchService,
-        self_reporting::report_request_usage_stats,
-    },
+    service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
 /// SearchStreamData
