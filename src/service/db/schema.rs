@@ -508,10 +508,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
         if i % 1000 == 0 {
-            log::info!("Cache schema group progress: {} / {}", i, items_num);
+            log::info!("Cache schema progress: {}/{}", i, items_num);
         }
     }
-    log::info!("Cache schema group done");
+    log::info!("Stream schemas Cached {} schemas", items_num);
     let keys_num = schemas.keys().len();
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     for (i, item_key) in keys.iter().enumerate() {
@@ -564,7 +564,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         w.insert(item_key.to_string(), schema_versions);
         drop(w);
         if i % 1000 == 0 {
-            log::info!("Stream schemas Cached progress: {} / {}", i, keys.len());
+            log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }
     log::info!("Stream schemas Cached {} streams", keys_num);
