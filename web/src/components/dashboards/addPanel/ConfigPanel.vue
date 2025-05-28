@@ -195,6 +195,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
       </template>
+
+      <div class="space"></div>
+
+      <q-toggle
+        v-if="dashboardPanelData.data.config.trellis?.layout"
+        v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
+        label="Group trellis series for multi Y-axis"
+        data-test="dashboard-config-trellis-group-by-y-axis"
+      />
     </div>
 
     <q-toggle
@@ -1578,6 +1587,7 @@ export default defineComponent({
         dashboardPanelData.data.config.trellis = {
           layout: null,
           num_of_columns: 1,
+          group_by_y_axis: false,
         };
       }
 
@@ -1654,6 +1664,10 @@ export default defineComponent({
       // If no step value is set, set it to 0
       if (!dashboardPanelData.data.config.step_value) {
         dashboardPanelData.data.config.step_value = "0";
+      }
+
+      if (!dashboardPanelData.data.config.trellis.group_by_y_axis) {
+        dashboardPanelData.data.config.trellis.group_by_y_axis = false;
       }
     });
 
