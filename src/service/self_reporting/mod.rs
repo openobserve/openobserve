@@ -279,7 +279,7 @@ pub async fn flush() {
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
 pub async fn run_audit_publish() {
-    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
     if !o2cfg.common.audit_enabled {
         return;
     }

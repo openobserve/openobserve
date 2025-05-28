@@ -370,7 +370,7 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
 mod super_cluster {
     use config::{meta::user::DBUser, utils::json};
     use infra::table::users::UserUpdate;
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
     use super::USER_RECORD_KEY;
 

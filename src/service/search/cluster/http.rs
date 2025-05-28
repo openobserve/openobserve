@@ -81,7 +81,7 @@ pub async fn search(
     // handle query function
     #[cfg(feature = "enterprise")]
     let ret = if _need_super_cluster
-        && o2_enterprise::enterprise::common::infra::config::get_config()
+        && o2_enterprise::enterprise::common::config::get_config()
             .super_cluster
             .enabled
         && !local_cluster_search
