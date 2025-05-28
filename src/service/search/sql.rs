@@ -53,10 +53,7 @@ use sqlparser::{
 #[cfg(feature = "enterprise")]
 use super::datafusion::udf::cipher_udf::{DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME};
 use super::{
-    datafusion::udf::match_all_udf::{
-        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
-        MATCH_ALL_UDF_NAME,
-    },
+    datafusion::udf::match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
     index::{Condition, IndexCondition, get_index_condition_from_expr},
     request::Request,
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
@@ -1079,11 +1076,7 @@ impl VisitorMut for MatchVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
-            if name == MATCH_ALL_UDF_NAME
-                || name == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                || name == MATCH_ALL_RAW_UDF_NAME
-                || name == FUZZY_MATCH_ALL_UDF_NAME
-            {
+            if name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME {
                 if let FunctionArguments::List(list) = &func.args {
                     if !list.args.is_empty() {
                         let value = trim_quotes(list.args[0].to_string().as_str());
