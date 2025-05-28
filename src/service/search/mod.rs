@@ -676,8 +676,13 @@ pub async fn search_partition(
             );
             files.extend(stream_files);
         } else {
-            // data retention in seconds
-            let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
+            // data retention should be either from stream settings or global data retension
+            let data_retention = if stream_settings.data_retention > 0 {
+                stream_settings.data_retention
+            } else {
+                cfg.compact.data_retention_days
+            };
+            let mut data_retention = data_retention * 24 * 60 * 60;
             // data duration in seconds
             let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
             let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
@@ -690,6 +695,7 @@ pub async fn search_partition(
             };
 
             let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+
             if data_retention_based_on_stats > 0 {
                 data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
             };
@@ -697,13 +703,14 @@ pub async fn search_partition(
                 log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
                 data_retention = 1;
             }
-            let records = (stats.doc_num as i64 * query_duration) / data_retention;
-            let original_size = (stats.storage_size as i64 * query_duration) / data_retention;
+            let records = (stats.doc_num as i64 / data_retention) * query_duration;
+            let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
             log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {}",
+                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {} , data_retention in seconds: {}",
                 stream_name,
                 records,
                 original_size,
+                data_retention,
             );
             files.push(infra::file_list::FileId {
                 id: Utc::now().timestamp_micros(),
