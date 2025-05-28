@@ -198,7 +198,6 @@ const useHttpStreaming = () => {
           url = `/_search_multi_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
         }
       } else if(type === "values") {
-        const fieldsString = meta?.fields.join(",");
         url = `/_values_stream`
       }
 

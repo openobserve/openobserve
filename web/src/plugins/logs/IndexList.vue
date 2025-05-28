@@ -1022,7 +1022,7 @@ export default defineComponent({
             // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
             if (isWebSocketEnabled() || isStreamingEnabled()) {
               fetchValuesWithWebsocket({
-                fields: [name],
+                field: name,
                 size: 10,
                 no_count: false,
                 regions: searchObj.meta.regions,
@@ -1294,7 +1294,7 @@ export default defineComponent({
       };
       initializeWebSocketConnection(wsPayload);
 
-      addTraceId(payload.fields[0], wsPayload.traceId);
+      addTraceId(payload.field, wsPayload.traceId);
     };
 
     const initializeWebSocketConnection = (payload: any) => {
@@ -1346,8 +1346,8 @@ export default defineComponent({
 
     const handleSearchClose = (payload: any, response: any) => {
       // Disable the loading indicator
-      if (fieldValues.value[payload.queryReq.fields[0]]) {
-        fieldValues.value[payload.queryReq.fields[0]].isLoading = false;
+      if (fieldValues.value[payload.queryReq.field]) {
+        fieldValues.value[payload.queryReq.field].isLoading = false;
       }
 
       //TODO Omkar: Remove the duplicate error codes, are present same in useSearchWebSocket.ts
@@ -1366,26 +1366,30 @@ export default defineComponent({
         });
       }
 
-      removeTraceId(payload.queryReq.fields[0], payload.traceId);
+      removeTraceId(payload.queryReq.field, payload.traceId);
     };
 
     const handleSearchError = (request: any, err: any) => {
-      if (fieldValues.value[request.queryReq.fields[0]]) {
-        fieldValues.value[request.queryReq.fields[0]].isLoading = false;
-        fieldValues.value[request.queryReq.fields[0]].errMsg =
+      if (fieldValues.value[request.queryReq.field]) {
+        fieldValues.value[request.queryReq.field].isLoading = false;
+        fieldValues.value[request.queryReq.field].errMsg =
           "Failed to fetch field values";
       }
 
-      removeTraceId(request.queryReq.fields[0], request.traceId);
+      removeTraceId(request.queryReq.field, request.traceId);
     };
 
     const handleSearchResponse = (payload: any, response: any) => {
       if (response.type === "cancel_response") {
-        removeTraceId(payload.queryReq.fields[0], response.content.trace_id);
+        removeTraceId(payload.queryReq.field, response.content.trace_id);
         return;
       }
 
-      const fieldName = payload.queryReq.fields[0];
+      if (response.type !== "search_response_hits") {
+        return;
+      }
+
+      const fieldName = payload.queryReq.field;
       const streamName = payload.queryReq.stream_name;
 
       // Initialize if not exists
@@ -1455,7 +1459,7 @@ export default defineComponent({
     };
 
     const handleSearchReset = (data: any) => {
-      const fieldName = data.payload.queryReq.fields[0];
+      const fieldName = data.payload.queryReq.field;
 
       // Reset the main fieldValues state
       fieldValues.value[fieldName] = {

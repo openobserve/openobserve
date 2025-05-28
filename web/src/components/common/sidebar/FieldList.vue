@@ -350,7 +350,7 @@ export default defineComponent({
           stream_name: stream_name ? stream_name : props.streamName,
           start_time: props.timeStamp.startTime,
           end_time: props.timeStamp.endTime,
-          fields: [name],
+          field: name,
           size: 10,
           type: props.streamType,
         })

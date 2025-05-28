@@ -218,7 +218,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
         stream_name: searchObj.data.stream.selectedStream.value,
         start_time: searchObj.data.datetime.startTime,
         end_time: searchObj.data.datetime.endTime,
-        fields: [name],
+        field: name,
         size: 10,
         type: "traces",
         query_context,

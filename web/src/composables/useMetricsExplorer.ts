@@ -686,7 +686,7 @@ const useMetricsExplorer = () => {
       end_time: new Date(
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
-      fields: [name],
+      field: name,
       size: 10,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex

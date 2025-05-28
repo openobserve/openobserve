@@ -405,7 +405,7 @@ export default defineComponent({
             stream_name: selectedMetric.value?.value,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
-            fields: [name],
+            field: name,
             type: "metrics",
             size: 10,
           })
