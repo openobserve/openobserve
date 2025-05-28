@@ -27,6 +27,7 @@ pub fn write_benchmark(c: &mut Criterion) {
                 build_file_path(dir, "org", "stream", entry_size.to_string()),
                 1024_1024,
                 buf_size,
+                None,
             )
             .unwrap();
             let data = vec![42u8; entry_size];

@@ -40,14 +40,6 @@ impl Writer {
         path: impl Into<PathBuf> + Clone + Deref<Target = Path> + AsRef<Path>,
         init_size: u64,
         buffer_size: usize,
-    ) -> Result<Self> {
-        Self::build(path, init_size, buffer_size, None)
-    }
-
-    pub fn build(
-        path: impl Into<PathBuf> + Clone + Deref<Target = Path> + AsRef<Path>,
-        init_size: u64,
-        buffer_size: usize,
         header: Option<FileHeader>,
     ) -> Result<Self> {
         create_dir_all(path.parent().ok_or_else(|| Error::NoParentDir {
