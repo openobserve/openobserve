@@ -24,6 +24,7 @@ publish = false
 [features]
 default = []
 enterprise = []
+cloud = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pprof"]
@@ -185,7 +186,7 @@ pin-project-lite = "0.2.16"
 futures-core = "0.3.31"
 actix-service = "2.0.3"
 actix-utils = "3.0.1"
-derive_more = {version = "2.0.1", features = ["full"]}
+derive_more = { version = "2.0.1", features = ["full"] }
 brotli = "8.0.1"
 
 [dev-dependencies]
@@ -247,18 +248,18 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "45.0.0"
-datafusion-proto = "45.0.0"
-datafusion-functions-aggregate-common = "45.0.0"
-datafusion-functions-json = "0.45.0"
+datafusion = "46.0.0"
+datafusion-proto = "46.0.0"
+datafusion-functions-aggregate-common = "46.0.0"
+datafusion-functions-json = "0.46.0"
 expect-test = "1.4"
-arrow = { version = "54.1.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "54.1.0"
-arrow-json = "54.1.0"
-arrow-schema = { version = "54.1.0", features = ["serde"] }
-parquet = { version = "54.1.0", features = ["arrow", "async", "object_store"] }
+arrow = { version = "54.2.1", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "54.2.1"
+arrow-json = "54.2.1"
+arrow-schema = { version = "54.2.1", features = ["serde"] }
+parquet = { version = "54.2.1", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.11.2", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.53.0", features = ["serde", "visitor"] }
+sqlparser = { version = "0.54.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"

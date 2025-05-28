@@ -101,7 +101,7 @@ impl Streams for StreamServiceImpl {
 
         let entries = Self::process_orgs_batch(&orgs, stream_type, stream_name).await;
         log::debug!(
-            "orgs:{:?}, stream_type:{:?}, stream_name:{:?}",
+            "[grpc:stream_stats] orgs: {:?}, stream_type: {:?}, stream_name: {:?}",
             orgs,
             stream_type,
             stream_name,

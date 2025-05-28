@@ -43,8 +43,8 @@ export
         await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
     }
 
-    async managementPageURLValidation() {
-        await expect(this.page).toHaveURL(/defaulttestmulti/);
+    async managementPageURLValidation(org_name) {
+        await expect(this.page).toHaveURL(new RegExp(`org_identifier=${org_name}`));
     }
 
     async managementURLValidation() {

@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 3;
+pub const DB_SCHEMA_VERSION: u64 = 4;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1090,6 +1090,24 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub websocket_enabled: bool,
+    #[env_config(name = "ZO_ES_VERSION", default = "")]
+    pub es_version: String,
+    #[env_config(
+        name = "ZO_CREATE_ORG_THROUGH_INGESTION",
+        default = false,
+        help = "If true (default false), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
+    )]
+    pub create_org_through_ingestion: bool,
+    #[env_config(
+        name = "ZO_ORG_INVITE_EXPIRY",
+        default = 7,
+        help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
+    )]
+    pub org_invite_expiry: u32,
+    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
+    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,

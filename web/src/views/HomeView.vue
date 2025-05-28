@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="margin: 0 auto; justify-content: center"
       :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
-      <div class="my-card-wide my-card card-container">
+      <div :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" class="my-card-wide my-card card-container">
         <div align="center" flat
-bordered class="my-card-wide my-card q-py-md">
+        :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" bordered class=" my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <q-separator class="q-ma-md" />
           <div class="row justify-center" v-if="isCloud == 'false'">
@@ -63,9 +63,34 @@ bordered class="my-card-wide my-card q-py-md">
               <div class="text-h6">{{ summary.index_size }}</div>
             </div>
           </div>
-          <div v-else>
-            <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
-            <div class="text-h6">{{ summary.ingested_data }}</div>
+          <div v-else class="row justify-center">
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.streamTotal") }}
+              </div>
+              <div class="text-h6">{{ summary.streams_count }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.docsCountLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.doc_count }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.totalDataIngested") }}
+              </div>
+              <div class="text-h6">{{ summary.ingested_data }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.indexSizeLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.index_size }}</div>
+            </div>
           </div>
         </div>
 
@@ -373,6 +398,9 @@ export default defineComponent({
 
 .my-card-wide {
   width: 88.6vw;
+}
+.my-card-narrow{
+  width: 66.6vw;
 }
 
 .card-container {

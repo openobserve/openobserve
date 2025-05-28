@@ -15,8 +15,8 @@ env:
   ZO_BASE_URL: http://localhost:5080/
   ZO_BASE_URL_SC: http://localhost:5080/
   WS_ZO_BASE_URL: ws://localhost:5080/
-  ZO_SMTP_ENABLED: true 
-
+  ZO_SMTP_ENABLED: true
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
 
 jobs:
   api_integration_tests:
@@ -60,8 +60,8 @@ jobs:
         uses: eifinger/setup-rye@v4
         with:
           enable-cache: true
-          working-directory: 'tests/api-testing/'
-          version: '0.27.0'
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
 
       - name: Start OpenObserve
         run: ZO_WEBSOCKET_ENABLED=true target/debug/openobserve &
@@ -83,10 +83,8 @@ jobs:
 
       - name: Setup websocket client
         run: pip install websocat
-        working-directory: 'tests/api-testing/'
-           
+        working-directory: "tests/api-testing/"
+
       - name: Run websocket tests
         run: echo "Skipping websocket tests for now"
-        working-directory: 'tests/api-testing/'
-        
-
+        working-directory: "tests/api-testing/"

@@ -70,6 +70,26 @@
     </div>
     <div class="add-function-actions flex justify-center">
       <q-btn
+            v-if="config.isEnterprise == 'true' && !isAddFunctionComponent"
+            :ripple="false"
+            @click="emit('open:chat',!store.state.isAiChatEnabled)"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            dense
+            class="o2-button ai-hover-btn q-px-sm q-py-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%;"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
+
+          >
+            <div class="row items-center no-wrap tw-gap-2  ">
+              <img  :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
+      <q-btn
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
         class="text-bold tw-border-primary add-function-fullscreen-btn"
@@ -125,7 +145,8 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
-
+import config from "../../aws-exports";
+import { getImageURL } from "@/utils/zincutils";
 const { t } = useI18n();
 
 const q = useQuasar();
@@ -143,14 +164,19 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isAddFunctionComponent: {
+    type: Boolean,
+    default: true,
+  },
 });
 
-const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
+const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat"]);
 
 const addFunctionForm = ref(null);
 
 const showInputError = ref(false);
 
+const isHovered = ref(false);
 const isValidMethodName = () => {
   if (!functionName.value) return "Field is required!";
   const methodPattern = /^[A-Z_][A-Z0-9_]*$/i;
@@ -169,6 +195,7 @@ const functionName = computed({
   set: (value) => emit("update:name", value),
 });
 
+const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))
 const handleFullScreen = () => {
   q.fullscreen.toggle();
 };
@@ -181,6 +208,16 @@ const onSave = () => {
   showInputError.value = true;
   emit("save");
 };
+
+const getBtnLogo = computed(() => {
+      if (isHovered.value || store.state.isAiChatEnabled) {
+        return getImageURL('images/common/ai_icon_dark.svg')
+      }
+
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
 
 defineExpose({ addFunctionForm });
 </script>

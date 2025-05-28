@@ -112,18 +112,16 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
-            cfg.tokio_console.tokio_console_retention,
+            get_config().tokio_console.tokio_console_retention,
         ))
         .server_addr(
             format!(
                 "{}:{}",
-                cfg.tokio_console.tokio_console_server_addr,
-                cfg.tokio_console.tokio_console_server_port
+                get_config().tokio_console.tokio_console_server_addr,
+                get_config().tokio_console.tokio_console_server_port
             )
             .as_str()
             .parse::<SocketAddr>()?,
@@ -132,28 +130,29 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
-        let guard = pprof::ProfilerGuardBuilder::default()
-            .frequency(1000)
-            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-            .build()
-            .unwrap();
-        Some(guard)
-    } else {
-        None
-    };
+    let pprof_guard =
+        if get_config().profiling.pprof_enabled || get_config().profiling.pprof_protobuf_enabled {
+            let guard = pprof::ProfilerGuardBuilder::default()
+                .frequency(1000)
+                .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+                .build()
+                .unwrap();
+            Some(guard)
+        } else {
+            None
+        };
 
     // setup pyroscope
     #[cfg(feature = "pyroscope")]
-    let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
+    let pyroscope_agent = if get_config().profiling.pyroscope_enabled {
         let agent = PyroscopeAgent::builder(
-            &cfg.profiling.pyroscope_server_url,
-            &cfg.profiling.pyroscope_project_name,
+            &get_config().profiling.pyroscope_server_url,
+            &get_config().profiling.pyroscope_project_name,
         )
         .tags(
             [
-                ("role", cfg.common.node_role.as_str()),
-                ("instance", cfg.common.instance_name.as_str()),
+                ("role", get_config().common.node_role.as_str()),
+                ("instance", get_config().common.instance_name.as_str()),
                 ("version", config::VERSION),
             ]
             .to_vec(),
@@ -172,13 +171,14 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut tracer_provider = None;
+    let cfg = get_config();
 
     // setup logs
     #[cfg(feature = "tokio-console")]
     let enable_tokio_console = true;
     #[cfg(not(feature = "tokio-console"))]
     let enable_tokio_console = false;
+    let mut tracer_provider = None;
     let _guard: Option<WorkerGuard> = if enable_tokio_console {
         None
     } else if cfg.log.events_enabled {
@@ -259,6 +259,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("infra init failed: {}", e);
             }
+
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {}", e);
@@ -268,7 +269,7 @@ async fn main() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
-                panic!("enerprise init failed: {}", e);
+                panic!("enterprise init failed: {}", e);
             }
 
             // ingester init
@@ -344,14 +345,14 @@ async fn main() -> Result<(), anyhow::Error> {
             .expect("grpc runtime init failed");
         let _guard = rt.enter();
         rt.block_on(async move {
-            if config::cluster::LOCAL_NODE.is_router() {
-                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
-                    .await
-                    .expect("router gRPC server init failed");
+            let ret = if config::cluster::LOCAL_NODE.is_router() {
+                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
             } else {
-                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
-                    .await
-                    .expect("router gRPC server init failed");
+                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
+            };
+            if let Err(e) = ret {
+                log::error!("gRPC server init failed: {:?}", e);
+                std::process::exit(1);
             }
         });
     });
@@ -373,7 +374,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
             meta::telemetry::Telemetry::new()
-                .event("OpenObserve - Starting server", None, false)
+                .send_track_event("OpenObserve - Starting server", None, true, false)
                 .await;
         });
     }
@@ -416,7 +417,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // stop telemetry
     if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
-            .event("OpenObserve - Server stopped", None, false)
+            .send_track_event("OpenObserve - Server stopped", None, true, true)
             .await;
     }
 
@@ -551,6 +552,7 @@ async fn init_common_grpc_server(
         gaddr
     );
     init_tx.send(()).ok();
+
     let builder = if cfg.grpc.tls_enabled {
         let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
         let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
@@ -559,7 +561,7 @@ async fn init_common_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    builder
+    let ret = builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
@@ -577,8 +579,11 @@ async fn init_common_grpc_server(
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
-        .await
-        .expect("gRPC server init failed");
+        .await;
+    if let Err(e) = ret {
+        return Err(anyhow::anyhow!("{:?}", e));
+    }
+
     stopped_tx.send(()).ok();
     Ok(())
 }
@@ -612,6 +617,7 @@ async fn init_router_grpc_server(
         gaddr
     );
     init_tx.send(()).ok();
+
     let builder = if cfg.grpc.tls_enabled {
         let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
         let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
@@ -620,7 +626,7 @@ async fn init_router_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    builder
+    let ret = builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)
@@ -629,8 +635,11 @@ async fn init_router_grpc_server(
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
-        .await
-        .expect("gRPC server init failed");
+        .await;
+    if let Err(e) = ret {
+        return Err(anyhow::anyhow!("{:?}", e));
+    }
+
     stopped_tx.send(()).ok();
     Ok(())
 }
@@ -1127,7 +1136,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     // stop telemetry
     if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
-            .event("OpenObserve - Server stopped", None, false)
+            .send_track_event("OpenObserve - Server stopped", None, true, true)
             .await;
     }
 
