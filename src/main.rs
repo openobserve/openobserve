@@ -1198,6 +1198,12 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
             .await?;
     }
+
+    #[cfg(feature = "cloud")]
+    {
+        use crate::self_reporting::search::get_usage;
+        o2_enterprise::enterprise::metering::init(get_usage).await?;
+    }
     Ok(())
 }
 #[cfg(feature = "enterprise")]
