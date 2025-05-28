@@ -101,16 +101,6 @@ const defaultSuggestions = [
     insertText: (_keyword: string) => `match_all('${_keyword}')`,
   },
   {
-    label: (_keyword: string) => `match_all_raw('${_keyword}')`,
-    kind: "Text",
-    insertText: (_keyword: string) => `match_all_raw('${_keyword}')`,
-  },
-  {
-    label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
-    kind: "Text",
-    insertText: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
-  },
-  {
     label: (_keyword: string) => `re_match(fieldname: string, regular_expression: string)`,
     kind: "Text",
     insertText: (_keyword: string) => `re_match(fieldname, '')`,

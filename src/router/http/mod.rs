@@ -147,6 +147,13 @@ async fn dispatch(
         .map(|x| x.as_str())
         .unwrap_or("")
         .to_string();
+
+    // HACK: node list api need return by itself
+    if path.contains("/api/") && path.contains("/node/list") {
+        let nodes = cluster::get_cached_nodes(|_| true).await;
+        return Ok(crate::common::meta::http::HttpResponse::json(nodes));
+    }
+
     let new_url = get_url(&path).await;
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable()
