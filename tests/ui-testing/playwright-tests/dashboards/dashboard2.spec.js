@@ -42,21 +42,27 @@ test.describe("dashboard UI testcases", () => {
   test("should add the breakdown field to the dashboard panel and allow the user to cancel the action", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardRefresh = new DashboardTimeRefresh(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const dashboardPanel = new DashboardPanel(page);
+
+    const dashboardName = `dashboard-${Date.now()}`;
     const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
 
+    // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    // Create dashboard and add panel
     await dashboardCreate.createDashboard(dashboardName);
     await dashboardCreate.addPanel();
     await dashboardActions.addPanelName(panelName);
 
+    // Select stream and fields
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
@@ -66,23 +72,28 @@ test.describe("dashboard UI testcases", () => {
       "kubernetes_container_image",
       "b"
     );
+
+    // Simulate user removing a field (cancel-like behavior)
     await chartTypeSelector.removeField("kubernetes_container_image", "b");
 
+    // Apply configuration
     await dashboardActions.applyDashboardBtn();
+
+    // Set relative time
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardRefresh.setRelative("4", "w");
     await dashboardActions.applyDashboardBtn();
 
+    // Save and verify panel
     await dashboardActions.savePanel();
-    await page.locator('[data-test="dashboard-back-btn"]').waitFor({
-      state: "visible",
-    });
-    await dashboardPanel.deletePanel(panelName);
+    await page
+      .locator('[data-test="dashboard-back-btn"]')
+      .waitFor({ state: "visible" });
 
+    // Delete panel and dashboard
+    await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
-
-   
   });
 
   test("should add and cancel the breakdown field with different times and timezones and ensure it displays the correct output", async ({
@@ -127,7 +138,6 @@ test.describe("dashboard UI testcases", () => {
     await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
-
   });
 
   test("should update the breakdown field correctly to match the existing one according to the chart type when changing the chart type.", async ({
