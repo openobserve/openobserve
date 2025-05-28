@@ -834,10 +834,6 @@ export default defineComponent({
 
         loadLogsData();
 
-        if (isCloudEnvironment()) {
-          setupCloudSpecificThreshold();
-        }
-
         searchObj.meta.quickMode = isQuickModeEnabled();
         searchObj.meta.showHistogram = isHistogramEnabled();
 

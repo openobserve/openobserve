@@ -52,6 +52,7 @@ const organizationObj = {
     scrape_interval: 15,
     trace_id_field_name: "trace_id",
     span_id_field_name: "span_id",
+    free_trial_expiry: "",
   },
   isDataIngested: false,
 };
