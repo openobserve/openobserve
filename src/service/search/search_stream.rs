@@ -634,13 +634,14 @@ pub async fn do_partitioned_search(
                 let field = values_ctx.as_ref().unwrap().field.clone();
                 let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
                 let no_count = values_ctx.as_ref().unwrap().no_count;
-                let top_k_values = tokio::task::spawn_blocking(move || {
+                let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &field, top_k, no_count)
                 })
                 .instrument(search_stream_span.clone())
                 .await
-                .unwrap();
-                search_res.hits = top_k_values?;
+                .unwrap()?;
+                search_res.total = hit_count as usize;
+                search_res.hits = top_k_values;
                 let duration = instant.elapsed();
                 log::debug!("Top k values for partition {idx} took {:?}", duration);
             }
@@ -1096,13 +1097,14 @@ async fn process_delta(
                 let field = values_ctx.as_ref().unwrap().field.clone();
                 let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
                 let no_count = values_ctx.as_ref().unwrap().no_count;
-                let top_k_values = tokio::task::spawn_blocking(move || {
+                let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &field, top_k, no_count)
                 })
                 .instrument(search_stream_span.clone())
                 .await
-                .unwrap();
-                search_res.hits = top_k_values?;
+                .unwrap()?;
+                search_res.total = hit_count as usize;
+                search_res.hits = top_k_values;
             }
 
             let response = StreamResponses::SearchResponse {
@@ -1336,7 +1338,7 @@ pub fn get_top_k_values(
     field: &str,
     top_k: i64,
     no_count: bool,
-) -> Result<Vec<Value>, infra::errors::Error> {
+) -> Result<(Vec<Value>, u64), infra::errors::Error> {
     let mut top_k_values: Vec<Value> = Vec::new();
 
     if field.is_empty() {
@@ -1359,6 +1361,7 @@ pub fn get_top_k_values(
         search_result_hits.push((key, num));
     }
 
+    let result_count;
     if no_count {
         // For alphabetical sorting, collect all entries first
         let mut all_entries: Vec<_> = search_result_hits;
@@ -1375,6 +1378,7 @@ pub fn get_top_k_values(
             })
             .collect::<Vec<_>>();
 
+        result_count = top_hits.len();
         let mut field_value: Map<String, Value> = Map::new();
         field_value.insert("field".to_string(), Value::String(field.to_string()));
         field_value.insert("values".to_string(), Value::Array(top_hits));
@@ -1408,11 +1412,12 @@ pub fn get_top_k_values(
             })
             .collect::<Vec<_>>();
 
+        result_count = top_hits.len();
         let mut field_value: Map<String, Value> = Map::new();
         field_value.insert("field".to_string(), Value::String(field.to_string()));
         field_value.insert("values".to_string(), Value::Array(top_hits));
         top_k_values.push(Value::Object(field_value));
     }
 
-    Ok(top_k_values)
+    Ok((top_k_values, result_count as u64))
 }
