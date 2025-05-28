@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -93,6 +93,11 @@ export default defineComponent({
     const planName = "pay-as-you-go";
     const btnCancelSubscription = ref(t('billing.manageSubscription'));
     const btnSubscribe = ref(t('billing.subscribe'));
+
+    onMounted(() => {
+      btnCancelSubscription.value = t('billing.manageSubscription');
+      btnSubscribe.value = t('billing.subscribe');
+    })
 
     const features = [
       { name: 'Ingestion (Logs, Metrics, Traces)', price: '$0.30/GB' , is_parent: true},
