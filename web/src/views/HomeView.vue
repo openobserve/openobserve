@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
       <TrialPeriod></TrialPeriod>
-      <div class="my-card-wide my-card card-container q-mt-lg q-mb-lg">
+      <div :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" class="my-card-wide my-card card-container q-mt-lg q-mb-lg">
         <div align="center" flat
-bordered class="my-card-wide my-card q-py-md">
+        :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" bordered class=" my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <q-separator class="q-ma-md " />
           <div class="row justify-center" v-if="isCloud == 'false'">
@@ -401,6 +401,9 @@ export default defineComponent({
 
 .my-card-wide {
   width: 100%;
+}
+.my-card-narrow{
+  width: 66.6vw;
 }
 
 .card-container {

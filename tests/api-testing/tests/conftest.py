@@ -8,12 +8,15 @@ from pathlib import Path
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
 
-
-def random_string(length: int):
-    # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
-    # digits consist of '0' to '9'
-    characters = string.ascii_letters + string.digits
-    return "".join(random.choices(characters, k=length))
+@pytest.fixture(scope="module")
+def random_string():
+    """Generate a random string of specified length."""
+    def _generate(length=5):
+        # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
+        # digits consist of '0' to '9'
+        characters = string.ascii_letters + string.digits
+        return "".join(random.choices(characters, k=length))
+    return _generate
 
 def _create_session_inner():
     s = requests.Session()
@@ -37,13 +40,13 @@ def _create_session_inner_v2():
     return s
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def create_session():
     """Create a session and return it."""
-    return _create_session_inner()
+    return _create_session_inner_v2()
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def base_url():
     """Return the base URL."""
     return BASE_URL

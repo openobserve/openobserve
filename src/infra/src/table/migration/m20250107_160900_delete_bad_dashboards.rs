@@ -117,9 +117,9 @@ mod sea_orm_dashboards {
     #[sea_orm(table_name = "dashboards")]
     pub struct Model {
         #[sea_orm(primary_key)]
-        pub id: i64,
+        pub id: String,
         pub dashboard_id: String,
-        pub folder_id: i64,
+        pub folder_id: String,
         pub owner: String,
         pub role: Option<String>,
         pub title: String,

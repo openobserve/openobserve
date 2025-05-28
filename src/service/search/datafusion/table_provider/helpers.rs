@@ -122,11 +122,14 @@ pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
             // - ScalarVariable could be `applicable`, but that would require access to the context
             Expr::AggregateFunction { .. }
             | Expr::WindowFunction { .. }
-            | Expr::Wildcard { .. }
             | Expr::Unnest { .. }
             | Expr::Placeholder(_) => {
                 is_applicable = false;
                 Ok(TreeNodeRecursion::Stop)
+            }
+            #[allow(deprecated)]
+            Expr::Wildcard { .. } => {
+                unreachable!("datafusion should not generate wildcard expression after v46");
             }
         }
     })

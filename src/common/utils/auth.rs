@@ -323,10 +323,18 @@ impl FromRequest for AuthExtractor {
             } else {
                 path_columns[1]
             };
+
+            // for organization api changes we need perms on _all_{org}
+            let entity = if key == "organizations" {
+                format!("_all_{}", path_columns[0])
+            } else {
+                path_columns[0].to_string()
+            };
+
             format!(
                 "{}:{}",
                 OFGA_MODELS.get(key).map_or(key, |model| model.key),
-                path_columns[0]
+                entity
             )
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
@@ -664,6 +672,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/short")
                 || path.contains("/ws")
                 || path.contains("/_values_stream")
+                || (url_len > 1 && path_columns[1].eq("ai"))
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
