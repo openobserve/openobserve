@@ -1165,7 +1165,7 @@ export default defineComponent({
 
         if(orgSettings?.data?.data?.free_trial_expiry != null && orgSettings?.data?.data?.free_trial_expiry != "") {
           const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if(trialDueDays <= 8) {
+          if(trialDueDays <= 0) {
             router.push({name: "plans"})
           }
         }
