@@ -150,8 +150,23 @@ async fn dispatch(
 
     // HACK: node list api need return by itself
     if path.contains("/api/") && path.contains("/node/list") {
-        let nodes = cluster::get_cached_nodes(|_| true).await;
-        return Ok(crate::common::meta::http::HttpResponse::json(nodes));
+        let org_id = web::Path::<String>::from_request(&req, &mut payload.into_inner())
+            .await
+            .ok()
+            .map(|x| x.into_inner())
+            .unwrap_or_default();
+        let query =
+            web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
+                .ok()
+                .map(|x| x.into_inner())
+                .unwrap_or_default();
+        return crate::handler::http::request::organization::org::node_list_impl(&org_id, query)
+            .await
+            .map_err(|e| {
+                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                    format!("Failed to parse node list request: {:?}", e).as_str(),
+                )))
+            });
     }
 
     let new_url = get_url(&path).await;
