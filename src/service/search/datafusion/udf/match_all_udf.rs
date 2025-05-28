@@ -61,7 +61,10 @@ impl ScalarUDFImpl for MatchAllUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue> {
         Err(DataFusionError::Internal(
             "match_all function don't support sql with multiple streams".to_string(),
         ))
@@ -101,7 +104,10 @@ impl ScalarUDFImpl for FuzzyMatchAllUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue> {
         Err(DataFusionError::Internal(
             "fuzzy_match_all function don't support sql with multiple streams".to_string(),
         ))
