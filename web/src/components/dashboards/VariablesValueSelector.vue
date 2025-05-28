@@ -790,8 +790,13 @@ export default defineComponent({
         return;
       }
 
-      // If we have custom values, set them immediately
+      // Check if this is a child variable
+      const isChildVariable =
+        variablesDependencyGraph[currentVariable.name]?.parentVariables
+          ?.length > 0;
+
       if (
+        !isChildVariable &&
         currentVariable?.selectAllValueForMultiSelect === "custom" &&
         currentVariable?.customMultiSelectValue?.length > 0
       ) {
@@ -816,9 +821,6 @@ export default defineComponent({
         // if selected values exist, use them
         if (selectedValues.length > 0) {
           currentVariable.value = selectedValues;
-        } else if (currentVariable?.customMultiSelectValue?.length > 0) {
-          currentVariable.value = currentVariable.customMultiSelectValue;
-          currentVariable.isVariableLoadingPending = true;
         } else if (currentVariable.options.length > 0) {
           // Default to first option if nothing else is set
           currentVariable.value = [currentVariable.options[0].value];
@@ -832,9 +834,6 @@ export default defineComponent({
           oldVariableSelectedValues[0] !== undefined
         ) {
           currentVariable.value = oldVariableSelectedValues[0];
-        } else if (currentVariable?.customMultiSelectValue?.length > 0) {
-          currentVariable.value = currentVariable.customMultiSelectValue[0];
-          currentVariable.isVariableLoadingPending = true;
         } else if (currentVariable.options.length > 0) {
           currentVariable.value = currentVariable.options[0].value;
         } else {
