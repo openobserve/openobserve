@@ -579,33 +579,7 @@ export default defineComponent({
       const normalizedCurrent = normalizeVariables(variablesData);
       const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
 
-      console.log(
-        "View Dashboard Current variables (normalized):",
-        JSON.stringify(normalizedCurrent, null, 2),
-      );
-      console.log(
-        "View Dashboard Refreshed variables (normalized):",
-        JSON.stringify(normalizedRefreshed, null, 2),
-      );
-
-      const result = !isEqual(normalizedCurrent, normalizedRefreshed);
-      console.log("View Dashboard isVariablesChanged:", result);
-
-      if (result) {
-        console.log(
-          "Differences found between current and refreshed variables",
-        );
-        Object.keys(normalizedCurrent).forEach((key) => {
-          if (!isEqual(normalizedCurrent[key], normalizedRefreshed[key])) {
-            console.log(`Difference in key "${key}":`, {
-              current: normalizedCurrent[key],
-              refreshed: normalizedRefreshed[key],
-            });
-          }
-        });
-      }
-
-      return result;
+      return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
     // ======= [START] default variable values
 

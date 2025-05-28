@@ -930,9 +930,31 @@ export default defineComponent({
       //check that is it addpanel initial call
       if (isInitialDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
+
+      const normalizeVariables = (obj) => {
+        const normalized = JSON.parse(JSON.stringify(obj));
+        // Sort arrays to ensure consistent ordering
+        if (normalized.values) {
+          normalized.values = normalized.values
+            .map((variable) => {
+              if (Array.isArray(variable.value)) {
+                variable.value.sort((a, b) =>
+                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
+                );
+              }
+              return variable;
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return normalized;
+      };
+
+      const normalizedCurrent = normalizeVariables(variablesData);
+      const normalizedRefreshed = normalizeVariables(updatedVariablesData);
+
       return (
         !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(variablesData, updatedVariablesData)
+        !isEqual(normalizedCurrent, normalizedRefreshed)
       );
     });
 
