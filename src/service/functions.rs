@@ -21,7 +21,9 @@ use actix_web::{
 };
 use config::{
     meta::{
-        function::{FunctionList, TestVRLResponse, Transform, VRLResult, VRLResultResolver},
+        function::{
+            FunctionList, RESULT_ARRAY, TestVRLResponse, Transform, VRLResult, VRLResultResolver,
+        },
         pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
     },
     utils::json,
@@ -36,7 +38,7 @@ use crate::{
     handler::http::{
         request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
     },
-    service::{db, ingestion::compile_vrl_function, search::RESULT_ARRAY},
+    service::{db, ingestion::compile_vrl_function},
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use vrl::{
@@ -21,6 +23,10 @@ use vrl::{
 };
 
 use crate::{meta::stream::StreamType, utils::json};
+
+// Checks for #ResultArray#
+pub static RESULT_ARRAY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +43,15 @@ pub struct Transform {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streams: Option<Vec<StreamOrder>>,
+}
+
+impl Transform {
+    pub fn is_vrl(&self) -> bool {
+        self.trans_type.is_some() && self.trans_type.unwrap() == 0
+    }
+    pub fn is_result_array_vrl(&self) -> bool {
+        self.is_vrl() && RESULT_ARRAY.is_match(&self.function)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
