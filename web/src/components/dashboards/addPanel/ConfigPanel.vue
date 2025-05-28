@@ -1666,7 +1666,7 @@ export default defineComponent({
         dashboardPanelData.data.config.step_value = "0";
       }
 
-      if (!dashboardPanelData.data.config.trellis.group_by_y_axis) {
+      if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
         dashboardPanelData.data.config.trellis.group_by_y_axis = false;
       }
     });
