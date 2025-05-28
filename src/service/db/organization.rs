@@ -62,7 +62,7 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
     #[cfg(feature = "cloud")]
     let trial_period_expiry = {
         use o2_enterprise::enterprise::{
-            cloud::billings, common::infra::config::get_config as get_o2_config,
+            cloud::billings, common::config::get_config as get_o2_config,
         };
         let o2_config = get_o2_config();
 

@@ -623,7 +623,7 @@ pub async fn get_org(org: &str) -> Option<Organization> {
 
 #[cfg(feature = "cloud")]
 pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::Error> {
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     let o2_config = get_o2_config();
 
     // if trial period check is disabled, everything is free trial period
