@@ -56,7 +56,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::make_grpc_search_client,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
     std::collections::HashSet, tracing::info_span,
 };
