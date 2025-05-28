@@ -46,7 +46,13 @@ console.log(`Generated logo name: ${logoName}`);
     await ingestionPage.ingestion();
  
     await page.waitForTimeout(10000);
-    // Step 2: Navigate to Logs Page
+
+    // Perform a hard refresh
+    await page.reload({ ignoreCache: true });
+
+    await page.waitForTimeout(10000);
+    
+    // Step 2: Navigate to _meta Organization Page
      
     await logoManagementPage.managementOrg('_meta');
 
