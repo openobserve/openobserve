@@ -558,10 +558,15 @@ async fn node_list(
     org_id: web::Path<String>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+    node_list_impl(&org_id.into_inner(), query.into_inner()).await
+}
 
+pub async fn node_list_impl(
+    org_id: &str,
+    query: std::collections::HashMap<String, String>,
+) -> Result<HttpResponse, Error> {
     // Ensure this API is only available for the "_meta" organization
-    if org != config::META_ORG_ID {
+    if org_id != config::META_ORG_ID {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
             "This API is only available for the _meta organization".to_string(),
