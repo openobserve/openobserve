@@ -1018,7 +1018,7 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     // await page.getByText("Error Loading Data").click();
     await expect(
-      page.getByText("sql parser error: Expected:").first()
+      page.getByText("Search SQL execute error").first()
     ).toBeVisible();
 
     await page
