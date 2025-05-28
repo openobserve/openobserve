@@ -32,11 +32,8 @@ env:
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_WEBSOCKET_ENABLED: true
-  ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
   ZO_SMTP_ENABLED: true
-  ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
-  ZO_CREATE_ORG_THROUGH_INGESTION: true
 
 jobs:
   build_binary:
@@ -100,7 +97,6 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: [
-            "alertsfolders.spec.js",
             "sanity.spec.js",
             "alerts.spec.js",
             "schema.spec.js",
@@ -116,7 +112,7 @@ jobs:
             "dashboards/visualize.spec.js",
             "unflattened.spec.js",
             "secondsPrecisionAdded.spec.js",
-            # "dashboards/visualization-vrl.spec.js",
+            "dashboards/visualization-vrl.spec.js",
             "dashboards/dashboard-transpose.spec.js",
             "dashboards/dashboard-general-setting.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",
@@ -125,10 +121,7 @@ jobs:
             "reportsUpdated.spec.js",
             "reportsUpdated2.spec.js",
             "dashboards/dashboard-filter.spec.js",
-            "dashboards/dashboard-geoMap.spec.js",
-            "dashboards/dashboard-maps.spec.js",
             "dashboards/dashboard-folder.spec.js",
-            "dashboards/dashboard-multi-y-axis.spec.js",
             "join.spec.js",
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
@@ -136,9 +129,7 @@ jobs:
             "sanity2.spec.js",
             "schemaload.spec.js",
             "websocket.spec.js",
-            "alertImportTDA.spec.js",
-            "streamname.spec.js",
-            "streaming.spec.js",
+            "websocketLoad.spec.js",
             # "remotepipeline.spec.js",
 
           ]

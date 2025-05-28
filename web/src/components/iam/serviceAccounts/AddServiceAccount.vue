@@ -122,6 +122,7 @@ import {
   getImageURL,
   useLocalCurrentUser,
   useLocalUserInfo,
+  getLogoutURL,
   invlidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";

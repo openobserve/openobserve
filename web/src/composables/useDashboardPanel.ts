@@ -1937,11 +1937,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // escape any single quotes in the value
     tempValue = escapeSingleQuotes(tempValue);
     // add double quotes around the value
-    tempValue =
-      columnType == "Utf8" || columnType === undefined
-        ? `'${tempValue}'`
-        : `${tempValue}`;
-
+    tempValue = columnType == "Utf8" ? `'${tempValue}'` : `${tempValue}`;
     return tempValue;
   };
 
@@ -1963,7 +1959,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
       return value;
     } else {
-      return splitQuotedString(value ?? "")
+      return splitQuotedString(value)
         ?.map((it: any) => {
           return `'${escapeSingleQuotes(it)}'`;
         })
@@ -2032,6 +2028,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           )})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
+        } else if (condition.operator === "match_all_raw") {
+          selectFilter += `match_all_raw(${formatValue(condition.value, condition.column)})`;
+        } else if (condition.operator === "match_all_raw_ignore_case") {
+          selectFilter += `match_all_raw_ignore_case(${formatValue(
+            condition.value,
+            condition.column,
+          )})`;
         } else if (condition.operator === "str_match") {
           selectFilter += `str_match(${condition.column}, ${formatValue(
             condition.value,

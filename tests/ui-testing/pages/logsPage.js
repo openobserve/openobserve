@@ -68,16 +68,35 @@ export class LogsPage {
   }
 
   async logsPageDefaultMultiOrg() {
-    await this.page.waitForTimeout(2000);
-    await this.page.reload();
+
     await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
     await this.page.waitForTimeout(2000);
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+
+
+
   }
 
+  async logsPageOtlpOrg() {
+
+    await this.page.getByText('arrow_drop_down').click();
+    await this.page.getByText('otlp-production').click();
+
+    // await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    // await this.page.waitForTimeout(2000);
+    // await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
+
+    // await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    // await this.page.waitForTimeout(2000);
+    // await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
+
+
+
+  }
   async logsPageURLValidation() {
-    // TODO: fix the test
-    // await expect(this.page).not.toHaveURL(/default/);
+
+    await expect(this.page).toHaveURL(/defaulttestmulti/);
+
   }
 
   async selectIndexAndStream() {
@@ -231,7 +250,7 @@ export class LogsPage {
     await this.page.keyboard.press("Backspace");
     await this.page.waitForTimeout(3000);
     await this.page.locator(this.queryButton).click();
-    await this.page.getByText("SQL query is missing or invalid. Please submit a valid SQL statement.").click();
+    await this.page.getByText("No column found in selected stream.").click();
   }
 
 
@@ -478,87 +497,47 @@ async waitForSearchResultAndCheckText(expectedText) {
   await expect(locator).toContainText(expectedText);
 }
 
-async executeQueryWithKeyboardShortcut() {
-  // Press Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
-  await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+async selectStreamDefault() {
+  await this.page.waitForSelector('[data-test="logs-search-index-list"]');
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForSelector('[data-test="log-search-index-list-stream-toggle-default"] div');
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+  
 }
 
-async executeQueryWithKeyboardShortcutTest() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type("match_all('code')");
-
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
-
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+async selectQueryDefault() {
+  await this.page
+    .locator('[data-test="logs-search-bar-query-editor"]')
+    .getByLabel("Editor content;Press Alt+F1")
+    .fill('SELECT * FROM "default"');
+  await this.page.waitForTimeout(5000);
 }
 
-async executeQueryWithKeyboardShortcutAfterClickingElsewhere() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-
-  // Click elsewhere on the screen first
-  await this.page.locator('[data-test="logs-search-bar"]').click();
-
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type("match_all('code')");
-
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
-
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+async selectQuery1DayTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-1-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-1-d-btn"]').click();
+  await this.page.waitForTimeout(5000);
 }
 
-async executeQueryWithKeyboardShortcutWithDifferentQuery() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'ziox')");
-
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
-
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+async selectQuery4DaysTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-4-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+  
 }
 
-async executeQueryWithKeyboardShortcutWithSQLMode() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+// async logsPageOtlpOrg() {
 
-  // Enable SQL mode
-  await this.sqlModeToggle.click();
 
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate" Group by _timestamp ORDER BY _timestamp DESC');
+//   await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+//   await this.page.waitForTimeout(2000);
+//   await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
 
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
 
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="logs-search-result-bar-chart"]')).toBeVisible();
-}
+
+// }
 
 }

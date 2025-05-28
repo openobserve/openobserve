@@ -110,7 +110,6 @@ async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
 
 #[tracing::instrument(name = "grpc:search::make_client", skip_all)]
 pub async fn make_grpc_search_client<T>(
-    trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
@@ -137,13 +136,11 @@ pub async fn make_grpc_search_client<T>(
         .await
         .map_err(|err| {
             log::error!(
-                "[trace_id {trace_id}] search->grpc: node: {}, connect err: {:?}",
+                "search->grpc: node: {}, connect err: {:?}",
                 &node.get_grpc_addr(),
                 err
             );
-            let err = ErrorCodes::from_json(err.message())
-                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
-            Error::ErrorCode(err)
+            Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
         })?;
     let client = cluster_rpc::search_client::SearchClient::with_interceptor(
         channel,
@@ -201,9 +198,9 @@ pub async fn make_grpc_metrics_client<T>(
                 &node.get_grpc_addr(),
                 err
             );
-            let err = ErrorCodes::from_json(err.message())
-                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
-            Error::ErrorCode(err)
+            Error::ErrorCode(ErrorCodes::ServerInternalError(
+                "connect search node error".to_string(),
+            ))
         })?;
     let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
         channel,
@@ -224,7 +221,6 @@ pub async fn make_grpc_metrics_client<T>(
 
 #[tracing::instrument(name = "grpc:node:make_client", skip_all)]
 pub async fn make_grpc_node_client<T>(
-    trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
@@ -251,13 +247,11 @@ pub async fn make_grpc_node_client<T>(
         .await
         .map_err(|err| {
             log::error!(
-                "[trace_id {trace_id}] node->grpc: node: {}, connect err: {:?}",
+                "node->grpc: node: {}, connect err: {:?}",
                 &node.get_grpc_addr(),
                 err
             );
-            let err = ErrorCodes::from_json(err.message())
-                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
-            Error::ErrorCode(err)
+            Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
         })?;
     let client = cluster_rpc::node_service_client::NodeServiceClient::with_interceptor(
         channel,
@@ -275,7 +269,6 @@ pub async fn make_grpc_node_client<T>(
 
 #[tracing::instrument(name = "grpc:cluster_info:make_client", skip_all)]
 pub async fn make_grpc_cluster_info_client<T>(
-    trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
@@ -302,13 +295,11 @@ pub async fn make_grpc_cluster_info_client<T>(
         .await
         .map_err(|err| {
             log::error!(
-                "[trace_id {trace_id}] cluster_info->grpc: node: {}, connect err: {:?}",
+                "cluster_info->grpc: node: {}, connect err: {:?}",
                 &node.get_grpc_addr(),
                 err
             );
-            let err = ErrorCodes::from_json(err.message())
-                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
-            Error::ErrorCode(err)
+            Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
         })?;
     let client =
         cluster_rpc::cluster_info_service_client::ClusterInfoServiceClient::with_interceptor(

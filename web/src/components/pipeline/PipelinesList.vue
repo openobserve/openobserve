@@ -80,20 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              :title="t('pipeline.edit')"
+              :title="t('alerts.edit')"
               @click.stop="editPipeline(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
-              icon="download"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('pipeline.export')"
-              @click.stop="exportPipeline(props.row)"
             ></q-btn>
             <q-btn
               :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
@@ -104,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              :title="t('pipeline.delete')"
+              :title="t('alerts.delete')"
               @click.stop="openDeleteDialog(props.row)"
             ></q-btn>
             <q-btn
@@ -116,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              :title="t('pipeline.view')"
+              :title="t('alerts.view')"
             >
             <q-tooltip position="bottom">
               <PipelineView :pipeline="props.row" />
@@ -188,14 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" class="cursor-pointer" />
             </template>
           </q-input>
-          <q-btn
-              data-test="pipeline-list-import-pipeline-btn"
-              class="q-ml-md q-mb-xs text-bold"
-              padding="sm lg"
-              no-caps
-              :label="t(`pipeline.import`)"
-              @click="routeToImportPipeline"
-          />
           <q-btn
               data-test="pipeline-list-add-pipeline-btn"
               class="q-ml-md q-mb-xs text-bold no-border"
@@ -513,9 +493,9 @@ const getPipelines = async () => {
             pipeline.stream_type = pipeline.source.stream_type;
           } else {
             pipeline.stream_type = pipeline.source.stream_type;
-            pipeline.frequency = pipeline.source.trigger_condition.frequency_type == 'minutes' ? pipeline.source.trigger_condition.frequency + " Mins" : pipeline.source.trigger_condition.cron
+            pipeline.frequency = pipeline.source.trigger_condition.frequency + " Mins";
             pipeline.period = pipeline.source.trigger_condition.period + " Mins";
-            pipeline.cron = pipeline.source.trigger_condition.frequency_type == 'minutes' ? 'False' : 'True';
+            pipeline.cron = pipeline.cron && pipeline.cron !== "" ? pipeline.source.trigger_condition.cron : 'False';
             pipeline.sql_query = pipeline.source.query_condition.sql;
           }
 
@@ -655,39 +635,6 @@ const filterData = (rows: any, terms: any) => {
 const routeToAddPipeline = () => {
   router.push({
     name: "createPipeline",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
-}
-const exportPipeline = (row: any) => {
-
-  const pipelineToBeExported = row.name
-
-  const pipelineJson  = JSON.stringify(row,null, 2);
-    // Create a Blob from the JSON string
-    const blob = new Blob([pipelineJson], { type: 'application/json' });
-
-    // Create an object URL for the Blob
-    const url = URL.createObjectURL(blob);
-
-    // Create an anchor element to trigger the download
-    const link = document.createElement('a');
-    link.href = url;
-
-    // Set the filename of the download
-    link.download = `${pipelineToBeExported}.json`;
-
-    // Trigger the download by simulating a click
-    link.click();
-
-    // Clean up the URL object after download
-    URL.revokeObjectURL(url);
-}
-
-const routeToImportPipeline = () =>{
-  router.push({
-    name: "importPipeline",
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
     },

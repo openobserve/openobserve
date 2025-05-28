@@ -148,10 +148,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
+        v-if="loading"
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
+        <q-spinner-dots
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; z-index: 999"
+        />
       </div>
       <div
         v-if="allowAnnotationsAdd && isCursorOverPanel"
@@ -297,7 +302,6 @@ import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitVal
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -341,7 +345,6 @@ export default defineComponent({
     MarkdownRenderer,
     AddAnnotation,
     CustomChartRenderer,
-    LoadingProgress,
   },
   props: {
     selectedTimeObj: {
@@ -446,7 +449,6 @@ export default defineComponent({
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
-      loadingProgressPercentage,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -1481,8 +1483,6 @@ export default defineComponent({
             __value: Array.isArray(drilldownParams[0].value)
               ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
               : drilldownParams[0].value,
-            __axisValue:
-              drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
           };
         }
 
@@ -1888,7 +1888,6 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
-      loadingProgressPercentage,
     };
   },
 });

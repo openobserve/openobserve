@@ -28,7 +28,7 @@ export class RumPage {
 
 
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-
+    
 
         await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
 
@@ -39,8 +39,7 @@ export class RumPage {
 
     async rumPageURLValidation() {
 
-        // TODO: Fix this test
-        // await expect(this.page).not.toHaveURL(/default/);
+        await expect(this.page).toHaveURL(/defaulttestmulti/);
 
     }
 

@@ -24,48 +24,21 @@ def generate_random_string(length=5):
 
 # Generate a random stream name
 random_string = generate_random_string()
-
+# Organization ID
+org_id = random_string
 stream_name = "tdef" + random_string
+print("Random Org ID:", org_id)
 print("Random Stream:", stream_name)
 
-@pytest.fixture(scope="module")
-def org_id(create_session, base_url, random_string):
-    """Create a new organization and return its identifier."""
-    session = create_session
-    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+@pytest.fixture
+def create_session():
+    """Create a session for API requests."""
+    session = requests.Session()  # Create a new session
+    # Optionally, set up any headers or authentication here
+    yield session  # This will make the session available to tests
+    session.close()  # Clean up after tests
 
-    org_id_new = random_string(5)
-    print("Random Org ID:", org_id_new)
-
-    payload = {
-        "name": org_id_new
-    }
-
-    resp_create_organization = session.post(
-        f"{base_url}api/organizations", json=payload
-    )
-
-    print(resp_create_organization.content)
-    
-    assert (
-        resp_create_organization.status_code == 200
-    ), f"Expected 200, but got {resp_create_organization.status_code} {resp_create_organization.content}"
-
-    assert resp_create_organization.json().get("name") == org_id_new
-
-    org_id = resp_create_organization.json().get("identifier")
-    print("Org identifier:", org_id)
-
-    yield org_id
-
-    # Cleanup: Delete the organization after all tests are done
-    resp_delete_organization = session.delete(
-        f"{base_url}api/organizations/{org_id}"
-    )
-    print(f"Deleted organization {org_id}")
-
-@pytest.mark.order(1)
-def test_data(create_session, base_url, org_id):
+def test_data(create_session, base_url):
     """Ingest data into the OpenObserve running instance."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -134,8 +107,8 @@ def test_data(create_session, base_url, org_id):
     print("Create pipeline response:", resp_create_pipeline.json())
 
     # Wait for a few seconds to allow the pipeline to be created
-    time.sleep(5)  # Increase this time if necessary
 
+    time.sleep(5)  # Increase this time if necessary
     # Create new alert
     alert_name = f"newalert_{random.randint(1000, 9999)}"  # Make the name unique
     folder_alert = f"newfloder_{random.randint(1000, 9999)}"  # Make the name unique
@@ -336,8 +309,7 @@ def base_url_sc():
     """Provide the base URL for the API of Super Cluster."""
     return ZO_BASE_URL_SC
 
-@pytest.mark.order(2)
-def test_summary(create_session, base_url_sc, org_id):
+def test_summary(create_session, base_url_sc):
     """Run an E2E test for summary mode."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)  # Add this line
@@ -472,8 +444,7 @@ def test_summary(create_session, base_url_sc, org_id):
         assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
         print(f"Successfully deleted stream {stream_name}")
 
-@pytest.mark.order(3)
-def test_summary_validate(create_session, base_url, org_id):
+def test_summary_validate(create_session, base_url):
     """Run an E2E test for summary mode."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)  # Add this line

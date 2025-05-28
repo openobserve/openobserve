@@ -18,13 +18,8 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
-    cluster::LOCAL_NODE,
     get_config,
-    meta::{
-        cluster::{NodeInfo, RoleGroup},
-        search::{ScanStats, SearchEventType},
-        sql::TableReferenceExt,
-    },
+    meta::{cluster::NodeInfo, search::ScanStats, sql::TableReferenceExt},
     metrics,
     utils::json,
 };
@@ -41,13 +36,12 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
-    DATAFUSION_RUNTIME, SearchResult,
+    DATAFUSION_RUNTIME,
     cluster::flight::{generate_context, register_table},
     datafusion::distributed_plan::{
         remote_scan::RemoteScanExec,
         rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
     },
-    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
     utils::ScanStatsVisitor,
@@ -66,7 +60,7 @@ pub async fn search(
     _query: cluster_rpc::SearchQuery,
     req_regions: Vec<String>,
     req_clusters: Vec<String>,
-) -> Result<SearchResult> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
     let _start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] super cluster leader: start {}", sql);
@@ -83,37 +77,14 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
+        return Ok((vec![], ScanStats::new(), 0, false, 0, "".to_string()));
     }
 
     let (use_inverted_index, _) = super::super::is_use_inverted_index(&sql);
     req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes
-    let get_node_start = std::time::Instant::now();
-    let role_group = req
-        .search_event_type
-        .as_ref()
-        .map(|v| {
-            SearchEventType::try_from(v.as_str())
-                .ok()
-                .map(RoleGroup::from)
-        })
-        .unwrap_or(None);
-
-    let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters, role_group).await?;
-    log::info!(
-        "{}",
-        search_inspector_fields(
-            format!("[trace_id {trace_id}] super get nodes: {}", nodes.len()),
-            SearchInspectorFieldsBuilder::new()
-                .node_name(LOCAL_NODE.name.clone())
-                .component("super get nodes".to_string())
-                .search_role("super".to_string())
-                .duration(get_node_start.elapsed().as_millis() as usize)
-                .build()
-        )
-    );
+    let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters).await?;
 
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[&sql.org_id])
@@ -149,9 +120,8 @@ pub async fn search(
     );
 
     let trace_id_move = trace_id.to_string();
-    let follower_nodes = nodes.clone();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(trace_id_move, req, sql, follower_nodes)
+        run_datafusion(trace_id_move, req, sql, nodes)
             .instrument(datafusion_span)
             .await
     });
@@ -196,14 +166,10 @@ pub async fn search(
         }
     };
 
-    let main_trace_id = trace_id.split("-").next().unwrap();
-    let stats = super::super::utils::collect_scan_stats(&nodes, main_trace_id, true).await;
-    scan_stats.add(&stats);
-
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
     scan_stats.format_to_mb();
-    Ok((data, scan_stats, 0, !partial_err.is_empty(), partial_err))
+    Ok((data, scan_stats, 0, !partial_err.is_empty(), 0, partial_err))
 }
 
 async fn run_datafusion(
@@ -313,7 +279,6 @@ async fn run_datafusion(
         println!("{}", plan);
     }
 
-    let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
@@ -321,18 +286,7 @@ async fn run_datafusion(
         log::error!("[trace_id {trace_id}] super cluster leader: datafusion collect error: {e}");
         Err(e.into())
     } else {
-        log::info!(
-            "{}",
-            search_inspector_fields(
-                format!("[trace_id {trace_id}] super cluster leader: datafusion collect done"),
-                SearchInspectorFieldsBuilder::new()
-                    .node_name(LOCAL_NODE.name.clone())
-                    .component("super:leader:run_datafusion collect done".to_string())
-                    .search_role("super".to_string())
-                    .duration(datafusion_start.elapsed().as_millis() as usize)
-                    .build()
-            )
-        );
+        log::info!("[trace_id {trace_id}] super cluster leader: datafusion collect done");
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }

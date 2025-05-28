@@ -151,6 +151,18 @@ export const invlidateLoginData = () => {
   userService.logout().then((res: any) => {});
 };
 
+export const getLoginURL = () => {
+  return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
+};
+
+export const getLogoutURL = () => {
+  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${
+    config.aws_user_pools_web_client_id
+  }&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${
+    config.oauth.redirectSignOut
+  }&state=random_string`;
+};
+
 export const getDecodedAccessToken = (token: string) => {
   try {
     const decodedString = b64DecodeStandard(token.split(".")[1]);
@@ -372,7 +384,7 @@ export const getPath = () => {
         ? window.location.pathname.slice(0, pos + 5)
         : "";
   const cloudPath = import.meta.env.BASE_URL;
-  return config.isCloud == "true" ? path : path;
+  return config.isCloud == "true" ? cloudPath : path;
 };
 
 export const routeGuard = async (to: any, from: any, next: any) => {
@@ -814,7 +826,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
   return formattedDuration;
 };
 
-export const getTimezoneOffset = (timezone: string |null = null) => {
+export const getTimezoneOffset = () => {
   const now = new Date();
 
   // Get the day, month, and year from the date object
@@ -832,7 +844,7 @@ export const getTimezoneOffset = (timezone: string |null = null) => {
   // Combine them in the HH:MM format
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
@@ -982,20 +994,6 @@ export const isWebSocketEnabled = () => {
     return (window as any).use_web_socket;
   }
 };
-
-export const isStreamingEnabled = () => {
-  if (!store.state.zoConfig?.streaming_enabled) {
-    return false;
-  }
-
-  if ((window as any).use_streaming === undefined) {
-    return store?.state?.organizationData?.organizationSettings
-      ?.enable_streaming_search;
-  } else {
-    return (window as any).use_streaming;
-  }
-};
-
 export const maxLengthCharValidation = (
   val: string = "",
   char_length: number = 50,

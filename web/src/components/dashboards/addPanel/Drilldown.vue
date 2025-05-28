@@ -80,7 +80,7 @@
       no-caps
       data-test="dashboard-addpanel-config-drilldown-add-btn"
     />
-    <app-dialog v-model="showDrilldownPopUp">
+    <q-dialog v-model="showDrilldownPopUp">
       <drilldown-pop-up
         :drilldown-data-index="selectedDrilldownIndexToEdit"
         :is-edit-mode="isDrilldownEditMode"
@@ -88,7 +88,7 @@
         @close="saveDrilldownData"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
-    </app-dialog>
+    </q-dialog>
   </div>
 </template>
 
@@ -97,12 +97,11 @@ import { defineComponent, inject, ref } from "vue";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import AppDialog from "../../common/AppDialog.vue";
 import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, AppDialog },
+  components: { DrilldownPopUp },
   props: ["variablesData"],
   setup() {
     const store = useStore();
@@ -112,10 +111,10 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard",
+      "dashboard"
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
+      dashboardPanelDataPageKey
     );
 
     onBeforeMount(() => {

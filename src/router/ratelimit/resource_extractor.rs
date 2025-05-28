@@ -27,7 +27,7 @@ use o2_ratelimit::{
             DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER, find_group_by_openapi,
         },
     },
-    middleware::{ExtractorRule, ExtractorRuleResult, handle_rules},
+    middleware::{ExtractorRule, ExtractorRuleResult},
 };
 use regex::Regex;
 use utoipa::OpenApi;
@@ -58,21 +58,9 @@ fn extract_org_id(path: &str) -> String {
             .unwrap_or_default()
     }
 }
-
-pub async fn ws_extractor(
-    trace_id: &str,
-    auth_str: String,
-    local_path: String,
-    method: &Method,
-) -> anyhow::Result<()> {
-    handle_rules(trace_id, rule_extractor(auth_str, local_path, method).await)
-}
-
-fn rule_extractor(
-    auth_str: String,
-    local_path: String,
-    method: &Method,
-) -> BoxFuture<'_, ExtractorRuleResult> {
+pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleResult> {
+    let auth_str = extract_auth_str(req.request());
+    let local_path = req.path().to_string();
     let path = match local_path
         .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
     {
@@ -81,7 +69,8 @@ fn rule_extractor(
     };
 
     let (path, org_id) = (path.to_string(), extract_org_id(path));
-    let openapi_path = extract_openapi_path(&local_path, method);
+
+    let openapi_path = extract_openapi_path(req);
     Box::pin(async move {
         let user_email = get_user_email_from_auth_str(&auth_str)
             .await
@@ -133,12 +122,6 @@ fn rule_extractor(
             ),
         }
     })
-}
-
-pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleResult> {
-    let auth_str = extract_auth_str(req.request());
-    let local_path = req.path().to_string();
-    rule_extractor(auth_str, local_path, req.method())
 }
 
 async fn find_default_and_custom_rules(
@@ -315,7 +298,7 @@ fn path_to_regex(path: &str) -> Regex {
     Regex::new(&format!("^{}$", replaced)).unwrap()
 }
 
-fn extract_openapi_path(path: &str, method: &Method) -> Option<String> {
+fn extract_openapi_path(req: &ServiceRequest) -> Option<String> {
     let api = ApiDoc::openapi();
     let path_patterns: HashMap<String, Regex> = {
         api.paths
@@ -327,6 +310,9 @@ fn extract_openapi_path(path: &str, method: &Method) -> Option<String> {
             })
             .collect()
     };
+
+    let path = req.path();
+    let method = req.method();
 
     // Find matching path
     for (openapi_path, path_item) in &api.paths.paths {

@@ -17,6 +17,7 @@ use config::{
     meta::stream::FileListDeleted,
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
+use hashbrown::HashMap;
 use infra::{file_list as infra_file_list, storage};
 
 pub async fn delete(
@@ -29,16 +30,17 @@ pub async fn delete(
     if files.is_empty() {
         return Ok(0);
     }
-    let files_num = files.len() as i64;
+    let files_num = files.values().flatten().count() as i64;
 
     // delete files from storage
     let local_mode = config::get_config().common.local_mode;
     if let Err(e) = storage::del(
-        files
-            .iter()
+        &files
+            .values()
+            .flatten()
             .filter_map(|file| {
                 if !ingester::is_wal_file(local_mode, &file.file) {
-                    Some((file.account.as_str(), file.file.as_str()))
+                    Some(file.file.as_str())
                 } else {
                     None
                 }
@@ -56,11 +58,11 @@ pub async fn delete(
 
     // delete related inverted index puffin files
     let inverted_index_files = files
-        .iter()
+        .values()
+        .flatten()
         .filter_map(|file| {
             if file.index_file {
                 convert_parquet_idx_file_name_to_tantivy_file(&file.file)
-                    .map(|f| (file.account.to_string(), f))
             } else {
                 None
             }
@@ -68,9 +70,9 @@ pub async fn delete(
         .collect::<Vec<_>>();
     if !inverted_index_files.is_empty() {
         if let Err(e) = storage::del(
-            inverted_index_files
+            &inverted_index_files
                 .iter()
-                .map(|file| (file.0.as_str(), file.1.as_str()))
+                .map(|file| file.as_str())
                 .collect::<Vec<_>>(),
         )
         .await
@@ -86,16 +88,14 @@ pub async fn delete(
 
     // delete flattened files from storage
     let flattened_files = files
-        .iter()
+        .values()
+        .flatten()
         .filter_map(|file| {
             if file.flattened {
-                Some((
-                    file.account.to_string(),
-                    format!(
-                        "files{}/{}",
-                        config::get_config().common.column_all,
-                        file.file.strip_prefix("files/").unwrap()
-                    ),
+                Some(format!(
+                    "files{}/{}",
+                    config::get_config().common.column_all,
+                    file.file.strip_prefix("files/").unwrap()
                 ))
             } else {
                 None
@@ -104,9 +104,9 @@ pub async fn delete(
         .collect::<Vec<_>>();
     if !flattened_files.is_empty() {
         if let Err(e) = storage::del(
-            flattened_files
+            &flattened_files
                 .iter()
-                .map(|file| (file.0.as_str(), file.1.as_str()))
+                .map(|file| file.as_str())
                 .collect::<Vec<_>>(),
         )
         .await
@@ -119,10 +119,21 @@ pub async fn delete(
         }
     }
 
+    // delete files from file_list_deleted s3
+    if files.keys().len() > 1 || !files.contains_key("") {
+        if let Err(e) =
+            storage::del(&files.keys().map(|file| file.as_str()).collect::<Vec<_>>()).await
+        {
+            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+            return Err(e.into());
+        }
+    }
+
     // delete files from file_list_deleted table
     if let Err(e) = infra_file_list::batch_remove_deleted(
         &files
-            .iter()
+            .values()
+            .flatten()
             .map(|file| file.file.to_owned())
             .collect::<Vec<_>>(),
     )
@@ -139,8 +150,11 @@ async fn query_deleted(
     org_id: &str,
     time_max: i64,
     limit: i64,
-) -> Result<Vec<FileListDeleted>, anyhow::Error> {
-    infra_file_list::query_deleted(org_id, time_max, limit)
-        .await
-        .map_err(|e| e.into())
+) -> Result<HashMap<String, Vec<FileListDeleted>>, anyhow::Error> {
+    let files = infra_file_list::query_deleted(org_id, time_max, limit).await?;
+    let mut hash_files = HashMap::default();
+    if !files.is_empty() {
+        hash_files.insert("".to_string(), files);
+    }
+    Ok(hash_files)
 }

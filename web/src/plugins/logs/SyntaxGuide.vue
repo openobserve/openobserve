@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     dense
     flat
-    class="q-ml-xs q-pa-xs"
-    :class="[sqlmode ? 'sql-mode' : 'normal-mode',
-      !store.state.isAiChatEnabled ? 'syntax-guide-button' : ''
-    ]"
+    class="q-ml-xs q-pa-xs syntax-guide-button"
+    :class="sqlmode ? 'sql-mode' : 'normal-mode'"
     icon="help"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">

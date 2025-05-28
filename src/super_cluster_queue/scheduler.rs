@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    meta::triggers::{Trigger, TriggerModule},
-    utils::json,
-};
+use config::{meta::triggers::Trigger, utils::json};
 use infra::{
     errors::{Error, Result},
     scheduler,
@@ -133,7 +130,7 @@ async fn delete(msg: Message) -> Result<()> {
 
 async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
     // Return if the module_key is in new format (alert_id only)
-    if !trigger.module_key.contains("/") || trigger.module != TriggerModule::Alert {
+    if !trigger.module_key.contains("/") {
         return Ok(());
     }
     let parts = trigger.module_key.split("/").collect::<Vec<&str>>();

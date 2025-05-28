@@ -23,6 +23,7 @@ use config::{
         sql::TableReferenceExt,
         stream::{FileKey, StreamType},
     },
+    utils::time::BASE_TIME,
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
@@ -38,28 +39,24 @@ use infra::{
 use proto::cluster_rpc::{KvItem, SearchQuery};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::{
-    db::enrichment_table,
-    search::{
-        cluster::flight::{
-            check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
-            partition_filt_list,
-        },
-        datafusion::{
-            distributed_plan::{
-                NewEmptyExecVisitor,
-                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-                empty_exec::NewEmptyExec,
-                node::{RemoteScanNode, SearchInfos},
-                remote_scan::RemoteScanExec,
-            },
-            exec::{prepare_datafusion_context, register_udf},
-        },
-        generate_filter_from_equal_items,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::{FlightSearchRequest, Request},
-        utils::AsyncDefer,
+use crate::service::search::{
+    cluster::flight::{
+        check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
+        partition_filt_list,
     },
+    datafusion::{
+        distributed_plan::{
+            NewEmptyExecVisitor,
+            codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+            empty_exec::NewEmptyExec,
+            node::{RemoteScanNode, SearchInfos},
+            remote_scan::RemoteScanExec,
+        },
+        exec::{prepare_datafusion_context, register_udf},
+    },
+    generate_filter_from_equal_items,
+    request::{FlightSearchRequest, Request},
+    utils::AsyncDefer,
 };
 
 /// in cluster search function only single stream take part in
@@ -85,14 +82,9 @@ pub async fn search(
     let trace_id = trace_id.to_string();
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx = prepare_datafusion_context(
-        req.work_group.clone(),
-        vec![],
-        vec![],
-        false,
-        cfg.limit.cpu_num,
-    )
-    .await?;
+    let mut ctx =
+        prepare_datafusion_context(req.work_group.clone(), vec![], false, cfg.limit.cpu_num)
+            .await?;
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
@@ -129,32 +121,19 @@ pub async fn search(
     let stream_type = stream.get_stream_type(req.stream_type);
 
     // 1. get file id list
-    let file_id_list =
-        get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
+    let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
+
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
-    let file_id_list_num = file_id_list_vec.len();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "{}",
-        search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
-                req.time_range, file_id_list_num, file_id_list_took,
-            ),
-            SearchInspectorFieldsBuilder::new()
-                .node_name(LOCAL_NODE.name.clone())
-                .component("super:leader get file id".to_string())
-                .search_role("leader".to_string())
-                .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_num))
-                .build()
-        )
+        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
+        req.time_range,
+        file_id_list_vec.len(),
+        file_id_list_took,
     );
-
     let mut scan_stats = ScanStats {
-        files: file_id_list_num as i64,
+        files: file_id_list_vec.len() as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
-        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 
@@ -172,8 +151,7 @@ pub async fn search(
     req.set_use_inverted_index(use_ttv_inverted_index);
 
     // get nodes
-    let get_node_start = std::time::Instant::now();
-    let role_group = req
+    let node_group = req
         .search_event_type
         .as_ref()
         .map(|v| {
@@ -182,7 +160,7 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(None);
-    let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
+    let mut nodes = get_online_querier_nodes(&trace_id, node_group).await?;
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
@@ -195,28 +173,6 @@ pub async fn search(
         return Err(Error::Message("no querier node online".to_string()));
     }
 
-    log::info!(
-        "{}",
-        search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] super->follower_leader: get nodes num: {}, querier num: {}",
-                nodes.len(),
-                querier_num,
-            ),
-            SearchInspectorFieldsBuilder::new()
-                .node_name(LOCAL_NODE.name.clone())
-                .component("super:leader get nodes".to_string())
-                .search_role("leader".to_string())
-                .duration(get_node_start.elapsed().as_millis() as usize)
-                .desc(format!(
-                    "get nodes num: {}, querier num: {}",
-                    nodes.len(),
-                    querier_num
-                ))
-                .build()
-        )
-    );
-
     // check work group
     let (_took_wait, work_group_str, work_group) = check_work_group(
         &req,
@@ -225,7 +181,6 @@ pub async fn search(
         &file_id_list_vec,
         start,
         file_id_list_took,
-        "leader".to_string(),
     )
     .await?;
     // add work_group
@@ -252,29 +207,7 @@ pub async fn search(
     });
 
     // partition file list
-    let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
-    let mut need_ingesters = 0;
-    let mut need_queriers = 0;
-    for (i, node) in nodes.iter().enumerate() {
-        if node.is_ingester() {
-            need_ingesters += 1;
-            continue;
-        }
-        if node.is_querier()
-            && partition_file_lists
-                .get(i)
-                .map(|v| !v.is_empty())
-                .unwrap_or_default()
-        {
-            need_queriers += 1;
-        }
-    }
-    log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get files num: {}, need ingester num: {}, need querier num: {}",
-        file_id_list_num,
-        need_ingesters,
-        need_queriers,
-    );
+    let partition_file_lists = partition_filt_list(file_id_list, &nodes, node_group).await?;
 
     // update search session scan stats
     super::super::SEARCH_SERVER
@@ -314,14 +247,7 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
     }
 
-    log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish");
-
-    // we should collect scan state by `collect_stats`, here need to reutrn empty for super cluster
-    // follower
-    scan_stats.files = 0;
-    scan_stats.records = 0;
-    scan_stats.original_size = 0;
-    scan_stats.compressed_size = 0;
+    log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish",);
 
     Ok((ctx, physical_plan, defer, scan_stats))
 }
@@ -331,7 +257,6 @@ pub async fn search(
     skip_all
 )]
 pub async fn get_file_id_lists(
-    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream: &TableReference,
@@ -342,19 +267,13 @@ pub async fn get_file_id_lists(
     // if stream is enrich, rewrite the time_range
     if let Some(schema) = stream.schema() {
         if schema == "enrich" || schema == "enrichment_tables" {
-            let start = enrichment_table::get_start_time(org_id, &stream_name).await;
+            let start = BASE_TIME.timestamp_micros();
             let end = config::utils::time::now_micros();
             time_range = Some((start, end));
         }
     }
-    let file_id_list = crate::service::file_list::query_ids(
-        trace_id,
-        org_id,
-        stream_type,
-        &stream_name,
-        time_range,
-    )
-    .await?;
+    let file_id_list =
+        crate::service::file_list::query_ids(org_id, stream_type, &stream_name, time_range).await?;
     Ok(file_id_list)
 }
 

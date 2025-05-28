@@ -143,7 +143,7 @@ pub async fn save(
     }
 
     // Save the trigger to db
-    let next_run_at = get_next_run_at(&derived_stream)?;
+    let next_run_at = Utc::now().timestamp_micros();
     let trigger = db::scheduler::Trigger {
         org: derived_stream.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
@@ -180,6 +180,7 @@ pub async fn delete(
 
 #[async_trait]
 pub trait DerivedStreamExt: Sync + Send + 'static {
+    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String;
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),
@@ -190,6 +191,13 @@ pub trait DerivedStreamExt: Sync + Send + 'static {
 
 #[async_trait]
 impl DerivedStreamExt for DerivedStream {
+    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String {
+        format!(
+            "{}/{}/{}/{}",
+            self.stream_type, self.org_id, pipeline_name, pipeline_id
+        )
+    }
+
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),
@@ -211,20 +219,4 @@ impl DerivedStreamExt for DerivedStream {
             )
             .await
     }
-}
-
-pub(super) fn get_next_run_at(derived_stream: &DerivedStream) -> Result<i64, anyhow::Error> {
-    let delay_in_mins = derived_stream.delay.unwrap_or_default();
-    // validate & parse delay value
-    if delay_in_mins < 0 {
-        return Err(anyhow::anyhow!(
-            "Invalid delay value. Value must be non-negative"
-        ));
-    }
-
-    let delay = chrono::Duration::minutes(delay_in_mins as _);
-    Ok(chrono::Utc::now()
-        .checked_add_signed(delay)
-        .ok_or(anyhow::anyhow!("DateTime arithmetic overflow"))?
-        .timestamp_micros())
 }

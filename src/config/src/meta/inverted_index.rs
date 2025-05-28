@@ -65,7 +65,6 @@ impl std::fmt::Display for InvertedIndexTantivyMode {
 pub enum InvertedIndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
-    SimpleHistogram(i64, u64, usize),
 }
 
 impl std::fmt::Display for InvertedIndexOptimizeMode {
@@ -75,12 +74,6 @@ impl std::fmt::Display for InvertedIndexOptimizeMode {
                 write!(f, "simple_select(limit: {}, ascend: {})", limit, ascend)
             }
             InvertedIndexOptimizeMode::SimpleCount => write!(f, "simple_count"),
-            InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
-                write!(
-                    f,
-                    "simple_histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets})"
-                )
-            }
         }
     }
 }
@@ -93,13 +86,6 @@ impl From<cluster_rpc::IdxOptimizeMode> for InvertedIndexOptimizeMode {
             }
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(_)) => {
                 InvertedIndexOptimizeMode::SimpleCount
-            }
-            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(select)) => {
-                InvertedIndexOptimizeMode::SimpleHistogram(
-                    select.min_value,
-                    select.bucket_width,
-                    select.num_buckets as usize,
-                )
             }
             None => panic!("Invalid InvertedIndexOptimizeMode"),
         }
@@ -122,17 +108,6 @@ impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                     cluster_rpc::SimpleCount {},
                 )),
             },
-            InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
-                cluster_rpc::IdxOptimizeMode {
-                    mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(
-                        cluster_rpc::SimpleHistogram {
-                            min_value,
-                            bucket_width,
-                            num_buckets: num_buckets as u32,
-                        },
-                    )),
-                }
-            }
         }
     }
 }

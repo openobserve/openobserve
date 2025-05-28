@@ -43,7 +43,7 @@ use datafusion::{
         session_state::SessionStateBuilder,
     },
     logical_expr::AggregateUDF,
-    optimizer::{AnalyzerRule, OptimizerRule},
+    optimizer::OptimizerRule,
     physical_plan::execute_stream,
     prelude::{Expr, SessionContext},
 };
@@ -134,9 +134,6 @@ pub async fn merge_parquet_files(
             "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
             TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, fields_str, fields_str, TIMESTAMP_COL_NAME
         )
-    } else if stream_type == StreamType::Filelist {
-        // for file list we do not have timestamp, so we instead sort by min ts of entries
-        "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
         format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
     };
@@ -146,14 +143,8 @@ pub async fn merge_parquet_files(
     let sort_by_timestamp_desc = true;
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
-    let ctx = prepare_datafusion_context(
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx =
+        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
     ctx.register_table("tbl", union_table)?;
@@ -254,14 +245,8 @@ pub async fn merge_parquet_files_with_downsampling(
     // create datafusion context
     let sort_by_timestamp_desc = true;
     let target_partitions = 2; // force use 2 cpu cores for one merge task
-    let ctx = prepare_datafusion_context(
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx =
+        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
     ctx.register_table("tbl", union_table)?;
@@ -448,6 +433,10 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let wal_url = url::Url::parse("wal:///").unwrap();
     object_store_registry.register_store(&wal_url, Arc::new(wal));
 
+    let tmpfs = super::storage::tmpfs::Tmpfs::new();
+    let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
+    object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
+
     let cfg = get_config();
     let mut builder =
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
@@ -478,7 +467,6 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
 
 pub async fn prepare_datafusion_context(
     _work_group: Option<String>,
-    analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
     target_partitions: usize,
@@ -498,9 +486,6 @@ pub async fn prepare_datafusion_context(
         .with_config(session_config)
         .with_runtime_env(runtime_env)
         .with_default_features();
-    for rule in analyzer_rules {
-        builder = builder.with_analyzer_rule(rule);
-    }
     if !optimizer_rules.is_empty() {
         builder = builder
             .with_optimizer_rules(optimizer_rules)
@@ -533,6 +518,8 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     #[cfg(feature = "enterprise")]
     ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
@@ -567,7 +554,6 @@ pub async fn register_table(
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
-        vec![],
         vec![],
         sorted_by_time,
         session.target_partitions,
@@ -652,6 +638,8 @@ pub async fn create_parquet_table(
     } else if session.storage_type == StorageType::Wal {
         file_list::set(&session.id, &schema_key, files).await;
         format!("wal:///{}/schema={}/", session.id, schema_key)
+    } else if session.storage_type == StorageType::Tmpfs {
+        format!("tmpfs:///{}/", session.id)
     } else {
         return Err(DataFusionError::Execution(format!(
             "Unsupported storage_type {:?}",
@@ -697,7 +685,7 @@ pub async fn create_parquet_table(
         fst_fields,
         need_optimize_partition,
     )?;
-    if file_stat_cache.is_some() {
+    if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))

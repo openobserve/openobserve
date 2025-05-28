@@ -38,7 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >match_all('error') in query editor</span
+                    >match_all_raw('error') in query editor</span
+                  >
+                </li>
+                <li>
+                  For case-insensitive full text search of value 'error' use
+                  <span class="bg-highlight"
+                    >match_all_raw_ignore_case('error')</span
                   >
                 </li>
                 <li>
@@ -88,7 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   For full text search of value 'error' use
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
-                    match_all('error')</span
+                    match_all_raw('error')</span
+                  >
+                </li>
+                <li>
+                  For case-insensitive full text search of value 'error' use
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all_raw_ignore_case('error')</span
                   >
                 </li>
                 <li>

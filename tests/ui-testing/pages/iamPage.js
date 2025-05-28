@@ -50,8 +50,7 @@ export class IamPage {
     }
 
     async iamPageURLValidation() {
-        // TODO: Fix this test
-        // await expect(this.page).not.toHaveURL(/default/);
+        await expect(this.page).toHaveURL(/defaulttestmulti/);
     }
 
     async iamURLValidation() {
@@ -166,8 +165,8 @@ export class IamPage {
     async reloadServiceAccountPage(emailName) {
 
         await this.page.reload(); // Optional, if necessary
-        // await this.page.locator('[data-test="iam-page"]').getByText('arrow_drop_down').click({ force: true });
-        // await this.page.getByText('100').click({ force: true });
+       // await this.page.locator('[data-test="iam-page"]').getByText('arrow_drop_down').click({ force: true });
+       // await this.page.getByText('100').click({ force: true });
 
     }
 

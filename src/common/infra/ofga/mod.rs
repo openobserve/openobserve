@@ -15,29 +15,25 @@
 
 mod migrations;
 
-use std::cmp::Ordering;
-
-use config::meta::{folder::DEFAULT_FOLDER, user::UserRole};
+use config::meta::folder::DEFAULT_FOLDER;
 use hashbrown::HashSet;
 use infra::dist_lock;
-#[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::is_ofga_migrations_done;
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
     super_cluster::kv::ofga::{get_model, set_model},
 };
 use o2_openfga::{
     authorizer::authz::{
-        add_tuple_for_pipeline, get_org_creation_tuples, get_ownership_all_org_tuple,
-        get_ownership_tuple, get_user_role_tuple, update_tuples,
+        add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
+        get_ownership_all_org_tuple, get_ownership_tuple, get_user_role_tuple, update_tuples,
     },
     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
 };
 
 use crate::{
     common::{
-        infra::config::{ORG_USERS, ORGANIZATIONS, USERS},
-        meta::organization::DEFAULT_ORG,
+        infra::config::USERS,
+        meta::{organization::DEFAULT_ORG, user::UserRole},
     },
     service::db,
 };
@@ -47,6 +43,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
+    let mut need_migrate_index_streams = false;
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
@@ -70,36 +67,36 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 // set to super cluster
                 set_model(Some(existing_model.clone())).await?;
             }
-            (Some(model), None) => {
+            (Some(meta_model), None) => {
                 // set to local
-                existing_meta = Some(model.clone());
+                existing_meta = Some(meta_model.clone());
                 migrate_native_objects = false;
-                db::ofga::set_ofga_model_to_db(model).await?;
+                db::ofga::set_ofga_model_to_db(meta_model).await?;
             }
-            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
-            {
-                Ordering::Less => {
+            (Some(meta_model), Some(existing_model)) => {
+                let meta_version = version_compare::Version::from(&meta_model.version).unwrap();
+                let existing_version =
+                    version_compare::Version::from(&existing_model.version).unwrap();
+                if meta_version < existing_version {
                     log::info!(
                         "[OFGA:SuperCluster] model version changed: {} -> {}",
                         existing_model.version,
-                        model.version
+                        meta_model.version
                     );
                     // update version in super cluster
                     set_model(Some(existing_model.clone())).await?;
-                }
-                Ordering::Greater => {
+                } else if meta_version > existing_version {
                     log::info!(
                         "[OFGA:SuperCluster] model version changed: {} -> {}",
                         existing_model.version,
-                        model.version
+                        meta_model.version
                     );
                     // update version in local
-                    existing_meta = Some(model.clone());
+                    existing_meta = Some(meta_model.clone());
                     migrate_native_objects = false;
-                    db::ofga::set_ofga_model_to_db(model).await?;
+                    db::ofga::set_ofga_model_to_db(meta_model).await?;
                 }
-                Ordering::Equal => {}
-            },
+            }
             _ => {}
         }
     }
@@ -135,6 +132,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let meta_version = version_compare::Version::from(&meta.version).unwrap();
         let existing_model_version =
             version_compare::Version::from(&existing_model.version).unwrap();
+        let v0_0_4 = version_compare::Version::from("0.0.4").unwrap();
         let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
         let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
         let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
@@ -144,6 +142,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_13 = version_compare::Version::from("0.0.13").unwrap();
         let v0_0_15 = version_compare::Version::from("0.0.15").unwrap();
         let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
+        if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
+            need_migrate_index_streams = true;
+        }
         if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
             need_pipeline_migration = true;
         }
@@ -176,21 +177,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
             o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id);
 
-            #[cfg(feature = "cloud")]
-            if !is_ofga_migrations_done().await.unwrap() {
-                log::info!("[OFGA:Local] OFGA migrations are not done yet");
-                // release lock
-                dist_lock::unlock(&locker)
-                    .await
-                    .expect("Failed to release lock");
-                return Ok(());
-            }
-
             let mut tuples = vec![];
-            let r = ORGANIZATIONS.read().await;
             let mut orgs = HashSet::new();
-            for org_name in r.keys() {
-                orgs.insert(org_name.to_owned());
+            for user in USERS.iter() {
+                orgs.insert(user.value().org.to_string());
             }
             log::info!("[OFGA:Local] Migrating native objects");
             if migrate_native_objects {
@@ -221,24 +211,26 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     .await;
                 }
 
-                for user_key_val in ORG_USERS.iter() {
-                    let org_user = user_key_val.value();
-                    let user = USERS.get(org_user.email.as_str()).unwrap();
-                    if user.user_type.is_external() {
+                for user_key_val in USERS.iter() {
+                    let user = user_key_val.value();
+                    if user.is_external {
                         continue;
                     } else {
-                        let role = if user.is_root {
+                        let role = if user.role.eq(&UserRole::Root) {
                             UserRole::Admin.to_string()
                         } else {
-                            org_user.role.to_string()
+                            user.role.to_string()
                         };
 
-                        get_user_role_tuple(&role, &org_user.email, &org_user.org_id, &mut tuples);
+                        get_user_role_tuple(&role, &user.email, &user.org, &mut tuples);
                     }
                 }
             } else {
                 log::info!("[OFGA:Local] Migrating index streams");
                 for org_name in orgs.iter() {
+                    if need_migrate_index_streams {
+                        get_index_creation_tuples(org_name, &mut tuples).await;
+                    }
                     if need_cipher_keys_migration {
                         get_ownership_all_org_tuple(org_name, "cipher_keys", &mut tuples);
                     }

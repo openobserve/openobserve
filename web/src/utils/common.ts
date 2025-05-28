@@ -102,7 +102,6 @@ export const logsErrorMessage = (code: number) => {
     20006: "SearchParquetFileNotFound",
     20007: "SearchFieldHasNoCompatibleDataType",
     20008: "SearchSQLExecuteError",
-    20009: "SearchSQLCancelled",
   };
 
   if (messages[code] != undefined) {

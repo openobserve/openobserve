@@ -76,7 +76,6 @@ const defaultObject = {
     scrollInfo: {},
     serviceColors: {} as any,
     redirectedFromLogs: false,
-    searchApplied: false,
   },
   data: {
     query: "",
@@ -136,8 +135,7 @@ const defaultObject = {
       } | null,
       traceId: "",
       spanList: [],
-      isLoadingTraceMeta: false,
-      isLoadingTraceDetails: false,
+      loading: false,
       selectedSpanId: "" as String | null,
       expandedSpans: [] as String[],
       showSpanDetails: false,
@@ -155,7 +153,7 @@ const useTraces = () => {
 
   const resetSearchObj = () => {
     // delete searchObj.data;
-    searchObj.data.errorMsg = "";
+    searchObj.data.errorMsg = "No stream found in selected organization!";
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];
@@ -174,10 +172,7 @@ const useTraces = () => {
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
     searchObj.runQuery = false;
-    searchObj.data.traceDetails.isLoadingTraceDetails = false;
-    searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };
-  
   const updatedLocalLogFilterField = (): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =

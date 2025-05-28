@@ -8,15 +8,12 @@ from pathlib import Path
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
 
-@pytest.fixture(scope="module")
-def random_string():
-    """Generate a random string of specified length."""
-    def _generate(length=5):
-        # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
-        # digits consist of '0' to '9'
-        characters = string.ascii_letters + string.digits
-        return "".join(random.choices(characters, k=length))
-    return _generate
+
+def random_string(length: int):
+    # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
+    # digits consist of '0' to '9'
+    characters = string.ascii_letters + string.digits
+    return "".join(random.choices(characters, k=length))
 
 def _create_session_inner():
     s = requests.Session()
@@ -40,13 +37,13 @@ def _create_session_inner_v2():
     return s
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def create_session():
     """Create a session and return it."""
-    return _create_session_inner_v2()
+    return _create_session_inner()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def base_url():
     """Return the base URL."""
     return BASE_URL
@@ -62,7 +59,7 @@ def ingest_data():
         data = f.read()
 
     stream_name = "stream_pytest_data"
-    org = "default"
+    org = "org_pytest_data"
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp = session.post(url, data=data, headers={"Content-Type": "application/json"})
     print("Data ingested successfully, status code: ", resp.status_code)

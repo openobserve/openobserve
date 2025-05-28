@@ -41,13 +41,10 @@ use {
 
 use crate::{
     common::{
-        infra::{
-            cluster::get_cached_online_querier_nodes,
-            config::{ENRICHMENT_TABLES, ORGANIZATIONS},
-        },
+        infra::{cluster::get_cached_online_querier_nodes, config::ENRICHMENT_TABLES},
         meta::stream::StreamSchema,
     },
-    service::{db, enrichment::StreamTable, organization::check_and_create_org},
+    service::{db, enrichment::StreamTable},
 };
 
 pub async fn merge(
@@ -137,13 +134,7 @@ pub async fn delete(
         // Enrichment table size is not deleted by schema delete
         // Since we are storing the current size of the table in bytes in the meta table,
         // when we delete enrichment table, we need to delete the size from the db as well.
-        if let Err(e) = super::enrichment_table::delete_table_size(org_id, stream_name).await {
-            log::error!("Failed to delete table size: {}", e);
-        }
-        if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await
-        {
-            log::error!("Failed to delete meta table stats: {}", e);
-        }
+        let _ = super::enrichment_table::delete_table_size(org_id, stream_name).await;
     }
 
     // super cluster
@@ -158,10 +149,6 @@ pub async fn delete(
         )
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
-        // sync to other regions to delete data of this stream
-        o2_enterprise::enterprise::super_cluster::queue::stream_delete(&key)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
     }
 
     Ok(())
@@ -278,11 +265,6 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    let audit_enabled = get_o2_config().common.audit_enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let audit_enabled = false;
-    let cfg = get_config();
     let key = "/schema/";
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
@@ -361,7 +343,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let latest_schema = latest_schema.pop().unwrap();
                 let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
-                if settings.store_original_data || settings.index_original_data {
+                if settings.store_original_data {
                     if let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
                     {
@@ -421,18 +403,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             data,
                         },
                     );
-                }
-
-                // if create_org_through_ingestion is enabled, we need to create the org
-                // if it doesn't exist. Hence, we need to check if the org exists in the cache
-                if (cfg.common.create_org_through_ingestion
-                    || cfg.common.usage_enabled
-                    || audit_enabled)
-                    && !ORGANIZATIONS.read().await.contains_key(org_id)
-                {
-                    if let Err(e) = check_and_create_org(org_id).await {
-                        log::error!("Failed to save organization in database: {}", e);
-                    }
                 }
             }
             db::Event::Delete(ev) => {
@@ -495,11 +465,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
     let items = db::list(db_key).await?;
-    let items_num = items.len();
-    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items_num);
-
-    log::info!("Cache schema got {} items", items_num);
-    for (i, (key, val)) in items.into_iter().enumerate() {
+    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items.len());
+    for (key, val) in items {
         let key = key.strip_prefix(db_key).unwrap();
         let columns = key.split('/').take(4).collect::<Vec<_>>();
         assert_eq!(columns.len(), 4, "BUG");
@@ -507,14 +474,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
-        if i % 1000 == 0 {
-            log::info!("Cache schema progress: {}/{}", i, items_num);
-        }
     }
-    log::info!("Stream schemas Cached {} schemas", items_num);
-    let keys_num = schemas.keys().len();
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
-    for (i, item_key) in keys.iter().enumerate() {
+    for item_key in keys.iter() {
         let Some(mut schema_versions) = schemas.remove(item_key) else {
             continue;
         };
@@ -531,7 +493,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let latest_schema = latest_schema.last().unwrap();
         let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
-        if settings.store_original_data || settings.index_original_data {
+        if settings.store_original_data {
             if let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
             {
@@ -563,11 +525,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let mut w = STREAM_SCHEMAS.write().await;
         w.insert(item_key.to_string(), schema_versions);
         drop(w);
-        if i % 1000 == 0 {
-            log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
-        }
     }
-    log::info!("Stream schemas Cached {} streams", keys_num);
+    log::info!("Stream schemas Cached");
     Ok(())
 }
 

@@ -97,6 +97,10 @@ export const addLabelToSQlQuery = async (
 
   if (operator === "match_all") {
     condition = `match_all(${formatValue(value)})`;
+  } else if (operator === "match_all_raw") {
+    condition = `match_all_raw(${formatValue(value)})`;
+  } else if (operator === "match_all_raw_ignore_case") {
+    condition = `match_all_raw_ignore_case(${formatValue(value)})`;
   } else if (operator === "str_match") {
     condition = `str_match(${label}, ${formatValue(value)})`;
   } else if (operator === "str_match_ignore_case") {
@@ -470,6 +474,8 @@ function parseCondition(condition: any) {
       // function without field name and with value
       const conditionsWithoutFieldName = [
         "match_all",
+        "match_all_raw",
+        "match_all_raw_ignore_case",
       ];
 
       if (conditionsWithFieldName.includes(conditionName)) {
@@ -634,7 +640,7 @@ export const changeHistogramInterval = async (
   histogramInterval: any,
 ) => {
   // if histogramInterval is null or query is null or query is empty, return query
-  if (query === null || query === "") {
+  if (histogramInterval === null || query === null || query === "") {
     return query;
   }
 
@@ -642,12 +648,11 @@ export const changeHistogramInterval = async (
   const ast: any = parser.astify(query);
 
   // Iterate over the columns to check if the column is histogram
-  ast?.columns?.forEach((column: any) => {
+  ast.columns.forEach((column: any) => {
     // check if the column is histogram
     if (
       column.expr.type === "function" &&
-      column?.expr?.name?.name?.[0]?.value === "histogram" &&
-      histogramInterval !== null
+      column?.expr?.name?.name?.[0]?.value === "histogram"
     ) {
       const histogramExpr = column.expr;
       if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
@@ -680,21 +685,4 @@ export const changeHistogramInterval = async (
 
   const sql = parser.sqlify(ast);
   return sql.replace(/`/g, '"');
-};
-
-export const convertQueryIntoSingleLine = async (query: any) => {
-  try {
-    // if query is null or empty, return query as is
-    if (query === null || query === "") {
-      return query;
-    }
-
-    await importSqlParser();
-    const ast: any = parser.astify(query);
-
-    const sql = parser.sqlify(ast);
-    return sql.replace(/`/g, '"');
-  } catch (error) {
-    return query;
-  }
 };

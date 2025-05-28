@@ -26,7 +26,6 @@ use config::{
         promql::ClusterLeader,
         ratelimit::CachedUserRoles,
         stream::StreamParams,
-        user::User,
     },
 };
 use dashmap::DashMap;
@@ -34,35 +33,29 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::{RwLock as TokioRwLock, mpsc};
+use tokio::sync::RwLock as TokioRwLock;
 use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        maxmind::MaxmindClient,
-        organization::{Organization, OrganizationSetting},
-        syslog::SyslogRoute,
+        maxmind::MaxmindClient, organization::OrganizationSetting, syslog::SyslogRoute, user::User,
     },
-    handler::http::request::ws::session::WsSession,
+    handler::http::request::ws_v2::session::WsSession,
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
+        websocket_events::search_registry_utils::SearchState,
     },
 };
 
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
-pub static USERS: Lazy<RwHashMap<String, infra::table::users::UserRecord>> =
-    Lazy::new(DashMap::default);
-pub static ORG_USERS: Lazy<RwHashMap<String, infra::table::org_users::OrgUserRecord>> =
-    Lazy::new(DashMap::default);
-pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, infra::table::org_users::OrgUserRecord>>> =
+pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
     Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static ORGANIZATIONS: Lazy<Arc<RwAHashMap<String, Organization>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
@@ -109,46 +102,5 @@ pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<TokioRwLock<WsSession>>>> =
     Lazy::new(Default::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
-
-/// Refreshes in-memory cache in the event of NATs restart.
-///
-/// We should add all in-memory caches listed above that a CacheMiss is not followed by
-/// reading from db, e.g. UserSession, Pipeline
-pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::nats::NatsEvent>) {
-    let mut first_conenction = true;
-    while let Some(event) = nats_event_rx.recv().await {
-        if let infra::db::nats::NatsEvent::Connected = event {
-            // Skip refreshing if it's the first time connecting to the client
-            if first_conenction {
-                first_conenction = false;
-                continue;
-            }
-            log::info!(
-                "[infra::config] received NATs event: {event}, refreshing in-memory cache for Alerts, Pipelines, RealtimeTriggers, Schema, Users, and UserSessions"
-            );
-            if let Err(e) = crate::service::db::alerts::alert::cache().await {
-                log::error!("Error refreshing in-memory cache \"Alerts\": {}", e);
-            }
-            if let Err(e) = crate::service::db::pipeline::cache().await {
-                log::error!("Error refreshing in-memory cache \"Pipelines\": {}", e);
-            }
-            if let Err(e) = crate::service::db::alerts::realtime_triggers::cache().await {
-                log::error!(
-                    "Error refreshing in-memory cache \"RealtimeTriggers\": {}",
-                    e
-                );
-            }
-            if let Err(e) = crate::service::db::schema::cache().await {
-                log::error!("Error refreshing in-memory cache \"Schema\": {}", e);
-            }
-            if let Err(e) = crate::service::db::session::cache().await {
-                log::error!("Error refreshing in-memory cache \"UserSessions\": {}", e);
-            }
-            if let Err(e) = crate::service::db::user::cache().await {
-                log::error!("Error refreshing in-memory cache \"Users\": {}", e);
-            }
-        }
-    }
-
-    log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
-}
+// Global registry for search requests by `trace_id`
+pub static WS_SEARCH_REGISTRY: Lazy<RwAHashMap<String, SearchState>> = Lazy::new(Default::default);
