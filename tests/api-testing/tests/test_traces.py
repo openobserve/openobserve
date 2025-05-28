@@ -95,7 +95,8 @@ def test_e2e_valid_trace_ingestion(create_session, base_url):
     org_id = "default"
 
     trace = valid_trace()
-    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+    
+    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace, headers={"X-Org-Id": org_id})
 
     assert (
         resp_post_trace.status_code == 200
@@ -111,7 +112,7 @@ def test_e2e_old_trace_ingestion(create_session, base_url):
     trace = valid_trace()
     trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = "1724898237575000000"
     trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["endTimeUnixNano"] = "1724898237576000000"
-    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace, headers={"X-Org-Id": org_id})
 
     assert (
         resp_post_trace.status_code == 206
@@ -129,7 +130,7 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
     url = base_url
     org_id = "default"
 
-    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json={})
+    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json={}, headers={"X-Org-Id": org_id})
     assert (
         resp_post_trace.status_code == 400
     ), f"Invalid trace json expected 400, but got {resp_post_trace.status_code}"
@@ -141,7 +142,7 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
 
     trace = valid_trace()
     trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = 1724898237575000000
-    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace, headers={"X-Org-Id": org_id})
 
     assert (
         resp_post_trace.status_code == 400
@@ -167,7 +168,7 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
     end_time_str = "{:d}".format(end_time)
     get_query_url = f"{url}api/{org_id}/default/traces/latest?filter=duration >= 0 AND duration <= 100000000&start_time={start_time_str}&end_time={end_time_str}&from=0&size=25"
 
-    resp_get_trace = session.get(get_query_url)
+    resp_get_trace = session.get(get_query_url, headers={"X-Org-Id": org_id})
     original_count = len(resp_get_trace.json()["hits"])
 
     trace = valid_trace()
@@ -180,7 +181,7 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
         "droppedAttributesCount": 0,
         "flags": 1
     }]
-    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace, headers={"X-Org-Id": org_id})
 
     assert (
         resp_post_trace.status_code == 400
@@ -196,13 +197,13 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
         "droppedAttributesCount": 0,
         "flags": 1
     }]
-    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace, headers={"X-Org-Id": org_id})
 
     assert (
         resp_post_trace.status_code == 400
     ), f"Invalid trace id expected 400, but got {resp_post_trace.status_code}"
 
-    resp_get_trace = session.get(get_query_url)
+    resp_get_trace = session.get(get_query_url, headers={"X-Org-Id": org_id})
     new_count = len(resp_get_trace.json()["hits"])
 
     assert (original_count == new_count), "Expected count of traces to increase by 1."

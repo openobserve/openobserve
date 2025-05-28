@@ -4,6 +4,7 @@ import os
 import random
 import string
 from pathlib import Path
+import base64
 
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
@@ -31,12 +32,9 @@ def _create_session_inner_v2():
     s = requests.Session()
     username = os.environ["ZO_ROOT_USER_EMAIL"]
     password = os.environ["ZO_ROOT_USER_PASSWORD"]
-    # s.auth = (username, password)
-    # resp = s.post(BASE_URL)
-    resp = s.post(f"{BASE_URL}auth/login", json={"name": username, "password": password})
-    print (resp.status_code)
-    if resp.status_code != 200:
-        raise Exception("Invalid username/password")
+    # Set Authorization header for all requests
+    basic_auth = base64.b64encode(f"{username}:{password}".encode()).decode()
+    s.headers.update({"Authorization": f"Basic {basic_auth}"})
     return s
 
 
