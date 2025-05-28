@@ -114,6 +114,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
                                 file
                             );
+                            // update metrics
+                            metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
+                                .with_label_values(&[])
+                                .dec();
                             continue;
                         }
 
@@ -205,6 +209,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                         "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
                                         file
                                     );
+                                    // update metrics
+                                    metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
+                                        .with_label_values(&[])
+                                        .dec();
                                     return;
                                 }
 
