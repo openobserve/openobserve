@@ -672,8 +672,13 @@ pub async fn search_partition(
             );
             files.extend(stream_files);
         } else {
-            // data retention in seconds
-            let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
+            // data retention should be either from stream settings or global data retension
+            let data_retention = if stream_settings.data_retention > 0 {
+                stream_settings.data_retention
+            } else {
+                cfg.compact.data_retention_days
+            };
+            let mut data_retention = data_retention * 24 * 60 * 60;
             // data duration in seconds
             let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
             let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
@@ -686,6 +691,7 @@ pub async fn search_partition(
             };
 
             let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+
             if data_retention_based_on_stats > 0 {
                 data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
             };
