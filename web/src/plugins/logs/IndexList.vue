@@ -1020,7 +1020,10 @@ export default defineComponent({
             query_context = query_context == undefined ? "" : query_context;
 
             // Implement websocket based field values, check getQueryData in useLogs for websocket enabled
-            if (isWebSocketEnabled(store.state) || isStreamingEnabled()) {
+            if (
+              isWebSocketEnabled(store.state) ||
+              isStreamingEnabled(store.state)
+            ) {
               fetchValuesWithWebsocket({
                 fields: [name],
                 size: 10,
@@ -1312,7 +1315,7 @@ export default defineComponent({
     };
 
     const initializeWebSocketConnection = (payload: any) => {
-      if (isWebSocketEnabled()) {
+      if (isWebSocketEnabled(store.state)) {
         fetchQueryDataWithWebSocket(payload, {
           open: sendSearchMessage,
           close: handleSearchClose,
@@ -1323,7 +1326,7 @@ export default defineComponent({
         return;
       }
 
-      if (isStreamingEnabled()) {
+      if (isStreamingEnabled(store.state)) {
         fetchQueryDataWithHttpStream(payload, {
           data: handleSearchResponse,
           error: handleSearchError,
@@ -1505,7 +1508,7 @@ export default defineComponent({
     const cancelFilterCreator = (row: any) => {
       //if it is websocker based then cancel the trace id
       //else cancel the further value api calls using the openedFilterFields
-      if (isWebSocketEnabled()) {
+      if (isWebSocketEnabled(store.state)) {
         cancelTraceId(row.name);
       } else {
         cancelValueApi(row.name);

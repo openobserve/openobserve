@@ -22,7 +22,6 @@ import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
-import store from "../stores";
 import cronParser from "cron-parser";
 
 let moment: any;
@@ -986,14 +985,13 @@ export const isWebSocketEnabled = (data: any) => {
   }
 };
 
-export const isStreamingEnabled = () => {
-  if (!store.state.zoConfig?.streaming_enabled) {
+export const isStreamingEnabled = (data: any) => {
+  if (!data.zoConfig?.streaming_enabled) {
     return false;
   }
 
   if ((window as any).use_streaming === undefined) {
-    return store?.state?.organizationData?.organizationSettings
-      ?.enable_streaming_search;
+    return data.organizationData?.organizationSettings?.enable_streaming_search;
   } else {
     return (window as any).use_streaming;
   }

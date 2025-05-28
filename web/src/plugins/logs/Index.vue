@@ -1707,7 +1707,7 @@ export default defineComponent({
           this.searchObj.loadingHistogram = true;
 
           const shouldUseWebSocket = this.isWebSocketEnabled(this.store.state);
-          const shouldUseStreaming = this.isStreamingEnabled();
+          const shouldUseStreaming = this.isStreamingEnabled(this.store.state);
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 

@@ -1442,7 +1442,7 @@ export const usePanelDataLoader = (
                 : [];
               state.annotations = annotations;
 
-              if (isStreamingEnabled()) {
+              if (isStreamingEnabled(store.state)) {
                 await getDataThroughStreaming(
                   query,
                   it,
@@ -1748,7 +1748,7 @@ export const usePanelDataLoader = (
             : errorDetailValue;
 
         const errorCode =
-          isWebSocketEnabled() || isStreamingEnabled()
+          isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)
             ? error?.response?.data?.code || error?.code || error?.status || ""
             : error?.response?.status ||
               error?.status ||

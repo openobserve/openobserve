@@ -1578,7 +1578,7 @@ const useLogs = () => {
       // else use organization settings
       searchObj.meta.jobId = "";
       const shouldUseWebSocket = isWebSocketEnabled(store.state);
-      const shouldUseStreaming = isStreamingEnabled();
+      const shouldUseStreaming = isStreamingEnabled(store.state);
 
       const isMultiStreamSearch =
         searchObj.data.stream.selectedStream.length > 1 &&
