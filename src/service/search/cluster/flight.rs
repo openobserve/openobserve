@@ -563,13 +563,19 @@ pub async fn get_online_querier_nodes(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     nodes.sort_by_key(|x| x.id);
-    let nodes = nodes;
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
+
+    // use enterprise scheduler to filter nodes
+    #[cfg(feature = "enterprise")]
+    {
+        nodes = o2_enterprise::enterprise::search::scheduler::filter_nodes_by_cpu(nodes);
+    }
+
     Ok(nodes)
 }
 

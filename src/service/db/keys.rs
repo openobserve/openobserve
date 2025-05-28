@@ -54,7 +54,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
 
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_put(entry.clone()).await
                 {
@@ -97,7 +97,7 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
             .await?;
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_update(entry.clone())
                     .await
@@ -141,7 +141,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
 
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await
                 {

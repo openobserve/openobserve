@@ -21,7 +21,7 @@ use std::{
 use actix_web::{HttpRequest, HttpResponse, Result, get, http, post, put, web};
 use config::meta::cluster::NodeInfo;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::OrganizationInvites,
