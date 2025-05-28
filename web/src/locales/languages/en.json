@@ -305,8 +305,7 @@
     "allowedOrg": "Allowed Organization",
     "roles": "Roles",
     "groups": "Groups",
-    "customRole": "Custom Roles",
-    "status": "Status"
+    "customRole": "Custom Roles"
   },
   "serviceAccounts": {
     "header": "Service Accounts",
