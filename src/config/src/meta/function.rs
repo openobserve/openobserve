@@ -47,7 +47,7 @@ pub struct Transform {
 
 impl Transform {
     pub fn is_vrl(&self) -> bool {
-        self.trans_type.is_some() && self.trans_type.unwrap() == 0
+        self.trans_type.map_or(false, |t| t == 0)
     }
     pub fn is_result_array_vrl(&self) -> bool {
         self.is_vrl() && RESULT_ARRAY.is_match(&self.function)
