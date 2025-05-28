@@ -441,6 +441,7 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
+  getDueDays,
 } from "../utils/zincutils";
 
 import {
@@ -1115,6 +1116,14 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_streaming_search ?? false,
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
         });
+
+        if(orgSettings?.data?.data?.free_trial_expiry != null && orgSettings?.data?.data?.free_trial_expiry != "") {
+          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
+          if(trialDueDays <= 8) {
+            router.push({name: "plans"})
+          }
+        }
+        
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);
       }

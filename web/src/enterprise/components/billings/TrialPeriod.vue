@@ -49,6 +49,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
+import { getDueDays } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "TrialPeriod",
@@ -77,23 +78,6 @@ export default defineComponent({
 
     const showTrialPeriodMsg = ref((Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry") && store.state.organizationData.organizationSettings.free_trial_expiry != "" && store.state.organizationData.organizationSettings.free_trial_expiry != null) ? true : false);
     
-    function getDueDays(microTimestamp: number): number {
-      // Convert microseconds to milliseconds
-      const timestampMs = Math.floor(microTimestamp / 1000);
-
-      // Create date objects
-      const givenDate = new Date(timestampMs);
-      const currentDate = new Date();
-
-      // Calculate time difference in milliseconds using getTime()
-      const timeDiffMs = givenDate.getTime() - currentDate.getTime();
-
-      // Convert milliseconds to full days
-      const dueDays = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
-
-      return dueDays;
-    }
-
     const redirectBilling = () => {
       router.push('/billings/plans/')
     };

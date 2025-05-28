@@ -379,26 +379,14 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
   const q = useQuasar();
   const { getStreams } = useStreams();
-
-  // if (
-  //   config.isCloud &&
-  //   store.state.selectedOrganization.subscription_type == config.freePlan
-  // ) {
-  //   await billings
-  //     .list_subscription(store.state.selectedOrganization.identifier)
-  //     .then((res: any) => {
-  //       if (res.data.data.length == 0) {
-  //         next({ path: "/billings/plans" });
-  //       }
-
-  //       if (
-  //         res.data.data.CustomerBillingObj.customer_id == null ||
-  //         res.data.data.CustomerBillingObj.customer_id == ""
-  //       ) {
-  //         next({ path: "/billings/plans" });
-  //       }
-  //     });
-  // }
+  if (config.isCloud) {
+    if(store.state.organizationData?.organizationSettings?.free_trial_expiry != "") {
+      const trialDueDays = getDueDays(store.state.organizationData?.organizationSettings?.free_trial_expiry);
+      if(trialDueDays <= 0) {
+        next({ path: "/billings/plans" });
+      }
+    }
+  }
 
   if (
     to.path.indexOf("/ingestion") == -1 &&
@@ -1045,4 +1033,21 @@ export function isAboveMinRefreshInterval(
 ) {
   const minInterval = Number(config?.min_auto_refresh_interval) || 1;
   return value >= minInterval;
+}
+
+export function getDueDays(microTimestamp: number): number {
+  // Convert microseconds to milliseconds
+  const timestampMs = Math.floor(microTimestamp / 1000);
+
+  // Create date objects
+  const givenDate = new Date(timestampMs);
+  const currentDate = new Date();
+
+  // Calculate time difference in milliseconds using getTime()
+  const timeDiffMs = givenDate.getTime() - currentDate.getTime();
+
+  // Convert milliseconds to full days
+  const dueDays = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+
+  return dueDays;
 }
