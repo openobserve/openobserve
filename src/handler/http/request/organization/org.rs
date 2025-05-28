@@ -142,7 +142,7 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
         (status = 200, description = "Success", content_type = "application/json", body = AllOrganizationResponse),
     )
 )]
-#[get("/{org_id}/organizations/all")]
+#[get("/{org_id}/organizations")]
 pub async fn all_organizations(
     org_id: web::Path<String>,
     user_email: UserEmail,
@@ -465,7 +465,7 @@ async fn create_org(
         (status = 200, description = "Success", content_type = "text"),
     )
 )]
-#[post("/{org_id}/extend_free_trial")]
+#[put("/{org_id}/extend_trial_period")]
 async fn extend_trial_period(
     org_id: web::Path<String>,
     req: web::Json<ExtendTrialPeriodRequest>,
