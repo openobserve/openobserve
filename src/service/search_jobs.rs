@@ -28,7 +28,7 @@ use infra::{
     table::entity::{search_job_partitions::Model as PartitionJob, search_jobs::Model as Job},
 };
 use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
+    common::config::get_config as get_o2_config,
     super_cluster::{
         kv::cluster::get_grpc_addr,
         search::{get_cluster_node_by_name, get_cluster_nodes},

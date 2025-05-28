@@ -36,7 +36,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use {
     infra::{errors::Error, schema::mk_key},
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
 use crate::{

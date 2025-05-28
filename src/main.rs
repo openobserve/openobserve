@@ -93,7 +93,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 #[cfg(feature = "enterprise")]
-use {config::Config, o2_enterprise::enterprise::common::infra::config::O2Config};
+use {config::Config, o2_enterprise::enterprise::common::config::O2Config};
 #[cfg(feature = "pyroscope")]
 use {
     pyroscope::PyroscopeAgent,
@@ -1177,7 +1177,7 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::warn!("Failed to init action manager client: {e}");
     }
 
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
@@ -1188,7 +1188,7 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 
     // check ratelimit config
     let cfg = config::get_config();
-    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
     if let Err(e) = check_ratelimit_config(&cfg, &o2cfg) {
         panic!("ratelimit config error: {e}");
     }
