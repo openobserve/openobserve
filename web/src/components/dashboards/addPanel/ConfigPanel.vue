@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="dashboardPanelData.data.config.trellis?.layout"
         v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
-        label="Group trellis series for multi Y-axis"
+        label="Group multi Y-axis for trellis"
         data-test="dashboard-config-trellis-group-by-y-axis"
       />
     </div>
