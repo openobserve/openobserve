@@ -388,6 +388,20 @@ function parseCondition(condition: any) {
           logicalOperator: "AND",
           filterType: "condition",
         };
+      } else if (condition.operator == "NOT IN") {
+        // create values array based on right side of condition
+        const values =
+          condition?.right?.value?.map((value: any) => `${value?.value}`) ?? [];
+
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column?.expr?.value ?? "",
+          operator: condition?.operator,
+          value: values?.join(","),
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
       } else if (condition.operator == "IN") {
         // create values array based on right side of condition
         const values = condition.right.value.map(
@@ -426,20 +440,57 @@ function parseCondition(condition: any) {
           filterType: "condition",
         };
       } else if (condition?.operator == "LIKE") {
-        // right value may have % at the beginning or end or both
-        // so we need to remove it
-        const value = condition?.right?.value
-          ?.replace(/^%/, "")
-          .replace(/%$/, "");
-        return {
-          type: "condition",
-          values: [],
-          column: condition?.left?.column?.expr?.value,
-          operator: "Contains",
-          value: `${value}`,
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
+        // Check the pattern to determine the specific operator
+        const rightValue = condition?.right?.value || "";
+
+        if (rightValue.startsWith("%") && rightValue.endsWith("%")) {
+          // Pattern: %value% - Contains
+          const value = rightValue?.replace(/^%/, "").replace(/%$/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Contains",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else if (rightValue.startsWith("%")) {
+          // Pattern: %value - Ends With
+          const value = rightValue.replace(/^%/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Ends With",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else if (rightValue.endsWith("%")) {
+          // Pattern: value% - Starts With
+          const value = rightValue.replace(/%$/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Starts With",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else {
+          // No % pattern - treat as Contains for fallback
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Contains",
+            value: `${rightValue}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        }
       } else if (condition?.operator == "NOT LIKE") {
         // right value may have % at the beginning or end or both
         // so we need to remove it
