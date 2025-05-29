@@ -26,7 +26,7 @@ use config::{
         },
         pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
     },
-    utils::json,
+    utils::json::Value,
 };
 
 use crate::{
@@ -84,7 +84,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
 pub async fn test_run_function(
     org_id: &str,
     mut function: String,
-    events: Vec<json::Value>,
+    events: Vec<Value>,
 ) -> Result<HttpResponse, anyhow::Error> {
     // Append a dot at the end of the function if it doesn't exist
     if !function.ends_with('.') {
@@ -125,7 +125,7 @@ pub async fn test_run_function(
                 program: program.clone(),
                 fields: fields.clone(),
             },
-            json::Value::Array(events),
+            Value::Array(events),
             org_id,
             &[String::new()],
         );
@@ -141,11 +141,20 @@ pub async fn test_run_function(
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|v| {
-                (!v.is_null()).then_some(config::utils::flatten::flatten(v.clone()).unwrap())
-            })
-            .for_each(|transform| {
-                transformed_events.push(VRLResult::new("", transform));
+            .for_each(|record| match record {
+                Value::Object(hit) => transformed_events.push(VRLResult::new(
+                    "",
+                    config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+                )),
+                Value::Array(hits) => hits.iter().for_each(|hit| {
+                    if let Value::Object(hit) = hit {
+                        transformed_events.push(VRLResult::new(
+                            "",
+                            config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+                        ))
+                    }
+                }),
+                _ => {}
             });
     } else {
         events.into_iter().for_each(|event| {
