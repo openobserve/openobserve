@@ -1001,6 +1001,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.sql')"
         />
         <q-tab
+        :disable="dateTimePicker.length > 0"
           data-test="scheduled-alert-metrics-tab"
           v-if="alertData.stream_type === 'metrics'"
           name="promql"
@@ -1127,8 +1128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-bold add-variable no-border q-py-sm"
                           color="primary"
                           style="width: 120px;"
-                          @click="runSqlQuery"
-                          :disable="query == ''"
+                          @click="tab === 'sql' ? runSqlQuery() : runPromqlQuery()"
+                          :disable="tab == 'sql' ? query == '' : promqlQuery == ''"
                         />
                       </div>
                     </div>
@@ -1153,7 +1154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="min-height: 10rem;"
                     />
 
-                    <div v-show="!!sqlQueryErrorMsg" class="text-negative q-py-sm invalid-sql-error">
+                    <div v-show="!!sqlQueryErrorMsg && tab === 'sql'" class="text-negative q-py-sm invalid-sql-error">
                     <span v-show="!!sqlQueryErrorMsg">
                       Error: {{ sqlQueryErrorMsg }}</span
                     >
@@ -1171,7 +1172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         promqlQuery === '' ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
-                        'tw-h-[calc(100%-70px)]'
+                        'tw-h-[calc(100%-50px)]'
                       ]"
                       @blur="onBlurQueryEditor"
                       style="min-height: 10rem;"
@@ -1179,7 +1180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   
             </div>
-            <div  class="tw-h-[40%] container-for-editors">
+            <div v-if="tab !== 'promql'"  class="tw-h-[40%] container-for-editors">
               <div class="tw-w-full tw-h-full scheduled-alerts " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
                 <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm q-px-md editor-title">
                       
@@ -1256,7 +1257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="  tw-flex tw-flex-col tw-h-[100%] tw-w-[38%] tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
           <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit q-py-sm q-px-md editor-title">
             <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-gap-2">
-              <span class="editor-text-title">SQL Output</span>
+              <span class="editor-text-title"> {{ tab === 'sql' ? 'SQL' : 'PromQL' }} Output</span>
               <q-btn :icon="expandSqlOutput ? 'expand_more' : 'expand_less'" size="16px"  dense flat border-less class="tw-cursor-pointer" @click="handleExpandSqlOutput"  ></q-btn>
             </div>
                     <!-- this is the time of trigger -->
@@ -1288,7 +1289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-if="expandSqlOutput" class="sql-output-section tw-h-[calc(100%-50px)] " >
             <!-- no output before run query section -->
-            <div v-if="!tempRunQuery && outputEvents == ''"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
+            <div v-if="!tempRunQuery && outputEvents == '' "  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
               <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                 <q-icon
                   :name="outlinedLightbulb"
@@ -1308,7 +1309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-text-orange-400"
                 />
                 <div>
-                  <span>No results found</span>
+                  <span> {{ runPromqlError ? runPromqlError : "No results found" }}</span>
                 </div>
               </div>
             </div>
@@ -1333,7 +1334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
             </div>
           </div>
-          <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit q-py-sm q-px-md editor-title">
+          <div v-if="tab !== 'promql'" class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit q-py-sm q-px-md editor-title">
             <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-gap-2">
               <span class="editor-text-title">Combined Output (SQL and VRL)</span>
               <q-btn :icon="expandCombinedOutput ? 'expand_more' : 'expand_less'" size="16px"  dense flat border-less class="tw-cursor-pointer" @click="handleExpandCombinedOutput"  ></q-btn>
@@ -1598,12 +1599,14 @@ const formattedDestinations = ref(props.formattedDestinations);
 const filteredFields = ref(props.columns);
 
 const selectedStream = ref(props.selectedStream);
-const selectedStreamType = ref(props.selectedStreamType);
+const selectedStreamType = computed(() => props.selectedStreamType);
 const fnEditorRef = ref<any>(null);
 
 const tempRunQuery = ref(false);
 
 const runQueryLoading = ref(false);
+
+const runPromqlError = ref("");
 
 const selectedColumn = ref("");
 
@@ -2180,6 +2183,9 @@ const routeToCreateDestination = () => {
         else{
           outputEvents.value = "";
         }
+        if(queryReq.aggs){
+          delete queryReq.aggs;
+        }
         try {
           const res = await searchService.search({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -2232,6 +2238,7 @@ const routeToCreateDestination = () => {
 
 
   const runSqlQuery = async () => {
+    runPromqlError.value = "";
     tempRunQuery.value = true;
     expandCombinedOutput.value = false;
     expandSqlOutput.value = true;
@@ -2239,6 +2246,7 @@ const routeToCreateDestination = () => {
   };
 
   const runTestFunction = async () => {
+    runPromqlError.value = "";
     tempTestFunction.value = true;
     expandCombinedOutput.value = true;
     expandSqlOutput.value = false;
@@ -2283,6 +2291,46 @@ const routeToCreateDestination = () => {
     }
   })
 
+  const runPromqlQuery = async () => {
+    runPromqlError.value = "";
+    tempRunQuery.value = true;
+    expandCombinedOutput.value = false;
+    expandSqlOutput.value = true;
+    await triggerPromqlQuery();
+  }
+
+  const triggerPromqlQuery = async () => {
+    const queryReq = buildQueryPayload({
+        sqlMode: true,
+        streamName: selectedStream.value,
+      });
+
+      const periodInMicroseconds = triggerData.value.period * 60 * 1000000;
+      const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
+      const startTime = endTime - periodInMicroseconds;
+
+        queryReq.query.start_time = startTime;
+        queryReq.query.end_time = endTime;
+        runQueryLoading.value = true;
+          outputEvents.value = "";
+        try {
+          const res = await searchService.metrics_query_range({
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: queryReq,
+              start_time: startTime,
+              end_time: endTime,
+              step: '0'
+            })
+          if(res.data.hits.length > 0){
+              outputEvents.value = JSON.stringify(res.data.hits,null,2);
+          }
+          runQueryLoading.value = false;
+        } catch (err) {
+          runPromqlError.value = err.response.data.error ?? "Something went wrong";
+          runQueryLoading.value = false;
+        }
+  }
+
 
 
 
@@ -2312,7 +2360,8 @@ defineExpose({
   handleRemoveMultiWindowOffset,
   inputData,
   updateGroup,
-  removeConditionGroup
+  removeConditionGroup,
+  runPromqlError
 });
 </script>
 

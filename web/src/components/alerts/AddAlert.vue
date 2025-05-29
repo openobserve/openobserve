@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :vrlFunctionError="vrlFunctionError"
                 :showTimezoneWarning="showTimezoneWarning"
                 :selectedStream="formData.stream_name"
-                :selectedStreamType="formData.stream_type"
+                :selected-stream-type="formData.stream_type"
                 :destinations="formData.destinations"
                 :formattedDestinations="getFormattedDestinations"
                 v-model:trigger="formData.trigger_condition"
