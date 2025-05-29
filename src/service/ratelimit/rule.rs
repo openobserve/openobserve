@@ -70,7 +70,7 @@ async fn handle_rule_operation(
     db_operation.await.map_err(RatelimitError::DbError)?;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {

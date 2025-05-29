@@ -42,7 +42,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::SEARCH_SERVER,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::TaskStatus,
 };
 

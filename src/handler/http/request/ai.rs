@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
-use o2_enterprise::enterprise::{ai, common::infra::config::get_config as get_o2_config};
+use o2_enterprise::enterprise::{ai, common::config::get_config as get_o2_config};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
