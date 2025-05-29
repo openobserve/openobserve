@@ -188,7 +188,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
             }
 
             #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::infra::config::get_config()
+            if o2_enterprise::enterprise::common::config::get_config()
                 .super_cluster
                 .enabled
             {
@@ -211,7 +211,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
 
             // super cluster
             #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::infra::config::get_config()
+            if o2_enterprise::enterprise::common::config::get_config()
                 .super_cluster
                 .enabled
             {

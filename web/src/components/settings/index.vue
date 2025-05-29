@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-route-tab
             default
             name="queryManagement"
-            :to="'/settings/query_management'"
+            :to="`/settings/query_management?org_identifier=${store.state.selectedOrganization?.identifier}`"
             icon="query_stats"
             :label="t('settings.queryManagement')"
             content-class="tab_content"
@@ -50,14 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-route-tab
             name="general"
-            :to="'/settings/general'"
+            :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
             :icon="outlinedSettings"
             :label="t('settings.generalLabel')"
             content-class="tab_content"
           />
           <q-route-tab
             name="organization"
-            :to="'/settings/organization'"
+            :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
             icon="business"
             :label="t('settings.orgLabel')"
             content-class="tab_content"

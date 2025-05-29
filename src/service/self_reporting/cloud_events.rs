@@ -1,5 +1,5 @@
 use config::{META_ORG_ID, meta::stream::StreamType, utils::json};
-use o2_enterprise::enterprise::common::infra::config::get_config;
+use o2_enterprise::enterprise::common::config::get_config;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};

@@ -62,7 +62,7 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
     #[cfg(feature = "cloud")]
     let trial_period_expiry = {
         use o2_enterprise::enterprise::{
-            cloud::billings, common::infra::config::get_config as get_o2_config,
+            cloud::billings, common::config::get_config as get_o2_config,
         };
         let o2_config = get_o2_config();
 
@@ -304,7 +304,7 @@ pub(crate) async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow
 
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
     use crate::common::meta::organization::Organization;
 
