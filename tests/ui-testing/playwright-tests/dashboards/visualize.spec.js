@@ -613,25 +613,6 @@ test.describe(" visualize UI testcases", () => {
     // Open the dropdown
     await page.locator('[data-test="index-dropdown-stream"]').click();
 
-    // await page.waitForTimeout(5000);
-    // Check if the dropdown is blank
-    // const dropdownOptions = await page.getByRole("option");
-    // const dropdownCount = await dropdownOptions.count();
-
-    // console.log("Dropdown count:", dropdownCount); // Debugging line
-
-    // // Ensure the dropdown options are blank
-    // expect(dropdownCount).toBeGreaterThan(0);
-
-    // // Get the row element
-    // const row = page
-    //   .getByRole("row", { name: "_timestamp +X +Y +B +F" })
-    //   .first();
-
-    // // Alternative assertions
-    // await expect(row).toBeDefined();
-
-    // Wait until dropdown options are loaded and stable
     let previousCount = -1;
     let currentCount = 0;
     const maxRetries = 10;
@@ -657,21 +638,4 @@ test.describe(" visualize UI testcases", () => {
       .first();
     await expect(row).toBeVisible(); // Use visible check
   });
-
-  // test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
-  //   page,
-  // }) => {
-  //   await page.locator('[data-test="date-time-btn"]').click();
-  //   await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
-  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  //   await page.locator('[data-test="logs-visualize-toggle"]').click();
-  //   await page
-  //     .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
-  //     .click();
-  //   await page.locator('[data-test="logs-logs-toggle"]').click();
-  //   await page.locator('[data-test="confirm-button"]').click();
-  //   await expect(
-  //     page.locator('[data-test="logs-search-result-bar-chart"]')
-  //   ).toBeVisible();
-  // });
 });
