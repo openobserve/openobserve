@@ -390,8 +390,10 @@ function parseCondition(condition: any) {
         };
       } else if (condition.operator == "NOT IN") {
         // create values array based on right side of condition
+        // quote the values
         const values =
-          condition?.right?.value?.map((value: any) => `${value?.value}`) ?? [];
+          condition?.right?.value?.map((value: any) => `'${value?.value}'`) ??
+          [];
 
         return {
           type: "condition",
@@ -519,9 +521,7 @@ function parseCondition(condition: any) {
       ];
 
       // function without field name and with value
-      const conditionsWithoutFieldName = [
-        "match_all",
-      ];
+      const conditionsWithoutFieldName = ["match_all"];
 
       if (conditionsWithFieldName.includes(conditionName)) {
         return {
