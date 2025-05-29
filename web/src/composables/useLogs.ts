@@ -5030,9 +5030,19 @@ const useLogs = () => {
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       
-      if(shouldGetPageCount(queryReq, fnParsedSQL())) {
+      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval === 0) {
         queryReq.query.size = queryReq.query.size + 1;
       }
+
+      // in case of live refresh, reset from to 0
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        router.currentRoute.value.name == "logs"
+      ) {
+        queryReq.query.from = 0;
+        searchObj.meta.refreshHistogram = false;
+      }
+      
 
       const requestId = initializeSearchConnection(payload);
 
@@ -5242,31 +5252,20 @@ const useLogs = () => {
   // Update results
 
   const handleStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
-    if (
-      searchObj.meta.refreshInterval > 0 &&
-      router.currentRoute.value.name == "logs"
-    ) {
+    // Scan-size and took time in histogram title
+    // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+    // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+    if (appendResult) {
+      searchObj.data.queryResults.hits.push(
+        ...response.content.results.hits,
+      );
+    } else {
       searchObj.data.queryResults.hits = response.content.results.hits;
     }
-
-    if (!searchObj.meta.refreshInterval) {
-      // Scan-size and took time in histogram title
-      // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
-      // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-      if (appendResult) {
-        searchObj.data.queryResults.hits.push(
-          ...response.content.results.hits,
-        );
-      } else {
-        searchObj.data.queryResults.hits = response.content.results.hits;
-      }
-      
-
-      if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (searchObj.data.queryResults.hits.length === payload.queryReq.query.size)) {
-        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, payload.queryReq.query.size - 1);
-      }
+    
+    if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval === 0 && (searchObj.data.queryResults.hits.length === payload.queryReq.query.size)) {
+      searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, payload.queryReq.query.size - 1);
     }
-
     processPostPaginationData();
   }
 
@@ -5280,56 +5279,44 @@ const useLogs = () => {
     ////// Handle reset field values ///////
     resetFieldValues();
 
-    if (
-      searchObj.meta.refreshInterval > 0 &&
-      router.currentRoute.value.name == "logs"
-    ) {
-      searchObj.data.queryResults.from = response.content.results.from;
-      searchObj.data.queryResults.scan_size =
+    // In page count we set track_total_hits
+    if (!payload.queryReq.query.hasOwnProperty("track_total_hits")) {
+      delete response.content.total;
+    } 
+    // Scan-size and took time in histogram title
+    // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+    // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+    if (appendResult) {
+      searchObj.data.queryResults.total += response.content.results.total;
+      searchObj.data.queryResults.took += response.content.results.took;
+      searchObj.data.queryResults.scan_size +=
         response.content.results.scan_size;
-      searchObj.data.queryResults.took = response.content.results.took;
-      searchObj.data.queryResults.aggs = response.content.results.aggs;
+    } else {
+      if (isPagination && response.content?.streaming_aggs) {
+        searchObj.data.queryResults.from = response.content.results.from;
+        searchObj.data.queryResults.scan_size =
+          response.content.results.scan_size;
+        searchObj.data.queryResults.took = response.content.results.took;
+      } else if (response.content?.streaming_aggs) {
+        searchObj.data.queryResults = {
+          ...response.content.results,
+          took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
+          scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
+          hits: searchObj.data?.queryResults?.hits || [],
+          streaming_aggs: response.content?.streaming_aggs,
+        }
+      } else if (isPagination) {
+        searchObj.data.queryResults.from = response.content.results.from;
+        searchObj.data.queryResults.scan_size =
+          response.content.results.scan_size;
+        searchObj.data.queryResults.took = response.content.results.took;
+        searchObj.data.queryResults.total = response.content.results.total;
+      } else {
+        searchObj.data.queryResults = response.content.results;
+      }
     }
 
-    if (!searchObj.meta.refreshInterval) {
-      // In page count we set track_total_hits
-      if (!payload.queryReq.query.hasOwnProperty("track_total_hits")) {
-        delete response.content.total;
-      }
-
-      // Scan-size and took time in histogram title
-      // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
-      // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-      if (appendResult) {
-        searchObj.data.queryResults.total += response.content.results.total;
-        searchObj.data.queryResults.took += response.content.results.took;
-        searchObj.data.queryResults.scan_size +=
-          response.content.results.scan_size;
-      } else {
-        if (isPagination && response.content?.streaming_aggs) {
-          searchObj.data.queryResults.from = response.content.results.from;
-          searchObj.data.queryResults.scan_size =
-            response.content.results.scan_size;
-          searchObj.data.queryResults.took = response.content.results.took;
-        } else if (response.content?.streaming_aggs) {
-          searchObj.data.queryResults = {
-            ...response.content.results,
-            took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
-            scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
-            hits: searchObj.data?.queryResults?.hits || [],
-            streaming_aggs: response.content?.streaming_aggs,
-          }
-        } else if (isPagination) {
-          searchObj.data.queryResults.from = response.content.results.from;
-          searchObj.data.queryResults.scan_size =
-            response.content.results.scan_size;
-          searchObj.data.queryResults.took = response.content.results.took;
-          searchObj.data.queryResults.total = response.content.results.total;
-        } else {
-          searchObj.data.queryResults = response.content.results;
-        }
-      }
-
+    if(searchObj.meta.refreshInterval === 0) {
       if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
       } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total != payload.queryReq.query.size)){
