@@ -795,6 +795,15 @@ pub async fn search_partition(
         part_num = 1000;
     }
 
+    log::info!(
+        "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {}, base_speed: {}, partition_secs: {}, part_num: {}",
+        resp.original_size,
+        cpu_cores,
+        cfg.limit.query_group_base_speed,
+        cfg.limit.query_partition_by_secs,
+        part_num
+    );
+
     // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
