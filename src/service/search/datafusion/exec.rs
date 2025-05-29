@@ -54,8 +54,8 @@ use {
     arrow::array::Int64Array,
     config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
     o2_enterprise::enterprise::{
-        common::downsampling::get_largest_downsampling_rule,
-        common::infra::config::get_config as get_o2_config, search::WorkGroup,
+        common::config::get_config as get_o2_config,
+        common::downsampling::get_largest_downsampling_rule, search::WorkGroup,
     },
     parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue},
 };
@@ -533,8 +533,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     #[cfg(feature = "enterprise")]
     ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());

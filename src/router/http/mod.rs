@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
@@ -147,6 +147,26 @@ async fn dispatch(
         .map(|x| x.as_str())
         .unwrap_or("")
         .to_string();
+
+    // HACK: node list api need return by itself
+    if path.contains("/api/_meta/node/list") {
+        let query =
+            web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
+                .ok()
+                .map(|x| x.into_inner())
+                .unwrap_or_default();
+        return crate::handler::http::request::organization::org::node_list_impl(
+            META_ORG_ID,
+            query,
+        )
+        .await
+        .map_err(|e| {
+            Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                format!("Failed to parse node list request: {:?}", e).as_str(),
+            )))
+        });
+    }
+
     let new_url = get_url(&path).await;
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable()

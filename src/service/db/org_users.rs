@@ -394,7 +394,7 @@ mod super_cluster {
 
     use config::utils::json;
     use infra::table::org_users::OrgUserPut;
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
     pub async fn org_user_add(
         key: &str,
