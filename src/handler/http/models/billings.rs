@@ -71,31 +71,3 @@ impl From<cloud_billings::org_usage::OrgUsageQueryResult> for OrgUserData {
         }
     }
 }
-
-#[derive(Clone, Debug, Serialize, ToSchema)]
-pub struct GetQuotaThresholdResponseBody {
-    pub data: OrgQuotaThreshold,
-    pub message: String,
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema, Default)]
-pub struct OrgQuotaThreshold {
-    ingestion: f64,
-    search: f64,
-    functions: f64,
-    other: f64,
-}
-
-impl From<cloud_billings::org_usage::OrgUsageThreshold> for GetQuotaThresholdResponseBody {
-    fn from(value: cloud_billings::org_usage::OrgUsageThreshold) -> Self {
-        Self {
-            data: OrgQuotaThreshold {
-                ingestion: value.ingestion,
-                search: value.search,
-                functions: value.functions,
-                other: value.other,
-            },
-            message: "Organization monthly quota pulled successfully".to_string(),
-        }
-    }
-}
