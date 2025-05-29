@@ -198,12 +198,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
-      <q-toggle
+      <div
         v-if="dashboardPanelData.data.config.trellis?.layout"
-        v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
-        label="Group multi Y-axis for trellis"
-        data-test="dashboard-config-trellis-group-by-y-axis"
-      />
+        class="row items-center"
+      >
+        <q-toggle
+          v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
+          label="Group multi Y-axis for trellis"
+          data-test="dashboard-config-trellis-group-by-y-axis"
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-trellis-group-by-y-axis-info"
+          />
+          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+            <div>
+              <b>Group multi Y-axis for trellis</b>
+              <br /><br />
+              When you have multiple Y-axis fields and a breakdown field:
+              <br /><br />
+              <b>Enabled:</b> Groups all Y-axis metrics for the same breakdown
+              value into a single trellis chart <br /><br />
+              <b>Disabled:</b> Creates separate trellis charts for each Y-axis
+              metric and breakdown value combination <br /><br />
+              <i
+                >Example: With Y-axis fields [CPU, Memory] and breakdown by
+                [Server A, Server B]:</i
+              >
+              <br />
+              • Enabled: 2 charts (Server A chart with CPU+Memory, Server B
+              chart with CPU+Memory)
+              <br />
+              • Disabled: 4 charts (Server A CPU, Server A Memory, Server B CPU,
+              Server B Memory)
+            </div>
+          </q-tooltip>
+        </div>
+      </div>
     </div>
 
     <q-toggle
