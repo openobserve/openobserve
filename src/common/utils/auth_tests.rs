@@ -3056,6 +3056,7 @@ mod tests {
                 feature_query_without_index: bool::default(),
                 feature_query_remove_filter_with_index: bool::default(),
                 feature_query_streaming_aggs: bool::default(),
+                streaming_aggs_partition_window_secs: i64::default(),
                 feature_join_match_one_enabled: bool::default(),
                 feature_join_right_side_max_rows: usize::default(),
                 feature_query_skip_wal: bool::default(),

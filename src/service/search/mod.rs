@@ -856,8 +856,13 @@ pub async fn search_partition(
     );
 
     // Generate partitions
-    let partitions =
-        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+    let partitions = generator.generate_partitions(
+        req.start_time,
+        req.end_time,
+        step,
+        sql_order_by,
+        is_streaming_aggregate,
+    );
 
     if sql_order_by == OrderBy::Asc {
         resp.order_by = OrderBy::Asc;

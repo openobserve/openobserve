@@ -52,10 +52,15 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        is_streaming_aggregate: bool,
     ) -> Vec<[i64; 2]> {
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
                 start_time, end_time, step, order_by,
+            )
+        } else if is_streaming_aggregate {
+            self.generate_partitions_with_streaming_aggregate_partition_window(
+                start_time, end_time, order_by,
             )
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
@@ -179,6 +184,34 @@ impl PartitionGenerator {
 
         partitions
     }
+
+    fn generate_partitions_with_streaming_aggregate_partition_window(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
+        // Generate partitions by DESC order
+        let window_micros = config::get_config()
+            .common
+            .streaming_aggs_partition_window_secs
+            * 1_000_000;
+        let mut end_window_hour = end_time - (end_time % window_micros);
+
+        let mut partitions = vec![[end_window_hour, end_time]];
+
+        while end_window_hour > start_time {
+            let start = std::cmp::max(end_window_hour - window_micros, start_time);
+            partitions.push([start, end_window_hour]);
+            end_window_hour = start;
+        }
+
+        if order_by == OrderBy::Asc {
+            partitions.reverse();
+        }
+
+        partitions
+    }
 }
 
 #[cfg(test)]
@@ -200,7 +233,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false);
 
         // Expected partitions:
         // Partition 1: 10:15 - 10:17
@@ -252,7 +286,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false);
 
         // Expected partitions for ASC order:
         // Partition 1: 10:02 - 10:05
@@ -324,7 +359,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false);
 
         // Expected partitions:
         // 1. 10:16 - 10:17 (mini partition)
@@ -381,7 +417,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false);
 
         // Expected partitions with ASC order:
         // 1. 10:02 - 10:03 (mini partition)
@@ -421,5 +458,34 @@ mod tests {
             mini_partition[0], start_time,
             "Mini partition should start at start_time"
         );
+    }
+
+    #[test]
+    fn test_partition_generator_with_streaming_aggregate_partition_window() {
+        let start_time: i64 = 1748513700000 * 1_000; // 10:15
+        let end_time: i64 = 1748528100000 * 1_000; // 14:15
+
+        let min_step = 300000000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
+        let step = 300000000; // 5 minutes
+
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true);
+
+        let mut expected_partitions = vec![
+            [1748527200000000, 1748528100000000], // 14:00 - 14:15
+            [1748523600000000, 1748527200000000], // 13:00 - 14:00
+            [1748520000000000, 1748523600000000], // 12:00 - 13:00
+            [1748516400000000, 1748520000000000], // 11:00 - 12:00
+            [1748513700000000, 1748516400000000], // 10:15 - 11:00
+        ];
+        assert_eq!(partitions, expected_partitions);
+
+        let partitions_asc =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true);
+        expected_partitions.reverse();
+        assert_eq!(partitions_asc, expected_partitions);
     }
 }
