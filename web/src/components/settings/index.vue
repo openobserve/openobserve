@@ -130,6 +130,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.nodes')"
             content-class="tab_content"
           />
+          <q-route-tab
+            v-if="config.isCloud == 'true' && isMetaOrg"
+            data-test="organization-management-tab"
+            name="organization_management"
+            :to="{
+              name: 'orgnizationManagement',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            icon="hub"
+            :label="t('settings.organizationManagement')"
+            content-class="tab_content"
+          />
         </q-tabs>
 
         </div>

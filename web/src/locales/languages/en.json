@@ -1117,7 +1117,17 @@
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
     "cipherKeys": "Cipher Keys",
     "nodes": "Nodes",
-    "enableStreamingSearch": "Enable Streaming Search"
+    "enableStreamingSearch": "Enable Streaming Search",
+    "organizationManagement": "Organization Management",
+    "extendTrial": "Extend Trial",
+    "searchOrgs": "Search Orgs",
+    "paginationOrganizationLabel": "Organization",
+    "org_name": "Org Name",
+    "org_identifier": "Org Identifier",
+    "subscription_status": "Subscription Status",
+    "created_on": "Created on",
+    "trial_expiry": "Trial Expiry",
+    "actions": "Actions"
   },
   "reports": {
     "header": "Reports",
