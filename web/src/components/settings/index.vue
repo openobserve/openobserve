@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 org_identifier: store.state.selectedOrganization.identifier,
               },
             }"
-            icon="hub"
+            icon="lan"
             :label="t('settings.organizationManagement')"
             content-class="tab_content"
           />

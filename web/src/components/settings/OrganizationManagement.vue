@@ -167,7 +167,16 @@ export default defineComponent({
     });
 
     onMounted(() => {
-      getData();
+      if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+        getData();
+      } else {
+        router.replace({
+          name: "general",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        })
+      }
     });
 
     const columns: any = ref<QTableProps["columns"]>([
