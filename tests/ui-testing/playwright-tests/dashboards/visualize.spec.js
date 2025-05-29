@@ -118,6 +118,20 @@ test.describe(" visualize UI testcases", () => {
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
+  async function waitForDashboardResponse(page) {
+    const response = await page.waitForResponse((response) => {
+      const url = response.url();
+      return (
+        url.includes("search_type=dashboards") &&
+        url.includes("use_cache=") &&
+        response.status() === 200
+      );
+    });
+
+    const data = await response.json();
+    expect(data.hits.length).toBeGreaterThan(0);
+    return data;
+  }
 
   test("should create logs when queries are ingested into the search field", async ({
     page,
@@ -233,115 +247,56 @@ test.describe(" visualize UI testcases", () => {
     await expect(
       page.locator('[data-test="chart-renderer"] canvas').last()
     ).toBeVisible();
+
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
 
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 457,
-          y: 135,
-        },
-      });
+    // Wait for and assert dashboard response after each chart type selection
+    await waitForDashboardResponse(page);
+
     await page.locator('[data-test="selected-chart-area-item"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 590,
-          y: 127,
-        },
-      });
+    await waitForDashboardResponse(page);
+
     await page
       .locator('[data-test="selected-chart-area-stacked-item"]')
       .click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 475,
-          y: 45,
-        },
-      });
+    await waitForDashboardResponse(page);
+
     await page.locator('[data-test="selected-chart-h-bar-item"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 722,
-          y: 52,
-        },
-      });
+    await waitForDashboardResponse(page);
+
     await page.locator('[data-test="selected-chart-scatter-item"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 362,
-          y: 30,
-        },
-      });
+    await waitForDashboardResponse(page);
+
     await page.locator('[data-test="selected-chart-pie-item"]').click();
-
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
+    await waitForDashboardResponse(page);
 
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 650,
-          y: 85,
-        },
-      });
     await page.locator('[data-test="selected-chart-donut-item"]').click();
-
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 216,
-          y: 53,
-        },
-      });
+    await waitForDashboardResponse(page);
+
     await page.locator('[data-test="selected-chart-gauge-item"]').click();
-
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .last()
-      .click({
-        position: {
-          x: 423,
-          y: 127,
-        },
-      });
+    await waitForDashboardResponse(page);
   });
 
   test("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
