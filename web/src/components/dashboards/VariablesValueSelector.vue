@@ -627,9 +627,17 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: true,
         };
-        // need to use initial value
-        // also, constant type variable should not be updated
-        if (item.type != "constant") {
+
+        // Set custom values immediately if they exist
+        if (
+          item.type === "query_values" &&
+          item.selectAllValueForMultiSelect === "custom" &&
+          item.customMultiSelectValue?.length > 0
+        ) {
+          variableData.value = item.multiSelect
+            ? item.customMultiSelectValue
+            : item.customMultiSelectValue[0];
+        } else if (item.type != "constant") {
           // for textbox type variable, if initial value is not exist, use the default value
           if (item.type == "textbox") {
             variableData.value = initialValue ?? variableData.value;
@@ -1073,11 +1081,23 @@ export default defineComponent({
             `[WebSocket] handleVariableType: building query context for ${variableObject.name}`,
           );
 
-          // If we have custom values, emit immediately before making API call
+          // Check if this is a child variable
+          const isChildVariable =
+            variablesDependencyGraph[variableObject.name]?.parentVariables
+              ?.length > 0;
+
+          // Only apply custom values during initial load
           if (
             variableObject?.selectAllValueForMultiSelect === "custom" &&
-            variableObject?.customMultiSelectValue?.length > 0
+            variableObject?.customMultiSelectValue?.length > 0 &&
+            !variableObject.isVariableLoadingPending
           ) {
+            // Set the custom values before making the API call
+            variableObject.value = variableObject.multiSelect
+              ? variableObject.customMultiSelectValue
+              : variableObject.customMultiSelectValue[0];
+
+            // Emit the updated values immediately
             emitVariablesData();
           }
 
@@ -1397,11 +1417,17 @@ export default defineComponent({
           );
 
           // Reset all child variables first
-          childVariableObjects.forEach((childVariable) => {
-            resetVariableState(childVariable);
-            childVariable.isVariableLoadingPending = true;
-            childVariable.isLoading = false;
-          });
+          childVariableObjects.forEach(
+            (childVariable: {
+              isVariableLoadingPending: boolean;
+              isLoading: boolean;
+              name: string;
+            }) => {
+              resetVariableState(childVariable);
+              childVariable.isVariableLoadingPending = true;
+              childVariable.isLoading = false;
+            },
+          );
 
           // Only attempt to load children if parent has a valid value
           if (hasValidValue) {
