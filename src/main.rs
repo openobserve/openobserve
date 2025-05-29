@@ -1199,13 +1199,9 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
             .await?;
     }
 
-    #[cfg(feature = "cloud")]
-    {
-        use crate::self_reporting::search::get_usage;
-        o2_enterprise::enterprise::metering::init(get_usage).await?;
-    }
     Ok(())
 }
+
 #[cfg(feature = "enterprise")]
 fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::Error> {
     if o2cfg.rate_limit.rate_limit_enabled {

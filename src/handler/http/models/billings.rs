@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,28 +51,23 @@ impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct GetOrgUsageResponseBody {
-    pub data: OrgUserData,
-    pub message: String,
+    pub data: Vec<OrgUserData>,
+    pub range: String,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema, Default)]
 pub struct OrgUserData {
-    ingestion: f64,
-    search: f64,
-    functions: f64,
-    other: f64,
+    pub event: String,
+    pub value: f64,
+    pub unit: String,
 }
 
-impl From<cloud_billings::org_usage::OrgUsage> for GetOrgUsageResponseBody {
-    fn from(value: cloud_billings::org_usage::OrgUsage) -> Self {
+impl From<cloud_billings::org_usage::OrgUsageQueryResult> for OrgUserData {
+    fn from(value: cloud_billings::org_usage::OrgUsageQueryResult) -> Self {
         Self {
-            data: OrgUserData {
-                ingestion: value.ingestion,
-                search: value.search,
-                functions: value.functions,
-                other: value.other,
-            },
-            message: "Data usage retried successfully".to_string(),
+            event: value.event.to_string(),
+            value: value.size,
+            unit: value.unit.to_string(),
         }
     }
 }
