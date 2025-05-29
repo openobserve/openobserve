@@ -247,56 +247,115 @@ test.describe(" visualize UI testcases", () => {
     await expect(
       page.locator('[data-test="chart-renderer"] canvas').last()
     ).toBeVisible();
-
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
 
-    // Wait for and assert dashboard response after each chart type selection
-    await waitForDashboardResponse(page);
-
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 457,
+          y: 135,
+        },
+      });
     await page.locator('[data-test="selected-chart-area-item"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await waitForDashboardResponse(page);
-
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 590,
+          y: 127,
+        },
+      });
     await page
       .locator('[data-test="selected-chart-area-stacked-item"]')
       .click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await waitForDashboardResponse(page);
-
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 475,
+          y: 45,
+        },
+      });
     await page.locator('[data-test="selected-chart-h-bar-item"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await waitForDashboardResponse(page);
-
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 722,
+          y: 52,
+        },
+      });
     await page.locator('[data-test="selected-chart-scatter-item"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await waitForDashboardResponse(page);
-
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 362,
+          y: 30,
+        },
+      });
     await page.locator('[data-test="selected-chart-pie-item"]').click();
+
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await waitForDashboardResponse(page);
 
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 650,
+          y: 85,
+        },
+      });
     await page.locator('[data-test="selected-chart-donut-item"]').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-    await waitForDashboardResponse(page);
 
-    await page.locator('[data-test="selected-chart-gauge-item"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-    await waitForDashboardResponse(page);
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 216,
+          y: 53,
+        },
+      });
+    await page.locator('[data-test="selected-chart-gauge-item"]').click();
+
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 423,
+          y: 127,
+        },
+      });
   });
 
   test("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
