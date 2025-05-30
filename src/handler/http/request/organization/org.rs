@@ -82,8 +82,8 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
         let Ok(records) = organization::list_all_orgs(limit).await else {
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    "Something went wrong".to_string(),
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Something went wrong",
                 )),
             );
         };
@@ -91,8 +91,8 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     } else {
         let Ok(records) = organization::list_orgs_by_user(user_id).await else {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                "Something went wrong".to_string(),
+                http::StatusCode::NOT_FOUND,
+                "Something went wrong",
             )));
         };
         records
@@ -184,10 +184,10 @@ async fn get_user_passcode(
     }
     match get_passcode(org_id, user_id).await {
         Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -222,10 +222,10 @@ async fn update_user_passcode(
     }
     match update_passcode(org_id, user_id).await {
         Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -260,10 +260,10 @@ async fn get_user_rumtoken(
     }
     match get_rum_token(org_id, user_id).await {
         Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -298,10 +298,10 @@ async fn update_user_rumtoken(
     }
     match update_rum_token(org_id, user_id).await {
         Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -336,10 +336,10 @@ async fn create_user_rumtoken(
     }
     match update_rum_token(org_id, user_id).await {
         Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -368,10 +368,8 @@ async fn create_org(
     let result = organization::create_org(&mut org, &user_email.user_id).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -401,18 +399,16 @@ async fn rename_org(
     let new_name = new_name.into_inner().new_name;
     if new_name.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "New name cannot be empty".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "New name cannot be empty",
         )));
     }
 
     let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -447,10 +443,8 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
                 .collect();
             Ok(HttpResponse::Ok().json(result))
         }
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -482,10 +476,8 @@ pub async fn generate_org_invite(
     let result = organization::generate_invitation(&org, &user_email.user_id, invites).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -516,10 +508,8 @@ async fn accept_org_invite(
     let result = organization::accept_invitation(&user_email.user_id, &invite_token).await;
     match result {
         Ok(_) => Ok(MetaHttpResponse::ok("Invitation accepted successfully")),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -568,8 +558,8 @@ pub async fn node_list_impl(
     // Ensure this API is only available for the "_meta" organization
     if org_id != config::META_ORG_ID {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            "This API is only available for the _meta organization".to_string(),
+            http::StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
         )));
     }
 
@@ -650,8 +640,8 @@ async fn cluster_info(
     // Ensure this API is only available for the "_meta" organization
     if org != config::META_ORG_ID {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            "This API is only available for the _meta organization".to_string(),
+            http::StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
         )));
     }
 

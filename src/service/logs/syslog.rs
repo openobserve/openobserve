@@ -68,8 +68,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     "Syslogs from the IP are not allowed".to_string(),
                 ))
                 .json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    "Syslogs from the IP are not allowed".to_string(),
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Syslogs from the IP are not allowed",
                 )));
         }
     };

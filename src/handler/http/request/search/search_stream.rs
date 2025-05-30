@@ -183,7 +183,9 @@ pub async fn search_http2_stream(
 
     // Set use_cache from query params
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    req.use_cache = Some(use_cache);
+    if use_cache {
+        req.use_cache = Some(use_cache);
+    }
 
     // Set search type if not set
     if req.search_type.is_none() {
