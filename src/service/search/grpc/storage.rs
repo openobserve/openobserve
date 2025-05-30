@@ -446,7 +446,7 @@ pub async fn cache_files(
         let file_age_hours = file_age_seconds as f64 / 3600.0;
         
         if file_age_hours > 0.0  {
-            config::metrics::FILE_ACCESS_TIME_BUCKET_HISTOGRAM
+            config::metrics::FILE_ACCESS_TIME
                 .with_label_values(&[&stream_type.to_string()])
                 .observe(file_age_hours);
         }

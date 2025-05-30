@@ -853,10 +853,10 @@ pub static FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(||
 });
 
 // File access time bucket histogram
-pub static FILE_ACCESS_TIME_BUCKET_HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
+pub static FILE_ACCESS_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
-            "file_access_time_bucket_histogram",
+            "file_access_time",
             "Histogram showing query counts within time windows from 1h to 1week (1h, 2h, 3h, 6h, 12h, 24h, 48h, 96h, 168h)"
         )
         .namespace(NAMESPACE)
@@ -1096,7 +1096,7 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(FILE_ACCESS_TIME_BUCKET_HISTOGRAM.clone()))
+        .register(Box::new(FILE_ACCESS_TIME.clone()))
         .expect("Metric registered");
 }
 
