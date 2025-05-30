@@ -261,12 +261,7 @@ pub async fn search_parquet(
     }
 
     // construct latest schema map
-    let latest_schema = Arc::new(
-        schema
-            .as_ref()
-            .clone()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -280,7 +275,7 @@ pub async fn search_parquet(
         }
         let schema = schema_versions[ver]
             .clone()
-            .with_metadata(std::collections::HashMap::new());
+            .with_metadata(Default::default());
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
@@ -433,12 +428,7 @@ pub async fn search_memtable(
     }
 
     // construct latest schema map
-    let latest_schema = Arc::new(
-        schema
-            .as_ref()
-            .clone()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
