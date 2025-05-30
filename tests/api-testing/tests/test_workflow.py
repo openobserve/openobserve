@@ -19,7 +19,7 @@ ZO_BASE_URL_SC2 = os.environ.get("ZO_BASE_URL_SC2")  # Use environment variable
 
 total_count = 2
 org_id = "default"
-stream_name = "default"
+stream_name = "stream_pytest_data"
 
 def test_workflow(create_session, base_url):
 
