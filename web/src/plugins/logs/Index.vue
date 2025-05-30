@@ -1560,16 +1560,22 @@ export default defineComponent({
 
     const getContext = async () => {
       return new Promise(async (resolve, reject) => {
-        const schema = await getStream(
-          searchObj.data.stream.selectedStream[0],
-          searchObj.data.stream.streamType || "logs",
-          true,
-        );
+        const payload = {};
 
-        resolve({
-          stream_name: searchObj.data.stream.selectedStream[0],
-          schema: schema.uds_schema || schema.schema || [],
-        });
+        for (let i = 0; i < searchObj.data.stream.selectedStream.length; i++) {
+          const schema = await getStream(
+            searchObj.data.stream.selectedStream[0],
+            searchObj.data.stream.streamType || "logs",
+            true,
+          );
+
+          payload["stream_name_" + (i + 1)] =
+            searchObj.data.stream.selectedStream[i];
+          payload["schema_" + (i + 1)] =
+            schema.uds_schema || schema.schema || [];
+        }
+
+        resolve(payload);
       });
     };
 
