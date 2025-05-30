@@ -342,11 +342,6 @@ test.describe("logs testcases", () => {
       .click();
 
     await page.waitForTimeout(1000);
-
-    // await page.getByText('e2e_automate').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
