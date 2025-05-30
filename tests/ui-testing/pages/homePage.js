@@ -68,4 +68,34 @@ export class HomePage {
         // TODO: Fix this test
         await expect(this.page).toHaveURL(orgNameIdentifier);
     }
+
+    async homeURLContains(orgNameIdentifier) {
+        const expectedURLPart = `org_identifier=${orgNameIdentifier}`;
+        const currentURL = this.page.url(); // Get the current page URL
+    
+        // Check if the current URL contains the expected identifier
+        await expect(currentURL).toContain(expectedURLPart);
+    }
+
+    async homeDefaultOrg() {
+        // Click the dropdown to open the list of organizations
+        await this.page.getByText('arrow_drop_down').click();
+    
+        // Wait for the dropdown options to be visible
+        await this.page.waitForTimeout(500); // Brief wait to ensure the dropdown opens
+    
+        // Check if the options are visible
+        const isDropdownVisible = await this.page.isVisible('[role="option"]');
+        if (!isDropdownVisible) {
+            throw new Error('Dropdown options are not visible');
+        }
+    
+        // Locate the 'default' option by its exact name and click it
+        await this.page.getByRole('option', { name: 'default' }).click();
+    
+        // Optionally, you can click the dropdown again to close it if necessary
+        await this.page.getByText('arrow_drop_down').click();
+    }
+    
+    
 }
