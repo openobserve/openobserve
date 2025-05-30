@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use actix_web::{Responder, get, web};
+use actix_web::{Responder, post, web};
 use config::utils::json;
 
 use crate::{
@@ -34,12 +34,23 @@ use crate::{
     security(
         ("Authorization" = [])
     ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = NewUserAttrition,
+        description = "New user attrition info",
+        example = json!({
+            "from": "Over the web",
+            "company": "Monster Inc.",
+        }),
+    ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
     ),
 )]
-#[get("/billings/new_user_attrition")]
+#[post("/{org_id}/billings/new_user_attrition")]
 pub async fn handle_new_attrition_event(
     user_email: UserEmail,
     req_body: web::Json<NewUserAttrition>,
@@ -48,7 +59,7 @@ pub async fn handle_new_attrition_event(
     let new_usr_attrition = req_body.into_inner();
 
     // Send new user info to ActiveCampaign via segment proxy
-    log::warn!("sending track event to segment");
+    log::info!("sending track event to segment");
     let segment_event_data = HashMap::from([
         (
             "from".to_string(),
