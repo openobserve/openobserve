@@ -949,7 +949,8 @@
     "enterpriseSubtitle": "Advanced functionality and support for Enterprise demands",
     "discountTag": "On Discount",
     "enterpriseNote": "High volume needs? Let's talk scale! Contact us for tailored solutions.",
-    "contactSupport": "Contact Support"
+    "contactSupport": "Contact Support",
+    "totalUsage": "Total Usage"
   },
   "message": {
     "ServerInternalError": "Error: Something went wrong. Internal server error.",

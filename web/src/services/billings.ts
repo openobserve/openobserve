@@ -58,9 +58,9 @@ const billings = {
   list_invoice_history: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billings/invoices`);
   },
-  get_data_usage: (org_identifier: string, usage_date: string) => {
+  get_data_usage: (org_identifier: string, usage_date: string, data_type: string) => {
     return http().get(
-      `/api/${org_identifier}/billings/data_usage/${usage_date}`
+      `/api/${org_identifier}/billings/data_usage/${usage_date}?data_type=${data_type}`
     );
   },
 };
