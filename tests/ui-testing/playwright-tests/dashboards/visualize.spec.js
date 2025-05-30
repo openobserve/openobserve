@@ -534,7 +534,6 @@ test.describe("logs testcases", () => {
       await page.waitForTimeout(300); // Small delay before checking again
     }
 
-    console.log("Dropdown count:", currentCount);
     expect(currentCount).toBeGreaterThan(0);
 
     // Validate the row element
