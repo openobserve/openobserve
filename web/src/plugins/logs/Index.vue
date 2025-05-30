@@ -1561,10 +1561,21 @@ export default defineComponent({
 
     const getContext = async () => {
       return new Promise(async (resolve, reject) => {
+        const isLogsPage = router.currentRoute.value.name === "logs";
+
+        const isStreamSelectedInLogsPage =
+          searchObj.meta.logsVisualizeToggle === "logs" &&
+          searchObj.data.stream.selectedStream.length;
+
+        const isStreamSelectedInDashboardPage =
+          searchObj.meta.logsVisualizeToggle === "visualize" &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+
         if (
-          router.currentRoute.value.name !== "logs" ||
-          searchObj.meta.logsVisualizeToggle !== "logs" ||
-          !searchObj.data.stream.selectedStream.length
+          !isLogsPage ||
+          !(isStreamSelectedInLogsPage || isStreamSelectedInDashboardPage)
         ) {
           resolve("");
           return;
@@ -1572,15 +1583,31 @@ export default defineComponent({
 
         const payload = {};
 
-        for (let i = 0; i < searchObj.data.stream.selectedStream.length; i++) {
-          const schema = await getStream(
-            searchObj.data.stream.selectedStream[0],
-            searchObj.data.stream.streamType || "logs",
-            true,
-          );
+        const streams =
+          searchObj.meta.logsVisualizeToggle === "logs"
+            ? searchObj.data.stream.selectedStream
+            : [
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream,
+              ];
 
-          payload["stream_name_" + (i + 1)] =
-            searchObj.data.stream.selectedStream[i];
+        const streamType =
+          searchObj.meta.logsVisualizeToggle === "logs"
+            ? searchObj.data.stream.streamType
+            : dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream_type;
+
+        if (!streamType || !streams?.length) {
+          resolve("");
+          return;
+        }
+
+        for (let i = 0; i < streams.length; i++) {
+          const schema = await getStream(streams[i], streamType, true);
+
+          payload["stream_name_" + (i + 1)] = streams[i];
           payload["schema_" + (i + 1)] =
             schema.uds_schema || schema.schema || [];
         }
