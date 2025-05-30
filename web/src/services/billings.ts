@@ -63,6 +63,9 @@ const billings = {
       `/api/${org_identifier}/billings/data_usage/${usage_date}`
     );
   },
+  submit_new_user_info: async ( org_identifier: string, payload: any,) => {
+    return http().post(`/api/${org_identifier}/billings/new_user_attrition`, payload);
+  }
 };
 
 export default billings;

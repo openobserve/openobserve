@@ -1046,3 +1046,14 @@ export function isAboveMinRefreshInterval(
   const minInterval = Number(config?.min_auto_refresh_interval) || 1;
   return value >= minInterval;
 }
+
+export function checkCallBackValues(url: string , key: string) {
+  const tokens = url.split("#");
+  for (const token of tokens) {
+    const propArr = token.split("=");
+    if (propArr[0] == key) {
+      return propArr[1];
+    }
+  }
+}
+
