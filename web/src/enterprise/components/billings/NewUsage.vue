@@ -220,7 +220,6 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       let chartData: any = ref({});
       onMounted(async () => {
         selectUsageDate();
-        pipelinesPanelDataKey.value++;
       });
       const usageDate: any = computed(() => {
         return router.currentRoute.value.query.usage_date ?? "30days";
@@ -245,6 +244,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         BillingService.get_data_usage(
           store.state.selectedOrganization.identifier,
           usageDate.value,
+          usageDataType.value
         )
           .then((res) => {
             dataLoading.value = false;
@@ -274,81 +274,6 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const searchIcon = getImageURL("images/usage/search.svg");
       const functionsIcon = getImageURL("images/usage/function.svg");
 
-      const pipelinesPanelData = computed(() => {
-        return {
-          chartType: "custom_chart",
-          tooltip: {
-            trigger: 'axis',
-            axisPointer: {
-              type: 'shadow'
-            },
-            formatter: function (params) {
-              const item = params[0];
-              return `${item.axisValue}<br/>Data Ingestion: ${item.data}`;
-            }
-          },
-          xAxis: {
-            type: "category",
-            data: [
-              "1 May", "2 May", "3 May", "4 May", "5 May", "6 May", "7 May", "8 May", "9 May", "10 May",
-              "11 May", "12 May", "13 May", "14 May", "15 May", "16 May", "17 May", "18 May", "19 May", "20 May",
-              "21 May", "22 May", "23 May", "24 May", "25 May", "26 May", "27 May", "28 May", "29 May", "30 May"
-            ],
-            nameLocation: "left",
-            nameGap: 10,
-            nameTextStyle: {
-              fontSize: 16,
-              fontWeight: "normal",
-              color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-            },
-            axisLabel: {
-              fontSize: 14,
-              color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
-            }
-          },
-          yAxis: {
-            type: "value",
-            min: 0,
-            max: 50,
-            interval: 10,
-            name: "Data Ingestion",
-            nameLocation: "middle",
-            nameGap: 30,
-            nameRotate: 90,
-            nameTextStyle: {
-              fontSize: 16,
-              fontWeight: "normal",
-              color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-            },
-            axisLabel: {
-              fontSize: 12,
-              color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-            },
-            splitLine: {
-              lineStyle: {
-                color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
-              }
-            }
-          },
-          series: [
-            {
-              data: [
-                32, 45, 21, 38, 26, 43, 49, 35, 40, 28,
-                31, 37, 22, 44, 25, 46, 39, 30, 27, 33,
-                42, 24, 48, 29, 36, 23, 41, 34, 20, 47
-              ],
-              type: "bar",
-              barWidth: "50%",
-              label: {
-                show: false
-              },
-              itemStyle: {
-                color: "#64B5F6"
-              }
-            }
-          ]
-        };
-      });
   const dataModel = ref(
             {
             "chartType": "bar",
@@ -922,7 +847,6 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         actionScriptIcon,
         errorTrackingIcon,
         rumSessionIcon,
-        pipelinesPanelData,
         pipelinesPanelDataKey,
         dataModel,
         ingestionIcon,
