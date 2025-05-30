@@ -136,6 +136,9 @@ export default defineComponent({
     // currently executing promise
     const currentlyExecutingPromises: any = {};
 
+    // Flag to track initial load
+    const isInitialLoad = ref(true);
+
     const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
@@ -628,11 +631,12 @@ export default defineComponent({
           isVariableLoadingPending: true,
         };
 
-        // Set custom values immediately if they exist
+        // Set custom values immediately if they exist and no URL value is present
         if (
           item.type === "query_values" &&
           item.selectAllValueForMultiSelect === "custom" &&
-          item.customMultiSelectValue?.length > 0
+          item.customMultiSelectValue?.length > 0 &&
+          !initialValue // Only set custom value if no URL value exists
         ) {
           variableData.value = item.multiSelect
             ? item.customMultiSelectValue
@@ -703,11 +707,17 @@ export default defineComponent({
 
       // load all variables
       loadAllVariablesData(true);
+
+      // Set initial load flag to false after first load
+      isInitialLoad.value = false;
     });
 
     watch(
       () => props.variablesConfig,
       async () => {
+        // Reset initial load flag when config changes
+        isInitialLoad.value = true;
+
         // make list of variables using variables config list
         initializeVariablesData();
 
@@ -716,6 +726,9 @@ export default defineComponent({
         skipAPILoad.value = false;
         // load all variables
         loadAllVariablesData(true);
+
+        // Set initial load flag to false after load
+        isInitialLoad.value = false;
       },
     );
 
@@ -1086,11 +1099,14 @@ export default defineComponent({
             variablesDependencyGraph[variableObject.name]?.parentVariables
               ?.length > 0;
 
-          // Only apply custom values during initial load
+          // Only apply custom values during initial load and if variable is not pending and no URL value exists
           if (
             variableObject?.selectAllValueForMultiSelect === "custom" &&
             variableObject?.customMultiSelectValue?.length > 0 &&
-            !variableObject.isVariableLoadingPending
+            !variableObject.isVariableLoadingPending &&
+            isInitialLoad.value && // Check if this is initial load
+            !oldVariablesData[variableObject.name] && // Only set during initial load
+            !props.initialVariableValues?.value[variableObject.name] // Don't set if URL value exists
           ) {
             // Set the custom values before making the API call
             variableObject.value = variableObject.multiSelect
