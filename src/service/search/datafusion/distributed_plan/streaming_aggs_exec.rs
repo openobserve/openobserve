@@ -16,12 +16,14 @@
 use std::{
     any::Any,
     collections::VecDeque,
+    fs::File,
+    path::Path,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 
-use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader as ArrowFileReader};
 use dashmap::DashMap;
 use datafusion::{
     common::{Result, Statistics},
@@ -37,6 +39,8 @@ use datafusion::{
 use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
 
+use crate::service::search::cache::streaming_aggs::cache_streaming_aggs_to_disk;
+
 pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
     Lazy::new(|| Arc::new(StreamingAggsCache::default()));
 
@@ -44,13 +48,13 @@ pub static GLOBAL_ID_CACHE: Lazy<Arc<StreamingIdCache>> =
     Lazy::new(|| Arc::new(StreamingIdCache::default()));
 
 // init streaming cache for the id
-pub fn init_cache(id: &str, start_time: i64, end_time: i64) {
-    GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time);
+pub fn init_cache(id: &str, start_time: i64, end_time: i64, file_path: &str) {
+    GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time, file_path.to_string());
     log::debug!(
         "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}",
         id,
         start_time,
-        end_time
+        end_time,
     );
 }
 
@@ -237,7 +241,24 @@ impl Stream for MonitorStream {
                 let streaming_done =
                     GLOBAL_ID_CACHE.check_time(&self.id, self.start_time, self.end_time);
                 if streaming_done {
+                    // get all the record batches
+                    let all_records = GLOBAL_CACHE.get(&self.id);
+                    let file_path = get_file_path_from_streaming_id(&self.id);
+                    let file_name = format!("{}_{}.arrow", self.start_time, self.end_time);
+                    // remove the cache
                     remove_cache(&self.id);
+                    // write the record batches to the file
+                    if let Some(records) = all_records {
+                        if let Err(e) =
+                            cache_streaming_aggs_to_disk(&file_path, &file_name, records)
+                        {
+                            log::error!(
+                                "[streaming_id: {}] Error caching streaming aggs record batches to disk: {:?}",
+                                self.id,
+                                e
+                            );
+                        }
+                    }
                 }
                 Poll::Ready(None)
             }
@@ -327,9 +348,9 @@ impl StreamingIdCache {
         }
     }
 
-    pub fn insert(&self, k: String, start_time: i64, end_time: i64) {
+    pub fn insert(&self, k: String, start_time: i64, end_time: i64, file_path: String) {
         self.data
-            .insert(k, StreamingIdItem::new(start_time, end_time));
+            .insert(k, StreamingIdItem::new(start_time, end_time, file_path));
     }
 
     pub fn exists(&self, k: &str) -> bool {
@@ -346,6 +367,16 @@ impl StreamingIdCache {
     pub fn remove(&self, k: &str) {
         self.data.remove(k);
     }
+
+    pub fn get_file_path(&self, k: &str) -> Option<String> {
+        let entry = self.data.get(k);
+        if let Some(v) = entry {
+            let file_path = v.value().get_file_path();
+            Some(file_path)
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for StreamingIdCache {
@@ -359,15 +390,17 @@ struct StreamingIdItem {
     end_time: i64,
     start_ok: bool,
     end_ok: bool,
+    file_path: String,
 }
 
 impl StreamingIdItem {
-    pub fn new(start_time: i64, end_time: i64) -> Self {
+    pub fn new(start_time: i64, end_time: i64, file_path: String) -> Self {
         Self {
             start_time,
             end_time,
             start_ok: false,
             end_ok: false,
+            file_path,
         }
     }
 
@@ -380,4 +413,13 @@ impl StreamingIdItem {
         }
         self.start_ok && self.end_ok
     }
+
+    pub fn get_file_path(&self) -> String {
+        self.file_path.clone()
+    }
+}
+
+fn get_file_path_from_streaming_id(streaming_id: &str) -> String {
+    let file_path = GLOBAL_ID_CACHE.get_file_path(streaming_id);
+    file_path.unwrap_or_default()
 }

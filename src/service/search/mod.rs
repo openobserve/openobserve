@@ -33,7 +33,9 @@ use config::{
     },
     metrics,
     utils::{
-        base64, json,
+        base64,
+        hash::Sum64,
+        json,
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
         time::now_micros,
@@ -631,11 +633,49 @@ pub async fn search_partition(
     } else {
         None
     };
+
+    let origin_sql = req.sql.clone();
+    let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
+        // TODO: cache don't not support multiple stream names
+        Ok(v) => (v[0].clone(), v.join(",")),
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
+        }
+    };
+
+    // TODO: add action_id to the query
+    // let action = req
+    //     .query
+    //     .action_id
+    //     .as_ref()
+    //     .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
+    // calculate hash for the query
+    let mut hash_body = vec![origin_sql];
+    if let Some(vrl_function) = &req.query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    // if let Some(action_id) = req.action {
+    //     hash_body.push(action_id.to_string());
+    // }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
+    let mut h = config::utils::hash::gxhash::new();
+    let hashed_query = h.sum64(&hash_body.join(","));
+
+    let file_path = format!(
+        "{}/{}/{}/{}",
+        org_id, stream_type, stream_name, hashed_query
+    );
+
     if let Some(id) = &streaming_id {
         log::info!(
             "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
         );
-        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time);
+        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &file_path);
     }
 
     let mut files = Vec::new();
