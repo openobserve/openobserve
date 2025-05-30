@@ -6373,6 +6373,7 @@ const useLogs = () => {
     sendCancelSearchMessage,
     isDistinctQuery,
     isWithQuery,
+    getStream
   };
 };
 

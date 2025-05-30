@@ -388,6 +388,7 @@ import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import useAiChat from "@/composables/useAiChat";
 
 export default defineComponent({
   name: "PageSearch",
@@ -570,6 +571,7 @@ export default defineComponent({
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
+      getStream,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -596,6 +598,8 @@ export default defineComponent({
     const visualizeErrorData: any = reactive({
       errors: [],
     });
+
+    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 
     // function restoreUrlQueryParams() {
     //   const queryParams = router.currentRoute.value.query;
@@ -655,11 +659,14 @@ export default defineComponent({
           router.back();
         }
       }
+
+      registerAiContextHandler();
     });
 
     onBeforeUnmount(() => {
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
+      removeAiContextHandler();
     });
 
     onActivated(() => {
@@ -1545,6 +1552,33 @@ export default defineComponent({
       sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
     };
 
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        const schema = await getStream(
+          searchObj.data.stream.selectedStream[0],
+          searchObj.data.stream.streamType || "logs",
+          true,
+        );
+
+        resolve({
+          stream_name: searchObj.data.stream.selectedStream[0],
+          schema: schema.uds_schema || schema.schema || [],
+        });
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
     return {
       t,
       store,
@@ -1828,7 +1862,7 @@ export default defineComponent({
       this.refreshHistogramChart();
     },
   },
-});
+}) as any;
 </script>
 
 <style lang="scss">
