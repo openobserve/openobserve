@@ -51,6 +51,8 @@ pub async fn get_streaming_aggs_records_from_disk(
     }
 
     let mut cached_records = Vec::new();
+    let mut cache_start_time: i64 = i64::MAX;
+    let mut cache_end_time: i64 = i64::MIN;
 
     // Check if cached records were found for the entire time range
     let read_dir = std::fs::read_dir(&cache_path)?;
@@ -109,17 +111,30 @@ pub async fn get_streaming_aggs_records_from_disk(
                 })?;
                 cached_records.push(batch);
             }
+            cache_start_time = std::cmp::min(cache_start_time, file_start_time);
+            cache_end_time = std::cmp::max(cache_end_time, file_end_time);
         }
     }
 
     // Return the cached records if any were found
     if !cached_records.is_empty() {
         log::info!(
-            "Loaded {} cached record batches from {}",
+            "Loaded {} cached record batches cache_start_time: {}, cache_end_time: {}",
             cached_records.len(),
-            file_path
+            cache_start_time,
+            cache_end_time
         );
-        return Ok((cached_records, true));
+        if cache_start_time == start_time && cache_end_time == end_time {
+            log::info!("Found cached records for the entire time range");
+            return Ok((cached_records, true));
+        } else {
+            log::info!(
+                "Found cached records for the time range: {}, {}",
+                cache_start_time,
+                cache_end_time
+            );
+            return Ok((cached_records, false));
+        }
     }
 
     // No cached records found
