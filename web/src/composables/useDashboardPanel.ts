@@ -48,6 +48,7 @@ const getDefaultDashboardPanelData: any = () => ({
       trellis: {
         layout: null,
         num_of_columns: 1,
+        group_by_y_axis: false,
       },
       show_legends: true,
       legends_position: null,

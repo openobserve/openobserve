@@ -338,12 +338,7 @@ pub async fn search(
     };
 
     // construct latest schema map
-    let latest_schema = Arc::new(
-        schema
-            .as_ref()
-            .clone()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -356,7 +351,7 @@ pub async fn search(
             continue;
         }
         let schema = schema_versions[ver].clone();
-        let schema = schema.with_metadata(std::collections::HashMap::new());
+        let schema = schema.with_metadata(Default::default());
 
         let session = config::meta::search::Session {
             id: format!("{}-storage-{ver}", query.trace_id),

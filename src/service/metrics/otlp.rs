@@ -74,7 +74,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
                 e
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Invalid proto: {}", e),
             )));
         }
@@ -98,7 +98,7 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Invalid json: {}", e),
             )));
         }
@@ -124,8 +124,8 @@ pub async fn handle_otlp_request(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, "not an ingester".to_string()))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                "not an ingester",
             )));
     }
 
@@ -133,7 +133,7 @@ pub async fn handle_otlp_request(
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
+            http::StatusCode::FORBIDDEN,
             format!("Quota exceeded for this organization [{}]", org_id),
         )));
     }
@@ -142,8 +142,8 @@ pub async fn handle_otlp_request(
     if let Err(e) = ingester::check_memtable_size() {
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                e,
             )),
         );
     }

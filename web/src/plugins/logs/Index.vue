@@ -1667,7 +1667,11 @@ export default defineComponent({
         ? this.searchObj.config.lastSplitterPosition
         : 0;
     },
-    async showHistogram() {
+    async showHistogram(newVal, oldVal) {
+      if(newVal == true && oldVal == false && this.searchObj.meta.histogramDirtyFlag == true && this.searchObj.data.queryResults.hits.length > 0){
+        this.searchObj.meta.resetPlotChart = true;
+        this.searchObj.data.queryResults.aggs = [];
+      }
       let parsedSQL = null;
 
       if (this.searchObj.meta.sqlMode) parsedSQL = this.fnParsedSQL();
@@ -1706,8 +1710,8 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          const shouldUseWebSocket = this.isWebSocketEnabled();
-          const shouldUseStreaming = this.isStreamingEnabled();
+          const shouldUseWebSocket = this.isWebSocketEnabled(this.store.state);
+          const shouldUseStreaming = this.isStreamingEnabled(this.store.state);
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
