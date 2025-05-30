@@ -3,20 +3,15 @@ import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time";
-import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
-import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
-import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
-import DashboardFolder from "../../pages/dashboardPages/dashboard-folder";
-import DashboardDrilldownPage from "../../pages/dashboardPages/dashboard-drilldown";
-import { waitForDashboardPage } from "../utils/dashCreation.js";
+import {
+  waitForDashboardPage,
+  deleteDashboard,
+} from "../utils/dashCreation.js";
 
 test.describe.configure({ mode: "parallel" });
 
-test.describe("dashboard filter testcases", () => {
+test.describe("dashboard tabs setting", () => {
   const generateDashboardName = (prefix = "Dashboard") =>
     `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
@@ -50,7 +45,14 @@ test.describe("dashboard filter testcases", () => {
     // Open dashboard settings and add a tab
     await dashboardSetting.openSetting();
     await dashboardSetting.addTabSetting(newTabName);
+
+    // Cancel the tab without saving
     await dashboardSetting.cancelTabwithoutSave();
+    await dashboardSetting.closeSettingDashboard();
+
+    //delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should go to tabs, click on add tab, add its name and save it", async ({
@@ -78,6 +80,17 @@ test.describe("dashboard filter testcases", () => {
     await dashboardSetting.openSetting();
     await dashboardSetting.addTabSetting(newTabName);
     await dashboardSetting.saveTabSetting();
+    await dashboardSetting.closeSettingDashboard();
+    await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.getByText("Tab added successfully")).toBeVisible({
+      timeout: 2000,
+    });
+
+    //delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should edit tab name and save it", async ({ page }) => {
@@ -105,10 +118,27 @@ test.describe("dashboard filter testcases", () => {
     await dashboardSetting.openSetting();
     await dashboardSetting.addTabSetting(newTabName);
     await dashboardSetting.saveTabSetting();
+    await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.getByText("Tab added successfully")).toBeVisible({
+      timeout: 2000,
+    });
 
-    // Edit the tab name
+    // Edit the tab name and save it
     await dashboardSetting.updateDashboardTabName(newTabName, updatedTabName);
     await dashboardSetting.saveEditedtab();
+    await expect(page.getByText("Tab added successfully")).toBeVisible({
+      timeout: 2000,
+    });
+    await expect(page.getByText("Tab updated successfully")).toBeVisible({
+      timeout: 2000,
+    });
+    await dashboardSetting.closeSettingDashboard();
+
+    //delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
   test("should edit tab name and cancel it", async ({ page }) => {
     const randomDashboardName = generateDashboardName();
@@ -136,9 +166,20 @@ test.describe("dashboard filter testcases", () => {
     await dashboardSetting.addTabSetting(newTabName);
     await dashboardSetting.saveTabSetting();
 
-    // Edit the tab name
+    // Edit the tab name and cancel it
     await dashboardSetting.updateDashboardTabName(newTabName, updatedTabName);
     await dashboardSetting.cancelEditedtab();
+    await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.getByText("Tab added successfully")).toBeVisible({
+      timeout: 2000,
+    });
+    await dashboardSetting.closeSettingDashboard();
+
+    //delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("should delete tab, click delete and confirm it", async ({ page }) => {
@@ -164,6 +205,23 @@ test.describe("dashboard filter testcases", () => {
     await dashboardSetting.openSetting();
     await dashboardSetting.addTabSetting(newTabName);
     await dashboardSetting.saveTabSetting();
+
+    await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.getByText("Tab added successfully")).toBeVisible({
+      timeout: 2000,
+    });
+    
+    // Delete the tab
     await dashboardSetting.deleteTab(newTabName);
+    await expect(page.getByText("Tab deleted successfully")).toBeVisible({
+      timeout: 2000,
+    });
+    await dashboardSetting.closeSettingDashboard();
+
+    //delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 });
