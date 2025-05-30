@@ -564,6 +564,10 @@ export const timestampToTimezoneDate = (
   timezone: string = "UTC",
   format: string = "yyyy-MM-dd HH:mm:ss.SSS",
 ) => {
+  if (unixMilliTimestamp > 1e14) {
+    unixMilliTimestamp = Math.floor(unixMilliTimestamp / 1000); // convert microseconds to milliseconds
+  }
+
   return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
     .setZone(timezone)
     .toFormat(format);
