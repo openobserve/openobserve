@@ -23,7 +23,7 @@ use infra::dist_lock;
 #[cfg(feature = "cloud")]
 use o2_enterprise::enterprise::cloud::is_ofga_migrations_done;
 use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
+    common::config::get_config as get_o2_config,
     super_cluster::kv::ofga::{get_model, set_model},
 };
 use o2_openfga::{

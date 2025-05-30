@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -66,7 +66,11 @@ pub async fn save_destination(
     };
     log::warn!("dest module is alert: {}", dest.is_alert_destinations());
     match destinations::save("", dest, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Destination saved")),
+        Ok(v) => Ok(MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Destination saved")
+                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
+                .with_name(v.name),
+        )),
         Err(e) => Ok(e.into()),
     }
 }

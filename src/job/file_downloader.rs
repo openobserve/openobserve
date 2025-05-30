@@ -15,16 +15,28 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
-use config::{get_config, metrics, utils::time::now_micros};
+use config::{
+    cluster::LOCAL_NODE,
+    get_config,
+    meta::cluster::{Role, RoleGroup, get_internal_grpc_token},
+    metrics,
+    utils::time::now_micros,
+};
+use futures_util::StreamExt;
+use hashbrown::{HashMap, HashSet};
 use infra::cache::file_data;
 use once_cell::sync::Lazy;
+use proto::cluster_rpc::{SimpleFileList, event_client::EventClient};
 use tokio::sync::{
     Mutex,
     mpsc::{Receiver, Sender},
 };
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue};
 
-/// (trace_id, account, file, size, cache_type)
-type FileInfo = (String, String, String, usize, file_data::CacheType);
+use crate::common::infra::cluster;
+
+/// (trace_id, file_id, account, file, size, cache_type)
+type FileInfo = (String, i64, String, String, usize, file_data::CacheType);
 
 mod processing_files {
     use hashbrown::HashSet;
@@ -108,13 +120,17 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         log::debug!("[FILE_CACHE_DOWNLOAD:JOB:NORMAL] Receiving channel is closed");
                         break;
                     }
-                    Some((trace_id, account, file, file_size, cache)) => {
+                    Some((trace_id, id, account, file, file_size, cache)) => {
                         // check if the file is already being downloaded
                         if processing_files::is_processing(&file) {
                             log::warn!(
                                 "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
                                 file
                             );
+                            // update metrics
+                            metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
+                                .with_label_values(&[])
+                                .dec();
                             continue;
                         }
 
@@ -122,8 +138,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         processing_files::add(&file);
 
                         // download the file
-                        match download_file(thread, &trace_id, &account, &file, file_size, cache)
-                            .await
+                        match download_file(
+                            thread, &trace_id, id, &account, &file, file_size, cache,
+                        )
+                        .await
                         {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
@@ -175,9 +193,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     }
                     break;
                 }
-                Some((trace_id, account, file, file_size, cache)) => {
+                Some((trace_id, id, account, file, file_size, cache)) => {
                     PRIORITY_FILE_DOWNLOAD_CHANNEL
-                        .push((trace_id, account, file, file_size, cache))
+                        .push((trace_id, id, account, file, file_size, cache))
                         .await;
                 }
             }
@@ -199,13 +217,17 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     _ = async {
                         let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                         match file_info {
-                            Some((trace_id, account, file, file_size, cache)) => {
+                            Some((trace_id, id, account, file, file_size, cache)) => {
                                  // check if the file is already being downloaded
                                 if processing_files::is_processing(&file) {
                                     log::warn!(
                                         "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
                                         file
                                     );
+                                    // update metrics
+                                    metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
+                                        .with_label_values(&[])
+                                        .dec();
                                     return;
                                 }
 
@@ -213,7 +235,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 processing_files::add(&file);
 
                                 // download the file
-                                match download_file(thread, &trace_id, &account, &file, file_size, cache).await {
+                                match download_file(thread, &trace_id, id, &account, &file, file_size, cache).await {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
                                             log::warn!(
@@ -257,12 +279,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn download_file(
     thread: usize,
     trace_id: &str,
+    file_id: i64,
     account: &str,
     file_name: &str,
     file_size: usize,
     cache_type: file_data::CacheType,
 ) -> Result<usize, anyhow::Error> {
     let cfg = get_config();
+
+    // download file from node
+    if cfg.cache_latest_files.download_from_node {
+        if let Ok(ok) =
+            download_file_with_consistent_hash(file_id, account, file_name, file_size).await
+        {
+            if ok {
+                return Ok(file_size);
+            }
+        }
+    }
+
+    // download from object store
     let size = if file_size > 0 { Some(file_size) } else { None };
     let start = std::time::Instant::now();
     let ret = match cache_type {
@@ -295,8 +331,180 @@ async fn download_file(
     ret
 }
 
+async fn download_file_with_consistent_hash(
+    file_id: i64,
+    account: &str,
+    file_name: &str,
+    file_size: usize,
+) -> Result<bool, anyhow::Error> {
+    let role_group = if LOCAL_NODE.is_interactive_querier() {
+        RoleGroup::Interactive
+    } else {
+        RoleGroup::Background
+    };
+    let Some(node_name) = cluster::get_node_from_consistent_hash(
+        &file_id.to_string(),
+        &Role::Querier,
+        Some(role_group),
+    )
+    .await
+    else {
+        return Ok(false);
+    };
+    // get node by file_id
+    let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
+        return Ok(false);
+    };
+    // download file from node
+    let Ok(failed) = download_from_node(
+        &node.grpc_addr,
+        &[(
+            file_id,
+            account.to_string(),
+            file_name.to_string(),
+            file_size as i64,
+            0,
+        )],
+    )
+    .await
+    else {
+        return Ok(false);
+    };
+    // failed is empty means download success
+    Ok(failed.is_empty())
+}
+
+// download files from node and return download failed files
+// file: (account, file, size, ts)
+pub async fn download_from_node(
+    addr: &str,
+    files: &[(i64, String, String, i64, i64)],
+) -> Result<Vec<(i64, String, String, i64, i64)>, anyhow::Error> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+    log::debug!(
+        "[FILE_CACHE_DOWNLOAD:gRPC] Download files from node start, files: {:?}",
+        files.len()
+    );
+
+    let token: MetadataValue<_> = get_internal_grpc_token()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Invalid token"))?;
+
+    let channel = crate::service::grpc::get_cached_channel(addr).await?;
+    let client = EventClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
+        req.metadata_mut().insert("authorization", token.clone());
+        Ok(req)
+    });
+
+    let file_size_map = files
+        .iter()
+        .filter_map(|(_, _, f, s, _)| {
+            if *s > cfg.cache_latest_files.download_node_size * 1024 * 1024 {
+                None
+            } else {
+                Some((f, *s as usize))
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    if file_size_map.is_empty() {
+        return Ok(files.to_vec());
+    }
+    let request = tonic::Request::new(SimpleFileList {
+        files: files.iter().map(|(_, _, f, ..)| f.to_string()).collect(),
+    });
+
+    let resp = client
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .get_files(request)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get files from {addr}, {e}"))?;
+
+    let mut file_contents = HashMap::new();
+    let mut downloaded_files = HashSet::new();
+    let mut resp_stream = resp.into_inner();
+    while let Some(resp) = resp_stream.next().await {
+        let resp = match resp {
+            Ok(resp) => resp,
+            Err(err) => {
+                if err.code() == tonic::Code::NotFound {
+                    log::debug!(
+                        "[FILE_CACHE_DOWNLOAD:gRPC] Failed to download file {} from {}: file not found",
+                        err.message(),
+                        addr
+                    );
+                    continue;
+                }
+                return Err(anyhow::anyhow!(
+                    "Failed to download file from {addr}, {err}"
+                ));
+            }
+        };
+        for content in resp.entries {
+            let entry = file_contents
+                .entry(content.filename.clone())
+                .or_insert(bytes::BytesMut::new());
+            entry.extend_from_slice(&content.content);
+            downloaded_files.insert(content.filename);
+        }
+    }
+
+    log::debug!(
+        "[FILE_CACHE_DOWNLOAD:gRPC] Successfully retrieved {} files from {} in {} ms",
+        downloaded_files.len(),
+        addr,
+        start.elapsed().as_millis()
+    );
+
+    // Cache the file contents
+    for (file, content) in file_contents {
+        let data = content.freeze();
+        if let Some(size) = file_size_map.get(&file) {
+            if *size != data.len() {
+                log::warn!(
+                    "[FILE_CACHE_DOWNLOAD:gRPC] Failed to download file {} from {}: size mismatch, expected {} but got {}",
+                    file,
+                    addr,
+                    size,
+                    data.len()
+                );
+                downloaded_files.remove(&file);
+                continue;
+            }
+        }
+        if let Err(e) = infra::cache::file_data::set(&file, data).await {
+            log::error!(
+                "[FILE_CACHE_DOWNLOAD:gRPC] Failed to cache file {}: {}",
+                file,
+                e
+            );
+            downloaded_files.remove(&file);
+        }
+    }
+
+    // Return list of failed files
+    let failed_files: Vec<_> = files
+        .iter()
+        .filter(|(_, f, ..)| !downloaded_files.contains(f))
+        .cloned()
+        .collect();
+
+    log::debug!(
+        "[FILE_CACHE_DOWNLOAD:gRPC] Failed to retrieve {} files from {} in {} ms",
+        failed_files.len(),
+        addr,
+        start.elapsed().as_millis()
+    );
+
+    Ok(failed_files)
+}
+
 pub async fn queue_download(
     trace_id: String,
+    id: i64,
     account: String,
     file: String,
     size: i64,
@@ -312,7 +520,7 @@ pub async fn queue_download(
     {
         PRIORITY_FILE_DOWNLOAD_CHANNEL
             .sender
-            .send((trace_id, account, file, size as usize, cache_type))
+            .send((trace_id, id, account, file, size as usize, cache_type))
             .await?;
 
         // update metrics
@@ -324,6 +532,7 @@ pub async fn queue_download(
             .sender
             .send((
                 trace_id,
+                id,
                 account,
                 file.to_owned(),
                 size as usize,

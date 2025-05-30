@@ -452,8 +452,8 @@ pub async fn update_ratelimit(
         log::debug!("RatelimitRule::from_updater rules: {:?}", rules);
         match ratelimit::rule::update(RuleEntry::UpsertBatch(rules)).await {
             Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "Ratelimit rule updated successfully".to_string(),
+                http::StatusCode::OK,
+                "Ratelimit rule updated successfully",
             ))),
             Err(e) => Ok(e.into()),
         }

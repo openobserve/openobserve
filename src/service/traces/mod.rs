@@ -93,7 +93,7 @@ pub async fn otlp_proto(
                 e
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Invalid proto: {}", e),
             )));
         }
@@ -128,7 +128,7 @@ pub async fn otlp_json(
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Invalid json: {}", e),
             )));
         }
@@ -158,8 +158,8 @@ pub async fn handle_otlp_request(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, "not an ingester".to_string()))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                "not an ingester",
             )));
     }
 
@@ -167,7 +167,7 @@ pub async fn handle_otlp_request(
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
+            http::StatusCode::FORBIDDEN,
             format!("Quota exceeded for this organization [{}]", org_id),
         )));
     }
@@ -180,8 +180,8 @@ pub async fn handle_otlp_request(
         );
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                e,
             )),
         );
     }
@@ -420,8 +420,8 @@ pub async fn handle_otlp_request(
                             .append_header((ERROR_HEADER, format!("[trace_id: {trace_id}] stream did not receive a valid json object")))
                             .json(
                                 MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    "stream did not receive a valid json object".into(),
+                                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    "stream did not receive a valid json object",
                                 ),
                             ));
                         }
@@ -509,8 +509,8 @@ pub async fn handle_otlp_request(
                                         "stream did not receive a valid json object",
                                     ))
                                     .json(MetaHttpResponse::error(
-                                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                        "stream did not receive a valid json object".into(),
+                                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                                        "stream did not receive a valid json object",
                                     )));
                             }
                         };
@@ -552,7 +552,7 @@ pub async fn handle_otlp_request(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                http::StatusCode::INTERNAL_SERVER_ERROR,
                 format!("error while writing trace data: {e}"),
             )));
     }
@@ -599,8 +599,8 @@ pub async fn ingest_json(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, "not an ingester".to_string()))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                "not an ingester",
             )));
     }
 
@@ -608,7 +608,7 @@ pub async fn ingest_json(
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
+            http::StatusCode::FORBIDDEN,
             format!("Quota exceeded for this organization [{}]", org_id),
         )));
     }
@@ -621,8 +621,8 @@ pub async fn ingest_json(
         );
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                e,
             )),
         );
     }
@@ -681,8 +681,8 @@ pub async fn ingest_json(
                         ),
                     ))
                     .json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        "stream did not receive a valid json object".into(),
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "stream did not receive a valid json object",
                     )));
             }
         };
@@ -709,7 +709,7 @@ pub async fn ingest_json(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                http::StatusCode::INTERNAL_SERVER_ERROR,
                 format!("error while writing trace data: {e}"),
             )));
     }

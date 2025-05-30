@@ -24,7 +24,10 @@ use infra::{
     table::org_users::{self, OrgUserExpandedRecord, OrgUserRecord, UserOrgExpandedRecord},
 };
 
-use crate::common::infra::config::{ORG_USERS, ROOT_USER, USERS, USERS_RUM_TOKEN};
+use crate::common::{
+    infra::config::{ORG_USERS, ROOT_USER, USERS, USERS_RUM_TOKEN},
+    utils::auth::is_root_user,
+};
 
 pub const ORG_USERS_KEY_PREFIX: &str = "/org_users/";
 
@@ -264,6 +267,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     };
                     ORG_USERS.insert(item_key.to_string(), item_value.clone());
+                    if is_root_user(user_id) {
+                        let mut user = ROOT_USER.get("root").unwrap().to_owned();
+                        user.token = item_value.token.clone();
+                        user.rum_token = item_value.rum_token.clone();
+                        ROOT_USER.insert("root".to_string(), user);
+                    }
                     if let Some(rum_token) = &item_value.rum_token {
                         USERS_RUM_TOKEN
                             .clone()
@@ -394,7 +403,7 @@ mod super_cluster {
 
     use config::utils::json;
     use infra::table::org_users::OrgUserPut;
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
     pub async fn org_user_add(
         key: &str,

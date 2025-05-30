@@ -27,10 +27,7 @@ use datafusion::{
 
 use crate::service::search::datafusion::udf::{
     fuzzy_match_udf,
-    match_all_udf::{
-        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
-        MATCH_ALL_UDF_NAME,
-    },
+    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
 };
 
 /// Optimization rule that rewrite match_all() to str_match()
@@ -92,8 +89,6 @@ fn is_match_all(expr: &Expr) -> bool {
     match expr {
         Expr::ScalarFunction(ScalarFunction { func, .. }) => {
             func.name().to_lowercase() == MATCH_ALL_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_UDF_NAME
                 || func.name() == FUZZY_MATCH_ALL_UDF_NAME
         }
         _ => false,
@@ -119,10 +114,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
         match &expr {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
                 let name = func.name();
-                if name == MATCH_ALL_UDF_NAME
-                    || name == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                    || name == MATCH_ALL_RAW_UDF_NAME
-                {
+                if name == MATCH_ALL_UDF_NAME {
                     let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for match_all() keyword: {:?}",
@@ -137,7 +129,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                             expr: Box::new(Expr::Column(Column::new_unqualified(field))),
                             pattern: Box::new(item.clone()),
                             escape_char: None,
-                            case_insensitive: name != MATCH_ALL_RAW_UDF_NAME,
+                            case_insensitive: true,
                         });
                         expr_list.push(new_expr);
                     }
@@ -235,28 +227,6 @@ mod tests {
                     "+------------+",
                 ],
             ),
-            (
-                "select _timestamp from t where match_all_raw_ignore_case('observe')",
-                vec![
-                    "+------------+",
-                    "| _timestamp |",
-                    "+------------+",
-                    "| 2          |",
-                    "| 3          |",
-                    "| 4          |",
-                    "+------------+",
-                ],
-            ),
-            (
-                "select _timestamp from t where match_all_raw_ignore_case('observe') and _timestamp = 2",
-                vec![
-                    "+------------+",
-                    "| _timestamp |",
-                    "+------------+",
-                    "| 2          |",
-                    "+------------+",
-                ],
-            ),
         ];
 
         // define a schema.
@@ -300,9 +270,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_UDF.clone());
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
         ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
 
         for item in sqls {

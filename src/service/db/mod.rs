@@ -18,8 +18,7 @@ use hashbrown::HashMap;
 use infra::{db as infra_db, errors::Result};
 #[cfg(feature = "enterprise")]
 use {
-    infra::errors::Error,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    infra::errors::Error, o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
 pub mod alerts;

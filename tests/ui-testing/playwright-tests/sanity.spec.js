@@ -233,7 +233,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
     await page.waitForTimeout(2000);
     await page
@@ -265,7 +265,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".a=2");
     await page.waitForTimeout(1000);
     await page
@@ -300,13 +300,13 @@ test.describe("Sanity testcases", () => {
     await page.getByLabel("Name").click();
     await page.getByLabel("Name").fill("sanitytest");
     await page.locator('[data-test="logs-vrl-function-editor"]').click();
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").fill("sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea').fill("sanity=1");
     await page.locator('[data-test="logs-vrl-function-editor"]').getByText("sanity=").click();
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").fill(".sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea').press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea').press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea').press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea').press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea').fill(".sanity=1");
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByPlaceholder("Search Function").click();
     await page.getByPlaceholder("Search Function").fill("sanity");

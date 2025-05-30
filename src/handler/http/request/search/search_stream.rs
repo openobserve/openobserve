@@ -28,7 +28,7 @@ use log;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
-    infra::config::get_config as get_o2_config,
+    config::get_config as get_o2_config,
 };
 use tokio::sync::mpsc;
 use tracing::Span;
@@ -183,7 +183,9 @@ pub async fn search_http2_stream(
 
     // Set use_cache from query params
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    req.use_cache = Some(use_cache);
+    if use_cache {
+        req.use_cache = Some(use_cache);
+    }
 
     // Set search type if not set
     if req.search_type.is_none() {
@@ -437,7 +439,7 @@ pub async fn search_http2_stream(
 }
 
 #[cfg(feature = "enterprise")]
-async fn report_to_audit(
+pub async fn report_to_audit(
     user_id: String,
     org_id: String,
     trace_id: String,

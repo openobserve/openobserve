@@ -153,7 +153,6 @@ pub async fn get_search_profile(
         }
     };
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = config::meta::search::Request {
         query: Query {
@@ -174,7 +173,11 @@ pub async fn get_search_profile(
     if let Err(e) = req.decode() {
         return Ok(meta::http::HttpResponse::bad_request(e));
     }
-    req.use_cache = Some(use_cache);
+
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    if use_cache {
+        req.use_cache = Some(use_cache);
+    }
 
     // get stream settings
     if let Some(settings) = infra::schema::get_settings(&org_id, &stream_name, stream_type).await {
@@ -203,12 +206,8 @@ pub async fn get_search_profile(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(
-                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                        StatusCode::BAD_REQUEST.into(),
-                        e.to_string(),
-                    )),
-                );
+                return Ok(HttpResponse::BadRequest()
+                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
         if !keys_used.is_empty() {

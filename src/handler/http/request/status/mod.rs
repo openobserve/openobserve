@@ -56,7 +56,7 @@ use {
     },
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
-        infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
+        config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_text},
     },
     o2_openfga::config::{

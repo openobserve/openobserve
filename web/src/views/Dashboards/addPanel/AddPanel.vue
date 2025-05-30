@@ -17,8 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
-    <div class="flex justify-between items-center q-pa-sm">
-      <div class="flex items-center q-table__title q-mr-md">
+    <div class="flex  items-center q-pa-sm"
+    :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
+    >
+      <div class="flex items-center q-table__title" 
+      :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
+      >
         <span>
           {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
         </span>

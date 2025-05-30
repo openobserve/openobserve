@@ -55,15 +55,13 @@ pub async fn remote_write(
     if content_type == "application/x-protobuf" {
         Ok(match metrics::prom::remote_write(&org_id, body).await {
             Ok(_) => HttpResponse::Ok().into(),
-            Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )),
+            Err(e) => HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)),
         })
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Bad Request".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Bad Request",
         )))
     }
 }

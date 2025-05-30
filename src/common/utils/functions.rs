@@ -72,16 +72,17 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
         );
     }
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .common
         .enable_enterprise_mmdb
     {
         let geoip_ent = crate::common::infra::config::GEOIP_ENT_TABLE.read();
         if let Some(table) = geoip_ent.as_ref() {
             tables.insert(
-                    o2_enterprise::enterprise::common::infra::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
-                        .to_owned(),Box::new(table.clone())
-                );
+                o2_enterprise::enterprise::common::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
+                    .to_owned(),
+                Box::new(table.clone()),
+            );
         }
     };
 

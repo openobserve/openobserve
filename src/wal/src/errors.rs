@@ -86,4 +86,8 @@ pub enum Error {
     WriteQueueFull {
         idx: usize,
     },
+    #[snafu(display("Provided path '{}' has no parent directory", path.display()))]
+    NoParentDir {
+        path: PathBuf,
+    },
 }

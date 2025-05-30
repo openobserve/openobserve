@@ -3008,6 +3008,9 @@ mod tests {
                 ping_interval_secs: i64::default(),
                 max_frame_size: usize::default(),
                 max_continuation_size: usize::default(),
+                max_channel_buffer_size: usize::default(),
+                streaming_response_chunk_size: usize::default(),
+                streaming_enabled: bool::default(),
             },
             route: config::Route {
                 timeout: u64::default(),
@@ -3140,7 +3143,15 @@ mod tests {
                 ingestion_url: String::default(),
                 org_invite_expiry: u32::default(),
                 feature_ingester_none_compression: bool::default(),
-                ingestion_url: String::default(),
+                meta_ddl_dsn: Default::default(),
+                format_stream_name_to_lower: Default::default(),
+                websocket_enabled: Default::default(),
+                websocket_close_frame_delay: Default::default(),
+                file_list_dump_enabled: Default::default(),
+                file_list_dump_dual_write: Default::default(),
+                file_list_dump_min_hour: Default::default(),
+                file_list_dump_debug_check: Default::default(),
+                use_stream_settings_for_partitions_enabled: Default::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3253,6 +3264,10 @@ mod tests {
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
                 search_mini_partition_duration_secs: u64::default(),
+                file_download_priority_queue_thread_num: Default::default(),
+                file_download_priority_queue_window_secs: Default::default(),
+                file_download_enable_priority_queue: Default::default(),
+                histogram_enabled: Default::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
@@ -3281,6 +3296,8 @@ mod tests {
                 cache_parquet: bool::default(),
                 cache_index: bool::default(),
                 delete_merge_files: bool::default(),
+                download_from_node: Default::default(),
+                download_node_size: Default::default(),
             },
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),
@@ -3366,6 +3383,9 @@ mod tests {
                 max_idle_per_host: usize::default(),
                 keepalive_timeout: u64::default(),
                 multi_part_upload_size: usize::default(),
+                accounts: Default::default(),
+                stream_strategy: Default::default(),
+                feature_bulk_delete: Default::default(),
             },
             sns: config::Sns {
                 endpoint: String::default(),
@@ -3444,10 +3464,6 @@ mod tests {
             encryption: config::Encryption {
                 algorithm: String::default(),
                 master_key: String::default(),
-            },
-            ratelimit: config::RateLimit {
-                ratelimit_rule_refresh_interval: 0,
-                ratelimit_enabled: false,
             },
         }
     }

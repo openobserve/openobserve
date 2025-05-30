@@ -143,8 +143,8 @@ pub async fn save(
     if user.role.base_role.eq(&config::meta::user::UserRole::Root) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Not allowed".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Not allowed",
             )),
         );
     }
@@ -189,8 +189,8 @@ pub async fn update(
     if user.eq(&UpdateUser::default()) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Please specify appropriate fields to update user".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Please specify appropriate fields to update user",
             )),
         );
     }

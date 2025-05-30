@@ -21,11 +21,11 @@ import vueJsx from "@vitejs/plugin-vue-jsx";
 import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
-import path from "path";
-import dotenv from "dotenv";
-import fs from "fs-extra";
+import * as path from "path";
+import * as dotenv from "dotenv";
+import * as fs from "fs-extra";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
-import visualizer from "rollup-plugin-visualizer";
+import { visualizer } from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
@@ -43,7 +43,7 @@ const isTesting = process.env.NODE_ENV === "test";
 
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
-  async resolveId(source) {
+  async resolveId(source: string) {
     if (source.startsWith("@zo/")) {
       const fileName = source.replace("@zo/", "");
 
@@ -69,7 +69,7 @@ function monacoEditorTestResolver() {
   return {
     name: "monaco-editor-test-resolver",
     enforce: "post",
-    resolveId(id) {
+    resolveId(id: string) {
       if (id === "monaco-editor") {
         return {
           id: "monaco-editor/esm/vs/editor/editor.api",
@@ -116,21 +116,21 @@ export default defineConfig({
     process.env.VITE_COVERAGE === "true" &&
       istanbul({
         include: "src/**/*",
-        exclude: ["node_modules", "test/"],
+        exclude: ["node_modules", "test/", "src/**/*.spec.{ts,js}"],
         extension: [".js", ".ts", ".vue"],
         requireEnv: false,
         forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    monacoEditorPlugin.default({
+    (monacoEditorPlugin as any).default({
       customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
     }),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": fileURLToPath(new URL('./src', import.meta.url)),
       "@enterprise": fileURLToPath(
         new URL("./src/enterprise", import.meta.url),
       ),
@@ -148,8 +148,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
       plugins: [
-        nodePolyfills(),
-        visualizer.default({
+        nodePolyfills() as any,
+        visualizer({
           open: true,
           gzipSize: true,
           brotliSize: true,
@@ -185,43 +185,5 @@ export default defineConfig({
       plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
       target: "es2020",
     },
-  },
-  test: {
-    enable: true,
-    global: true,
-    setupFiles: "test/unit/helpers/setupTests.ts",
-    deps: {
-      inline: ["monaco-editor", "vitest-canvas-mock"],
-    },
-    coverage: {
-      reporter: ["text", "json", "html"],
-      all: true,
-      exclude: [
-        "coverage/**",
-        "dist/**",
-        "packages/*/test{,s}/**",
-        "cypress/**",
-        "src/test/**",
-        "test{,s}/**",
-        "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/__tests__/**",
-        "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
-        "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
-        "quasar.conf.js",
-        "env.d.ts",
-      ],
-    },
-    threads: false,
-    environment: "jsdom",
-    cache: false,
-    maxConcurrency: 20,
-    update: false,
-    environmentOptions: {
-      jsdom: {
-        resources: "usable",
-      },
-    },
-  },
+  }
 });

@@ -13,8 +13,9 @@
         <div
           class="field_label ellipsis"
           style="width: calc(100% - 28px); font-size: 14px"
+          :title="row.label || row.name"
         >
-          {{ row.name }}
+          {{ row.label || row.name }}
         </div>
         <div class="field_overlay">
           <q-btn
@@ -200,7 +201,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
 
       query_context = query_context.replace(
         "[WHERE_CLAUSE]",
-        " WHERE " + whereClause
+        " WHERE " + whereClause,
       );
     } else {
       query_context = query_context.replace("[WHERE_CLAUSE]", "");

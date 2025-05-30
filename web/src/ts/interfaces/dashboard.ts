@@ -28,6 +28,7 @@ interface MarkLine {
 export interface TrellisLayout {
   layout: "vertical" | "horizontal" | "custom" | null;
   num_of_columns: number;
+  group_by_y_axis: boolean;
 }
 export interface SeriesObject {
   name: string;

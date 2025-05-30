@@ -313,6 +313,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
+                    // init nats client
+                    let (tx, _rx) = tokio::sync::mpsc::channel::<infra::db::nats::NatsEvent>(1);
+                    if !cfg.common.local_mode
+                        && cfg.common.cluster_coordinator.to_lowercase() == "nats"
+                    {
+                        infra::db::nats::init_nats_client(tx).await?;
+                    }
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data

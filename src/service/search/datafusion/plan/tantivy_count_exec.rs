@@ -40,10 +40,10 @@ use crate::service::search::{
 #[derive(Debug)]
 pub struct TantivyOptimizeExec {
     query: Arc<QueryParams>,
-    schema: SchemaRef,               // The schema for the produced row
-    file_list: Vec<FileKey>,         // The list of files to read
-    index_condition: IndexCondition, // The condition to filter the rows
-    cache: PlanProperties,           // Cached properties of this plan
+    schema: SchemaRef,                       // The schema for the produced row
+    file_list: Vec<FileKey>,                 // The list of files to read
+    index_condition: Option<IndexCondition>, // The condition to filter the rows
+    cache: PlanProperties,                   // Cached properties of this plan
     index_optimize_mode: InvertedIndexOptimizeMode, // Type of query the ttv index optimizes
 }
 
@@ -53,7 +53,7 @@ impl TantivyOptimizeExec {
         query: Arc<QueryParams>,
         schema: SchemaRef,
         file_list: Vec<FileKey>,
-        index_condition: IndexCondition,
+        index_condition: Option<IndexCondition>,
         index_optimize_mode: InvertedIndexOptimizeMode,
     ) -> Self {
         let cache = Self::compute_properties(Arc::clone(&schema));
@@ -135,7 +135,7 @@ impl ExecutionPlan for TantivyOptimizeExec {
         let fut = adapt_tantivy_result(
             self.query.clone(),
             self.file_list.clone(),
-            Some(self.index_condition.clone()),
+            self.index_condition.clone(),
             self.schema.clone(),
             self.index_optimize_mode.clone(),
         );

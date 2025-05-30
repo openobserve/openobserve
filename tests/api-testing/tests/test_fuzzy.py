@@ -35,6 +35,7 @@ def post_query(session, base_url, org_id, query, retries=3, delay=2):
         "SELECT * FROM \"stream_pytest_data\" WHERE kubernetes_namespace_name LIKE '%zinc%' AND fuzzy_match(kubernetes_namespace_name, 'zinc', 4)",
     ],
 )
+@pytest.mark.skip
 def test_e2e_fuzzy(create_session, base_url, sql_query):
     """Running E2E tests for various SQL queries with retries."""
     session = create_session

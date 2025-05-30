@@ -48,6 +48,7 @@ const getDefaultDashboardPanelData: any = () => ({
       trellis: {
         layout: null,
         num_of_columns: 1,
+        group_by_y_axis: false,
       },
       show_legends: true,
       legends_position: null,
@@ -2032,13 +2033,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           )})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "match_all_raw") {
-          selectFilter += `match_all_raw(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "match_all_raw_ignore_case") {
-          selectFilter += `match_all_raw_ignore_case(${formatValue(
-            condition.value,
-            condition.column,
-          )})`;
         } else if (condition.operator === "str_match") {
           selectFilter += `str_match(${condition.column}, ${formatValue(
             condition.value,

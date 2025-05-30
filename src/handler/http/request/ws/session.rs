@@ -27,7 +27,7 @@ use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
-    infra::config::get_config as get_o2_config,
+    config::get_config as get_o2_config,
 };
 use rand::prelude::SliceRandom;
 use tracing::Instrument;

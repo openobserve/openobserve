@@ -131,7 +131,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrl12=123");
 
     await page.waitForTimeout(3000);
@@ -181,7 +181,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrL=1000");
     await page.waitForTimeout(3000);
 
@@ -240,7 +240,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".VRL=1000");
 
     await page.waitForTimeout(3000);
@@ -326,7 +326,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrl=11abc");
     await page.waitForTimeout(2000);
 
@@ -338,11 +338,11 @@ test.describe(" visualize UI testcases", () => {
 
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .press("Control+a");
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrl=123");
 
     await page.waitForTimeout(3000);
@@ -392,7 +392,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrl=100");
 
     await page.waitForTimeout(3000);
@@ -432,7 +432,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrlsanity=100");
 
     await page.waitForTimeout(3000);
@@ -451,7 +451,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .press("Control+a");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -471,7 +471,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".vrl=123");
 
     await page.waitForTimeout(3000);
@@ -527,7 +527,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator('.inputarea')
       .fill(".VRLsanity=1000");
     await page.waitForTimeout(3000);
 

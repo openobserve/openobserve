@@ -22,9 +22,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, FunctionArguments,
-        GroupByExpr, Offset as SqlOffset, OrderByExpr, Query, Select, SelectItem, SetExpr,
-        Statement, TableFactor, TableWithJoins, Value,
+        AccessExpr, BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr,
+        FunctionArguments, GroupByExpr, Offset as SqlOffset, OrderByExpr, Query, Select,
+        SelectItem, SetExpr, Statement, Subscript, TableFactor, TableWithJoins, Value,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -988,9 +988,47 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyho
         }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
-        SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
         SqlExpr::CompositeAccess { expr, .. } => get_field_name_from_expr(expr),
-        SqlExpr::Subscript { expr, .. } => get_field_name_from_expr(expr),
+        SqlExpr::CompoundFieldAccess { root, access_chain } => {
+            let mut fields = Vec::new();
+            if let Some(v) = get_field_name_from_expr(root)? {
+                fields.extend(v);
+            }
+            for access in access_chain.iter() {
+                match access {
+                    AccessExpr::Dot(expr) => {
+                        if let Some(v) = get_field_name_from_expr(expr)? {
+                            fields.extend(v);
+                        }
+                    }
+                    AccessExpr::Subscript(expr) => match expr {
+                        Subscript::Index { index } => {
+                            if let Some(v) = get_field_name_from_expr(index)? {
+                                fields.extend(v);
+                            }
+                        }
+                        Subscript::Slice {
+                            lower_bound,
+                            upper_bound,
+                            stride,
+                        } => {
+                            let mut func = |expr: &Option<SqlExpr>| -> Result<(), anyhow::Error> {
+                                if let Some(expr) = expr {
+                                    if let Some(v) = get_field_name_from_expr(expr)? {
+                                        fields.extend(v);
+                                    }
+                                }
+                                Ok(())
+                            };
+                            func(lower_bound)?;
+                            func(upper_bound)?;
+                            func(stride)?;
+                        }
+                    },
+                }
+            }
+            Ok((!fields.is_empty()).then_some(fields))
+        }
         SqlExpr::Subquery(subquery) => get_field_name_from_query(subquery),
         SqlExpr::InSubquery { expr, subquery, .. } => {
             let mut fields = Vec::new();

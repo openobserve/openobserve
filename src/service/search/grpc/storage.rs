@@ -257,7 +257,15 @@ pub async fn search(
         &query.trace_id,
         &files
             .iter()
-            .map(|f| (&f.account, &f.key, f.meta.compressed_size, f.meta.max_ts))
+            .map(|f| {
+                (
+                    f.id,
+                    &f.account,
+                    &f.key,
+                    f.meta.compressed_size,
+                    f.meta.max_ts,
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -401,14 +409,14 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(&String, &String, i64, i64)],
+    files: &[(i64, &String, &String, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<(file_data::CacheType, u64, u64), Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
-    for (_account, file, _size, _ts) in files.iter() {
+    for (_id, _account, file, _size, _ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -448,20 +456,21 @@ pub async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(account, file, size, ts)| {
+        .filter_map(|(id, account, file, size, ts)| {
             if cached_files.contains(&file) {
                 None
             } else {
-                Some((account.to_string(), file.to_string(), *size, *ts))
+                Some((*id, account.to_string(), file.to_string(), *size, *ts))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
-        for (account, file, size, ts) in files {
+        for (id, account, file, size, ts) in files {
             if let Err(e) = crate::job::queue_download(
                 trace_id.clone(),
+                id,
                 account,
                 file.clone(),
                 size,
@@ -531,7 +540,7 @@ pub async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, f)| (&f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
+            .map(|(ttv_file, f)| (f.id, &f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "index",

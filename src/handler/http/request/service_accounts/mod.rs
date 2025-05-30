@@ -191,10 +191,8 @@ pub async fn update(
                 token: passcode.passcode,
                 user: passcode.user,
             })),
-            Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                e.to_string(),
-            ))),
+            Err(e) => Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e))),
         };
     };
     let service_account = service_account.into_inner();
@@ -269,9 +267,9 @@ pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResp
             token: passcode.passcode,
             user: passcode.user,
         })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }

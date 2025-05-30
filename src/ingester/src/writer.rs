@@ -31,7 +31,7 @@ use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{RwLock, mpsc};
-use wal::Writer as WalWriter;
+use wal::{Writer as WalWriter, build_file_path};
 
 use crate::{
     ReadRecordBatchEntry, WriterSignal,
@@ -213,12 +213,10 @@ impl Writer {
             key: key.clone(),
             wal: Arc::new(RwLock::new(
                 WalWriter::new(
-                    wal_dir,
-                    &key.org_id,
-                    &key.stream_type,
-                    wal_id.to_string(),
+                    build_file_path(wal_dir, &key.org_id, &key.stream_type, wal_id.to_string()),
                     cfg.limit.max_file_size_on_disk as u64,
                     cfg.limit.wal_write_buffer_size,
+                    None,
                 )
                 .expect("wal file create error"),
             )),
@@ -416,12 +414,15 @@ impl Writer {
             wal_id
         );
         let new_wal = WalWriter::new(
-            wal_dir,
-            &self.key.org_id,
-            &self.key.stream_type,
-            wal_id.to_string(),
+            build_file_path(
+                wal_dir,
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id.to_string(),
+            ),
             cfg.limit.max_file_size_on_disk as u64,
             cfg.limit.wal_write_buffer_size,
+            None,
         )
         .context(WalSnafu)?;
         wal.sync().context(WalSnafu)?; // sync wal before rotation

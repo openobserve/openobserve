@@ -17,7 +17,7 @@ use infra::{errors, table::entity::search_job_results::Model as JobResult};
 #[cfg(feature = "enterprise")]
 use {
     infra::table::search_job::search_job_results::JobResultOperator,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::super_cluster,
 };
 

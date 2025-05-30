@@ -57,7 +57,10 @@ impl ScalarUDFImpl for HistogramUdf {
         Ok(Timestamp(Microsecond, None))
     }
 
-    fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue> {
         unreachable!()
     }
 }

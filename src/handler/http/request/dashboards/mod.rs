@@ -263,8 +263,8 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     match dashboards::delete_dashboard(&org_id, &dashboard_id).await {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Dashboard deleted".to_string(),
+            http::StatusCode::OK,
+            "Dashboard deleted",
         )),
         Err(err) => err.into(),
     }
@@ -315,8 +315,8 @@ async fn move_dashboard(
     .await
     {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Dashboard moved".to_string(),
+            http::StatusCode::OK,
+            "Dashboard moved",
         )),
         Err(err) => err.into(),
     }

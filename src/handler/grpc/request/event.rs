@@ -17,25 +17,16 @@ use std::ops::Range;
 
 use anyhow::Result;
 use config::{
-    cluster::LOCAL_NODE,
-    get_config,
-    meta::{cluster::get_internal_grpc_token, stream::FileKey},
-    metrics,
+    cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
-use futures_util::StreamExt;
-use hashbrown::{HashMap, HashSet};
 use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
 use proto::cluster_rpc::{
-    EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList,
-    event_client::EventClient, event_server::Event,
+    EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList, event_server::Event,
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{
-    Request, Response, Status, codec::CompressionEncoding, codegen::tokio_stream,
-    metadata::MetadataValue,
-};
+use tonic::{Request, Response, Status, codegen::tokio_stream};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::grpc::MetadataMap;
@@ -76,6 +67,7 @@ impl Event for Eventer {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
                     files_to_download.push((
+                        item.id,
                         item.account.clone(),
                         item.key.clone(),
                         item.meta.compressed_size,
@@ -88,6 +80,7 @@ impl Event for Eventer {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
                         files_to_download.push((
+                            item.id,
                             item.account.clone(),
                             ttv_file,
                             item.meta.index_size,
@@ -103,7 +96,7 @@ impl Event for Eventer {
 
                 // Try batch download files
                 if !files_to_download.is_empty() {
-                    match download_from_node(&grpc_addr, &files_to_download).await {
+                    match crate::job::download_from_node(&grpc_addr, &files_to_download).await {
                         Ok(failed) => failed_files = failed,
                         Err(e) => {
                             log::error!("[gRPC:Event] Failed to get files from notifier: {}", e);
@@ -113,9 +106,10 @@ impl Event for Eventer {
                 }
 
                 // Fallback to individual downloads for failed files
-                for (account, file, size, ts) in failed_files {
+                for (id, account, file, size, ts) in failed_files {
                     if let Err(e) = crate::job::queue_download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE.to_string(),
+                        id,
                         account,
                         file,
                         size,
@@ -129,9 +123,10 @@ impl Event for Eventer {
                 }
             } else {
                 // Direct download when download_from_node_enabled is false
-                for (account, file, size, ts) in files_to_download {
+                for (id, account, file, size, ts) in files_to_download {
                     if let Err(e) = crate::job::queue_download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE.to_string(),
+                        id,
                         account,
                         file,
                         size,
@@ -263,129 +258,4 @@ async fn handle_file_chunked(
     );
 
     Ok(())
-}
-
-async fn download_from_node(
-    addr: &str,
-    files: &[(String, String, i64, i64)],
-) -> Result<Vec<(String, String, i64, i64)>> {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
-    log::debug!(
-        "[gRPC:Event] Download files from node start, files: {:?}",
-        files.len()
-    );
-
-    let token: MetadataValue<_> = get_internal_grpc_token()
-        .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid token"))?;
-
-    let channel = crate::service::grpc::get_cached_channel(addr).await?;
-    let client = EventClient::with_interceptor(channel, move |mut req: Request<()>| {
-        req.metadata_mut().insert("authorization", token.clone());
-        Ok(req)
-    });
-
-    let file_size_map = files
-        .iter()
-        .filter_map(|(_, f, s, _)| {
-            if *s > cfg.cache_latest_files.download_node_size * 1024 * 1024 {
-                None
-            } else {
-                Some((f, *s as usize))
-            }
-        })
-        .collect::<HashMap<_, _>>();
-    if file_size_map.is_empty() {
-        return Ok(files
-            .iter()
-            .map(|(a, f, s, ts)| (a.clone(), f.clone(), *s, *ts))
-            .collect());
-    }
-    let request = Request::new(SimpleFileList {
-        files: files.iter().map(|(_, f, ..)| f.to_string()).collect(),
-    });
-
-    let resp = client
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .get_files(request)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to get files from {addr}, {e}"))?;
-
-    let mut file_contents = HashMap::new();
-    let mut downloaded_files = HashSet::new();
-    let mut resp_stream = resp.into_inner();
-    while let Some(resp) = resp_stream.next().await {
-        let resp = match resp {
-            Ok(resp) => resp,
-            Err(err) => {
-                if err.code() == tonic::Code::NotFound {
-                    log::debug!(
-                        "[gRPC:Event] Failed to download file {} from {}: file not found",
-                        err.message(),
-                        addr
-                    );
-                    continue;
-                }
-                return Err(anyhow::anyhow!(
-                    "Failed to download file from {addr}, {err}"
-                ));
-            }
-        };
-        for content in resp.entries {
-            let entry = file_contents
-                .entry(content.filename.clone())
-                .or_insert(bytes::BytesMut::new());
-            entry.extend_from_slice(&content.content);
-            downloaded_files.insert(content.filename);
-        }
-    }
-
-    log::debug!(
-        "[gRPC:Event] Successfully retrieved {} files from {} in {} ms",
-        downloaded_files.len(),
-        addr,
-        start.elapsed().as_millis()
-    );
-
-    // Cache the file contents
-    for (file, content) in file_contents {
-        let data = content.freeze();
-        if let Some(size) = file_size_map.get(&file) {
-            if *size != data.len() {
-                log::warn!(
-                    "[gRPC:Event] Failed to download file {} from {}: size mismatch, expected {} but got {}",
-                    file,
-                    addr,
-                    size,
-                    data.len()
-                );
-                downloaded_files.remove(&file);
-                continue;
-            }
-        }
-        if let Err(e) = infra::cache::file_data::set(&file, data).await {
-            log::error!("[gRPC:Event] Failed to cache file {}: {}", file, e);
-            downloaded_files.remove(&file);
-        }
-    }
-
-    // Return list of failed files
-    let failed_files: Vec<_> = files
-        .iter()
-        .filter(|(_, f, ..)| !downloaded_files.contains(f))
-        .cloned()
-        .collect();
-
-    log::debug!(
-        "[gRPC:Event] Failed to retrieve {} files from {} in {} ms",
-        failed_files.len(),
-        addr,
-        start.elapsed().as_millis()
-    );
-
-    Ok(failed_files)
 }

@@ -159,27 +159,28 @@ mod tests {
         // );
 
         let expected = vec![
-            "AggregateExec: mode=Final, gby=[], aggr=[count(*)]",
-            "  CoalescePartitionsExec",
-            "    AggregateExec: mode=Partial, gby=[], aggr=[count(*)]",
-            "      ProjectionExec: expr=[]",
-            "        CoalesceBatchesExec: target_batch_size=8192",
-            "          HashJoinExec: mode=Partitioned, join_type=LeftSemi, on=[(name@0, name@0)]",
-            "            CoalesceBatchesExec: target_batch_size=8192",
-            "              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=1",
-            "                MemoryExec: partitions=1, partition_sizes=[1]",
-            "            CoalesceBatchesExec: target_batch_size=8192",
-            "              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "                RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "                  DeduplicationExec: columns: [Column { name: \"name\", index: 0 }]",
-            "                    SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
-            "                      CoalescePartitionsExec",
-            "                        AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
-            "                          CoalesceBatchesExec: target_batch_size=8192",
-            "                            RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "                              RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "                                AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
-            "                                  MemoryExec: partitions=1, partition_sizes=[1]",
+            "ProjectionExec: expr=[count(Int64(1))@0 as count(*)]",
+            "  AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]",
+            "    CoalescePartitionsExec",
+            "      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]",
+            "        ProjectionExec: expr=[]",
+            "          CoalesceBatchesExec: target_batch_size=8192",
+            "            HashJoinExec: mode=Partitioned, join_type=LeftSemi, on=[(name@0, name@0)]",
+            "              CoalesceBatchesExec: target_batch_size=8192",
+            "                RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=1",
+            "                  DataSourceExec: partitions=1, partition_sizes=[1]",
+            "              CoalesceBatchesExec: target_batch_size=8192",
+            "                RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                  RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
+            "                    DeduplicationExec: columns: [Column { name: \"name\", index: 0 }]",
+            "                      SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "                        CoalescePartitionsExec",
+            "                          AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
+            "                            CoalesceBatchesExec: target_batch_size=8192",
+            "                              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                                RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
+            "                                  AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
+            "                                    DataSourceExec: partitions=1, partition_sizes=[1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -240,8 +241,8 @@ mod tests {
             "        SortExec: expr=[id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
             "          SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
             "            SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
-            "              MemoryExec: partitions=2, partition_sizes=[1, 1]",
-            "    MemoryExec: partitions=1, partition_sizes=[1]",
+            "              DataSourceExec: partitions=2, partition_sizes=[1, 1]",
+            "    DataSourceExec: partitions=1, partition_sizes=[1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -320,8 +321,8 @@ mod tests {
             "                    SortExec: expr=[usr_id@0 DESC NULLS LAST, _timestamp@2 DESC NULLS LAST], preserve_partitioning=[false]",
             "                      SortPreservingMergeExec: [_timestamp@2 DESC NULLS LAST], fetch=50000",
             "                        SortExec: TopK(fetch=50000), expr=[_timestamp@2 DESC NULLS LAST], preserve_partitioning=[true]",
-            "                          MemoryExec: partitions=2, partition_sizes=[1, 1]",
-            "                MemoryExec: partitions=1, partition_sizes=[1]",
+            "                          DataSourceExec: partitions=2, partition_sizes=[1, 1]",
+            "                DataSourceExec: partitions=1, partition_sizes=[1]",
             "    CoalesceBatchesExec: target_batch_size=8192",
             "      RepartitionExec: partitioning=Hash([prod_id@0], 12), input_partitions=1",
             "        ProjectionExec: expr=[prod_id@0 as prod_id]",
@@ -329,7 +330,7 @@ mod tests {
             "            SortExec: expr=[prod_id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
             "              SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
             "                SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
-            "                  MemoryExec: partitions=3, partition_sizes=[1, 1, 1]",
+            "                  DataSourceExec: partitions=3, partition_sizes=[1, 1, 1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));

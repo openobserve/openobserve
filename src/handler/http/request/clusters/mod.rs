@@ -20,8 +20,7 @@ use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
     config::meta::cluster::RoleGroup,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
-    std::io::ErrorKind,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config, std::io::ErrorKind,
 };
 
 /// ListClusters

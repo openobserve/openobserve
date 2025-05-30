@@ -46,11 +46,6 @@ def test_e2e_metrics_ingest_invalijson(create_session, base_url):
     session = create_session
     url = base_url
     org_id = "default"
-    access_key = "cm9vdEBhbHBoYTEuY29tOlJnNmpQWlRqUHFHNkVFSm8="
-    headers = {
-        "Authorization": f"Basic {access_key}",
-        "Content-Type": "application/json",
-    }
 
     payload = [
         {
@@ -65,7 +60,7 @@ def test_e2e_metrics_ingest_invalijson(create_session, base_url):
     ]
 
     resp_ingestmetrics = session.post(
-        f"{url}api/{org_id}/ingest/metrics/_json", json=payload, headers=headers
+        f"{url}api/{org_id}/ingest/metrics/_json", json=payload
     )
 
     print(resp_ingestmetrics.content)

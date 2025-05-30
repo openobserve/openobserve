@@ -27,7 +27,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use {
     config::cluster::LOCAL_NODE, infra::table::search_job::search_jobs::JobOperator,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::super_cluster,
 };
 

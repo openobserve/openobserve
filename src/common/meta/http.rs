@@ -31,6 +31,10 @@ pub struct HttpResponse {
     pub code: u16,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
@@ -44,19 +48,23 @@ pub struct ESResponse {
 }
 
 impl HttpResponse {
-    pub fn message(code: u16, message: String) -> Self {
+    pub fn message(code: impl Into<u16>, message: impl ToString) -> Self {
         HttpResponse {
-            code,
-            message,
+            code: code.into(),
+            message: message.to_string(),
+            id: None,
+            name: None,
             error_detail: None,
             trace_id: None,
         }
     }
 
-    pub fn error(code: u16, error: String) -> Self {
+    pub fn error(code: impl Into<u16>, error: impl ToString) -> Self {
         HttpResponse {
-            code,
-            message: error,
+            code: code.into(),
+            message: error.to_string(),
+            id: None,
+            name: None,
             error_detail: None,
             trace_id: None,
         }
@@ -66,6 +74,8 @@ impl HttpResponse {
         HttpResponse {
             code: err.get_code(),
             message: err.get_message(),
+            id: None,
+            name: None,
             error_detail: Some(err.get_error_detail()),
             trace_id: None,
         }
@@ -75,61 +85,71 @@ impl HttpResponse {
         HttpResponse {
             code: err.get_code(),
             message: err.get_message(),
+            id: None,
+            name: None,
             error_detail: Some(err.get_error_detail()),
             trace_id,
         }
     }
 
+    pub fn with_trace_id(&mut self, trace_id: String) -> &mut Self {
+        self.trace_id = Some(trace_id);
+        self
+    }
+
+    pub fn with_id(&mut self, id: String) -> &mut Self {
+        self.id = Some(id);
+        self
+    }
+
+    pub fn with_name(&mut self, name: String) -> &mut Self {
+        self.name = Some(name);
+        self
+    }
+
     /// Send a normal response in json format and associate the
     /// provided message as `message` field.
     pub fn ok(msg: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Ok().json(Self::message(StatusCode::OK.into(), msg.to_string()))
+        ActixHttpResponse::Ok().json(Self::message(StatusCode::OK, msg.to_string()))
     }
 
     /// Send a BadRequest response in json format and associate the
     /// provided error as `error` field.
     pub fn bad_request(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::BadRequest().json(Self::error(
-            StatusCode::BAD_REQUEST.into(),
-            error.to_string(),
-        ))
+        ActixHttpResponse::BadRequest()
+            .json(Self::error(StatusCode::BAD_REQUEST, error.to_string()))
     }
 
     /// Send an Unauthorized response in json format and sets the
     /// provided error as the `error` field.
     pub fn unauthorized(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Forbidden().json(Self::error(
-            StatusCode::UNAUTHORIZED.into(),
-            error.to_string(),
-        ))
+        ActixHttpResponse::Forbidden()
+            .json(Self::error(StatusCode::UNAUTHORIZED, error.to_string()))
     }
 
     /// Send a Forbidden response in json format and associate the
     /// provided error as `error` field.
     pub fn forbidden(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Forbidden()
-            .json(Self::error(StatusCode::FORBIDDEN.into(), error.to_string()))
+        ActixHttpResponse::Forbidden().json(Self::error(StatusCode::FORBIDDEN, error.to_string()))
     }
 
     /// Send a Forbidden response in json format and associate the
     /// provided error as `error` field.
     pub fn conflict(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Conflict()
-            .json(Self::error(StatusCode::CONFLICT.into(), error.to_string()))
+        ActixHttpResponse::Conflict().json(Self::error(StatusCode::CONFLICT, error.to_string()))
     }
 
     /// Send a NotFound response in json format and associate the
     /// provided error as `error` field.
     pub fn not_found(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::NotFound()
-            .json(Self::error(StatusCode::NOT_FOUND.into(), error.to_string()))
+        ActixHttpResponse::NotFound().json(Self::error(StatusCode::NOT_FOUND, error.to_string()))
     }
 
     /// Send a InternalServerError response in json format and associate the
     /// provided error as `error` field.
     pub fn internal_error(error: impl ToString) -> ActixHttpResponse {
         ActixHttpResponse::InternalServerError().json(Self::error(
-            StatusCode::INTERNAL_SERVER_ERROR.into(),
+            StatusCode::INTERNAL_SERVER_ERROR,
             error.to_string(),
         ))
     }
@@ -150,14 +170,11 @@ mod tests {
     #[test]
     fn test_http_response() {
         let msg = "This is an error response";
-        let err = HttpResponse::message(http::StatusCode::OK.into(), msg.to_string());
+        let err = HttpResponse::message(http::StatusCode::OK, msg.to_string());
         assert_eq!(err.code, http::StatusCode::OK);
         assert_eq!(err.message, msg);
 
-        let err = HttpResponse::error(
-            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-            msg.to_string(),
-        );
+        let err = HttpResponse::error(http::StatusCode::INTERNAL_SERVER_ERROR, msg.to_string());
         assert_eq!(err.code, http::StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(err.message, msg);
 

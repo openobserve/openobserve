@@ -339,7 +339,10 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (
+      isWebSocketEnabled(store.state) &&
+      state.searchRequestTraceIds
+    ) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
@@ -1439,7 +1442,7 @@ export const usePanelDataLoader = (
                 : [];
               state.annotations = annotations;
 
-              if (isStreamingEnabled()) {
+              if (isStreamingEnabled(store.state)) {
                 await getDataThroughStreaming(
                   query,
                   it,
@@ -1449,7 +1452,7 @@ export const usePanelDataLoader = (
                   panelQueryIndex,
                   abortControllerRef,
                 );
-              } else if (isWebSocketEnabled()) {
+              } else if (isWebSocketEnabled(store.state)) {
                 await getDataThroughWebSocket(
                   query,
                   it,
@@ -1745,7 +1748,7 @@ export const usePanelDataLoader = (
             : errorDetailValue;
 
         const errorCode =
-          isWebSocketEnabled() || isStreamingEnabled()
+          isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)
             ? error?.response?.data?.code || error?.code || error?.status || ""
             : error?.response?.status ||
               error?.status ||
@@ -2166,7 +2169,7 @@ export const usePanelDataLoader = (
     }
 
     // for websocket
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {

@@ -405,18 +405,6 @@ export default defineComponent({
               range: range,
             });
             filteredSuggestions.push({
-              label: `match_all_raw('${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_raw('${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `match_all_raw_ignore_case('${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_raw_ignore_case('${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
               label: `re_match(fieldname: string, regular_expression: string)`,
               kind: monaco.languages.CompletionItemKind.Text,
               insertText: `re_match(fieldname, '')`,

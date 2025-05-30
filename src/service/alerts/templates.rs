@@ -23,7 +23,11 @@ use crate::{
     service::db::{self, alerts::templates::TemplateError},
 };
 
-pub async fn save(name: &str, mut template: Template, create: bool) -> Result<(), TemplateError> {
+pub async fn save(
+    name: &str,
+    mut template: Template,
+    create: bool,
+) -> Result<Template, TemplateError> {
     if template.body.is_empty() {
         return Err(TemplateError::EmptyBody);
     }
@@ -64,7 +68,7 @@ pub async fn save(name: &str, mut template: Template, create: bool) -> Result<()
     if name.is_empty() {
         set_ownership(&saved.name, "templates", Authz::new(&saved.name)).await;
     }
-    Ok(())
+    Ok(saved)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {

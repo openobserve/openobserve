@@ -95,6 +95,7 @@ def test_e2e_valid_trace_ingestion(create_session, base_url):
     org_id = "default"
 
     trace = valid_trace()
+    
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
 
     assert (

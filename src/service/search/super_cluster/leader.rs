@@ -35,7 +35,7 @@ use datafusion::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-use o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes;
+use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -208,11 +208,19 @@ pub async fn search(
 
 async fn run_datafusion(
     trace_id: String,
-    req: Request,
+    mut req: Request,
     sql: Arc<Sql>,
     nodes: Vec<Arc<dyn NodeInfo>>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
+    // set work group
+    let work_group = if sql.is_complex {
+        WorkGroup::Long.to_string()
+    } else {
+        WorkGroup::Short.to_string()
+    };
+    req.add_work_group(Some(work_group));
+
     // construct physical plan
     let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
         Ok(v) => v,

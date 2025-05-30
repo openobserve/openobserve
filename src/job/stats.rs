@@ -69,7 +69,7 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
     )));
 
     #[cfg(feature = "enterprise")]
-    let need_wait_one_around = o2_enterprise::enterprise::common::infra::config::get_config()
+    let need_wait_one_around = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled;
     #[cfg(not(feature = "enterprise"))]

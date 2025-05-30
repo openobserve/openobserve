@@ -94,7 +94,7 @@
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
         <label>Select Logs Mode:</label>
-        <q-btn-group>
+        <q-btn-group class="q-ml-sm">
           <q-btn
             :class="drilldownData.data.logsMode === 'auto' ? 'selected' : ''"
             size="sm"
@@ -294,7 +294,7 @@
                 class="q-mr-xs"
                 size="20px"
                 name="close"
-                style="cursor: pointer; height: 35px; display: flex !important"
+                style="cursor: pointer; height: 54px; display: flex !important"
                 @click="() => drilldownData.data.variables.splice(index, 1)"
                 :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
