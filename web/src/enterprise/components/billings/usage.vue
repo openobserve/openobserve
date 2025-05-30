@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <!-- new section introduced to show the usage for ingestion , search , functions -->
-        <div v-if="!dataLoading" class="row wrap justify-evenly q-gutter-md ">
+        <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="row wrap justify-evenly q-gutter-md ">
             <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%; ">
               <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
@@ -209,7 +209,11 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const lastUsageUpdated = ref(0);
       const pipelinesPanelDataKey = ref(0);
       const elapsedText = ref('Just now');
-      const usageData = ref<any>({});
+      const usageData = ref<any>({
+        ingestion: "0.00",
+        search: "0.00",
+        functions: "0.00"
+      });
       const activeTab = ref(router.currentRoute.value.query.data_type || "gb");
       let chartData: any = ref({});
       onMounted(async () => {
@@ -242,7 +246,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
             dataLoading.value = false;
             res.data.data.forEach((item: any) => {  
               const numericValue = parseFloat(item.value);
-              usageData.value[item.event.toLowerCase()] = numericValue < 0.01 ? '< 0.01' : numericValue.toFixed(2);
+              usageData.value[item.event.toLowerCase()] =  numericValue.toFixed(2);
             });
 
             dismiss();
