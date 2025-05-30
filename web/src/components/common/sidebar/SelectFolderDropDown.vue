@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filled
         borderless
         dense
-        class="q-mb-xs showLabelOnTop"
+        class="q-mb-xs showLabelOnTop "
+        :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
         style="width: calc(100% - 40px)"
         :disable="disableDropdown"
       >
@@ -39,12 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
 
       <q-btn
-        class="q-mb-md text-bold"
+        class="q-mb-md text-bold add-folder-btn "
+        :class="store.state.theme === 'dark' ? 'add-folder-btn-dark' : 'add-folder-btn-light'"
         :data-test="`${type}-folder-move-new-add`"
         label="+"
         text-color="light-text"
         style="width: 40px;"
         :style="computedStyle"
+
         no-caps
         @click="
           () => {
@@ -96,6 +99,10 @@ import { getFoldersListByType } from "@/utils/commons";
         default: false,
       },
       style: {
+        type: String,
+        default: "",
+      },
+      class: {
         type: String,
         default: "",
       },

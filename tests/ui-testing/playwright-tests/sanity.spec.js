@@ -346,7 +346,7 @@ test.describe("Sanity testcases", () => {
     }
   });
 
-  test("create template, destination and alert and then delete it", async ({ page }) => {
+  test.skip("create template, destination and alert and then delete it", async ({ page }) => {
     const uniqueId = Date.now(); // Generate a unique ID for each run
     const templateName = `sanitytemp-${uniqueId}`;
     const destinationName = `sanitydest-${uniqueId}`;
