@@ -804,18 +804,29 @@ UPDATE stream_stats
 
         // delete files which already marked deleted
         if let Some((_min_id, max_id)) = pk_value {
-            if let Err(e) = sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id <= $1;")
-                .bind(max_id)
-                .execute(&mut *tx)
-                .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!(
-                        "[SQLITE] rollback set stream stats error for delete file list: {}",
-                        e
-                    );
+            let limit = config::get_config().limit.calculate_stats_step_limit;
+            loop {
+                match sqlx::query("DELETE FROM file_list WHERE id IN (SELECT id FROM file_list WHERE deleted IS TRUE AND id <= $1 LIMIT $2);")
+                    .bind(max_id)
+                    .bind(limit)
+                    .execute(&mut *tx)
+                    .await
+                {
+                    Ok(v) => {
+                        if v.rows_affected() == 0 {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!(
+                                "[SQLITE] rollback set stream stats error for delete file list: {}",
+                                e
+                            );
+                        }
+                        return Err(e.into());
+                    }
                 }
-                return Err(e.into());
             }
         }
 

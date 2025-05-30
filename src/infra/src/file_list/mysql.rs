@@ -897,18 +897,29 @@ UPDATE stream_stats
                 .with_label_values(&["clean_deleted", "file_list", ""])
                 .inc();
             let start = std::time::Instant::now();
-            if let Err(e) = sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id <= ?;")
-                .bind(max_id)
-                .execute(&mut *tx)
-                .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!(
-                        "[MYSQL] rollback set stream stats error for delete file list: {}",
-                        e
-                    );
+            let limit = config::get_config().limit.calculate_stats_step_limit;
+            loop {
+                match sqlx::query("DELETE FROM file_list WHERE id IN (SELECT id FROM file_list WHERE deleted IS TRUE AND id <= ? LIMIT ?);")
+                    .bind(max_id)
+                    .bind(limit)
+                    .execute(&mut *tx)
+                    .await
+                {
+                    Ok(v) => {
+                        if v.rows_affected() == 0 {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!(
+                                "[MYSQL] rollback set stream stats error for delete file list: {}",
+                                e
+                            );
+                        }
+                        return Err(e.into());
+                    }
                 }
-                return Err(e.into());
             }
             let time = start.elapsed().as_secs_f64();
             DB_QUERY_TIME
