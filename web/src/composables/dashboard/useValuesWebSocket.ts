@@ -164,7 +164,9 @@ const useValuesWebSocket = () => {
         }
 
         // Merge existing values with new values, removing duplicates
-        const mergedValues = [...new Set([...existingValues, ...newOptions])];
+        const mergedValues = Array.from(
+          new Set([...existingValues, ...newOptions]),
+        );
         console.log("Fetching field values: mergedValues", mergedValues);
 
         // Update or add the entry
@@ -197,7 +199,7 @@ const useValuesWebSocket = () => {
     payload: any,
     variableObject: any,
   ): any => {
-    if (isWebSocketEnabled()) {
+    if (isWebSocketEnabled(store.state)) {
       fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
@@ -208,7 +210,7 @@ const useValuesWebSocket = () => {
       return;
     }
 
-    if (isStreamingEnabled()) {
+    if (isStreamingEnabled(store.state)) {
       console.log(
         `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
         {
@@ -238,7 +240,7 @@ const useValuesWebSocket = () => {
   ) => {
     console.log("Fetching field values:", queryReq);
 
-    if (isWebSocketEnabled()) {
+    if (isWebSocketEnabled(store.state)) {
       // Use WebSocket
       const wsPayload = {
         queryReq: {
@@ -265,7 +267,7 @@ const useValuesWebSocket = () => {
       console.log("Fetching field values: res websocket", res);
 
       return res;
-    } else if (isStreamingEnabled()) {
+    } else if (isStreamingEnabled(store.state)) {
       const wsPayload = {
         queryReq: {
           stream_name: queryReq.stream_name,

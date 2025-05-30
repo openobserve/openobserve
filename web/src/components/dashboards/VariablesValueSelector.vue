@@ -486,7 +486,7 @@ export default defineComponent({
       payload: any,
       variableObject: any,
     ): any => {
-      if (isStreamingEnabled()) {
+      if (isStreamingEnabled(store.state)) {
         console.log(
           `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
           {
@@ -506,7 +506,7 @@ export default defineComponent({
         return;
       }
 
-      if (isWebSocketEnabled()) {
+      if (isWebSocketEnabled(store.state)) {
         fetchQueryDataWithWebSocket(payload, {
           open: sendSearchMessage,
           close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
@@ -1181,7 +1181,10 @@ export default defineComponent({
               `[WebSocket] handleVariableType: built query context for ${variableObject.name}`,
             );
 
-            if (isWebSocketEnabled() || isStreamingEnabled()) {
+            if (
+              isWebSocketEnabled(store.state) ||
+              isStreamingEnabled(store.state)
+            ) {
               // For WebSocket, we don't need to wait for the response here
               // as it will be handled by the WebSocket handlers
               fetchFieldValuesWithWebsocket(variableObject, queryContext);
