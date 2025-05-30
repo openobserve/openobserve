@@ -676,6 +676,13 @@ pub async fn search_partition(
             "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
         );
         streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &file_path);
+        // load cached results from disk
+        if let Err(e) = streaming_aggs_exec::prepare_cache(id).await {
+            log::error!(
+                "[trace_id {trace_id}] search_partition: error loading cached results: {:?}",
+                e
+            );
+        }
     }
 
     let mut files = Vec::new();
