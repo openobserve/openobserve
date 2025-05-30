@@ -3,7 +3,7 @@ export class CreateOrgPage {
     constructor(page) {
         this.page = page;
     }
-    async createOrg() {
+    async createOrg(newOrgName) {
         const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
         const headers = {
             "Authorization": `Basic ${basicAuthCredentials}`,
@@ -11,7 +11,7 @@ export class CreateOrgPage {
         };
 
         let newOrgBody = {
-            "name": "defaulttestmulti",
+            "name": newOrgName,
         }
 
         const fetchResponse = await fetch(
