@@ -1563,6 +1563,7 @@ export default defineComponent({
       return new Promise(async (resolve, reject) => {
         if (
           router.currentRoute.value.name !== "logs" ||
+          searchObj.meta.logsVisualizeToggle !== "logs" ||
           !searchObj.data.stream.selectedStream.length
         ) {
           resolve("");
