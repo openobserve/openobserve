@@ -222,6 +222,14 @@ impl MonitorStream {
             stream,
         }
     }
+
+    fn is_complete_partition_window(&self) -> bool {
+        let window_micros = config::get_config()
+            .common
+            .streaming_aggs_partition_window_secs
+            * 1_000_000;
+        (self.end_time - self.start_time) == window_micros
+    }
 }
 
 impl Stream for MonitorStream {
@@ -240,13 +248,11 @@ impl Stream for MonitorStream {
             Poll::Ready(None) => {
                 let streaming_done =
                     GLOBAL_ID_CACHE.check_time(&self.id, self.start_time, self.end_time);
-                if streaming_done {
+                if self.is_complete_partition_window() {
                     // get all the record batches
                     let all_records = GLOBAL_CACHE.get(&self.id);
                     let file_path = get_file_path_from_streaming_id(&self.id);
                     let file_name = format!("{}_{}.arrow", self.start_time, self.end_time);
-                    // remove the cache
-                    remove_cache(&self.id);
                     // write the record batches to the file
                     if let Some(records) = all_records {
                         if let Err(e) =
@@ -259,6 +265,10 @@ impl Stream for MonitorStream {
                             );
                         }
                     }
+                }
+                if streaming_done {
+                    // remove the cache
+                    remove_cache(&self.id);
                 }
                 Poll::Ready(None)
             }
