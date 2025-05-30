@@ -45,7 +45,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_created_at,
+        unwrap_stream_settings,
     },
     storage,
 };
@@ -67,7 +68,6 @@ use crate::{
             DATAFUSION_RUNTIME,
             datafusion::exec::{self, MergeParquetResult},
         },
-        stream,
     },
 };
 
@@ -112,7 +112,7 @@ pub async fn generate_job_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
     if offset == 0 && stream_created > 0 {
         offset = stream_created
     } else if offset == 0 {
@@ -338,7 +338,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
     if offset == 0 {
         offset = stream_created
     }
