@@ -2325,7 +2325,7 @@ const routeToCreateDestination = () => {
               outputEvents.value = JSON.stringify(res.data.hits,null,2);
           }
           runQueryLoading.value = false;
-        } catch (err) {
+        } catch (err: any) {
           runPromqlError.value = err.response.data.error ?? "Something went wrong";
           runQueryLoading.value = false;
         }
