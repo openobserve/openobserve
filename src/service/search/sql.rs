@@ -72,6 +72,7 @@ pub static RE_HISTOGRAM: Lazy<Regex> =
 #[derive(Clone, Debug)]
 pub struct Sql {
     pub sql: String,
+    pub is_complex: bool,
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_names: Vec<TableReference>,
@@ -285,8 +286,10 @@ impl Sql {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
         }
 
+        let is_complex = is_complex_query(&mut statement);
         Ok(Sql {
             sql: statement.to_string(),
+            is_complex,
             org_id: org_id.to_string(),
             stream_type,
             stream_names,
