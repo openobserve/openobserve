@@ -214,7 +214,6 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         search: "0.00",
         functions: "0.00"
       });
-      const activeTab = ref(router.currentRoute.value.query.data_type || "gb");
       let chartData: any = ref({});
       onMounted(async () => {
         selectUsageDate();
@@ -222,9 +221,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const usageDate: any = computed(() => {
         return router.currentRoute.value.query.usage_date ?? "30days";
       })
-      const usageDataType: any = computed(() => {
-        return router.currentRoute.value.query.data_type ?? "gb";
-      })
+      const usageDataType: any = computed(() => { return router.currentRoute.value.query.data_type ?? "gb" })
       watch(usageDate, (val) => {
         getUsage();
       })

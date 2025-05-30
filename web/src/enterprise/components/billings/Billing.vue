@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -131,8 +131,8 @@ export default defineComponent({
     const billingtab = ref("usage");
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
 
-    onBeforeMount(() => {
-      if (router.currentRoute.value.name == "billings") {
+    onMounted(() => {
+      if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "usage") {
         billingtab.value = "usage";
         router.push({ path: "/billings/usage", query: { org_identifier: store.state.selectedOrganization.identifier, usage_date: usageDate.value, data_type: usageDataType.value } });
       }
