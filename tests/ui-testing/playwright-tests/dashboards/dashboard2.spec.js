@@ -20,14 +20,6 @@ import {
 const dashboardName = `Dashboard_${Date.now()}`;
 
 test.describe("dashboard UI testcases", () => {
-  let dashboardCreate;
-  let dashboardList;
-  let dashboardActions;
-  let dashboardRefresh;
-  let chartTypeSelector;
-  let dashboardDrilldown;
-  let dashboardPanel;
-
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(1000);
@@ -47,11 +39,9 @@ test.describe("dashboard UI testcases", () => {
     const dashboardActions = new DashboardactionPage(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
     const dashboardPanel = new DashboardPanel(page);
-
     const dashboardName = `dashboard-${Date.now()}`;
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -99,24 +89,22 @@ test.describe("dashboard UI testcases", () => {
   test("should add and cancel the breakdown field with different times and timezones and ensure it displays the correct output", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardRefresh = new DashboardTimeRefresh(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
+    // Navigate to dashboards
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
 
-    await page
-      .locator('[data-test="dashboard-folder-tab-default"]')
-      .waitFor({ state: "visible" });
+    // Create dashboard and add panel
     await dashboardCreate.createDashboard(dashboardName);
     await dashboardCreate.addPanel();
 
+    // Select stream and fields
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField(
       "kubernetes_container_image",
@@ -124,17 +112,23 @@ test.describe("dashboard UI testcases", () => {
     );
     await chartTypeSelector.searchAndAddField("kubernetes_container_name", "b");
 
+    // Set relative time
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardRefresh.setRelative("6", "w");
     await dashboardActions.applyDashboardBtn();
-    await chartTypeSelector.removeField("kubernetes_container_name", "b");
 
+    // Cancel adding the breakdown field
+    await chartTypeSelector.removeField("kubernetes_container_name", "b");
     await dashboardActions.applyDashboardBtn();
+
+    // Save and verify panel
     await dashboardActions.addPanelName(panelName);
     await dashboardActions.savePanel();
     await page.locator('[data-test="dashboard-back-btn"]').waitFor({
       state: "visible",
     });
+
+    // Delete panel and dashboard
     await dashboardPanel.deletePanel(panelName);
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
@@ -146,12 +140,10 @@ test.describe("dashboard UI testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPanel = new DashboardPanel(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -214,12 +206,10 @@ test.describe("dashboard UI testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const dashboardPanel = new DashboardPanel(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -266,11 +256,9 @@ test.describe("dashboard UI testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -311,12 +299,10 @@ test.describe("dashboard UI testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const dashboardPanel = new DashboardPanel(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -360,10 +346,8 @@ test.describe("dashboard UI testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -398,12 +382,10 @@ test.describe("dashboard UI testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const dashboardPanel = new DashboardPanel(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -444,8 +426,7 @@ test.describe("dashboard UI testcases", () => {
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const dashboardPanel = new DashboardPanel(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
     const chartTypeSelector = new ChartTypeSelector(page);
 
     // Navigate to dashboards
