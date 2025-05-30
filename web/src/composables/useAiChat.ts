@@ -26,6 +26,7 @@ const useAiChat = () => {
         let url  = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chat_stream`;
         const context = await getContext();
 
+        // Clone the messages array to avoid mutating the original array, as it saves it in the indexDB
         const _messages = JSON.parse(JSON.stringify(messages));
 
         const currentMessage = _messages[_messages.length - 1];
