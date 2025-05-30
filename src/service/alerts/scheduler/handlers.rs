@@ -654,22 +654,27 @@ async fn handle_report_triggers(
     }
     let mut run_once = false;
 
+    let mut frequency_seconds = 60;
+
     // Update trigger, set `next_run_at` to the
     // frequency interval of this report
     match report.frequency.frequency_type {
         ReportFrequencyType::Hours => {
+            frequency_seconds = report.frequency.interval * 3600;
             new_trigger.next_run_at += Duration::try_hours(report.frequency.interval)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
         }
         ReportFrequencyType::Days => {
+            frequency_seconds = report.frequency.interval * 86400;
             new_trigger.next_run_at += Duration::try_days(report.frequency.interval)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
         }
         ReportFrequencyType::Weeks => {
+            frequency_seconds = report.frequency.interval * 604800;
             new_trigger.next_run_at += Duration::try_weeks(report.frequency.interval)
                 .unwrap()
                 .num_microseconds()
@@ -677,6 +682,7 @@ async fn handle_report_triggers(
         }
         ReportFrequencyType::Months => {
             // Assumes each month to be of 30 days.
+            frequency_seconds = report.frequency.interval * 2592000;
             new_trigger.next_run_at += Duration::try_days(report.frequency.interval * 30)
                 .unwrap()
                 .num_microseconds()
@@ -705,7 +711,7 @@ async fn handle_report_triggers(
         new_trigger.next_run_at = TriggerCondition::align_time(
             new_trigger.next_run_at,
             report.tz_offset,
-            report.frequency.interval,
+            frequency_seconds,
         );
     }
 
