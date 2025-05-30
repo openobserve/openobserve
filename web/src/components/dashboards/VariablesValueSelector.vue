@@ -806,7 +806,8 @@ export default defineComponent({
       // Skip setting value if the variable already has a value and we're just opening the dropdown
       if (
         currentVariable.value !== null &&
-        currentVariable.value !== undefined
+        currentVariable.value !== undefined &&
+        !currentVariable.multiSelect
       ) {
         return;
       }
@@ -835,28 +836,71 @@ export default defineComponent({
       // if multi select
       if (currentVariable.multiSelect) {
         // old selected values
-        const selectedValues = oldVariableSelectedValues.filter((value) => {
-          return value !== undefined && value !== null;
-        });
+        const selectedValues = currentVariable.options
+          .filter((option: any) =>
+            oldVariableSelectedValues.includes(option.value),
+          )
+          .map((option: any) => option.value);
 
-        // if selected values exist, use them
+        // if selected values exist, select the values
         if (selectedValues.length > 0) {
           currentVariable.value = selectedValues;
-        } else if (currentVariable.options.length > 0) {
-          // Default to first option if nothing else is set
-          currentVariable.value = [currentVariable.options[0].value];
         } else {
-          currentVariable.value = [];
+          // Here, multiselect and old values will be not exist
+          switch (currentVariable?.selectAllValueForMultiSelect) {
+            case "custom":
+              if (currentVariable?.customMultiSelectValue?.length > 0) {
+                // Filter to only include custom values that exist in options
+                currentVariable.value = optionsValues.filter((value: any) =>
+                  currentVariable.customMultiSelectValue.includes(value),
+                );
+                // If none of the custom values exist in options, default to first value
+                if (
+                  currentVariable.value.length === 0 &&
+                  optionsValues.length > 0
+                ) {
+                  currentVariable.value = [optionsValues[0]];
+                }
+              } else if (optionsValues.length > 0) {
+                currentVariable.value = [optionsValues[0]];
+              } else {
+                currentVariable.value = [];
+              }
+              break;
+            case "all":
+              currentVariable.value = optionsValues;
+              break;
+            default:
+              // Default to first option if nothing else is set
+              currentVariable.value =
+                optionsValues.length > 0 ? [optionsValues[0]] : [];
+          }
         }
       } else {
-        // Single select logic
-        if (
-          oldVariableSelectedValues[0] !== null &&
-          oldVariableSelectedValues[0] !== undefined
-        ) {
-          currentVariable.value = oldVariableSelectedValues[0];
+        // here, multi select is false
+        // old selected value
+        const oldValue = currentVariable.options.find(
+          (option: any) => option.value === oldVariableSelectedValues[0],
+        )?.value;
+
+        // if old value exist, select the old value
+        if (oldValue) {
+          currentVariable.value = oldValue;
         } else if (currentVariable.options.length > 0) {
-          currentVariable.value = currentVariable.options[0].value;
+          // here, multi select is false and old value not exist
+          if (currentVariable.selectAllValueForMultiSelect === "custom") {
+            const customValue = currentVariable.options.find(
+              (variableOption: any) =>
+                variableOption.value ===
+                currentVariable.customMultiSelectValue?.[0],
+            );
+
+            // customValue can be undefined or default value
+            currentVariable.value =
+              customValue?.value ?? currentVariable.options[0].value;
+          } else {
+            currentVariable.value = currentVariable.options[0].value;
+          }
         } else {
           currentVariable.value = null;
         }
