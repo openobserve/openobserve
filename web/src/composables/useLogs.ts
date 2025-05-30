@@ -1577,8 +1577,8 @@ const useLogs = () => {
       // if window has use_web_socket property then use that
       // else use organization settings
       searchObj.meta.jobId = "";
-      const shouldUseWebSocket = isWebSocketEnabled();
-      const shouldUseStreaming = isStreamingEnabled();
+      const shouldUseWebSocket = isWebSocketEnabled(store.state);
+      const shouldUseStreaming = isStreamingEnabled(store.state);
 
       const isMultiStreamSearch =
         searchObj.data.stream.selectedStream.length > 1 &&
