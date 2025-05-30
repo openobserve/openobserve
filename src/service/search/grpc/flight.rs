@@ -149,8 +149,11 @@ pub async fn search(
     // construct index condition
     let index_condition = generate_index_condition(&req.index_info.index_condition)?;
 
-    let stream_settings = unwrap_stream_settings(latest_schema.as_ref());
-    let stream_created_at = unwrap_stream_created_at(latest_schema.as_ref());
+    let db_schema = infra::schema::get(&org_id, &stream_name, stream_type)
+        .await
+        .unwrap_or(arrow_schema::Schema::empty());
+    let stream_settings = unwrap_stream_settings(&db_schema);
+    let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
         .filter_map(|v| {

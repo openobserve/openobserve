@@ -34,7 +34,7 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        unwrap_partition_time_level, unwrap_stream_settings,
+        unwrap_partition_time_level, unwrap_stream_created_at, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -160,7 +160,7 @@ pub fn stream_res(
         .collect::<Vec<_>>();
 
     let mut stats = stats.unwrap_or_default();
-    stats.created_at = stream_created(&schema).unwrap_or_default();
+    stats.created_at = unwrap_stream_created_at(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
         let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
@@ -734,13 +734,6 @@ async fn transform_stats(
             stats.doc_time_max = meta.end_time;
         }
     }
-}
-
-pub fn stream_created(schema: &Schema) -> Option<i64> {
-    schema
-        .metadata()
-        .get("created_at")
-        .map(|v| v.parse().unwrap())
 }
 
 pub async fn delete_fields(
