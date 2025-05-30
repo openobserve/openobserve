@@ -450,8 +450,7 @@ pub async fn cache_files(
         let file_age_seconds = current_time - max_ts;
         let file_age_hours = file_age_seconds as f64 / 3600.0;
         
-        // Only report if file age is positive and reasonable (not future files)
-        if file_age_hours > 0.0 && file_age_hours <= 32.0 {
+        if file_age_hours > 0.0  {
             config::metrics::FILE_ACCESS_TIME_BUCKET_HISTOGRAM
                 .with_label_values(&[&stream_type.to_string()])
                 .observe(file_age_hours);
