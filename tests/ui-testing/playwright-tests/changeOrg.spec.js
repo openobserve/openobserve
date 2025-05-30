@@ -24,7 +24,7 @@ test.describe("Change Organisation", () => {
         reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage,
         multiOrgIdentifier;
 
-    const newOrgName = `def${Math.floor(Math.random() * 1000)}`;
+    const newOrgName = `organisation${Math.floor(Math.random() * 10000)}`;
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
         ingestionPage = new IngestionPage(page);

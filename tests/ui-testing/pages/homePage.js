@@ -85,7 +85,7 @@ export class HomePage {
         await this.page.waitForTimeout(500); // Brief wait to ensure the dropdown opens
     
         // Check if the options are visible
-        const isDropdownVisible = await this.page.isVisible('[role="option"]');
+        const isDropdownVisible = await this.page.isVisible('[role="presentation"]');
         if (!isDropdownVisible) {
             throw new Error('Dropdown options are not visible');
         }
