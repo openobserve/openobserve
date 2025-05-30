@@ -142,13 +142,13 @@ pub async fn search_multi(
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN.into(),
+                    StatusCode::FORBIDDEN,
                     format!("org {org_id} has expired its trial period"),
                 )));
             }
             Err(e) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN.into(),
+                    StatusCode::FORBIDDEN,
                     e.to_string(),
                 )));
             }
@@ -703,13 +703,13 @@ pub async fn _search_partition_multi(
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN.into(),
+                    StatusCode::FORBIDDEN,
                     format!("org {org_id} has expired its trial period"),
                 )));
             }
             Err(e) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN.into(),
+                    StatusCode::FORBIDDEN,
                     e.to_string(),
                 )));
             }

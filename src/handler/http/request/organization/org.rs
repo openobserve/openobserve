@@ -152,7 +152,7 @@ pub async fn all_organizations(
     let org = org_id.into_inner();
     if org != "_meta" {
         return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
+            http::StatusCode::UNAUTHORIZED,
             "not authorized to access this resource".to_string(),
         )));
     }
@@ -171,7 +171,7 @@ pub async fn all_organizations(
         Err(e) => {
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
                     e.to_string(),
                 )),
             );
@@ -472,7 +472,7 @@ async fn extend_trial_period(
     let org = org_id.into_inner();
     if org != "_meta" {
         return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
+            http::StatusCode::UNAUTHORIZED,
             "not authorized to access this resource".to_string(),
         )));
     }
@@ -481,14 +481,14 @@ async fn extend_trial_period(
         Ok(org) => org,
         Err(e) => {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
+                http::StatusCode::NOT_FOUND,
                 e.to_string(),
             )));
         }
     };
     if org.trial_ends_at > req.new_end_date {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
+            http::StatusCode::BAD_REQUEST,
             "new end date cannot be earlier than existing".to_string(),
         )));
     }
@@ -496,7 +496,7 @@ async fn extend_trial_period(
     match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date).await {
         Ok(_) => Ok(HttpResponse::Ok().body("success")),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
+            http::StatusCode::BAD_REQUEST,
             err.to_string(),
         ))),
     }

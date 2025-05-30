@@ -177,13 +177,13 @@ pub async fn handle_otlp_request(
         match super::organization::is_org_in_free_trial_period(org_id).await {
             Ok(false) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN.into(),
+                    http::StatusCode::FORBIDDEN,
                     format!("org {org_id} has expired its trial period"),
                 )));
             }
             Err(e) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN.into(),
+                    http::StatusCode::FORBIDDEN,
                     e.to_string(),
                 )));
             }
@@ -637,13 +637,13 @@ pub async fn ingest_json(
         match super::organization::is_org_in_free_trial_period(org_id).await {
             Ok(false) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN.into(),
+                    http::StatusCode::FORBIDDEN,
                     format!("org {org_id} has expired its trial period"),
                 )));
             }
             Err(e) => {
                 return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN.into(),
+                    http::StatusCode::FORBIDDEN,
                     e.to_string(),
                 )));
             }
