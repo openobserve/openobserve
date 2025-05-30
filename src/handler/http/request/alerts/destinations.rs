@@ -66,7 +66,12 @@ pub async fn save_destination(
     };
     log::warn!("dest module is alert: {}", dest.is_alert_destinations());
     match destinations::save("", dest, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Destination saved")),
+        Ok(v) => {
+            let mut ret = HashMap::new();
+            ret.insert("id", v.id.as_ref().unwrap().to_string());
+            ret.insert("name", v.name);
+            Ok(MetaHttpResponse::json(ret))
+        }
         Err(e) => Ok(e.into()),
     }
 }

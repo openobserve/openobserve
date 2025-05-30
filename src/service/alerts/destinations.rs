@@ -28,7 +28,7 @@ pub async fn save(
     name: &str,
     mut destination: Destination,
     create: bool,
-) -> Result<(), DestinationError> {
+) -> Result<Destination, DestinationError> {
     // First validate the `destination` according to its `destination_type`
     match &mut destination.module {
         Module::Alert {
@@ -99,7 +99,7 @@ pub async fn save(
     if name.is_empty() {
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
     }
-    Ok(())
+    Ok(saved)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {

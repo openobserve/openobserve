@@ -120,7 +120,12 @@ pub async fn create_alert(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::create(client, &org_id, &folder_id, alert).await {
-        Ok(_) => MetaHttpResponse::ok("Alert saved"),
+        Ok(v) => {
+            let mut ret = HashMap::new();
+            ret.insert("id", v.id.as_ref().unwrap().to_string());
+            ret.insert("name", v.name);
+            MetaHttpResponse::json(ret)
+        }
         Err(e) => e.into(),
     }
 }

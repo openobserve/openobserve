@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -65,7 +66,12 @@ pub async fn save_template(
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner().into(&org_id);
     match templates::save("", tmpl, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Template saved")),
+        Ok(v) => {
+            let mut ret = HashMap::new();
+            ret.insert("id", v.id.as_ref().unwrap().to_string());
+            ret.insert("name", v.name);
+            Ok(MetaHttpResponse::json(ret))
+        }
         Err(e) => Ok(e.into()),
     }
 }
