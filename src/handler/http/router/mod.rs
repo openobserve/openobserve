@@ -246,7 +246,7 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
         .service(status::schedulez);
 
     #[cfg(feature = "cloud")]
-    svc.service(web::scope("/webhook").service(billings::handle_stripe_event));
+    svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
 
     svc.service(
         web::scope("/auth")
@@ -604,13 +604,14 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
         .service(organization::org::accept_org_invite)
-        .service(billings::create_checkout_session)
-        .service(billings::process_session_detail)
-        .service(billings::list_subscription)
-        .service(billings::list_invoices)
-        .service(billings::unsubscribe)
-        .service(billings::create_billing_portal_session)
-        .service(billings::org_usage::get_org_usage)
+        .service(cloud::billings::create_checkout_session)
+        .service(cloud::billings::process_session_detail)
+        .service(cloud::billings::list_subscription)
+        .service(cloud::billings::list_invoices)
+        .service(cloud::billings::unsubscribe)
+        .service(cloud::billings::create_billing_portal_session)
+        .service(cloud::org_usage::get_org_usage)
+        .service(cloud::marketing::handle_new_attrition_event)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
 

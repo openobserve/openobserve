@@ -560,7 +560,6 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         base64::encode(&id_token),
                         is_new_usr.unwrap_or_default()
                     );
-                    log::warn!("url: {}", login_url);
                 }
                 Err(e) => {
                     audit_message.response_meta.http_response_code = 400;
