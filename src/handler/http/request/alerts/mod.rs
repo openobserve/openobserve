@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, patch, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, patch, post, put, web};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     triggers::{Trigger, TriggerModule},
@@ -120,12 +120,11 @@ pub async fn create_alert(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::create(client, &org_id, &folder_id, alert).await {
-        Ok(v) => {
-            let mut ret = HashMap::new();
-            ret.insert("id", v.id.as_ref().unwrap().to_string());
-            ret.insert("name", v.name);
-            MetaHttpResponse::json(ret)
-        }
+        Ok(v) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
+                .with_name(v.name),
+        ),
         Err(e) => e.into(),
     }
 }

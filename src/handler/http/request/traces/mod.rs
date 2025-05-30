@@ -82,8 +82,8 @@ async fn handle_req(
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Bad Request".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Bad Request",
             )),
         )
     }
