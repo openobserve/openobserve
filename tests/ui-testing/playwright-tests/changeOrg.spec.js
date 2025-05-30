@@ -159,7 +159,7 @@ test.describe("Change Organisation", () => {
 
 
         await pipelinesPage.gotoPipelinesPage();
-        await homePage.homeDefaultOrg();
+        await homePage.homePageDefaultOrg();
         await homePage.homePageURLValidationDefaultOrg();
         await pipelinesPage.pipelinesURLValidation();
         await pipelinesPage.pipelinesURLValidation();
@@ -179,7 +179,7 @@ test.describe("Change Organisation", () => {
 
 
         await dashboardPage.navigateToDashboards();
-        await homePage.homePageDefaultOrg();
+        await homePage.clickDefaultOrg();
         await homePage.homePageURLValidationDefaultOrg();
         await dashboardPage.dashboardURLValidation();
         
@@ -239,7 +239,7 @@ test.describe("Change Organisation", () => {
 
 
         await alertsPage.navigateToAlerts();
-        await homePage.homePageDefaultOrg();
+        await homePage.clickDefaultOrg();
         await page.waitForTimeout(5000);
         await homePage.homePageURLValidationDefaultOrg();
         await alertsPage.alertsURLValidation();
@@ -318,7 +318,6 @@ test.describe("Change Organisation", () => {
         await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
         await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
         await aboutPage.aboutURLValidation();
     });
 

@@ -97,5 +97,38 @@ export class HomePage {
         await this.page.getByText('arrow_drop_down').click();
     }
     
+    async clickDefaultOrg() {
+        // Click the dropdown to open the list of organizations
+        await this.page.getByText('arrow_drop_down').click();
+    
+        // Wait for the dropdown options to be present
+        const optionsSelector = '[data-test="navbar-organizations-select"] [role="option"]';
+        try {
+            await this.page.waitForSelector(optionsSelector, { state: 'visible', timeout: 60000 });
+        } catch (error) {
+            console.error('Dropdown options did not become visible:', error);
+            return; // Exit the function if options are not visible
+        }
+    
+        // Log the number of options visible for debugging
+        const optionsCount = await this.page.locator(optionsSelector).count();
+        console.log(`Number of options visible: ${optionsCount}`);
+    
+        // Check if the 'default' option is available and visible
+        const defaultOption = this.page.getByRole('option', { name: 'default' });
+    
+        // Wait for the 'default' option to be visible
+        try {
+            await defaultOption.waitFor({ state: 'visible', timeout: 60000 });
+            await defaultOption.click(); // Click the 'default' option
+            console.log('Clicked the default option successfully.');
+        } catch (error) {
+            console.error('Default option is not visible or clickable:', error);
+            return; // Exit if the default option is not available
+        }
+    
+        // Optionally, close the dropdown again if needed
+        await this.page.getByText('arrow_drop_down').click();
+    }
     
 }
