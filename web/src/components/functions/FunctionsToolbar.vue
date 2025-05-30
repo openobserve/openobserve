@@ -70,7 +70,7 @@
     </div>
     <div class="add-function-actions flex justify-center">
       <q-btn
-            v-if="config.isEnterprise == 'true' && !isAddFunctionComponent"
+            v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
             :ripple="false"
             @click="emit('open:chat',!store.state.isAiChatEnabled)"
             data-test="menu-link-ai-item"
