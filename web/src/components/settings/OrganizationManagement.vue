@@ -159,7 +159,7 @@ export default defineComponent({
     const extendedTrial = ref(1);
     const loading = ref(false);
     const extendTrialPrompt = ref(false);
-    const tabledata = ref([]);
+    const tabledata = ref<any>([]);
     const resultTotal = ref(0);
     const selectedPerPage = ref(20);
     const pagination: any = ref({
@@ -242,7 +242,7 @@ export default defineComponent({
       { label: "100", value: 100 },
     ];
 
-    const subscriptionPlans = {
+    const subscriptionPlans: any = {
       "0": "Free",
       "1": "Pay as you go",
       "2": "Enterprise"
@@ -302,7 +302,7 @@ export default defineComponent({
       extendTrialDataRow.value = row;
     }
 
-    const getTimestampInMicroseconds = weeks => (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
+    const getTimestampInMicroseconds = (weeks: number) => (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
 
 
     const updateTrialPeriod = (org_id: string, extended_week: number) => {

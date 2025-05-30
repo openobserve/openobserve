@@ -1055,3 +1055,13 @@ export function getDueDays(microTimestamp: number): number {
 
   return dueDays;
 }
+export function checkCallBackValues(url: string , key: string) {
+  const tokens = url.split("#");
+  for (const token of tokens) {
+    const propArr = token.split("=");
+    if (propArr[0] == key) {
+      return propArr[1];
+    }
+  }
+}
+

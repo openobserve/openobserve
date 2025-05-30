@@ -453,6 +453,9 @@ class="padding-none" />
       <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" />
     </div>
   </div>
+  <q-dialog v-model="showGetStarted" maximized full-height>
+    <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
+  </q-dialog>
   </q-layout>
 </template>
 
@@ -512,6 +515,7 @@ import configService from "@/services/config";
 import streamService from "@/services/stream";
 import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import GetStarted from "@/components/login/GetStarted.vue";
 import {
   outlinedHome,
   outlinedSearch,
@@ -570,6 +574,7 @@ export default defineComponent({
     ManagementIcon,
     ThemeSwitcher,
     O2AIChat,
+    GetStarted,
   },
   methods: {
     navigateToDocs() {
@@ -618,6 +623,7 @@ export default defineComponent({
     const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
+    const showGetStarted = ref(localStorage.getItem('isFirstTimeLogin') == 'true' ?? false);
     const isHovered = ref(false);
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
@@ -1263,6 +1269,13 @@ export default defineComponent({
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
+    //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
+    //this will be called from the get started component whenever users clicks on the submit button
+    const removeFirstTimeLogin = (val: boolean) => {
+      showGetStarted.value = val;
+      localStorage.removeItem('isFirstTimeLogin');
+    }
+
 
     return {
       t,
@@ -1296,6 +1309,8 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
+      showGetStarted,
+      removeFirstTimeLogin,
     };
   },
   computed: {

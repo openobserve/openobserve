@@ -16,10 +16,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="page">
-    <div class="head q-table__title q-pb-md">
-      {{ t("billing.header") }}
+  <q-page class="page" >
+    <div class="tw-flex tw-justify-between tw-items-center q-pb-md">
+    <div class="head q-table__title ">
+      {{ headerBasedOnRoute() }}
     </div>
+    <div v-if="isUsageRoute" class="tw-flex tw-gap-2 tw-items-center tw-h-[32px]">
+      <div class="custom-usage-date-select">
+          <q-select
+            dense
+            outlined
+            v-model="usageDate"
+            :options="options"
+            @update:model-value="(value: any) => selectUsageDate()"
+            class="q-pa-none q-ma-none  "
+            :class="store.state.theme === 'dark' ? 'tw-bg-[#35353C]' : 'tw-bg-[#D5D6EF]'"
+          >
+            <template v-slot:selected>
+              <span class="tw-text-xs ">
+                <span>
+                  <q-icon name="schedule" size="xs" class="tw-mr-2" />
+                </span>{{ usageDate }} ago
+              </span>
+            </template>
+          </q-select>
+        </div>
+        <div class="usage-data-type-tabs">
+          <AppTabs  :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
+        </div>
+    </div>
+      </div>
     <q-separator class="separator" />
     <q-splitter
       v-model="splitterModel"
@@ -39,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="usage"
             :to="
               '/billings/usage?org_identifier=' +
-              store.state.selectedOrganization.identifier
+              store.state.selectedOrganization.identifier +
+              '&usage_date=' +
+              usageDate + 
+              '&data_type=' +
+              usageDataType
             "
             :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
             :label="t('billing.usageLabel')"
@@ -71,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <router-view title=""> </router-view>
+          <router-view title=""> </router-view>
       </template>
     </q-splitter>
   </q-page>
@@ -79,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -88,27 +118,70 @@ import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, Usage },
+  components: { ConfirmDialog, Usage, AppTabs },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
     const billingtab = ref("usage");
+    const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
 
-    onBeforeMount(() => {
-      if (router.currentRoute.value.name == "billings") {
+    onMounted(() => {
+      if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "usage") {
         billingtab.value = "usage";
-        router.push({ path: "/billings/usage" });
+        router.push({ path: "/billings/usage", query: { org_identifier: store.state.selectedOrganization.identifier, usage_date: usageDate.value, data_type: usageDataType.value } });
       }
       // else {
       //   billingtab.value = router.currentRoute.value.name;
       //   router.push({ path: "/billings/" + router.currentRoute.value.name });
       // }
     });
+
+    const headerBasedOnRoute = () => {
+      if (router.currentRoute.value.name == "usage") {
+        return t("billing.usageLabel");
+      } else if (router.currentRoute.value.name == "plans") {
+        return t("billing.plansLabel");
+      } else if (router.currentRoute.value.name == "invoice_history") {
+        return t("billing.invoiceHistoryLabel");
+      }
+      return "";
+    };
+    const usageDate = ref(router.currentRoute.value.query.usage_date || "30days");
+
+    const isUsageRoute = computed(() => {
+      return router.currentRoute.value.name == "usage";
+    })
+    const selectUsageDate = () => {
+      router.push({
+        path: '/billings/usage',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          usage_date: usageDate.value,
+          data_type: usageDataType.value
+        }
+      })
+      
+    }
+    const updateActiveTab = (value: any) => {
+      usageDataType.value = value;
+      selectUsageDate();
+    }
+    const tabs = [
+    {
+        label: 'Gb',
+        value: "gb",
+      },
+      {
+        label: 'Mb',
+        value: "mb",
+      }
+    ]
 
     return {
       t,
@@ -118,6 +191,14 @@ export default defineComponent({
       billingtab,
       getImageURL,
       splitterModel: ref(200),
+      headerBasedOnRoute,
+      options: ["30days", "60days", "3months", "6months"],
+      usageDate,
+      selectUsageDate,
+      isUsageRoute,
+      tabs,
+      usageDataType,
+      updateActiveTab,
     };
   },
 });
@@ -126,9 +207,6 @@ export default defineComponent({
 <style scoped lang="scss">
 .page {
   padding: 1.5rem 1.5rem 0;
-  .head {
-    padding-bottom: 1rem;
-  }
   .q-tabs {
     &--vertical {
       margin: 1.5rem 1rem 0 0;
@@ -154,5 +232,67 @@ export default defineComponent({
       }
     }
   }
+}
+
+.usage-data-type-tabs {
+    height: 32px !important;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+      height: 32px !important;
+
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+
+.usage-data-type-tabs {
+  height: 32px !important;
+  
+
+  :deep(.rum-tabs) {
+    border: 1px solid #dcdcdc;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  :deep(.rum-tab) {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+    &:hover {
+      background: #eaeaea;
+      color: #000000 !important;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
+}
+.custom-usage-date-select{
+  ::v-deep(.q-field--auto-height.q-field--dense .q-field__control) {
+  min-height: 32px !important;
+  height: 32px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  align-items: center !important;
+}
+
+::v-deep(.q-field--auto-height.q-field--dense .q-field__native) {
+  min-height: 32px !important;
+  height: 32px !important;
+}
 }
 </style>

@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="feature.price !== ''"
           class="q-mx-sm"
-          style="flex: 1; border-top: 1px dotted #454F5B; height: 0;"
+          style="flex: 1; border-top: 1px dotted #454F5B; height: 0; opacity: 0.4;"
         ></div>
         <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
       </div>
