@@ -446,8 +446,8 @@ pub async fn cache_files(
             }
         };
          
-        let current_time = chrono::Utc::now().timestamp();
-        let file_age_seconds = current_time - max_ts;
+        let current_time = chrono::Utc::now().timestamp_micros();
+        let file_age_seconds = (current_time - max_ts) / 1_000_000;
         let file_age_hours = file_age_seconds as f64 / 3600.0;
         
         if file_age_hours > 0.0  {
