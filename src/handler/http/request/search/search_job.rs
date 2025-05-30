@@ -110,7 +110,6 @@ pub async fn submit_job(
         };
         let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
         // handle encoding for query and aggs
         let mut req: config::meta::search::Request = match json::from_slice(&body) {
             Ok(v) => v,
@@ -119,7 +118,11 @@ pub async fn submit_job(
         if let Err(e) = req.decode() {
             return Ok(MetaHttpResponse::bad_request(e));
         }
-        req.use_cache = Some(use_cache);
+
+        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+        if use_cache {
+            req.use_cache = Some(use_cache);
+        }
 
         // update timeout
         if req.timeout == 0 {
