@@ -852,6 +852,21 @@ pub static FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(||
     .expect("Metric created")
 });
 
+// File access time bucket histogram
+pub static FILE_ACCESS_TIME_BUCKET_HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "file_access_time_bucket_histogram",
+            "Histogram showing query counts within time windows (1h, 2h, 4h, 8h, 16h, 32h)"
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![1.0, 2.0, 4.0, 8.0, 16.0, 32.0])
+        .const_labels(create_const_labels()),
+        &["stream_type"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1079,6 +1094,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(FILE_ACCESS_TIME_BUCKET_HISTOGRAM.clone()))
         .expect("Metric registered");
 }
 
