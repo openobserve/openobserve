@@ -28,17 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             v-model="usageDate"
             :options="options"
+            emit-value
+            map-options
+            icon="schedule"
             @update:model-value="(value: any) => selectUsageDate()"
             class="q-pa-none q-ma-none  "
             :class="store.state.theme === 'dark' ? 'tw-bg-[#35353C]' : 'tw-bg-[#D5D6EF]'"
           >
-            <template v-slot:selected>
-              <span class="tw-text-xs ">
-                <span>
-                  <q-icon name="schedule" size="xs" class="tw-mr-2" />
-                </span>{{ usageDate }} ago
-              </span>
-            </template>
+          <template v-slot:prepend>
+            <q-icon name="schedule" size="xs" class="tw-mr-2" @click.stop.prevent />
+          </template>
           </q-select>
         </div>
         <div class="usage-data-type-tabs">
@@ -192,7 +191,11 @@ export default defineComponent({
       getImageURL,
       splitterModel: ref(200),
       headerBasedOnRoute,
-      options: ["30days", "60days", "3months", "6months"],
+      options: [
+        {label: "30 Days", value: "30days"}, 
+        {label: "60 Days", value: "60days"},
+        {label: "3 Months", value: "3months"},
+        {label: "6 Months", value: "6months"}],
       usageDate,
       selectUsageDate,
       isUsageRoute,

@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="autoRedirectDexLogin">
       <p>
         Redirecting to SSO login page. If you are not redirected, please
-        <a href="#" @click="loginWithSSo">click here</a>.
+        <a href="#" @click="loginWithSSo" class="cursor-pointer tw-underline">click here</a>.
       </p>
     </div>
 
