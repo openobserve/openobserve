@@ -245,7 +245,6 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -254,7 +253,11 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
-    req.use_cache = Some(use_cache);
+
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    if use_cache {
+        req.use_cache = Some(use_cache);
+    }
 
     // set search event type
     if req.search_type.is_none() {
@@ -314,12 +317,8 @@ pub async fn search(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(
-                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                        StatusCode::BAD_REQUEST.into(),
-                        e.to_string(),
-                    )),
-                );
+                return Ok(HttpResponse::BadRequest()
+                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
         if !keys_used.is_empty() {
@@ -1040,8 +1039,6 @@ async fn values_v1(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
-
     // search
     let req_query = config::meta::search::Query {
         sql: query_sql,
@@ -1064,7 +1061,7 @@ async fn values_v1(
     )
     .await;
 
-    let req = config::meta::search::Request {
+    let mut req = config::meta::search::Request {
         query: req_query,
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
@@ -1072,9 +1069,14 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(use_cache),
+        use_cache: None,
         local_mode: None,
     };
+
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
+    if use_cache {
+        req.use_cache = Some(use_cache);
+    }
 
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)

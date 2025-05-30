@@ -50,8 +50,8 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
         _ => HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, err.to_string()))
             .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                err.to_string(),
+                StatusCode::INTERNAL_SERVER_ERROR,
+                err,
             )),
     }
 }

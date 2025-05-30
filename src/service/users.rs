@@ -59,8 +59,8 @@ pub async fn post_user(
 ) -> Result<HttpResponse, Error> {
     if !is_valid_email(&usr_req.email) {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Invalid email".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Invalid email",
         )));
     }
     let cfg = get_config();
@@ -68,14 +68,14 @@ pub async fn post_user(
     if usr_req.role.custom_role.is_some() {
         #[cfg(not(feature = "enterprise"))]
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Custom roles not allowed".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Custom roles not allowed",
         )));
         #[cfg(feature = "enterprise")]
         if !get_openfga_config().enabled {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Custom roles not allowed".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Custom roles not allowed",
             )));
         } else {
             match o2_openfga::authorizer::roles::get_all_roles(org_id, None).await {
@@ -83,8 +83,8 @@ pub async fn post_user(
                     for custom_role in usr_req.role.custom_role.as_ref().unwrap() {
                         if !res.contains(custom_role) {
                             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                                http::StatusCode::BAD_REQUEST.into(),
-                                "Custom role not found".to_string(),
+                                http::StatusCode::BAD_REQUEST,
+                                "Custom role not found",
                             )));
                         }
                     }
@@ -92,8 +92,8 @@ pub async fn post_user(
                 Err(e) => {
                     log::error!("Error fetching custom roles during post user: {}", e);
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Custom role not found".to_string(),
+                        http::StatusCode::BAD_REQUEST,
+                        "Custom role not found",
                     )));
                 }
             }
@@ -106,14 +106,14 @@ pub async fn post_user(
         let initiator_user = db::user::get(Some(org_id), initiator_id).await;
         let Ok(initiator_user) = initiator_user else {
             return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                http::StatusCode::UNAUTHORIZED.into(),
-                "Not Allowed".to_string(),
+                http::StatusCode::UNAUTHORIZED,
+                "Not Allowed",
             )));
         };
         let Some(initiator_user) = initiator_user else {
             return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                http::StatusCode::UNAUTHORIZED.into(),
-                "Not Allowed".to_string(),
+                http::StatusCode::UNAUTHORIZED,
+                "Not Allowed",
             )));
         };
         initiator_user.role.eq(&UserRole::Admin)
@@ -139,8 +139,8 @@ pub async fn post_user(
                 && usr_req.password.is_empty()
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Password required to create new user".to_string(),
+                    http::StatusCode::BAD_REQUEST,
+                    "Password required to create new user",
                 )));
             }
             let salt = ider::uuid();
@@ -163,8 +163,8 @@ pub async fn post_user(
             if db::user::add(&user).await.is_err() {
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        "Failed to save user".to_string(),
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to save user",
                     )),
                 );
             }
@@ -204,19 +204,19 @@ pub async fn post_user(
                 }
             }
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "User saved successfully".to_string(),
+                http::StatusCode::OK,
+                "User saved successfully",
             )))
         } else {
             Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST.into(),
-                "User already exists".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "User already exists",
             )))
         }
     } else {
         Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            "Not Allowed".to_string(),
+            http::StatusCode::FORBIDDEN,
+            "Not Allowed",
         )))
     }
 }
@@ -253,8 +253,8 @@ pub async fn update_user(
     let mut allow_password_update = false;
     if !is_valid_email(email) {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Invalid email".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Invalid email",
         )));
     }
     let is_email_root = is_root_user(email);
@@ -262,8 +262,8 @@ pub async fn update_user(
     // Only root user can update root user
     if is_email_root && !self_update {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Root user cannot be updated".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Root user cannot be updated",
         )));
     }
 
@@ -275,8 +275,8 @@ pub async fn update_user(
             .is_some_and(|role_req| role_req.role.eq(&UserRole::Root.to_string()))
     {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Root user role cannot be updated".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Root user role cannot be updated",
         )));
     }
 
@@ -303,9 +303,8 @@ pub async fn update_user(
             Some(local_user) => {
                 if local_user.is_external {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Updates not allowed with external users, please update with source system"
-                            .to_string(),
+                        http::StatusCode::BAD_REQUEST,
+                        "Updates not allowed with external users, please update with source system",
                     )));
                 }
                 if !self_update {
@@ -328,8 +327,8 @@ pub async fn update_user(
                 }
                 if !self_update && local_user.role.eq(&UserRole::Root) {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Only root user can update its details".to_string(),
+                        http::StatusCode::BAD_REQUEST,
+                        "Only root user can update its details",
                     )));
                 }
                 new_user = local_user.clone();
@@ -347,8 +346,8 @@ pub async fn update_user(
                     } else {
                         message = "Existing/old password mismatch, please provide valid existing password";
                         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                            http::StatusCode::BAD_REQUEST.into(),
-                            message.to_string(),
+                            http::StatusCode::BAD_REQUEST,
+                            message,
                         )));
                     }
                 } else if self_update && user.new_password.is_some() && user.old_password.is_none()
@@ -412,15 +411,15 @@ pub async fn update_user(
 
                 if !message.is_empty() {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        message.to_string(),
+                        http::StatusCode::BAD_REQUEST,
+                        message,
                     )));
                 }
 
                 if !is_updated && !is_org_updated {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "No changes to update".to_string(),
+                        http::StatusCode::BAD_REQUEST,
+                        "No changes to update",
                     )));
                 }
 
@@ -437,8 +436,8 @@ pub async fn update_user(
                 {
                     return Ok(
                         HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                            "Failed to update user".to_string(),
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to update user",
                         )),
                     );
                 }
@@ -458,8 +457,8 @@ pub async fn update_user(
                             log::error!("Error updating org user relation: {}", e);
                             return Ok(HttpResponse::InternalServerError().json(
                                 MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    "Failed to update organization membership for user".to_string(),
+                                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    "Failed to update organization membership for user",
                                 ),
                             ));
                         }
@@ -475,8 +474,8 @@ pub async fn update_user(
                         log::error!("Error adding org user relation: {}", e);
                         return Ok(HttpResponse::InternalServerError().json(
                             MetaHttpResponse::error(
-                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                "Failed to add organization membership for user".to_string(),
+                                http::StatusCode::INTERNAL_SERVER_ERROR,
+                                "Failed to add organization membership for user",
                             ),
                         ));
                     }
@@ -536,8 +535,8 @@ pub async fn update_user(
                                     );
                                     return Ok(HttpResponse::InternalServerError().json(
                                         MetaHttpResponse::error(
-                                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                            "Failed to update custom roles for user".to_string(),
+                                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                                            "Failed to update custom roles for user",
                                         ),
                                     ));
                                 }
@@ -549,19 +548,19 @@ pub async fn update_user(
                 #[cfg(not(feature = "enterprise"))]
                 log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    "User updated successfully".to_string(),
+                    http::StatusCode::OK,
+                    "User updated successfully",
                 )))
             }
             None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                "User not found".to_string(),
+                http::StatusCode::NOT_FOUND,
+                "User not found",
             ))),
         }
     } else {
         Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "User not found".to_string(),
+            http::StatusCode::NOT_FOUND,
+            "User not found",
         )))
     }
 }
@@ -613,8 +612,8 @@ pub async fn add_user_to_org(
 ) -> Result<HttpResponse, Error> {
     if !is_valid_email(email) {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Invalid email".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Invalid email",
         )));
     }
     let email = email.trim().to_lowercase();
@@ -632,8 +631,8 @@ pub async fn add_user_to_org(
                 Err(e) => {
                     log::error!("Error fetching user: {}", e);
                     return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                        http::StatusCode::NOT_FOUND.into(),
-                        "User not found".to_string(),
+                        http::StatusCode::NOT_FOUND,
+                        "User not found",
                     )));
                 }
             }
@@ -655,8 +654,8 @@ pub async fn add_user_to_org(
             let is_member = db::org_users::get(org_id, &email).await.is_ok();
             if is_member {
                 return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
-                    http::StatusCode::CONFLICT.into(),
-                    "User is already part of the organization".to_string(),
+                    http::StatusCode::CONFLICT,
+                    "User is already part of the organization",
                 )));
             }
 
@@ -666,8 +665,8 @@ pub async fn add_user_to_org(
             {
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        "Failed to add user to org".to_string(),
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to add user to org",
                     )),
                 );
             }
@@ -698,20 +697,20 @@ pub async fn add_user_to_org(
                 }
             }
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "User added to org successfully".to_string(),
+                http::StatusCode::OK,
+                "User added to org successfully",
             )))
         } else {
             Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                http::StatusCode::UNAUTHORIZED.into(),
-                "Not Allowed".to_string(),
+                http::StatusCode::UNAUTHORIZED,
+                "Not Allowed",
             )))
         }
     } else {
         Ok(
             HttpResponse::UnprocessableEntity().json(MetaHttpResponse::error(
-                http::StatusCode::UNPROCESSABLE_ENTITY.into(),
-                "User not found".to_string(),
+                http::StatusCode::UNPROCESSABLE_ENTITY,
+                "User not found",
             )),
         )
     }
@@ -929,8 +928,8 @@ pub async fn remove_user_from_org(
             Ok(mut user) => {
                 if is_root_user(user.email.as_str()) {
                     return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                        http::StatusCode::FORBIDDEN.into(),
-                        "Not Allowed".to_string(),
+                        http::StatusCode::FORBIDDEN,
+                        "Not Allowed",
                     )));
                 }
 
@@ -939,8 +938,8 @@ pub async fn remove_user_from_org(
                     if orgs.len() == 1 {
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                                http::StatusCode::FORBIDDEN.into(),
-                                "Not Allowed".to_string(),
+                                http::StatusCode::FORBIDDEN,
+                                "Not Allowed",
                             )));
                         }
 
@@ -973,8 +972,8 @@ pub async fn remove_user_from_org(
                             if org.role.eq(&UserRole::ServiceAccount) && user.is_external {
                                 return Ok(HttpResponse::Forbidden().json(
                                     MetaHttpResponse::error(
-                                        http::StatusCode::FORBIDDEN.into(),
-                                        "Not Allowed".to_string(),
+                                        http::StatusCode::FORBIDDEN,
+                                        "Not Allowed",
                                     ),
                                 ));
                             }
@@ -1016,25 +1015,25 @@ pub async fn remove_user_from_org(
                         }
                     }
                     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                        http::StatusCode::OK.into(),
-                        "User removed from organization".to_string(),
+                        http::StatusCode::OK,
+                        "User removed from organization",
                     )))
                 } else {
                     Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                        http::StatusCode::NOT_FOUND.into(),
-                        "User for the organization not found".to_string(),
+                        http::StatusCode::NOT_FOUND,
+                        "User for the organization not found",
                     )))
                 }
             }
             Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                "User for the organization not found".to_string(),
+                http::StatusCode::NOT_FOUND,
+                "User for the organization not found",
             ))),
         }
     } else {
         Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
-            "Not Allowed".to_string(),
+            http::StatusCode::UNAUTHORIZED,
+            "Not Allowed",
         )))
     }
 }
@@ -1043,13 +1042,13 @@ pub async fn delete_user(email_id: &str) -> Result<HttpResponse, Error> {
     let result = db::user::delete(email_id).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "User deleted".to_string(),
+            http::StatusCode::OK,
+            "User deleted",
         ))),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 

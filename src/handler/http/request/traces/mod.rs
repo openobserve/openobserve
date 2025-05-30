@@ -13,17 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
 use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::http::get_or_create_trace_id,
+        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
     handler::http::request::{
         CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
@@ -81,8 +82,8 @@ async fn handle_req(
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Bad Request".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Bad Request",
             )),
         )
     }
@@ -277,6 +278,12 @@ pub async fn get_latest_traces(
         use_cache: None,
         local_mode: None,
     };
+
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    if use_cache {
+        req.use_cache = Some(use_cache);
+    }
+
     let stream_type = StreamType::Traces;
     let user_id = in_req
         .headers()

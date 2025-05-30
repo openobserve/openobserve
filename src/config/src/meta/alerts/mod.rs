@@ -142,7 +142,10 @@ impl TriggerCondition {
             .with_timezone(&timezone);
 
         // Convert frequency from seconds to minutes
-        let frequency_minutes = frequency / 60;
+        let mut frequency_minutes = frequency / 60;
+        if frequency_minutes == 0 {
+            frequency_minutes = 1;
+        }
 
         // Get the minute and second of the next_run_at time
         let minute = dt.minute() as i64;
