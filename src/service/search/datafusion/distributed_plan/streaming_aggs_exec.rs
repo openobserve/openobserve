@@ -39,7 +39,9 @@ use datafusion::{
 use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
 
-use crate::service::search::cache::streaming_aggs::cache_streaming_aggs_to_disk;
+use crate::service::search::cache::streaming_aggs::{
+    cache_streaming_aggs_to_disk, get_streaming_aggs_records_from_disk,
+};
 
 pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
     Lazy::new(|| Arc::new(StreamingAggsCache::default()));
@@ -332,6 +334,25 @@ impl StreamingAggsCache {
         entry.push(Arc::new(v));
     }
 
+    pub fn insert_many(&self, k: String, v: Vec<RecordBatch>) {
+        let mut w = self.cacher.lock();
+        if w.len() >= self.max_entries {
+            log::info!(
+                "[StreamingAggs] remove the oldest entry: max_entries={}, current_entries={}",
+                self.max_entries,
+                w.len()
+            );
+            if let Some(k) = w.pop_front() {
+                self.data.remove(&k);
+                GLOBAL_ID_CACHE.remove(&k);
+            }
+        }
+        w.push_back(k.clone());
+        drop(w);
+        let mut entry = self.data.entry(k).or_default();
+        entry.extend(v.into_iter().map(|v| Arc::new(v)));
+    }
+
     pub fn remove(&self, k: &str) {
         self.data.remove(k);
     }
@@ -378,6 +399,10 @@ impl StreamingIdCache {
         self.data.remove(k);
     }
 
+    pub fn get(&self, k: &str) -> Option<StreamingIdItem> {
+        self.data.get(k).map(|v| v.value().clone())
+    }
+
     pub fn get_file_path(&self, k: &str) -> Option<String> {
         let entry = self.data.get(k);
         if let Some(v) = entry {
@@ -395,6 +420,7 @@ impl Default for StreamingIdCache {
     }
 }
 
+#[derive(Clone)]
 struct StreamingIdItem {
     start_time: i64,
     end_time: i64,
@@ -432,4 +458,34 @@ impl StreamingIdItem {
 fn get_file_path_from_streaming_id(streaming_id: &str) -> String {
     let file_path = GLOBAL_ID_CACHE.get_file_path(streaming_id);
     file_path.unwrap_or_default()
+}
+
+// prepare cache for the streaming_id
+pub async fn prepare_cache(streaming_id: &str) -> anyhow::Result<bool> {
+    let streaming_item = match GLOBAL_ID_CACHE.get(streaming_id) {
+        Some(v) => v,
+        None => return Err(anyhow::anyhow!("StreamingId not found")),
+    };
+
+    let file_path = streaming_item.get_file_path();
+
+    let (cached_record_batches, is_complete_match) = get_streaming_aggs_records_from_disk(
+        &file_path,
+        streaming_item.start_time,
+        streaming_item.end_time,
+    )
+    .await?;
+
+    log::info!(
+        "[streaming_id {}] loaded {} cached record batches from {}",
+        streaming_id,
+        cached_record_batches.len(),
+        file_path
+    );
+
+    if !cached_record_batches.is_empty() {
+        GLOBAL_CACHE.insert_many(streaming_id.to_string(), cached_record_batches);
+    }
+
+    Ok(is_complete_match)
 }
