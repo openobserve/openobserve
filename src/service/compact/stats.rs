@@ -48,12 +48,8 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     // get stats from file_list
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
-        let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false)
-            .await
-            .unwrap_or_default();
-        let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true)
-            .await
-            .unwrap_or_default();
+        let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false).await?;
+        let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true).await?;
         let mut stream_stats = HashMap::new();
         for (stream, stats) in add_stream_stats {
             stream_stats.insert(stream, stats);
