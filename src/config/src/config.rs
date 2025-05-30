@@ -1234,6 +1234,8 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
+    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 10000)] // records
+    pub calculate_stats_step_limit: i64,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
@@ -2006,12 +2008,12 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.file_list_id_batch_size = 5000;
     }
 
-    if cfg.limit.consistent_hash_vnodes == 0 {
-        cfg.limit.consistent_hash_vnodes = 100;
+    if cfg.limit.consistent_hash_vnodes < 1 {
+        cfg.limit.consistent_hash_vnodes = 1000;
     }
 
     // reset to default if given zero
-    if cfg.limit.max_dashboard_series == 0 {
+    if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
     }
 
@@ -2019,6 +2021,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     #[allow(deprecated)]
     if cfg.limit.udschema_max_fields > 0 {
         cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
+    }
+
+    // check for calculate stats
+    if cfg.limit.calculate_stats_step_limit < 1 {
+        cfg.limit.calculate_stats_step_limit = 10000;
     }
 
     Ok(())

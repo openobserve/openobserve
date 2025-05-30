@@ -35,8 +35,10 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         }
     }
 
-    // get latest offset
+    // get latest offset and apply step limit
+    let step_limit = config::get_config().limit.calculate_stats_step_limit;
     let latest_pk = infra_file_list::get_max_pk_value().await?;
+    let latest_pk = std::cmp::min(offset + step_limit, latest_pk);
     let pk_value = if offset == 0 && latest_pk == 0 {
         None
     } else {
