@@ -1586,41 +1586,46 @@ export default defineComponent({
 
     const getContext = async () => {
       return new Promise(async (resolve, reject) => {
-        const isAddPanelPage = router.currentRoute.value.name === "addPanel";
+        try {
+          const isAddPanelPage = router.currentRoute.value.name === "addPanel";
 
-        const isStreamSelectedInDashboardPage =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
+          const isStreamSelectedInDashboardPage =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
 
-        if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
+          if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
+            resolve("");
+            return;
+          }
+
+          const payload = {};
+
+          const stream =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          const streamType =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type;
+
+          if (!streamType || !stream?.length) {
+            resolve("");
+            return;
+          }
+
+          const schema = await getStream(stream, streamType, true);
+
+          payload["stream_name"] = stream;
+          payload["schema"] = schema.uds_schema || schema.schema || [];
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for add panel page", error);
           resolve("");
-          return;
         }
-
-        const payload = {};
-
-        const stream =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
-
-        const streamType =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type;
-
-        if (!streamType || !stream?.length) {
-          resolve("");
-          return;
-        }
-
-        const schema = await getStream(stream, streamType, true);
-
-        payload["stream_name"] = stream;
-        payload["schema"] = schema.uds_schema || schema.schema || [];
-
-        resolve(payload);
       });
     };
 
