@@ -817,6 +817,20 @@ export default defineComponent({
         variablesDependencyGraph[currentVariable.name]?.parentVariables
           ?.length > 0;
 
+      // Check for URL values first
+      const urlValue = props.initialVariableValues?.value[currentVariable.name];
+      if (urlValue) {
+        // If URL value exists, use it
+        currentVariable.value = currentVariable.multiSelect
+          ? Array.isArray(urlValue)
+            ? urlValue
+            : [urlValue]
+          : urlValue;
+        currentVariable.isVariableLoadingPending = true;
+        return;
+      }
+
+      // Only apply custom values if no URL value exists
       if (
         !isChildVariable &&
         currentVariable?.selectAllValueForMultiSelect === "custom" &&
