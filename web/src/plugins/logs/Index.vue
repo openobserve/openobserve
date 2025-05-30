@@ -353,6 +353,7 @@ import {
   defineComponent,
   ref,
   onActivated,
+  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -1560,6 +1561,14 @@ export default defineComponent({
 
     const getContext = async () => {
       return new Promise(async (resolve, reject) => {
+        if (
+          router.currentRoute.value.name !== "logs" ||
+          !searchObj.data.stream.selectedStream.length
+        ) {
+          resolve("");
+          return;
+        }
+
         const payload = {};
 
         for (let i = 0; i < searchObj.data.stream.selectedStream.length; i++) {

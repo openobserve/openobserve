@@ -5,6 +5,11 @@ let contextHandler : any;
 const useAiChat = () => {
 
     const getContext = async () => {
+
+        if(!contextHandler || typeof contextHandler !== 'function' ) {
+            return "";
+        }
+
         const context = await contextHandler();
         return context;
     }
@@ -25,7 +30,9 @@ const useAiChat = () => {
 
         const currentMessage = _messages[_messages.length - 1];
 
-        currentMessage.content = getFormattedContext(currentMessage, context);
+        if(context) {
+            currentMessage.content = getFormattedContext(currentMessage, context);
+        }
 
         let body = '';
         body = model.length > 0 ? JSON.stringify({ model, messages: _messages }) : JSON.stringify({ messages: _messages });
