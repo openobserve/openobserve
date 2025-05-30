@@ -46,15 +46,6 @@ const useAiChat = () => {
         }
     }
 
-//     # 1. Context
-// - Project: Building a log monitoring dashboard.
-// - Tech stack: Vue 3 + Tailwind CSS.
-// - Goal: Implement a dynamic table with filterable columns.
-// - Constraints: Data comes from a large dataset (100K+ records), so performance matters.
-// - Current status: Using `@datatables.net-vue3`, but filters are lagging.
-// # 2. Request
-// - Can you help optimize filtering performance or suggest an alternative approach?
-
     const getFormattedContext = (message: any, context: any) => {
         // Initialize context section
 
