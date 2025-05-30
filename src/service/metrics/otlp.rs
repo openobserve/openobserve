@@ -133,7 +133,7 @@ pub async fn handle_otlp_request(
     {
         if !crate::service::organization::is_org_in_free_trial_period(org_id).await? {
             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                http::StatusCode::FORBIDDEN.into(),
+                http::StatusCode::FORBIDDEN,
                 format!("org {org_id} has expired its trial period"),
             )));
         }

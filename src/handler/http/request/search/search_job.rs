@@ -111,13 +111,13 @@ pub async fn submit_job(
             match is_org_in_free_trial_period(&org_id).await {
                 Ok(false) => {
                     return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                        StatusCode::FORBIDDEN.into(),
+                        StatusCode::FORBIDDEN,
                         format!("org {org_id} has expired its trial period"),
                     )));
                 }
                 Err(e) => {
                     return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                        StatusCode::FORBIDDEN.into(),
+                        StatusCode::FORBIDDEN,
                         e.to_string(),
                     )));
                 }
