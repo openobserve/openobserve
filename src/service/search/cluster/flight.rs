@@ -889,7 +889,11 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
 
     // register table
     for (stream, schema) in &sql.schemas {
-        let schema = schema.schema().as_ref().clone();
+        let schema = schema
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(Default::default());
         let stream_name = stream.to_quoted_string();
         let table = Arc::new(
             NewEmptyTable::new(&stream_name, Arc::new(schema))

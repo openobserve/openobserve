@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>   
         <q-btn
-          v-if="config.isEnterprise == 'true'"
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
@@ -116,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="border-radius: 100%;"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
-
         >
           <div class="row items-center no-wrap tw-gap-2  ">
             <img  :src="getBtnLogo" class="header-icon ai-icon" />
@@ -1172,7 +1171,9 @@ export default defineComponent({
         if(orgSettings?.data?.data?.free_trial_expiry != null && orgSettings?.data?.data?.free_trial_expiry != "") {
           const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
           if(trialDueDays <= 0) {
-            router.push({name: "plans"})
+            router.push({name: "plans", query: {
+              org_identifier: selectedOrg.value.identifier,
+            },})
           }
         }
         
