@@ -34,7 +34,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query},
+        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -56,7 +56,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::make_grpc_search_client,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
     std::collections::HashSet, tracing::info_span,
 };
@@ -77,6 +77,7 @@ pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
 pub(crate) mod request;
+pub(crate) mod search_stream;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
@@ -182,6 +183,7 @@ pub async fn search(
     if let Some(v) = in_req.local_mode {
         request.set_local_mode(Some(v));
     }
+    let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
@@ -236,6 +238,9 @@ pub async fn search(
     // do this because of clippy warning
     match res {
         Ok(mut res) => {
+            if in_req.query.streaming_output && meta.order_by.is_empty() {
+                res = crate::service::websocket_events::sort::order_search_results(res, None);
+            }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
             let (report_usage, search_type, search_event_context) = match in_req.search_type {
@@ -577,6 +582,7 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
+    is_http_req: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -610,10 +616,17 @@ pub async fn search_partition(
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
         && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
+    let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
+    let is_http_distinct = is_simple_distinct && is_http_req;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
         skip_get_file_list = false;
+    }
+
+    // if http distinct, we should skip file list
+    if is_http_distinct {
+        skip_get_file_list = true;
     }
 
     // check if we need to use streaming_output
@@ -637,7 +650,8 @@ pub async fn search_partition(
         let stream_type = stream.get_stream_type(stream_type);
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let use_stream_stats_for_partition = stream_settings.approx_partition;
+        let use_stream_stats_for_partition = cfg.common.use_stream_settings_for_partitions_enabled
+            || stream_settings.approx_partition;
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
@@ -662,13 +676,26 @@ pub async fn search_partition(
             );
             files.extend(stream_files);
         } else {
-            // data retention in seconds
-            let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
+            // data retention should be either from stream settings or global data retension
+            let data_retention = if stream_settings.data_retention > 0 {
+                stream_settings.data_retention
+            } else {
+                cfg.compact.data_retention_days
+            };
+            let mut data_retention = data_retention * 24 * 60 * 60;
             // data duration in seconds
             let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
             let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
-            let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
+
+            // if stats.doc_time_max is 0, handle the case by using current time
+            let data_end_time = if stats.doc_time_max == 0 {
+                Utc::now().timestamp_micros()
+            } else {
+                std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max)
+            };
+
             let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
+
             if data_retention_based_on_stats > 0 {
                 data_retention = std::cmp::min(data_retention, data_retention_based_on_stats);
             };
@@ -676,13 +703,14 @@ pub async fn search_partition(
                 log::warn!("Data retention is zero, setting to 1 to prevent division by zero");
                 data_retention = 1;
             }
-            let records = (stats.doc_num as i64 * query_duration) / data_retention;
-            let original_size = (stats.storage_size as i64 * query_duration) / data_retention;
+            let records = (stats.doc_num as i64 / data_retention) * query_duration;
+            let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
             log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {}",
+                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {} , data_retention in seconds: {}",
                 stream_name,
                 records,
                 original_size,
+                data_retention,
             );
             files.push(infra::file_list::FileId {
                 id: Utc::now().timestamp_micros(),
@@ -771,6 +799,15 @@ pub async fn search_partition(
         part_num = 1000;
     }
 
+    log::info!(
+        "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {}, base_speed: {}, partition_secs: {}, part_num: {}",
+        resp.original_size,
+        cpu_cores,
+        cfg.limit.query_group_base_speed,
+        cfg.limit.query_partition_by_secs,
+        part_num
+    );
+
     // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
@@ -825,6 +862,10 @@ pub async fn search_partition(
     // Generate partitions
     let partitions =
         generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+
+    if sql_order_by == OrderBy::Asc {
+        resp.order_by = OrderBy::Asc;
+    }
 
     resp.partitions = partitions;
     Ok(resp)
@@ -1171,6 +1212,7 @@ pub async fn search_partition_multi(
                 streaming_output: req.streaming_output,
             },
             false,
+            true,
         )
         .await
         {

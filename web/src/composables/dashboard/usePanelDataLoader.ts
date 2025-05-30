@@ -28,6 +28,7 @@ import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
 import {
   addLabelsToSQlQuery,
   changeHistogramInterval,
+  convertQueryIntoSingleLine,
 } from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
@@ -39,12 +40,14 @@ import {
   b64EncodeUnicode,
   generateTraceContext,
   isWebSocketEnabled,
+  isStreamingEnabled,
 } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
+import useHttpStreamingSearch from "../useStreamingSearch";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -84,6 +87,14 @@ export const usePanelDataLoader = (
     cancelSearchQueryBasedOnRequestId,
     cleanUpListeners,
   } = useSearchWebSocket();
+
+  const {
+    fetchQueryDataWithHttpStream,
+    cancelStreamQueryBasedOnRequestId,
+    closeStreamWithError,
+    closeStream,
+    resetAuthToken,
+  } = useHttpStreamingSearch();
 
   const { refreshAnnotations } = useAnnotations(
     store.state.selectedOrganization.identifier,
@@ -328,7 +339,10 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (
+      isWebSocketEnabled(store.state) &&
+      state.searchRequestTraceIds
+    ) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
@@ -411,6 +425,8 @@ export const usePanelDataLoader = (
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
               size: -1,
+              // pass always true for streaming_output
+              streaming_output: true,
             },
             page_type: pageType,
             traceparent,
@@ -476,13 +492,17 @@ export const usePanelDataLoader = (
                 {
                   org_identifier: store.state.selectedOrganization.identifier,
                   query: {
-                    query: await getHistogramSearchRequest(
-                      query,
-                      it,
-                      partition[0],
-                      partition[1],
-                      histogramInterval,
-                    ),
+                    query: {
+                      ...(await getHistogramSearchRequest(
+                        query,
+                        it,
+                        partition[0],
+                        partition[1],
+                        histogramInterval,
+                      )),
+                      streaming_output: res?.data?.streaming_aggs ?? false,
+                      streaming_id: res?.data?.streaming_id ?? null,
+                    },
                     // pass encodig if enabled,
                     // make sure that `encoding: null` is not being passed, that's why used object extraction logic
                     ...(store.state.zoConfig.sql_base64_enabled
@@ -533,8 +553,11 @@ export const usePanelDataLoader = (
             break;
           }
 
+          if (res?.data?.streaming_aggs) {
+            state.data[currentQueryIndex] = [...searchRes.data.hits];
+          }
           // if order by is desc, append new partition response at end
-          if (order_by.toLowerCase() === "desc") {
+          else if (order_by.toLowerCase() === "desc") {
             state.data[currentQueryIndex] = [
               ...(state.data[currentQueryIndex] ?? []),
               ...searchRes.data.hits,
@@ -635,32 +658,90 @@ export const usePanelDataLoader = (
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[payload?.queryReq?.currentQueryIndex] = [
+      state.data[payload?.meta?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
       ];
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
       // else append new partition response at start
-      state.data[payload?.queryReq?.currentQueryIndex] = [
+      state.data[payload?.meta?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
       ];
     } else {
-      state.data[payload?.queryReq?.currentQueryIndex] = [
-        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
         ...(searchRes?.content?.results?.hits ?? {}),
       ];
     }
 
     // update result metadata
-    state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
+    state.resultMetaData[payload?.meta?.currentQueryIndex] =
       searchRes?.content?.results ?? {};
+  };
+
+  const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
+    // update result metadata
+    state.resultMetaData[payload?.meta?.currentQueryIndex] = {
+      ...(searchRes?.content ?? {}),
+      ...(searchRes?.content?.results ?? {}),
+    };
+  };
+
+  const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
+    // remove past error detail
+    state.errorDetail = {
+      message: "",
+      code: "",
+    };
+
+    // is streaming aggs
+    const streaming_aggs =
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]
+        ?.streaming_aggs ?? false;
+
+    // if streaming aggs, replace the state data
+    if (streaming_aggs) {
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
+    }
+    // if order by is desc, append new partition response at end
+    else if (
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.order_by
+        ?.toLowerCase() === "asc"
+    ) {
+      // else append new partition response at start
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      ];
+    } else {
+      state.data[payload?.meta?.currentQueryIndex] = [
+        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
+    }
+
+    // update result metadata
+    state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
+      searchRes?.content?.results?.hits ?? {};
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
+      // console.log("panel data loader response", payload.traceId, response);
+
+      if (response.type === "search_response_metadata") {
+        handleStreamingHistogramMetadata(payload, response);
+      }
+
+      if (response.type === "search_response_hits") {
+        handleStreamingHistogramHits(payload, response);
+      }
+
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
       }
@@ -807,6 +888,7 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
+        meta: any;
       } = {
         queryReq: {
           query,
@@ -825,6 +907,9 @@ export const usePanelDataLoader = (
         traceId,
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
+        meta: {
+          currentQueryIndex,
+        },
       };
 
       fetchQueryDataWithWebSocket(payload, {
@@ -832,6 +917,95 @@ export const usePanelDataLoader = (
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
+        reset: handleSearchReset,
+      });
+
+      addTraceId(traceId);
+    } catch (e: any) {
+      state.errorDetail = {
+        message: e?.message || e,
+        code: e?.code ?? "",
+      };
+      state.loading = false;
+      state.isOperationCancelled = false;
+    }
+  };
+
+  const getDataThroughStreaming = async (
+    query: string,
+    it: any,
+    startISOTimestamp: string,
+    endISOTimestamp: string,
+    pageType: string,
+    currentQueryIndex: number,
+    abortControllerRef: any,
+  ) => {
+    try {
+      const { traceId } = generateTraceContext();
+
+      const payload: {
+        queryReq: any;
+        type: "search" | "histogram" | "pageCount";
+        isPagination: boolean;
+        traceId: string;
+        org_id: string;
+        pageType: string;
+        searchType: string;
+        meta: any;
+      } = {
+        queryReq: {
+          query: await getHistogramSearchRequest(
+            query,
+            it,
+            startISOTimestamp,
+            endISOTimestamp,
+            null,
+          ),
+        },
+        type: "histogram",
+        isPagination: false,
+        traceId,
+        org_id: store?.state?.selectedOrganization?.identifier,
+        pageType,
+        searchType: searchType.value ?? "dashboards",
+        meta: {
+          currentQueryIndex,
+          dashboard_id: dashboardId?.value,
+          folder_id: folderId?.value,
+          fallback_order_by_col: getFallbackOrderByCol(),
+        },
+      };
+
+      // type: "search",
+      // content: {
+      //   trace_id: payload.traceId,
+      //   payload: {
+      //     query: await getHistogramSearchRequest(
+      //       payload.queryReq.query,
+      //       payload.queryReq.it,
+      //       payload.queryReq.startISOTimestamp,
+      //       payload.queryReq.endISOTimestamp,
+      //       null,
+      //     ),
+      //   },
+      //   stream_type: payload.pageType,
+      //   search_type: searchType.value ?? "dashboards",
+      //   org_id: store?.state?.selectedOrganization?.identifier,
+      //   use_cache: (window as any).use_cache ?? true,
+      //   dashboard_id: dashboardId?.value,
+      //   folder_id: folderId?.value,
+      //   fallback_order_by_col: getFallbackOrderByCol(),
+      // },
+
+      // if aborted, return
+      if (abortControllerRef?.signal?.aborted) {
+        return;
+      }
+
+      fetchQueryDataWithHttpStream(payload, {
+        data: handleSearchResponse,
+        error: handleSearchError,
+        complete: handleSearchClose,
         reset: handleSearchReset,
       });
 
@@ -1243,7 +1417,8 @@ export const usePanelDataLoader = (
                   panelSchema.value.queryType,
                 );
 
-              const query = query2;
+              // convert query into single line
+              const query = await convertQueryIntoSingleLine(query2);
 
               const metadata: any = {
                 originalQuery: it.query,
@@ -1266,7 +1441,18 @@ export const usePanelDataLoader = (
                   )
                 : [];
               state.annotations = annotations;
-              if (isWebSocketEnabled()) {
+
+              if (isStreamingEnabled(store.state)) {
+                await getDataThroughStreaming(
+                  query,
+                  it,
+                  startISOTimestamp,
+                  endISOTimestamp,
+                  pageType,
+                  panelQueryIndex,
+                  abortControllerRef,
+                );
+              } else if (isWebSocketEnabled(store.state)) {
                 await getDataThroughWebSocket(
                   query,
                   it,
@@ -1561,12 +1747,13 @@ export const usePanelDataLoader = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
 
-        const errorCode = isWebSocketEnabled()
-          ? error?.response?.data?.code || error?.code || ""
-          : error?.response?.status ||
-            error?.status ||
-            error?.response?.data?.code ||
-            "";
+        const errorCode =
+          isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)
+            ? error?.response?.data?.code || error?.code || error?.status || ""
+            : error?.response?.status ||
+              error?.status ||
+              error?.response?.data?.code ||
+              "";
 
         state.errorDetail = {
           message: trimmedErrorMessage,
@@ -1982,7 +2169,7 @@ export const usePanelDataLoader = (
     }
 
     // for websocket
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {

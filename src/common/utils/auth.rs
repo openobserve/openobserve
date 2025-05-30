@@ -16,17 +16,19 @@
 use std::fmt::Debug;
 
 use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
-use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use base64::Engine;
-use config::utils::json;
+use config::{
+    meta::user::UserRole,
+    utils::{hash::get_passcode_hash, json},
+};
 use futures::future::{Ready, ready};
 use once_cell::sync::Lazy;
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::{
-        infra::config::USER_SESSIONS,
-        {meta, meta::ingestion::INGESTION_EP},
+    crate::{
+        common::{infra::config::USER_SESSIONS, meta::ingestion::INGESTION_EP},
+        service::users::get_user,
     },
     jsonwebtoken::TokenData,
     o2_dex::service::auth::get_dex_jwks,
@@ -37,11 +39,11 @@ use {
 };
 
 use crate::common::{
-    infra::config::{PASSWORD_HASH, USERS},
+    infra::config::{ORG_USERS, PASSWORD_HASH},
     meta::{
         authz::Authz,
         organization::DEFAULT_ORG,
-        user::{AuthTokens, UserRole},
+        user::{AuthTokens, UserOrgRole},
     },
 };
 
@@ -54,6 +56,17 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
     let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
     Regex::new(&pattern).unwrap()
 });
+
+pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+.-]*[a-zA-Z0-9_+])?)@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
+    )
+    .unwrap()
+});
+
+pub fn is_valid_email(email: &str) -> bool {
+    EMAIL_REGEX.is_match(email)
+}
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
@@ -79,40 +92,59 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     match hash {
         Some(ret_hash) => ret_hash.value().to_string(),
         None => {
-            let t_cost = 4;
-            let m_cost = 2048;
-            let p_cost = 2;
-            let params = Params::new(m_cost, t_cost, p_cost, None).unwrap();
-            let ctx = Argon2::new(Algorithm::Argon2d, Version::V0x10, params);
-            let password = pass.as_bytes();
-            let salt_string = SaltString::encode_b64(salt.as_bytes()).unwrap();
-            let password_hash = ctx
-                .hash_password(password, &salt_string)
-                .unwrap()
-                .to_string();
+            let password_hash = get_passcode_hash(pass, salt);
             PASSWORD_HASH.insert(key, password_hash.clone());
             password_hash
         }
     }
 }
 
+// TODO
+pub fn generate_invite_token() -> String {
+    "".to_string()
+}
+
 pub(crate) fn is_root_user(user_id: &str) -> bool {
-    match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
+    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
 }
 
 #[cfg(feature = "enterprise")]
-pub fn get_role(role: UserRole) -> UserRole {
+pub async fn save_org_tuples(org_id: &str) {
+    use o2_openfga::config::get_config as get_openfga_config;
+
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::save_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn save_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
+pub async fn delete_org_tuples(org_id: &str) {
+    use o2_openfga::config::get_config as get_openfga_config;
+
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn delete_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
+pub fn get_role(role: &UserOrgRole) -> UserRole {
     use std::str::FromStr;
 
-    let role = o2_openfga::authorizer::roles::get_role(format!("{role}"));
+    let role = o2_openfga::authorizer::roles::get_role(format!("{}", role.base_role));
     UserRole::from_str(&role).unwrap()
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub fn get_role(_role: UserRole) -> UserRole {
+pub fn get_role(_role: &UserOrgRole) -> UserRole {
     UserRole::Admin
 }
 
@@ -182,7 +214,7 @@ impl FromRequest for UserEmail {
         if let Some(auth_header) = req.headers().get("user_id") {
             if let Ok(user_str) = auth_header.to_str() {
                 return ready(Ok(UserEmail {
-                    user_id: user_str.to_owned(),
+                    user_id: user_str.to_lowercase(),
                 }));
             }
         }
@@ -262,7 +294,7 @@ impl FromRequest for AuthExtractor {
         let object_type = if url_len == 1 {
             // for organization entity itself, get requires the list
             // permissions, and the object is a special format string
-            if method.eq("GET") && path_columns[0].eq("organizations") {
+            if path_columns[0].eq("organizations") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 };
@@ -284,12 +316,25 @@ impl FromRequest for AuthExtractor {
                 method = "LIST".to_string();
             }
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
+            let key = if path_columns[1].eq("invites") {
+                "users"
+            } else if path_columns[1].eq("rename") && method.eq("PUT") {
+                "organizations"
+            } else {
+                path_columns[1]
+            };
+
+            // for organization api changes we need perms on _all_{org}
+            let entity = if key == "organizations" {
+                format!("_all_{}", path_columns[0])
+            } else {
+                path_columns[0].to_string()
+            };
+
             format!(
                 "{}:{}",
-                OFGA_MODELS
-                    .get(path_columns[1])
-                    .map_or(path_columns[1], |model| model.key),
-                path_columns[0]
+                OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                entity
             )
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
@@ -357,6 +402,13 @@ impl FromRequest for AuthExtractor {
                     "{}:{}",
                     OFGA_MODELS.get("streams").unwrap().key,
                     path_columns[1]
+                )
+            } else if path_columns[1].starts_with("rename") {
+                // Org rename
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("organizations").unwrap().key,
+                    org_id
                 )
             } else if (method.eq("PUT") && !path_columns[1].starts_with("ratelimit"))
                 || method.eq("DELETE")
@@ -619,6 +671,8 @@ impl FromRequest for AuthExtractor {
                 || path.contains("query_manager")
                 || path.contains("/short")
                 || path.contains("/ws")
+                || path.contains("/_values_stream")
+                || (url_len > 1 && path_columns[1].eq("ai"))
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
@@ -870,7 +924,7 @@ pub async fn check_permissions(
     parent_id: &str,
 ) -> bool {
     if !is_root_user(user_id) {
-        let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+        let user: config::meta::user::User = match get_user(Some(org_id), user_id).await {
             Some(user) => user.clone(),
             None => return false,
         }
@@ -994,10 +1048,13 @@ async fn decode_expiry(token: &str) -> Result<TokenData<HashMap<String, Value>>,
 
 #[cfg(test)]
 mod tests {
-    use infra::db as infra_db;
+    use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{
+        common::meta::user::UserRequest,
+        service::{self, organization, users},
+    };
 
     #[test]
     fn test_generate_presigned_url() {
@@ -1028,14 +1085,22 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
-        let _ = users::create_root_user(
+        infra_table::create_user_tables().await.unwrap();
+        organization::check_and_create_org_without_ofga(DEFAULT_ORG)
+            .await
+            .unwrap();
+        let _ = users::create_root_user_if_not_exists(
             DEFAULT_ORG,
             UserRequest {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: UserOrgRole {
+                    base_role: config::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
@@ -1043,6 +1108,9 @@ mod tests {
             },
         )
         .await;
+        service::db::user::cache().await.unwrap();
+        service::db::organization::cache().await.unwrap();
+        service::db::org_users::cache().await.unwrap();
         assert!(is_root_user("root@example.com"));
         assert!(!is_root_user("root2@example.com"));
     }

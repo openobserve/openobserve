@@ -15,6 +15,7 @@
 
 use actix_web::http::StatusCode;
 use config::meta::{
+    search::TimeOffset,
     sql::OrderBy,
     websocket::{SearchEventReq, ValuesEventReq},
 };
@@ -40,9 +41,9 @@ pub mod enterprise_utils {
     ) -> Result<(), String> {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{AuthExtractor, is_root_user},
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::users::get_user,
         };
 
         // Check if the user is a root user (has all permissions)
@@ -51,10 +52,7 @@ pub mod enterprise_utils {
         }
 
         // Get user details from the USERS cache
-        let user: meta::user::User = USERS
-            .get(&format!("{}/{}", org_id, user_id))
-            .ok_or_else(|| "User not found".to_string())?
-            .clone();
+        let user: config::meta::user::User = get_user(Some(org_id), user_id).await.unwrap();
 
         // If the user is external, check permissions
         let stream_type_str = stream_type.as_str();
@@ -322,13 +320,6 @@ impl WsClientEvents {
             _ => {}
         }
     }
-}
-
-/// To represent the query start and end time based of partition or cache
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeOffset {
-    pub start_time: i64,
-    pub end_time: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -20,7 +20,7 @@ use config::{
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-            SearchPartitionResponse, ValuesEventContext,
+            SearchPartitionResponse, TimeOffset, ValuesEventContext,
         },
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
@@ -50,7 +50,7 @@ use crate::{
             sql::Sql,
         },
         setup_tracing_with_trace_id,
-        websocket_events::{TimeOffset, WsServerEvents, calculate_progress_percentage},
+        websocket_events::{WsServerEvents, calculate_progress_percentage},
     },
 };
 
@@ -794,6 +794,7 @@ async fn get_partitions(
         req.stream_type,
         &search_partition_req,
         false,
+        false,
     )
     .instrument(tracing::info_span!(
         "src::handler::http::request::websocket::search::get_partitions"
@@ -1061,7 +1062,7 @@ pub async fn do_partitioned_search(
         }
 
         // Stop if reached the requested result size and it is not a streaming aggs query
-        if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
+        if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
                 "[WS_SEARCH]: Reached requested result size ({}), stopping search",
                 req_size

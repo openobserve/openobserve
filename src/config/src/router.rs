@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 21] = [
+const QUERIER_ROUTES: [(&str, usize); 23] = [
     ("config", 0),                            // /config
     ("summary", 2),                           // /api/{org_id}/summary
     ("organizations", 1),                     // /api/organizations
@@ -26,6 +26,8 @@ const QUERIER_ROUTES: [(&str, usize); 21] = [
     ("query_manager", 2),                     // /api/{org_id}/query_manager/...
     ("ws", 2),                                // /api/{org_id}/ws
     ("_search", 2),                           // /api/{org_id}/_search
+    ("_search_stream", 2),                    // /api/{org_id}/_search_stream
+    ("_values_stream", 2),                    // /api/{org_id}/_values_stream
     ("_around", 3),                           // /api/{org_id}/{stream_name}/_around
     ("_values", 3),                           // /api/{org_id}/{stream_name}/_values
     ("functions?page_num=", 2),               // /api/{org_id}/functions
@@ -39,7 +41,11 @@ const QUERIER_ROUTES: [(&str, usize); 21] = [
                                                * {label_name}/
                                                * values */
 ];
-const QUERIER_ROUTES_BY_BODY: [&str; 2] = [
+const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
+    "/_search",
+    "/_search_partition",
+    "/_search_stream",
+    "/_values_stream",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query_exemplars",
 ];
@@ -60,17 +66,18 @@ pub const INGESTER_ROUTES: [&str; 11] = [
 
 #[inline]
 pub fn is_querier_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
     QUERIER_ROUTES.iter().any(|(route, skip_segments)| {
         if path.contains(route) {
-            let segments = path
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>();
-            // check if we have enough segments
-            if segments.len() <= *skip_segments {
-                return false;
+            let mut segments = path.split('/').filter(|s| !s.is_empty());
+            // Skip the required number of segments
+            for _ in 0..*skip_segments {
+                if segments.next().is_none() {
+                    return false;
+                }
             }
-            let route_part = segments[*skip_segments..].join("/");
+            // Join remaining segments without collecting into a Vec
+            let route_part = segments.collect::<Vec<_>>().join("/");
             route_part.starts_with(route)
                 && INGESTER_ROUTES
                     .iter()
@@ -83,10 +90,41 @@ pub fn is_querier_route(path: &str) -> bool {
 
 #[inline]
 pub fn is_querier_route_by_body(path: &str) -> bool {
+    let path = remove_base_uri(path);
     QUERIER_ROUTES_BY_BODY.iter().any(|x| path.contains(x))
 }
 
 #[inline]
 pub fn is_fixed_querier_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
     FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
+}
+
+#[inline]
+pub fn is_ws_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
+    let mut segments = path.split('/').filter(|s| !s.is_empty());
+    // Skip first 3 segments
+    for _ in 0..3 {
+        if segments.next().is_none() {
+            return false;
+        }
+    }
+    segments.next() == Some("ws")
+        && INGESTER_ROUTES
+            .iter()
+            .all(|ingest_route| !path.ends_with(ingest_route))
+}
+
+#[inline]
+fn remove_base_uri(path: &str) -> &str {
+    let base_uri = &crate::get_config().common.base_uri;
+    if base_uri.is_empty() {
+        return path;
+    }
+    if let Some(stripped) = path.strip_prefix(base_uri) {
+        stripped
+    } else {
+        path
+    }
 }

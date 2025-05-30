@@ -184,7 +184,7 @@ const useSearchWebSocket = () => {
       socketId: socketId.value as string
     }
 
-    const url = getWebSocketUrl(socketId.value, org_id);
+    const url = getWebSocketUrl(socketId.value, org_id, store.state.API_ENDPOINT);
     // If needed we can store the socketID in global state
     webSocket.connect(socketId.value, url);
 
@@ -206,6 +206,7 @@ const useSearchWebSocket = () => {
       isPagination: boolean;
       traceId: string;
       org_id: string;
+      meta: any;
     },
     handlers: {
       open: (data: any, response: any) => void;
@@ -254,6 +255,7 @@ const useSearchWebSocket = () => {
     isPagination: boolean;
     traceId: string;
     org_id: string;
+    meta: any;
   }, handlers: {
     open: (data: any, response: any) => void;
     message: (data: any, response: any) => void;

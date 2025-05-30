@@ -231,6 +231,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .required(true)
                     .help("snowflake id"),
             ]),
+            clap::Command::new("consistent-hash").about("consistent hash").args([
+                clap::Arg::new("file")
+                    .short('f')
+                    .long("file")
+                    .required(true)
+                    .num_args(1..)
+                    .help("file"),
+            ]),
             clap::Command::new("upgrade-db")
                 .about("upgrade db table schemas").args(dataArgs()),
         ])
@@ -239,7 +247,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     if app.subcommand().is_none() {
         return Ok(false);
     }
-    let cfg = config::get_config();
+
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
@@ -258,6 +266,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     }
 
     // init infra, create data dir & tables
+    let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
     match name {
         "reset" => {
@@ -273,7 +282,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             change_password: true,
                             old_password: None,
                             new_password: Some(cfg.auth.root_user_password.clone()),
-                            role: Some(meta::user::UserRole::Root),
+                            role: Some(crate::common::meta::user::UserRoleRequest {
+                                role: config::meta::user::UserRole::Root.to_string(),
+                                custom: None,
+                            }),
                             first_name: Some("root".to_owned()),
                             last_name: Some("".to_owned()),
                             token: if cfg.auth.root_user_token.is_empty() {
@@ -301,6 +313,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
+                    // init nats client
+                    let (tx, _rx) = tokio::sync::mpsc::channel::<infra::db::nats::NatsEvent>(1);
+                    if !cfg.common.local_mode
+                        && cfg.common.cluster_coordinator.to_lowercase() == "nats"
+                    {
+                        infra::db::nats::init_nats_client(tx).await?;
+                    }
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
@@ -324,10 +343,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "version" => {
-                    println!("version: {}", db::version::get().await?);
+                    println!("version: {}", db::metas::version::get().await?);
                 }
                 "user" => {
                     db::user::cache().await?;
+                    db::org_users::cache().await?;
                     let mut id = 0;
                     for user in USERS.iter() {
                         id += 1;
@@ -494,6 +514,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let t = chrono::Utc.timestamp_nanos(ts * 1_000_000);
             let td = t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
             println!("datetimes: {}", td);
+        }
+        "consistent-hash" => {
+            let files = command
+                .get_many::<String>("file")
+                .unwrap()
+                .collect::<Vec<_>>();
+            let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
+            super::http::consistent_hash(files).await?;
         }
         "upgrade-db" => {
             crate::migration::init_db().await?;

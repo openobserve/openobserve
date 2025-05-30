@@ -28,8 +28,8 @@ use datafusion::{
     error::{DataFusionError, Result},
     functions::regex::regexpmatch::regexp_match,
     logical_expr::{
-        ReturnInfo, ReturnTypeArgs, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl,
-        Signature, TypeSignature::Exact, Volatility,
+        ReturnInfo, ReturnTypeArgs, ScalarFunctionArgs, ScalarFunctionImplementation, ScalarUDF,
+        ScalarUDFImpl, Signature, TypeSignature::Exact, Volatility,
     },
     physical_plan::ColumnarValue,
     prelude::create_udf,
@@ -287,9 +287,10 @@ impl ScalarUDFImpl for RegxpMatchToFields {
         ))
     }
 
-    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
+    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
         // 1. Get result from datafusion native regexp_match() function
         let len = args
+            .args
             .iter()
             .fold(Option::<usize>::None, |acc, arg| match arg {
                 ColumnarValue::Scalar(_) => acc,
@@ -298,6 +299,7 @@ impl ScalarUDFImpl for RegxpMatchToFields {
 
         let inferred_length = len.unwrap_or(0);
         let args_array = args
+            .args
             .iter()
             .map(|arg| arg.clone().into_array(inferred_length))
             .collect::<Result<Vec<_>>>()?;
@@ -312,7 +314,7 @@ impl ScalarUDFImpl for RegxpMatchToFields {
             }
         };
 
-        let (ret_data_type, regexp_pattern) = match &args[1] {
+        let (ret_data_type, regexp_pattern) = match &args.args[1] {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(pattern))) => {
                 (DataType::Utf8, pattern.to_string().replace('"', ""))
             }

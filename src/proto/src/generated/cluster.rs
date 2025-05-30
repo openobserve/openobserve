@@ -86,16 +86,18 @@ pub struct FileList {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileKey {
-    #[prost(string, tag = "1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub meta: ::core::option::Option<FileMeta>,
-    #[prost(bool, tag = "3")]
-    pub deleted: bool,
-    #[prost(bytes = "vec", optional, tag = "4")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-    #[prost(string, tag = "5")]
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    #[prost(string, tag = "2")]
     pub account: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "4")]
+    pub meta: ::core::option::Option<FileMeta>,
+    #[prost(bool, tag = "5")]
+    pub deleted: bool,
+    #[prost(bytes = "vec", optional, tag = "6")]
+    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2966,7 +2968,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2978,6 +2980,8 @@ pub mod idx_optimize_mode {
         SimpleSelect(super::SimpleSelect),
         #[prost(message, tag = "2")]
         SimpleCount(super::SimpleCount),
+        #[prost(message, tag = "3")]
+        SimpleHistogram(super::SimpleHistogram),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2991,6 +2995,16 @@ pub struct SimpleSelect {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SimpleCount {}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleHistogram {
+    #[prost(int64, tag = "1")]
+    pub min_value: i64,
+    #[prost(uint64, tag = "2")]
+    pub bucket_width: u64,
+    #[prost(uint32, tag = "3")]
+    pub num_buckets: u32,
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KvItem {

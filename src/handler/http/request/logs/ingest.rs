@@ -69,10 +69,8 @@ pub async fn bulk(
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
+            HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
         }
     };
 
@@ -140,10 +138,8 @@ pub async fn multi(
                 "Error processing request {org_id}/{stream_name}/_multi: {:?}",
                 e
             );
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
+            HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
         }
     };
 
@@ -211,10 +207,8 @@ pub async fn json(
                 "Error processing request {org_id}/{stream_name}/_json: {:?}",
                 e
             );
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
+            HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
         }
     };
 
@@ -313,10 +307,8 @@ pub async fn handle_gcp_request(
                     "Error processing request {org_id}/{stream_name}/_gcp: {:?}",
                     e
                 );
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
             }
         },
     )
@@ -354,7 +346,7 @@ pub async fn otlp_logs_write(
             Err(e) => {
                 log::error!("[LOGS:OTLP] Invalid proto: {}", e);
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
+                    http::StatusCode::BAD_REQUEST,
                     format!("Invalid proto: {}", e),
                 )));
             }
@@ -365,7 +357,7 @@ pub async fn otlp_logs_write(
                 Err(e) => {
                     log::error!("[LOGS:OTLP] Invalid json: {}", e);
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
+                        http::StatusCode::BAD_REQUEST,
                         format!("Invalid json: {}", e),
                     )));
                 }
@@ -373,8 +365,8 @@ pub async fn otlp_logs_write(
         }
         _ => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Bad Request".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Bad Request",
             )));
         }
     };
@@ -397,10 +389,8 @@ pub async fn otlp_logs_write(
                 in_stream_name,
                 e
             );
-            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )))
+            Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)))
         }
     }
 }

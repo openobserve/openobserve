@@ -223,14 +223,14 @@ pub async fn search_multi(
         {
             use o2_openfga::meta::mapping::OFGA_MODELS;
 
-            use crate::common::{
-                infra::config::USERS,
-                utils::auth::{AuthExtractor, is_root_user},
+            use crate::{
+                common::utils::auth::{AuthExtractor, is_root_user},
+                service::users::get_user,
             };
 
             if !is_root_user(user_id) {
-                let user: meta::user::User =
-                    USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
+                let user: config::meta::user::User =
+                    get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.as_str();
 
                 if !crate::handler::http::auth::validator::check_permissions(
@@ -271,8 +271,8 @@ pub async fn search_multi(
             // Check permissions on keys
             for key in keys_used {
                 if !is_root_user(user_id) {
-                    let user: meta::user::User =
-                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+                    let user: config::meta::user::User =
+                        get_user(Some(&org_id), user_id).await.unwrap();
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         user_id,

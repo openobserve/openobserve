@@ -15,7 +15,7 @@
 
 use config::{
     get_config,
-    meta::stream::{ALL_STREAM_TYPES, FileKey, PartitionTimeLevel},
+    meta::stream::{ALL_STREAM_TYPES, PartitionTimeLevel},
     utils::time::{BASE_TIME, now_micros},
 };
 use infra::file_list as infra_file_list;
@@ -63,13 +63,7 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
                     )
                     .await
                     .expect("load file_list failed");
-                let put_items = files
-                    .into_iter()
-                    .map(|(account, file_key, file_meta)| {
-                        FileKey::new(account, file_key, file_meta, false)
-                    })
-                    .collect::<Vec<_>>();
-                dest.batch_add(&put_items)
+                dest.batch_add(&files)
                     .await
                     .expect("load list_list into db failed");
             }

@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 3;
+pub const DB_SCHEMA_VERSION: u64 = 4;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -384,13 +384,12 @@ pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
 }
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    let blocked_streams = get_config()
+    get_config()
         .common
         .blocked_streams
         .split(',')
         .map(|x| x.to_string())
-        .collect();
-    blocked_streams
+        .collect()
 });
 
 #[derive(EnvConfig)]
@@ -448,6 +447,24 @@ pub struct WebSocket {
         help = "Maximum allowed continuation size in MB"
     )]
     pub max_continuation_size: usize,
+    #[env_config(
+        name = "ZO_WEBSOCKET_CHANNEL_BUFFER_SIZE",
+        default = 100,
+        help = "Maximum allowed number of messages in buffer"
+    )]
+    pub max_channel_buffer_size: usize,
+    #[env_config(
+        name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
+        default = 1,
+        help = "Size in MB for each chunk when streaming search responses"
+    )]
+    pub streaming_response_chunk_size: usize,
+    #[env_config(
+        name = "ZO_STREAMING_ENABLED",
+        default = false,
+        help = "Enable streaming"
+    )]
+    pub streaming_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1073,6 +1090,24 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub websocket_enabled: bool,
+    #[env_config(name = "ZO_ES_VERSION", default = "")]
+    pub es_version: String,
+    #[env_config(
+        name = "ZO_CREATE_ORG_THROUGH_INGESTION",
+        default = false,
+        help = "If true (default false), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
+    )]
+    pub create_org_through_ingestion: bool,
+    #[env_config(
+        name = "ZO_ORG_INVITE_EXPIRY",
+        default = 7,
+        help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
+    )]
+    pub org_invite_expiry: u32,
+    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
+    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,
@@ -1089,6 +1124,12 @@ pub struct Common {
     pub file_list_dump_min_hour: usize,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
     pub file_list_dump_debug_check: bool,
+    #[env_config(
+        name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
+        default = false,
+        help = "Enable to use stream settings for partitions. This will apply for all streams"
+    )]
+    pub use_stream_settings_for_partitions_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1167,6 +1208,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
+    pub file_download_priority_queue_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
+    pub file_download_priority_queue_window_secs: i64,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_ENABLE_PRIORITY_QUEUE", default = true)]
+    pub file_download_enable_priority_queue: bool,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
     #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
@@ -1501,6 +1548,8 @@ pub struct CacheLatestFiles {
     pub delete_merge_files: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
     pub download_from_node: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_NODE_SIZE", default = 100)] // MB
+    pub download_node_size: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1961,6 +2010,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.file_download_thread_num == 0 {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
+    }
+
+    if cfg.limit.file_download_priority_queue_thread_num == 0 {
+        cfg.limit.file_download_priority_queue_thread_num = std::cmp::max(1, cpu_num / 2);
     }
 
     // HACK for move_file_thread_num equal to CPU core

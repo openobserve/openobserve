@@ -28,7 +28,7 @@ use infra::{
     table::entity::{search_job_partitions::Model as PartitionJob, search_jobs::Model as Job},
 };
 use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
+    common::config::get_config as get_o2_config,
     super_cluster::{
         kv::cluster::get_grpc_addr,
         search::{get_cluster_node_by_name, get_cluster_nodes},
@@ -78,7 +78,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             }
 
             if let Err(e) = update_running_job(&job_id).await {
-                log::error!("[SEARCH JOB {id}] job_id: {job_id}, update_job_status failed: {e}",);
+                log::error!("[SEARCH JOB {id}] job_id: {job_id}, update_job_status failed: {e}");
             }
         }
     });
@@ -329,7 +329,7 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
 
         // delete all files
         if let Err(e) = delete_result(deleted_files).await {
-            log::warn!("[SEARCH JOB] delete_jobs failed to delete files error: {e}",);
+            log::warn!("[SEARCH JOB] delete_jobs failed to delete files error: {e}");
         }
 
         // 3. delete the partition jobs from database

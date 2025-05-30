@@ -329,7 +329,27 @@ export default defineComponent({
       });
 
       editorObj.onDidBlurEditorWidget(() => {
-        setValue(editorObj.getValue()?.trim());
+        const model = editorObj.getModel();
+        const value = model.getValue();
+        const trimmedValue = value.trim();
+        
+        // Only apply trim if there are actually tailing and leading spaces to trim
+        if (value !== trimmedValue) {
+          const lastLine = model.getLineCount();
+          const lastLineLength = model.getLineLength(lastLine);
+          
+          // Create an edit operation that replaces the entire content
+          // This preserves undo history becuase it treats this as a single edit operation
+          //and it will be in the undo stack as one operation 
+          model.pushEditOperations(
+            [],
+            [{
+              range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
+              text: trimmedValue
+            }],
+            () => null
+          );
+        }
       });
 
       editorObj.createContextKey("ctrlenter", true);
@@ -402,18 +422,6 @@ export default defineComponent({
               label: `match_all('${lastElement}')`,
               kind: monaco.languages.CompletionItemKind.Text,
               insertText: `match_all('${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `match_all_raw('${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_raw('${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `match_all_raw_ignore_case('${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_raw_ignore_case('${lastElement}')`,
               range: range,
             });
             filteredSuggestions.push({
