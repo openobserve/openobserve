@@ -38,19 +38,3 @@ pub async fn get_org_usage(
 
     Ok(query_result)
 }
-
-// pub async fn get_organization_usage_threshold(
-//     org_id: &str,
-//     user_email: &str,
-// ) -> Result<org_usage::OrgUsageThreshold, billings::BillingError> {
-//     let subscription_type = billings::get_org_subscription_type(org_id, user_email)
-//         .await
-//         .unwrap_or_default();
-
-//     if subscription_type.is_free_sub() {
-//         let org_sage = get_org_usage(org_id, org_usage::UsageRange::default()).await?;
-//         Ok(org_sage.into())
-//     } else {
-//         Ok(org_usage::OrgUsageThreshold::default())
-//     }
-// }

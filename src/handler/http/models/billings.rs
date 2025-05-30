@@ -55,6 +55,26 @@ pub struct GetOrgUsageResponseBody {
     pub range: String,
 }
 
+impl GetOrgUsageResponseBody {
+    pub fn convert_to_unit(&mut self, unit: &str) {
+        let target_unit = unit.to_ascii_lowercase();
+        for usage_data in self.data.iter_mut() {
+            let current_unit = usage_data.unit.to_ascii_lowercase();
+            match (current_unit.as_str(), target_unit.as_str()) {
+                ("gb", "mb") => {
+                    usage_data.value *= 1024.0;
+                    usage_data.unit = "MB".to_string();
+                }
+                ("mb", "gb") => {
+                    usage_data.value /= 1024.0;
+                    usage_data.unit = "GB".to_string();
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema, Default)]
 pub struct OrgUserData {
     pub event: String,
