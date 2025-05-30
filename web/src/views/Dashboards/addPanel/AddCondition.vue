@@ -29,7 +29,7 @@
           @show="(e: any) => loadFilterItem(condition.column)"
         >
           <div style="display: flex">
-            <q-select
+            <!-- <q-select
               v-model="condition.column"
               :options="filteredSchemaOptions"
               label="Filters on Field"
@@ -45,6 +45,11 @@
               emit-value
               @filter="filterStreamFn"
               @update:model-value="handleFieldChange"
+              /> -->
+            <StreamFieldSelect
+              class="tw-w-full"
+              :streams="getAllSelectedStreams()"
+              v-model="condition.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
             />
             <q-btn
@@ -177,17 +182,20 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, toRef, watch } from "vue";
+import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 
 export default defineComponent({
   name: "AddCondition",
   components: {
     CommonAutoComplete,
     SanitizedHtmlRenderer,
+    StreamFieldSelect,
   },
   props: [
     "condition",
@@ -199,6 +207,13 @@ export default defineComponent({
     "conditionIndex",
   ],
   setup(props, { emit }) {
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { getAllSelectedStreams, buildCondition } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
     const { t } = useI18n();
     const searchTerm = ref("");
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
@@ -206,9 +221,13 @@ export default defineComponent({
 
     const filteredListOptions = computed(() => {
       const options = props.dashboardPanelData.meta.filterValue
-        .find((it: any) => it.column == props.condition.column)
-        ?.value.filter((option: any) =>
-          option.toLowerCase().includes(searchTerm.value.toLowerCase()),
+        .find(
+          (it: any) =>
+            it.filterItem.field == props?.condition?.column?.field &&
+            it.filterItem.streamAlias == props?.condition?.column?.streamAlias,
+        )
+        ?.value?.filter((option: any) =>
+          option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
         );
 
       // Sort options alphabetically
@@ -247,47 +266,49 @@ export default defineComponent({
     const filterOptions = ["AND", "OR"];
 
     const computedLabel = (condition: any) => {
-      if (condition.operator === "match_all") {
-        return condition.operator + "(" + condition.value + ")";
-      } else if (condition.operator === "str_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "str_match_ignore_case") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_not_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else {
-        return props.condition.column;
-      }
+      // if (condition.operator === "match_all") {
+      //   return condition.operator + "(" + condition.value + ")";
+      // } else if (condition.operator === "str_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "str_match_ignore_case") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "re_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "re_not_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else {
+      //   return props.condition.column;
+      // }
+      const builtCondition = buildCondition(condition);
+      return builtCondition === "" ? condition.column.field : builtCondition;
     };
 
     const emitLogicalOperatorChange = (newOperator: string) => {
@@ -299,7 +320,7 @@ export default defineComponent({
     };
 
     const removeColumnName = () => {
-      props.condition.column = "";
+      props.condition.column = {};
     };
 
     watch(
@@ -308,6 +329,13 @@ export default defineComponent({
         if (newColumn !== oldColumn) {
           props.condition.values = [];
         }
+      },
+    );
+
+    watch(
+      () => props.condition.column,
+      () => {
+        props.loadFilterItem(props.condition.column);
       },
     );
 
@@ -323,6 +351,7 @@ export default defineComponent({
       removeColumnName,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,
+      getAllSelectedStreams,
     };
   },
 });
