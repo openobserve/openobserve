@@ -21,10 +21,12 @@ use actix_web::{
 };
 use config::{
     meta::{
-        function::{FunctionList, TestVRLResponse, Transform, VRLResult, VRLResultResolver},
+        function::{
+            FunctionList, RESULT_ARRAY, TestVRLResponse, Transform, VRLResult, VRLResultResolver,
+        },
         pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
     },
-    utils::json,
+    utils::json::Value,
 };
 
 use crate::{
@@ -36,7 +38,7 @@ use crate::{
     handler::http::{
         request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
     },
-    service::{db, ingestion::compile_vrl_function, search::RESULT_ARRAY},
+    service::{db, ingestion::compile_vrl_function},
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";
@@ -80,7 +82,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
 pub async fn test_run_function(
     org_id: &str,
     mut function: String,
-    events: Vec<json::Value>,
+    events: Vec<Value>,
 ) -> Result<HttpResponse, anyhow::Error> {
     // Append a dot at the end of the function if it doesn't exist
     if !function.ends_with('.') {
@@ -119,7 +121,7 @@ pub async fn test_run_function(
                 program: program.clone(),
                 fields: fields.clone(),
             },
-            json::Value::Array(events),
+            Value::Array(events),
             org_id,
             &[String::new()],
         );
@@ -135,20 +137,20 @@ pub async fn test_run_function(
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|v| {
-                let flattened_array = v
-                    .as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                    .map(|item| config::utils::flatten::flatten(item.clone()).unwrap())
-                    .collect::<Vec<_>>();
-                if flattened_array.is_empty() {
-                    return None;
-                }
-                Some(serde_json::Value::Array(flattened_array))
-            })
-            .for_each(|transform| {
-                transformed_events.push(VRLResult::new("", transform));
+            .for_each(|record| match record {
+                Value::Object(hit) => transformed_events.push(VRLResult::new(
+                    "",
+                    config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+                )),
+                Value::Array(hits) => hits.iter().for_each(|hit| {
+                    if let Value::Object(hit) = hit {
+                        transformed_events.push(VRLResult::new(
+                            "",
+                            config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+                        ))
+                    }
+                }),
+                _ => {}
             });
     } else {
         events.into_iter().for_each(|event| {

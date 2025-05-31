@@ -25,6 +25,7 @@ use config::{
     get_config, ider,
     meta::{
         cluster::RoleGroup,
+        function::RESULT_ARRAY,
         search,
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
@@ -48,7 +49,6 @@ use infra::{
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
-use regex::Regex;
 use sql::Sql;
 use tokio::runtime::Runtime;
 use tracing::Instrument;
@@ -83,10 +83,6 @@ pub(crate) mod sql;
 pub(crate) mod super_cluster;
 pub(crate) mod tantivy;
 pub(crate) mod utils;
-
-// Checks for #ResultArray#
-pub static RESULT_ARRAY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
