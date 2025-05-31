@@ -318,17 +318,20 @@ impl FromRequest for AuthExtractor {
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
             let key = if path_columns[1].eq("invites") {
                 "users"
-            } else if path_columns[1].eq("rename") && method.eq("PUT") {
+            } else if (path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
+                && method.eq("PUT")
+            {
                 "organizations"
             } else {
                 path_columns[1]
             };
 
             // for organization api changes we need perms on _all_{org}
-            let entity = if key == "organizations" {
-                format!("_all_{}", path_columns[0])
-            } else {
-                path_columns[0].to_string()
+            let entity = match (key, path_columns[1]) {
+                ("organizations", "extend_trial_period") => "_all__meta".to_string(),
+                ("organizations", "organizations") => path_columns[0].to_string(),
+                ("organizations", _) => format!("_all_{}", path_columns[0]),
+                _ => path_columns[0].to_string(),
             };
 
             format!(

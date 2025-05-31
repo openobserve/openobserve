@@ -38,6 +38,8 @@ use {
     o2_enterprise::enterprise::cloud::{OrgInviteStatus, org_invites},
 };
 
+#[cfg(feature = "cloud")]
+use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
         meta::organization::{
@@ -266,6 +268,16 @@ pub async fn create_org(
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
             add_admin_to_org(&org.identifier, user_email).await?;
+            #[cfg(feature = "cloud")]
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: Some(user_email.to_string()),
+                event: EventType::OrgCreated,
+                subscription_type: None,
+            })
+            .await;
             Ok(org.clone())
         }
         Err(e) => {
@@ -295,6 +307,16 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
+            #[cfg(feature = "cloud")]
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: None,
+                subscription_type: None,
+                event: EventType::OrgCreated,
+            })
+            .await;
             Ok(org.clone())
         }
         Err(e) => {
@@ -365,12 +387,26 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     if org_id.eq(DEFAULT_ORG) {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
-    if get_org(org_id).await.is_none() {
-        return Err(anyhow::anyhow!("Organization does not exist"));
-    }
+
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
             delete_org_tuples(org_id).await;
+            #[cfg(feature = "cloud")]
+            {
+                let org = match get_org(org_id).await {
+                    Some(org) => org,
+                    None => return Err(anyhow::anyhow!("Organization does not exist")),
+                };
+                enqueue_cloud_event(CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: None,
+                    subscription_type: None,
+                    event: EventType::OrgDeleted,
+                })
+                .await;
+            }
             Ok(())
         }
         Err(e) => {
@@ -493,9 +529,10 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     }
     let org_id = invite.org_id.clone();
 
-    if get_org(&org_id).await.is_none() {
-        return Err(anyhow::anyhow!("Organization doesn't exist"));
-    }
+    let org = match get_org(&org_id).await {
+        Some(org) => org,
+        None => return Err(anyhow::anyhow!("Organization doesn't exist")),
+    };
 
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
@@ -522,6 +559,16 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     {
         log::error!("Error updating the invite status in the db: {e}");
     }
+    #[cfg(feature = "cloud")]
+    enqueue_cloud_event(CloudEvent {
+        org_id: org.identifier.clone(),
+        org_name: org.name.clone(),
+        org_type: org.org_type.clone(),
+        user: Some(user_email.to_string()),
+        event: EventType::UserJoined,
+        subscription_type: None,
+    })
+    .await;
     Ok(())
 }
 
@@ -572,6 +619,34 @@ pub async fn is_add_user_allowed_for_org(org_id: Option<&str>, user_email: &str)
 
 pub async fn get_org(org: &str) -> Option<Organization> {
     db::organization::get_org(org).await.ok()
+}
+
+#[cfg(feature = "cloud")]
+pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::Error> {
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+    let o2_config = get_o2_config();
+
+    // if trial period check is disabled, everything is free trial period
+    if !o2_config.cloud.trial_period_enabled {
+        return Ok(true);
+    }
+
+    // exception for meta org
+    if org_id == "_meta" {
+        return Ok(true);
+    }
+    use o2_enterprise::enterprise::cloud::billings;
+    // first check if the org is
+    let subscription = billings::get_billing_by_org_id(org_id).await?;
+
+    if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
+        let org = infra::table::organizations::get(org_id).await?;
+        let now = Utc::now().timestamp_micros();
+        if now > org.trial_ends_at {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 #[cfg(test)]

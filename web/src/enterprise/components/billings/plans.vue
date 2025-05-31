@@ -15,30 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-md">
-    <div class="row justify-between items-center q-pl-xl q-pr-xl">
-      <div class="text-body1 text-weight-medium">
-        {{ t("billing.plans") }}
-      </div>
+  <q-page class="q-pa-lg">
+    <div class="row justify-between items-center q-mb-md">
       <div>
-        <q-btn
-          v-if="currentPlanDetail?.customer_id"
-          class="q-ml-md q-mb-xs text-bold"
-          outline
-          padding="sm lg"
-          color="white"
-          text-color="black"
-          no-caps
-          :label="t('billing.manageSubscription')"
-          @click="onChangePaymentDetail(currentPlanDetail.customer_id)"
-        />
+        <span class="o2-page-title">{{ t("billing.title") }}</span><br />
+        <span class="o2-page-subtitle">{{ t("billing.subtitle") }}</span>
       </div>
     </div>
-    <div
-      class="row justify-start text-h6 text-weight-bold q-pl-xl q-pb-xs subtitle"
-    >
-      {{ t("billing.subtitle") }}
-    </div>
+    <trial-period class="q-mb-md" currentPage="billing"></trial-period>
     <div
       v-if="
         store.state.selectedOrganization.hasOwnProperty('note') &&
@@ -57,132 +41,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-else class="row q-gutter-md justify-center">
-      <plan-card
-        v-for="plan in Plans"
-        :key="plan.id"
-        :plan="plan"
-        :isPaidPlan="planType"
-        :freeLoading="freeLoading"
-        :proLoading="proLoading"
-        @update:freeSubscription="subscribeFreePlan"
+      <pro-plan
+        :planType="planType"
         @update:proSubscription="onLoadSubscription(config.paidPlan)"
-        @update:businessSubscription="onLoadSubscription(config.enterprisePlan)"
-      ></plan-card>
+        @update:cancelSubscription="onUnsubscribe"
+      ></pro-plan>
+      <enterprise-plan></enterprise-plan>
     </div>
-
-    <!-- <div v-if="listSubscriptionResponse.card" style="min-height: 80%"> -->
-    <q-dialog v-model="changePayment">
-      <q-card style="width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-body1 text-weight-medium">
-            {{ t("billing.manageSubscription") }}
-          </div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup="true" />
-        </q-card-section>
-        <q-card-section>
-          <iframe
-            ref="updatesubscriptionref"
-            title="Update Subscription checkout"
-            v-if="updatePaymentResponse"
-            :src="updatePaymentResponse.url"
-            allowfullscreen
-            frameborder="0"
-            style="min-height: 70vh; min-width: 100%"
-          ></iframe>
-          <div v-else>Loading...</div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-    <!-- </div> -->
-    <!-- <div v-if="!isActiveSubscription && !isProPlan && hostedResponse.urlƒ"> -->
-    <q-dialog v-model="subScribePlan">
-      <q-card style="width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-body1 text-weight-medium">
-            {{ t("billing.subscriptionCheckout") }}
-          </div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup="true" />
-        </q-card-section>
-
-        <q-card-section>
-          <iframe
-            ref="subscriptionref"
-            title="Subscription checkout"
-            v-if="!isActiveSubscription && hostedResponse.url"
-            :src="hostedResponse.url"
-            allowfullscreen
-            frameborder="0"
-            style="min-height: 70vh; min-width: 100%"
-          ></iframe>
-          <div v-else>Loading...</div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirm_downgrade_subscription" persistent>
-      <q-card>
-        <q-card-section class="row items-center">
-          <span class="q-ml-sm"
-            ><q-avatar
-              icon="warning"
-              size="sm"
-              color="primary"
-              text-color="white"
-              class="q-mr-sm"
-            />{{ t("billing.downgradeMessage") }}</span
-          >
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn
-            :label="t('common.cancel')"
-            color="secondary"
-            v-close-popup="true"
-          />
-          <q-btn
-            :label="t('common.confirm')"
-            color="primary"
-            v-close-popup="true"
-            @click="onUnsubscribe"
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <!-- </div> -->
   </q-page>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import PlanCard from "./planCard.vue";
-import Plan from "@/constants/plans";
+import EnterprisePlan from "./enterprisePlan.vue";
+import ProPlan from "./proPlan.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import { useLocalOrganization, convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 
 export default defineComponent({
   name: "plans",
   components: {
-    PlanCard,
+    EnterprisePlan,
+    ProPlan,
+    TrialPeriod,
   },
-  emits: ["update:freeSubscription", "update:proSubscription"],
+  emits: ["update:proSubscription"],
   async mounted() {
     this.loading = true;
     await this.loadSubscription();
   },
   methods: {
-    subscribeFreePlan() {
-      if (this.currentPlanDetail.subscription_type == config.freePlan) {
-        this.onLoadSubscription(config.freePlan);
-      } else {
-        this.confirm_downgrade_subscription = true;
-      }
-    },
     onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
@@ -218,31 +111,7 @@ export default defineComponent({
       }
     },
     async onUnsubscribe() {
-      this.freeLoading = true;
-      BillingService.unsubscribe(
-        this.store.state.selectedOrganization.identifier,
-      )
-        .then(async (res: any) => {
-          if(res.status == 200){
-            this.$q.notify({
-              type: "positive",
-              message: res.data,
-              timeout: 5000,
-            });
-            await this.loadSubscription();
-            setTimeout(() => {
-              this.$router.go(0);
-            }, 1000);
-            }
-        })
-        .catch((e) => {
-          this.freeLoading = false;
-          this.$q.notify({
-            type: "negative",
-            message: e.message,
-            timeout: 5000,
-          });
-        });
+      this.onChangePaymentDetail(this.currentPlanDetail.customer_id)
     },
     onChangePaymentDetail(customer_id: string) {
       BillingService.get_session_url(
@@ -276,20 +145,12 @@ export default defineComponent({
             localOrg.value.subscription_type = config.paidPlan;
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
-            this.store.dispatch("setQuotaThresholdMsg", "");
-          } else if (res.data.subscription_type == config.freePlan) {
-            this.planType = config.freePlan;
-            const localOrg: any = useLocalOrganization();
-            localOrg.value.subscription_type = config.freePlan;
-            useLocalOrganization(localOrg.value);
-            this.store.dispatch("setSelectedOrganization", localOrg.value);
           } else if (res.data.subscription_type == config.enterprisePlan) {
             this.planType = config.enterprisePlan;
             const localOrg: any = useLocalOrganization();
             localOrg.value.subscription_type = config.enterprisePlan;
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
-            this.store.dispatch("setQuotaThresholdMsg", "");
           }
         } else {
           this.$q.notify({
@@ -299,7 +160,6 @@ export default defineComponent({
           });
         }
         this.loading = false;
-        this.freeLoading = false;
         this.proLoading = false;
         this.$router.push({
           name: "plans",
@@ -310,7 +170,6 @@ export default defineComponent({
         });
     } catch (e: any) {
       this.loading = false;
-      this.freeLoading = false;
       this.proLoading = false;
 
       this.$q.notify({
@@ -333,12 +192,7 @@ export default defineComponent({
     const updatePaymentResponse: any = ref();
     const subscriptionref = ref();
     const listSubscriptionResponse: any = ref({});
-    const Plans = Plan;
-    const changePayment: any = ref(false);
-    const subScribePlan: any = ref(false);
-    const freeLoading: any = ref(false);
     const proLoading: any = ref(false);
-    const confirm_downgrade_subscription: any = ref(false);
     const currentPlanDetail = ref();
 
     const retrieveHostedPage = () => {
@@ -366,12 +220,7 @@ export default defineComponent({
       listSubscriptionResponse,
       updatePaymentResponse,
       retrieveHostedPage,
-      Plans,
-      changePayment,
-      subScribePlan,
-      freeLoading,
       proLoading,
-      confirm_downgrade_subscription,
       currentPlanDetail,
     };
   },

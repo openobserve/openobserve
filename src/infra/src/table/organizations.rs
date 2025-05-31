@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::organization::OrganizationType;
+use config::{meta::organization::OrganizationType, utils::time::day_micros};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Schema, Set, entity::prelude::Expr,
@@ -33,14 +33,21 @@ pub struct OrganizationRecord {
     pub identifier: String,
     pub org_name: String,
     pub org_type: OrganizationType,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub trial_ends_at: i64,
 }
 
 impl OrganizationRecord {
     pub fn new(identifier: &str, org_name: &str, org_type: OrganizationType) -> Self {
+        let now = chrono::Utc::now().timestamp_micros();
         Self {
             identifier: identifier.to_string(),
             org_name: org_name.to_string(),
             org_type,
+            created_at: now,
+            updated_at: now,
+            trial_ends_at: now + day_micros(14),
         }
     }
 }
@@ -51,6 +58,9 @@ impl From<Model> for OrganizationRecord {
             identifier: model.identifier,
             org_name: model.org_name,
             org_type: model.org_type.into(),
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            trial_ends_at: model.trial_ends_at,
         }
     }
 }
@@ -84,12 +94,14 @@ pub async fn add(
     org_type: OrganizationType,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
+    let trial_end = now + day_micros(14);
     let record = ActiveModel {
         identifier: Set(org_id.to_string()),
         org_name: Set(org_name.to_string()),
         org_type: Set(org_type.into()),
         created_at: Set(now),
         updated_at: Set(now),
+        trial_ends_at: Set(trial_end),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -97,6 +109,25 @@ pub async fn add(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::insert(record)
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
+}
+
+pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::update_many()
+        .col_expr(Column::TrialEndsAt, Expr::value(new_end))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(Column::Identifier.eq(org_id))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
