@@ -54,6 +54,7 @@ use crate::{
 pub mod cacher;
 pub mod multi;
 pub mod result_utils;
+pub mod streaming_aggs;
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 pub async fn search(
