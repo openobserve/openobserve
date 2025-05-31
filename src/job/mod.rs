@@ -268,10 +268,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("cloud ofga migrations failed");
 
-        // OrgUsage pipeline init
-        o2_enterprise::enterprise::cloud::billings::org_usage::check_and_create_usage_pipeline()
+        use crate::service::self_reporting::search::get_usage;
+        o2_enterprise::enterprise::metering::init(get_usage)
             .await
-            .expect("Cloud OrgUsage pipeline init failed");
+            .expect("cloud usage metering job init failed");
     }
 
     // Shouldn't serve request until initialization finishes

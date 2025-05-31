@@ -40,6 +40,8 @@ use tokio::sync::oneshot;
 pub mod cloud_events;
 mod ingestion;
 mod queues;
+#[cfg(feature = "cloud")]
+pub mod search;
 
 pub async fn run() {
     let cfg = get_config();
