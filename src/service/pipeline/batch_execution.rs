@@ -703,7 +703,7 @@ async fn process_node(
                         )
                         .await;
                     } else {
-                        result_array_records.push((idx, record, flattened));
+                        result_array_records.push(record);
                     }
                 }
                 count += 1;
@@ -713,12 +713,7 @@ async fn process_node(
                     let result = match apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,
-                        json::Value::Array(
-                            result_array_records
-                                .into_iter()
-                                .map(|(_, record, _)| record)
-                                .collect(),
-                        ),
+                        json::Value::Array(result_array_records),
                         &org_id,
                         &[stream_name.clone()],
                     ) {
@@ -739,10 +734,11 @@ async fn process_node(
                         }
                     };
                     // since apply_vrl_fn can produce unflattened data
-                    for (idx, record) in result.as_array().unwrap().iter().enumerate() {
+                    for record in result.as_array().unwrap().iter() {
+                        // use usize::MAX as a flag to disregard original_value
                         send_to_children(
                             &mut child_senders,
-                            (idx, record.clone(), false),
+                            (usize::MAX, record.clone(), false),
                             "FunctionNode",
                         )
                         .await;
