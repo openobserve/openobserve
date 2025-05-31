@@ -78,6 +78,8 @@ async function processStream(traceId, reader) {
           if(msgLines.length > 1){
             const eventType = msgLines[0].startsWith('event:') ? msgLines[0].slice(7).trim() : msgLines[0].slice(6).trim();
 
+            //TODO: Logic is duplicated for event:search_response and event:search_response_hits
+            // Create method to handle this
             if (msgLines[1]?.startsWith('data:') || msgLines[1]?.startsWith('data: ')) {
               const data = msgLines[1]?.startsWith('data:') ? msgLines[1]?.slice(6) : msgLines[1]?.slice(5);
 
