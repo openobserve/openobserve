@@ -493,9 +493,10 @@ pub async fn logs_json_handler(
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_map
-                            .get(&destination_stream)
-                            .is_some_and(|v| *v)
+                        if idx != usize::MAX
+                            && streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(
