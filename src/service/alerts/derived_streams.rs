@@ -143,24 +143,38 @@ pub async fn save(
     }
 
     // Save the trigger to db
-    let next_run_at = get_next_run_at(&derived_stream)?;
-    let trigger = db::scheduler::Trigger {
-        org: derived_stream.org_id.to_string(),
-        module: db::scheduler::TriggerModule::DerivedStream,
-        module_key: trigger_module_key,
-        next_run_at,
-        is_realtime: false,
-        is_silenced: false,
-        ..Default::default()
-    };
-
-    match db::scheduler::get(&trigger.org, trigger.module.clone(), &trigger.module_key).await {
-        Ok(_) => db::scheduler::update_trigger(trigger)
-            .await
-            .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update")),
-        Err(_) => db::scheduler::push(trigger)
-            .await
-            .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e)),
+    match db::scheduler::get(
+        &derived_stream.org_id,
+        db::scheduler::TriggerModule::DerivedStream,
+        &trigger_module_key,
+    )
+    .await
+    {
+        Ok(mut existing_trigger) => {
+            let next_run_at = get_next_run_at(
+                derived_stream.delay.unwrap_or_default(),
+                Some(existing_trigger.next_run_at),
+            )?;
+            existing_trigger.next_run_at = next_run_at;
+            db::scheduler::update_trigger(existing_trigger)
+                .await
+                .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update"))
+        }
+        Err(_) => {
+            let next_run_at = get_next_run_at(derived_stream.delay.unwrap_or_default(), None)?;
+            let trigger = db::scheduler::Trigger {
+                org: derived_stream.org_id.to_string(),
+                module: db::scheduler::TriggerModule::DerivedStream,
+                module_key: trigger_module_key,
+                next_run_at,
+                is_realtime: false,
+                is_silenced: false,
+                ..Default::default()
+            };
+            db::scheduler::push(trigger)
+                .await
+                .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e))
+        }
     }
 }
 
@@ -213,8 +227,10 @@ impl DerivedStreamExt for DerivedStream {
     }
 }
 
-pub(super) fn get_next_run_at(derived_stream: &DerivedStream) -> Result<i64, anyhow::Error> {
-    let delay_in_mins = derived_stream.delay.unwrap_or_default();
+fn get_next_run_at(
+    delay_in_mins: i32,
+    previous_next_run_at: Option<i64>,
+) -> Result<i64, anyhow::Error> {
     // validate & parse delay value
     if delay_in_mins < 0 {
         return Err(anyhow::anyhow!(
@@ -223,7 +239,12 @@ pub(super) fn get_next_run_at(derived_stream: &DerivedStream) -> Result<i64, any
     }
 
     let delay = chrono::Duration::minutes(delay_in_mins as _);
-    Ok(chrono::Utc::now()
+    let supposed_next_run_at =
+        previous_next_run_at.map_or(Ok(chrono::Utc::now()), |prev_next_run_at| {
+            chrono::DateTime::<chrono::Utc>::from_timestamp_micros(prev_next_run_at)
+                .ok_or(anyhow::anyhow!("Invalid previous next run at timestamp"))
+        })?;
+    Ok(supposed_next_run_at
         .checked_add_signed(delay)
         .ok_or(anyhow::anyhow!("DateTime arithmetic overflow"))?
         .timestamp_micros())
