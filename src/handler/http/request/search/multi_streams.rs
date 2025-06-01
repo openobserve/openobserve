@@ -20,7 +20,7 @@ use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        function::VRLResultResolver,
+        function::{RESULT_ARRAY, VRLResultResolver},
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
@@ -485,11 +485,9 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
-        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = SearchService::RESULT_ARRAY
-                .replace(&input_fn, "")
-                .to_string();
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {

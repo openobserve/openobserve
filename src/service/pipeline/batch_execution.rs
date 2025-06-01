@@ -27,7 +27,7 @@ use config::{
     },
     utils::{
         flatten,
-        json::{Value, get_string_value},
+        json::{self, Value, get_string_value},
     },
 };
 use futures::future::try_join_all;
@@ -51,12 +51,12 @@ static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
 pub trait PipelineExt: Sync + Send + 'static {
     /// Registers the function of all the FunctionNode of this pipeline once for execution.
     /// Returns a map of node_id -> VRLResultResolver for quick lookup
-    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>>;
+    async fn register_functions(&self) -> Result<HashMap<String, (VRLResultResolver, bool)>>;
 }
 
 #[async_trait]
 impl PipelineExt for Pipeline {
-    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>> {
+    async fn register_functions(&self) -> Result<HashMap<String, (VRLResultResolver, bool)>> {
         let mut vrl_map = HashMap::new();
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
@@ -69,10 +69,13 @@ impl PipelineExt for Pipeline {
                 registry.finish_load();
                 vrl_map.insert(
                     node.get_node_id(),
-                    VRLResultResolver {
-                        program: vrl_runtime_config.program,
-                        fields: vrl_runtime_config.fields,
-                    },
+                    (
+                        VRLResultResolver {
+                            program: vrl_runtime_config.program,
+                            fields: vrl_runtime_config.fields,
+                        },
+                        transform.is_result_array_vrl(),
+                    ),
                 );
             }
         }
@@ -86,7 +89,7 @@ pub struct ExecutablePipeline {
     name: String,
     source_node_id: String,
     sorted_nodes: Vec<String>,
-    vrl_map: HashMap<String, VRLResultResolver>,
+    vrl_map: HashMap<String, (VRLResultResolver, bool)>,
     node_map: HashMap<String, ExecutableNode>,
 }
 
@@ -495,7 +498,7 @@ async fn process_node(
     node: ExecutableNode,
     mut receiver: Receiver<(usize, Value, bool)>,
     mut child_senders: Vec<Sender<(usize, Value, bool)>>,
-    vrl_runtime: Option<VRLResultResolver>,
+    vrl_runtime: Option<(VRLResultResolver, bool)>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
     error_sender: Sender<(String, String, String)>,
     pipeline_name: String,
@@ -646,8 +649,9 @@ async fn process_node(
             log::debug!("[Pipeline]: func node {node_idx} starts processing");
             let mut runtime = crate::service::ingestion::init_functions_runtime();
             let stream_name = stream_name.unwrap_or("pipeline".to_string());
+            let mut result_array_records = Vec::new();
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
-                if let Some(vrl_runtime) = &vrl_runtime {
+                if let Some((vrl_runtime, is_result_array_vrl)) = &vrl_runtime {
                     if func_params.after_flatten && !flattened {
                         record = match flatten::flatten_with_level(
                             record,
@@ -670,10 +674,49 @@ async fn process_node(
                             }
                         };
                     }
-                    record = match apply_vrl_fn(
+                    if !is_result_array_vrl {
+                        record = match apply_vrl_fn(
+                            &mut runtime,
+                            vrl_runtime,
+                            record,
+                            &org_id,
+                            &[stream_name.clone()],
+                        ) {
+                            (res, None) => res,
+                            (res, Some(error)) => {
+                                let err_msg = format!("FunctionNode error: {}", error);
+                                if let Err(send_err) = error_sender
+                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
+                                    );
+                                    break;
+                                }
+                                res
+                            }
+                        };
+                        flattened = false; // since apply_vrl_fn can produce unflattened data
+                        send_to_children(
+                            &mut child_senders,
+                            (idx, record, flattened),
+                            "FunctionNode",
+                        )
+                        .await;
+                    } else {
+                        result_array_records.push(record);
+                    }
+                }
+                count += 1;
+            }
+            if !result_array_records.is_empty() {
+                if let Some((vrl_runtime, true)) = &vrl_runtime {
+                    let result = match apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,
-                        record,
+                        json::Value::Array(result_array_records),
                         &org_id,
                         &[stream_name.clone()],
                     ) {
@@ -688,16 +731,22 @@ async fn process_node(
                                     "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
                                     pipeline_name
                                 );
-                                break;
+                                return Ok(());
                             }
                             res
                         }
                     };
-                    flattened = false; // since apply_vrl_fn can produce unflattened data
+                    // since apply_vrl_fn can produce unflattened data
+                    for record in result.as_array().unwrap().iter() {
+                        // use usize::MAX as a flag to disregard original_value
+                        send_to_children(
+                            &mut child_senders,
+                            (usize::MAX, record.clone(), false),
+                            "FunctionNode",
+                        )
+                        .await;
+                    }
                 }
-                send_to_children(&mut child_senders, (idx, record, flattened), "FunctionNode")
-                    .await;
-                count += 1;
             }
             log::debug!("[Pipeline]: func node {node_idx} done processing {count} records");
         }
