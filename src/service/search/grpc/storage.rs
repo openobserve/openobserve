@@ -417,7 +417,7 @@ pub async fn cache_files(
         } else {
             cache_misses += 1;
         };
-         
+
         // Record file access metrics
         let stream_type = if file_type == "index" {
             config::meta::stream::StreamType::Index
@@ -433,12 +433,12 @@ pub async fn cache_files(
                 config::meta::stream::StreamType::Logs // Default
             }
         };
-         
+
         let current_time = chrono::Utc::now().timestamp_micros();
         let file_age_seconds = (current_time - max_ts) / 1_000_000;
         let file_age_hours = file_age_seconds as f64 / 3600.0;
-        
-        if file_age_hours > 0.0  {
+
+        if file_age_hours > 0.0 {
             config::metrics::FILE_ACCESS_TIME
                 .with_label_values(&[&stream_type.to_string()])
                 .observe(file_age_hours);
