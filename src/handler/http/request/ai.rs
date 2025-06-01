@@ -58,6 +58,7 @@ use crate::{
 #[post("/{org_id}/ai/chat")]
 pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
     let config = get_o2_config();
+
     if config.ai.enabled {
         let req_body = body.into_inner();
         let response =
@@ -146,30 +147,33 @@ pub async fn chat_stream(
         return MetaHttpResponse::bad_request("AI is not enabled");
     }
 
-    let stream =
-        match ai::service::chat_stream(ai::AiServerRequest::new(req_body.messages, req_body.model))
-            .await
-        {
-            Ok(stream) => stream,
-            Err(e) => {
-                let error_message = Some(e.to_string());
-                // TODO: Handle the error rather than hard coding
-                code = 500;
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    code,
-                    error_message,
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
+    let stream = match ai::service::chat_stream(
+        ai::AiServerRequest::new(req_body.messages, req_body.model),
+        org_id.clone(),
+        "".to_string(),
+    )
+    .await
+    {
+        Ok(stream) => stream,
+        Err(e) => {
+            let error_message = Some(e.to_string());
+            // TODO: Handle the error rather than hard coding
+            code = 500;
+            report_to_audit(
+                user_id,
+                org_id,
+                trace_id,
+                code,
+                error_message,
+                &in_req,
+                body_bytes,
+            )
+            .await;
 
-                log::error!("Error in chat_stream: {}", e);
-                return MetaHttpResponse::bad_request(e.to_string());
-            }
-        };
+            log::error!("Error in chat_stream: {}", e);
+            return MetaHttpResponse::bad_request(e.to_string());
+        }
+    };
 
     report_to_audit(user_id, org_id, trace_id, code, None, &in_req, body_bytes).await;
     HttpResponse::Ok()
