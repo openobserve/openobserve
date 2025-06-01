@@ -246,10 +246,12 @@ async fn handle_alert_triggers(
             &new_trigger.module_key
         );
 
-        new_trigger.next_run_at =
-            alert
-                .trigger_condition
-                .get_aligned_next_trigger_time(true, alert.tz_offset, false)?;
+        new_trigger.next_run_at = alert.trigger_condition.get_aligned_next_trigger_time(
+            true,
+            alert.tz_offset,
+            false,
+            None,
+        )?;
 
         // Keep the last_satisfied_at field
         trigger_data.reset();
@@ -407,6 +409,7 @@ async fn handle_alert_triggers(
                 true,
                 alert.tz_offset,
                 false,
+                None,
             )?;
             trigger_data.reset();
             new_trigger.data = json::to_string(&trigger_data).unwrap();
@@ -453,18 +456,22 @@ async fn handle_alert_triggers(
         }
     }
     if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
-        new_trigger.next_run_at =
-            alert
-                .trigger_condition
-                .get_aligned_next_trigger_time(true, alert.tz_offset, true)?;
+        new_trigger.next_run_at = alert.trigger_condition.get_aligned_next_trigger_time(
+            true,
+            alert.tz_offset,
+            true,
+            None,
+        )?;
         new_trigger.is_silenced = true;
         // For silence period, no need to store last end time
         should_store_last_end_time = false;
     } else {
-        new_trigger.next_run_at =
-            alert
-                .trigger_condition
-                .get_aligned_next_trigger_time(true, alert.tz_offset, false)?;
+        new_trigger.next_run_at = alert.trigger_condition.get_aligned_next_trigger_time(
+            true,
+            alert.tz_offset,
+            false,
+            None,
+        )?;
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
@@ -856,7 +863,7 @@ async fn handle_derived_stream_triggers(
             "Pipeline associated with trigger not found: {}/{}/{}/{}. Checking after 5 mins.",
             org_id, stream_type, pipeline_name, pipeline_id
         );
-        // Check after 7 days if the pipeline is created
+        // Check after 5 mins if the pipeline is created
         new_trigger.next_run_at += Duration::try_minutes(5)
             .unwrap()
             .num_microseconds()
@@ -896,7 +903,7 @@ async fn handle_derived_stream_triggers(
     };
 
     if !pipeline.enabled {
-        // Pipeline not enabled, check after 7 days
+        // Pipeline not enabled, check again in 5 mins
         let msg = format!(
             "Pipeline associated with trigger not enabled: {}/{}/{}/{}. Checking after 5 mins.",
             org_id, stream_type, pipeline_name, pipeline_id
@@ -982,9 +989,13 @@ async fn handle_derived_stream_triggers(
 
     // in case the range [start_time, end_time] is greater than querying period, it needs to
     // evaluate and ingest 1 period at a time.
-    let suppossed_to_be_run_at = trigger.next_run_at;
-    let mut final_end_time = suppossed_to_be_run_at;
-    // let now = Utc::now().timestamp_micros();
+    let user_defined_delay = derived_stream
+        .delay
+        .and_then(|delay_in_mins| {
+            chrono::Duration::try_minutes(delay_in_mins as _).and_then(|td| td.num_microseconds())
+        })
+        .unwrap_or_default();
+    let mut supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
@@ -999,30 +1010,28 @@ async fn handle_derived_stream_triggers(
         // For derived stream, period is in minutes, so we need to convert it to seconds for
         // align_time
         let aligned_curr_time = TriggerCondition::align_time(
-            current_time,
+            supposed_to_be_run_at,
             derived_stream.tz_offset,
             derived_stream.trigger_condition.period * 60,
         );
-        final_end_time = if aligned_curr_time > t0 {
-            aligned_curr_time
-        } else {
-            suppossed_to_be_run_at
+        // conditionally modify supposed_to_be_run_at
+        if aligned_curr_time > t0 {
+            supposed_to_be_run_at = aligned_curr_time;
         };
-        // If the delay is equal to or greater than the frequency, we need to ingest data one by
-        // one If the delay is less than the frequency, we need to ingest data for
-        // the "next run at" period, For example, if the current time is 5:19pm,
-        // frequency is 5 mins, and delay is 4mins (supposed to be run at 5:15pm),
-        // we need to ingest data for the period from 5:10pm to 5:15pm only. The
-        // next run at will be 5:20pm which will query for the period from 5:15pm to
-        // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
-        // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
-        // period from 5:05pm to 5:15pm.
+        // If the delay is equal to or greater than the frequency, we need to ingest data one by one
+        // If the delay is less than the frequency, we need to ingest data for the "next run at"
+        // period, For example, if the current time is 5:19pm, frequency is 5 mins, and
+        // delay is 4mins (supposed to be run at 5:15pm), we need to ingest data for the
+        // period from 5:10pm to 5:15pm only. The next run at will be 5:20pm which will
+        // query for the period from 5:15pm to 5:20pm. But, if the suppossed to be run at is
+        // 5:10pm, then we need ingest data for the period from 5:05pm to 5:15pm.
+        // Which is to cover the skipped period from 5:05pm to 5:15pm.
         (
             Some(t0),
-            std::cmp::min(suppossed_to_be_run_at, t0 + period_num_microseconds),
+            std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds),
         )
     } else {
-        (None, suppossed_to_be_run_at)
+        (None, supposed_to_be_run_at)
     };
 
     // In case the scheduler background job (watch_timeout) updates the trigger retries
@@ -1038,309 +1047,300 @@ async fn handle_derived_stream_triggers(
         // Go to the next nun at, but use the same trigger start time
         new_trigger.next_run_at = derived_stream
             .trigger_condition
-            .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?;
+            .get_aligned_next_trigger_time(
+                false,
+                derived_stream.tz_offset,
+                false,
+                Some(end + user_defined_delay),
+            )?;
         // Start over next time
         new_trigger.retries = 0;
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
 
-    while end <= final_end_time {
-        log::debug!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream: querying for time range: start_time {}, end_time {}. Final end_time is {}",
-            start.unwrap_or_default(),
-            end,
-            final_end_time
-        );
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream: querying for time range: start_time {}, end_time {}.",
+        start.unwrap_or_default(),
+        end,
+    );
 
-        let mut trigger_data_stream = TriggerData {
-            _timestamp: Utc::now().timestamp_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.to_lowercase(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Completed,
-            start_time: if let Some(start) = start {
-                start
-            } else {
-                end - period_num_microseconds
-            },
-            end_time: end,
-            retries: new_trigger.retries,
-            error: None,
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-        };
+    let mut trigger_data_stream = TriggerData {
+        _timestamp: Utc::now().timestamp_micros(),
+        org: new_trigger.org.clone(),
+        module: TriggerDataType::DerivedStream,
+        key: new_trigger.module_key.to_lowercase(),
+        next_run_at: new_trigger.next_run_at,
+        is_realtime: new_trigger.is_realtime,
+        is_silenced: new_trigger.is_silenced,
+        status: TriggerDataStatus::Completed,
+        start_time: if let Some(start) = start {
+            start
+        } else {
+            end - period_num_microseconds
+        },
+        end_time: end,
+        retries: new_trigger.retries,
+        error: None,
+        success_response: None,
+        is_partial: None,
+        delay_in_secs: None,
+        evaluation_took_in_secs: None,
+        source_node: Some(LOCAL_NODE.name.clone()),
+        query_took: None,
+        scheduler_trace_id: Some(scheduler_trace_id.clone()),
+        time_in_queue_ms: Some(time_in_queue),
+    };
 
-        // evaluate trigger and configure trigger next run time
-        match derived_stream
-            .evaluate(
-                (start, end),
-                &trigger.module_key,
-                Some(query_trace_id.clone()),
-            )
-            .await
-        {
-            Err(e) => {
-                let err_msg = format!(
-                    "Source node DerivedStream QueryCondition error during query evaluation, caused by {}",
-                    e
+    // evaluate trigger and configure trigger next run time
+    match derived_stream
+        .evaluate(
+            (start, end),
+            &trigger.module_key,
+            Some(query_trace_id.clone()),
+        )
+        .await
+    {
+        Err(e) => {
+            let err_msg = format!(
+                "Source node DerivedStream QueryCondition error during query evaluation, caused by {}",
+                e
+            );
+            log::error!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] pipeline org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}",
+                pipeline.org,
+                pipeline.name,
+                e
+            );
+
+            // update TriggerData that's to be reported to _meta
+            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.error = Some(err_msg.clone());
+            trigger_data_stream.retries += 1;
+
+            // report pipeline error
+            let pipeline_error = PipelineError {
+                pipeline_id: pipeline.id.to_string(),
+                pipeline_name: pipeline.name.to_string(),
+                error: Some(err_msg),
+                node_errors: HashMap::new(),
+            };
+            crate::service::self_reporting::publish_error(ErrorData {
+                _timestamp: Utc::now().timestamp_micros(),
+                stream_params: pipeline.get_source_stream_params(),
+                error_source: ErrorSource::Pipeline(pipeline_error),
+            })
+            .await;
+
+            // incr trigger retry count
+            new_trigger.retries += 1;
+        }
+        Ok(trigger_results) => {
+            let is_satisfied = trigger_results
+                .data
+                .as_ref()
+                .is_some_and(|ret| !ret.is_empty());
+
+            // ingest evaluation result into destination
+            if is_satisfied {
+                log::info!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream(org: {}/module_key: {}): query conditions satisfied. Result to be processed and ingested",
+                    new_trigger.org,
+                    new_trigger.module_key
                 );
-                log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] pipeline org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}",
-                    pipeline.org,
-                    pipeline.name,
-                    e
-                );
 
-                // update TriggerData that's to be reported to _meta
-                trigger_data_stream.status = TriggerDataStatus::Failed;
-                trigger_data_stream.error = Some(err_msg.clone());
-                trigger_data_stream.retries += 1;
-
-                // report pipeline error
-                let pipeline_error = PipelineError {
-                    pipeline_id: pipeline.id.to_string(),
-                    pipeline_name: pipeline.name.to_string(),
-                    error: Some(err_msg),
-                    node_errors: HashMap::new(),
-                };
-                crate::service::self_reporting::publish_error(ErrorData {
-                    _timestamp: Utc::now().timestamp_micros(),
-                    stream_params: pipeline.get_source_stream_params(),
-                    error_source: ErrorSource::Pipeline(pipeline_error),
-                })
-                .await;
-
-                // incr trigger retry count
-                new_trigger.retries += 1;
-                // set end to now to exit the loop below
-                end = final_end_time + 1;
-            }
-            Ok(trigger_results) => {
-                let is_satisfied = trigger_results
-                    .data
-                    .as_ref()
-                    .is_some_and(|ret| !ret.is_empty());
-
-                // ingest evaluation result into destination
-                if is_satisfied {
-                    log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream(org: {}/module_key: {}): query conditions satisfied. Result to be processed and ingested",
-                        new_trigger.org,
-                        new_trigger.module_key
-                    );
-
-                    let local_val = trigger_results.data // checked is some
+                let local_val = trigger_results.data // checked is some
                         .unwrap()
                         .into_iter()
                         .map(json::Value::Object)
                         .collect::<Vec<_>>();
 
-                    // pass search results to pipeline to get modified results before ingesting
-                    let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =
-                        HashMap::new();
-                    let mut ingestion_error_msg = None;
+                // pass search results to pipeline to get modified results before ingesting
+                let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =
+                    HashMap::new();
+                let mut ingestion_error_msg = None;
 
-                    match ExecutablePipeline::new(&pipeline).await {
+                match ExecutablePipeline::new(&pipeline).await {
+                    Err(e) => {
+                        let err_msg = format!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to initialize to ExecutablePipeline. Caused by: {}",
+                            org_id, pipeline_name, e
+                        );
+                        log::error!("{err_msg}");
+                        ingestion_error_msg = Some(err_msg);
+                    }
+                    Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
                         Err(e) => {
                             let err_msg = format!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to initialize to ExecutablePipeline. Caused by: {}",
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",
                                 org_id, pipeline_name, e
                             );
                             log::error!("{err_msg}");
                             ingestion_error_msg = Some(err_msg);
                         }
-                        Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
-                            Err(e) => {
-                                let err_msg = format!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",
-                                    org_id, pipeline_name, e
-                                );
-                                log::error!("{err_msg}");
-                                ingestion_error_msg = Some(err_msg);
-                            }
-                            Ok(pl_results) => {
-                                for (stream_params, stream_pl_results) in pl_results {
-                                    if matches!(
-                                        stream_params.stream_type,
-                                        StreamType::Logs
-                                            | StreamType::EnrichmentTables
-                                            | StreamType::Metrics
-                                            | StreamType::Traces
-                                    ) {
-                                        let (_, results): (Vec<_>, Vec<_>) =
-                                            stream_pl_results.into_iter().unzip();
-                                        json_data_by_stream
-                                            .entry(stream_params)
-                                            .or_default()
-                                            .extend(results);
-                                    }
+                        Ok(pl_results) => {
+                            for (stream_params, stream_pl_results) in pl_results {
+                                if matches!(
+                                    stream_params.stream_type,
+                                    StreamType::Logs
+                                        | StreamType::EnrichmentTables
+                                        | StreamType::Metrics
+                                        | StreamType::Traces
+                                ) {
+                                    let (_, results): (Vec<_>, Vec<_>) =
+                                        stream_pl_results.into_iter().unzip();
+                                    json_data_by_stream
+                                        .entry(stream_params)
+                                        .or_default()
+                                        .extend(results);
                                 }
                             }
-                        },
-                    };
-
-                    // Ingest result into destination stream
-                    if ingestion_error_msg.is_none() {
-                        for (dest_stream, records) in json_data_by_stream {
-                            // need to get the metadata from the destination node with the same
-                            // stream_params since this is a scheduled
-                            // pipeline, only the destination node can be of stream node.
-                            let request_metadata = pipeline
-                                .get_metadata_by_stream_params(&dest_stream)
-                                .map(|meta| cluster_rpc::IngestRequestMetadata { data: meta });
-                            let (org_id, stream_name, stream_type): (String, String, String) = {
-                                (
-                                    dest_stream.org_id.into(),
-                                    dest_stream.stream_name.into(),
-                                    dest_stream.stream_type.to_string(),
-                                )
-                            };
-                            let records_len = records.len();
-                            let req = cluster_rpc::IngestionRequest {
-                                org_id: org_id.clone(),
-                                stream_name: stream_name.clone(),
-                                stream_type: stream_type.clone(),
-                                data: Some(cluster_rpc::IngestionData::from(records)),
-                                ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
-                                metadata: request_metadata,
-                            };
-                            match ingestion_service::ingest(req).await {
-                                Ok(resp) if resp.status_code == 200 => {
-                                    log::info!(
-                                        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {}",
-                                        records_len
-                                    );
-                                }
-                                error => {
-                                    let err =
-                                        error.map_or_else(|e| e.to_string(), |resp| resp.message);
-                                    log::error!(
-                                        "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, caused by {}",
-                                        pipeline.org,
-                                        pipeline.name,
-                                        org_id,
-                                        stream_name,
-                                        stream_type,
-                                        err
-                                    );
-                                    ingestion_error_msg = Some(err);
-                                    break;
-                                }
-                            };
                         }
-                    }
+                    },
+                };
 
-                    if let Some(err) = ingestion_error_msg {
-                        // FAIL: update new_trigger, trigger_data_stream, and
-                        new_trigger.retries += 1;
-
-                        // trigger_data_stream
-                        trigger_data_stream.status = TriggerDataStatus::Failed;
-                        trigger_data_stream.error = Some(err.clone());
-                        trigger_data_stream.retries += 1;
-
-                        // report pipeline error
-                        let pipeline_error = PipelineError {
-                            pipeline_id: pipeline.id.to_string(),
-                            pipeline_name: pipeline.name.to_string(),
-                            error: Some(err),
-                            node_errors: HashMap::new(),
+                // Ingest result into destination stream
+                if ingestion_error_msg.is_none() {
+                    for (dest_stream, records) in json_data_by_stream {
+                        // need to get the metadata from the destination node with the same
+                        // stream_params since this is a scheduled
+                        // pipeline, only the destination node can be of stream node.
+                        let request_metadata = pipeline
+                            .get_metadata_by_stream_params(&dest_stream)
+                            .map(|meta| cluster_rpc::IngestRequestMetadata { data: meta });
+                        let (org_id, stream_name, stream_type): (String, String, String) = {
+                            (
+                                dest_stream.org_id.into(),
+                                dest_stream.stream_name.into(),
+                                dest_stream.stream_type.to_string(),
+                            )
                         };
-                        crate::service::self_reporting::publish_error(ErrorData {
-                            _timestamp: Utc::now().timestamp_micros(),
-                            stream_params: pipeline.get_source_stream_params(),
-                            error_source: ErrorSource::Pipeline(pipeline_error),
-                        })
-                        .await;
-
-                        // set end to now to exit the loop below but not moving time range forward
-                        end = final_end_time + 1;
-                    } else {
-                        // SUCCESS: move the time range forward by frequency and continue
-                        start = Some(trigger_results.end_time);
-                        // There could still be some data to be processed for the current period
-                        // so we need to move the end time forward by the period length or the
-                        // remaining time whichever is smaller
-                        let _end = period_num_microseconds + 1;
-                        // If the gap is less than or equal to 0, we need to break the loop
-                        end = if final_end_time - end <= 0 {
-                            end + _end
-                        } else {
-                            std::cmp::min(end + _end, final_end_time)
+                        let records_len = records.len();
+                        let req = cluster_rpc::IngestionRequest {
+                            org_id: org_id.clone(),
+                            stream_name: stream_name.clone(),
+                            stream_type: stream_type.clone(),
+                            data: Some(cluster_rpc::IngestionData::from(records)),
+                            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                            metadata: request_metadata,
                         };
-                        trigger_data_stream.query_took = trigger_results.query_took;
+                        match ingestion_service::ingest(req).await {
+                            Ok(resp) if resp.status_code == 200 => {
+                                log::info!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {}",
+                                    records_len
+                                );
+                            }
+                            error => {
+                                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                                log::error!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, caused by {}",
+                                    pipeline.org,
+                                    pipeline.name,
+                                    org_id,
+                                    stream_name,
+                                    stream_type,
+                                    err
+                                );
+                                ingestion_error_msg = Some(err);
+                                break;
+                            }
+                        };
                     }
+                }
+
+                if let Some(err) = ingestion_error_msg {
+                    // FAIL: update new_trigger, trigger_data_stream, and
+                    new_trigger.retries += 1;
+
+                    // trigger_data_stream
+                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    trigger_data_stream.error = Some(err.clone());
+                    trigger_data_stream.retries += 1;
+
+                    // report pipeline error
+                    let pipeline_error = PipelineError {
+                        pipeline_id: pipeline.id.to_string(),
+                        pipeline_name: pipeline.name.to_string(),
+                        error: Some(err),
+                        node_errors: HashMap::new(),
+                    };
+                    crate::service::self_reporting::publish_error(ErrorData {
+                        _timestamp: Utc::now().timestamp_micros(),
+                        stream_params: pipeline.get_source_stream_params(),
+                        error_source: ErrorSource::Pipeline(pipeline_error),
+                    })
+                    .await;
+
+                    // do not move time window forward
                 } else {
-                    log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
-                        &new_trigger.org,
-                        &new_trigger.module_key
-                    );
-                    trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
-                    trigger_data_stream.query_took = trigger_results.query_took;
-
-                    // move the time range forward by frequency and continue
+                    // SUCCESS: move the time range forward by frequency and continue
                     start = Some(trigger_results.end_time);
                     // There could still be some data to be processed for the current period
-                    // so we need to move the end time forward by the period length or the remaining
-                    // time whichever is smaller
+                    // so we need to move the end time forward by the period length or the
+                    // remaining time whichever is smaller
                     let _end = period_num_microseconds + 1;
-                    // If the gap is less than or equal to 0, we need to break the loop
-                    end = if final_end_time - end <= 0 {
-                        end + _end
-                    } else {
-                        std::cmp::min(end + _end, final_end_time)
-                    };
+                    end += _end;
+                    trigger_data_stream.query_took = trigger_results.query_took;
                 }
-            }
-        };
+            } else {
+                log::info!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
+                    &new_trigger.org,
+                    &new_trigger.module_key
+                );
+                trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+                trigger_data_stream.query_took = trigger_results.query_took;
 
-        // configure next run time before exiting the loop
-        if end > final_end_time {
-            // Store the last used derived stream period end time
-            if let Some(start_time) = start {
-                new_trigger.data = json::to_string(&ScheduledTriggerData {
-                    period_end_time: Some(start_time), // updated start_time as end_time
-                    tolerance: 0,
-                    last_satisfied_at: None,
-                })
-                .unwrap();
+                // move the time range forward by frequency and continue
+                start = Some(trigger_results.end_time);
+                // There could still be some data to be processed for the current period
+                // so we need to move the end time forward by the period length or the remaining
+                // time whichever is smaller
+                let _end = period_num_microseconds + 1;
+                end += _end;
             }
-
-            // If the trigger has failed and is not at the max retries, no need to update the next
-            // run at In that case, the trigger will be picked up again by the scheduler
-            // at the next batch immediately Once it reaches max retries, the trigger
-            // will be run again at the next scheduled time.
-            if !(trigger_data_stream.status == TriggerDataStatus::Failed
-                && new_trigger.retries < max_retries)
-            {
-                // Go to the next nun at, but use the same trigger start time
-                new_trigger.next_run_at = derived_stream
-                    .trigger_condition
-                    .get_aligned_next_trigger_time(false, derived_stream.tz_offset, false)?;
-
-                // If the trigger didn't fail, we need to reset the `retries` count.
-                // Only cumulative failures should be used to check with `max_retries`
-                if trigger_data_stream.status != TriggerDataStatus::Failed {
-                    new_trigger.retries = 0;
-                }
-            }
-            trigger_data_stream.next_run_at = new_trigger.next_run_at;
         }
+    };
 
-        // publish the triggers as stream
-        publish_triggers_usage(trigger_data_stream).await;
+    // Store the last used derived stream period end time
+    if let Some(start_time) = start {
+        new_trigger.data = json::to_string(&ScheduledTriggerData {
+            // updated start_time as end_time
+            period_end_time: Some(start_time),
+            tolerance: 0,
+            last_satisfied_at: None,
+        })
+        .unwrap();
     }
+
+    // If the trigger has failed and is not at the max retries, no need to update the next
+    // run at In that case, the trigger will be picked up again by the scheduler
+    // at the next batch immediately Once it reaches max retries, the trigger
+    // will be run again at the next scheduled time.
+    if !(trigger_data_stream.status == TriggerDataStatus::Failed
+        && new_trigger.retries < max_retries)
+    {
+        // Go to the next nun at, but use the same trigger start time
+        new_trigger.next_run_at = derived_stream
+            .trigger_condition
+            .get_aligned_next_trigger_time(
+                false,
+                derived_stream.tz_offset,
+                false,
+                Some(end + user_defined_delay),
+            )?;
+
+        // If the trigger didn't fail, we need to reset the `retries` count.
+        // Only cumulative failures should be used to check with `max_retries`
+        if trigger_data_stream.status != TriggerDataStatus::Failed {
+            new_trigger.retries = 0;
+        }
+    }
+    trigger_data_stream.next_run_at = new_trigger.next_run_at;
+
+    // publish the triggers as stream
+    publish_triggers_usage(trigger_data_stream).await;
 
     // If it reaches max retries, go to the next nun at, but use the same trigger start time
     if new_trigger.retries >= max_retries {
