@@ -806,6 +806,7 @@ UPDATE stream_stats
         if let Some((_min_id, max_id)) = pk_value {
             let limit = config::get_config().limit.calculate_stats_step_limit;
             loop {
+                let start = std::time::Instant::now();
                 match sqlx::query("DELETE FROM file_list WHERE id IN (SELECT id FROM file_list WHERE org = $1 AND deleted IS TRUE AND id <= $2 LIMIT $3);")
                     .bind(org_id)
                     .bind(max_id)
@@ -814,6 +815,7 @@ UPDATE stream_stats
                     .await
                 {
                     Ok(v) => {
+                        log::debug!("[SQLITE] delete file list rows affected: {}, took: {} ms", v.rows_affected(), start.elapsed().as_millis());
                         if v.rows_affected() == 0 {
                             break;
                         }
