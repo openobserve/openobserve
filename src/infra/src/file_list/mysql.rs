@@ -899,7 +899,8 @@ UPDATE stream_stats
             let start = std::time::Instant::now();
             let limit = config::get_config().limit.calculate_stats_step_limit;
             loop {
-                match sqlx::query("DELETE FROM file_list WHERE id IN (SELECT id FROM file_list WHERE deleted IS TRUE AND id <= ? LIMIT ?);")
+                match sqlx::query("DELETE FROM file_list WHERE id IN (SELECT id FROM file_list WHERE org = ? AND deleted IS TRUE AND id <= ? LIMIT ?);")
+                    .bind(org_id)
                     .bind(max_id)
                     .bind(limit)
                     .execute(&mut *tx)
