@@ -164,7 +164,6 @@ export default defineComponent({
         this.$router.push({
           name: "plans",
           query: {
-            update_org: Date.now(),
             org_identifier: this.store.state.selectedOrganization.identifier,
           },
         });
