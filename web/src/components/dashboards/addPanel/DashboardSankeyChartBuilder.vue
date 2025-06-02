@@ -80,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-source-item-${sourceLabel}-menu`"
-                style="width: 771px !important"
               >
                 <div style="padding: 3px 16px 16px 16px">
                   <div>
@@ -190,7 +189,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-target-item-${targetLabel}-menu`"
-                style="width: 771px !important"
               >
                 <div style="padding: 3px 16px 16px 16px">
                   <div>
@@ -298,9 +296,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-sm"
             >
               <q-menu
-                :data-test="`dashboard-value-item-${valueLabel}-menu`"
                 class="field-function-menu-popup"
-                style="width: 771px !important"
+                :data-test="`dashboard-value-item-${valueLabel}-menu`"
               >
                 <div style="padding: 3px 16px 16px 16px">
                   <div>

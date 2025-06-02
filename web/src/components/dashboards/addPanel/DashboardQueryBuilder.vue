@@ -114,21 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-menu
                       :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
                       class="field-function-menu-popup"
-                      style="width: 771px !important"
                     >
                       <div style="padding: 3px 16px 16px 16px">
                         <div>
-                          <div
-                            v-if="
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery &&
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index].isDerived
-                            "
-                            class="q-mr-xs q-mb-sm"
-                          >
+                          <div class="q-mr-xs q-mb-sm">
                             <DynamicFunctionPopUp
                               v-model="
                                 dashboardPanelData.data.queries[
@@ -286,21 +275,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-menu
                       :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
                       class="field-function-menu-popup"
-                      style="width: 771px !important"
                     >
                       <div style="padding: 3px 16px 16px 16px">
                         <div>
-                          <div
-                            v-if="
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery &&
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.breakdown[index].isDerived
-                            "
-                            class="q-mr-xs q-mb-sm"
-                          >
+                          <div class="q-mr-xs q-mb-sm">
                             <DynamicFunctionPopUp
                               v-model="
                                 dashboardPanelData.data.queries[
@@ -436,21 +414,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-menu
                   :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
                   class="field-function-menu-popup"
-                  style="width: 771px !important"
                 >
                   <div style="padding: 3px 16px 16px 16px">
                     <div>
-                      <div
-                        v-if="
-                          !dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery &&
-                          !dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].isDerived
-                        "
-                        class="q-mr-xs q-mb-sm"
-                      >
+                      <div class="q-mr-xs q-mb-sm">
                         <DynamicFunctionPopUp
                           v-model="
                             dashboardPanelData.data.queries[
@@ -585,21 +552,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-menu
                     :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
                     class="field-function-menu-popup"
-                    style="width: 771px !important"
                   >
                     <div style="padding: 3px 16px 16px 16px">
                       <div>
-                        <div
-                          v-if="
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery &&
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.z[index].isDerived
-                          "
-                          class="q-mr-xs q-mb-sm"
-                        >
+                        <div class="q-mr-xs q-mb-sm">
                           <DynamicFunctionPopUp
                             v-model="
                               dashboardPanelData.data.queries[
