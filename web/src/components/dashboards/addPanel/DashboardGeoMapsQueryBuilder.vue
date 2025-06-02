@@ -89,6 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].fields.latitude
                     "
                     :allowAggregation="false"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
                   />
                 </div>
               </q-menu>
@@ -189,6 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].fields.longitude
                     "
                     :allowAggregation="false"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
                   />
                 </div>
               </q-menu>
@@ -289,6 +299,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].fields.weight
                     "
                     :allowAggregation="true"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
                   />
                 </div>
               </q-menu>
