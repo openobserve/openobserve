@@ -124,10 +124,18 @@ export default class DashboardSetting {
     await this.page.locator('[data-test="dashboard-add-cancel"]').click();
   }
 
+  // async saveEditedtab() {
+  //   await this.page
+  //     .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
+  //     .click();
+  // }
   async saveEditedtab() {
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
-      .click();
+    const saveBtn = this.page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
+    );
+    await saveBtn.waitFor({ state: "visible", timeout: 15000 }); // wait up to 15s
+    // await expect(saveBtn).toBeEnabled();
+    await saveBtn.click();
   }
 
   async cancelEditedtab() {
