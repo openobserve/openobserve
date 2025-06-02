@@ -20,6 +20,20 @@ use infra::{dist_lock, file_list as infra_file_list};
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
+    loop {
+        let Some(offset) = update_stats_from_file_list_inner().await? else {
+            break;
+        };
+        log::info!(
+            "keep updating stream stats from file list, offset: {:?} ...",
+            offset
+        );
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+    Ok(None)
+}
+
+async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
