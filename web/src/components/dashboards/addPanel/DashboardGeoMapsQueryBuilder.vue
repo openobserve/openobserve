@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.latitude.column,
+              ].fields?.latitude,
               'latitude',
             )
           "
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.longitude.column,
+              ].fields?.longitude,
               'longitude',
             )
           "
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.weight.column,
+              ].fields?.weight,
               'weight',
             )
           "
@@ -337,7 +337,6 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 
-
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
@@ -411,6 +410,7 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string) => {
+      e.stopPropagation();
       // move the items  between axis or from the field list
       // check if the source is from axis or field list
       if (dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
@@ -438,57 +438,62 @@ export default defineComponent({
         // move the item from field list to axis
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-        const dragName =
-          selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-            (item: any) => item?.name === dragElement,
-          );
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement,
-          );
+        const currentQueryField =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields;
+        if (targetAxis !== "f") {
+          if (
+            (targetAxis === "latitude" && currentQueryField.latitude) ||
+            (targetAxis === "longitude" && currentQueryField.longitude) ||
+            (targetAxis === "weight" && currentQueryField.weight)
+          ) {
+            const maxAllowedAxisFields = 1;
 
-        if (dragName || customDragName) {
-          const currentQueryField =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields;
-          if (targetAxis !== "f") {
-            if (
-              (targetAxis === "latitude" && currentQueryField.latitude) ||
-              (targetAxis === "longitude" && currentQueryField.longitude) ||
-              (targetAxis === "weight" && currentQueryField.weight)
-            ) {
-              const maxAllowedAxisFields = 1;
+            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
 
-              const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            showErrorNotification(errorMessage);
+            cleanupDraggingFields();
+            return;
+          }
 
-              showErrorNotification(errorMessage);
-              cleanupDraggingFields();
-              return;
-            }
-
-            // Remove from the original axis
-            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-            if (dragSource === "latitude") {
-              removeLatitude();
-            } else if (dragSource === "longitude") {
-              removeLongitude();
-            } else if (dragSource === "weight") {
-              removeWeight();
-            }
+          // Remove from the original axis
+          const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+          if (dragSource === "latitude") {
+            removeLatitude();
+          } else if (dragSource === "longitude") {
+            removeLongitude();
+          } else if (dragSource === "weight") {
+            removeWeight();
           }
         }
         if (targetAxis === "f") {
           return;
         }
 
+        // find first arg which is of type field
+        const firstFieldTypeArg = dragElement?.args?.find(
+          (arg: any) => arg?.type === "field",
+        )?.value;
+
+        if (!firstFieldTypeArg) {
+          showErrorNotification("Without field, not able to drag");
+          cleanupDraggingFields();
+          return;
+        }
+
+        const fieldObj = {
+          name: firstFieldTypeArg.field,
+          streamAlias: firstFieldTypeArg.streamAlias,
+        };
+
         // Add to the new axis
         if (targetAxis === "latitude") {
-          addLatitude(dragName || customDragName);
+          addLatitude(fieldObj);
         } else if (targetAxis === "longitude") {
-          addLongitude(dragName || customDragName);
+          addLongitude(fieldObj);
         } else if (targetAxis === "weight") {
-          addWeight(dragName || customDragName);
+          addWeight(fieldObj);
         }
       }
 
