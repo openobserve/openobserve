@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="outputFormats"
               color="input-border"
               bg-color="input-bg"
-              class="showLabelOnTop "
+              class="showLabelOnTop"
               stack-label
               outlined
               :popup-content-style="{ textTransform: 'uppercase' }"
