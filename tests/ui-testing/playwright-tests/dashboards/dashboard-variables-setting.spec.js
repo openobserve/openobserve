@@ -3,32 +3,16 @@ import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time";
-import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
-import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
-import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
-import DashboardFolder from "../../pages/dashboardPages/dashboard-folder";
-import DashboardDrilldownPage from "../../pages/dashboardPages/dashboard-drilldown";
-import { waitForDashboardPage } from "../utils/dashCreation.js";
+import {
+  waitForDashboardPage,
+  deleteDashboard,
+} from "../utils/dashCreation.js";
 const dashboardName = `Dashboard_${Date.now()}`;
 
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard filter testcases", () => {
-  let dashboardCreate;
-  let dashboardList;
-  let dashboardActions;
-  let dashboardRefresh;
-  let chartTypeSelector;
-  let dashboardDrilldown;
-  let dashboardPanel;
-  let dashboardPanelConfigs;
-  let dashboardAction;
-  let dashboardSetting;
-
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(1000);
@@ -38,27 +22,26 @@ test.describe("dashboard filter testcases", () => {
   test("should try to open variables, click add variable, and without saving close it ", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
-    dashboardAction = new DashboardactionPage(page);
-    dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    dashboardSetting = new DashboardSetting(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardSetting = new DashboardSetting(page);
+
+    // Get the variable name
     const variableName = dashboardSetting.variableName();
 
+    // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
+
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+    // Open the setting and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
     await dashboardSetting.addVariable(
@@ -68,35 +51,40 @@ test.describe("dashboard filter testcases", () => {
       "e2e_automate",
       "kubernetes_container_name"
     );
+    // Cancel the variable
     await dashboardSetting.cancelVariable();
+    await dashboardSetting.closeSettingWindow();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   // query values test cases
+
   test("should add query_values to dashboard and save it", async ({ page }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
-    dashboardAction = new DashboardactionPage(page);
-    dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    dashboardSetting = new DashboardSetting(page);
+    // const dashboardName = generateDashboardName();
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
 
+    // Navigate to the dashboard page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+    // Open the setting and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
-    // await dashboardSetting.addTypeofVaribale("Query Values");
+
+    // Add a query values variable
     await dashboardSetting.addVariable(
       "Query Values",
       variableName,
@@ -104,33 +92,39 @@ test.describe("dashboard filter testcases", () => {
       "e2e_automate",
       "kubernetes_container_name"
     );
+
+    // Save the variable
     await dashboardSetting.saveVariable();
+    await dashboardSetting.closeSettingWindow();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   test("should add max records size, check toggle of multi select, and save it", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
-    dashboardAction = new DashboardactionPage(page);
-    dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    dashboardSetting = new DashboardSetting(page);
+    // Initialize page objects
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
 
+    // Navigate to dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
+
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+
+    // Open the setting and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
     await dashboardSetting.addVariable(
@@ -138,39 +132,45 @@ test.describe("dashboard filter testcases", () => {
       variableName,
       "logs",
       "e2e_automate",
+
+      // Add a variable with specified properties
       "kubernetes_namespace_name"
     );
+    // Set max records size and enable multi-select
     await dashboardSetting.addMaxRecord("2");
     await dashboardSetting.enableMultiSelect();
     await dashboardSetting.saveVariable();
     await dashboardSetting.closeSettingWindow();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 
   test("should verify that by default select is working", async ({ page }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
-    dashboardAction = new DashboardactionPage(page);
-    dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    dashboardSetting = new DashboardSetting(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
-    const value = "ingress-nginx";
+    const defaultValue = "ingress-nginx";
 
+    // Navigate to the dashboard page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+
+    // Open the setting and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
+
+    // Add a query values variable
     await dashboardSetting.addVariable(
       "Query Values",
       variableName,
@@ -178,37 +178,45 @@ test.describe("dashboard filter testcases", () => {
       "e2e_automate",
       "kubernetes_namespace_name"
     );
+    // Set the default value
     await dashboardSetting.addMaxRecord("2");
-    // await dashboardSetting.enableMultiSelect();
-    // await dashboardSetting.addCustomValue();
-    await dashboardSetting.addCustomValue(value);
+    await dashboardSetting.addCustomValue(defaultValue);
+    // Save the variable
     await dashboardSetting.saveVariable();
+    await dashboardSetting.closeSettingWindow();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
+
   test("should verify that hide on query_values variable dashboard is working", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardPanel = new DashboardPanel(page);
-    dashboardAction = new DashboardactionPage(page);
-    dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    dashboardSetting = new DashboardSetting(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to the dashboard page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
+
+    // Wait for the add panel button to be visible
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+
+    // Open the setting and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
+
+    // Add a query values variable
     await dashboardSetting.addVariable(
       "Query Values",
       variableName,
@@ -216,42 +224,72 @@ test.describe("dashboard filter testcases", () => {
       "e2e_automate",
       "kubernetes_namespace_name"
     );
+
+    // Set max records size to 2
     await dashboardSetting.addMaxRecord("2");
+
+    // Hide the variable
     await dashboardSetting.hideVariable();
+
+    // Save the variable
+    await dashboardSetting.saveVariable();
+    await dashboardSetting.closeSettingWindow();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
+
   test("should verify constant variable by adding and verify that its visible on dashboard", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardSetting = new DashboardSetting(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
+
+    // Wait for the add panel button to be visible
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+
+    // Open the setting and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
+
+    // Select constant type
     await dashboardSetting.selectConstantType(
       "Constant",
       variableName,
       "ingress-nginx"
     );
+
+    // Save the variable
     await dashboardSetting.saveVariable();
     await dashboardSetting.closeSettingWindow();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
   test("should verify that hide on constant variable dashboard is working", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardSetting = new DashboardSetting(page);
-    dashboardList = new DashboardListPage(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
@@ -261,6 +299,8 @@ test.describe("dashboard filter testcases", () => {
       .waitFor({
         state: "visible",
       });
+
+    // Open the setting and save variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
     await dashboardSetting.selectConstantType(
@@ -274,77 +314,116 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
     await dashboardSetting.closeSettingWindow();
+
+    //delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
   test("should verify textbox variable by adding and verify that its visible on dashboard", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardSetting = new DashboardSetting(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to the dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+      .waitFor({ state: "visible" });
+
+    // Open dashboard settings and variables section
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
+
+    // Select and add a textbox variable
     await dashboardSetting.selectTextType("TextBox", variableName);
+
+    // Save the added variable
     await dashboardSetting.saveVariable();
+
+    // Ensure the add variable button is visible
     await page
       .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
+
+    // Close the settings window
     await dashboardSetting.closeSettingWindow();
+
+    //delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
+
   test("should verify that hide on textbox variable dashboard is working", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardSetting = new DashboardSetting(page);
+    // Initialize page objects
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to the dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+      .waitFor({ state: "visible" });
+
+    // Open the settings and variables section and save variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
     await dashboardSetting.selectTextType("TextBox", variableName);
     await dashboardSetting.hideVariable();
     await dashboardSetting.saveVariable();
+
+    // Ensure the add variable button is visible
     await page
       .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
+
+    // Close the settings window
     await dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
+
   test("should verify custom variables by adding and its visible on dashboard", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardSetting = new DashboardSetting(page);
+    // Initialize page objects
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to the dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+
+    // Open the settings and variables section and save variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
     await dashboardSetting.selectCustomType(
@@ -354,33 +433,47 @@ test.describe("dashboard filter testcases", () => {
       "ingress-nginx"
     );
 
+    // Save the added variable
     await dashboardSetting.saveVariable();
+
     await page
       .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
     await dashboardSetting.closeSettingWindow();
+
+    // Ensure the panel is visible
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
+
   test("should verify that multi select is working properly", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardSetting = new DashboardSetting(page);
+    // Initialize page objects
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to the dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+      .waitFor({ state: "visible" });
+
+    // Open settings and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
+
+    // Select custom type and enable multi-select
     await dashboardSetting.selectCustomType(
       "Custom",
       variableName,
@@ -388,6 +481,8 @@ test.describe("dashboard filter testcases", () => {
       "ingress-nginx"
     );
     await dashboardSetting.enableMultiSelect();
+
+    // Save the variable
     await dashboardSetting.saveVariable();
     await page
       .locator('[data-test="dashboard-variable-add-btn"]')
@@ -396,25 +491,37 @@ test.describe("dashboard filter testcases", () => {
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
+
   test("should verify that hide on custom variable dashboard is working", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardSetting = new DashboardSetting(page);
+    // Initialize page objects
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
     const variableName = dashboardSetting.variableName();
+
+    // Navigate to the dashboards page
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard
     await dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
+    // Open settings and variables
     await dashboardSetting.openSetting();
     await dashboardSetting.openVariables();
+
+    // Select custom type and enable multi-select
     await dashboardSetting.selectCustomType(
       "Custom",
       variableName,
@@ -422,6 +529,8 @@ test.describe("dashboard filter testcases", () => {
       "ingress-nginx"
     );
     await dashboardSetting.hideVariable();
+
+    // Save the variable
     await dashboardSetting.saveVariable();
     await page
       .locator('[data-test="dashboard-variable-add-btn"]')
@@ -430,5 +539,9 @@ test.describe("dashboard filter testcases", () => {
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 });
