@@ -307,7 +307,7 @@
     "roles": "Roles",
     "groups": "Groups",
     "customRole": "Custom Roles",
-    "status": "Status"
+    "description": "Description"
   },
   "serviceAccounts": {
     "header": "Service Accounts",

@@ -23,6 +23,20 @@ use crate::{
 };
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
+    loop {
+        let Some(offset) = update_stats_from_file_list_inner().await? else {
+            break;
+        };
+        log::info!(
+            "keep updating stream stats from file list, offset: {:?} ...",
+            offset
+        );
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+    Ok(None)
+}
+
+async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -49,6 +63,11 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     } else {
         Some((offset, latest_pk))
     };
+
+    // there is no new data to process
+    if offset == latest_pk {
+        return Ok(None);
+    }
 
     // get stats from file_list
     let orgs = db::schema::list_organizations_from_cache().await;

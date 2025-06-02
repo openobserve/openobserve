@@ -58,6 +58,7 @@ impl From<meta_dest::Destination> for Destination {
                     template: Some(template),
                     #[cfg(feature = "enterprise")]
                     action_id: endpoint.action_id,
+                    output_format: endpoint.output_format,
                     ..Default::default()
                 },
                 meta_dest::DestinationType::Sns(aws_sns) => Self {
@@ -76,6 +77,7 @@ impl From<meta_dest::Destination> for Destination {
                 skip_tls_verify: endpoint.skip_tls_verify,
                 headers: endpoint.headers,
                 destination_type: DestinationType::Http,
+                output_format: endpoint.output_format,
                 ..Default::default()
             },
         }

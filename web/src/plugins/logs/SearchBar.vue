@@ -1447,7 +1447,8 @@ export default defineComponent({
         return;
       }
       // const queryReq = this.buildSearch();
-      this.searchObj.data.customDownloadQueryObj.query.from = initNumber;
+      this.searchObj.data.customDownloadQueryObj.query.from =
+        initNumber == 0 ? 0 : initNumber - 1;
       this.searchObj.data.customDownloadQueryObj.query.size =
         this.downloadCustomRange;
       searchService
