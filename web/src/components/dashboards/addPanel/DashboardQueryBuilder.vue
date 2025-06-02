@@ -284,11 +284,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`dashboard-b-item-${itemB?.alias}`"
                   >
                     <q-menu
-                      class="q-pa-md"
                       :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
+                      class="field-function-menu-popup"
+                      style="width: 771px !important"
                     >
-                      <div>
-                        <div class="">
+                      <div style="padding: 3px 16px 16px 16px">
+                        <div>
                           <div
                             v-if="
                               !dashboardPanelData.data.queries[
@@ -307,6 +308,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ].fields.breakdown[index]
                               "
                               :allowAggregation="false"
+                              :customQuery="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].customQuery
+                              "
                             />
                           </div>
                         </div>
@@ -428,11 +434,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-pl-sm"
               >
                 <q-menu
-                  class="q-pa-md tw-overflow-scroll"
                   :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
+                  class="field-function-menu-popup"
+                  style="width: 771px !important"
                 >
-                  <div>
-                    <div class="row q-mb-sm" style="align-items: center">
+                  <div style="padding: 3px 16px 16px 16px">
+                    <div>
                       <div
                         v-if="
                           !dashboardPanelData.data.queries[
@@ -442,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.y[index].isDerived
                         "
-                        class="q-mr-xs"
+                        class="q-mr-xs q-mb-sm"
                       >
                         <DynamicFunctionPopUp
                           v-model="
@@ -454,6 +461,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.data.type == 'heatmap'
                               ? false
                               : true
+                          "
+                          :customQuery="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery
                           "
                         />
                       </div>
@@ -571,11 +583,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-pl-sm"
                 >
                   <q-menu
-                    class="q-pa-md"
                     :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
+                    class="field-function-menu-popup"
+                    style="width: 771px !important"
                   >
-                    <div>
-                      <div class="row q-mb-sm" style="align-items: center">
+                    <div style="padding: 3px 16px 16px 16px">
+                      <div>
                         <div
                           v-if="
                             !dashboardPanelData.data.queries[
@@ -585,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.z[index].isDerived
                           "
-                          class="q-mr-xs"
+                          class="q-mr-xs q-mb-sm"
                         >
                           <DynamicFunctionPopUp
                             v-model="
@@ -594,6 +607,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ].fields.z[index]
                             "
                             :allowAggregation="true"
+                            :customQuery="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].customQuery
+                            "
                           />
                         </div>
                       </div>
