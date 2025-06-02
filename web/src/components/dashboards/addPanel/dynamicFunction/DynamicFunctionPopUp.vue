@@ -73,7 +73,7 @@
         </q-tab-panel>
         <q-tab-panel name="raw" style="padding: 0px; padding-top: 8px">
           <div style="display: flex; width: 100%">
-            <div style="width: calc(100% - 134px)">
+            <div style="width: 100%; padding-right: 12px">
               <RawQueryBuilder
                 v-model="fields"
                 data-test="dynamic-function-popup-raw-query-builder"
@@ -82,12 +82,54 @@
           </div>
         </q-tab-panel>
       </q-tab-panels>
+
+      <div
+        class="tw-flex tw-justify-between tw-items-center tw-pt-2 tw-pr-3"
+        v-if="allowAggregation"
+      >
+        <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
+
+        <q-btn
+          dense
+          outline
+          icon="add"
+          label="Add"
+          padding="sm sm"
+          no-caps
+          @click="toggleHavingFilter"
+          v-if="!isHavingFilterVisible()"
+        />
+
+        <div
+          class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+          v-if="isHavingFilterVisible()"
+        >
+          <q-select
+            dense
+            filled
+            v-model="getHavingCondition().operator"
+            :options="havingOperators"
+            style="width: 30%"
+          />
+
+          <q-input
+            dense
+            filled
+            v-model.number="getHavingCondition().value"
+            style="width: 50%"
+            type="number"
+            placeholder="Value"
+          />
+
+          <q-btn dense flat icon="close" @click="cancelHavingFilter" />
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, nextTick } from "vue";
 import RawQueryBuilder from "./RawQueryBuilder.vue";
 import SelectFunction from "./SelectFunction.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
@@ -150,11 +192,47 @@ export default {
       }
     };
 
+    const havingOperators = ["=", "<>", ">=", "<=", ">", "<"];
+
+    const isHavingFilterVisible = () => {
+      const isVisible = !!fields.value?.havingConditions?.length;
+      return isVisible;
+    };
+
+    const toggleHavingFilter = async () => {
+      if (!fields.value?.havingConditions) {
+        fields.value.havingConditions = [];
+      }
+
+      if (!fields.value.havingConditions.length) {
+        fields.value.havingConditions.push({ operator: null, value: null });
+      }
+
+      await nextTick();
+    };
+
+    const cancelHavingFilter = async () => {
+      fields.value.havingConditions = [];
+
+      await nextTick();
+    };
+
+    const getHavingCondition = () => {
+      return (
+        fields.value.havingConditions?.[0] || { operator: null, value: null }
+      );
+    };
+
     return {
       store,
       t,
       fields,
       onFieldTypeChange,
+      havingOperators,
+      isHavingFilterVisible,
+      toggleHavingFilter,
+      cancelHavingFilter,
+      getHavingCondition,
     };
   },
 };
