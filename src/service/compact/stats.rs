@@ -50,6 +50,11 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         Some((offset, latest_pk))
     };
 
+    // there is no new data to process
+    if offset == latest_pk {
+        return Ok(None);
+    }
+
     // get stats from file_list
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
