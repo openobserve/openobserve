@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
-            v-if="props.row.enableEdit && props.row.status != 'pending'"
+            v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <add-user
-        v-if="config.isCloud == 'true'"
+        v-if="config.isCloud == 'false'"
         style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
