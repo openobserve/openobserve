@@ -6,8 +6,12 @@ import { IamPage } from "../pages/iamPage.js";
 
 test.describe("Service Account for API access", () => {
     let loginPage, iamPage;
+
+    const timestamp = Date.now(); 
+    const randomSuffix = Math.floor(Math.random() * 1000); 
+    const emailName = `email${timestamp}${randomSuffix}@gmail.com`;
+
     
-    const emailName = `email${Math.floor(Math.random() * 1000000)}@gmail.com`;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
