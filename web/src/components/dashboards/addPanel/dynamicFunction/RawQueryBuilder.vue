@@ -2,29 +2,31 @@
   <div style="width: 100%">
     <div class="query-section">
       <div class="query-label">Query</div>
+      <div class="query-label tw-text-xs">
+        Write a SQL query for complex actions.
+      </div>
 
       <textarea
         style="
           min-width: 100%;
           max-width: 100%;
           resize: vertical;
-          border: 1px solid;
+          border: 1px solid #ccc;
           border-radius: 4px;
+          margin-top: 2px;
           padding: 2px;
         "
         v-model="fields.rawQuery"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
         data-test="dashboard-drilldown-url-textarea"
+        :rows="6"
       ></textarea>
     </div>
   </div>
 </template>
-
 <script lang="ts">
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
-
-//   import useDashboardPanelData from "@/composables/useDashboardPanel";
 
 export default {
   name: "RawQueryBuilder",
@@ -53,9 +55,7 @@ export default {
       (value: any) => {
         emit("update:modelValue", value);
       },
-      {
-        deep: true,
-      },
+      { deep: true },
     );
 
     return {
@@ -65,25 +65,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-.query-section {
-  margin-bottom: 20px;
-}
-
-.query-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #666666;
-  margin-bottom: 5px;
-}
-
-.query-input {
-  width: 100%;
-  min-height: 100px;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: vertical;
-}
-</style>

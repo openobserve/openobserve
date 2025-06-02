@@ -90,34 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :allowAggregation="false"
                   />
-                  <q-input
-                    dense
-                    filled
-                    data-test="dashboard-source-item-input"
-                    :label="t('common.label')"
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.source.label
-                    "
-                    :rules="[(val: any) => val > 0 || 'Required']"
-                  />
-                  <div
-                    v-if="
-                      !dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                      dashboardPanelData.data.queryType == 'sql'
-                    "
-                  >
-                    <SortByBtnGrp
-                      :fieldObj="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.source
-                      "
-                    />
-                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -218,34 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :allowAggregation="false"
                   />
-                  <q-input
-                    dense
-                    filled
-                    label="Label"
-                    data-test="dashboard-target-item-input"
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.target.label
-                    "
-                    :rules="[(val: any) => val > 0 || 'Required']"
-                  />
-                  <div
-                    v-if="
-                      !dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                      dashboardPanelData.data.queryType == 'sql'
-                    "
-                  >
-                    <SortByBtnGrp
-                      :fieldObj="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.target
-                      "
-                    />
-                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -355,105 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :allowAggregation="true"
                       />
-                      <!-- <q-select
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.value.aggregationFunction
-                        "
-                        :options="triggerOperators"
-                        dense
-                        filled
-                        emit-value
-                        map-options
-                        :label="t('common.aggregation')"
-                        data-test="dashboard-value-item-dropdown"
-                      >
-                        <template v-slot:append>
-                          <q-icon
-                            name="close"
-                            size="small"
-                            @click.stop.prevent="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.value.aggregationFunction = null
-                            "
-                            class="cursor-pointer"
-                          />
-                        </template>
-                      </q-select> -->
                     </div>
-                  </div>
-                  <q-input
-                    dense
-                    filled
-                    :label="t('common.label')"
-                    data-test="dashboard-value-item-input"
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.value.label
-                    "
-                    :rules="[(val: any) => val > 0 || 'Required']"
-                  />
-                  <div style="width: 100%" class="tw-mb-2">
-                    <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
-
-                    <q-btn
-                      dense
-                      outline
-                      color="primary"
-                      icon="add"
-                      label="Add"
-                      @click="toggleHavingFilter"
-                      v-if="!isHavingFilterVisible()"
-                    />
-
-                    <div
-                      class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
-                      v-if="isHavingFilterVisible()"
-                    >
-                      <q-select
-                        dense
-                        filled
-                        v-model="getHavingCondition().operator"
-                        :options="operators"
-                        style="width: 30%"
-                      >
-                      </q-select>
-
-                      <q-input
-                        dense
-                        filled
-                        v-model.number="getHavingCondition().value"
-                        style="width: 50%"
-                        type="number"
-                        placeholder="Value"
-                      />
-
-                      <q-btn
-                        dense
-                        flat
-                        icon="close"
-                        @click="cancelHavingFilter"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    v-if="
-                      !dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                      dashboardPanelData.data.queryType == 'sql'
-                    "
-                  >
-                    <SortByBtnGrp
-                      :fieldObj="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.value
-                      "
-                    />
                   </div>
                 </div>
               </q-menu>
@@ -480,6 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <q-separator />
+    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
     <q-separator />
     <!-- filters container -->
     <DashboardFiltersOption
@@ -508,6 +356,7 @@ import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
+import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
@@ -517,6 +366,7 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
+    DashboardJoinsOption,
   },
   props: ["dashboardData"],
   setup(props) {
