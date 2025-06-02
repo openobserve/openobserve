@@ -78,18 +78,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-source-item-${sourceLabel}`"
             >
               <q-menu
-                class="q-pa-md"
+                class="field-function-menu-popup"
                 :data-test="`dashboard-source-item-${sourceLabel}-menu`"
+                style="width: 771px !important"
               >
-                <div>
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.source
-                    "
-                    :allowAggregation="false"
-                  />
+                <div style="padding: 3px 16px 16px 16px">
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.source
+                        "
+                        :allowAggregation="false"
+                        :customQuery="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery
+                        "
+                      />
+                    </div>
+                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -178,18 +188,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-sm"
             >
               <q-menu
-                class="q-pa-md"
+                class="field-function-menu-popup"
                 :data-test="`dashboard-target-item-${targetLabel}-menu`"
+                style="width: 771px !important"
               >
-                <div>
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.target
-                    "
-                    :allowAggregation="false"
-                  />
+                <div style="padding: 3px 16px 16px 16px">
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.target
+                        "
+                        :allowAggregation="false"
+                        :customQuery="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery
+                        "
+                      />
+                    </div>
+                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -278,19 +298,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-sm"
             >
               <q-menu
-                class="q-pa-md"
                 :data-test="`dashboard-value-item-${valueLabel}-menu`"
+                class="field-function-menu-popup"
+                style="width: 771px !important"
               >
-                <div>
-                  <div class="row q-mb-sm" style="align-items: center">
-                    <div
-                      v-if="
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
-                      "
-                      class="q-mr-xs"
-                    >
+                <div style="padding: 3px 16px 16px 16px">
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
                       <DynamicFunctionPopUp
                         v-model="
                           dashboardPanelData.data.queries[
@@ -298,6 +312,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ].fields.value
                         "
                         :allowAggregation="true"
+                        :customQuery="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery
+                        "
                       />
                     </div>
                   </div>
