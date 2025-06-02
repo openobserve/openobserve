@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use {
     crate::common::meta::organization::OrganizationInvites,
     crate::common::meta::organization::{AllOrgListDetails, AllOrganizationResponse},
-    o2_enterprise::enterprise::cloud::billings as cloud_billings,
+    o2_enterprise::enterprise::cloud::{billings as cloud_billings, list_customer_billings},
 };
 
 use crate::{
@@ -145,10 +145,8 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
 #[get("/{org_id}/organizations")]
 pub async fn all_organizations(
     org_id: web::Path<String>,
-    user_email: UserEmail,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let user_id = user_email.user_id.as_str();
     let org = org_id.into_inner();
     if org != "_meta" {
         return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
@@ -178,19 +176,32 @@ pub async fn all_organizations(
         }
     };
 
+    let all_subscriptions = match list_customer_billings().await {
+        Ok(orgs) => orgs
+            .into_iter()
+            .map(|cb| (cb.org_id, cb.subscription_type as i32))
+            .collect::<HashMap<_, _>>(),
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+
     let mut id = 1;
     for org in all_orgs {
-        let org_subscription: i32 =
-            cloud_billings::get_org_subscription_type(org.identifier.as_str(), user_id)
-                .await
-                .map(|sub_type| sub_type as i32)
-                .unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
             name: org.org_name,
             org_type: org.org_type.to_string(),
-            plan: org_subscription,
+            plan: all_subscriptions
+                .get(&org.identifier)
+                .cloned()
+                .unwrap_or_default(),
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
