@@ -327,20 +327,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     // load stream list
                     db::schema::cache().await?;
                     // update stats from file list
-                    loop {
-                        let ret = compact::stats::update_stats_from_file_list()
-                            .await
-                            .expect("file list remote calculate stats failed");
-                        let Some(offset) = ret else {
-                            break;
-                        };
-                        log::info!(
-                            "keep updating stats from file list, offset: {:?} ...",
-                            offset
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                    }
-                    log::info!("update stats from file list success");
+                    compact::stats::update_stats_from_file_list()
+                        .await
+                        .expect("file list remote calculate stats failed");
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
