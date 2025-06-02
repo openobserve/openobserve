@@ -541,6 +541,8 @@ pub struct MapView {
 pub struct Trellis {
     pub layout: Option<String>,
     pub num_of_columns: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_by_y_axis: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
