@@ -6,7 +6,8 @@ import { IamPage } from "../pages/iamPage.js";
 
 test.describe("Service Account for API access", () => {
     let loginPage, iamPage;
-    const emailName = `email${Date.now()}@gmail.com`;
+    
+    const emailName = `email${Math.floor(Math.random() * 1000000)}@gmail.com`;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -49,14 +50,14 @@ test.describe("Service Account for API access", () => {
         await iamPage.verifySuccessMessage('User already exists');
 
     });
-    //this is actually failing , so skipping it
-    test.skip("Service Account not created if Cancel clicked", async ({ page }) => {
+    
+    test("Service Account not created if Cancel clicked", async ({ page }) => {
 
         await iamPage.gotoIamPage();
         await iamPage.iamPageServiceAccountsTab();
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.enterFirstLastNameServiceAccount();
+        await iamPage.enterDescriptionSA();
         await iamPage.clickCancelServiceAccount();
 
     });
@@ -73,8 +74,8 @@ test.describe("Service Account for API access", () => {
 
 
     });
-    //this is flaky , so skipping it
-    test.skip("Service Account Download Token", async ({ page }) => {
+    
+    test("Service Account Download Token", async ({ page }) => {
 
         await iamPage.gotoIamPage();
         await iamPage.iamPageServiceAccountsTab();
@@ -86,8 +87,8 @@ test.describe("Service Account for API access", () => {
 
 
     });
-    //this is flaky , so skipping it
-    test.skip("Service Account Token Pop Up Closed", async ({ page }) => {
+    
+    test("Service Account Token Pop Up Closed", async ({ page }) => {
 
         await iamPage.gotoIamPage();
         await iamPage.iamPageServiceAccountsTab();
@@ -99,8 +100,8 @@ test.describe("Service Account for API access", () => {
 
     });
 
-    //this is flaky , so skipping it
-    test.skip("Service Account Created and deleted", async ({ page }) => {
+    
+    test("Service Account Created and deleted", async ({ page }) => {
 
         await iamPage.gotoIamPage();
         await iamPage.iamPageServiceAccountsTab();
@@ -131,8 +132,8 @@ test.describe("Service Account for API access", () => {
 
     });
 
-    //this is actually failing , so skipping it
-    test.skip("Service Account Created and updated details", async ({ page }) => {
+   
+    test("Service Account Created and updated details", async ({ page }) => {
 
         await iamPage.gotoIamPage();
         await iamPage.iamPageServiceAccountsTab();
@@ -143,7 +144,7 @@ test.describe("Service Account for API access", () => {
         await iamPage.clickServiceAccountPopUpClosed();
         await iamPage.reloadServiceAccountPage();
         await iamPage.updatedServiceAccount(emailName);
-        await iamPage.enterFirstLastNameServiceAccount();
+        await iamPage.enterDescriptionSA();
         await iamPage.clickSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account updated successfully.');
 
