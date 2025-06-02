@@ -177,12 +177,6 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Install AWS CLI
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
-
       - name: Upload to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -190,6 +184,16 @@ jobs:
           AWS_REGION: ${{ vars.AWS_S3_REGION }}
           BUCKET: ${{ vars.AWS_S3_BUCKET_NAME }}
         run: |
+          if ! command -v aws &> /dev/null; then
+            echo "AWS CLI not found. Installing..."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+          else
+            echo "AWS CLI already installed."
+          fi
+
+          echo "Uploading artifacts to S3..."
           for file in $(find . -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256sum" \)); do
             echo "Uploading $file to s3://${BUCKET}/releases/${GITHUB_REF_NAME}/"
             aws s3 cp "$file" "s3://${BUCKET}/releases/${GITHUB_REF_NAME}/$(basename "$file")"
