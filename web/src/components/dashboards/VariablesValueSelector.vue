@@ -821,11 +821,16 @@ export default defineComponent({
       const urlValue = props.initialVariableValues?.value[currentVariable.name];
       if (urlValue) {
         // If URL value exists, use it
-        currentVariable.value = currentVariable.multiSelect
-          ? Array.isArray(urlValue)
+        if (currentVariable.multiSelect) {
+          currentVariable.value = Array.isArray(urlValue)
             ? urlValue
-            : [urlValue]
-          : urlValue;
+            : [urlValue];
+        } else {
+          // For single select, if coming from multiSelect, take first value
+          currentVariable.value = Array.isArray(urlValue)
+            ? urlValue[0]
+            : urlValue;
+        }
         currentVariable.isVariableLoadingPending = true;
         return;
       }
