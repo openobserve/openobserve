@@ -1198,8 +1198,10 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
             .await?;
     }
+
     Ok(())
 }
+
 #[cfg(feature = "enterprise")]
 fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::Error> {
     if o2cfg.rate_limit.rate_limit_enabled {

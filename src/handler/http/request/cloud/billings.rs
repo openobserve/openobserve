@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ use actix_web::{HttpRequest, HttpResponse, Responder, get, post, web};
 use config::{get_config, utils::json};
 use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
 
+use super::IntoHttpResponse;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -32,8 +33,6 @@ use crate::{
         self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
     },
 };
-
-pub mod org_usage;
 
 /// GetSubscriptionUrl
 #[utoipa::path(
@@ -380,30 +379,5 @@ pub async fn handle_stripe_event(
             }))
         }
         Err(err) => err.into_http_response(),
-    }
-}
-
-// BillingsError extension
-pub trait IntoHttpResponse {
-    fn into_http_response(self) -> HttpResponse;
-}
-
-impl IntoHttpResponse for o2_cloud_billings::BillingError {
-    fn into_http_response(self) -> HttpResponse {
-        match self {
-            o2_cloud_billings::BillingError::InfraError(err) => {
-                MetaHttpResponse::internal_error(err)
-            }
-            o2_cloud_billings::BillingError::OrgNotFound => {
-                MetaHttpResponse::not_found(self.to_string())
-            }
-            o2_cloud_billings::BillingError::SessionIdNotFound => {
-                MetaHttpResponse::not_found(self.to_string())
-            }
-            o2_cloud_billings::BillingError::SubscriptionNotFound => {
-                MetaHttpResponse::not_found(self.to_string())
-            }
-            _ => MetaHttpResponse::bad_request(self.to_string()),
-        }
     }
 }

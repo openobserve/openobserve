@@ -58,7 +58,7 @@ pub async fn process_token(
         TokenValidationResponse,
         Option<TokenData<HashMap<String, Value>>>,
     ),
-) {
+) -> Option<bool> {
     let dec_token = res.1.unwrap();
 
     let user_email = res.0.user_email.to_owned();
@@ -70,7 +70,7 @@ pub async fn process_token(
 
     #[cfg(feature = "cloud")]
     {
-        check_and_add_to_org(&user_email, &name).await;
+        Some(check_and_add_to_org(&user_email, &name).await)
     }
 
     #[cfg(not(feature = "cloud"))]
@@ -132,7 +132,7 @@ pub async fn process_token(
         // Assign users custom roles in RBAC
         if openfga_cfg.map_group_to_role {
             map_group_to_custom_role(&user_email, &name, custom_roles, res.0.user_role).await;
-            return;
+            return None;
         }
 
         // Check if the user exists in the database
@@ -200,7 +200,7 @@ pub async fn process_token(
             // assumption is always a service account irrespective of the orgs it belongs to
             if res.0.user_role.is_some() && res.0.user_role.unwrap().eq(&UserRole::ServiceAccount) {
                 log::info!("User is service account and skipping the role update");
-                return;
+                return None;
             }
 
             log::info!("User exists in the database perform check for role change");
@@ -354,6 +354,7 @@ pub async fn process_token(
                 }
             }
         };
+        None
     }
 }
 
@@ -558,7 +559,7 @@ fn format_role_name(org: &str, role: String) -> String {
 }
 
 #[cfg(feature = "cloud")]
-pub async fn check_and_add_to_org(user_email: &str, name: &str) {
+pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
     use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::org_invites::list_by_invitee;
     use o2_openfga::authorizer::authz::save_org_tuples;
@@ -566,10 +567,12 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
     use crate::service::users::{add_admin_to_org, create_new_user};
     let o2cfg = get_openfga_config();
 
+    let mut is_new_user = false;
     let mut tuples_to_add = HashMap::new();
     let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
     let db_user = db::user::get_user_by_email(user_email).await;
     if db_user.is_none() {
+        is_new_user = true;
         match create_new_user(DBUser {
             email: user_email.to_owned(),
             first_name: first_name.to_owned(),
@@ -589,7 +592,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
             }
             Err(e) => {
                 log::error!("Error adding user to the database: {}", e);
-                return;
+                return is_new_user;
             }
         }
     }
@@ -681,33 +684,37 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
         }
     }
 
-    // Send new user info to ActiveCampaign via segment proxy
-    log::info!("sending track event to segment");
-    let segment_event_data = HashMap::from([
-        (
-            "first_name".to_string(),
-            json::Value::String(first_name.to_string()),
-        ),
-        (
-            "last_name".to_string(),
-            json::Value::String(last_name.to_string()),
-        ),
-        (
-            "email".to_string(),
-            json::Value::String(user_email.to_string()),
-        ),
-        ("organization".to_string(), json::Value::String(org_name)),
-        (
-            "created_at".to_string(),
-            json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
-        ),
-    ]);
-    telemetry::Telemetry::new()
-        .send_track_event(
-            "OpenObserve - New user registered",
-            Some(segment_event_data),
-            false,
-            false,
-        )
-        .await;
+    if is_new_user {
+        // Send new user info to ActiveCampaign via segment proxy
+        log::warn!("sending track event to segment");
+        let segment_event_data = HashMap::from([
+            (
+                "first_name".to_string(),
+                json::Value::String(first_name.to_string()),
+            ),
+            (
+                "last_name".to_string(),
+                json::Value::String(last_name.to_string()),
+            ),
+            (
+                "email".to_string(),
+                json::Value::String(user_email.to_string()),
+            ),
+            ("organization".to_string(), json::Value::String(org_name)),
+            (
+                "created_at".to_string(),
+                json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
+            ),
+        ]);
+        telemetry::Telemetry::new()
+            .send_track_event(
+                "OpenObserve - New user registered",
+                Some(segment_event_data),
+                false,
+                false,
+            )
+            .await;
+    }
+
+    is_new_user
 }
