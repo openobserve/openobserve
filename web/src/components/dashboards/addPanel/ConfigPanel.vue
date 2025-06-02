@@ -199,7 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <div
-        v-if="dashboardPanelData.data.config.trellis?.layout"
+        v-if="
+          dashboardPanelData.data.config.trellis?.layout &&
+          !(isBreakdownFieldEmpty || hasTimeShifts)
+        "
         class="row items-center"
       >
         <q-toggle
