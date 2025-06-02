@@ -469,7 +469,7 @@ pub async fn prepare_cache(streaming_id: &str) -> anyhow::Result<bool> {
 
     let file_path = streaming_item.get_file_path();
 
-    let (cached_record_batches, is_complete_match) = get_streaming_aggs_records_from_disk(
+    let cache_result = get_streaming_aggs_records_from_disk(
         &file_path,
         streaming_item.start_time,
         streaming_item.end_time,
@@ -479,13 +479,14 @@ pub async fn prepare_cache(streaming_id: &str) -> anyhow::Result<bool> {
     log::info!(
         "[streaming_id {}] loaded {} cached record batches from {}",
         streaming_id,
-        cached_record_batches.len(),
+        cache_result.cache_result.len(),
         file_path
     );
 
-    if !cached_record_batches.is_empty() {
-        GLOBAL_CACHE.insert_many(streaming_id.to_string(), cached_record_batches);
+    if !cache_result.cache_result.is_empty() {
+        let all_record_batches = cache_result.get_record_batches();
+        GLOBAL_CACHE.insert_many(streaming_id.to_string(), all_record_batches);
     }
 
-    Ok(is_complete_match)
+    Ok(cache_result.is_complete_match)
 }

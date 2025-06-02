@@ -5,6 +5,8 @@ use arrow::{
     ipc::{reader::FileReader as ArrowFileReader, writer::FileWriter as ArrowFileWriter},
 };
 
+use crate::common::meta::search::{StreamingAggsCacheResult, StreamingAggsCacheResultRecordBatch};
+
 const STREAMING_AGGS_CACHE_DIR: &str = "result_streaming_aggs";
 
 pub fn cache_streaming_aggs_to_disk(
@@ -41,7 +43,7 @@ pub async fn get_streaming_aggs_records_from_disk(
     file_path: &str,
     start_time: i64,
     end_time: i64,
-) -> std::io::Result<(Vec<RecordBatch>, bool)> {
+) -> std::io::Result<StreamingAggsCacheResult> {
     let cache_path = construct_cache_path(file_path);
     if !Path::new(&cache_path).exists() {
         return Err(std::io::Error::new(
@@ -51,6 +53,7 @@ pub async fn get_streaming_aggs_records_from_disk(
     }
 
     let mut cached_records = Vec::new();
+    // TODO: handle the case if this would remain the max and min value
     let mut cache_start_time: i64 = i64::MAX;
     let mut cache_end_time: i64 = i64::MIN;
 
@@ -109,7 +112,12 @@ pub async fn get_streaming_aggs_records_from_disk(
                         format!("Arrow error: {}", e),
                     )
                 })?;
-                cached_records.push(batch);
+                let record_batch_cache_result = StreamingAggsCacheResultRecordBatch {
+                    record_batch: batch,
+                    cache_start_time: file_start_time,
+                    cache_end_time: file_end_time,
+                };
+                cached_records.push(record_batch_cache_result);
             }
             cache_start_time = std::cmp::min(cache_start_time, file_start_time);
             cache_end_time = std::cmp::max(cache_end_time, file_end_time);
@@ -126,19 +134,31 @@ pub async fn get_streaming_aggs_records_from_disk(
         );
         if cache_start_time == start_time && cache_end_time == end_time {
             log::info!("Found cached records for the entire time range");
-            return Ok((cached_records, true));
+            let cache_result = StreamingAggsCacheResult {
+                cache_result: cached_records,
+                is_complete_match: true,
+                // TODO: calculate deltas
+                deltas: vec![],
+            };
+            return Ok(cache_result);
         } else {
             log::info!(
                 "Found cached records for the time range: {}, {}",
                 cache_start_time,
                 cache_end_time
             );
-            return Ok((cached_records, false));
+            let cache_result = StreamingAggsCacheResult {
+                cache_result: cached_records,
+                is_complete_match: false,
+                // TODO: calculate deltas
+                deltas: vec![],
+            };
+            return Ok(cache_result);
         }
     }
 
     // No cached records found
-    Ok((Vec::new(), false))
+    Ok(StreamingAggsCacheResult::default())
 }
 
 pub fn construct_cache_path(file_path: &str) -> String {

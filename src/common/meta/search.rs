@@ -15,6 +15,7 @@
 
 use std::str::FromStr;
 
+use arrow::array::RecordBatch;
 use config::meta::search::Response;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -89,5 +90,28 @@ impl FromStr for ResultCacheSelectionStrategy {
             "both" => Ok(ResultCacheSelectionStrategy::Both),
             _ => Ok(ResultCacheSelectionStrategy::Both),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct StreamingAggsCacheResultRecordBatch {
+    pub record_batch: RecordBatch,
+    pub cache_start_time: i64,
+    pub cache_end_time: i64,
+}
+
+#[derive(Default)]
+pub struct StreamingAggsCacheResult {
+    pub cache_result: Vec<StreamingAggsCacheResultRecordBatch>,
+    pub is_complete_match: bool,
+    pub deltas: Vec<QueryDelta>,
+}
+
+impl StreamingAggsCacheResult {
+    pub fn get_record_batches(&self) -> Vec<RecordBatch> {
+        self.cache_result
+            .iter()
+            .map(|v| v.record_batch.clone())
+            .collect::<Vec<_>>()
     }
 }
