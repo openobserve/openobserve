@@ -484,6 +484,9 @@ const setupDestinationData = () => {
         addApiHeader(key, value);
       });
     }
+    if (props.destination.output_format) {
+      formData.value.output_format = props.destination.output_format;
+    }
   }
 };
 
