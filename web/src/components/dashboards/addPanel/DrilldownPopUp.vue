@@ -94,7 +94,7 @@
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
         <label>Select Logs Mode:</label>
-        <q-btn-group>
+        <q-btn-group class="q-ml-sm">
           <q-btn
             :class="drilldownData.data.logsMode === 'auto' ? 'selected' : ''"
             size="sm"
@@ -294,7 +294,7 @@
                 class="q-mr-xs"
                 size="20px"
                 name="close"
-                style="cursor: pointer; height: 35px; display: flex !important"
+                style="cursor: pointer; height: 54px; display: flex !important"
                 @click="() => drilldownData.data.variables.splice(index, 1)"
                 :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
@@ -695,10 +695,24 @@ export default defineComponent({
             });
           });
         });
+      } else if (
+        ["pie", "donut", "gauge"].includes(dashboardPanelData.data.type)
+      ) {
+        selectedValues = [
+          { label: "Series Name", value: "${series.__name}" },
+          { label: "Series Value", value: "${series.__value}" },
+          ...variableListName,
+        ];
+      } else if (dashboardPanelData.data.type === "metric") {
+        selectedValues = [
+          { label: "Series Value", value: "${series.__value}" },
+          ...variableListName,
+        ];
       } else {
         selectedValues = [
           { label: "Series Name", value: "${series.__name}" },
           { label: "Series Value", value: "${series.__value}" },
+          { label: "Axis Value", value: "${series.__axisValue}" },
           ...variableListName,
         ];
       }

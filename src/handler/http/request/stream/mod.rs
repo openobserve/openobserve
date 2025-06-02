@@ -76,8 +76,8 @@ async fn schema(
     let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
     let Some(mut schema) = schema else {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "stream not found".to_string(),
+            StatusCode::NOT_FOUND,
+            "stream not found",
         )));
     };
     if let Some(uds_fields) = schema.settings.defined_schema_fields.as_ref() {
@@ -160,7 +160,7 @@ async fn settings(
     if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Index {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Stream type '{}' not allowed", stream_type),
             )),
         );
@@ -209,7 +209,7 @@ async fn update_settings(
     if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Index {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Stream type '{}' not allowed", stream_type),
             )),
         );
@@ -307,13 +307,11 @@ async fn delete_fields(
     .await
     {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "fields deleted".to_string(),
+            http::StatusCode::OK,
+            "fields deleted",
         ))),
-        Err(e) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            e.to_string(),
-        ))),
+        Err(e) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))),
     }
 }
 
@@ -541,8 +539,8 @@ async fn delete_stream_cache(
 ) -> Result<HttpResponse, Error> {
     if !config::get_config().common.result_cache_enabled {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Result Cache is disabled".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Result Cache is disabled",
         )));
     }
     let (org_id, mut stream_name) = path.into_inner();
@@ -559,12 +557,12 @@ async fn delete_stream_cache(
 
     match crate::service::search::cluster::cacher::delete_cached_results(path).await {
         true => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "cache deleted".to_string(),
+            http::StatusCode::OK,
+            "cache deleted",
         ))),
         false => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Error deleting cache, please retry".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Error deleting cache, please retry",
         ))),
     }
 }

@@ -38,7 +38,7 @@ pub mod reports;
 pub mod timed_annotations;
 
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
@@ -623,7 +623,7 @@ async fn filter_permitted_dashboards(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
-                o2_type: format!("{}:{folder_id}", OFGA_MODELS.get("folders").unwrap().key,),
+                o2_type: format!("{}:{folder_id}", OFGA_MODELS.get("folders").unwrap().key),
                 method: "GET".to_string(),
                 bypass_check: false,
                 parent_id: "".to_string(),

@@ -150,7 +150,15 @@ pub(crate) async fn create_context(
         trace_id,
         &files
             .iter()
-            .map(|f| (&f.account, &f.key, f.meta.compressed_size, f.meta.max_ts))
+            .map(|f| {
+                (
+                    f.id,
+                    &f.account,
+                    &f.key,
+                    f.meta.compressed_size,
+                    f.meta.max_ts,
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -203,11 +211,7 @@ pub(crate) async fn create_context(
         cfg.limit.cpu_num
     };
 
-    let schema = Arc::new(
-        schema
-            .to_owned()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),

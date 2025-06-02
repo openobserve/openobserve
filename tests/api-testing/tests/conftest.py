@@ -4,16 +4,20 @@ import os
 import random
 import string
 from pathlib import Path
+import base64
 
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
 
-
-def random_string(length: int):
-    # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
-    # digits consist of '0' to '9'
-    characters = string.ascii_letters + string.digits
-    return "".join(random.choices(characters, k=length))
+@pytest.fixture(scope="module")
+def random_string():
+    """Generate a random string of specified length."""
+    def _generate(length=5):
+        # ascii_letters consist of alphabets for 'a' to 'z' and 'A' to 'Z'
+        # digits consist of '0' to '9'
+        characters = string.ascii_letters + string.digits
+        return "".join(random.choices(characters, k=length))
+    return _generate
 
 def _create_session_inner():
     s = requests.Session()
@@ -28,22 +32,19 @@ def _create_session_inner_v2():
     s = requests.Session()
     username = os.environ["ZO_ROOT_USER_EMAIL"]
     password = os.environ["ZO_ROOT_USER_PASSWORD"]
-    # s.auth = (username, password)
-    # resp = s.post(BASE_URL)
-    resp = s.post(f"{BASE_URL}auth/login", json={"name": username, "password": password})
-    print (resp.status_code)
-    if resp.status_code != 200:
-        raise Exception("Invalid username/password")
+    # Set Authorization header for all requests
+    basic_auth = base64.b64encode(f"{username}:{password}".encode()).decode()
+    s.headers.update({"Authorization": f"Basic {basic_auth}"})
     return s
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def create_session():
     """Create a session and return it."""
-    return _create_session_inner()
+    return _create_session_inner_v2()
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def base_url():
     """Return the base URL."""
     return BASE_URL
@@ -59,7 +60,7 @@ def ingest_data():
         data = f.read()
 
     stream_name = "stream_pytest_data"
-    org = "org_pytest_data"
+    org = "default"
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp = session.post(url, data=data, headers={"Content-Type": "application/json"})
     print("Data ingested successfully, status code: ", resp.status_code)

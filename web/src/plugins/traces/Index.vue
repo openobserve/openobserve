@@ -824,12 +824,11 @@ async function extractFields() {
       Object.keys(importantFields).forEach((rowName) => {
         if (fields[rowName] == undefined) {
           fields[rowName] = {};
-          const formattedName =
-            rowName === "duration" ? `${rowName} (µs)` : rowName;
           searchObj.data.stream.selectedStreamFields.push({
-            name: formattedName,
+            name: rowName,
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
+            label: rowName === "duration" ? "duration (µs)" : rowName,
           });
         }
       });

@@ -789,6 +789,16 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_consistent_hash", "Consistent hash")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["type"],
+    )
+    .expect("Metric created")
+});
+
 // query disk cache metrics
 pub static QUERY_DISK_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -838,6 +848,21 @@ pub static FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(||
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &[],
+    )
+    .expect("Metric created")
+});
+
+// File access time bucket histogram
+pub static FILE_ACCESS_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "file_access_time",
+            "Histogram showing query counts within time windows from 1h to 1week (1h, 2h, 3h, 6h, 12h, 24h, 48h, 96h, 168h)"
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![1.0, 2.0, 3.0, 6.0, 12.0, 24.0, 48.0, 96.0, 168.0])
+        .const_labels(create_const_labels()),
+        &["stream_type"],
     )
     .expect("Metric created")
 });
@@ -1052,6 +1077,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_CONSISTENT_HASH.clone()))
+        .expect("Metric registered");
 
     // query disk cache metrics
     registry
@@ -1066,6 +1094,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(FILE_ACCESS_TIME.clone()))
         .expect("Metric registered");
 }
 

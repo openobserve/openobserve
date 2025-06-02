@@ -45,7 +45,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_created_at,
+        unwrap_stream_settings,
     },
     storage,
 };
@@ -67,7 +68,6 @@ use crate::{
             DATAFUSION_RUNTIME,
             datafusion::exec::{self, MergeParquetResult},
         },
-        stream,
     },
 };
 
@@ -112,7 +112,7 @@ pub async fn generate_job_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
     if offset == 0 && stream_created > 0 {
         offset = stream_created
     } else if offset == 0 {
@@ -338,7 +338,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
     if offset == 0 {
         offset = stream_created
     }
@@ -644,11 +644,9 @@ pub async fn merge_by_stream(
 
                 for file in delete_file_list {
                     events.push(FileKey {
-                        account: file.account.clone(),
-                        key: file.key.clone(),
-                        meta: file.meta.clone(),
                         deleted: true,
                         segment_ids: None,
+                        ..file.clone()
                     });
                 }
                 events.sort_by(|a, b| a.key.cmp(&b.key));
@@ -931,7 +929,7 @@ pub async fn merge_files(
                 files,
                 latest_schema
             );
-            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}",)).into());
+            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
         }
     };
 
@@ -999,7 +997,7 @@ pub async fn merge_files(
                 )
                 .await?;
             }
-            new_files.push(FileKey::new(account, new_file_key, new_file_meta, false));
+            new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
         }
         MergeParquetResult::Multiple { bufs, file_metas } => {
             for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
@@ -1041,7 +1039,7 @@ pub async fn merge_files(
                     .await?;
                 }
 
-                new_files.push(FileKey::new(account, new_file_key, new_file_meta, false));
+                new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
             }
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
@@ -1114,6 +1112,7 @@ async fn generate_inverted_index(
             if let Err(e) = write_file_list(
                 org_id,
                 &[FileKey {
+                    id: 0,
                     account,
                     key: file_name.clone(),
                     meta: filemeta,
@@ -1203,7 +1202,15 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     if success {
         // send broadcast to other nodes
         if get_config().cache_latest_files.enabled {
-            if let Err(e) = db::file_list::broadcast::send(events, None).await {
+            // get id for all the new files
+            let file_ids = infra_file_list::query_ids_by_files(events).await?;
+            let mut events = events.to_vec();
+            for event in events.iter_mut() {
+                if let Some(id) = file_ids.get(&event.key) {
+                    event.id = *id;
+                }
+            }
+            if let Err(e) = db::file_list::broadcast::send(&events).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
             }
         }

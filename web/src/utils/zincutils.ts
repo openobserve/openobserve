@@ -22,7 +22,6 @@ import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
-import store from "../stores";
 import cronParser from "cron-parser";
 
 let moment: any;
@@ -149,18 +148,6 @@ export const getUserInfo = (loginString: string) => {
 
 export const invlidateLoginData = () => {
   userService.logout().then((res: any) => {});
-};
-
-export const getLoginURL = () => {
-  return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
-};
-
-export const getLogoutURL = () => {
-  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${
-    config.aws_user_pools_web_client_id
-  }&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${
-    config.oauth.redirectSignOut
-  }&state=random_string`;
 };
 
 export const getDecodedAccessToken = (token: string) => {
@@ -384,7 +371,7 @@ export const getPath = () => {
         ? window.location.pathname.slice(0, pos + 5)
         : "";
   const cloudPath = import.meta.env.BASE_URL;
-  return config.isCloud == "true" ? cloudPath : path;
+  return config.isCloud == "true" ? path : path;
 };
 
 export const routeGuard = async (to: any, from: any, next: any) => {
@@ -977,32 +964,34 @@ export const deepCopy = (value: any) => {
   return JSON.parse(JSON.stringify(value));
 };
 
-export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
+export const getWebSocketUrl = (
+  request_id: string,
+  org_identifier: string,
+  apiEndPoint: string,
+) => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
+  return `${protocol}//${apiEndPoint.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
 };
 
-export const isWebSocketEnabled = () => {
-  if (!store.state.zoConfig?.websocket_enabled) {
+export const isWebSocketEnabled = (data: any) => {
+  if (!data.zoConfig?.websocket_enabled) {
     return false;
   }
 
   if ((window as any).use_web_socket === undefined) {
-    return store?.state?.organizationData?.organizationSettings
-      ?.enable_websocket_search;
+    return data.organizationData?.organizationSettings?.enable_websocket_search;
   } else {
     return (window as any).use_web_socket;
   }
 };
 
-export const isStreamingEnabled = () => {
-  if (!store.state.zoConfig?.streaming_enabled) {
+export const isStreamingEnabled = (data: any) => {
+  if (!data.zoConfig?.streaming_enabled) {
     return false;
   }
 
   if ((window as any).use_streaming === undefined) {
-    return store?.state?.organizationData?.organizationSettings
-      ?.enable_streaming_search;
+    return data.organizationData?.organizationSettings?.enable_streaming_search;
   } else {
     return (window as any).use_streaming;
   }

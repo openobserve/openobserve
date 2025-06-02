@@ -14,13 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
         search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
     },
-    router::{INGESTER_ROUTES, is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
+    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body, is_ws_route},
     utils::{json, rand::get_rand_element},
 };
 use actix_web::{
@@ -147,6 +147,26 @@ async fn dispatch(
         .map(|x| x.as_str())
         .unwrap_or("")
         .to_string();
+
+    // HACK: node list api need return by itself
+    if path.contains("/api/_meta/node/list") {
+        let query =
+            web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
+                .ok()
+                .map(|x| x.into_inner())
+                .unwrap_or_default();
+        return crate::handler::http::request::organization::org::node_list_impl(
+            META_ORG_ID,
+            query,
+        )
+        .await
+        .map_err(|e| {
+            Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                format!("Failed to parse node list request: {:?}", e).as_str(),
+            )))
+        });
+    }
+
     let new_url = get_url(&path).await;
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable()
@@ -155,12 +175,7 @@ async fn dispatch(
     }
 
     // check if the request is a websocket request
-    let path_columns: Vec<&str> = path.split('/').collect();
-    if *path_columns.get(3).unwrap_or(&"") == "ws"
-        && INGESTER_ROUTES
-            .iter()
-            .all(|ingest_route| !path.ends_with(ingest_route))
-    {
+    if is_ws_route(&path) {
         return proxy_ws(req, payload, start).await;
     }
 
@@ -262,38 +277,40 @@ async fn default_proxy(
         }
     }
 
-    let http_response =
-        if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
-            // Add headers to disable response buffering
-            new_resp
-                .insert_header((header::CACHE_CONTROL, "no-cache"))
-                .insert_header((
-                    header::CONNECTION,
-                    header::HeaderValue::from_static("keep-alive"),
-                ))
-                .streaming(resp.take_payload())
-        } else {
-            let body = match resp
-                .body()
-                .limit(get_config().limit.req_payload_limit)
-                .await
-            {
-                Ok(b) => b,
-                Err(e) => {
-                    log::error!(
-                        "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                        new_url.path,
-                        new_url.node_addr,
-                        e,
-                        start.elapsed().as_millis()
-                    );
-                    return Ok(HttpResponse::ServiceUnavailable()
-                        .force_close()
-                        .body(e.to_string()));
-                }
-            };
-            new_resp.body(body)
+    let http_response = if query_str.ends_with("/_search_stream")
+        || query_str.ends_with("/_values_stream")
+        || query_str.ends_with("/ai/chat_stream")
+    {
+        // Add headers to disable response buffering
+        new_resp
+            .insert_header((header::CACHE_CONTROL, "no-cache"))
+            .insert_header((
+                header::CONNECTION,
+                header::HeaderValue::from_static("keep-alive"),
+            ))
+            .streaming(resp.take_payload())
+    } else {
+        let body = match resp
+            .body()
+            .limit(get_config().limit.req_payload_limit)
+            .await
+        {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!(
+                    "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                    new_url.path,
+                    new_url.node_addr,
+                    e,
+                    start.elapsed().as_millis()
+                );
+                return Ok(HttpResponse::ServiceUnavailable()
+                    .force_close()
+                    .body(e.to_string()));
+            }
         };
+        new_resp.body(body)
+    };
     Ok(http_response)
 }
 
@@ -448,38 +465,40 @@ async fn proxy_querier_by_body(
         }
     }
 
-    let http_response =
-        if query_str.ends_with("/_search_stream") || query_str.ends_with("/_values_stream") {
-            // Add headers to disable response buffering
-            new_resp
-                .insert_header((header::CACHE_CONTROL, "no-cache"))
-                .insert_header((
-                    header::CONNECTION,
-                    header::HeaderValue::from_static("keep-alive"),
-                ))
-                .streaming(resp.take_payload())
-        } else {
-            let body = match resp
-                .body()
-                .limit(get_config().limit.req_payload_limit)
-                .await
-            {
-                Ok(b) => b,
-                Err(e) => {
-                    log::error!(
-                        "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
-                        new_url.path,
-                        new_url.node_addr,
-                        e,
-                        start.elapsed().as_millis()
-                    );
-                    return Ok(HttpResponse::ServiceUnavailable()
-                        .force_close()
-                        .body(e.to_string()));
-                }
-            };
-            new_resp.body(body)
+    let http_response = if query_str.ends_with("/_search_stream")
+        || query_str.ends_with("/_values_stream")
+        || query_str.ends_with("/ai/chat_stream")
+    {
+        // Add headers to disable response buffering
+        new_resp
+            .insert_header((header::CACHE_CONTROL, "no-cache"))
+            .insert_header((
+                header::CONNECTION,
+                header::HeaderValue::from_static("keep-alive"),
+            ))
+            .streaming(resp.take_payload())
+    } else {
+        let body = match resp
+            .body()
+            .limit(get_config().limit.req_payload_limit)
+            .await
+        {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!(
+                    "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
+                    new_url.path,
+                    new_url.node_addr,
+                    e,
+                    start.elapsed().as_millis()
+                );
+                return Ok(HttpResponse::ServiceUnavailable()
+                    .force_close()
+                    .body(e.to_string()));
+            }
         };
+        new_resp.body(body)
+    };
     Ok(http_response)
 }
 

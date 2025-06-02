@@ -45,11 +45,12 @@ message FileList {
 }
 
 message FileKey {
-    string         key         = 1;
-    FileMeta       meta        = 2;
-    bool           deleted     = 3;
-    optional bytes segment_ids = 4;
-    string         account     = 5;
+    int64          id          = 1;
+    string         account     = 2;
+    string         key         = 3;
+    FileMeta       meta        = 4;
+    bool           deleted     = 5;
+    optional bytes segment_ids = 6;
 }
 
 message IdxFileName {

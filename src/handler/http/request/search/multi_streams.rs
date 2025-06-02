@@ -20,7 +20,7 @@ use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        function::VRLResultResolver,
+        function::{RESULT_ARRAY, VRLResultResolver},
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
@@ -223,14 +223,14 @@ pub async fn search_multi(
         {
             use o2_openfga::meta::mapping::OFGA_MODELS;
 
-            use crate::common::{
-                infra::config::USERS,
-                utils::auth::{AuthExtractor, is_root_user},
+            use crate::{
+                common::utils::auth::{AuthExtractor, is_root_user},
+                service::users::get_user,
             };
 
             if !is_root_user(user_id) {
-                let user: meta::user::User =
-                    USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
+                let user: config::meta::user::User =
+                    get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.as_str();
 
                 if !crate::handler::http::auth::validator::check_permissions(
@@ -271,8 +271,8 @@ pub async fn search_multi(
             // Check permissions on keys
             for key in keys_used {
                 if !is_root_user(user_id) {
-                    let user: meta::user::User =
-                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+                    let user: config::meta::user::User =
+                        get_user(Some(&org_id), user_id).await.unwrap();
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         user_id,
@@ -464,11 +464,9 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
-        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = SearchService::RESULT_ARRAY
-                .replace(&input_fn, "")
-                .to_string();
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {

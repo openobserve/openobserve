@@ -40,7 +40,7 @@ use {
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
-        infra::config::get_config as get_o2_config,
+        config::get_config as get_o2_config,
     },
 };
 
@@ -86,6 +86,7 @@ async fn audit_middleware(
     if get_o2_config().common.audit_enabled
         && !(path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
         || path_columns.get(1).unwrap_or(&"").to_string().ends_with("_stream") // skip for http2 streams
+        || path.ends_with("ai/chat_stream") // skip for ai
         || (method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1])))
     {
         let query_params = req.query_string().to_string();
@@ -243,6 +244,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     svc.service(status::healthz)
         .service(status::healthz_head)
         .service(status::schedulez);
+
+    #[cfg(feature = "cloud")]
+    svc.service(web::scope("/webhook").service(billings::handle_stripe_event));
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -261,7 +266,8 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(status::enable_node)
             .service(status::flush_node)
             .service(status::list_node)
-            .service(status::node_metrics),
+            .service(status::node_metrics)
+            .service(status::consistent_hash),
     );
 
     if get_config().common.swagger_enabled {
@@ -371,6 +377,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
+        .service(users::list_invitations)
+        .service(users::list_roles)
         .service(organization::org::organizations)
         .service(organization::settings::get)
         .service(organization::settings::create)
@@ -525,6 +533,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(logs::ingest::handle_gcp_request)
         .service(organization::org::create_org)
         .service(authz::fga::create_role)
+        .service(organization::org::rename_org)
         .service(authz::fga::get_roles)
         .service(authz::fga::update_role)
         .service(authz::fga::get_role_permissions)
@@ -534,6 +543,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(authz::fga::get_group_details)
         .service(authz::fga::get_resources)
         .service(authz::fga::get_users_with_role)
+        .service(authz::fga::get_roles_for_user)
+        .service(authz::fga::get_groups_for_user)
         .service(authz::fga::delete_role)
         .service(authz::fga::delete_group)
         .service(users::list_roles)
@@ -584,7 +595,23 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::list_role_ratelimit)
         .service(ratelimit::update_ratelimit)
         .service(ratelimit::api_modules)
-        .service(actions::operations::test_action);
+        .service(actions::operations::test_action)
+        .service(ai::chat)
+        .service(ai::chat_stream);
+
+    #[cfg(feature = "cloud")]
+    let service = service
+        .service(organization::org::get_org_invites)
+        .service(organization::org::generate_org_invite)
+        .service(organization::org::accept_org_invite)
+        .service(billings::create_checkout_session)
+        .service(billings::process_session_detail)
+        .service(billings::list_subscription)
+        .service(billings::list_invoices)
+        .service(billings::unsubscribe)
+        .service(billings::create_billing_portal_session)
+        .service(billings::org_usage::get_org_quota_threshold)
+        .service(billings::org_usage::get_org_usage);
 
     svc.service(service);
 }

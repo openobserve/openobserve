@@ -70,6 +70,7 @@ impl TriggerCondition {
         freq_in_secs: bool,
         timezone_offset: i32,
         apply_silence: bool,
+        start_from: Option<i64>,
     ) -> Result<i64, anyhow::Error> {
         let frequency = if freq_in_secs {
             self.frequency
@@ -84,11 +85,16 @@ impl TriggerCondition {
             }
             _ => 0,
         };
+        let start_utc = start_from.map_or(Ok(Utc::now()), |from| {
+            chrono::DateTime::<Utc>::from_timestamp_micros(from).ok_or(anyhow::anyhow!(
+                "Error converting start_from value to timestamp"
+            ))
+        })?;
         let timezone_offset = FixedOffset::east_opt(timezone_offset * 60).unwrap();
         if self.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&self.cron)?;
             if apply_silence {
-                let silence = Utc::now() + Duration::try_minutes(self.silence).unwrap();
+                let silence = start_utc + Duration::try_minutes(self.silence).unwrap();
                 let silence = silence.with_timezone(&timezone_offset);
                 // Check for the cron timestamp after the silence period
                 Ok(schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance)
@@ -110,14 +116,14 @@ impl TriggerCondition {
             // should use the max of (frequency, silence) as the next_run_at.
             // Silence period is in minutes, and the frequency is in seconds.
             let delta = std::cmp::max(frequency, self.silence * 60);
-            Ok(Utc::now().timestamp_micros()
+            Ok(start_utc.timestamp_micros()
                 + Duration::try_seconds(delta)
                     .unwrap()
                     .num_microseconds()
                     .unwrap()
                 + tolerance)
         } else {
-            Ok(Utc::now().timestamp_micros()
+            Ok(start_utc.timestamp_micros()
                 + Duration::try_seconds(frequency)
                     .unwrap()
                     .num_microseconds()
@@ -142,7 +148,10 @@ impl TriggerCondition {
             .with_timezone(&timezone);
 
         // Convert frequency from seconds to minutes
-        let frequency_minutes = frequency / 60;
+        let mut frequency_minutes = frequency / 60;
+        if frequency_minutes == 0 {
+            frequency_minutes = 1;
+        }
 
         // Get the minute and second of the next_run_at time
         let minute = dt.minute() as i64;
@@ -180,9 +189,14 @@ impl TriggerCondition {
         freq_in_secs: bool,
         timezone_offset: i32,
         apply_silence: bool,
+        start_from: Option<i64>,
     ) -> Result<i64, anyhow::Error> {
-        let next_run_at =
-            self.get_next_trigger_time_non_aligned(freq_in_secs, timezone_offset, apply_silence)?;
+        let next_run_at = self.get_next_trigger_time_non_aligned(
+            freq_in_secs,
+            timezone_offset,
+            apply_silence,
+            start_from,
+        )?;
         // Cron frequency is handled by the cron library, so we don't need to align it
         if self.frequency_type != FrequencyType::Cron {
             // `align_time` expects frequency in seconds, so convert if necessary
@@ -202,11 +216,22 @@ impl TriggerCondition {
         freq_in_secs: bool,
         timezone_offset: i32,
         apply_silence: bool,
+        start_from: Option<i64>,
     ) -> Result<i64, anyhow::Error> {
         if self.align_time {
-            self.get_aligned_next_trigger_time(freq_in_secs, timezone_offset, apply_silence)
+            self.get_aligned_next_trigger_time(
+                freq_in_secs,
+                timezone_offset,
+                apply_silence,
+                start_from,
+            )
         } else {
-            self.get_next_trigger_time_non_aligned(freq_in_secs, timezone_offset, apply_silence)
+            self.get_next_trigger_time_non_aligned(
+                freq_in_secs,
+                timezone_offset,
+                apply_silence,
+                start_from,
+            )
         }
     }
 }
@@ -592,7 +617,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time_non_aligned(true, 0, false)
+            .get_next_trigger_time_non_aligned(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         let after_5_minutes = Utc::now() + Duration::minutes(5);
@@ -606,7 +631,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time_non_aligned(true, 0, false)
+            .get_next_trigger_time_non_aligned(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         assert_eq!(dt.minute() % 5, 0);
@@ -619,7 +644,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time_non_aligned(true, 0, true)
+            .get_next_trigger_time_non_aligned(true, 0, true, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         // The next trigger should be after the silence period
@@ -634,7 +659,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time_non_aligned(true, 0, false)
+            .get_next_trigger_time_non_aligned(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         // The next trigger should be within the tolerance range
@@ -656,7 +681,7 @@ mod test {
 
         // Mock the current time for testing
         let result = condition
-            .get_aligned_next_trigger_time(true, 0, false)
+            .get_aligned_next_trigger_time(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
 
@@ -679,7 +704,7 @@ mod test {
         // For cron expressions, the time should not be aligned by our function
         // as it's handled by the cron library
         let result = condition
-            .get_aligned_next_trigger_time(true, 0, false)
+            .get_aligned_next_trigger_time(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
 

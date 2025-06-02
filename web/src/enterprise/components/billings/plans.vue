@@ -22,19 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <q-btn
-          v-if="listSubscriptionResponse.hasOwnProperty('card')"
+          v-if="currentPlanDetail?.customer_id"
           class="q-ml-md q-mb-xs text-bold"
           outline
           padding="sm lg"
           color="white"
           text-color="black"
           no-caps
-          :label="t('billing.manageCards')"
-          @click="
-            onChangePaymentDetail(
-              listSubscriptionResponse.card.gateway_account_id
-            )
-          "
+          :label="t('billing.manageSubscription')"
+          @click="onChangePaymentDetail(currentPlanDetail.customer_id)"
         />
       </div>
     </div>
@@ -69,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :freeLoading="freeLoading"
         :proLoading="proLoading"
         @update:freeSubscription="subscribeFreePlan"
-        @update:proSubscription="onLoadSubscription('pro')"
-        @update:businessSubscription="onLoadSubscription('business')"
+        @update:proSubscription="onLoadSubscription(config.paidPlan)"
+        @update:businessSubscription="onLoadSubscription(config.enterprisePlan)"
       ></plan-card>
     </div>
 
@@ -79,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="width: 500px">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-body1 text-weight-medium">
-            {{ t("billing.manageCards") }}
+            {{ t("billing.manageSubscription") }}
           </div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup="true" />
@@ -175,17 +171,14 @@ export default defineComponent({
     PlanCard,
   },
   emits: ["update:freeSubscription", "update:proSubscription"],
-  mounted() {
+  async mounted() {
     this.loading = true;
-    this.loadSubscription();
+    await this.loadSubscription();
   },
   methods: {
     subscribeFreePlan() {
-      if (
-        this.currentPlanDetail.CustomerBillingObj.subscription_type ==
-        config.freePlan
-      ) {
-        this.onLoadSubscription("Developer");
+      if (this.currentPlanDetail.subscription_type == config.freePlan) {
+        this.onLoadSubscription(config.freePlan);
       } else {
         this.confirm_downgrade_subscription = true;
       }
@@ -194,10 +187,10 @@ export default defineComponent({
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
         BillingService.resume_subscription(
-          this.store.state.selectedOrganization.identifier
+          this.store.state.selectedOrganization.identifier,
         )
-          .then((res) => {
-            this.loadSubscription(true);
+          .then(async (res) => {
+            await this.loadSubscription(true);
           })
           .catch((e) => {
             this.proLoading = false;
@@ -210,17 +203,10 @@ export default defineComponent({
       } else {
         BillingService.get_hosted_url(
           this.store.state.selectedOrganization.identifier,
-          convertToTitleCase(planType)
+          planType,
         )
           .then((res) => {
-            console.log(res);
-            // alert(res.data.data.url)
-            window.location.href = res.data.data.url;
-            // this.isActiveSubscription = false;
-            // this.subScribePlan = true;
-            // this.hostedResponse = res.data.data.url;
-            // setInterval(this.retrieveHostedPage, 5000);
-            // this.loadSubscription(true);
+            window.location.href = res.data.url;
           })
           .catch((e) => {
             this.$q.notify({
@@ -231,173 +217,108 @@ export default defineComponent({
           });
       }
     },
-    onUnsubscribe() {
+    async onUnsubscribe() {
       this.freeLoading = true;
       BillingService.unsubscribe(
-        this.store.state.selectedOrganization.identifier
-      )
-        .then((res) => {
-          this.loadSubscription();
-          this.$router.go(0);
-        })
-        .catch((e) => {
-          this.freeLoading = false;
-          this.$q.notify({
-            type: "negative",
-            message: e.message,
-            timeout: 5000,
-          });
-        });
-    },
-    onChangePaymentDetail(gatewayId: string) {
-      this.changePayment = true;
-      BillingService.change_payment_detail(
         this.store.state.selectedOrganization.identifier,
-        gatewayId
       )
-        .then((res) => {
-          this.updatePaymentResponse = res.data.data.hosted_page;
-          setInterval(this.retrieveHostedPage, 5000);
-        })
-        .catch((e) => {
-          this.$q.notify({
-            type: "negative",
-            message: e.message,
-            timeout: 5000,
-          });
-        });
-    },
-    loadSubscription(fromPro = false) {
-      BillingService.list_subscription(
-        this.store.state.selectedOrganization.identifier
-      )
-        .then((res) => {
-          this.currentPlanDetail = res.data.data;
-
-          if (
-            res.data.data.CustomerBillingObj.customer_id !== "" &&
-            res.data.data.CustomerBillingObj.customer_id !== null
-          ) {
-            if (
-              res.data.data.CustomerBillingObj.subscription_type ==
-              "professional-USD-Monthly"
-            ) {
-              this.planType = "pro";
-              const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = "professional-USD-Monthly";
-              useLocalOrganization(localOrg.value);
-              this.store.dispatch("setSelectedOrganization", localOrg.value);
-              this.store.dispatch("setQuotaThresholdMsg", "");
-            } else if (
-              res.data.data.CustomerBillingObj.subscription_type ==
-              config.freePlan
-            ) {
-              this.planType = "basic";
-              const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = config.freePlan;
-              useLocalOrganization(localOrg.value);
-              this.store.dispatch("setSelectedOrganization", localOrg.value);
-            } else if (
-              res.data.data.CustomerBillingObj.subscription_type ==
-              "business-USD-Monthly"
-            ) {
-              this.planType = "business";
-              const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = "professional-USD-Monthly";
-              useLocalOrganization(localOrg.value);
-              this.store.dispatch("setSelectedOrganization", localOrg.value);
-              this.store.dispatch("setQuotaThresholdMsg", "");
-            }
-          } else {
+        .then(async (res: any) => {
+          if(res.status == 200){
             this.$q.notify({
-              type: "warning",
-              message: "Please subscribe to one of the plan.",
+              type: "positive",
+              message: res.data,
               timeout: 5000,
             });
-          }
-          // this.listSubscriptionResponse = res.data.data;
-          // this.listSubscriptionResponse.subscription.current_term_end =
-          //   date.formatDate(
-          //     Math.floor(
-          //       this.listSubscriptionResponse.subscription.current_term_end *
-          //         1000
-          //     ),
-          //     "MMM DD, YYYY"
-          //   );
-          // this.listSubscriptionResponse.subscription.current_term_start =
-          //   date.formatDate(
-          //     Math.floor(
-          //       this.listSubscriptionResponse.subscription.current_term_start *
-          //         1000
-          //     ),
-          //     "MMM DD, YYYY"
-          //   );
-          // res.data.data.subscription.subscription_items.forEach(
-          //   (element: any) => {
-          //     if (element.item_price_id == "professional-USD-Monthly") {
-          //       this.isProPlan = true;
-          //       const localOrg: any = useLocalOrganization();
-          //       localOrg.value.subscription_type = "professional-USD-Monthly";
-          //       useLocalOrganization(localOrg.value);
-          //       this.store.dispatch("setSelectedOrganization", localOrg.value);
-          //       this.store.dispatch("setQuotaThresholdMsg", "");
-          //     } else if (element.item_price_id == "Free-Plan-USD-Monthly") {
-          //       this.isProPlan = false;
-          //       const localOrg: any = useLocalOrganization();
-          //       localOrg.value.subscription_type = "Free-Plan-USD-Monthly";
-          //       useLocalOrganization(localOrg.value);
-          //       this.store.dispatch("setSelectedOrganization", localOrg.value);
-          //     }
-          //   }
-          // );
-          // if (
-          //   res.data.data.card &&
-          //   res.data.data.card.payment_source_id != ""
-          // ) {
-          //   this.isActiveSubscription = true;
-          // } else {
-          //   BillingService.get_hosted_url(
-          //     this.store.state.selectedOrganization.identifier
-          //   )
-          //     .then((res) => {
-          //       this.hostedResponse = res.data.data.hosted_page;
-          //       setInterval(this.retrieveHostedPage, 5000);
-          //     })
-          //     .catch((e) => {
-          //       this.$q.notify({
-          //         type: "negative",
-          //         message: e.message,
-          //         timeout: 5000,
-          //       });
-          //     });
-          // }
-          this.loading = false;
-          this.freeLoading = false;
-          this.proLoading = false;
-          this.$router.push({
-            name: "plans",
-            query: { update_org: Date.now() },
-          });
-          // if (
-          //   fromPro &&
-          //   !this.isActiveSubscription &&
-          //   !this.isProPlan &&
-          //   this.hostedResponse.url
-          // ) {
-          //   this.subScribePlan = true;
-          // }
+            await this.loadSubscription();
+            setTimeout(() => {
+              this.$router.go(0);
+            }, 1000);
+            }
         })
         .catch((e) => {
-          this.loading = false;
           this.freeLoading = false;
-          this.proLoading = false;
-
           this.$q.notify({
             type: "negative",
             message: e.message,
             timeout: 5000,
           });
         });
+    },
+    onChangePaymentDetail(customer_id: string) {
+      BillingService.get_session_url(
+        this.store.state.selectedOrganization.identifier,
+        customer_id,
+      )
+        .then((res) => {
+          // this.updatePaymentResponse = res.data.data.url;
+          // setInterval(this.retrieveHostedPage, 5000);
+          if (res.data?.url) {
+            window.location.href = res.data.url;
+          }
+        })
+        .catch((e) => {
+          this.$q.notify({
+            type: "negative",
+            message: e.message,
+            timeout: 5000,
+          });
+        });
+    },
+   async loadSubscription(fromPro = false) {
+    try{
+      const res = await BillingService.list_subscription(this.store.state.selectedOrganization.identifier);
+        this.currentPlanDetail = res.data;
+
+        if (res.data.subscription_type !== "") {
+          if (res.data.subscription_type == config.paidPlan) {
+            this.planType = config.paidPlan;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = config.paidPlan;
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+            this.store.dispatch("setQuotaThresholdMsg", "");
+          } else if (res.data.subscription_type == config.freePlan) {
+            this.planType = config.freePlan;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = config.freePlan;
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+          } else if (res.data.subscription_type == config.enterprisePlan) {
+            this.planType = config.enterprisePlan;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = config.enterprisePlan;
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+            this.store.dispatch("setQuotaThresholdMsg", "");
+          }
+        } else {
+          this.$q.notify({
+            type: "warning",
+            message: "Please subscribe to one of the plan.",
+            timeout: 5000,
+          });
+        }
+        this.loading = false;
+        this.freeLoading = false;
+        this.proLoading = false;
+        this.$router.push({
+          name: "plans",
+          query: {
+            update_org: Date.now(),
+            org_identifier: this.store.state.selectedOrganization.identifier,
+          },
+        });
+    } catch (e: any) {
+      this.loading = false;
+      this.freeLoading = false;
+      this.proLoading = false;
+
+      this.$q.notify({
+        type: "negative",
+        message: e.message,
+        timeout: 5000,
+      });
+    }
     },
   },
   setup() {
@@ -423,7 +344,7 @@ export default defineComponent({
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
         store.state.selectedOrganization.identifier,
-        hostedResponse.value.id
+        hostedResponse.value.id,
       ).then((res) => {
         if (res.data.data.hosted_page.state == "succeeded") {
           window.location.reload();
@@ -435,6 +356,7 @@ export default defineComponent({
     return {
       t,
       store,
+      config,
       frmPayment,
       planType,
       isActiveSubscription,

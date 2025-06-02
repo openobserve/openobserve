@@ -22,7 +22,7 @@ use infra::{
     table::distinct_values::{DistinctFieldRecord, OriginType},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config;
+use o2_enterprise::enterprise::common::config::get_config;
 
 pub async fn add(record: DistinctFieldRecord) -> Result<(), errors::Error> {
     #[cfg(feature = "enterprise")]

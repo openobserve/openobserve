@@ -328,6 +328,7 @@ async fn prepare_files(
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(
+            0,
             "".to_string(), // here we don't need it
             file_key.clone(),
             parquet_meta,
@@ -536,8 +537,9 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await;
-        if let Err(e) = ret {
+        if let Err(e) =
+            db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
+        {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
                 new_file_name,
@@ -1574,6 +1576,9 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
     }
     for field in index_fields.iter() {
+        if field == TIMESTAMP_COL_NAME {
+            continue;
+        }
         let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)
@@ -1582,6 +1587,8 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         );
         tantivy_schema_builder.add_text_field(field, index_opts);
     }
+    // add _timestamp field to tantivy schema
+    tantivy_schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
     let tantivy_schema = tantivy_schema_builder.build();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
@@ -1636,6 +1643,32 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 for (i, doc) in docs.iter_mut().enumerate() {
                     doc.add_text(field, column_data.value(i));
                     tokio::task::coop::consume_budget().await;
+                }
+            }
+
+            // process _timestamp field
+            let column_data = match inverted_idx_batch.column_by_name(TIMESTAMP_COL_NAME) {
+                Some(column_data) => match column_data.as_any().downcast_ref::<Int64Array>() {
+                    Some(column_data) => column_data,
+                    None => {
+                        // generate empty array to ensure the tantivy and parquet have same rows
+                        &Int64Array::from(vec![0; num_rows])
+                    }
+                },
+                None => {
+                    // generate empty array to ensure the tantivy and parquet have same rows
+                    &Int64Array::from(vec![0; num_rows])
+                }
+            };
+            let ts_field = tantivy_schema.get_field(TIMESTAMP_COL_NAME).unwrap(); // unwrap directly since added above
+            const YIELD_THRESHOLD: usize = 100;
+            let mut batch_size = 0;
+            for (i, doc) in docs.iter_mut().enumerate() {
+                doc.add_i64(ts_field, column_data.value(i));
+                batch_size += 1;
+                if batch_size >= YIELD_THRESHOLD {
+                    tokio::task::coop::consume_budget().await;
+                    batch_size = 0;
                 }
             }
 

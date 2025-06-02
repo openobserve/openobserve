@@ -27,7 +27,7 @@ use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
-    infra::config::get_config as get_o2_config,
+    config::get_config as get_o2_config,
 };
 use rand::prelude::SliceRandom;
 use tracing::Instrument;
@@ -427,7 +427,7 @@ pub async fn handle_text_message(user_id: &str, req_id: &str, msg: String, path:
                         return;
                     };
 
-                    log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id,);
+                    log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id);
 
                     let res = handle_cancel(&trace_id, &org_id).await;
                     let _ = send_message(req_id, res.to_json()).await;

@@ -1481,6 +1481,8 @@ export default defineComponent({
             __value: Array.isArray(drilldownParams[0].value)
               ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
               : drilldownParams[0].value,
+            __axisValue:
+              drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
           };
         }
 
