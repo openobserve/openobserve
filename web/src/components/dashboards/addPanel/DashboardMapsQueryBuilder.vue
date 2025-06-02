@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.name.column,
+              ].fields?.name,
               'name',
             )
           "
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value_for_maps.column,
+              ].fields?.value_for_maps,
               'value_for_maps',
             )
           "
@@ -258,7 +258,7 @@ import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFilters
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
-
+import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
@@ -272,6 +272,8 @@ export default defineComponent({
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();
+    const { showErrorNotification } = useNotifications();
+
     const $q = useQuasar();
     const expansionItems = reactive({
       name: true,
@@ -332,6 +334,7 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string) => {
+      e.stopPropagation();
       // move the items  between axis or from the field list
       // check if the source is from axis or field list
       if (dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
@@ -356,56 +359,58 @@ export default defineComponent({
         // move the item from field list to axis
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-        const dragName =
-          dashboardPanelData.meta.stream.selectedStreamFields.find(
-            (item: any) => item?.name === dragElement,
-          );
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement,
-          );
+        const currentQueryField =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields;
+        if (targetAxis !== "f") {
+          if (
+            (targetAxis === "name" && currentQueryField.name) ||
+            (targetAxis === "value_for_maps" &&
+              currentQueryField.value_for_maps)
+          ) {
+            const maxAllowedAxisFields = 1;
 
-        if (dragName || customDragName) {
-          const currentQueryField =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields;
-          if (targetAxis !== "f") {
-            if (
-              (targetAxis === "name" && currentQueryField.name) ||
-              (targetAxis === "value_for_maps" &&
-                currentQueryField.value_for_maps)
-            ) {
-              const maxAllowedAxisFields = 1;
+            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
 
-              const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            showErrorNotification(errorMessage);
+            cleanupDraggingFields();
+            return;
+          }
 
-              $q.notify({
-                type: "negative",
-                message: errorMessage,
-                timeout: 5000,
-              });
-              cleanupDraggingFields();
-              return;
-            }
-
-            // Remove from the original axis
-            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-            if (dragSource === "name") {
-              removeMapName();
-            } else if (dragSource === "value_for_maps") {
-              removeMapValue();
-            }
+          // Remove from the original axis
+          const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+          if (dragSource === "name") {
+            removeMapName();
+          } else if (dragSource === "value_for_maps") {
+            removeMapValue();
           }
         }
         if (targetAxis === "f") {
           return;
         }
+
+        // find first arg which is of type field
+        const firstFieldTypeArg = dragElement?.args?.find(
+          (arg: any) => arg?.type === "field",
+        )?.value;
+
+        if (!firstFieldTypeArg) {
+          showErrorNotification("Without field, not able to drag");
+          cleanupDraggingFields();
+          return;
+        }
+
+        const fieldObj = {
+          name: firstFieldTypeArg.field,
+          streamAlias: firstFieldTypeArg.streamAlias,
+        };
+
         // Add to the new axis
         if (targetAxis === "name") {
-          addMapName(dragName || customDragName);
+          addMapName(fieldObj);
         } else if (targetAxis === "value_for_maps") {
-          addMapValue(dragName || customDragName);
+          addMapValue(fieldObj);
         }
       }
 
