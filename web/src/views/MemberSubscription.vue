@@ -71,8 +71,10 @@ export default defineComponent({
     };
   },
   created() {
-    const propArr = this.$route.hash.split("=");
-    this.ProcessSubscription(propArr[1], "confirm");
+    const propArr = this.$route.hash.substring(1);
+    const params = new URLSearchParams(propArr);
+    const sub_key = params.get("sub_key");
+    this.ProcessSubscription(sub_key, "confirm");
   },
   methods: {
     async ProcessSubscription(s: any, action: string) {
