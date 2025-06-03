@@ -124,28 +124,28 @@ export default class DashboardSetting {
     await this.page.locator('[data-test="dashboard-add-cancel"]').click();
   }
 
-  // async saveEditedtab() {
-  //   await this.page
-  //     .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
-  //     .click();
-  // }
   async saveEditedtab() {
-    const saveBtn = this.page.locator(
-      '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
-    );
-    // await expect(saveBtn).toBeVisible({ timeout: 3000 });
-
-    // Retry click if DOM re-renders
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        await saveBtn.click({ timeout: 3000 });
-        break;
-      } catch (e) {
-        if (attempt === 2) throw e; // rethrow on final attempt
-        await this.page.waitForTimeout(500); // wait before retry
-      }
-    }
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
+      .click();
   }
+  // async saveEditedtab() {
+  //   const saveBtn = this.page.locator(
+  //     '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
+  //   );
+  //   // await expect(saveBtn).toBeVisible({ timeout: 3000 });
+
+  //   // Retry click if DOM re-renders
+  //   for (let attempt = 0; attempt < 3; attempt++) {
+  //     try {
+  //       await saveBtn.click({ timeout: 3000 });
+  //       break;
+  //     } catch (e) {
+  //       if (attempt === 2) throw e; // rethrow on final attempt
+  //       await this.page.waitForTimeout(500); // wait before retry
+  //     }
+  //   }
+  // }
 
   async cancelEditedtab() {
     await this.page

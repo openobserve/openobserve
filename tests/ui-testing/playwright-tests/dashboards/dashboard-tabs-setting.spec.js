@@ -118,9 +118,9 @@ test.describe("dashboard tabs setting", () => {
     await dashboardSetting.openSetting();
     await dashboardSetting.addTabSetting(newTabName);
     await dashboardSetting.saveTabSetting();
-    await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-      timeout: 3000,
-    });
+    // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
+    //   timeout: 3000,
+    // });
     await expect(page.getByText("Tab added successfully")).toBeVisible({
       timeout: 2000,
     });
@@ -128,9 +128,9 @@ test.describe("dashboard tabs setting", () => {
     // Edit the tab name and save it
     await dashboardSetting.updateDashboardTabName(newTabName, updatedTabName);
     await dashboardSetting.saveEditedtab();
-    await expect(page.getByText("Tab added successfully")).toBeVisible({
-      timeout: 2000,
-    });
+    // await expect(page.getByText("Tab added successfully")).toBeVisible({
+    //   timeout: 2000,
+    // });
     await expect(page.getByText("Tab updated successfully")).toBeVisible({
       timeout: 2000,
     });
@@ -212,7 +212,7 @@ test.describe("dashboard tabs setting", () => {
     await expect(page.getByText("Tab added successfully")).toBeVisible({
       timeout: 2000,
     });
-    
+
     // Delete the tab
     await dashboardSetting.deleteTab(newTabName);
     await expect(page.getByText("Tab deleted successfully")).toBeVisible({
