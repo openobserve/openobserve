@@ -96,7 +96,10 @@
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
                   <template v-slot:prepend>
-                    <q-icon name="event" />
+                    <q-icon
+                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
+                      padding="sm"
+                    />
                   </template>
                 </q-select>
 
@@ -216,6 +219,11 @@ import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/convertDataIntoUnitValue";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
+import {
+  symOutlinedFunction,
+  symOutlinedTitle,
+  symOutlined123,
+} from "@quasar/extras/material-symbols-outlined";
 
 export default {
   name: "SelectFunction",
@@ -470,6 +478,19 @@ export default {
       }
     };
 
+    const getIconBasedOnArgType = (type: string) => {
+      switch (type) {
+        case "field":
+          return symOutlinedFunction;
+        case "string":
+          return symOutlinedTitle;
+        case "number":
+          return symOutlined123;
+        case "histogramInterval":
+          return "bar_chart";
+      }
+    };
+
     return {
       fields,
       functionValidation,
@@ -489,6 +510,7 @@ export default {
       filterFunctionsOptions,
       onArgTypeChange,
       getAllSelectedStreams,
+      getIconBasedOnArgType,
     };
   },
 };

@@ -1100,10 +1100,6 @@
                         {
                             "label": "Field",
                             "value": "field"
-                        },
-                        {
-                            "label": "Array",
-                            "value": "array"
                         }
                     ],
                     "required": true
