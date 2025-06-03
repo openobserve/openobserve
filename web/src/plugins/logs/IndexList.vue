@@ -1423,10 +1423,11 @@ export default defineComponent({
       const fieldName = payload.queryReq?.field;
       const streamName = payload.queryReq?.stream_name;
 
-        if (response.type !== "search_response_hits") {
-          return;
-        }
+      if (response.type !== "search_response_hits") {
+        return;
+      }
 
+      try {
         // Initialize if not exists
         if (!fieldValues.value[fieldName]) {
           fieldValues.value[fieldName] = {
