@@ -1018,7 +1018,7 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     // await page.getByText("Error Loading Data").click();
     await expect(
-      page.getByText("Search SQL execute error").first()
+      page.getByText("Schema error: No field named controller. Valid fields are e2e_automate._timestamp, e2e_automate.kubernetes_container_name.").first()
     ).toBeVisible();
 
     await page
