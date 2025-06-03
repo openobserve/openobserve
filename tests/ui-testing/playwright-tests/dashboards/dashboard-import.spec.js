@@ -1,22 +1,10 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
-import importdata from "../../../test-data/dashboards-import.json";
-import importdata1 from "../../../test-data/dashboard1-import.json";
-import importdata2 from "../../../test-data/dashboard2-import.json";
-import importdata3 from "../../../test-data/dashboardV3-import.json";
-import importdata4 from "../../../test-data/dashboardAzure.json";
 import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
 import { waitForDashboardPage } from "../utils/dashCreation";
-
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 import DashboardImport from "../../pages/dashboardPages/dashboard.import.js";
-import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -35,11 +23,7 @@ test.describe("dashboard Import testcases", () => {
   });
 
   test("should import the dashbaord", async ({ page }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
     await dashboardPage.menuItem("dashboards-item");
@@ -71,13 +55,10 @@ test.describe("dashboard Import testcases", () => {
   test("Should auto-update the .json data at the correct location when the Dashboard title is added from the error validation dialog.", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
@@ -127,13 +108,10 @@ test.describe("dashboard Import testcases", () => {
   });
 
   test("should import the dashbaord using URL import", async ({ page }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
@@ -170,13 +148,10 @@ test.describe("dashboard Import testcases", () => {
   test("Should cancel the file upload action when clicking the Cancel button in the 'Drop your file' dialog", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
@@ -208,13 +183,10 @@ test.describe("dashboard Import testcases", () => {
   test("Should display an error validation message when clicking the Import button if the 'Title' field is missing in the .json data.", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
@@ -239,13 +211,10 @@ test.describe("dashboard Import testcases", () => {
   test("Should display an error validation message if the 'Stream type' field is missing in the .json data when clicking the Import button.", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
@@ -270,14 +239,10 @@ test.describe("dashboard Import testcases", () => {
   test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
-    const dashboardFolders = new DashboardFolder(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
@@ -338,19 +303,12 @@ test.describe("dashboard Import testcases", () => {
   test("Should import the Version 3 dashboard successfully", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
 
     await waitForDashboardPage(page);
-
-    await dashboardPage.menuItem("dashboards-item");
-
     await dashboardImport.clickImportDashboard();
 
     //file name to be used for import
@@ -370,13 +328,10 @@ test.describe("dashboard Import testcases", () => {
   });
 
   test("Should import the Azure dashboard without errors", async ({ page }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
@@ -408,13 +363,10 @@ test.describe("dashboard Import testcases", () => {
         errorMessage += msg.text() + "\n";
       }
     });
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
     const dashboardImport = new DashboardImport(page);
 
+    // Navigate to the dashboard page
     await dashboardPage.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
@@ -465,12 +417,11 @@ test.describe("dashboard Import testcases", () => {
       }
     });
 
-    const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
+
     const dashboardImport = new DashboardImport(page);
+
+    // Navigate to the dashboard page
 
     await dashboardPage.menuItem("dashboards-item");
 
