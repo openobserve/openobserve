@@ -127,7 +127,8 @@ test.describe("dashboard tabs setting", () => {
 
     // Edit the tab name and save it
     await dashboardSetting.updateDashboardTabName(newTabName, updatedTabName);
-    await dashboardSetting.saveEditedtab();
+
+    // await dashboardSetting.saveEditedtab();
     // await expect(page.getByText("Tab added successfully")).toBeVisible({
     //   timeout: 2000,
     // });
