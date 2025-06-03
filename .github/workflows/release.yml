@@ -199,10 +199,10 @@ jobs:
             aws s3 cp "$file" "s3://${BUCKET}/releases/${GITHUB_REF_NAME}/$(basename "$file")"
           done
 
-      # - name: Publish release
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     name: "Release ${{ github.ref_name }}"
-      #     generate_release_notes: true
-      #     files: |
-      #       **/openobserve-*
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ github.ref_name }}"
+          generate_release_notes: true
+          files: |
+            **/openobserve-*
