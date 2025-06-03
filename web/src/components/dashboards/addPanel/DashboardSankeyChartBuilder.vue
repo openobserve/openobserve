@@ -994,4 +994,14 @@ export default defineComponent({
 .q-field--dense .q-field__marginal {
   height: 34px;
 }
+
+.field-function-menu-popup {
+  width: 771px !important;
+  height: 323px;
+  border-radius: 4px;
+  border: 1px solid #d5d5d5;
+  background: #fff;
+  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+}
 </style>
