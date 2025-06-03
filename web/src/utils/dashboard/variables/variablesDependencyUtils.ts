@@ -6,7 +6,7 @@
  */
 const extractVariableNames = (
   str: string,
-  variableNames: Set<string>
+  variableNames: Set<string>,
 ): string[] => {
   const regex = /\$([a-zA-Z0-9_-]+)/g; // find all occurrences of $<variable_name>
   const names: string[] = [];
@@ -31,50 +31,88 @@ const extractVariableNames = (
  *  - parentVariables: list of variables that the key variable depends on
  *  - childVariables: list of variables that depend on the key variable
  */
+/**
+ * Extracts variable names from a string value
+ * @param value The string value to extract variable names from
+ * @param variablesList Set of all valid variable names
+ * @returns Array of extracted variable names
+ */
+
+/**
+ * Builds a dependency graph for variables
+ * @param variables Array of variable objects
+ * @returns Graph representation of variable dependencies
+ */
 export const buildVariablesDependencyGraph = (
-  variables: { name: string; type: string; query_data: any }[]
+  variables: {
+    name: string;
+    type?: string;
+    query_data?: any;
+    scope?: string;
+  }[],
 ) => {
-  let graph: any = {};
+  // Create a set of variable names for quick lookup
+  const variableNameSet = new Set(variables.map((variable) => variable.name));
 
-  // Create a set of variable names
-  let variablesNameList = new Set(
-    variables.map((variable: { name: string }) => variable.name)
-  );
+  // Initialize the graph with empty arrays and scope information
+  const graph: {
+    [key: string]: {
+      parentVariables: string[];
+      childVariables: string[];
+      scope: string;
+    };
+  } = {};
 
-  // Initialize the graph with empty arrays
-  for (let item of variables) {
-    // empty arrays for parent and child variables
-    graph[item.name] = {
+  // First pass: initialize the graph structure
+  variables.forEach((variable) => {
+    graph[variable.name] = {
       parentVariables: [],
       childVariables: [],
+      scope: variable.scope || "global", // Default to global scope if not specified
     };
-  }
+  });
 
-  // Populate the graph
-  for (let item of variables) {
-    let name = item.name;
-    if (item.type == "query_values") {
-      for (let filter of item?.query_data?.filter ?? []) {
-        let dependencies = extractVariableNames(
+  // Second pass: build the dependency relationships
+  variables.forEach((variable) => {
+    const name = variable.name;
+
+    // Handle query_values type specifically
+    if (variable.type === "query_values") {
+      // Process filters if they exist
+      (variable.query_data?.filter || []).forEach((filter: any) => {
+        const dependencies = extractVariableNames(
           filter.value,
-          variablesNameList
+          variableNameSet,
         );
-        // loop on all dependencies and append them as child
-        dependencies.forEach((dep: any) => {
-          graph[dep].childVariables.push(name);
-        });
 
-        // append all dependencies as parent
+        // Add parent dependencies to current variable
         graph[name].parentVariables.push(...dependencies);
-      }
+
+        // Add current variable as child to all dependencies
+        dependencies.forEach((dep) => {
+          if (graph[dep]) {
+            graph[dep].childVariables.push(name);
+          }
+        });
+      });
     } else {
-      // no dependencies for non query_values variables
-      graph[item.name] = {
-        parentVariables: [],
-        childVariables: [],
-      };
+      // For other types, check if there are filters to process
+      if (variable.query_data?.filter) {
+        variable.query_data.filter.forEach((filter: any) => {
+          if (
+            typeof filter.value === "string" &&
+            filter.value.startsWith("$")
+          ) {
+            const parentName = filter.value.substring(1);
+            if (graph[parentName]) {
+              graph[name].parentVariables.push(parentName);
+              graph[parentName].childVariables.push(name);
+            }
+          }
+        });
+      }
     }
-  }
+  });
 
   return graph;
 };
