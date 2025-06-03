@@ -104,7 +104,7 @@ fn get_skipped_timestamps(
         next_run_at = TriggerCondition::align_time(
             supposed_to_run_at + second_micros(frequency),
             tz_offset,
-            frequency,
+            Some(frequency),
         );
 
         while next_run_at <= supposed_to_run_at + delay {
@@ -1011,6 +1011,16 @@ async fn handle_derived_stream_triggers(
         // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
         // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
         // period from 5:05pm to 5:15pm.
+        log::warn!(
+            "supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
+                .unwrap()
+                .time(),
+            chrono::DateTime::from_timestamp_micros(t0 + period_num_microseconds)
+                .unwrap()
+                .time(),
+            supposed_to_be_run_at < t0 + period_num_microseconds,
+        );
         (
             Some(t0),
             std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds),
@@ -1019,11 +1029,7 @@ async fn handle_derived_stream_triggers(
         (None, supposed_to_be_run_at)
     };
     // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
-    let aligned_curr_time = TriggerCondition::align_time(
-        end,
-        derived_stream.tz_offset,
-        derived_stream.trigger_condition.period * 60,
-    );
+    let aligned_curr_time = TriggerCondition::align_time(end, derived_stream.tz_offset, None);
     // conditionally modify supposed_to_be_run_at
     if start.is_none_or(|t0| t0 < aligned_curr_time) {
         end = aligned_curr_time;
@@ -1319,6 +1325,21 @@ async fn handle_derived_stream_triggers(
         }
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
+    log::warn!(
+        "execution_time: {}, start_time: {}, end_time: {}, next_run_at: {}",
+        chrono::DateTime::from_timestamp_micros(trigger.next_run_at)
+            .unwrap()
+            .time(),
+        chrono::DateTime::from_timestamp_micros(trigger_data_stream.start_time)
+            .unwrap()
+            .time(),
+        chrono::DateTime::from_timestamp_micros(trigger_data_stream.end_time)
+            .unwrap()
+            .time(),
+        chrono::DateTime::from_timestamp_micros(trigger_data_stream.next_run_at)
+            .unwrap()
+            .time(),
+    );
 
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
