@@ -79,8 +79,11 @@ export default defineComponent({
       const baseURL = getPath();
       const route = this.$router.resolve({ name: "organizations" });
       const redirectURI = route.href || baseURL;
+      const hash = this.$route.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const invited_org_id = params.get("org_id");
       await organizationsService
-        .process_subscription(s, action, this.$store.state.selectedOrganization.identifier)
+        .process_subscription(s, action, invited_org_id)
         .then((res) => {
           this.status = "completed";
           const dismiss = this.$q.notify({
@@ -92,9 +95,9 @@ export default defineComponent({
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 
-            window.location.href = redirectURI;
+            window.location.href = redirectURI + "?org_identifier=" + invited_org_id;
           } else {
-            window.location.href = redirectURI;
+            window.location.href = redirectURI + "?org_identifier=" + invited_org_id;
           }
           return res;
         })
