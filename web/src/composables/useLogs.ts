@@ -1504,14 +1504,12 @@ const useLogs = () => {
                 partitionDetail.paginations[pageNumber] = [];
               }
 
-              if(recordSize > 0) {
-                partitionDetail.paginations[pageNumber].push({
-                  startTime: item[0],
-                  endTime: item[1],
-                  from,
-                  size: Math.abs(Math.min(recordSize, rowsPerPage)),
-                });
-              }
+              partitionDetail.paginations[pageNumber].push({
+                startTime: item[0],
+                endTime: item[1],
+                from,
+                size: Math.abs(Math.min(recordSize, rowsPerPage)),
+              });
 
               partitionFrom += recordSize;
 
@@ -1548,18 +1546,16 @@ const useLogs = () => {
               recordSize = 0;
             }
 
-            if (total < recordSize) {
+            if (total !== -1 && total < recordSize) {
               recordSize = total;
             }
 
-            if(recordSize > 0) {
-              partitionDetail.paginations[pageNumber].push({
-                startTime: item[0],
-                endTime: item[1],
-                from,
-                size: Math.abs(recordSize),
-              });
-            }
+            partitionDetail.paginations[pageNumber].push({
+              startTime: item[0],
+              endTime: item[1],
+              from,
+              size: Math.abs(recordSize),
+            });
 
             if (partitionDetail.paginations[pageNumber].size > 0) {
               pageNumber++;
