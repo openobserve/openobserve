@@ -1733,6 +1733,38 @@ export default defineComponent({
         return;
       }
 
+      // For multiSelect, filter out values not present in options only if options are fully loaded
+      if (
+        currentVariable.multiSelect &&
+        Array.isArray(currentVariable.value) &&
+        !currentVariable.isLoading &&
+        !currentVariable.isVariableLoadingPending
+      ) {
+        console.log(
+          `[Debug] Filtering multiSelect values for ${currentVariable.name}`,
+        );
+
+        const filtered = currentVariable.value.filter((val: any) =>
+          currentVariable.options.some((opt: any) => opt.value === val),
+        );
+        console.log(
+          `[Debug] Filtered multiSelect values for ${currentVariable.name}:`,
+          filtered,
+        );
+
+        if (filtered.length !== currentVariable.value.length) {
+          console.log(
+            `[Debug] Updating multiSelect value for ${currentVariable.name} to filtered values`,
+          );
+
+          currentVariable.value = filtered;
+          console.log(
+            `[Debug] Updated multiSelect value for ${currentVariable.name}:`,
+            currentVariable.value,
+          );
+        }
+      }
+
       // Check if the value actually changed
       if (oldVariablesData[currentVariable.name] === currentVariable.value) {
         return;
