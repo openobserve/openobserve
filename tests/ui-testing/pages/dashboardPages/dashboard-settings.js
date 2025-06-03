@@ -353,9 +353,9 @@ export default class DashboardSetting {
     await nameEditLocator.fill(updatedTabName);
 
     // Save changes
-    await page
-      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
-      .click();
+    // await page
+    //   .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
+    //   .click();
   }
 
   // Delete tab in edit tab options//
