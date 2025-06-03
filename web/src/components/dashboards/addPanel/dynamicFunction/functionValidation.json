@@ -991,8 +991,14 @@
                 },
                 {
                     "type": [
-                        "field",
-                        "string"
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
                     ],
                     "required": false
                 }
@@ -1026,10 +1032,6 @@
                         {
                             "label": "Field",
                             "value": "field"
-                        },
-                        {
-                            "label": "Array",
-                            "value": "array"
                         }
                     ],
                     "required": true
@@ -1045,10 +1047,6 @@
                         {
                             "label": "Field",
                             "value": "field"
-                        },
-                        {
-                            "label": "Array",
-                            "value": "array"
                         }
                     ],
                     "required": true
@@ -1064,10 +1062,6 @@
                         {
                             "label": "Field",
                             "value": "field"
-                        },
-                        {
-                            "label": "Array",
-                            "value": "array"
                         }
                     ],
                     "required": true
