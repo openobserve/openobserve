@@ -368,10 +368,13 @@ pub async fn ingest(
                             local_val = crate::service::logs::refactor_map(local_val, fields);
                         }
 
+                        // usize::MAX used as a flag when pipeline is applied with ResultArray vrl
+                        //  - invalid original_data
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_map
-                            .get(&destination_stream)
-                            .is_some_and(|v| *v)
+                        if idx != usize::MAX
+                            && streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(

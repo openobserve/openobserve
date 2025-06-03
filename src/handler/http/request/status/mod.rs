@@ -56,7 +56,7 @@ use {
     },
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
-        infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
+        config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_text},
     },
     o2_openfga::config::{
@@ -133,6 +133,7 @@ struct ConfigResponse<'a> {
     streaming_enabled: bool,
     histogram_enabled: bool,
     max_query_range: i64,
+    ai_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -264,6 +265,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = false;
 
     #[cfg(feature = "enterprise")]
+    let ai_enabled = o2cfg.ai.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let ai_enabled = false;
+
+    #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
@@ -327,6 +333,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         streaming_enabled: cfg.websocket.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
+        ai_enabled,
     }))
 }
 

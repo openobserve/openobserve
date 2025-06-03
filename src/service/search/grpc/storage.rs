@@ -257,7 +257,15 @@ pub async fn search(
         &query.trace_id,
         &files
             .iter()
-            .map(|f| (&f.account, &f.key, f.meta.compressed_size, f.meta.max_ts))
+            .map(|f| {
+                (
+                    f.id,
+                    &f.account,
+                    &f.key,
+                    f.meta.compressed_size,
+                    f.meta.max_ts,
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -330,12 +338,7 @@ pub async fn search(
     };
 
     // construct latest schema map
-    let latest_schema = Arc::new(
-        schema
-            .as_ref()
-            .clone()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -348,7 +351,7 @@ pub async fn search(
             continue;
         }
         let schema = schema_versions[ver].clone();
-        let schema = schema.with_metadata(std::collections::HashMap::new());
+        let schema = schema.with_metadata(Default::default());
 
         let session = config::meta::search::Session {
             id: format!("{}-storage-{ver}", query.trace_id),
@@ -401,14 +404,15 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(&String, &String, i64, i64)],
+    files: &[(i64, &String, &String, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<(file_data::CacheType, u64, u64), Error> {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
-    for (_account, file, _size, _ts) in files.iter() {
+
+    for (_id, _account, file, _size, max_ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -419,8 +423,35 @@ pub async fn cache_files(
             cache_hits += 1;
         } else {
             cache_misses += 1;
+        };
+
+        // Record file access metrics
+        let stream_type = if file_type == "index" {
+            config::meta::stream::StreamType::Index
+        } else {
+            // Determine stream type from the file path
+            if file.contains("/logs/") {
+                config::meta::stream::StreamType::Logs
+            } else if file.contains("/metrics/") {
+                config::meta::stream::StreamType::Metrics
+            } else if file.contains("/traces/") {
+                config::meta::stream::StreamType::Traces
+            } else {
+                config::meta::stream::StreamType::Logs // Default
+            }
+        };
+
+        let current_time = chrono::Utc::now().timestamp_micros();
+        let file_age_seconds = (current_time - max_ts) / 1_000_000;
+        let file_age_hours = file_age_seconds as f64 / 3600.0;
+
+        if file_age_hours > 0.0 {
+            config::metrics::FILE_ACCESS_TIME
+                .with_label_values(&[&stream_type.to_string()])
+                .observe(file_age_hours);
         }
     }
+
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
@@ -448,20 +479,21 @@ pub async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(account, file, size, ts)| {
+        .filter_map(|(id, account, file, size, ts)| {
             if cached_files.contains(&file) {
                 None
             } else {
-                Some((account.to_string(), file.to_string(), *size, *ts))
+                Some((*id, account.to_string(), file.to_string(), *size, *ts))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
-        for (account, file, size, ts) in files {
+        for (id, account, file, size, ts) in files {
             if let Err(e) = crate::job::queue_download(
                 trace_id.clone(),
+                id,
                 account,
                 file.clone(),
                 size,
@@ -531,7 +563,7 @@ pub async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, f)| (&f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
+            .map(|(ttv_file, f)| (f.id, &f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "index",

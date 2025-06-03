@@ -68,8 +68,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     "Syslogs from the IP are not allowed".to_string(),
                 ))
                 .json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    "Syslogs from the IP are not allowed".to_string(),
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Syslogs from the IP are not allowed",
                 )));
         }
     };
@@ -323,9 +323,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_map
-                            .get(&destination_stream)
-                            .is_some_and(|v| *v)
+                        if idx != usize::MAX
+                            && streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(

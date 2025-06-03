@@ -25,6 +25,7 @@ use config::{
     get_config, ider,
     meta::{
         cluster::RoleGroup,
+        function::RESULT_ARRAY,
         search,
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
@@ -48,7 +49,6 @@ use infra::{
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
-use regex::Regex;
 use sql::Sql;
 use tokio::runtime::Runtime;
 use tracing::Instrument;
@@ -56,7 +56,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::make_grpc_search_client,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
     std::collections::HashSet, tracing::info_span,
 };
@@ -83,10 +83,6 @@ pub(crate) mod sql;
 pub(crate) mod super_cluster;
 pub(crate) mod tantivy;
 pub(crate) mod utils;
-
-// Checks for #ResultArray#
-pub static RESULT_ARRAY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -798,6 +794,15 @@ pub async fn search_partition(
     if part_num > 1000 {
         part_num = 1000;
     }
+
+    log::info!(
+        "[trace_id {trace_id}] search_partition: original_size: {}, cpu_cores: {}, base_speed: {}, partition_secs: {}, part_num: {}",
+        resp.original_size,
+        cpu_cores,
+        cfg.limit.query_group_base_speed,
+        cfg.limit.query_partition_by_secs,
+        part_num
+    );
 
     // Calculate step with all constraints
     let mut step = (req.end_time - req.start_time) / part_num as i64;

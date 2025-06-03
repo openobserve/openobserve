@@ -23,6 +23,20 @@ use crate::{
 };
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
+    loop {
+        let Some(offset) = update_stats_from_file_list_inner().await? else {
+            break;
+        };
+        log::info!(
+            "keep updating stream stats from file list, offset: {:?} ...",
+            offset
+        );
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+    Ok(None)
+}
+
+async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -38,26 +52,35 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         }
     }
 
-    // get latest offset
-    let latest_pk = infra_file_list::get_max_pk_value().await?;
+    // get latest offset and apply step limit
+    let step_limit = config::get_config().limit.calculate_stats_step_limit;
+    let latest_pk = infra_file_list::get_max_pk_value()
+        .await
+        .map_err(|e| anyhow::anyhow!("get max pk value error: {:?}", e))?;
+    let latest_pk = std::cmp::min(offset + step_limit, latest_pk);
     let pk_value = if offset == 0 && latest_pk == 0 {
         None
     } else {
         Some((offset, latest_pk))
     };
 
+    // there is no new data to process
+    if offset == latest_pk {
+        return Ok(None);
+    }
+
     // get stats from file_list
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false)
             .await
-            .unwrap_or_default();
+            .map_err(|e| anyhow::anyhow!("get add stream stats error: {:?}", e))?;
         let dumped_add_stats = file_list_dump::stats(&org_id, None, None, pk_value)
             .await
-            .unwrap_or_default();
+            .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {:?}", e))?;
         let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true)
             .await
-            .unwrap_or_default();
+            .map_err(|e| anyhow::anyhow!("get del stream stats error: {:?}", e))?;
         // dump never store deleted files, so we do not have to consider deleted here
         let mut stream_stats = HashMap::new();
         for (stream, stats) in add_stream_stats {
@@ -73,13 +96,17 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         }
         if !stream_stats.is_empty() {
             let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
-            infra_file_list::set_stream_stats(&org_id, &stream_stats, pk_value).await?;
+            infra_file_list::set_stream_stats(&org_id, &stream_stats, pk_value)
+                .await
+                .map_err(|e| anyhow::anyhow!("set stream stats error: {:?}", e))?;
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 
     // update offset
-    db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE.uuid.clone())).await?;
+    db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE.uuid.clone()))
+        .await
+        .map_err(|e| anyhow::anyhow!("set offset error: {:?}", e))?;
 
     Ok(pk_value)
 }

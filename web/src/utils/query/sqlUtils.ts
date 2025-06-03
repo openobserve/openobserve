@@ -388,6 +388,22 @@ function parseCondition(condition: any) {
           logicalOperator: "AND",
           filterType: "condition",
         };
+      } else if (condition.operator == "NOT IN") {
+        // create values array based on right side of condition
+        // quote the values
+        const values =
+          condition?.right?.value?.map((value: any) => `'${value?.value}'`) ??
+          [];
+
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column?.expr?.value ?? "",
+          operator: condition?.operator,
+          value: values?.join(","),
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
       } else if (condition.operator == "IN") {
         // create values array based on right side of condition
         const values = condition.right.value.map(
@@ -426,20 +442,57 @@ function parseCondition(condition: any) {
           filterType: "condition",
         };
       } else if (condition?.operator == "LIKE") {
-        // right value may have % at the beginning or end or both
-        // so we need to remove it
-        const value = condition?.right?.value
-          ?.replace(/^%/, "")
-          .replace(/%$/, "");
-        return {
-          type: "condition",
-          values: [],
-          column: condition?.left?.column?.expr?.value,
-          operator: "Contains",
-          value: `${value}`,
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
+        // Check the pattern to determine the specific operator
+        const rightValue = condition?.right?.value || "";
+
+        if (rightValue.startsWith("%") && rightValue.endsWith("%")) {
+          // Pattern: %value% - Contains
+          const value = rightValue?.replace(/^%/, "").replace(/%$/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Contains",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else if (rightValue.startsWith("%")) {
+          // Pattern: %value - Ends With
+          const value = rightValue.replace(/^%/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Ends With",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else if (rightValue.endsWith("%")) {
+          // Pattern: value% - Starts With
+          const value = rightValue.replace(/%$/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Starts With",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else {
+          // No % pattern - treat as Contains for fallback
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Contains",
+            value: `${rightValue}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        }
       } else if (condition?.operator == "NOT LIKE") {
         // right value may have % at the beginning or end or both
         // so we need to remove it
@@ -468,9 +521,7 @@ function parseCondition(condition: any) {
       ];
 
       // function without field name and with value
-      const conditionsWithoutFieldName = [
-        "match_all",
-      ];
+      const conditionsWithoutFieldName = ["match_all"];
 
       if (conditionsWithFieldName.includes(conditionName)) {
         return {
@@ -633,53 +684,57 @@ export const changeHistogramInterval = async (
   query: any,
   histogramInterval: any,
 ) => {
-  // if histogramInterval is null or query is null or query is empty, return query
-  if (query === null || query === "") {
-    return query;
-  }
+  try {
+    // if histogramInterval is null or query is null or query is empty, return query
+    if (query === null || query === "") {
+      return query;
+    }
 
-  await importSqlParser();
-  const ast: any = parser.astify(query);
+    await importSqlParser();
+    const ast: any = parser.astify(query);
 
-  // Iterate over the columns to check if the column is histogram
-  ast?.columns?.forEach((column: any) => {
-    // check if the column is histogram
-    if (
-      column.expr.type === "function" &&
-      column?.expr?.name?.name?.[0]?.value === "histogram" &&
-      histogramInterval !== null
-    ) {
-      const histogramExpr = column.expr;
-      if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
-        // if selected histogramInterval is null then remove interval argument
-        if (!histogramInterval) {
-          histogramExpr.args.value = histogramExpr.args.value.slice(0, 1);
-        }
-        // else update interval argument
-        else {
-          // check if there is existing interval value
-          // if have then do not do anything
-          // else insert new arg with given histogramInterval
-          if (histogramExpr.args.value[1]) {
-            // Update existing interval value
-            // histogramExpr.args.value[1] = {
-            //   type: "single_quote_string",
-            //   value: `${histogramInterval}`,
-            // };
-          } else {
-            // create new arg for interval
-            histogramExpr.args.value.push({
-              type: "single_quote_string",
-              value: `${histogramInterval}`,
-            });
+    // Iterate over the columns to check if the column is histogram
+    ast?.columns?.forEach((column: any) => {
+      // check if the column is histogram
+      if (
+        column.expr.type === "function" &&
+        column?.expr?.name?.name?.[0]?.value === "histogram" &&
+        histogramInterval !== null
+      ) {
+        const histogramExpr = column.expr;
+        if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
+          // if selected histogramInterval is null then remove interval argument
+          if (!histogramInterval) {
+            histogramExpr.args.value = histogramExpr.args.value.slice(0, 1);
+          }
+          // else update interval argument
+          else {
+            // check if there is existing interval value
+            // if have then do not do anything
+            // else insert new arg with given histogramInterval
+            if (histogramExpr.args.value[1]) {
+              // Update existing interval value
+              // histogramExpr.args.value[1] = {
+              //   type: "single_quote_string",
+              //   value: `${histogramInterval}`,
+              // };
+            } else {
+              // create new arg for interval
+              histogramExpr.args.value.push({
+                type: "single_quote_string",
+                value: `${histogramInterval}`,
+              });
+            }
           }
         }
       }
-    }
-  });
+    });
 
-  const sql = parser.sqlify(ast);
-  return sql.replace(/`/g, '"');
+    const sql = parser.sqlify(ast);
+    return sql.replace(/`/g, '"');
+  } catch (error) {
+    return query;
+  }
 };
 
 export const convertQueryIntoSingleLine = async (query: any) => {
