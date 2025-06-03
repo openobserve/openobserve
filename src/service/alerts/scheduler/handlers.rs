@@ -107,7 +107,7 @@ fn get_skipped_timestamps(
             TriggerCondition::align_time(
                 supposed_to_run_at + second_micros(frequency),
                 tz_offset,
-                frequency,
+                Some(frequency),
             )
         } else {
             supposed_to_run_at + second_micros(frequency)
@@ -713,7 +713,7 @@ async fn handle_report_triggers(
         new_trigger.next_run_at = TriggerCondition::align_time(
             new_trigger.next_run_at,
             report.tz_offset,
-            frequency_seconds,
+            Some(frequency_seconds),
         );
     }
 
@@ -1041,11 +1041,7 @@ async fn handle_derived_stream_triggers(
     };
     // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
     if derived_stream.trigger_condition.align_time {
-        let aligned_curr_time = TriggerCondition::align_time(
-            end,
-            derived_stream.tz_offset,
-            derived_stream.trigger_condition.period * 60,
-        );
+        let aligned_curr_time = TriggerCondition::align_time(end, derived_stream.tz_offset, None);
         // conditionally modify supposed_to_be_run_at
         if start.is_none_or(|t0| t0 < aligned_curr_time) {
             end = aligned_curr_time;
