@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use {
     crate::common::meta::organization::OrganizationInvites,
     crate::common::meta::organization::{AllOrgListDetails, AllOrganizationResponse},
-    o2_enterprise::enterprise::cloud::{billings as cloud_billings, list_customer_billings},
+    o2_enterprise::enterprise::cloud::list_customer_billings,
 };
 
 use crate::{
@@ -98,13 +98,29 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
         };
         records
     };
+
+    #[cfg(feature = "cloud")]
+    let all_subscriptions = match list_customer_billings().await {
+        Ok(orgs) => orgs
+            .into_iter()
+            .map(|cb| (cb.org_id, cb.subscription_type as i32))
+            .collect::<HashMap<_, _>>(),
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+
     for org in all_orgs {
         id += 1;
         #[cfg(feature = "cloud")]
-        let org_subscription: i32 = cloud_billings::get_billing_by_org_id(org.identifier.as_str())
-            .await
-            .unwrap_or_default()
-            .map(|cb| cb.subscription_type as i32)
+        let org_subscription: i32 = all_subscriptions
+            .get(&org.identifier)
+            .cloned()
             .unwrap_or_default();
         #[cfg(not(feature = "cloud"))]
         let org_subscription = 0;
