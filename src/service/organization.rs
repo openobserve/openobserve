@@ -251,13 +251,6 @@ pub async fn create_org(
     }
     org.name = org.name.trim().to_owned();
 
-    #[cfg(feature = "cloud")]
-    if !is_root_user(user_email) && !is_add_user_allowed_for_org(None, user_email).await {
-        return Err(anyhow::anyhow!(
-            "User can not be member of more than one free organization"
-        ));
-    }
-
     org.identifier = ider::uuid();
     #[cfg(not(feature = "cloud"))]
     let org_type = CUSTOM.to_owned();
@@ -519,11 +512,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
 
     let now = chrono::Utc::now().timestamp_micros();
-    if !is_add_user_allowed_for_org(Some(&invite.org_id), user_email).await {
-        return Err(anyhow::anyhow!(
-            "User is already part of a free organization"
-        ));
-    }
+
     if invite.expires_at < now {
         return Err(anyhow::anyhow!("Invalid token"));
     }
@@ -570,51 +559,6 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     })
     .await;
     Ok(())
-}
-
-#[cfg(feature = "cloud")]
-pub async fn is_add_user_allowed_for_org(org_id: Option<&str>, user_email: &str) -> bool {
-    use o2_enterprise::enterprise::cloud::billings as cloud_billings;
-
-    if let Some(org) = org_id {
-        let cb = cloud_billings::get_subscription(user_email, org)
-            .await
-            .unwrap_or_default();
-        if let Some(billing) = cb {
-            if !billing.subscription_type.is_free_sub() {
-                return true;
-            }
-        }
-    };
-
-    let mut is_already_a_free_org = false;
-    let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
-    for member_org in member_orgs {
-        // skip the org we are trying to add the user in
-        if let Some(org) = org_id {
-            if member_org.identifier == org {
-                continue;
-            }
-        }
-        let org_sub = cloud_billings::get_subscription(user_email, &member_org.identifier)
-            .await
-            .unwrap_or_default();
-        match org_sub {
-            Some(sub) => {
-                if sub.subscription_type.is_free_sub() {
-                    is_already_a_free_org = true;
-                    break;
-                }
-            }
-            None => {
-                // if there is no subscription record for that org, then that org is on free plan
-                is_already_a_free_org = true;
-                break;
-            }
-        }
-    }
-
-    !is_already_a_free_org
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {
