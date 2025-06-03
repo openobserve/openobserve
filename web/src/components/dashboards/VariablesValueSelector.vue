@@ -617,11 +617,17 @@ export default defineComponent({
               ) ?? [])
             : (props.initialVariableValues?.value[item.name] ?? null);
 
+        // Handle multiSelect initialization
         if (item.multiSelect) {
-          initialValue = Array.isArray(initialValue)
-            ? initialValue
-            : [initialValue];
+          // If initialValue is not an array, convert it to array
+          initialValue =
+            initialValue !== null && initialValue !== undefined
+              ? Array.isArray(initialValue)
+                ? initialValue
+                : [initialValue]
+              : [];
         }
+
         const variableData = {
           ...item,
           // isLoading is used to check that currently, if the variable is loading(it is used to show the loading icon)
@@ -803,13 +809,31 @@ export default defineComponent({
       console.log("oldVariableSelectedValues", oldVariableSelectedValues);
       console.log("currentVariable", currentVariable);
 
-      // Skip setting value if the variable already has a value and we're just opening the dropdown
-      if (
-        currentVariable.value !== null &&
-        currentVariable.value !== undefined &&
-        !currentVariable.multiSelect
-      ) {
-        return;
+      // For multiSelect, preserve existing values even if they're not in current options
+      if (currentVariable.multiSelect) {
+        // If we have existing values, keep them
+        if (
+          Array.isArray(currentVariable.value) &&
+          currentVariable.value.length > 0
+        ) {
+          // Don't add missing values to options, just keep the existing values
+          return;
+        }
+      } else {
+        // For single select, only skip if value is not null/undefined and is present in options
+        const isValid =
+          currentVariable.value !== null &&
+          currentVariable.value !== undefined &&
+          currentVariable.options.some(
+            (opt: any) => opt.value === currentVariable.value,
+          );
+        if (isValid) {
+          console.log(
+            "[Debug] SingleSelect variable already has a valid value, skipping recalculation",
+            currentVariable.value,
+          );
+          return;
+        }
       }
 
       // Check if this is a child variable
@@ -954,15 +978,34 @@ export default defineComponent({
           currentVariable.value = selectedValues;
         } else {
           // here, multiselect and old values will be not exist
-          // Always set first option as default for multi-select
-          currentVariable.value =
-            currentVariable.options.length > 0
-              ? [currentVariable.options[0].value]
-              : [];
+          switch (currentVariable?.selectAllValueForMultiSelect) {
+            case "custom":
+              // Use custom values if available
+              if (currentVariable?.customMultiSelectValue?.length > 0) {
+                currentVariable.value = currentVariable.customMultiSelectValue;
+              } else {
+                currentVariable.value =
+                  currentVariable.options.length > 0
+                    ? [currentVariable.options[0].value]
+                    : [];
+              }
+              break;
+            case "all":
+              // Select all available options
+              currentVariable.value = currentVariable.options.map(
+                (option: any) => option.value,
+              );
+              break;
+            default:
+              // Default to first option
+              currentVariable.value =
+                currentVariable.options.length > 0
+                  ? [currentVariable.options[0].value]
+                  : [];
+          }
         }
       } else {
         // here, multi select is false
-
         // Keep old value if it exists, regardless of whether it's in current options
         if (
           oldVariableSelectedValues[0] !== undefined &&
