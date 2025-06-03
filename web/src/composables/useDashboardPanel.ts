@@ -684,12 +684,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.y.find((it: any) => it?.column == row.name)
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.y.push({
@@ -725,7 +719,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     });
-    // }
     updateArrayAlias();
   };
 
@@ -746,12 +739,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.z.find((it: any) => it.column == row.name)
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.z.push({
@@ -765,9 +752,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery && !isDerived
           ? "z_axis_" +
-            (dashboardPanelData.data.queries[
+            ((dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.z.length +
+            ].fields?.z?.length ?? 0) +
               1)
           : row.name,
       // column: row.name,
@@ -786,23 +773,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     });
-    // }
     updateArrayAlias();
   };
 
   const addLatitude = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.latitude
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.latitude = {
       label: generateLabelFromName(row.name),
-      alias: isDerived ? row.name : "latitude",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "latitude"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -819,22 +804,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     };
-    // }
   };
 
   const addLongitude = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.longitude
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.longitude = {
       label: generateLabelFromName(row.name),
-      alias: isDerived ? row.name : "longitude",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "longitude"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -851,22 +834,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     };
-    // }
   };
 
   const addWeight = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.weight
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.weight = {
       label: generateLabelFromName(row.name),
-      alias: isDerived ? row.name : "weight",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "weight"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -883,20 +864,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     };
-    // }
   };
 
   const addMapName = (row: any) => {
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.name
-    // ) {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.name = {
       label: generateLabelFromName(row.name),
-      alias: "name",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "name"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -912,20 +893,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ],
       havingConditions: [],
     };
-    // }
   };
 
   const addMapValue = (row: any) => {
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.value_for_maps
-    // ) {
+    const isDerived = checkIsDerivedField(row.name) ?? false;
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.value_for_maps = {
       label: generateLabelFromName(row.name),
-      alias: "value_for_maps",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "value_for_maps"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -941,22 +922,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         },
       ],
     };
-    // }
   };
 
   const addSource = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.source
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.source = {
       label: generateLabelFromName(row.name),
-      alias: isDerived ? row.name : "source",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "source"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -973,22 +952,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     };
-    // }
   };
 
   const addTarget = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.target
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.target = {
       label: generateLabelFromName(row.name),
-      alias: isDerived ? row.name : "target",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "target"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -1005,22 +982,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     };
-    // }
   };
 
   const addValue = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    // HERE NEED CHANGES
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.value
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.value = {
       label: generateLabelFromName(row.name),
-      alias: isDerived ? row.name : "value",
+      alias:
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery && !isDerived
+          ? "value"
+          : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
@@ -1037,7 +1012,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     };
-    // }
   };
 
   // get new color value based on existing color from the chart
@@ -2147,7 +2121,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           const newName = newArray[changedIndex[0]]?.name;
 
           // Update the field alias and column to the new name
-          // HERE NEED CHANGES
           field.alias = newName;
           field.column = newName;
         }

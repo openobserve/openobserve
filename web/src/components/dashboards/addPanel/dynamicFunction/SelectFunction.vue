@@ -36,7 +36,7 @@
       <div class="tw-w-full">
         <div
           v-for="(arg, argIndex) in fields.args"
-          :key="argIndex"
+          :key="argIndex + '-' + arg.type"
           class="tw-w-full tw-flex tw-flex-col"
         >
           <div class="tw-flex">
@@ -223,6 +223,7 @@ import {
   symOutlinedFunction,
   symOutlinedTitle,
   symOutlined123,
+  symOutlinedList,
 } from "@quasar/extras/material-symbols-outlined";
 
 export default {
@@ -481,6 +482,8 @@ export default {
     const getIconBasedOnArgType = (type: string) => {
       switch (type) {
         case "field":
+          return symOutlinedList;
+        case "function":
           return symOutlinedFunction;
         case "string":
           return symOutlinedTitle;

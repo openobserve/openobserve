@@ -472,7 +472,6 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
-        //  HERE NEED CHANGES
         return field?.alias;
       }
       return buildSQLQueryFromInput(
