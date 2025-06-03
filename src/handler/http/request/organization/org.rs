@@ -101,11 +101,11 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     for org in all_orgs {
         id += 1;
         #[cfg(feature = "cloud")]
-        let org_subscription: i32 =
-            cloud_billings::get_org_subscription_type(org.identifier.as_str(), user_id)
-                .await
-                .map(|sub_type| sub_type as i32)
-                .unwrap_or_default();
+        let org_subscription: i32 = cloud_billings::get_billing_by_org_id(org.identifier.as_str())
+            .await
+            .unwrap_or_default()
+            .map(|cb| cb.subscription_type as i32)
+            .unwrap_or_default();
         #[cfg(not(feature = "cloud"))]
         let org_subscription = 0;
         let org = OrgDetails {
