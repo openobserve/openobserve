@@ -791,7 +791,7 @@ pub async fn build_search_request_per_field(
                     return Err(Error::other("Failed to parse sql"));
                 };
 
-                let sql_where_from_query = if !sql.is_complex_query {
+                let sql_where_from_query = if !sql.is_complex {
                     // pick up where clause from sql
                     match SearchService::sql::pickup_where(&query.sql, None) {
                         Ok(Some(v)) => format!("WHERE {}", v),
