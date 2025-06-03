@@ -30,7 +30,10 @@
       </div>
     </div>
 
-    <div v-if="!customQuery" style="width: calc(100% - 134px)">
+    <div
+      v-if="!customQuery && !fields.isDerived"
+      style="width: calc(100% - 134px)"
+    >
       <!-- active-color="primary" -->
       <!-- narrow-indicator -->
       <!-- class="text-grey" -->
