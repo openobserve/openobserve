@@ -3626,6 +3626,7 @@ export default defineComponent({
       listScheduledSearchIcon,
       getColumnNames,
       getSearchObj,
+      createSavedViews,
     };
   },
   computed: {
