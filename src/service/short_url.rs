@@ -33,7 +33,7 @@ fn construct_short_url(org_id: &str, short_id: &str) -> String {
     format!(
         "{}/{}/{}{}{}",
         get_base_url(),
-        "api",
+        "web",
         org_id,
         SHORT_URL_WEB_PATH,
         short_id
