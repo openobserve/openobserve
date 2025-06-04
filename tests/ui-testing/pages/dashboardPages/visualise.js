@@ -1,9 +1,13 @@
+//logs visualise page object
+//Methods: openLogs, openVisualiseTab, logsApplyQueryButton, applyQueryButtonVisualise, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditior, fillQueryEditor
 export default class LogsVisualise {
   constructor(page) {
     this.page = page;
     this.timeTab = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
-    this.indexListDropdown = page.locator('[data-test="log-search-index-list-select-stream"]')
+    this.indexListDropdown = page.locator(
+      '[data-test="log-search-index-list-select-stream"]'
+    );
   }
   async openLogs() {
     // Open Logs Page
@@ -31,6 +35,8 @@ export default class LogsVisualise {
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
   }
+
+  //set relative time selection
   async setRelative(date, time) {
     await this.timeTab.waitFor({ state: "visible" });
     await this.timeTab.click();
@@ -40,6 +46,7 @@ export default class LogsVisualise {
       .click();
   }
 
+  //search and add fields
   async searchAndAddField(fieldName, target) {
     console.log(`Adding field: ${fieldName} to: ${target}`);
     const searchInput = this.page.locator(
@@ -85,8 +92,13 @@ export default class LogsVisualise {
       .click();
   }
 
-  async enableSQLMode(){
-    await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+  //enable SQL Mode
+  async enableSQLMode() {
+    await this.page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
   }
 
   //stram index list
@@ -118,7 +130,7 @@ export default class LogsVisualise {
     const chartOption = this.page.locator(
       `[data-test="selected-chart-${chartType}-item"]`
     );
-    await chartOption.waitFor({ state: "visible"});
+    await chartOption.waitFor({ state: "visible" });
     await chartOption.click();
   }
 
@@ -155,7 +167,7 @@ export default class LogsVisualise {
     console.log(`Removed field: ${fieldName} from ${target}`);
   }
   //chart render
-  async chartRender(x,y) {
+  async chartRender(x, y) {
     await this.page
       .locator('[data-test="chart-renderer"] canvas')
       .first()
@@ -174,17 +186,20 @@ export default class LogsVisualise {
   //back to logs
   async backToLogs() {
     await this.page.locator('[data-test="logs-logs-toggle"]').click();
-    await this.page.locator('[data-test="confirm-button"]').waitFor({ state: "visible" });
+    await this.page
+      .locator('[data-test="confirm-button"]')
+      .waitFor({ state: "visible" });
     await this.page.locator('[data-test="confirm-button"]').click();
   }
+
+  //open query editor
   async openQueryEditior() {
-    await this.page.locator('.view-lines').first().click();
+    await this.page.locator(".view-lines").first().click();
   }
   async fillQueryEditor(sqlQuery) {
-    const queryEditor = this.page.locator('.view-lines').first();
+    const queryEditor = this.page.locator(".view-lines").first();
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
     await queryEditor.click();
     await queryEditor.type(sqlQuery);
-    // await queryEditor.fill(sqlQuery);
-}
+  }
 }

@@ -1,3 +1,4 @@
+//Methods: Create folder, Search folder, Add folder Name, Edit folder name, Delete folder
 import { expect } from "@playwright/test";
 
 export default class DashboardFolder {
@@ -5,6 +6,7 @@ export default class DashboardFolder {
     this.page = page;
     this.folderSearchInput = page.locator('[data-test="folder-search"]');
   }
+  // Generate a unique folder name with a prefix
   generateUniqueFolderName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
@@ -106,3 +108,4 @@ export default class DashboardFolder {
     await page.locator('[data-test="dashboard-folder-add-save"]').click();
   }
 }
+
