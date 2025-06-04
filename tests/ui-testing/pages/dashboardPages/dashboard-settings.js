@@ -361,6 +361,13 @@ export default class DashboardSetting {
     //   .click();
   }
 
+  //save edited tab name
+   async saveEditedtab() {
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
+      .click();
+  }
+
   // Delete tab in edit tab options//
 
   async deleteTab(oldTabName) {
