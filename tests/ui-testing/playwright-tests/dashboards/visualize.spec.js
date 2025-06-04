@@ -32,15 +32,20 @@ test.describe("logs testcases", () => {
 
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await logsVisualise.logsApplyQueryButton();
-    await applyQueryButton(page);
+    // await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
+
   test("should create logs when queries are ingested into the search field", async ({
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and enable SQL mode
     await logsVisualise.openLogs();
     await logsVisualise.enableSQLMode();
+
+    //set relative time
     await logsVisualise.logsSelectStream("e2e_automate");
     await logsVisualise.setRelative("4", "d");
     await logsVisualise.logsApplyQueryButton();
@@ -50,9 +55,13 @@ test.describe("logs testcases", () => {
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and select stream
     await logsVisualise.openLogs();
     await logsVisualise.streamIndexList();
     await logsVisualise.logsToggle();
+
+    //open the Visualize tab and check the default chart type and axes
     await logsVisualise.openVisualiseTab();
     await logsVisualise.selectChartType("bar");
     await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
@@ -63,6 +72,7 @@ test.describe("logs testcases", () => {
       page.locator('[data-test="dashboard-y-item-_timestamp"]')
     ).toBeVisible();
   });
+
   test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
     page,
   }) => {
@@ -72,10 +82,12 @@ test.describe("logs testcases", () => {
 
     await logsVisualise.openVisualiseTab();
 
+    // Remove the _timestamp field from the X-axis
     await logsVisualise.removeField("_timestamp", "x");
     await page.getByText("Chart configuration has been").click();
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
 
+    // Apply the changes
     await logsVisualise.applyQueryButtonVisualise();
     await expect(page.getByText("There are some errors, please")).toBeVisible();
     await page
@@ -89,8 +101,10 @@ test.describe("logs testcases", () => {
       )
       .click();
 
+    // Apply the changes
     await logsVisualise.applyQueryButtonVisualise();
 
+    // Remove the _timestamp field from the Y-axis
     await logsVisualise.removeField("_timestamp", "y");
     await page
       .locator(
@@ -102,6 +116,8 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+
+    // Apply the changes
     const search = page.waitForResponse(logData.applyQuery);
 
     await logsVisualise.applyQueryButtonVisualise();
@@ -110,16 +126,19 @@ test.describe("logs testcases", () => {
       .toBe(200);
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
-    // const x=470;
-    // const y=13;
     await logsVisualise.chartRender(470, 13);
   });
+
   test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and visualize tab
     await logsVisualise.openLogs();
     await logsVisualise.openVisualiseTab();
+
+    // Add a field to the chart
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
@@ -133,47 +152,58 @@ test.describe("logs testcases", () => {
       .click();
 
     await logsVisualise.applyQueryButtonVisualise();
+
+    // Change the chart types
     await logsVisualise.selectChartType("line");
+
     await expect(
       page.locator('[data-test="chart-renderer"] canvas').last()
     ).toBeVisible();
+
+    //set relative time
     await logsVisualise.setRelative("6", "w");
     await logsVisualise.chartRender(457, 135);
 
+    // Change the chart type to area
     await logsVisualise.selectChartType("area");
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.chartRender(590, 127);
 
+    // Change the chart type to area-stacked
     await logsVisualise.selectChartType("area-stacked");
-
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.chartRender(475, 45);
 
+    // Change the chart type to horizontal bar
     await logsVisualise.selectChartType("h-bar");
-
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.chartRender(722, 52);
 
+    // Change the chart type to scatter and apply
     await logsVisualise.selectChartType("scatter");
-
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.chartRender(362, 30);
 
+    // Change the chart type to pie and apply
     await logsVisualise.selectChartType("pie");
-
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.chartRender(650, 85);
 
+    // Change the chart type to donut and apply
     await logsVisualise.selectChartType("donut");
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.chartRender(216, 53);
+
+    // Change the chart type to gauge and apply
     await logsVisualise.selectChartType("gauge");
     await logsVisualise.applyQueryButtonVisualise();
     await logsVisualise.chartRender(423, 127);
   });
 
   test("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
+    // Apply the changes
     page,
+    // Render the chart
   }) => {
     const logsVisualise = new LogsVisualise(page);
     await logsVisualise.openLogs();
