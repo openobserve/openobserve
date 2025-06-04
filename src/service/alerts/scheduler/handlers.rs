@@ -104,7 +104,7 @@ fn get_skipped_timestamps(
         next_run_at = TriggerCondition::align_time(
             supposed_to_run_at + second_micros(frequency),
             tz_offset,
-            frequency,
+            Some(frequency),
         );
 
         while next_run_at <= supposed_to_run_at + delay {
@@ -995,37 +995,32 @@ async fn handle_derived_stream_triggers(
             chrono::Duration::try_minutes(delay_in_mins as _).and_then(|td| td.num_microseconds())
         })
         .unwrap_or_default();
-    let mut supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
+    let supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
         .unwrap();
 
     let (mut start, mut end) = if let Some(t0) = start_time {
-        // Don't use only the period_num_microseconds, because, the the delay is lets say 10 secs
-        // The following code will make a separate query to cover the delay period of 10 secs which
-        // is unnecessary. Hence, we need to check how big the delay is.
-        // Note: For pipeline, period and frequency both have the same value.
-
-        // For derived stream, period is in minutes, so we need to convert it to seconds for
-        // align_time
-        let aligned_curr_time = TriggerCondition::align_time(
-            supposed_to_be_run_at,
-            derived_stream.tz_offset,
-            derived_stream.trigger_condition.period * 60,
+        // If the delay is equal to or greater than the frequency, we need to ingest data one by
+        // one If the delay is less than the frequency, we need to ingest data for
+        // the "next run at" period, For example, if the current time is 5:19pm,
+        // frequency is 5 mins, and delay is 4mins (supposed to be run at 5:15pm),
+        // we need to ingest data for the period from 5:10pm to 5:15pm only. The
+        // next run at will be 5:20pm which will query for the period from 5:15pm to
+        // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
+        // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
+        // period from 5:05pm to 5:15pm.
+        log::warn!(
+            "supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
+                .unwrap()
+                .time(),
+            chrono::DateTime::from_timestamp_micros(t0 + period_num_microseconds)
+                .unwrap()
+                .time(),
+            supposed_to_be_run_at < t0 + period_num_microseconds,
         );
-        // conditionally modify supposed_to_be_run_at
-        if aligned_curr_time > t0 {
-            supposed_to_be_run_at = aligned_curr_time;
-        };
-        // If the delay is equal to or greater than the frequency, we need to ingest data one by one
-        // If the delay is less than the frequency, we need to ingest data for the "next run at"
-        // period, For example, if the current time is 5:19pm, frequency is 5 mins, and
-        // delay is 4mins (supposed to be run at 5:15pm), we need to ingest data for the
-        // period from 5:10pm to 5:15pm only. The next run at will be 5:20pm which will
-        // query for the period from 5:15pm to 5:20pm. But, if the suppossed to be run at is
-        // 5:10pm, then we need ingest data for the period from 5:05pm to 5:15pm.
-        // Which is to cover the skipped period from 5:05pm to 5:15pm.
         (
             Some(t0),
             std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds),
@@ -1033,6 +1028,12 @@ async fn handle_derived_stream_triggers(
     } else {
         (None, supposed_to_be_run_at)
     };
+    // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
+    let aligned_curr_time = TriggerCondition::align_time(end, derived_stream.tz_offset, None);
+    // conditionally modify supposed_to_be_run_at
+    if start.is_none_or(|t0| t0 < aligned_curr_time) {
+        end = aligned_curr_time;
+    }
 
     // In case the scheduler background job (watch_timeout) updates the trigger retries
     // (not through this handler), we need to skip to the next run at but with the same
@@ -1045,14 +1046,12 @@ async fn handle_derived_stream_triggers(
             new_trigger.module_key
         );
         // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream
-            .trigger_condition
-            .get_aligned_next_trigger_time(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(end + user_defined_delay),
-            )?;
+        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+            false,
+            derived_stream.tz_offset,
+            false,
+            Some(trigger.next_run_at),
+        )?;
         // Start over next time
         new_trigger.retries = 0;
         db::scheduler::update_trigger(new_trigger).await?;
@@ -1276,11 +1275,6 @@ async fn handle_derived_stream_triggers(
                 } else {
                     // SUCCESS: move the time range forward by frequency and continue
                     start = Some(trigger_results.end_time);
-                    // There could still be some data to be processed for the current period
-                    // so we need to move the end time forward by the period length or the
-                    // remaining time whichever is smaller
-                    let _end = period_num_microseconds + 1;
-                    end += _end;
                     trigger_data_stream.query_took = trigger_results.query_took;
                 }
             } else {
@@ -1294,11 +1288,6 @@ async fn handle_derived_stream_triggers(
 
                 // move the time range forward by frequency and continue
                 start = Some(trigger_results.end_time);
-                // There could still be some data to be processed for the current period
-                // so we need to move the end time forward by the period length or the remaining
-                // time whichever is smaller
-                let _end = period_num_microseconds + 1;
-                end += _end;
             }
         }
     };
@@ -1322,14 +1311,12 @@ async fn handle_derived_stream_triggers(
         && new_trigger.retries < max_retries)
     {
         // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream
-            .trigger_condition
-            .get_aligned_next_trigger_time(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(end + user_defined_delay),
-            )?;
+        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+            false,
+            derived_stream.tz_offset,
+            false,
+            Some(trigger.next_run_at),
+        )?;
 
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
@@ -1338,6 +1325,21 @@ async fn handle_derived_stream_triggers(
         }
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
+    log::warn!(
+        "execution_time: {}, start_time: {}, end_time: {}, next_run_at: {}",
+        chrono::DateTime::from_timestamp_micros(trigger.next_run_at)
+            .unwrap()
+            .time(),
+        chrono::DateTime::from_timestamp_micros(trigger_data_stream.start_time)
+            .unwrap()
+            .time(),
+        chrono::DateTime::from_timestamp_micros(trigger_data_stream.end_time)
+            .unwrap()
+            .time(),
+        chrono::DateTime::from_timestamp_micros(trigger_data_stream.next_run_at)
+            .unwrap()
+            .time(),
+    );
 
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
