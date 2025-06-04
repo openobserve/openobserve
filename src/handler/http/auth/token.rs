@@ -62,8 +62,20 @@ pub async fn token_validator(
         Ok(res) => {
             let user_id = &res.0.user_email;
             if res.0.is_valid {
+                // for member sub i.e. invitation, we must check user directly from db, because
+                // the else-arm here will check if user is present in given org. However before
+                // accepting the invitation, user will not be added to the org,
+                // hence getting unauthorized error. Thus we add a check that for
+                // member_subscription, check the user directly from db users,
+                // not particularly associated with any org
+                let is_member_subscription = path_columns
+                    .get(1)
+                    .is_some_and(|p| p.eq(&"member_subscription"));
                 let path_suffix = path_columns.last().unwrap_or(&"");
-                if path_suffix.eq(&"organizations") || path_suffix.eq(&"clusters") {
+                if path_suffix.eq(&"organizations")
+                    || path_suffix.eq(&"clusters")
+                    || is_member_subscription
+                {
                     let db_user = db::user::get_db_user(user_id).await;
                     user = match db_user {
                         Ok(user) => {
