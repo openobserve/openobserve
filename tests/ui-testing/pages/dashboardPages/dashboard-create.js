@@ -1,7 +1,10 @@
-// pages/chartTypeSelector.js
 // methods: createDashboard, searchDashboard, AddPanel, applyButton
 
 export default class DashboardCreate {
+  /**
+   * Constructor for the DashboardCreate object
+   * @param {Page} page - The page object to interact with
+   */
   constructor(page) {
     this.page = page;
     this.dashCreateBtn = this.page.locator('[data-test="dashboard-add"]');
@@ -17,20 +20,20 @@ export default class DashboardCreate {
     this.backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
   }
 
+  //Create Dashboard
   async createDashboard(dashboardName) {
     const nameInput = this.page.locator('[data-test="add-dashboard-name"]');
-  
+
     await this.dashCreateBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.dashCreateBtn.click();
-  
-    await this.dashName.waitFor({ state: "visible", timeout:15000 });
+
+    await this.dashName.waitFor({ state: "visible", timeout: 15000 });
     await this.dashName.click();
     await this.dashName.fill(dashboardName);
-  
+
     await this.submitBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.submitBtn.click();
   }
-  
 
   //back to dashboard list
   async backToDashboardList() {
@@ -38,7 +41,7 @@ export default class DashboardCreate {
     await this.backBtn.click();
   }
 
-  //Search Folder
+  //Search the Folder
   async searchDashboard(dashboardName) {
     await this.page
       .locator('[data-test="dashboard-folder-tab-default"]')
@@ -73,6 +76,7 @@ export default class DashboardCreate {
     await this.addPanelIfEmptyBtn.click();
   }
 
+  //Apply dashboard button
   async applyButton() {
     await this.applyQueryBtn.click();
   }

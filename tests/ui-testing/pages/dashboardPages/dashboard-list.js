@@ -1,3 +1,5 @@
+//Methods: Duplicate dashboard, Move dashboard, Menu Items(dashboards)
+
 import { expect } from "@playwright/test";
 import { deleteDashboard } from "../../playwright-tests/utils/dashCreation";
 

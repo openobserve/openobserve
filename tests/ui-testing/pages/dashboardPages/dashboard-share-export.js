@@ -1,3 +1,5 @@
+//Dashboard Share and Export Page Object
+//Methods: Share dashboard, Export dashboard
 export default class DashboardShareExportPage {
   constructor(page) {
     this.page = page;

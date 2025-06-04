@@ -1,3 +1,5 @@
+//Dahboard time refresh
+// Methods: Set relative time selection, Set absolute time selection, Auto refresh interval, Refresh dashboard manual
 export default class DashboardTimeRefresh {
   constructor(page) {
     this.page = page;
@@ -47,7 +49,7 @@ export default class DashboardTimeRefresh {
     await this.applyBtn.click();
   }
 
-  //Refresh Button with time selection manuall
+  //Refresh Button with time selection manual
   async autoRefreshInterval(time) {
     await this.refreshBtnManual.waitFor({ state: "visible" });
     await this.refreshBtnManual.click();
