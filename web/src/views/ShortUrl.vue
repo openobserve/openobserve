@@ -39,19 +39,18 @@ export default defineComponent({
           }
         } else {
           // Handle case where redirect URL is not found
-          routeToLogs();
+          routeToHome();
         }
       } catch (error) {
         console.error("Error fetching short URL:", error);
         // Redirect to home page on error
-        routeToLogs();
+        routeToHome();
       }
     };
 
-    const routeToLogs = () => {
+    const routeToHome = () => {
       router.replace({
-        name: "logs",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
+        name: "home",
       });
     };
 
