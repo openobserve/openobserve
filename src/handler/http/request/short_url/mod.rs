@@ -113,7 +113,7 @@ pub async fn retrieve(
         "short_url::retrieve handler called for path: {}",
         req.path()
     );
-    let (_org_id, short_id) = path.into_inner();
+    let (org_id, short_id) = path.into_inner();
     let original_url = short_url::retrieve(&short_id).await;
 
     // Check if type=ui for JSON response
@@ -127,13 +127,12 @@ pub async fn retrieve(
         }
     }
 
-    // Default behavior: redirect to original URL or short URL based on length
-    if let Some(url) = original_url {
-        let redirect_url = if url.len() < 1024 {
-            url
-        } else {
-            format!("/web/short_url/{}", short_id)
-        };
+    // Here we redirect the legacy short urls to the new short url
+    if original_url.is_some() {
+        let connection_info = req.connection_info();
+        let scheme = connection_info.scheme();
+        let host = connection_info.host();
+        let redirect_url = format!("{}://{}/web/short_url/{}?org_identifier={}", scheme, host, short_id, org_id);
         let redirect_http = RedirectResponseBuilder::new(&redirect_url).build().redirect_http();
         Ok(redirect_http)
     } else {
