@@ -286,8 +286,11 @@ export default class DashboardSetting {
 
   //enable default value
   async addCustomValue(value) {
-    await this.page;
-    '[data-test="dashboard-multi-select-default-value-toggle-custom"]'.click();
+    await this.page
+      .locator(
+        '[data-test="dashboard-multi-select-default-value-toggle-custom"]'
+      )
+      .click();
     await this.page
       .locator('[data-test="dashboard-variable-custom-value-0"]')
       .click();
