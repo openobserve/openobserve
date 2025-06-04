@@ -20,6 +20,7 @@ const store = createStore({
     API_ENDPOINT: "http://localhost:5080",
 
     theme: "dark",
+    timezone: "UTC",
     selectedOrganization: {
       label: "default Organization",
       id: 159,

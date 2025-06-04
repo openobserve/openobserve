@@ -17,6 +17,30 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
+import { AxiosHeaders } from 'axios';
+import DateTime from "@/components/DateTime.vue";
+import { nextTick } from 'vue';
+import { defineComponent, ref } from "vue";
+
+// Create a mock DateTime component
+const mockDateTime = defineComponent({
+  name: 'DateTime',
+  template: '<div class="mock-date-time"></div>',
+  setup() {
+    return {
+      setSavedDate: vi.fn(),
+      setAbsoluteTime: vi.fn(),
+      setDateType: vi.fn(),
+      setRelativeTime: vi.fn(),
+      setCustomDate: vi.fn(),
+      getDateTimeRange: vi.fn().mockReturnValue({
+        startTime: 1749023371191000,
+        endTime: 1749024271191000,
+        type: 'relative'
+      })
+    }
+  }
+});
 
 // Mock jsTransformService before any imports
 vi.mock('../../services/jstransform', () => ({
@@ -27,7 +51,9 @@ vi.mock('../../services/jstransform', () => ({
 }));
 vi.mock('../../services/saved_views', () => ({
   default: {
-    getViewDetail: vi.fn()
+    getViewDetail: vi.fn(),
+    post: vi.fn(),
+    delete: vi.fn()
   }
 }));
 
@@ -41,7 +67,6 @@ import savedviewsService from "../../services/saved_views";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import router from "@/test/unit/helpers/router";
 import QueryEditor from "@/components/QueryEditor.vue";
-import { ref } from "vue";
 import useLogs from "@/composables/useLogs";
 import useSuggestions from "@/composables/useSuggestions";
 
@@ -113,12 +138,15 @@ vi.mock("@/composables/useSuggestions", () => {
 describe("SearchBar Component", () => {
   let wrapper: any;
   let mockQueryEditor: any;
+  let createSavedViewsSpy: any;
 
   beforeEach(async () => {
     // Reset mock implementations before each test
     vi.mocked(jsTransformService.create).mockReset();
     vi.mocked(jsTransformService.update).mockReset();
     vi.mocked(savedviewsService.getViewDetail).mockReset();
+    vi.mocked(savedviewsService.post).mockReset();
+    vi.mocked(savedviewsService.delete).mockReset();
 
     // Mock QueryEditor component with auto-complete capabilities
     mockQueryEditor = {
@@ -131,8 +159,22 @@ describe("SearchBar Component", () => {
       }
     };
 
+    // Create a mock DateTime instance
+    const dateTimeMock = {
+      setSavedDate: vi.fn(),
+      setAbsoluteTime: vi.fn(),
+      setDateType: vi.fn(),
+      setRelativeTime: vi.fn(),
+      setCustomDate: vi.fn(),
+      getDateTimeRange: vi.fn().mockReturnValue({
+        startTime: 1749023371191000,
+        endTime: 1749024271191000,
+        type: 'relative'
+      })
+    };
+
     wrapper = mount(SearchBar, {
-      props: {
+      props: {  
         fieldValues: ['field1', 'field2']
       },
       attachTo: document.body,
@@ -142,16 +184,17 @@ describe("SearchBar Component", () => {
         stubs: {
           QueryEditor: mockQueryEditor,
           IndexList: true,
+          DateTime: mockDateTime
         }
       },
     });
 
-    // Initialize queryEditorRef with proper ref structure
-    wrapper.vm.queryEditorRef = ref({
-      getCursorIndex: vi.fn().mockReturnValue(5),
-      triggerAutoComplete: true,
-      setValue: vi.fn()
+    // Directly set the dateTimeRef with our mock
+    wrapper.vm.dateTimeRef = ref({
+      ...dateTimeMock,
+      value: dateTimeMock
     });
+    createSavedViewsSpy = vi.spyOn(wrapper.vm, 'createSavedViews');
 
     wrapper.vm.router.currentRoute.value.name = "logs";
     await flushPromises();
@@ -333,7 +376,7 @@ describe("SearchBar Component", () => {
     await resetButton.trigger('click'); 
     const sqlModeToggle = wrapper.find('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
     await sqlModeToggle.trigger('click');
-    });
+  });
 
   it("should update SQL query when addSearchTerm watcher is triggered in SQL mode", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"]
@@ -668,8 +711,408 @@ describe("SearchBar Component", () => {
       );
     });
 
-
+    // it('should reset function content', async () => {
+      
+    //   wrapper.vm.searchObj.data.tempFunctionContent = 'function content';
+    //   wrapper.vm.searchObj.data.tempFunctionName = 'validName';
+    //   wrapper.vm.resetFunctionContent();
+    //   expect(wrapper.vm.searchObj.data.tempFunctionContent).toBe('');
+    //   expect(wrapper.vm.searchObj.data.tempFunctionName).toBe('');
+    // });
 
   });
 
+  describe('handleSavedView', () => {
+    beforeEach(() => {
+      // Mock savedviewsService.post
+      vi.mocked(savedviewsService.post).mockResolvedValue({
+        status: 200,
+        data: { message: 'Success' }
+      } as any);
+    });
+
+    it('should call createSavedViews for valid view name', async () => {
+      // Set up valid view name
+      // wrapper.vm.isSavedViewAction = 'create';
+      wrapper.vm.savedViewName = 'valid-view-name';
+      
+      const createSavedViewsSpy = vi.spyOn(wrapper.vm, 'createSavedViews');
+      
+      await wrapper.vm.handleSavedView();
+
+      await flushPromises();
+
+      wrapper.vm.createSavedViews('valid-view-name');
+    
+
+      vi.mocked(savedviewsService.post).mockResolvedValue({
+        status: 200,
+        data: { message: 'Success' }
+      } as any);
+
+      
+    });
+
+    it('should successfully apply saved view with complete response data', async () => {
+      // Mock the response data
+      const responseData = {
+        data: {
+          org_id: "2y1ufyK0yGTUSIXQfOrRxWpFqQs",
+          data: {
+            communicationMethod: "http",
+            config: {
+              fnLastSplitterPosition: 0,
+              fnSplitterLimit: [40, 100],
+              fnSplitterModel: 60,
+              lastSplitterPosition: 0,
+              refreshTimes: [
+                [
+                  { label: "5 sec", value: 5 },
+                  { label: "1 min", value: 60 },
+                  { label: "1 hr", value: 3600 }
+                ],
+                [
+                  { label: "10 sec", value: 10 },
+                  { label: "5 min", value: 300 },
+                  { label: "2 hr", value: 7200 }
+                ],
+                [
+                  { label: "15 sec", value: 15 },
+                  { label: "15 min", value: 900 },
+                  { label: "1 day", value: 86400 }
+                ],
+                [
+                  { label: "30 sec", value: 30 },
+                  { label: "30 min", value: 1800 }
+                ]
+              ],
+              splitterLimit: [0, 40],
+              splitterModel: 20
+            },
+            data: {
+              actionId: null,
+              actions: [],
+              additionalErrorMsg: "",
+              countErrorMsg: "",
+              customDownloadQueryObj: {},
+              datetime: {
+                endTime: 1749024271191000,
+                queryRangeRestrictionInHour: -1,
+                queryRangeRestrictionMsg: "",
+                relativeTimePeriod: "15m",
+                startTime: 1749023371191000,
+                type: "relative"
+              },
+              editorValue: 'SELECT * FROM "stream1"',
+              errorCode: 0,
+              errorDetail: "",
+              errorMsg: "",
+              filterErrMsg: "",
+              functionError: "",
+              hasSearchDataTimestampField: false,
+              histogramInterval: 0,
+              histogramQuery: "",
+              isOperationCancelled: false,
+              missingStreamMessage: "",
+              originalDataCache: {},
+              parsedQuery: {
+                columns: [
+                  {
+                    as: null,
+                    expr: {
+                      column: "*",
+                      table: null,
+                      type: "column_ref"
+                    }
+                  }
+                ],
+                distinct: { type: null },
+                from: [
+                  {
+                    as: null,
+                    db: null,
+                    table: "stream1"
+                  }
+                ],
+                groupby: null,
+                having: null,
+                into: { position: null },
+                limit: { seperator: "", value: [] },
+                options: null,
+                orderby: null,
+                type: "select",
+                where: null,
+                window: null,
+                with: null
+              },
+              query: 'SELECT * FROM "stream1"',
+              resultGrid: {
+                colOrder: {},
+                colSizes: {},
+                columns: [],
+                currentDateTime: "2025-06-04T08:04:09.069Z",
+                currentPage: 1
+              },
+              savedViewFilterFields: "",
+              searchAround: {
+                histogramHide: false,
+                indexTimestamp: -1,
+                size: 0
+              },
+              searchRequestTraceIds: [],
+              searchRetriesCount: {},
+              searchWebSocketTraceIds: [],
+              selectedTransform: null,
+              stream: {
+                addToFilter: "",
+                expandGroupRows: {
+                  common: true,
+                  stream1: true
+                },
+                expandGroupRowsFieldCount: {
+                  common: 0,
+                  stream1: 4
+                },
+                filterField: "",
+                filteredField: [],
+                interestingFieldList: [],
+                loading: false,
+                missingStreamMultiStreamFilter: [],
+                pipelineQueryStream: [],
+                selectedFields: [],
+                selectedStreamFields: [
+                  {
+                    ftsKey: false,
+                    group: "stream1",
+                    isInterestingField: false,
+                    isSchemaField: true,
+                    name: "_timestamp",
+                    showValues: false,
+                    streams: ["stream1"]
+                  },
+                  {
+                    ftsKey: false,
+                    group: "stream1",
+                    isInterestingField: false,
+                    isSchemaField: true,
+                    name: "job",
+                    showValues: true,
+                    streams: ["stream1"]
+                  },
+                  {
+                    ftsKey: false,
+                    group: "stream1",
+                    isInterestingField: false,
+                    isSchemaField: true,
+                    name: "level",
+                    showValues: true,
+                    streams: ["stream1"]
+                  },
+                  {
+                    ftsKey: false,
+                    group: "stream1",
+                    isInterestingField: false,
+                    isSchemaField: true,
+                    name: "log",
+                    showValues: true,
+                    streams: ["stream1"]
+                  }
+                ],
+                selectedStream: ["stream1"],
+                streamType: "logs",
+                userDefinedSchema: [],
+                functions: []
+              },
+              tempFunctionContent: "",
+              tempFunctionLoading: false,
+              tempFunctionName: "",
+              timezone: "Asia/Calcutta",
+              transformType: "function",
+              transforms: [],
+              histogram: {
+                xData: [],
+                yData: [],
+                chartParams: {}
+              },
+              savedViews: [
+                {
+                  org_id: "2y1ufyK0yGTUSIXQfOrRxWpFqQs",
+                  view_id: "2y2ETfwQVsIYcupzBRFisihBHdg",
+                  view_name: "dd"
+                }
+              ],
+              queryResults: []
+            },
+            loading: false,
+            loadingCounter: false,
+            loadingHistogram: false,
+            loadingSavedView: false,
+            loadingStream: false,
+            meta: {
+              clusters: [],
+              functionEditorPlaceholderFlag: true,
+              hasUserDefinedSchemas: false,
+              histogramDirtyFlag: false,
+              isActionsEnabled: false,
+              jobId: "",
+              jobRecords: "100",
+              logsVisualizeToggle: "logs",
+              pageType: "logs",
+              queryEditorPlaceholderFlag: true,
+              quickMode: false,
+              refreshHistogram: true,
+              refreshInterval: 0,
+              refreshIntervalLabel: "Off",
+              regions: [],
+              resetPlotChart: false,
+              resultGrid: {
+                chartInterval: "1 second",
+                chartKeyFormat: "HH:mm:ss",
+                manualRemoveFields: false,
+                navigation: {
+                  currentRowIndex: 0
+                },
+                rowsPerPage: 50,
+                showPagination: true,
+                wrapCells: false
+              },
+              searchApplied: false,
+              selectedTraceStream: "",
+              showDetailTab: false,
+              showFields: true,
+              showHistogram: true,
+              showQuery: true,
+              showSearchScheduler: false,
+              showTransformEditor: true,
+              sqlMode: true,
+              sqlModeManualTrigger: false,
+              toggleFunction: false,
+              toggleSourceWrap: true,
+              useUserDefinedSchemas: "user_defined_schema",
+              scrollInfo: {}
+            },
+            organizationIdentifier: "2y1ufyK0yGTUSIXQfOrRxWpFqQs",
+            runQuery: false,
+            shouldIgnoreWatcher: false
+          },
+          view_id: "2y2ETfwQVsIYcupzBRFisihBHdg",
+          view_name: "dd"
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {
+          "content-type": "application/json"
+        },
+        config: {
+          transitional: {
+            silentJSONParsing: true,
+            forcedJSONParsing: true,
+            clarifyTimeoutError: false
+          },
+          adapter: ["xhr", "http", "fetch"],
+          transformRequest: [null],
+          transformResponse: [null],
+          timeout: 0,
+          xsrfCookieName: "XSRF-TOKEN",
+          xsrfHeaderName: "X-XSRF-TOKEN",
+          maxContentLength: -1,
+          maxBodyLength: -1,
+          env: {},
+          headers: {
+            Accept: "application/json, text/plain, */*"
+          },
+          withCredentials: true,
+          baseURL: "http://localhost:5080",
+          method: "get",
+          url: "/api/2y1ufyK0yGTUSIXQfOrRxWpFqQs/savedviews/2y2ETfwQVsIYcupzBRFisihBHdg",
+          allowAbsoluteUrls: true
+        },
+        request: {
+          rqProxyXhr: {
+            _method: "GET",
+            _requestURL: "http://localhost:5080/api/2y1ufyK0yGTUSIXQfOrRxWpFqQs/savedviews/2y2ETfwQVsIYcupzBRFisihBHdg",
+            _async: true,
+            _requestHeaders: {
+              Accept: "application/json, text/plain, */*"
+            },
+            _requestData: null
+          }
+        }
+      };
+      
+
+      // Setup initial state
+      wrapper.vm.searchObj.data.stream.selectedStream = [];
+      wrapper.vm.searchObj.data.stream.streamLists.push({ value: 'stream1', label: 'Stream 1' });
+
+      // Mock the required services and refs
+      vi.mocked(savedviewsService.getViewDetail).mockResolvedValue(responseData as any);
+      
+      wrapper.vm.dateTimeRef = {
+        value: {
+          setSavedDate: vi.fn(),
+          setAbsoluteTime: vi.fn(),
+          setDateType: vi.fn(),
+          setRelativeTime: vi.fn(),
+          setCustomDate: vi.fn(),
+          getDateTimeRange: vi.fn().mockReturnValue({
+            startTime: 1749023371191000,
+            endTime: 1749024271191000,
+            type: 'relative'
+          })
+        }
+      };
+
+
+      // Call applySavedView with a view item
+      await wrapper.vm.applySavedView({
+        view_id: "2y2ETfwQVsIYcupzBRFisihBHdg",
+        view_name: "dd"
+      });
+
+      console.log(wrapper.vm.searchObj.meta.toggleFunction,'togglefunction')
+
+      // Wait for all promises to resolve
+      await flushPromises();
+
+
+
+      // Verify service was called
+      expect(savedviewsService.getViewDetail).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "2y2ETfwQVsIYcupzBRFisihBHdg"
+      );
+
+
+
+    });
+  });
+
+  describe('deleteSavedViews', () => {
+    beforeEach(() => {
+      wrapper.vm.deleteViewID = 'test-view-id';
+      vi.mocked(savedviewsService.delete).mockResolvedValue({
+        status: 200,
+        data: { message: 'Success' }
+      } as any);
+    });
+
+    it('should handle delete failure with error detail', async () => {
+      // Mock failed delete response with error detail
+      vi.mocked(savedviewsService.delete).mockResolvedValue({
+        status: 400,
+        data: { error_detail: 'View not found' }
+      } as any);
+
+      await wrapper.vm.deleteSavedViews();
+
+      expect(savedviewsService.delete).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        'test-view-id'
+      );
+    });
+
+  });
+
+  
 });
