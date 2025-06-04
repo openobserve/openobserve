@@ -59,23 +59,30 @@ impl RedirectResponse {
                 .append_header((LOCATION, redirect_uri))
                 .finish()
         } else {
-            let html = format!(
-                r#"
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="utf-8">
-                    <meta http-equiv="refresh" content="0;url={redirect_uri}">
-                    <title>OpenObserve Redirecting...</title>
-                </head>
-                <body>
-                    Redirecting to <a href="{redirect_uri}">click here</a>
-                </body>
-                </html>"#
-            );
-            HttpResponse::Found()
-                .content_type(ContentType::html())
-                .body(html)
+            // if the URL is too long, we send the original URL and let FE handle the redirect.
+            log::info!("Sending long URL as json response: {}", redirect_uri);
+            HttpResponse::Ok()
+                .content_type(ContentType::json())
+                .body(serde_json::json!({
+                    "redirect_uri": redirect_uri
+                }).to_string())
+            // let html = format!(
+            //     r#"
+            //     <!DOCTYPE html>
+            //     <html lang="en">
+            //     <head>
+            //         <meta charset="utf-8">
+            //         <meta http-equiv="refresh" content="0;url={redirect_uri}">
+            //         <title>OpenObserve Redirecting...</title>
+            //     </head>
+            //     <body>
+            //         Redirecting to <a href="{redirect_uri}">click here</a>
+            //     </body>
+            //     </html>"#
+            // );
+            // HttpResponse::Found()
+            //     .content_type(ContentType::html())
+            //     .body(html)
         }
     }
 }
