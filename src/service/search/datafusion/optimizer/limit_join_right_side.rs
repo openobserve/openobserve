@@ -15,18 +15,20 @@
 
 use std::sync::Arc;
 
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{
-        Result,
-        tree_node::{Transformed, TreeNode},
+        Column, Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
-    logical_expr::LogicalPlan,
+    logical_expr::{Extension, LogicalPlan, Sort, SortExpr},
     optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
-    prelude::Expr,
+    prelude::{Expr, col},
 };
 use itertools::Itertools;
 
-use super::utils::AddSortAndLimit;
+use super::utils::{AddSortAndLimit, is_contain_deduplication_plan};
+use crate::service::search::datafusion::plan::deduplication::DeduplicationLogicalNode;
 
 #[derive(Default, Debug)]
 pub struct LimitJoinRightSide {
@@ -57,6 +59,9 @@ impl OptimizerRule for LimitJoinRightSide {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
+        if self.limit == 0 {
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+        }
         match plan {
             LogicalPlan::Join(mut join) => {
                 let right_column = join
@@ -70,29 +75,102 @@ impl OptimizerRule for LimitJoinRightSide {
                         }
                     })
                     .collect_vec();
-                if right_column.is_empty() {
-                    let plan = (*join.right)
-                        .clone()
-                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
+                // limit the right side output size
+                let mut plan = (*join.right)
+                    .clone()
+                    .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
+                    .data;
+                if !right_column.is_empty() {
+                    // deduplication on join key
+                    plan = plan
+                        .rewrite(&mut DeduplicationRewriter::new(right_column))?
                         .data;
-                    join.right = Arc::new(plan);
-                    Ok(Transformed::yes(LogicalPlan::Join(join)))
-                } else {
-                    let plan = (*join.right)
-                        .clone()
-                        .rewrite(&mut AddSortAndLimit::new_with_deduplication(
-                            self.limit,
-                            0,
-                            right_column,
-                        ))?
-                        .data;
-                    join.right = Arc::new(plan);
-                    Ok(Transformed::yes(LogicalPlan::Join(join)))
                 }
+                join.right = Arc::new(plan);
+                Ok(Transformed::yes(LogicalPlan::Join(join)))
             }
             _ => Ok(Transformed::no(plan)),
         }
     }
+}
+
+struct DeduplicationRewriter {
+    pub deduplication_columns: Vec<Column>,
+}
+
+impl DeduplicationRewriter {
+    pub fn new(deduplication_columns: Vec<Column>) -> Self {
+        Self {
+            deduplication_columns,
+        }
+    }
+}
+
+impl TreeNodeRewriter for DeduplicationRewriter {
+    type Node = LogicalPlan;
+
+    fn f_down(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
+        if is_contain_deduplication_plan(&node) {
+            return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
+        }
+
+        // insert deduplication to first plan that contains deduplication columns
+        let plan = match node {
+            LogicalPlan::Projection(_) | LogicalPlan::SubqueryAlias(_) => {
+                let schema = node.inputs().first().unwrap().schema();
+                for column in self.deduplication_columns.iter() {
+                    if schema.field_with_name(None, column.name()).is_err() {
+                        let plan = generate_deduplication_plan(
+                            Arc::new(node),
+                            self.deduplication_columns.clone(),
+                        );
+                        return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+                    }
+                }
+                Transformed::no(node)
+            }
+            _ => {
+                let plan =
+                    generate_deduplication_plan(Arc::new(node), self.deduplication_columns.clone());
+                Transformed::new(plan, true, TreeNodeRecursion::Stop)
+            }
+        };
+
+        Ok(plan)
+    }
+}
+
+fn generate_deduplication_plan(
+    node: Arc<LogicalPlan>,
+    deduplication_columns: Vec<Column>,
+) -> LogicalPlan {
+    let mut sort_columns = Vec::with_capacity(deduplication_columns.len() + 1);
+    let schema = node.schema().clone();
+
+    for column in deduplication_columns.iter() {
+        sort_columns.push(SortExpr {
+            expr: col(column.name()),
+            asc: false,
+            nulls_first: false,
+        });
+    }
+
+    if schema.field_with_name(None, TIMESTAMP_COL_NAME).is_ok() {
+        sort_columns.push(SortExpr {
+            expr: col(TIMESTAMP_COL_NAME.to_string()),
+            asc: false,
+            nulls_first: false,
+        });
+    }
+
+    let sort = LogicalPlan::Sort(Sort {
+        expr: sort_columns,
+        input: node,
+        fetch: None,
+    });
+    LogicalPlan::Extension(Extension {
+        node: Arc::new(DeduplicationLogicalNode::new(sort, deduplication_columns)),
+    })
 }
 
 #[cfg(test)]

@@ -142,6 +142,7 @@ pub async fn save(
         };
     }
 
+    let next_run_at = chrono::Utc::now().timestamp_micros();
     // Save the trigger to db
     match db::scheduler::get(
         &derived_stream.org_id,
@@ -151,17 +152,12 @@ pub async fn save(
     .await
     {
         Ok(mut existing_trigger) => {
-            let next_run_at = get_next_run_at(
-                derived_stream.delay.unwrap_or_default(),
-                Some(existing_trigger.next_run_at),
-            )?;
             existing_trigger.next_run_at = next_run_at;
             db::scheduler::update_trigger(existing_trigger)
                 .await
                 .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update"))
         }
         Err(_) => {
-            let next_run_at = get_next_run_at(derived_stream.delay.unwrap_or_default(), None)?;
             let trigger = db::scheduler::Trigger {
                 org: derived_stream.org_id.to_string(),
                 module: db::scheduler::TriggerModule::DerivedStream,
@@ -225,27 +221,4 @@ impl DerivedStreamExt for DerivedStream {
             )
             .await
     }
-}
-
-fn get_next_run_at(
-    delay_in_mins: i32,
-    previous_next_run_at: Option<i64>,
-) -> Result<i64, anyhow::Error> {
-    // validate & parse delay value
-    if delay_in_mins < 0 {
-        return Err(anyhow::anyhow!(
-            "Invalid delay value. Value must be non-negative"
-        ));
-    }
-
-    let delay = chrono::Duration::minutes(delay_in_mins as _);
-    let supposed_next_run_at =
-        previous_next_run_at.map_or(Ok(chrono::Utc::now()), |prev_next_run_at| {
-            chrono::DateTime::<chrono::Utc>::from_timestamp_micros(prev_next_run_at)
-                .ok_or(anyhow::anyhow!("Invalid previous next run at timestamp"))
-        })?;
-    Ok(supposed_next_run_at
-        .checked_add_signed(delay)
-        .ok_or(anyhow::anyhow!("DateTime arithmetic overflow"))?
-        .timestamp_micros())
 }

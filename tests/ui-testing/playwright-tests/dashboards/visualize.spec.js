@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../baseFixtures";
 import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
 import logsdata from "../../../test-data/logs_data.json";
@@ -313,7 +313,7 @@ test.describe("logs testcases", () => {
     // Enter an invalid query into the search bar
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator('.inputarea')
+      .locator(".inputarea")
       .fill("select from user whare ID =1");
 
     // Refresh the search
