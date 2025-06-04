@@ -559,7 +559,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     .unwrap();
                     let is_new_usr = process_token(res)
                         .await
-                        .map(|new_user| format!("#new_user_login={}", new_user));
+                        .map(|new_user| format!("&new_user_login={}", new_user));
                     login_url = format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
