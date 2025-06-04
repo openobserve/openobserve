@@ -839,21 +839,18 @@ export default defineComponent({
               optionsValues.length > 0 ? [optionsValues[0]] : [];
         }
         return;
-      }
-
-      // For single select, only skip if value is not null/undefined and is present in options
-      const isValid =
-        currentVariable.value !== null &&
-        currentVariable.value !== undefined &&
-        currentVariable.options.some(
-          (opt: any) => opt.value === currentVariable.value,
-        );
-      if (isValid) {
-        console.log(
-          "[Debug] SingleSelect variable already has a valid value, skipping recalculation",
-          currentVariable.value,
-        );
-        return;
+      } else {
+        // For single select, we need to ensure the value is valid
+        if (
+          currentVariable.value !== null &&
+          currentVariable.value !== undefined
+        ) {
+          console.log(
+            "[Debug] SingleSelect variable already has a valid value, skipping recalculation",
+            currentVariable.value,
+          );
+          return;
+        }
       }
 
       // Check if this is a child variable
