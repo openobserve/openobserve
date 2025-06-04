@@ -509,7 +509,12 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
     use crate::service::db::org_users::get_cached_user_org;
 
-    let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
+    let invite = org_invites::get_by_token_user(invite_token, user_email)
+        .await
+        .map_err(|e| {
+            log::info!("error getting token {invite_token} for email {user_email} : {e}");
+            anyhow::anyhow!("Provided Token is not valid for this email id")
+        })?;
 
     let now = chrono::Utc::now().timestamp_micros();
 

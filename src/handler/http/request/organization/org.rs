@@ -516,7 +516,7 @@ async fn extend_trial_period(
     if org.trial_ends_at > req.new_end_date {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
-            "new end date cannot be earlier than existing".to_string(),
+            "Existing trial end date is after the provided date".to_string(),
         )));
     }
 
