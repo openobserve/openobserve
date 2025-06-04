@@ -1,3 +1,6 @@
+  //Methods: Drilldown Name, Drilldown by dashboard, Drilldown by URL, Drilldown by logs
+
+
 export default class DashboardDrilldownPage {
   constructor(page) {
     this.page = page;
@@ -30,15 +33,13 @@ export default class DashboardDrilldownPage {
   generateUniqueDrilldownName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
-  //    await this.page.getByRole('option', { name: position }).click();
+  
+  // Generate a unique dashboard name
   generatedashboardName(prefix = "dashboard") {
     return `${prefix}_${Date.now()}`;
   }
-
-  // generateUniquePanelName(prefix = "panel") {
-  //   return `${prefix}_${Date.now()}`;
-  // } //generateUniquePanelName
-
+  
+  //Add Drilldown by Dashboard
   async addDrillownDashboard(
     folderName,
     drilldownName,
@@ -61,7 +62,7 @@ export default class DashboardDrilldownPage {
     await this.addBtn.click();
   }
 
-  //Drilldwon by URL
+  //Add Drilldwon by URL
   async addDrillownByURL(drilldownName, url) {
     await this.addDrilldownButton.waitFor({ state: "visible" });
     await this.addDrilldownButton.click();
@@ -73,7 +74,7 @@ export default class DashboardDrilldownPage {
     await this.addBtn.click();
   }
 
-  //Drilldown by logs
+  // AddDrilldown by logs
   async addDrillownByLogs(drilldownName) {
     await this.addDrilldownButton.waitFor({ state: "visible" });
     await this.addDrilldownButton.click();
@@ -84,3 +85,4 @@ export default class DashboardDrilldownPage {
     await this.addBtn.click();
   }
 }
+

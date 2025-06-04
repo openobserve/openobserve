@@ -1,3 +1,5 @@
+//dashboard panel edit page
+// Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs
 export default class DashboardPanel {
   constructor(page) {
     this.page = page;
