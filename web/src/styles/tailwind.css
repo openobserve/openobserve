@@ -23,9 +23,6 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     width: auto;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   /* ... */
 }
