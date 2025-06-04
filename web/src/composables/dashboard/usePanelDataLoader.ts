@@ -167,6 +167,7 @@ export const usePanelDataLoader = (
     loadingTotal: 0,
     loadingCompleted: 0,
     loadingProgressPercentage: 0,
+    isPartialData: false,
   });
 
   // observer for checking if panel is visible on the screen
@@ -437,6 +438,10 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        // Set partial data when partition API call is interrupted
+        state.isPartialData = true;
+        // Save current state to cache with partial data flag
+        saveCurrentStateToCache();
         return;
       }
 
@@ -642,6 +647,10 @@ export const usePanelDataLoader = (
     } catch (error) {
       // Process API error for "sql"
       processApiError(error, "sql");
+      // Set partial data when partition API call fails
+      state.isPartialData = true;
+      // Save current state to cache with partial data flag
+      saveCurrentStateToCache();
       return { result: null, metadata: metadata };
     } finally {
       // set loading to false
@@ -713,8 +722,9 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.order_by
-        ?.toLowerCase() === "asc"
+      state?.resultMetaData?.[
+        payload?.meta?.currentQueryIndex
+      ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
       state.data[payload?.meta?.currentQueryIndex] = [
@@ -1026,6 +1036,9 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
+    // Reset partial data flag when starting new load
+    state.isPartialData = false;
+
     try {
       log("loadData: entering...");
       state.loadingTotal = 0;
@@ -2271,6 +2284,7 @@ export const usePanelDataLoader = (
       state.resultMetaData = tempPanelCacheValue.resultMetaData;
       state.annotations = tempPanelCacheValue.annotations;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
+      state.isPartialData = tempPanelCacheValue.isPartialData;
 
       // set that the cache is restored
       isRestoredFromCache = true;
