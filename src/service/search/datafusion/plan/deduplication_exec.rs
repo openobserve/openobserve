@@ -330,7 +330,9 @@ fn generate_deduplication_arrays(
                         .unwrap()
                         .clone(),
                 ),
-                _ => return Err(internal_err!("Unsupported data type: {}", array.data_type())),
+                _ => {
+                    panic!("Unsupported data type: {}", array.data_type());
+                }
             }
         })
         .collect_vec();
