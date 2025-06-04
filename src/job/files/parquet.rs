@@ -548,6 +548,7 @@ async fn move_files(
         for file in new_file_list.iter() {
             // use same lock to combine the operations of check lock and add to removing list
             let wal_lock = infra::local_lock::lock("wal").await?;
+            let lock_guard = wal_lock.lock().await;
             let can_delete = if wal::lock_files_exists(&file.key) {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
@@ -566,7 +567,7 @@ async fn move_files(
                 db::file_list::local::add_removing(&file.key).await?;
                 true
             };
-            drop(wal_lock);
+            drop(lock_guard);
 
             if can_delete {
                 match remove_file(wal_dir.join(&file.key)) {
