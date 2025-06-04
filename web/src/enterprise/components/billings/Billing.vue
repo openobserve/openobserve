@@ -58,6 +58,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           inline-label
           vertical
         >
+
+          <q-route-tab
+            exact
+            name="plans"
+            :to="
+              '/billings/plans?org_identifier=' +
+              store.state.selectedOrganization.identifier
+            "
+            :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
+            :label="t('billing.plansLabel')"
+            content-class="tab_content"
+          />
           <q-route-tab
             exact
             default
@@ -72,17 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
             :label="t('billing.usageLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            exact
-            name="plans"
-            :to="
-              '/billings/plans?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
-            :label="t('billing.plansLabel')"
             content-class="tab_content"
           />
           <q-route-tab
@@ -131,9 +132,9 @@ export default defineComponent({
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
 
     onMounted(() => {
-      if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "usage") {
-        billingtab.value = "usage";
-        router.push({ path: "/billings/usage", query: { org_identifier: store.state.selectedOrganization.identifier, usage_date: usageDate.value, data_type: usageDataType.value } });
+      if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
+        billingtab.value = "plans";
+        router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
       }
       // else {
       //   billingtab.value = router.currentRoute.value.name;
