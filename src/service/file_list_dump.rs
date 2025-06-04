@@ -73,7 +73,6 @@ async fn get_dump_files_in_range(
 
 fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(id_col, "id", Int64Array, rb);
-    get_col!(account_col, "account", StringArray, rb);
     get_col!(org_col, "org", StringArray, rb);
     get_col!(stream_col, "stream", StringArray, rb);
     get_col!(date_col, "date", StringArray, rb);
@@ -90,7 +89,6 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     for idx in 0..rb.num_rows() {
         let t = FileRecord {
             id: id_col.value(idx),
-            account: account_col.value(idx).to_string(),
             org: org_col.value(idx).to_string(),
             stream: stream_col.value(idx).to_string(),
             date: date_col.value(idx).to_string(),
@@ -214,10 +212,6 @@ pub async fn query(
     id_hint: Option<i64>,
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let cfg = get_config();
-    if !cfg.common.file_list_dump_enabled {
-        return Ok(vec![]);
-    }
-
     let stream_key = format!(
         "{org}/{}/{org}_{stream_type}_{stream}",
         StreamType::Filelist
@@ -230,7 +224,15 @@ pub async fn query(
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
-    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
+    let dump_files: Vec<_> = dump_files
+        .into_iter()
+        .map(|f| FileKey {
+            key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
+            meta: (&f).into(),
+            deleted: false,
+            segment_ids: None,
+        })
+        .collect();
     let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
 
     let stream_key = format!("{org}/{stream_type}/{stream}");
@@ -274,7 +276,15 @@ pub async fn get_ids_in_range(
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
-    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
+    let dump_files: Vec<_> = dump_files
+        .into_iter()
+        .map(|f| FileKey {
+            key: format!("files/{}/{}/{}", stream_key, f.date, f.file),
+            meta: (&f).into(),
+            deleted: false,
+            segment_ids: None,
+        })
+        .collect();
     let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
 
     let stream_key = format!("{org}/{stream_type}/{stream}");
@@ -322,7 +332,6 @@ async fn move_and_delete(
         .iter()
         .chain(dump_files.iter())
         .map(|f| FileListDeleted {
-            account: f.account.to_string(),
             file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             index_file: false,
             flattened: false,
@@ -349,11 +358,11 @@ async fn move_and_delete(
         let items: Vec<_> = list
             .iter()
             .chain(dump_files.iter())
-            .map(|f| {
-                let mut f = FileKey::from(f);
-                f.deleted = true;
-                f.segment_ids = None;
-                f
+            .map(|f| FileKey {
+                key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
+                meta: f.into(),
+                deleted: true,
+                segment_ids: None,
             })
             .collect();
         if let Err(e) = infra::file_list::batch_process(&items).await {
@@ -442,7 +451,15 @@ pub async fn stats(
         return Ok(vec![]);
     }
 
-    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
+    let dump_files: Vec<_> = dump_files
+        .into_iter()
+        .map(|f| FileKey {
+            key: format!("files/{}/{}/{}", f.stream, f.date, f.file),
+            meta: (&f).into(),
+            deleted: false,
+            segment_ids: None,
+        })
+        .collect();
 
     let sql = format!(
         r#"

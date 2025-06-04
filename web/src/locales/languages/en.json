@@ -123,7 +123,7 @@
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
-    "legendLabel": "Legends",
+    "legendLabel":"Legends",
     "logs": "Logs",
     "enrichmentTables": "Enrichment Tables",
     "savedViewsLabel": "Saved View",
@@ -304,9 +304,7 @@
     "apiKeyNotFound": "User API Key Not Found.",
     "allowedOrg": "Allowed Organization",
     "roles": "Roles",
-    "groups": "Groups",
-    "customRole": "Custom Roles",
-    "description": "Description"
+    "groups": "Groups"
   },
   "serviceAccounts": {
     "header": "Service Accounts",
@@ -329,7 +327,7 @@
     "groups": "User Groups",
     "roles": "Roles",
     "organizations": "Organizations",
-    "addGroup": "Add User Group",
+    "addGroup": "Add Group",
     "addRole": "Add Role",
     "roleName": "Role Name",
     "groupName": "Group Name",
@@ -345,11 +343,9 @@
     "userName": "User Name",
     "resourceName": "Resource Name",
     "searchRole": "Search Role",
-    "searchGroup": "Search User Group",
+    "searchGroup": "Search Group",
     "object": "Object",
     "serviceAccounts": "Service Accounts",
-    "serviceAccountsName": "Service Accounts Name",
-    "basicUsers": "Users",
     "quota": "Quotas"
   },
   "ticket": {
@@ -380,7 +376,7 @@
   "organization": {
     "header": "Organizations",
     "orgName": "Organization Name",
-    "createOrganization": "Add Organization",
+    "createOrganization": "Create Organization",
     "updateOrganization": "Update Organization",
     "nameHolder": "Type name here",
     "add": "Add Organization",
@@ -409,8 +405,7 @@
     "role": "Role",
     "nameRequired": "Name is required",
     "subscription_type": "Plan Type",
-    "proceed_subscription": "Proceed to Subscription",
-    "subscription_plan": "Subscription Plan"
+    "proceed_subscription": "Proceed to Subscription"
   },
   "template": {
     "header": "Templates",
@@ -469,8 +464,8 @@
     "storeOriginalData": "Store Original Data",
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
-    "extendedStartDate": "Start Date",
-    "extendedEndDate": "End Date"
+    "extendedStartDate":"Start Date",
+    "extendedEndDate":"End Date"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -491,12 +486,12 @@
     "conditionTitle": "Associate Condition",
     "query": "Associate Query",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
-    "import": "Import",
-    "export": "Export",
-    "edit": "Edit",
-    "delete": "Delete",
-    "view": "View",
-    "delay": "Delay"
+    "import":"Import",
+    "export":"Export",
+    "edit":"Edit",
+    "delete":"Delete",
+    "view":"View",
+    "delay":"Delay"
   },
   "function": {
     "header": "Functions",
@@ -901,11 +896,11 @@
     "header": "Usage & Billing",
     "plans": "Plans",
     "subtitle": "Simple, transparent pricing",
-    "individuals": "For Individuals",
-    "startups": "For Startups",
-    "basic": "Free",
-    "pro": "Pay as you Go",
-    "business": "Enterprise",
+    "individuals": "For individuals",
+    "startups": "For startups",
+    "basic": "Basic",
+    "pro": "Pro",
+    "business": "Business",
     "whatIsIncluded": "What's included",
     "subscribed": "Subscribed",
     "getStarted": "Get started",
@@ -920,7 +915,7 @@
     "status": "Status",
     "action": "Action",
     "usage": "Usage",
-    "manageSubscription": "Manage Subscription",
+    "manageCards": "Manage Cards",
     "subscriptionCheckout": "Subscription checkout",
     "everythingDeveloperPlan": "Everything in Basic Plan, plus:",
     "messageDataNotFound": "Data not found",
@@ -943,8 +938,7 @@
     "SearchFunctionNotDefined": "Error: Search function not defined.",
     "SearchParquetFileNotFound": "Error: Search parquet file not found.",
     "SearchFieldHasNoCompatibleDataType": "Error: Search file has no compatible data type.",
-    "SearchSQLExecuteError": "Error: Search SQL execute error.",
-    "SearchSQLCancelled": "Error: Search SQL was cancelled."
+    "SearchSQLExecuteError": "Error: Search SQL execute error."
   },
   "alerts": {
     "header": "Alerts",
@@ -1001,17 +995,17 @@
     "title": "Title",
     "createFunction": "Create Function",
     "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline.",
-    "createdBy": "Created By",
-    "createdAt": "Created At",
-    "lastRunAt": "Last Run At",
-    "lastSuccessfulAt": "Last Successfull At",
-    "status": "Status",
+    "createdBy":"Created By",
+    "createdAt":"Created At",
+    "lastRunAt":"Last Run At",
+    "lastSuccessfulAt":"Last Successfull At",
+    "status":"Status",
     "numOfEvents": "Number of Events",
-    "view": "View",
-    "webhook": "Web Hook",
-    "email": "Email",
-    "action": "Action",
-    "all": "All"
+    "view":"View",
+    "webhook":"Web Hook",
+    "email":"Email",
+    "action":"Action",
+    "all":"All"
   },
   "alert_templates": {
     "header": "Templates",
@@ -1049,11 +1043,10 @@
     "api_header_value": "Value",
     "add_template": "New Template",
     "skip_tls_verify": "Skip TLS Verify",
-    "action": "Action",
-    "output_format": "Output Format"
+    "action": "Action"
   },
   "pipeline_destinations": {
-    "header": "Pipeline Destinations"
+    "header":"Pipeline Destinations"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",
@@ -1099,8 +1092,7 @@
     "spanIdFieldName": "Span ID Field Name",
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
     "cipherKeys": "Cipher Keys",
-    "nodes": "Nodes",
-    "enableStreamingSearch": "Enable Streaming Search"
+    "nodes": "Nodes"
   },
   "reports": {
     "header": "Reports",
@@ -1158,9 +1150,9 @@
     "deleteTitle": "Delete",
     "deleteText": "Are you sure you want to delete file ?",
     "uploadCodeZip": "Upload Code ZIP File",
-    "update": "Update Action",
-    "type": "Execution Type",
-    "serviceAccount": "Service Account",
+    "update":"Update Action",
+    "type":"Execution Type",
+    "serviceAccount":"Service Account",
     "search": "Search Action",
     "timezone": "Timezone",
     "zipFileRequired": "ZIP File is required!",
@@ -1194,7 +1186,7 @@
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
   },
-  "quota": {
+  "quota":{
     "header": "Quotas",
     "api-limits": "API Limits",
     "role-limits": "Role Limits",

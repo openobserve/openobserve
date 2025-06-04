@@ -285,11 +285,6 @@ impl StreamingAggsCache {
     pub fn insert(&self, k: String, v: RecordBatch) {
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
-            log::info!(
-                "[StreamingAggs] remove the oldest entry: max_entries={}, current_entries={}",
-                self.max_entries,
-                w.len()
-            );
             if let Some(k) = w.pop_front() {
                 self.data.remove(&k);
                 GLOBAL_ID_CACHE.remove(&k);
@@ -311,7 +306,7 @@ impl Default for StreamingAggsCache {
         Self::new(
             config::get_config()
                 .limit
-                .datafusion_streaming_aggs_cache_max_entries,
+                .datafusion_file_stat_cache_max_entries,
         )
     }
 }
@@ -330,10 +325,6 @@ impl StreamingIdCache {
     pub fn insert(&self, k: String, start_time: i64, end_time: i64) {
         self.data
             .insert(k, StreamingIdItem::new(start_time, end_time));
-    }
-
-    pub fn exists(&self, k: &str) -> bool {
-        self.data.contains_key(k)
     }
 
     pub fn check_time(&self, k: &str, start_time: i64, end_time: i64) -> bool {

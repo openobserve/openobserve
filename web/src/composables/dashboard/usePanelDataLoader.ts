@@ -28,7 +28,6 @@ import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
 import {
   addLabelsToSQlQuery,
   changeHistogramInterval,
-  convertQueryIntoSingleLine,
 } from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
@@ -40,14 +39,12 @@ import {
   b64EncodeUnicode,
   generateTraceContext,
   isWebSocketEnabled,
-  isStreamingEnabled,
 } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
-import useHttpStreamingSearch from "../useStreamingSearch";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -88,32 +85,11 @@ export const usePanelDataLoader = (
     cleanUpListeners,
   } = useSearchWebSocket();
 
-  const {
-    fetchQueryDataWithHttpStream,
-    cancelStreamQueryBasedOnRequestId,
-    closeStreamWithError,
-    closeStream,
-    resetAuthToken,
-  } = useHttpStreamingSearch();
-
   const { refreshAnnotations } = useAnnotations(
     store.state.selectedOrganization.identifier,
     dashboardId?.value,
     panelSchema.value.id,
   );
-
-  const shouldFetchAnnotations = () => {
-    return [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "stacked",
-      "h-stacked",
-    ].includes(panelSchema.value.type);
-  };
 
   const getFallbackOrderByCol = () => {
     // from panelSchema, get first x axis field alias
@@ -339,10 +315,7 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    if (
-      isWebSocketEnabled(store.state) &&
-      state.searchRequestTraceIds
-    ) {
+    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
@@ -369,13 +342,8 @@ export const usePanelDataLoader = (
     endISOTimestamp: string,
     histogramInterval: string | null,
   ) => {
-    const sql = store.state.zoConfig.sql_base64_enabled
-      ? b64EncodeUnicode(
-          await changeHistogramInterval(query, histogramInterval ?? null),
-        )
-      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
-      sql,
+      sql: await changeHistogramInterval(query, histogramInterval ?? null),
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -410,14 +378,7 @@ export const usePanelDataLoader = (
           queryService.partition({
             org_identifier: store.state.selectedOrganization.identifier,
             query: {
-              sql: store.state.zoConfig.sql_base64_enabled
-                ? b64EncodeUnicode(query)
-                : query,
-              // pass encodig if enabled,
-              // make sure that `encoding: null` is not being passed, that's why used object extraction logic
-              ...(store.state.zoConfig.sql_base64_enabled
-                ? { encoding: "base64" }
-                : {}),
+              sql: query,
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
@@ -425,8 +386,6 @@ export const usePanelDataLoader = (
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
               size: -1,
-              // pass always true for streaming_output
-              streaming_output: true,
             },
             page_type: pageType,
             traceparent,
@@ -492,22 +451,13 @@ export const usePanelDataLoader = (
                 {
                   org_identifier: store.state.selectedOrganization.identifier,
                   query: {
-                    query: {
-                      ...(await getHistogramSearchRequest(
-                        query,
-                        it,
-                        partition[0],
-                        partition[1],
-                        histogramInterval,
-                      )),
-                      streaming_output: res?.data?.streaming_aggs ?? false,
-                      streaming_id: res?.data?.streaming_id ?? null,
-                    },
-                    // pass encodig if enabled,
-                    // make sure that `encoding: null` is not being passed, that's why used object extraction logic
-                    ...(store.state.zoConfig.sql_base64_enabled
-                      ? { encoding: "base64" }
-                      : {}),
+                    query: await getHistogramSearchRequest(
+                      query,
+                      it,
+                      partition[0],
+                      partition[1],
+                      histogramInterval,
+                    ),
                   },
                   page_type: pageType,
                   traceparent,
@@ -553,11 +503,8 @@ export const usePanelDataLoader = (
             break;
           }
 
-          if (res?.data?.streaming_aggs) {
-            state.data[currentQueryIndex] = [...searchRes.data.hits];
-          }
           // if order by is desc, append new partition response at end
-          else if (order_by.toLowerCase() === "desc") {
+          if (order_by.toLowerCase() === "desc") {
             state.data[currentQueryIndex] = [
               ...(state.data[currentQueryIndex] ?? []),
               ...searchRes.data.hits,
@@ -658,90 +605,32 @@ export const usePanelDataLoader = (
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[payload?.meta?.currentQueryIndex] = [
+      state.data[payload?.queryReq?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
       ];
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
       // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = [
+      state.data[payload?.queryReq?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
       ];
     } else {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      state.data[payload?.queryReq?.currentQueryIndex] = [
+        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
         ...(searchRes?.content?.results?.hits ?? {}),
       ];
     }
 
     // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] =
+    state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
       searchRes?.content?.results ?? {};
-  };
-
-  const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = {
-      ...(searchRes?.content ?? {}),
-      ...(searchRes?.content?.results ?? {}),
-    };
-  };
-
-  const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
-    // remove past error detail
-    state.errorDetail = {
-      message: "",
-      code: "",
-    };
-
-    // is streaming aggs
-    const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]
-        ?.streaming_aggs ?? false;
-
-    // if streaming aggs, replace the state data
-    if (streaming_aggs) {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
-    }
-    // if order by is desc, append new partition response at end
-    else if (
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.order_by
-        ?.toLowerCase() === "asc"
-    ) {
-      // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-      ];
-    } else {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(state.data[payload?.meta?.currentQueryIndex] ?? []),
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
-    }
-
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
-      searchRes?.content?.results?.hits ?? {};
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
-      // console.log("panel data loader response", payload.traceId, response);
-
-      if (response.type === "search_response_metadata") {
-        handleStreamingHistogramMetadata(payload, response);
-      }
-
-      if (response.type === "search_response_hits") {
-        handleStreamingHistogramHits(payload, response);
-      }
-
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
       }
@@ -806,11 +695,6 @@ export const usePanelDataLoader = (
             payload.queryReq.endISOTimestamp,
             null,
           ),
-          // pass encodig if enabled,
-          // make sure that `encoding: null` is not being passed, that's why used object extraction logic
-          ...(store.state.zoConfig.sql_base64_enabled
-            ? { encoding: "base64" }
-            : {}),
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
@@ -888,7 +772,6 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
-        meta: any;
       } = {
         queryReq: {
           query,
@@ -896,20 +779,12 @@ export const usePanelDataLoader = (
           startISOTimestamp,
           endISOTimestamp,
           currentQueryIndex,
-          // pass encodig if enabled,
-          // make sure that encoding: null is not being passed, that's why used object extraction logic
-          ...(store.state.zoConfig.sql_base64_enabled
-            ? { encoding: "base64" }
-            : {}),
         },
         type: "histogram",
         isPagination: false,
         traceId,
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
-        meta: {
-          currentQueryIndex,
-        },
       };
 
       fetchQueryDataWithWebSocket(payload, {
@@ -917,95 +792,6 @@ export const usePanelDataLoader = (
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
-        reset: handleSearchReset,
-      });
-
-      addTraceId(traceId);
-    } catch (e: any) {
-      state.errorDetail = {
-        message: e?.message || e,
-        code: e?.code ?? "",
-      };
-      state.loading = false;
-      state.isOperationCancelled = false;
-    }
-  };
-
-  const getDataThroughStreaming = async (
-    query: string,
-    it: any,
-    startISOTimestamp: string,
-    endISOTimestamp: string,
-    pageType: string,
-    currentQueryIndex: number,
-    abortControllerRef: any,
-  ) => {
-    try {
-      const { traceId } = generateTraceContext();
-
-      const payload: {
-        queryReq: any;
-        type: "search" | "histogram" | "pageCount";
-        isPagination: boolean;
-        traceId: string;
-        org_id: string;
-        pageType: string;
-        searchType: string;
-        meta: any;
-      } = {
-        queryReq: {
-          query: await getHistogramSearchRequest(
-            query,
-            it,
-            startISOTimestamp,
-            endISOTimestamp,
-            null,
-          ),
-        },
-        type: "histogram",
-        isPagination: false,
-        traceId,
-        org_id: store?.state?.selectedOrganization?.identifier,
-        pageType,
-        searchType: searchType.value ?? "dashboards",
-        meta: {
-          currentQueryIndex,
-          dashboard_id: dashboardId?.value,
-          folder_id: folderId?.value,
-          fallback_order_by_col: getFallbackOrderByCol(),
-        },
-      };
-
-      // type: "search",
-      // content: {
-      //   trace_id: payload.traceId,
-      //   payload: {
-      //     query: await getHistogramSearchRequest(
-      //       payload.queryReq.query,
-      //       payload.queryReq.it,
-      //       payload.queryReq.startISOTimestamp,
-      //       payload.queryReq.endISOTimestamp,
-      //       null,
-      //     ),
-      //   },
-      //   stream_type: payload.pageType,
-      //   search_type: searchType.value ?? "dashboards",
-      //   org_id: store?.state?.selectedOrganization?.identifier,
-      //   use_cache: (window as any).use_cache ?? true,
-      //   dashboard_id: dashboardId?.value,
-      //   folder_id: folderId?.value,
-      //   fallback_order_by_col: getFallbackOrderByCol(),
-      // },
-
-      // if aborted, return
-      if (abortControllerRef?.signal?.aborted) {
-        return;
-      }
-
-      fetchQueryDataWithHttpStream(payload, {
-        data: handleSearchResponse,
-        error: handleSearchError,
-        complete: handleSearchClose,
         reset: handleSearchReset,
       });
 
@@ -1165,10 +951,12 @@ export const usePanelDataLoader = (
             }
           },
         );
+
         // get annotations
-        const annotationList = shouldFetchAnnotations()
-          ? await refreshAnnotations(startISOTimestamp, endISOTimestamp)
-          : [];
+        const annotationList = await refreshAnnotations(
+          startISOTimestamp,
+          endISOTimestamp,
+        );
 
         // Wait for all query promises to resolve
         const queryResults: any = await Promise.all(queryPromises);
@@ -1382,12 +1170,10 @@ export const usePanelDataLoader = (
                   }
 
                   // get annotations
-                  const annotationList = shouldFetchAnnotations()
-                    ? await refreshAnnotations(
-                        startISOTimestamp,
-                        endISOTimestamp,
-                      )
-                    : [];
+                  const annotationList = await refreshAnnotations(
+                    startISOTimestamp,
+                    endISOTimestamp,
+                  );
                   state.annotations = annotationList;
 
                   // need to break the loop, save the cache
@@ -1417,8 +1203,7 @@ export const usePanelDataLoader = (
                   panelSchema.value.queryType,
                 );
 
-              // convert query into single line
-              const query = await convertQueryIntoSingleLine(query2);
+              const query = query2;
 
               const metadata: any = {
                 originalQuery: it.query,
@@ -1434,25 +1219,12 @@ export const usePanelDataLoader = (
               };
 
               state.metadata.queries[panelQueryIndex] = metadata;
-              const annotations = shouldFetchAnnotations()
-                ? await refreshAnnotations(
-                    Number(startISOTimestamp),
-                    Number(endISOTimestamp),
-                  )
-                : [];
+              const annotations = await refreshAnnotations(
+                Number(startISOTimestamp),
+                Number(endISOTimestamp),
+              );
               state.annotations = annotations;
-
-              if (isStreamingEnabled(store.state)) {
-                await getDataThroughStreaming(
-                  query,
-                  it,
-                  startISOTimestamp,
-                  endISOTimestamp,
-                  pageType,
-                  panelQueryIndex,
-                  abortControllerRef,
-                );
-              } else if (isWebSocketEnabled(store.state)) {
+              if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
                   query,
                   it,
@@ -1722,11 +1494,7 @@ export const usePanelDataLoader = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
 
-        const errorCode =
-          error?.response?.status ||
-          error?.status ||
-          error?.response?.data?.code ||
-          "";
+        const errorCode = error?.response?.data?.code || error?.code || "";
 
         state.errorDetail = {
           message: trimmedErrorMessage,
@@ -1747,13 +1515,7 @@ export const usePanelDataLoader = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
 
-        const errorCode =
-          isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)
-            ? error?.response?.data?.code || error?.code || error?.status || ""
-            : error?.response?.status ||
-              error?.status ||
-              error?.response?.data?.code ||
-              "";
+        const errorCode = error?.response?.data?.code || error?.code || "";
 
         state.errorDetail = {
           message: trimmedErrorMessage,
@@ -2169,7 +1931,7 @@ export const usePanelDataLoader = (
     }
 
     // for websocket
-    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
+    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {

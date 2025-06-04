@@ -19,7 +19,7 @@ use config::{
     get_config,
     meta::{
         search::ScanStats,
-        stream::{FileKey, PartitionTimeLevel, StreamType},
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
     metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
     utils::file::get_file_meta as util_get_file_meta,
@@ -48,7 +48,7 @@ pub async fn query(
     time_max: i64,
 ) -> Result<Vec<FileKey>> {
     let cfg = get_config();
-    let mut files = file_list::query(
+    let files = file_list::query(
         org_id,
         stream_type,
         stream_name,
@@ -66,15 +66,15 @@ pub async fn query(
         None,
     )
     .await?;
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
+    if cfg.common.file_list_dump_debug_check {
         let dumped_file_names = dumped_files
             .iter()
             .map(|f| "files/".to_string() + &f.stream + "/" + &f.date + "/" + &f.file)
             .collect::<HashSet<_>>();
         let missing_files: usize = files
             .iter()
-            .map(|f| {
-                if dumped_file_names.contains(&f.key) {
+            .map(|(name, _)| {
+                if dumped_file_names.contains(name) {
                     0
                 } else {
                     1
@@ -83,23 +83,44 @@ pub async fn query(
             .sum();
         if missing_files > 0 {
             log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
+                "[trace_id : {trace_id}] dump was missing {missing_files} files present in db"
             );
         }
     }
-
+    let mut file_keys = Vec::with_capacity(files.len());
+    for file in files {
+        file_keys.push(FileKey {
+            key: file.0,
+            meta: file.1,
+            deleted: false,
+            segment_ids: None,
+        });
+    }
     if !cfg.common.file_list_dump_dual_write {
         // we only consider these files in case of dual write disabled,
         // because with dual write there are some edge cases which cannot be sovled even with id
         // de-dup so the data gets counted twice.
-        for file in dumped_files.iter() {
-            files.push(file.into())
+        for file in dumped_files {
+            file_keys.push(FileKey {
+                key: "files/".to_string() + &file.stream + "/" + &file.date + "/" + &file.file,
+                meta: FileMeta {
+                    min_ts: file.min_ts,
+                    max_ts: file.max_ts,
+                    records: file.records,
+                    original_size: file.original_size,
+                    compressed_size: file.compressed_size,
+                    index_size: file.index_size,
+                    flattened: file.flattened,
+                },
+                deleted: file.deleted,
+                segment_ids: None,
+            })
         }
     }
 
-    files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    Ok(files)
+    file_keys.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    file_keys.dedup_by(|a, b| a.key == b.key);
+    Ok(file_keys)
 }
 
 /// NOTE: This will not query the files from file_dump. If you also want files from the dump, use
@@ -125,10 +146,19 @@ pub async fn query_for_merge(
         Some((date_start.to_string(), date_end.to_string())),
     )
     .await?;
+    let mut file_keys = Vec::with_capacity(files.len());
+    for file in files {
+        file_keys.push(FileKey {
+            key: file.0,
+            meta: file.1,
+            deleted: false,
+            segment_ids: None,
+        });
+    }
     // we don't need to query from dump here, because
     // we expected all dumped files to be already compacted,
     // and the compaction marks old files as deleted, which is not possible with dump
-    Ok(files)
+    Ok(file_keys)
 }
 
 #[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
@@ -158,7 +188,10 @@ pub async fn query_by_ids(
                 Vec::new()
             }
         };
-        let cached_ids = cached_files.iter().map(|f| f.id).collect::<HashSet<_>>();
+        let cached_ids = cached_files
+            .iter()
+            .map(|(id, ..)| *id)
+            .collect::<HashSet<_>>();
         log::info!(
             "{}",
             search_inspector_fields(
@@ -185,8 +218,17 @@ pub async fn query_by_ids(
             .with_label_values(&[])
             .set(cached_ids.len() as i64);
 
+        let mut file_keys = Vec::with_capacity(ids.len());
+        for (_, key, meta) in cached_files {
+            file_keys.push(FileKey {
+                key,
+                meta,
+                deleted: false,
+                segment_ids: None,
+            });
+        }
         (
-            cached_files,
+            file_keys,
             ids_set.difference(&cached_ids).cloned().collect::<Vec<_>>(),
         )
     } else {
@@ -196,6 +238,20 @@ pub async fn query_by_ids(
     // 2. query from remote db
     let start = std::time::Instant::now();
     let db_files = file_list::query_by_ids(&ids).await?;
+    let db_files = db_files
+        .into_iter()
+        .map(|(id, key, meta)| {
+            (
+                id,
+                FileKey {
+                    key,
+                    meta,
+                    deleted: false,
+                    segment_ids: None,
+                },
+            )
+        })
+        .collect::<Vec<_>>();
     log::info!(
         "{}",
         search_inspector_fields(
@@ -209,7 +265,7 @@ pub async fn query_by_ids(
                 .component("file_list query from db".to_string())
                 .search_role("follower".to_string())
                 .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("query from db: {}", db_files.len()))
+                .desc(format!("query from db: {}", db_files.len(),))
                 .build()
         )
     );
@@ -227,22 +283,43 @@ pub async fn query_by_ids(
     )
     .await?;
 
-    let dumped_files: Vec<FileKey> = dumped_files
-        .iter()
+    let dumped_files: Vec<_> = dumped_files
+        .into_iter()
         .filter(|r| ids.contains(&r.id))
-        .map(|r| r.into())
+        .map(|r| {
+            (
+                r.id,
+                FileKey {
+                    key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                    meta: FileMeta {
+                        min_ts: r.min_ts,
+                        max_ts: r.max_ts,
+                        records: r.records,
+                        original_size: r.original_size,
+                        compressed_size: r.compressed_size,
+                        index_size: r.index_size,
+                        flattened: r.flattened,
+                    },
+                    deleted: r.deleted,
+                    segment_ids: None,
+                },
+            )
+        })
         .collect();
 
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
-        let db_ids = db_files.iter().map(|f| f.id).collect::<Vec<_>>();
+    if cfg.common.file_list_dump_debug_check {
+        let dump_ids = dumped_files
+            .iter()
+            .map(|entry| entry.0)
+            .collect::<HashSet<_>>();
+        let db_ids = db_files.iter().map(|entry| entry.0).collect::<Vec<_>>();
         let missing_files: usize = db_ids
             .iter()
             .map(|id| if dump_ids.contains(id) { 0 } else { 1 })
             .sum();
         if missing_files > 0 {
             log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
+                "[trace_id : {trace_id}] dump was missing {missing_files} files present in db"
             );
         }
     }
@@ -250,6 +327,7 @@ pub async fn query_by_ids(
     // 3. set the local cache
     if !cfg.common.local_mode {
         let start = std::time::Instant::now();
+        let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!(
                 "[trace_id {trace_id}] file_list set cache failed for db files: {:?}",
@@ -258,6 +336,7 @@ pub async fn query_by_ids(
         }
 
         if !cfg.common.file_list_dump_dual_write {
+            let dumped_files: Vec<_> = dumped_files.iter().map(|(id, f)| (*id, f)).collect();
             if let Err(e) = file_list::LOCAL_CACHE
                 .batch_add_with_id(&dumped_files)
                 .await
@@ -282,16 +361,16 @@ pub async fn query_by_ids(
                     .component("file_list set cached_ids".to_string())
                     .search_role("follower".to_string())
                     .duration(start.elapsed().as_millis() as usize)
-                    .desc(format!("set cached_ids: {}", db_files.len()))
+                    .desc(format!("set cached_ids: {}", db_files.len(),))
                     .build()
             )
         );
     }
 
     // 4. merge the results
-    files.extend(db_files);
+    files.extend(db_files.into_iter().map(|(_, f)| f));
     if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files);
+        files.extend(dumped_files.into_iter().map(|(_, f)| f));
     }
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
@@ -322,7 +401,7 @@ pub async fn query_ids(
     )
     .await
     .unwrap();
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
+    if cfg.common.file_list_dump_debug_check {
         let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
         let db_ids = files.iter().map(|f| f.id).collect::<Vec<_>>();
         let missing_files: usize = db_ids
@@ -331,12 +410,12 @@ pub async fn query_ids(
             .sum();
         if missing_files > 0 {
             log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
+                "[trace_id : {trace_id}] dump was missing {missing_files} files present in db"
             );
         }
     }
     if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files);
+        files.extend(dumped_files.into_iter());
     }
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);
@@ -370,20 +449,13 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64> {
 }
 
 // Delete one parquet file and update the file list
-pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool) -> Result<()> {
+pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<()> {
     // delete from file list in metastore
-    file_list::batch_process(&[FileKey::new(
-        0,
-        account.to_string(),
-        key.to_string(),
-        Default::default(),
-        true,
-    )])
-    .await?;
+    file_list::batch_process(&[FileKey::new(key.to_string(), Default::default(), true)]).await?;
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {
-        _ = storage::del(vec![(account, key)]).await;
+        _ = storage::del(&[key]).await;
     }
     Ok(())
 }

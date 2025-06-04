@@ -168,8 +168,6 @@ pub struct ListStreamParams {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileKey {
-    pub id: i64,
-    pub account: String,
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
@@ -177,10 +175,8 @@ pub struct FileKey {
 }
 
 impl FileKey {
-    pub fn new(id: i64, account: String, key: String, meta: FileMeta, deleted: bool) -> Self {
+    pub fn new(key: String, meta: FileMeta, deleted: bool) -> Self {
         Self {
-            id,
-            account,
             key,
             meta,
             deleted,
@@ -190,8 +186,6 @@ impl FileKey {
 
     pub fn from_file_name(file: &str) -> Self {
         Self {
-            id: 0,
-            account: String::default(),
             key: file.to_string(),
             meta: FileMeta::default(),
             deleted: false,
@@ -242,7 +236,6 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
 
 #[derive(Clone, Debug, Default)]
 pub struct FileListDeleted {
-    pub account: String,
     pub file: String,
     pub index_file: bool,
     pub flattened: bool,
@@ -477,8 +470,6 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
 impl From<&FileKey> for cluster_rpc::FileKey {
     fn from(req: &FileKey) -> Self {
         cluster_rpc::FileKey {
-            id: req.id,
-            account: req.account.clone(),
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
             deleted: req.deleted,
@@ -490,8 +481,6 @@ impl From<&FileKey> for cluster_rpc::FileKey {
 impl From<&cluster_rpc::FileKey> for FileKey {
     fn from(req: &cluster_rpc::FileKey) -> Self {
         FileKey {
-            id: req.id,
-            account: req.account.clone(),
             key: req.key.clone(),
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,

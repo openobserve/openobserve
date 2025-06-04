@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import OrganizationsCloud from "@/enterprise/components/organizations/Organization.vue";
 import OrganizationsEnterprise from "@/components/iam/organizations/ListOrganizations.vue";
 
 import config from "@/aws-exports";
@@ -32,24 +33,25 @@ import { watch } from "vue";
 export default defineComponent({
   name: "AppOrganizations",
   components: {
+    OrganizationsCloud,
     OrganizationsEnterprise,
   },
   setup() {
     const store = useStore();
     const { t } = useI18n();
 
-    const componentName = ref("OrganizationsEnterprise");
+    const componentName = ref("");
 
     const loadComponent = ref(false);
 
     watch(
       () => store.state.zoConfig,
       (zoConfig) => {
-        if (
-          zoConfig.sso_enabled ||
-          config.isEnterprise == "true" ||
-          config.isCloud == "true"
-        ) {
+        if (config.isCloud == "true") {
+          componentName.value = "OrganizationsCloud";
+        }
+
+        if (zoConfig.sso_enabled || config.isEnterprise == "true") {
           componentName.value = "OrganizationsEnterprise";
         }
 
@@ -57,7 +59,7 @@ export default defineComponent({
       },
       {
         immediate: true,
-      },
+      }
     );
 
     return { store, t, componentName, loadComponent };

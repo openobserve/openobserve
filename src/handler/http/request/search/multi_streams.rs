@@ -15,12 +15,12 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        function::{RESULT_ARRAY, VRLResultResolver},
+        function::VRLResultResolver,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
@@ -47,7 +47,6 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
     service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
@@ -190,7 +189,12 @@ pub async fn search_multi(
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
-                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+                return Ok(HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        e.to_string(),
+                    ),
+                ));
             }
         };
         vrl_stream_name = stream_name.clone();
@@ -223,14 +227,14 @@ pub async fn search_multi(
         {
             use o2_openfga::meta::mapping::OFGA_MODELS;
 
-            use crate::{
-                common::utils::auth::{AuthExtractor, is_root_user},
-                service::users::get_user,
+            use crate::common::{
+                infra::config::USERS,
+                utils::auth::{AuthExtractor, is_root_user},
             };
 
             if !is_root_user(user_id) {
-                let user: config::meta::user::User =
-                    get_user(Some(&org_id), user_id).await.unwrap();
+                let user: meta::user::User =
+                    USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
                 let stream_type_str = stream_type.as_str();
 
                 if !crate::handler::http::auth::validator::check_permissions(
@@ -261,7 +265,12 @@ pub async fn search_multi(
             let keys_used = match get_cipher_key_names(&req.query.sql) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Ok(map_error_to_http_response(&e, Some(trace_id)));
+                    return Ok(HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            e.to_string(),
+                        ),
+                    ));
                 }
             };
             if !keys_used.is_empty() {
@@ -271,8 +280,8 @@ pub async fn search_multi(
             // Check permissions on keys
             for key in keys_used {
                 if !is_root_user(user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), user_id).await.unwrap();
+                    let user: meta::user::User =
+                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         user_id,
@@ -464,9 +473,11 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
-        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+            input_fn = SearchService::RESULT_ARRAY
+                .replace(&input_fn, "")
+                .to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
@@ -738,7 +749,15 @@ pub async fn _search_partition_multi(
                 ])
                 .inc();
             log::error!("search error: {:?}", err);
-            Ok(map_error_to_http_response(&err, Some(trace_id)))
+            Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
+                ),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            })
         }
     }
 }
@@ -877,7 +896,25 @@ pub async fn around_multi(
                     ])
                     .inc();
                 log::error!("multi search around error: {:?}", err);
-                return Ok(map_error_to_http_response(&err, Some(trace_id)));
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code_with_trace_id(
+                                &code,
+                                Some(trace_id),
+                            )),
+                        _ => HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error_code_with_trace_id(
+                                &code,
+                                Some(trace_id),
+                            ),
+                        ),
+                    },
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
             }
         };
 

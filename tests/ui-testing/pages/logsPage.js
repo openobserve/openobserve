@@ -68,16 +68,19 @@ export class LogsPage {
   }
 
   async logsPageDefaultMultiOrg() {
-    await this.page.waitForTimeout(2000);
-    await this.page.reload();
+
     await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
     await this.page.waitForTimeout(2000);
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+
+
+
   }
 
   async logsPageURLValidation() {
-    // TODO: fix the test
-    // await expect(this.page).not.toHaveURL(/default/);
+
+    await expect(this.page).toHaveURL(/defaulttestmulti/);
+
   }
 
   async selectIndexAndStream() {
@@ -245,7 +248,7 @@ export class LogsPage {
   async kubernetesContainerNameJoin() {
     await this.page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .getByLabel("Editor content;Press Alt+F1")
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
@@ -253,7 +256,7 @@ export class LogsPage {
   async kubernetesContainerNameJoinLimit() {
     await this.page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .getByLabel("Editor content;Press Alt+F1")
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
     await this.page.waitForTimeout(5000);
   }
@@ -262,7 +265,7 @@ export class LogsPage {
   async kubernetesContainerNameJoinLike() {
     await this.page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .getByLabel("Editor content;Press Alt+F1")
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
     await this.page.waitForTimeout(5000);
   }
@@ -270,7 +273,7 @@ export class LogsPage {
   async kubernetesContainerNameLeftJoin() {
     await this.page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .getByLabel("Editor content;Press Alt+F1")
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
@@ -278,7 +281,7 @@ export class LogsPage {
   async kubernetesContainerNameRightJoin() {
     await this.page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .getByLabel("Editor content;Press Alt+F1")
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
@@ -286,7 +289,7 @@ export class LogsPage {
   async kubernetesContainerNameFullJoin() {
     await this.page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .getByLabel("Editor content;Press Alt+F1")
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
@@ -466,7 +469,7 @@ async selectIndexStreamDefault() {
 }
 
 async clearAndFillQueryEditor(query) {
-  const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').locator(".inputarea");
+  const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content;Press Alt+F1');
   await editor.fill(''); // Clear the editor
   await this.page.waitForTimeout(1000); // Optional: adjust or remove as per your needs
   await editor.fill(query); // Fill with the new query
@@ -478,112 +481,5 @@ async waitForSearchResultAndCheckText(expectedText) {
   await expect(locator).toContainText(expectedText);
 }
 
-async executeQueryWithKeyboardShortcut() {
-  // Press Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
-  await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
-}
-
-async executeQueryWithKeyboardShortcutTest() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type("match_all('code')");
-
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
-
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
-}
-
-async executeQueryWithKeyboardShortcutAfterClickingElsewhere() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-
-  // Click elsewhere on the screen first
-  await this.page.locator('[data-test="logs-search-bar"]').click();
-
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type("match_all('code')");
-
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
-
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
-}
-
-async executeQueryWithKeyboardShortcutWithDifferentQuery() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'ziox')");
-
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
-
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
-}
-
-async executeQueryWithKeyboardShortcutWithSQLMode() {
-  // Set up date/time filter
-  await this.page.locator('[data-test="date-time-btn"]').click({ force: true });
-  await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-
-  // Enable SQL mode
-  await this.sqlModeToggle.click();
-
-  // Ensure the query editor is visible and clickable before typing
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-  await expect(queryEditor).toBeVisible();
-  await queryEditor.click();
-  await this.page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate" Group by _timestamp ORDER BY _timestamp DESC');
-
-  // Execute query using keyboard shortcut
-  await this.executeQueryWithKeyboardShortcut();
-
-  // Verify that the expected log table column is visible
-  await expect(this.page.locator('[data-test="logs-search-result-bar-chart"]')).toBeVisible();
-}
-
-async executeQueryWithErrorHandling() {
-  // Fill query editor with invalid query
-  await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox', { name: 'Editor content;Press Alt+F1' }).fill('match_all(\'invalid\')');
-  
-  // Click refresh button and verify error
-  await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  await this.page.locator('[data-test="logs-search-error-message"]').click();
-  
-  // Reset filters
-  await this.page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click();
-  
-  // Toggle histogram
-  await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').first().click();
-  
-  // Click first line and refresh
-  await this.page.locator('.view-line').first().click();
-  await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  
-  // Verify no data message
-  await this.page.getByText('warning No data found for').click();
-  
-  // Click on result detail
-  await this.page.locator('[data-test="logs-search-result-detail-undefined"]').click();
-}
 
 }

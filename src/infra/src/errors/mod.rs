@@ -82,8 +82,6 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("Error# {0}")]
     WalFileError(String),
-    #[error("Error# {0}")]
-    OtherError(#[from] anyhow::Error),
 }
 
 unsafe impl Send for Error {}

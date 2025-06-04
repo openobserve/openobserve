@@ -219,7 +219,6 @@
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
           class="monaco-editor test-function-input-editor"
-          :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
         />
@@ -291,7 +290,6 @@
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
           class="monaco-editor test-function-output-editor"
-          :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
           read-only
@@ -330,10 +328,6 @@ const props = defineProps({
   vrlFunction: {
     type: Object,
     required: true,
-  },
-  heightOffset: {
-    type: Number,
-    default: 0,
   },
 });
 
@@ -739,10 +733,10 @@ defineExpose({
   border-radius: 5px;
 }
 
-// .test-function-input-editor,
-// .test-function-output-editor {
-//   height: calc((100vh - (260px + 75px)) / 2) !important;
-// }
+.test-function-input-editor,
+.test-function-output-editor {
+  height: calc((100vh - 260px) / 2) !important;
+}
 
 .test-function-option-tabs {
   :deep(.rum-tab) {

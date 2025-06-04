@@ -107,8 +107,8 @@ pub async fn save(
             Ok(_) => {
                 set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK,
-                    "Key created successfully",
+                    http::StatusCode::OK.into(),
+                    "Key created successfully".to_string(),
                 )))
             }
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -262,8 +262,8 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
             Ok(_) => {
                 remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK,
-                    "cipher key removed successfully",
+                    http::StatusCode::OK.into(),
+                    "cipher key removed successfully".to_string(),
                 )))
             }
             Err(e) => Ok(MetaHttpResponse::internal_error(e)),
@@ -380,8 +380,8 @@ pub async fn update(
         .await
         {
             Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK,
-                "key updated successfully",
+                http::StatusCode::OK.into(),
+                "key updated successfully".to_string(),
             ))),
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
         }

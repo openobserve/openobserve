@@ -261,7 +261,12 @@ pub async fn search_parquet(
     }
 
     // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let latest_schema = Arc::new(
+        schema
+            .as_ref()
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -273,9 +278,12 @@ pub async fn search_parquet(
         if files.is_empty() {
             continue;
         }
+        if files.is_empty() {
+            continue;
+        }
         let schema = schema_versions[ver]
             .clone()
-            .with_metadata(Default::default());
+            .with_metadata(std::collections::HashMap::new());
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
@@ -428,7 +436,12 @@ pub async fn search_memtable(
     }
 
     // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let latest_schema = Arc::new(
+        schema
+            .as_ref()
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -556,9 +569,6 @@ async fn get_file_list_inner(
         })
         .collect::<Vec<_>>();
 
-    // use same lock to combine the operations of filter by pending delete and lock files
-    let wal_lock = infra::local_lock::lock("wal").await?;
-
     // filter by pending delete
     let files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
@@ -567,7 +577,6 @@ async fn get_file_list_inner(
 
     // lock theses files
     wal::lock_files(&files);
-    drop(wal_lock);
 
     let stream_params = Arc::new(StreamParams::new(
         &query.org_id,

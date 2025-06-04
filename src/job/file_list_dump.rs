@@ -48,7 +48,6 @@ use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
         Field::new("id", arrow_schema::DataType::Int64, false),
-        Field::new("account", arrow_schema::DataType::Utf8, false),
         Field::new("org", arrow_schema::DataType::Utf8, false),
         Field::new("stream", arrow_schema::DataType::Utf8, false),
         Field::new("date", arrow_schema::DataType::Utf8, false),
@@ -151,8 +150,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
-
     let config = get_config();
+
     if !config.common.file_list_dump_enabled {
         return Ok(());
     }
@@ -315,7 +314,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
     let batch_size = files.len();
 
     let mut field_id = Int64Builder::with_capacity(batch_size);
-    let mut field_account = StringBuilder::with_capacity(batch_size, batch_size * 128);
     let mut field_org = StringBuilder::with_capacity(batch_size, batch_size * 128);
     let mut field_stream = StringBuilder::with_capacity(batch_size, batch_size * 256);
     let mut field_date = StringBuilder::with_capacity(batch_size, batch_size * 10);
@@ -331,7 +329,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
 
     for file in files {
         field_id.append_value(file.id);
-        field_account.append_value(file.account);
         field_org.append_value(file.org);
         field_stream.append_value(file.stream);
         field_date.append_value(file.date);
@@ -350,7 +347,6 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
         schema.clone(),
         vec![
             Arc::new(field_id.finish()),
-            Arc::new(field_account.finish()),
             Arc::new(field_org.finish()),
             Arc::new(field_stream.finish()),
             Arc::new(field_date.finish()),
@@ -432,20 +428,18 @@ async fn generate_dump(
         flattened: false,
     };
 
-    // first store the file in storage
-    // then update the entries in db,
-    // and if both pass only then set the job as dumped=true
-    let account = infra::storage::get_account(&file_key).unwrap_or_default();
-    infra::storage::put(&account, &file_key, buf.into()).await?;
-
     let dump_file = FileKey {
-        id: 0,
-        account: account.clone(),
         key: file_key.clone(),
         meta: meta.clone(),
         deleted: false,
         segment_ids: None,
     };
+
+    // first store the file in storage
+    // then update the entries in db,
+    // and if both pass only then set the job as dumped=true
+
+    infra::storage::put(&file_key, buf.into()).await?;
     infra::file_list::update_dump_records(&dump_file, &ids).await?;
     infra::file_list::set_job_dumped_status(job_id, true).await?;
     log::info!(

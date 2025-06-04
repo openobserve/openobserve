@@ -77,8 +77,6 @@ use crate::{
               ],
               "node_name": "usertest-openobserve-ingester-0",
               "search_role": "follower",
-              "region": "us-east-1",
-              "cluster": "cluster-0",
               "duration": 0,
               "component": "wal:memtable load",
               "desc": "wal mem search load groups 1, files 6, scan_size 16.01 MB, compressed_size 16.85 MB"
@@ -153,6 +151,7 @@ pub async fn get_search_profile(
         }
     };
 
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = config::meta::search::Request {
         query: Query {
@@ -173,11 +172,7 @@ pub async fn get_search_profile(
     if let Err(e) = req.decode() {
         return Ok(meta::http::HttpResponse::bad_request(e));
     }
-
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    req.use_cache = Some(use_cache);
 
     // get stream settings
     if let Some(settings) = infra::schema::get_settings(&org_id, &stream_name, stream_type).await {
@@ -206,8 +201,12 @@ pub async fn get_search_profile(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(HttpResponse::BadRequest()
-                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return Ok(
+                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                        StatusCode::BAD_REQUEST.into(),
+                        e.to_string(),
+                    )),
+                );
             }
         };
         if !keys_used.is_empty() {
@@ -216,7 +215,6 @@ pub async fn get_search_profile(
         for key in keys_used {
             // Check permissions on keys
             {
-                use config::meta::user::DBUser;
                 use o2_openfga::meta::mapping::OFGA_MODELS;
 
                 use crate::common::{
@@ -225,17 +223,10 @@ pub async fn get_search_profile(
                 };
 
                 if !is_root_user(&user_id) {
-                    let user =
-                        match USERS
-                            .get(&format!("{org_id}/{}", user_id))
-                            .and_then(|user_record| {
-                                DBUser::from(&(user_record.clone())).get_user(org_id.clone())
-                            }) {
-                            Some(user) => user,
-                            None => {
-                                return Ok(meta::http::HttpResponse::forbidden("User not found"));
-                            }
-                        };
+                    let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+                        Some(u) => u.clone(),
+                        None => return Ok(meta::http::HttpResponse::forbidden("User not found")),
+                    };
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         &user_id,
@@ -340,10 +331,7 @@ pub async fn get_search_profile(
                 "",
             );
             log::error!("[trace_id {trace_id}] search error: {}", err);
-            Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ))
+            Ok(error_utils::map_error_to_http_response(&err, trace_id))
         }
     }
 }

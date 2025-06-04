@@ -139,10 +139,16 @@ pub async fn generate_by_stream(
         start.elapsed().as_millis()
     );
 
-    for file in files {
-        if PROCESSING_FILES.read().contains(&file.key) {
+    for (file, meta) in files {
+        if PROCESSING_FILES.read().contains(&file) {
             continue;
         }
+        let file = FileKey {
+            key: file,
+            meta,
+            deleted: false,
+            segment_ids: None,
+        };
         // add into queue
         PROCESSING_FILES.write().insert(file.key.clone());
         worker_tx.send(file).await?;
@@ -156,7 +162,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     log::debug!("[FLATTEN_COMPACTOR] generate flatten file for {}", file.key);
 
-    let data = storage::get_bytes(&file.account, &file.key).await?;
+    let data = storage::get(&file.key).await?;
     let (_, batches) = read_recordbatch_from_bytes(&data)
         .await
         .map_err(|e| anyhow::anyhow!("read_recordbatch_from_bytes error: {}", e))?;
@@ -164,7 +170,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
         .map_err(|e| anyhow::anyhow!("generate_vertical_partition_recordbatch error: {}", e))?;
 
     if new_batches.is_empty() {
-        storage::del(vec![(&file.account, &file.key)]).await?;
+        storage::del(&[&file.key]).await?;
         return Ok(());
     }
     let columns = file.key.splitn(9, '/').collect::<Vec<&str>>();
@@ -192,7 +198,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
             .await
             .map_err(|e| anyhow::anyhow!("write_recordbatch_to_parquet error: {}", e))?;
     // upload filee
-    storage::put(&file.account, &new_file, new_data.into()).await?;
+    storage::put(&new_file, new_data.into()).await?;
     // delete from queue
     PROCESSING_FILES.write().remove(&file.key);
     log::info!(

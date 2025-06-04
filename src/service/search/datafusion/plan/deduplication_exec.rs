@@ -19,11 +19,8 @@ use std::{
     task::{Context, Poll},
 };
 
-use arrow::array::{
-    BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, TimestampMicrosecondArray,
-    UInt64Array,
-};
-use arrow_schema::{DataType, SortOptions, TimeUnit};
+use arrow::array::{BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array};
+use arrow_schema::{DataType, SortOptions};
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
@@ -258,7 +255,6 @@ enum Array {
     UInt64(UInt64Array),
     Boolean(BooleanArray),
     Float64(Float64Array),
-    TimestampMicrosecond(TimestampMicrosecondArray),
 }
 
 impl Array {
@@ -269,7 +265,6 @@ impl Array {
             Array::UInt64(array) => Value::UInt64(array.value(i)),
             Array::Boolean(array) => Value::Boolean(array.value(i)),
             Array::Float64(array) => Value::Float64(array.value(i)),
-            Array::TimestampMicrosecond(array) => Value::Int64(array.value(i)),
         }
     }
 }
@@ -323,16 +318,7 @@ fn generate_deduplication_arrays(
                         .unwrap()
                         .clone(),
                 ),
-                DataType::Timestamp(TimeUnit::Microsecond, None) => Array::TimestampMicrosecond(
-                    array
-                        .as_any()
-                        .downcast_ref::<TimestampMicrosecondArray>()
-                        .unwrap()
-                        .clone(),
-                ),
-                _ => {
-                    panic!("Unsupported data type: {}", array.data_type());
-                }
+                _ => panic!("Unsupported data type"),
             }
         })
         .collect_vec();

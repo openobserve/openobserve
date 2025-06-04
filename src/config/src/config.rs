@@ -45,10 +45,6 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
-// for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 4;
-pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
-
 // global version variables
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -384,12 +380,13 @@ pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
 }
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    get_config()
+    let blocked_streams = get_config()
         .common
         .blocked_streams
         .split(',')
         .map(|x| x.to_string())
-        .collect()
+        .collect();
+    blocked_streams
 });
 
 #[derive(EnvConfig)]
@@ -447,24 +444,6 @@ pub struct WebSocket {
         help = "Maximum allowed continuation size in MB"
     )]
     pub max_continuation_size: usize,
-    #[env_config(
-        name = "ZO_WEBSOCKET_CHANNEL_BUFFER_SIZE",
-        default = 100,
-        help = "Maximum allowed number of messages in buffer"
-    )]
-    pub max_channel_buffer_size: usize,
-    #[env_config(
-        name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
-        default = 1,
-        help = "Size in MB for each chunk when streaming search responses"
-    )]
-    pub streaming_response_chunk_size: usize,
-    #[env_config(
-        name = "ZO_STREAMING_ENABLED",
-        default = false,
-        help = "Enable streaming"
-    )]
-    pub streaming_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -693,8 +672,6 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
     pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
-    #[env_config(name = "ZO_META_DDL_DSN", default = "")]
-    pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -1008,8 +985,6 @@ pub struct Common {
     pub report_server_skip_tls_verify: bool,
     #[env_config(name = "ZO_SKIP_FORMAT_STREAM_NAME", default = false)]
     pub skip_formatting_stream_name: bool,
-    #[env_config(name = "ZO_FORMAT_STREAM_NAME_TO_LOWERCASE", default = true)]
-    pub format_stream_name_to_lower: bool,
     #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
@@ -1090,24 +1065,6 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
-    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
-    pub websocket_enabled: bool,
-    #[env_config(name = "ZO_ES_VERSION", default = "")]
-    pub es_version: String,
-    #[env_config(
-        name = "ZO_CREATE_ORG_THROUGH_INGESTION",
-        default = false,
-        help = "If true (default false), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
-    )]
-    pub create_org_through_ingestion: bool,
-    #[env_config(
-        name = "ZO_ORG_INVITE_EXPIRY",
-        default = 7,
-        help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
-    )]
-    pub org_invite_expiry: u32,
-    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
-    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,
@@ -1124,12 +1081,6 @@ pub struct Common {
     pub file_list_dump_min_hour: usize,
     #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
     pub file_list_dump_debug_check: bool,
-    #[env_config(
-        name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
-        default = false,
-        help = "Enable to use stream settings for partitions. This will apply for all streams"
-    )]
-    pub use_stream_settings_for_partitions_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1208,12 +1159,6 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
-    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
-    pub file_download_priority_queue_thread_num: usize,
-    #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
-    pub file_download_priority_queue_window_secs: i64,
-    #[env_config(name = "ZO_FILE_DOWNLOAD_ENABLE_PRIORITY_QUEUE", default = true)]
-    pub file_download_enable_priority_queue: bool,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
     #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
@@ -1271,8 +1216,6 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 10000)] // records
-    pub calculate_stats_step_limit: i64,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
@@ -1514,7 +1457,7 @@ pub struct Compact {
     pub data_retention_history: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 0,
+        default = 500,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,
@@ -1550,8 +1493,6 @@ pub struct CacheLatestFiles {
     pub delete_merge_files: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
     pub download_from_node: bool,
-    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_NODE_SIZE", default = 100)] // MB
-    pub download_node_size: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1722,20 +1663,8 @@ pub struct Nats {
     pub queue_max_age: u64,
 }
 
-#[derive(Debug, Default, EnvConfig)]
+#[derive(Debug, EnvConfig)]
 pub struct S3 {
-    #[env_config(
-        name = "ZO_S3_ACCOUNTS",
-        default = "",
-        help = "comma separated list of accounts"
-    )]
-    pub accounts: String,
-    #[env_config(
-        name = "ZO_S3_STREAM_STRATEGY",
-        default = "",
-        help = "stream strategy, default is: empty, only use default account, other value is: file_hash, stream_hash, stream1:account1,stream2:account2"
-    )]
-    pub stream_strategy: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
@@ -2014,10 +1943,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
     }
 
-    if cfg.limit.file_download_priority_queue_thread_num == 0 {
-        cfg.limit.file_download_priority_queue_thread_num = std::cmp::max(1, cpu_num / 2);
-    }
-
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
         if cfg.common.local_mode {
@@ -2068,11 +1993,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.limit.consistent_hash_vnodes == 0 {
-        cfg.limit.consistent_hash_vnodes = 1000;
+        cfg.limit.consistent_hash_vnodes = 100;
     }
 
     // reset to default if given zero
-    if cfg.limit.max_dashboard_series < 1 {
+    if cfg.limit.max_dashboard_series == 0 {
         cfg.limit.max_dashboard_series = 100;
     }
 
@@ -2080,11 +2005,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     #[allow(deprecated)]
     if cfg.limit.udschema_max_fields > 0 {
         cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
-    }
-
-    // check for calculate stats
-    if cfg.limit.calculate_stats_step_limit < 1 {
-        cfg.limit.calculate_stats_step_limit = 10000;
     }
 
     Ok(())
@@ -2390,7 +2310,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.memory_cache.gc_size *= 1024 * 1024;
     }
-    if cfg.memory_cache.enabled && cfg.memory_cache.max_size >= mem_total {
+    if cfg.memory_cache.max_size >= mem_total {
         return Err(anyhow::anyhow!(
             "ZO_MEMORY_CACHE_MAX_SIZE is larger than total memory, please set a smaller value"
         ));
@@ -2609,7 +2529,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
+        cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
@@ -2747,14 +2667,14 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             Ok(v) => v,
             Err(e) => {
                 return Err(anyhow::anyhow!(
-                    "master encryption key is not properly base64 encoded: {e}"
+                    "master encryption key is not properly base64 encoded : {e}"
                 ));
             }
         };
         match Aes256Siv::new_from_slice(&key) {
             Ok(_) => {}
             Err(e) => {
-                return Err(anyhow::anyhow!("invalid master encryption key: {e}"));
+                return Err(anyhow::anyhow!("invalid master encryption key : {e}"));
             }
         }
     }

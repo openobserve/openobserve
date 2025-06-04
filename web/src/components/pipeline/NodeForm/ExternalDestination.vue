@@ -117,10 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tabindex="0"
               />
             </div>
-            <div class="tw-flex tw-flex-row tw-gap-x-2">
-              <div
+            <div
               v-if="createNewDestination"
-              class="tw-w-1/2 q-py-xs destination-method-select"
+              class="col-12 q-py-xs destination-method-select"
             >
               <q-select
                 data-test="add-destination-method-select"
@@ -139,29 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tabindex="0"
               />
             </div>
-            <div
-              v-if="createNewDestination"
-              class="tw-w-1/2 q-py-xs destination-method-select"
-            >
-              <q-select
-                data-test="add-destination-output-format-select"
-                v-model="formData.output_format"
-                :label="t('alert_destinations.output_format') + ' *'"
-                :options="outputFormats"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop "
-                stack-label
-                outlined
-                :popup-content-style="{ textTransform: 'uppercase' }"
-                filled
-                dense
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                tabindex="0"
-              />
-            </div>
-            </div>
-
             <div v-if="createNewDestination" class="col-12 q-py-sm">
               <div class="text-bold q-py-xs" style="paddingleft: 10px">
                 Headers
@@ -299,7 +275,6 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
-const outputFormats = ["json", "ndjson"];
 const store = useStore();
 const { t } = useI18n();
 const formData: Ref<DestinationData> = ref({
@@ -311,7 +286,6 @@ const formData: Ref<DestinationData> = ref({
   headers: {},
   emails: "",
   type: "http",
-  output_format: "json",
 });
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
@@ -360,7 +334,6 @@ watch(
         headers: {},
         emails: "",
         type: "http",
-        output_format: "json",
       };
       apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
     }
@@ -397,7 +370,6 @@ const createDestination = () => {
     headers: headers,
     name: formData.value.name,
     type: "http",
-    output_format: formData.value.output_format,
   };
 
   destinationService

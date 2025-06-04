@@ -74,10 +74,7 @@ pub async fn token_validator(
                                 all_users.first().cloned()
                             }
                         }
-                        Err(e) => {
-                            log::error!("Error getting user in token validator: {}", e);
-                            None
-                        }
+                        Err(_) => None,
                     }
                 } else {
                     user = match path.find('/') {

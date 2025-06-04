@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -65,11 +65,7 @@ pub async fn save_template(
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner().into(&org_id);
     match templates::save("", tmpl, true).await {
-        Ok(v) => Ok(MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Template saved")
-                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
-                .with_name(v.name),
-        )),
+        Ok(_) => Ok(MetaHttpResponse::ok("Template saved")),
         Err(e) => Ok(e.into()),
     }
 }

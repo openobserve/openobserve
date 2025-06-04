@@ -513,9 +513,9 @@ const getPipelines = async () => {
             pipeline.stream_type = pipeline.source.stream_type;
           } else {
             pipeline.stream_type = pipeline.source.stream_type;
-            pipeline.frequency = pipeline.source.trigger_condition.frequency_type == 'minutes' ? pipeline.source.trigger_condition.frequency + " Mins" : pipeline.source.trigger_condition.cron
+            pipeline.frequency = pipeline.source.trigger_condition.frequency + " Mins";
             pipeline.period = pipeline.source.trigger_condition.period + " Mins";
-            pipeline.cron = pipeline.source.trigger_condition.frequency_type == 'minutes' ? 'False' : 'True';
+            pipeline.cron = pipeline.cron && pipeline.cron !== "" ? pipeline.source.trigger_condition.cron : 'False';
             pipeline.sql_query = pipeline.source.query_condition.sql;
           }
 

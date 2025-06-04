@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::meta::{
-    search::TimeOffset,
-    sql::OrderBy,
-    websocket::{SearchEventReq, ValuesEventReq},
+use config::{
+    ider,
+    meta::{
+        sql::OrderBy,
+        websocket::{SearchEventReq, ValuesEventReq},
+    },
 };
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 
@@ -41,9 +44,9 @@ pub mod enterprise_utils {
     ) -> Result<(), String> {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         // Check if the user is a root user (has all permissions)
@@ -52,7 +55,10 @@ pub mod enterprise_utils {
         }
 
         // Get user details from the USERS cache
-        let user: config::meta::user::User = get_user(Some(org_id), user_id).await.unwrap();
+        let user: meta::user::User = USERS
+            .get(&format!("{}/{}", org_id, user_id))
+            .ok_or_else(|| "User not found".to_string())?
+            .clone();
 
         // If the user is external, check permissions
         let stream_type_str = stream_type.as_str();
@@ -230,6 +236,21 @@ pub mod sessions_cache_utils {
     }
 }
 
+/// Setup tracing with a trace ID
+pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
+    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let traceparent = format!(
+        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
+                        * recorded/exported */
+        trace_id,
+        ider::generate_span_id()
+    );
+    headers.insert("traceparent".to_string(), traceparent);
+    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
+    span.set_parent(parent_ctx);
+    span
+}
+
 /// Represents the different types of WebSocket client messages that can be sent.
 ///
 /// The `WSClientMessage` enum is used to represent the different types of messages that can be sent
@@ -322,6 +343,13 @@ impl WsClientEvents {
     }
 }
 
+/// To represent the query start and end time based of partition or cache
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeOffset {
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(
     tag = "type",
@@ -375,7 +403,8 @@ impl WsServerEvents {
             errors::Error::ErrorCode(code) => {
                 let message = code.get_message();
                 let error_detail = code.get_error_detail();
-                let http_response = map_error_to_http_response(err, trace_id.clone());
+                let http_response =
+                    map_error_to_http_response(err, trace_id.clone().unwrap_or_default());
                 WsServerEvents::Error {
                     code: http_response.status().into(),
                     message,

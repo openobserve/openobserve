@@ -54,8 +54,8 @@ use {
     arrow::array::Int64Array,
     config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
     o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config,
-        common::downsampling::get_largest_downsampling_rule, search::WorkGroup,
+        common::downsampling::get_largest_downsampling_rule,
+        common::infra::config::get_config as get_o2_config, search::WorkGroup,
     },
     parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue},
 };
@@ -448,6 +448,10 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let wal_url = url::Url::parse("wal:///").unwrap();
     object_store_registry.register_store(&wal_url, Arc::new(wal));
 
+    let tmpfs = super::storage::tmpfs::Tmpfs::new();
+    let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
+    object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
+
     let cfg = get_config();
     let mut builder =
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
@@ -533,6 +537,8 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     #[cfg(feature = "enterprise")]
     ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
@@ -652,6 +658,8 @@ pub async fn create_parquet_table(
     } else if session.storage_type == StorageType::Wal {
         file_list::set(&session.id, &schema_key, files).await;
         format!("wal:///{}/schema={}/", session.id, schema_key)
+    } else if session.storage_type == StorageType::Tmpfs {
+        format!("tmpfs:///{}/", session.id)
     } else {
         return Err(DataFusionError::Execution(format!(
             "Unsupported storage_type {:?}",
@@ -697,7 +705,7 @@ pub async fn create_parquet_table(
         fst_fields,
         need_optimize_partition,
     )?;
-    if file_stat_cache.is_some() {
+    if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))

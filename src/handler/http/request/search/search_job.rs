@@ -24,7 +24,7 @@ use {
     crate::service::search_jobs::{get_result, merge_response},
     crate::{
         common::{
-            meta::http::HttpResponse as MetaHttpResponse,
+            meta::{self, http::HttpResponse as MetaHttpResponse},
             utils::http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_stream_type_from_request, get_use_cache_from_request,
@@ -46,9 +46,6 @@ use {
     infra::table::entity::search_jobs::Model as JobModel,
     tracing::Span,
 };
-
-#[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 
 // 1. submit
 /// SearchSQL
@@ -110,6 +107,7 @@ pub async fn submit_job(
         };
         let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
         // handle encoding for query and aggs
         let mut req: config::meta::search::Request = match json::from_slice(&body) {
             Ok(v) => v,
@@ -118,11 +116,7 @@ pub async fn submit_job(
         if let Err(e) = req.decode() {
             return Ok(MetaHttpResponse::bad_request(e));
         }
-
-        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-        if use_cache {
-            req.use_cache = Some(use_cache);
-        }
+        req.use_cache = Some(use_cache);
 
         // update timeout
         if req.timeout == 0 {
@@ -142,7 +136,12 @@ pub async fn submit_job(
         let stream_names = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
-                return Ok(map_error_to_http_response(&e.into(), Some(trace_id)));
+                return Ok(HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        e.to_string(),
+                    ),
+                ));
             }
         };
 

@@ -699,7 +699,7 @@
     "status": "Status",
     "action": "Aktion",
     "usage": "Verwendung",
-    "manageSubscription": "Abonnement verwalten",
+    "manageCards": "Karten verwalten",
     "subscriptionCheckout": "Kaufabwicklung für das Abonnement",
     "everythingDeveloperPlan": "Alles, was im Developer Abonnement enthalten ist, plus:",
     "messageDataNotFound": "Daten wurden nicht gefunden",

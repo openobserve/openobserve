@@ -17,10 +17,7 @@ use std::sync::Arc;
 
 use config::{
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
-    utils::{
-        json,
-        time::{BASE_TIME, now_micros},
-    },
+    utils::{json, time::now_micros},
 };
 use infra::{cache::stats, db as infra_db};
 use vrl::prelude::NotNan;
@@ -35,14 +32,18 @@ pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
+    let (start_time, end_time) = match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) => (meta_stats.start_time, now_micros()),
+        None => {
+            let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+            (stats.doc_time_min, now_micros())
+        }
+    };
 
     let query = config::meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\""),
         start_time,
         end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
         ..Default::default()
     };
 
@@ -57,11 +58,6 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         use_cache: None,
         local_mode: Some(true),
     };
-    log::debug!(
-        "get enrichment table {} data req start time: {}",
-        name,
-        start_time
-    );
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
@@ -123,8 +119,8 @@ pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
                 let size = String::from_utf8_lossy(&size);
                 size.parse::<f64>().unwrap_or(0.0)
             }
-            Err(_) => {
-                // log::error!("get_table_size error: {:?}", e);
+            Err(e) => {
+                log::error!("get_table_size error: {:?}", e);
                 stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
             }
         },
@@ -137,11 +133,7 @@ pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
         Some(meta_stats) => meta_stats.start_time,
         None => {
             let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
-            if stats.doc_time_min > 0 {
-                stats.doc_time_min
-            } else {
-                BASE_TIME.timestamp_micros()
-            }
+            stats.doc_time_min
         }
     }
 }
@@ -156,8 +148,8 @@ pub async fn get_meta_table_stats(
     .await
     {
         Ok(size) => size,
-        Err(_) => {
-            // log::error!("get_table_size error: {:?}", e);
+        Err(e) => {
+            log::error!("get_table_size error: {:?}", e);
             return None;
         }
     };
@@ -237,11 +229,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let data = super::enrichment_table::get(org_id, stream_name)
                     .await
                     .unwrap();
-                log::debug!(
-                    "enrichment table: {} cache data length: {}",
-                    item_key,
-                    data.len()
-                );
                 ENRICHMENT_TABLES.insert(
                     item_key.to_owned(),
                     StreamTable {

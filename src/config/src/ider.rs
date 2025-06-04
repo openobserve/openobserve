@@ -35,7 +35,7 @@ pub fn init() {
 
 /// Generate a distributed unique id with snowflake.
 pub fn generate() -> String {
-    IDER.lock().real_time_generate().to_string()
+    IDER.lock().generate().to_string()
 }
 
 /// Generate a unique id like uuid.

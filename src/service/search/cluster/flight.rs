@@ -114,26 +114,27 @@ pub async fn search(
     )
     .await?;
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
-    let file_id_list_num = file_id_list_vec.len();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
-                sql.time_range, file_id_list_num, file_id_list_took,
+                sql.time_range,
+                file_id_list_vec.len(),
+                file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_num))
+                .desc(format!("get files {} ids", file_id_list_vec.len(),))
                 .build()
         )
     );
     let mut scan_stats = ScanStats {
-        files: file_id_list_num as i64,
+        files: file_id_list_vec.len() as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
         ..Default::default()
     };
@@ -267,27 +268,6 @@ pub async fn search(
 
     // 5. partition file list
     let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, role_group).await?;
-    let mut need_ingesters = 0;
-    let mut need_queriers = 0;
-    for (i, node) in nodes.iter().enumerate() {
-        if node.is_ingester() {
-            need_ingesters += 1;
-            continue;
-        }
-        if node.is_querier()
-            && partitioned_file_lists
-                .values()
-                .any(|v| v.get(i).map(|v| !v.is_empty()).unwrap_or_default())
-        {
-            need_queriers += 1;
-        }
-    }
-    log::info!(
-        "[trace_id {trace_id}] flight->search: get files num: {}, need ingester num: {}, need querier num: {}",
-        file_id_list_num,
-        need_ingesters,
-        need_queriers,
-    );
 
     #[cfg(feature = "enterprise")]
     super::super::SEARCH_SERVER
@@ -489,12 +469,7 @@ pub async fn run_datafusion(
 
     // check for streaming aggregation query
     if streaming_output {
-        let Some(streaming_id) = streaming_id else {
-            return Err(Error::Message(
-                "streaming_id is required for streaming aggregation query".to_string(),
-            ));
-        };
-        let mut rewriter = StreamingAggsRewriter::new(streaming_id, start_time, end_time);
+        let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 
@@ -563,19 +538,13 @@ pub async fn get_online_querier_nodes(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     nodes.sort_by_key(|x| x.id);
+    let nodes = nodes;
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
-
-    // use enterprise scheduler to filter nodes
-    #[cfg(feature = "enterprise")]
-    {
-        nodes = o2_enterprise::enterprise::search::scheduler::filter_nodes_by_cpu(nodes);
-    }
-
     Ok(nodes)
 }
 
@@ -889,11 +858,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
 
     // register table
     for (stream, schema) in &sql.schemas {
-        let schema = schema
-            .schema()
-            .as_ref()
-            .clone()
-            .with_metadata(Default::default());
+        let schema = schema.schema().as_ref().clone();
         let stream_name = stream.to_quoted_string();
         let table = Arc::new(
             NewEmptyTable::new(&stream_name, Arc::new(schema))

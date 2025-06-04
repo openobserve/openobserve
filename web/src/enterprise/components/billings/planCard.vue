@@ -45,13 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </span>
             <span class="row text-h5 text-weight-bold">
-              <span class="secondaryColor" v-if="planData.type == config.freePlan">{{
+              <span class="secondaryColor" v-if="planData.type == 'basic'">{{
                 t("billing.basic")
               }}</span>
-              <span class="primaryColor" v-if="planData.type == config.paidPlan">{{
+              <span class="primaryColor" v-if="planData.type == 'pro'">{{
                 t("billing.pro")
               }}</span>
-              <span class="primaryColor" v-if="planData.type == config.enterprisePlan">{{
+              <span class="primaryColor" v-if="planData.type == 'business'">{{
                 t("billing.business")
               }}</span>
             </span>
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="text-body1 text-weight-bold q-mt-md"
-        v-if="planData.type == config.paidPlan || planData.type == config.enterprisePlan"
+        v-if="planData.type == 'pro' || planData.type == 'business'"
       >
         {{ t("billing.everythingDeveloperPlan") }}
       </div>
@@ -137,7 +137,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
-import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PlanCard",
@@ -156,11 +155,11 @@ export default defineComponent({
 
     const onGetStartedSubscription = (planType: string) => {
       loading.value = true;
-      if (planType == config.paidPlan) {
+      if (planType == "pro") {
         emit("update:proSubscription");
-      } else if (planType == config.freePlan) {
+      } else if (planType == "basic") {
         emit("update:freeSubscription");
-      } else if (planType == config.enterprisePlan) {
+      } else if (planType == "business") {
         emit("update:businessSubscription");
       }
     };
@@ -168,7 +167,6 @@ export default defineComponent({
     return {
       t,
       planData,
-      config,
       cardColor,
       isPaidPlan,
       onGetStartedSubscription,

@@ -39,7 +39,7 @@ use openobserve::{
     cli::basic::cli,
     common::{
         infra::{self as common_infra, cluster},
-        meta,
+        meta, migration,
         utils::zo_logger,
     },
     handler::{
@@ -59,7 +59,7 @@ use openobserve::{
         },
         http::router::*,
     },
-    job, migration, router,
+    job, router,
     service::{
         cluster_info::ClusterInfoService, db, metadata, node::NodeService, search::SEARCH_SERVER,
         self_reporting, tls::http_tls_config,
@@ -93,7 +93,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 #[cfg(feature = "enterprise")]
-use {config::Config, o2_enterprise::enterprise::common::config::O2Config};
+use {config::Config, o2_enterprise::enterprise::common::infra::config::O2Config};
 #[cfg(feature = "pyroscope")]
 use {
     pyroscope::PyroscopeAgent,
@@ -112,16 +112,18 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
-            get_config().tokio_console.tokio_console_retention,
+            cfg.tokio_console.tokio_console_retention,
         ))
         .server_addr(
             format!(
                 "{}:{}",
-                get_config().tokio_console.tokio_console_server_addr,
-                get_config().tokio_console.tokio_console_server_port
+                cfg.tokio_console.tokio_console_server_addr,
+                cfg.tokio_console.tokio_console_server_port
             )
             .as_str()
             .parse::<SocketAddr>()?,
@@ -130,29 +132,28 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let pprof_guard =
-        if get_config().profiling.pprof_enabled || get_config().profiling.pprof_protobuf_enabled {
-            let guard = pprof::ProfilerGuardBuilder::default()
-                .frequency(1000)
-                .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-                .build()
-                .unwrap();
-            Some(guard)
-        } else {
-            None
-        };
+    let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
+        let guard = pprof::ProfilerGuardBuilder::default()
+            .frequency(1000)
+            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+            .build()
+            .unwrap();
+        Some(guard)
+    } else {
+        None
+    };
 
     // setup pyroscope
     #[cfg(feature = "pyroscope")]
-    let pyroscope_agent = if get_config().profiling.pyroscope_enabled {
+    let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
         let agent = PyroscopeAgent::builder(
-            &get_config().profiling.pyroscope_server_url,
-            &get_config().profiling.pyroscope_project_name,
+            &cfg.profiling.pyroscope_server_url,
+            &cfg.profiling.pyroscope_project_name,
         )
         .tags(
             [
-                ("role", get_config().common.node_role.as_str()),
-                ("instance", get_config().common.instance_name.as_str()),
+                ("role", cfg.common.node_role.as_str()),
+                ("instance", cfg.common.instance_name.as_str()),
                 ("version", config::VERSION),
             ]
             .to_vec(),
@@ -171,14 +172,13 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let cfg = get_config();
+    let mut tracer_provider = None;
 
     // setup logs
     #[cfg(feature = "tokio-console")]
     let enable_tokio_console = true;
     #[cfg(not(feature = "tokio-console"))]
     let enable_tokio_console = false;
-    let mut tracer_provider = None;
     let _guard: Option<WorkerGuard> = if enable_tokio_console {
         None
     } else if cfg.log.events_enabled {
@@ -247,19 +247,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("config init failed: {}", e);
             }
-
-            // db related inits
-            if let Err(e) = migration::init_db().await {
-                job_init_tx.send(false).ok();
-                panic!("db init failed: {}", e);
-            }
-
             // init infra
             if let Err(e) = infra::init().await {
                 job_init_tx.send(false).ok();
                 panic!("infra init failed: {}", e);
             }
-
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {}", e);
@@ -269,7 +261,31 @@ async fn main() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
-                panic!("enterprise init failed: {}", e);
+                panic!("enerprise init failed: {}", e);
+            }
+
+            // check version upgrade
+            let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
+            if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
+                job_init_tx.send(false).ok();
+                panic!("check upgrade failed: {}", e);
+            }
+
+            #[allow(deprecated)]
+            migration::upgrade_resource_names()
+                .await
+                .expect("migrate resource names into supported ofga format failed");
+
+            // migrate infra_sea_orm
+            if let Err(e) = infra::table::migrate().await {
+                job_init_tx.send(false).ok();
+                panic!("infra sea_orm migrate failed: {}", e);
+            }
+
+            // migrate dashboards
+            if let Err(e) = migration::dashboards::run().await {
+                job_init_tx.send(false).ok();
+                panic!("migrate dashboards failed: {}", e);
             }
 
             // ingester init
@@ -345,14 +361,14 @@ async fn main() -> Result<(), anyhow::Error> {
             .expect("grpc runtime init failed");
         let _guard = rt.enter();
         rt.block_on(async move {
-            let ret = if config::cluster::LOCAL_NODE.is_router() {
-                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
+            if config::cluster::LOCAL_NODE.is_router() {
+                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
+                    .await
+                    .expect("router gRPC server init failed");
             } else {
-                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
-            };
-            if let Err(e) = ret {
-                log::error!("gRPC server init failed: {:?}", e);
-                std::process::exit(1);
+                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
+                    .await
+                    .expect("router gRPC server init failed");
             }
         });
     });
@@ -374,7 +390,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
             meta::telemetry::Telemetry::new()
-                .send_track_event("OpenObserve - Starting server", None, true, false)
+                .event("OpenObserve - Starting server", None, false)
                 .await;
         });
     }
@@ -417,7 +433,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // stop telemetry
     if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
-            .send_track_event("OpenObserve - Server stopped", None, true, true)
+            .event("OpenObserve - Server stopped", None, false)
             .await;
     }
 
@@ -552,7 +568,6 @@ async fn init_common_grpc_server(
         gaddr
     );
     init_tx.send(()).ok();
-
     let builder = if cfg.grpc.tls_enabled {
         let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
         let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
@@ -561,7 +576,7 @@ async fn init_common_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    let ret = builder
+    builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
@@ -579,11 +594,8 @@ async fn init_common_grpc_server(
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
-        .await;
-    if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{:?}", e));
-    }
-
+        .await
+        .expect("gRPC server init failed");
     stopped_tx.send(()).ok();
     Ok(())
 }
@@ -617,7 +629,6 @@ async fn init_router_grpc_server(
         gaddr
     );
     init_tx.send(()).ok();
-
     let builder = if cfg.grpc.tls_enabled {
         let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
         let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
@@ -626,7 +637,7 @@ async fn init_router_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    let ret = builder
+    builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)
@@ -635,11 +646,8 @@ async fn init_router_grpc_server(
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
-        .await;
-    if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{:?}", e));
-    }
-
+        .await
+        .expect("gRPC server init failed");
     stopped_tx.send(()).ok();
     Ok(())
 }
@@ -730,7 +738,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
+            .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
@@ -850,7 +858,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
+            .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
@@ -1097,7 +1105,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
+            .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
@@ -1136,7 +1144,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     // stop telemetry
     if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
-            .send_track_event("OpenObserve - Server stopped", None, true, true)
+            .event("OpenObserve - Server stopped", None, false)
             .await;
     }
 
@@ -1177,7 +1185,7 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::warn!("Failed to init action manager client: {e}");
     }
 
-    if o2_enterprise::enterprise::common::config::get_config()
+    if o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
         .enabled
     {
@@ -1188,7 +1196,7 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 
     // check ratelimit config
     let cfg = config::get_config();
-    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
     if let Err(e) = check_ratelimit_config(&cfg, &o2cfg) {
         panic!("ratelimit config error: {e}");
     }

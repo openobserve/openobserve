@@ -18,7 +18,7 @@ const Plans = [
     id: 1,
     icon: "",
     for: "individuals",
-    type: "free",
+    type: "basic",
     price: "Free",
     duration: "Month",
     included: {
@@ -35,7 +35,7 @@ const Plans = [
     id: 2,
     icon: "",
     for: "startups",
-    type: "pay-as-you-go",
+    type: "pro",
     price: "$19",
     duration: "Month",
     included: {
@@ -53,7 +53,7 @@ const Plans = [
     id: 3,
     icon: "",
     for: "business",
-    type: "enterprise",
+    type: "business",
     price: "$199",
     duration: "Month",
     included: {

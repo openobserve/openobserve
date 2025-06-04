@@ -48,7 +48,6 @@ use prost::Message;
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
-    handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
@@ -74,7 +73,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
                 e
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
+                http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid proto: {}", e),
             )));
         }
@@ -98,7 +97,7 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
+                http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid json: {}", e),
             )));
         }
@@ -121,19 +120,19 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                "not an ingester",
-            )));
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                "not an ingester".to_string(),
+            )),
+        );
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty()
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN,
+            http::StatusCode::FORBIDDEN.into(),
             format!("Quota exceeded for this organization [{}]", org_id),
         )));
     }
@@ -142,8 +141,8 @@ pub async fn handle_otlp_request(
     if let Err(e) = ingester::check_memtable_size() {
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
             )),
         );
     }

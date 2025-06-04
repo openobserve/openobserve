@@ -20,23 +20,20 @@ use actix_web::{
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
-    post, put, web,
+    put, web,
 };
 use arrow_schema::Schema;
 use config::{
     Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
-    meta::{
-        cluster::{NodeStatus, Role, RoleGroup},
-        function::ZoFunction,
-        search::{HashFileRequest, HashFileResponse},
-    },
+    meta::{cluster::NodeStatus, function::ZoFunction},
     utils::{base64, json, schema_ext::SchemaExt},
 };
 use hashbrown::HashMap;
 use infra::{
-    cache, file_list,
+    cache::{self, file_data::disk::FileType},
+    file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
@@ -56,7 +53,7 @@ use {
     },
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
+        infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_text},
     },
     o2_openfga::config::{
@@ -130,10 +127,7 @@ struct ConfigResponse<'a> {
     query_default_limit: i64,
     max_dashboard_series: usize,
     actions_enabled: bool,
-    streaming_enabled: bool,
     histogram_enabled: bool,
-    max_query_range: i64,
-    ai_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -265,11 +259,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = false;
 
     #[cfg(feature = "enterprise")]
-    let ai_enabled = o2cfg.ai.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let ai_enabled = false;
-
-    #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
@@ -330,10 +319,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
-        streaming_enabled: cfg.websocket.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
-        max_query_range: cfg.limit.default_max_query_range_days * 24,
-        ai_enabled,
     }))
 }
 
@@ -359,13 +345,11 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let mem_file_num = cache::file_data::memory::len().await;
     let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::DATA).await;
-    let (disk_max_size, disk_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::DATA).await;
-    let disk_result_file_num =
-        cache::file_data::disk::len(cache::file_data::disk::FileType::RESULT).await;
+    let disk_file_num = cache::file_data::disk::len(FileType::DATA).await;
+    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats(FileType::DATA).await;
+    let disk_result_file_num = cache::file_data::disk::len(FileType::RESULT).await;
     let (disk_result_max_size, disk_result_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::RESULT).await;
+        cache::file_data::disk::stats(FileType::RESULT).await;
     stats.insert(
         "FILE_DATA",
         json::json!({
@@ -381,6 +365,9 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         "FILE_LIST",
         json::json!({"num":file_list_num,"max_id": file_list_max_id}),
     );
+
+    let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
+    stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
 
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
     stats.insert(
@@ -470,9 +457,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use config::meta::user::UserRole;
-
-    use crate::common::meta::user::AuthTokens;
+    use crate::common::meta::user::{AuthTokens, UserRole};
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -833,34 +818,4 @@ async fn list_node() -> Result<HttpResponse, Error> {
 async fn node_metrics() -> Result<HttpResponse, Error> {
     let metrics = config::utils::sysinfo::get_node_metrics();
     Ok(MetaHttpResponse::json(metrics))
-}
-
-#[post("/consistent_hash")]
-async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpResponse, Error> {
-    let mut ret = HashFileResponse::default();
-    for file in body.files.iter() {
-        let mut nodes = HashMap::new();
-        nodes.insert(
-            "querier_interactive".to_string(),
-            cluster::get_node_from_consistent_hash(
-                file,
-                &Role::Querier,
-                Some(RoleGroup::Interactive),
-            )
-            .await
-            .unwrap_or_default(),
-        );
-        nodes.insert(
-            "querier_background".to_string(),
-            cluster::get_node_from_consistent_hash(
-                file,
-                &Role::Querier,
-                Some(RoleGroup::Background),
-            )
-            .await
-            .unwrap_or_default(),
-        );
-        ret.files.insert(file.clone(), nodes);
-    }
-    Ok(MetaHttpResponse::json(ret))
 }

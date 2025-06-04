@@ -13,22 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
 use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
-use hashbrown::HashMap;
+use infra::errors;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
+        utils::http::get_or_create_trace_id,
     },
-    handler::http::request::{
-        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
-    },
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces},
 };
 
@@ -82,8 +80,8 @@ async fn handle_req(
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "Bad Request",
+                http::StatusCode::BAD_REQUEST.into(),
+                "Bad Request".to_string(),
             )),
         )
     }
@@ -161,15 +159,16 @@ pub async fn get_latest_traces(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{AuthExtractor, is_root_user},
         };
         let user_id = in_req.headers().get("user_id").unwrap();
         if !is_root_user(user_id.to_str().unwrap()) {
-            let user: config::meta::user::User = get_user(Some(&org_id), user_id.to_str().unwrap())
-                .await
-                .unwrap();
+            let user: meta::user::User = USERS
+                .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                .unwrap()
+                .clone();
             let stream_type_str = StreamType::Traces.as_str();
 
             if !crate::handler::http::auth::validator::check_permissions(
@@ -278,12 +277,6 @@ pub async fn get_latest_traces(
         use_cache: None,
         local_mode: None,
     };
-
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
-
     let stream_type = StreamType::Traces;
     let user_id = in_req
         .headers()
@@ -293,16 +286,9 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
 
-    let search_res = SearchService::cache::search(
-        &trace_id,
-        &org_id,
-        stream_type,
-        user_id.clone(),
-        &req,
-        "".to_string(),
-    )
-    .instrument(http_span.clone())
-    .await;
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+        .instrument(http_span.clone())
+        .await;
 
     let resp_search = match search_res {
         Ok(res) => res,
@@ -329,7 +315,18 @@ pub async fn get_latest_traces(
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
-            return Ok(map_error_to_http_response(&err, Some(trace_id)));
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code(code)),
+                    _ => HttpResponse::InternalServerError()
+                        .json(meta::http::HttpResponse::error_code(code)),
+                },
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
         }
     };
     if resp_search.hits.is_empty() {
@@ -381,16 +378,10 @@ pub async fn get_latest_traces(
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
 
     loop {
-        let search_res = SearchService::cache::search(
-            &trace_id,
-            &org_id,
-            stream_type,
-            user_id.clone(),
-            &req,
-            "".to_string(),
-        )
-        .instrument(http_span.clone())
-        .await;
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
 
         let resp_search = match search_res {
             Ok(res) => res,
@@ -417,7 +408,18 @@ pub async fn get_latest_traces(
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
-                return Ok(map_error_to_http_response(&err, Some(trace_id)));
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                        _ => HttpResponse::InternalServerError()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                    },
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
             }
         };
 

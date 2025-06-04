@@ -23,8 +23,6 @@ use object_store::{
     PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
-use super::format_location;
-
 /// File system with memory cache
 #[derive(Debug, Default)]
 pub struct FS {}
@@ -33,6 +31,14 @@ impl FS {
     /// Create new memory storage.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn format_location(&self, location: &Path) -> Path {
+        let mut path = location.to_string();
+        if let Some(p) = path.find("/$$/") {
+            path = path[p + 4..].to_string();
+        }
+        path.into()
     }
 }
 
@@ -45,23 +51,27 @@ impl std::fmt::Display for FS {
 #[async_trait]
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
-        let (account, location) = format_location(location);
-        infra::cache::storage::get(&account, &location).await
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT.get(&location).await
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        let (account, location) = format_location(location);
-        infra::cache::storage::get_opts(&account, &location, options).await
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT
+            .get_opts(&location, options)
+            .await
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        let (account, location) = format_location(location);
-        infra::cache::storage::get_range(&account, &location, range).await
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT
+            .get_range(&location, range)
+            .await
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        let (account, location) = format_location(location);
-        infra::cache::storage::head(&account, &location).await
+        let location = self.format_location(location);
+        infra::cache::storage::DEFAULT.head(&location).await
     }
 
     #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]

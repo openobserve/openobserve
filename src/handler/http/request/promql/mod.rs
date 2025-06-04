@@ -55,13 +55,15 @@ pub async fn remote_write(
     if content_type == "application/x-protobuf" {
         Ok(match metrics::prom::remote_write(&org_id, body).await {
             Ok(_) => HttpResponse::Ok().into(),
-            Err(e) => HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)),
+            Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )),
         })
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "Bad Request",
+            http::StatusCode::BAD_REQUEST.into(),
+            "Bad Request".to_string(),
         )))
     }
 }
@@ -155,9 +157,9 @@ async fn query(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
@@ -167,8 +169,10 @@ async fn query(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
-                let user: config::meta::user::User =
-                    get_cached_user_org(org_id, user_email).unwrap();
+                let user: crate::common::meta::user::User = USERS
+                    .get(&format!("{org_id}/{}", user_email))
+                    .unwrap()
+                    .clone();
                 if !crate::handler::http::auth::validator::check_permissions(
                     user_email,
                     AuthExtractor {
@@ -414,9 +418,9 @@ async fn query_range(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
@@ -434,8 +438,10 @@ async fn query_range(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
-                let user: config::meta::user::User =
-                    get_cached_user_org(org_id, user_email).unwrap();
+                let user: crate::common::meta::user::User = USERS
+                    .get(&format!("{org_id}/{}", user_email))
+                    .unwrap()
+                    .clone();
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
                         user_email,
@@ -667,9 +673,9 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         let metric_name = match selector
@@ -684,7 +690,10 @@ async fn series(
         let user_email = user_id.to_str().unwrap();
 
         if !is_root_user(user_email) {
-            let user: config::meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
+            let user: crate::common::meta::user::User = USERS
+                .get(&format!("{org_id}/{}", user_email))
+                .unwrap()
+                .clone();
             let stream_type_str = StreamType::Metrics.as_str();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(

@@ -22,7 +22,6 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
-    metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -146,19 +145,11 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let (cache_type, cache_hits, cache_misses) = cache_files(
+    let cache_type = cache_files(
         trace_id,
         &files
             .iter()
-            .map(|f| {
-                (
-                    f.id,
-                    &f.account,
-                    &f.key,
-                    f.meta.compressed_size,
-                    f.meta.max_ts,
-                )
-            })
+            .map(|f| (f.key.as_ref(), f.meta.compressed_size))
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -170,38 +161,18 @@ pub(crate) async fn create_context(
         DataFusionError::Execution(e.to_string())
     })?;
 
-    // report cache hit and miss metrics
-    metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
-        .inc_by(cache_hits);
-    metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[org_id, &stream_type.to_string(), "parquet"])
-        .inc_by(cache_misses);
-
-    scan_stats.querier_files = scan_stats.files;
-    let cached_ratio = (scan_stats.querier_memory_cached_files
-        + scan_stats.querier_disk_cached_files) as f64
-        / scan_stats.querier_files as f64;
-
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!("downloading others into {:?} in background,", cache_type)
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
-        scan_stats.querier_files,
+        "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
+        scan_stats.files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
-        (cached_ratio * 100.0) as usize,
         cache_start.elapsed().as_millis()
     );
-
-    if scan_stats.querier_files > 0 {
-        QUERY_PARQUET_CACHE_RATIO_NODE
-            .with_label_values(&[org_id, &StreamType::Metrics.to_string()])
-            .observe(cached_ratio);
-    }
 
     // set target partitions based on cache type
     let cfg = get_config();
@@ -211,7 +182,11 @@ pub(crate) async fn create_context(
         cfg.limit.cpu_num
     };
 
-    let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
+    let schema = Arc::new(
+        schema
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
 
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),

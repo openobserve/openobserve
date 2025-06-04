@@ -35,7 +35,7 @@ use datafusion::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
+use o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -149,9 +149,8 @@ pub async fn search(
     );
 
     let trace_id_move = trace_id.to_string();
-    let follower_nodes = nodes.clone();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(trace_id_move, req, sql, follower_nodes)
+        run_datafusion(trace_id_move, req, sql, nodes)
             .instrument(datafusion_span)
             .await
     });
@@ -196,10 +195,6 @@ pub async fn search(
         }
     };
 
-    let main_trace_id = trace_id.split("-").next().unwrap();
-    let stats = super::super::utils::collect_scan_stats(&nodes, main_trace_id, true).await;
-    scan_stats.add(&stats);
-
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
     scan_stats.format_to_mb();
@@ -208,19 +203,11 @@ pub async fn search(
 
 async fn run_datafusion(
     trace_id: String,
-    mut req: Request,
+    req: Request,
     sql: Arc<Sql>,
     nodes: Vec<Arc<dyn NodeInfo>>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
-    // set work group
-    let work_group = if sql.is_complex {
-        WorkGroup::Long.to_string()
-    } else {
-        WorkGroup::Short.to_string()
-    };
-    req.add_work_group(Some(work_group));
-
     // construct physical plan
     let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
         Ok(v) => v,

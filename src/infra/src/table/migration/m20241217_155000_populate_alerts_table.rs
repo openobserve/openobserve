@@ -103,7 +103,6 @@ enum Folders {
 #[derive(DeriveIden)]
 enum Meta {
     Table,
-    Id,
     Module,
     Key1,
     Value,
@@ -132,7 +131,6 @@ impl OrgWithAlert {
             .from(Meta::Table)
             .and_where(Expr::col(Meta::Module).eq("alerts"))
             .group_by_col(Meta::Key1)
-            .order_by(Meta::Key1, Order::Asc)
             .to_owned()
     }
 
@@ -190,7 +188,6 @@ impl MetaAlertWithFolder {
             .and_where(Expr::col((Meta::Table, Meta::Module)).eq("alerts"))
             .and_where(Expr::col((Folders::Table, Folders::Type)).eq(ALERTS_FOLDER_TYPE))
             .and_where(Expr::col((Folders::Table, Folders::FolderId)).eq("default"))
-            .order_by((Meta::Table, Meta::Id), Order::Asc)
             .to_owned()
     }
 
@@ -1012,7 +1009,7 @@ mod tests {
         let stmnt = OrgWithAlert::statement();
         assert_eq!(
             &stmnt.to_string(PostgresQueryBuilder),
-            r#"SELECT "key1" FROM "meta" WHERE "module" = 'alerts' GROUP BY "key1" ORDER BY "key1" ASC"#
+            r#"SELECT "key1" FROM "meta" WHERE "module" = 'alerts' GROUP BY "key1""#
         );
     }
 
@@ -1021,7 +1018,7 @@ mod tests {
         let stmnt = OrgWithAlert::statement();
         assert_eq!(
             &stmnt.to_string(MysqlQueryBuilder),
-            r#"SELECT `key1` FROM `meta` WHERE `module` = 'alerts' GROUP BY `key1` ORDER BY `key1` ASC"#
+            r#"SELECT `key1` FROM `meta` WHERE `module` = 'alerts' GROUP BY `key1`"#
         );
     }
 
@@ -1030,7 +1027,7 @@ mod tests {
         let stmnt = OrgWithAlert::statement();
         assert_eq!(
             &stmnt.to_string(SqliteQueryBuilder),
-            r#"SELECT "key1" FROM "meta" WHERE "module" = 'alerts' GROUP BY "key1" ORDER BY "key1" ASC"#
+            r#"SELECT "key1" FROM "meta" WHERE "module" = 'alerts' GROUP BY "key1""#
         );
     }
 
@@ -1049,7 +1046,6 @@ mod tests {
                 WHERE "meta"."module" = 'alerts' 
                 AND "folders"."type" = 1 
                 AND "folders"."folder_id" = 'default'
-                ORDER BY "meta"."id" ASC
             "#
         );
     }
@@ -1069,7 +1065,6 @@ mod tests {
                 WHERE `meta`.`module` = 'alerts' 
                 AND `folders`.`type` = 1 
                 AND `folders`.`folder_id` = 'default'
-                ORDER BY `meta`.`id` ASC
             "#
         );
     }
@@ -1089,7 +1084,6 @@ mod tests {
                 WHERE "meta"."module" = 'alerts' 
                 AND "folders"."type" = 1 
                 AND "folders"."folder_id" = 'default'
-                ORDER BY "meta"."id" ASC
             "#
         );
     }

@@ -44,9 +44,6 @@ use crate::{
             syslog::SyslogRoute,
         },
     },
-    handler::http::{
-        request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
-    },
     service::{
         format_stream_name, ingestion::check_ingestion_allowed, logs::bulk::TRANSFORM_FAILED,
     },
@@ -62,15 +59,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         Some(matching_route) => matching_route,
         None => {
             log::warn!("Syslogs from the IP {} are not allowed", ip);
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((
-                    ERROR_HEADER,
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                     "Syslogs from the IP are not allowed".to_string(),
-                ))
-                .json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    "Syslogs from the IP are not allowed",
-                )));
+                )),
+            );
         }
     };
 
@@ -81,7 +75,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // check stream
     let stream_name = format_stream_name(in_stream_name);
     if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
-        return Ok(map_error_to_http_response(&e.into(), None));
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                e.to_string(),
+            )),
+        );
     };
 
     let cfg = get_config();
@@ -323,10 +322,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if idx != usize::MAX
-                            && streams_need_original_map
-                                .get(&destination_stream)
-                                .is_some_and(|v| *v)
+                        if streams_need_original_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(

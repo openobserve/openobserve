@@ -187,14 +187,6 @@ const useIngestionRoutes = () => {
                     routeGuard(to, from, next);
                   },
                 },
-                {
-                  path: "syslogng",
-                  name: "syslogNg",
-                  component: SyslogNg,
-                  beforeEnter(to: any, from: any, next: any) {
-                    routeGuard(to, from, next);
-                  },
-                },
               ],
             },
             {
@@ -794,20 +786,20 @@ const useIngestionRoutes = () => {
     },
   };
 
-  // const sysLogNg = {
-  //   path: "syslogng",
-  //   name: "syslogNg",
-  //   component: SyslogNg,
-  //   beforeEnter(to: any, from: any, next: any) {
-  //     routeGuard(to, from, next);
-  //   },
-  // };
+  const sysLogNg = {
+    path: "syslogng",
+    name: "syslogNg",
+    component: SyslogNg,
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  };
 
   if (config.isCloud === "false" || !config.isCloud) {
     ingestionRoutes[0].children
       .find((child: any) => child.name === "custom")
       .children.find((child: any) => child.name === "ingestLogs")
-      ?.children.push(...[sysLog]);
+      ?.children.push(...[sysLog, sysLogNg]);
   }
 
   return ingestionRoutes;

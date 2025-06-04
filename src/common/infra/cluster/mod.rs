@@ -163,22 +163,6 @@ pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>
     map
 }
 
-pub async fn count_consistent_hash() -> HashMap<String, usize> {
-    let mut map = HashMap::new();
-    let r = QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await;
-    map.insert("querier_interactive".to_string(), r.len());
-    drop(r);
-    let r = QUERIER_BACKGROUND_CONSISTENT_HASH.read().await;
-    map.insert("querier_background".to_string(), r.len());
-    drop(r);
-    let r = COMPACTOR_CONSISTENT_HASH.read().await;
-    map.insert("compactor".to_string(), r.len());
-    drop(r);
-    let r = FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await;
-    map.insert("flatten_compactor".to_string(), r.len());
-    map
-}
-
 /// Register and keep alive the node to cluster
 pub async fn register_and_keep_alive() -> Result<()> {
     let cfg = get_config();
@@ -609,16 +593,10 @@ fn filter_nodes_with_group(
 ) -> Option<Vec<Node>> {
     let mut nodes = nodes?;
     match group {
-        Some(RoleGroup::Interactive) => nodes.retain(|n| {
-            !n.is_querier()
-                || n.role_group == RoleGroup::None
-                || n.role_group == RoleGroup::Interactive
-        }),
-        Some(RoleGroup::Background) => nodes.retain(|n| {
-            !n.is_querier()
-                || n.role_group == RoleGroup::None
-                || n.role_group == RoleGroup::Background
-        }),
+        Some(RoleGroup::Interactive) => nodes
+            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Interactive),
+        Some(RoleGroup::Background) => nodes
+            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Background),
         _ => {}
     };
     Some(nodes)
@@ -632,7 +610,7 @@ async fn set_node_status_metrics(node: &Node) {
     }
 }
 
-async fn update_node_status_metrics() -> NodeMetrics {
+fn update_node_status_metrics() -> NodeMetrics {
     let node_status = get_node_metrics();
 
     config::metrics::NODE_UP
@@ -665,14 +643,6 @@ async fn update_node_status_metrics() -> NodeMetrics {
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["resets"])
         .set(node_status.tcp_conns_resets as i64);
-
-    // update node consistent hash metrics
-    let consistent_hash = count_consistent_hash().await;
-    for (k, v) in consistent_hash {
-        config::metrics::NODE_CONSISTENT_HASH
-            .with_label_values(&[k.as_str()])
-            .set(v as i64);
-    }
 
     node_status
 }

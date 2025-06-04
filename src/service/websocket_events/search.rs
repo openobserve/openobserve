@@ -20,7 +20,7 @@ use config::{
     meta::{
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-            SearchPartitionResponse, TimeOffset, ValuesEventContext,
+            SearchPartitionResponse, ValuesEventContext,
         },
         sql::{OrderBy, resolve_stream_names},
         websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
@@ -49,8 +49,9 @@ use crate::{
             self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
             sql::Sql,
         },
-        setup_tracing_with_trace_id,
-        websocket_events::{WsServerEvents, calculate_progress_percentage},
+        websocket_events::{
+            TimeOffset, WsServerEvents, calculate_progress_percentage, setup_tracing_with_trace_id,
+        },
     },
 };
 
@@ -83,6 +84,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     }
 }
 
+#[tracing::instrument(name = "service:search:websocket::handle_search_request", skip_all)]
 pub async fn handle_search_request(
     req_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
@@ -108,25 +110,13 @@ pub async fn handle_search_request(
     // Setup tracing
     let ws_search_span = setup_tracing_with_trace_id(
         &req.trace_id,
-        tracing::info_span!("service:websocket_events:search:handle_search_request"),
+        tracing::info_span!("src::service::websocket_events::search::handle_search_request"),
     )
     .await;
 
     // check and append search event type
     if req.payload.search_type.is_none() {
         req.payload.search_type = Some(req.search_type);
-    }
-
-    // decode the sql query
-    if let Err(e) = req.payload.decode() {
-        let err_res = WsServerEvents::error_response(
-            &Error::Message(e.to_string()),
-            Some(req_id.to_string()),
-            Some(trace_id),
-            Default::default(),
-        );
-        send_message(req_id, err_res.to_json()).await?;
-        return Ok(());
     }
 
     // get stream name
@@ -794,7 +784,6 @@ async fn get_partitions(
         req.stream_type,
         &search_partition_req,
         false,
-        false,
     )
     .instrument(tracing::info_span!(
         "src::handler::http::request::websocket::search::get_partitions"
@@ -1062,7 +1051,7 @@ pub async fn do_partitioned_search(
         }
 
         // Stop if reached the requested result size and it is not a streaming aggs query
-        if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
+        if req_size != -1 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
                 "[WS_SEARCH]: Reached requested result size ({}), stopping search",
                 req_size

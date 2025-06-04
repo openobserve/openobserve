@@ -71,8 +71,7 @@ pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ra
 }
 
 /// Updates the `HISTOGRAM` function in a SQL query to include or modify the interval.
-// TODO: should be a utils function in sql crate
-pub fn update_histogram_interval_in_query(
+pub(crate) fn update_histogram_interval_in_query(
     sql: &str,
     histogram_interval: i64,
 ) -> Result<String, Error> {
@@ -81,7 +80,7 @@ pub fn update_histogram_interval_in_query(
         .pop()
         .unwrap();
 
-    let _ = visit_statements_mut(&mut statement, |stmt| {
+    visit_statements_mut(&mut statement, |stmt| {
         if let Statement::Query(query) = stmt {
             if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
                 for projection in &mut select.projection {

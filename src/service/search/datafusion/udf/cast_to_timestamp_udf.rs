@@ -18,12 +18,10 @@ use std::any::Any;
 use arrow_schema::TimeUnit;
 use datafusion::{
     arrow::datatypes::DataType,
-    common::exec_err,
+    common::{exec_err, not_impl_err},
     error::Result,
     functions::datetime::to_timestamp::ToTimestampMicrosFunc,
-    logical_expr::{
-        ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
-    },
+    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
 };
 use once_cell::sync::Lazy;
 
@@ -64,9 +62,17 @@ impl ScalarUDFImpl for CastToTimestampUdf {
         Ok(DataType::Int64)
     }
 
-    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
+    fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
+        not_impl_err!(
+            "Function {} does not implement invoke but called",
+            self.name()
+        )
+    }
+
+    fn invoke_batch(&self, args: &[ColumnarValue], number_rows: usize) -> Result<ColumnarValue> {
         let ttm = ToTimestampMicrosFunc::new();
-        let ret = ttm.invoke_with_args(args)?;
+        let ret = ttm.invoke_batch(args, number_rows)?;
+
         match ret.data_type() {
             DataType::Int32 | DataType::Int64 | DataType::Null | DataType::Float64 => {
                 ret.cast_to(&DataType::Int64, None)
@@ -76,6 +82,9 @@ impl ScalarUDFImpl for CastToTimestampUdf {
                 .cast_to(&DataType::Int64, None),
             DataType::Timestamp(_, Some(tz)) => ret
                 .cast_to(&DataType::Timestamp(TimeUnit::Microsecond, Some(tz)), None)?
+                .cast_to(&DataType::Int64, None),
+            DataType::Utf8 => CastToTimestampUdf::new()
+                .invoke_batch(args, number_rows)?
                 .cast_to(&DataType::Int64, None),
             other => {
                 exec_err!(

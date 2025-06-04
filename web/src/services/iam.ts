@@ -59,7 +59,7 @@ export const deleteRole = (role_id: string, org_identifier: string) => {
 export const createRole = (role_id: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/roles`;
   return http({}).post(url, {
-    role: role_id,
+    name: role_id,
   });
 };
 

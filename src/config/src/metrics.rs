@@ -359,21 +359,6 @@ pub static QUERY_PARQUET_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "query_parquet_cache_ratio_node",
-            "Querier parquet cache ratio for local node.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .buckets(vec![
-            0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0,
-        ])
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
-    )
-    .expect("Metric created")
-});
 
 // query cache ratio for metrics
 pub static QUERY_METRICS_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
@@ -497,6 +482,18 @@ pub static STORAGE_WRITE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "storage_read_requests",
+            "Storage read requests.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
         &["organization", "stream_type", "storage_type"],
     )
     .expect("Metric created")
@@ -509,19 +506,7 @@ pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type", "storage_type"],
-    )
-    .expect("Metric created")
-});
-pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "storage_read_requests",
-            "Storage read requests.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type", "method_type", "storage_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -533,7 +518,7 @@ pub static STORAGE_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type", "method_type", "storage_type"],
+        &["organization", "stream_type", "storage_type"],
     )
     .expect("Metric created")
 });
@@ -789,84 +774,6 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new("node_consistent_hash", "Consistent hash")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &["type"],
-    )
-    .expect("Metric created")
-});
-
-// query disk cache metrics
-pub static QUERY_DISK_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "query_disk_cache_hit_count",
-            "query disk cache hit count".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type", "file_type"],
-    )
-    .expect("Metric created")
-});
-pub static QUERY_DISK_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "query_disk_cache_miss_count",
-            "query disk cache miss count".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream_type", "file_type"],
-    )
-    .expect("Metric created")
-});
-
-// file downloader metrics
-pub static FILE_DOWNLOADER_NORMAL_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "file_downloader_normal_queue_size",
-            "file downloader normal queue size",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "file_downloader_priority_queue_size",
-            "file downloader priority queue size",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-// File access time bucket histogram
-pub static FILE_ACCESS_TIME: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "file_access_time",
-            "Histogram showing query counts within time windows from 1h to 1week (1h, 2h, 3h, 6h, 12h, 24h, 48h, 96h, 168h)"
-        )
-        .namespace(NAMESPACE)
-        .buckets(vec![1.0, 2.0, 3.0, 6.0, 12.0, 24.0, 48.0, 96.0, 168.0])
-        .const_labels(create_const_labels()),
-        &["stream_type"],
-    )
-    .expect("Metric created")
-});
-
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -946,9 +853,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_PARQUET_CACHE_RATIO.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(QUERY_PARQUET_CACHE_RATIO_NODE.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_METRICS_CACHE_RATIO.clone()))
@@ -1077,27 +981,6 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
-    registry
-        .register(Box::new(NODE_CONSISTENT_HASH.clone()))
-        .expect("Metric registered");
-
-    // query disk cache metrics
-    registry
-        .register(Box::new(QUERY_DISK_CACHE_HIT_COUNT.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(QUERY_DISK_CACHE_MISS_COUNT.clone()))
-        .expect("Metric registered");
-    // file downloader metrics
-    registry
-        .register(Box::new(FILE_DOWNLOADER_NORMAL_QUEUE_SIZE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(FILE_ACCESS_TIME.clone()))
-        .expect("Metric registered");
 }
 
 fn create_const_labels() -> HashMap<String, String> {
@@ -1115,6 +998,14 @@ pub fn gather() -> String {
     TextEncoder::new()
         .encode(&registry.gather(), &mut buffer)
         .unwrap();
+
+    // process metrics
+    let mut process_metrics = vec![];
+    TextEncoder::new()
+        .encode(&prometheus::gather(), &mut process_metrics)
+        .unwrap();
+    buffer.extend_from_slice(&process_metrics);
+
     String::from_utf8(buffer).unwrap()
 }
 

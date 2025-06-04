@@ -59,6 +59,9 @@ pub async fn handle_request(
     user_email: &str,
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse> {
+    const SERVICE_NAME: &str = "service.name";
+    const SERVICE: &str = "service";
+
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
@@ -114,18 +117,31 @@ pub async fn handle_request(
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
     };
-    for resource_log in request.resource_logs {
+    for resource_log in &request.resource_logs {
         if resource_log.scope_logs.is_empty() {
             continue;
         }
 
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
-        if let Some(resource) = resource_log.resource {
-            for res_attr in resource.attributes {
-                service_att_map.insert(
-                    res_attr.key.to_string(),
-                    get_val_with_type_retained(&res_attr.value.as_ref()),
-                );
+
+        if let Some(attributes) = resource_log
+            .resource
+            .clone()
+            .map(|resource| resource.attributes)
+        {
+            for local_attr in attributes.into_iter() {
+                if local_attr.key == SERVICE_NAME {
+                    let service_name_value = get_val_with_type_retained(&local_attr.value.as_ref());
+
+                    for item in service_name_value.as_object().unwrap().values().cloned() {
+                        service_att_map.insert(SERVICE_NAME.to_string(), item);
+                    }
+                } else {
+                    service_att_map.insert(
+                        format!("{}_{}", SERVICE, local_attr.key),
+                        get_val_with_type_retained(&local_attr.value.as_ref()),
+                    );
+                }
             }
         }
 
@@ -156,14 +172,22 @@ pub async fn handle_request(
                         .inc();
                     log_failed_record(
                         log_ingestion_errors,
-                        log_record,
+                        &resource_log,
                         &stream_status.status.error,
                     );
                     continue;
                 }
 
                 let mut rec = json::json!({});
+
+                // For HttpJson
                 rec.as_object_mut().unwrap().extend(service_att_map.clone());
+
+                if let Some(attributes) = resource_log.resource.as_ref().map(|v| &v.attributes) {
+                    for item in attributes {
+                        rec[item.key.as_str()] = get_val_with_type_retained(&item.value.as_ref());
+                    }
+                }
 
                 if let Some(lib) = &instrumentation_logs.scope {
                     let library_name = lib.name.to_owned();
@@ -186,12 +210,12 @@ pub async fn handle_request(
                 };
 
                 rec["body"] = get_val(&log_record.body.as_ref());
-                rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
-
                 log_record.attributes.iter().for_each(|local_attr| {
-                    rec[local_attr.key.as_str()] =
-                        get_val_with_type_retained(&local_attr.value.as_ref());
+                    let mut key = local_attr.key.clone();
+                    flatten::format_key(&mut key);
+                    rec[key] = get_val_with_type_retained(&local_attr.value.as_ref());
                 });
+                rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
 
                 match TraceId::from_bytes(
                     log_record
@@ -261,10 +285,7 @@ pub async fn handle_request(
                         .is_some_and(|v| *v)
                         && original_data.is_some()
                     {
-                        local_val.insert(
-                            ORIGINAL_DATA_COL_NAME.to_string(),
-                            original_data.unwrap().into(),
-                        );
+                        local_val[ORIGINAL_DATA_COL_NAME] = original_data.clone().unwrap().into();
 
                         let record_id = crate::service::ingestion::generate_record_id(
                             org_id,
@@ -272,7 +293,7 @@ pub async fn handle_request(
                             &StreamType::Logs,
                         );
 
-                        local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
+                        local_val[ID_COL_NAME] = json::Value::String(record_id.to_string());
                     }
 
                     // add `_all_values` if required by StreamSettings
@@ -293,8 +314,7 @@ pub async fn handle_request(
                             })
                             .map(|(_, v)| v)
                             .join(" ");
-                        local_val
-                            .insert(ALL_VALUES_COL_NAME.to_string(), json::Value::String(values));
+                        local_val[ALL_VALUES_COL_NAME] = json::Value::String(values);
                     }
 
                     let (ts_data, fn_num) = json_data_by_stream
@@ -364,23 +384,20 @@ pub async fn handle_request(
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if idx != usize::MAX
-                            && streams_need_original_map
-                                .get(&destination_stream)
-                                .is_some_and(|v| *v)
+                        if streams_need_original_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
-                            local_val.insert(
-                                ORIGINAL_DATA_COL_NAME.to_string(),
-                                original_options[idx].clone().unwrap().into(),
-                            );
+                            local_val[ORIGINAL_DATA_COL_NAME] =
+                                original_options[idx].clone().unwrap().into();
 
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
                                 &destination_stream,
                                 &StreamType::Logs,
                             );
-                            local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
+                            local_val[ID_COL_NAME] = record_id.to_string().into();
                         }
 
                         // add `_all_values` if required by StreamSettings
@@ -403,7 +420,7 @@ pub async fn handle_request(
                                 .map(|(_, v)| v)
                                 .join(" ");
 
-                            local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
+                            local_val[ALL_VALUES_COL_NAME] = values.into();
                         }
 
                         let (ts_data, fn_num) = json_data_by_stream
