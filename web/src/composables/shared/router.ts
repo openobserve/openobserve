@@ -20,6 +20,7 @@ import Tickets from "@/views/TicketsView.vue";
 import About from "@/views/About.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
+import ShortUrl from "@/views/ShortUrl.vue";
 
 const Search = () => import("@/views/Search.vue");
 const AppMetrics = () => import("@/views/AppMetrics.vue");
@@ -285,6 +286,14 @@ const useRoutes = () => {
       path: "alerts",
       name: "alertList",
       component: AlertList,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "short/:id",
+      name: "shortUrl",
+      component: ShortUrl,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
