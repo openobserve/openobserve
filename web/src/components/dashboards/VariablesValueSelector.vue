@@ -1827,19 +1827,7 @@ export default defineComponent({
         emitVariablesData();
       });
 
-      // If parent value is null or empty, don't load child variables
-      const isParentValueEmpty =
-        !currentVariable.value ||
-        (Array.isArray(currentVariable.value) &&
-          currentVariable.value.length === 0);
-
-      if (isParentValueEmpty) {
-        // Just emit the reset state
-        emitVariablesData();
-        return;
-      }
-
-      // Load variables in dependency order
+      // Load variables in dependency order, even if parent value is empty
       for (const varName of affectedVariables) {
         const variable = variablesData.values.find(
           (v: any) => v.name === varName,
