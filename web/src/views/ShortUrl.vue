@@ -18,6 +18,27 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
 
+    const routeToHome = () => {
+      router.replace({
+        name: "home",
+      });
+    };
+
+    const handleOriginalUrl = (url: string) => {
+      const urlArray = url.split("/");
+
+      // if the url contains web, then route to the original url
+      if (urlArray.includes("web")) {
+        routeToOriginalUrl(urlArray[4]);
+      } else {
+        routeToOriginalUrl(urlArray[3]);
+      }
+    };
+
+    const routeToOriginalUrl = (url: string) => {
+      url.startsWith("/") ? router.replace(url) : router.replace("/" + url);
+    };
+
     const fetchAndRedirect = async () => {
       try {
         const id = route.params.id as string;
@@ -27,16 +48,7 @@ export default defineComponent({
         );
 
         if (typeof response.data === "string") {
-          const url = response.data.split("/");
-          if (url.includes("web")) {
-            url[4].startsWith("/")
-              ? router.replace(url[4])
-              : router.replace("/" + url[4]);
-          } else {
-            url[3].startsWith("/")
-              ? router.replace(url[3])
-              : router.replace("/" + url[3]);
-          }
+          handleOriginalUrl(response.data);
         } else {
           // Handle case where redirect URL is not found
           routeToHome();
@@ -46,12 +58,6 @@ export default defineComponent({
         // Redirect to home page on error
         routeToHome();
       }
-    };
-
-    const routeToHome = () => {
-      router.replace({
-        name: "home",
-      });
     };
 
     // Execute when component is mounted
