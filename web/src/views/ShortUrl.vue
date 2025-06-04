@@ -26,8 +26,17 @@ export default defineComponent({
           id,
         );
 
-        if (response.data && response.data.redirect_url) {
-          router.replace(response.data.redirect_url);
+        if (typeof response.data === "string") {
+          const url = response.data.split("/");
+          if (url.includes("web")) {
+            url[4].startsWith("/")
+              ? router.replace(url[4])
+              : router.replace("/" + url[4]);
+          } else {
+            url[3].startsWith("/")
+              ? router.replace(url[3])
+              : router.replace("/" + url[3]);
+          }
         } else {
           // Handle case where redirect URL is not found
           routeToLogs();

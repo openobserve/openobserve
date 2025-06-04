@@ -20,7 +20,7 @@ const shortURL = {
     });
   },
   get: (org_identifier: string, id: string) => {
-    return http().get(`/api/${org_identifier}/short/${id}`);
+    return http().get(`/api/${org_identifier}/short/${id}?type=ui`);
   },
 };
 export default shortURL;
