@@ -29,7 +29,7 @@ pub fn get_base_url() -> String {
     format!("{}{}", config.common.web_url, config.common.base_uri)
 }
 
-fn construct_short_url(org_id: &str, short_id: &str) -> String {
+pub fn construct_short_url(org_id: &str, short_id: &str) -> String {
     format!(
         "{}/{}/{}{}?org_identifier={}",
         get_base_url(),

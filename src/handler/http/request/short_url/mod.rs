@@ -128,11 +128,10 @@ pub async fn retrieve(
     }
 
     // Here we redirect the legacy short urls to the new short url
+    // the redirection then will be handled by the frontend using this flow
+    // TODO: Remove this once we are sure there is no more legacy short urls
     if original_url.is_some() {
-        let connection_info = req.connection_info();
-        let scheme = connection_info.scheme();
-        let host = connection_info.host();
-        let redirect_url = format!("{}://{}/web/short_url/{}?org_identifier={}", scheme, host, short_id, org_id);
+        let redirect_url = short_url::construct_short_url(&org_id, &short_id);
         let redirect_http = RedirectResponseBuilder::new(&redirect_url).build().redirect_http();
         Ok(redirect_http)
     } else {
