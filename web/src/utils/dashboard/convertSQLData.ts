@@ -940,7 +940,8 @@ export const convertSQLData = async (
       enterable: true,
       backgroundColor:
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-      extraCssText: "max-height: 200px; overflow: auto; max-width: 400px",
+      extraCssText:
+        "max-height: 200px; overflow: auto; max-width: 400px; user-select: text;",
       axisPointer: {
         type: "cross",
         label: {
@@ -2082,7 +2083,8 @@ export const convertSQLData = async (
           store.state.theme === "dark"
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
-        extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
+        extraCssText:
+          "max-height: 200px; overflow: auto; max-width: 500px; user-select: text;",
       };
       options.angleAxis = {
         show: false,
