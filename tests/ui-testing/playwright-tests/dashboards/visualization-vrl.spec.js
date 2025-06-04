@@ -1,5 +1,4 @@
 import { test, expect } from "../baseFixtures";
-import { test, expect } from "@playwright/test";
 import LogsVisualise from "../../pages/dashboardPages/visualise";
 import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
