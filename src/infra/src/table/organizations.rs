@@ -94,7 +94,7 @@ pub async fn add(
     org_type: OrganizationType,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
-    let trial_end = now + day_micros(14);
+    let trial_end = now + day_micros(15);
     let record = ActiveModel {
         identifier: Set(org_id.to_string()),
         org_name: Set(org_name.to_string()),
