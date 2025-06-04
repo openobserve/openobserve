@@ -1744,6 +1744,20 @@ export default defineComponent({
           `[Debug] Filtering multiSelect values for ${currentVariable.name}`,
         );
 
+        // If custom values are set and current value matches custom values, don't filter
+        if (
+          currentVariable?.selectAllValueForMultiSelect === "custom" &&
+          currentVariable?.customMultiSelectValue?.length > 0 &&
+          JSON.stringify(currentVariable.value) ===
+            JSON.stringify(currentVariable.customMultiSelectValue)
+        ) {
+          console.log(
+            `[Debug] Keeping custom values for ${currentVariable.name}`,
+            currentVariable.value,
+          );
+          return;
+        }
+
         const filtered = currentVariable.value.filter((val: any) =>
           currentVariable.options.some((opt: any) => opt.value === val),
         );
