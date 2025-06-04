@@ -1,3 +1,6 @@
+// Dashboard Setting Page Object
+// This class contains methods to interact with the dashboard settings page in OpenObserve.
+// This includes changing the dashboard name, adding tabs, managing variables, and more.
 export default class DashboardSetting {
   constructor(page) {
     this.page = page;
@@ -42,10 +45,13 @@ export default class DashboardSetting {
     );
   }
 
+  //Dashboard Settings//
+  //Generate unique dashboard name
   generateUniqueDashboardnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
 
+  //Open Dashboard Setting//
   async openSetting() {
     await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
       state: "visible",
@@ -53,6 +59,8 @@ export default class DashboardSetting {
     });
     await this.setting.click();
   }
+  //General Setting//
+  //Change Dashboard Name//
   async dashboardNameChange(name) {
     await this.general.waitFor({ state: "visible" });
     await this.newName.waitFor({ state: "visible" });
@@ -78,10 +86,13 @@ export default class DashboardSetting {
     await this.saveSettingBtn.waitFor({ state: "visible" });
     await this.saveSettingBtn.click();
   }
+
+  //Cancel dashboard changes//
   async cancelSettingDashboard() {
     await this.cancelBtn.waitFor({ state: "visible" });
     await this.cancelBtn.click();
   }
+  //close setting dashboard//
   async closeSettingDashboard() {
     await this.closeSetting.waitFor({ state: "visible" });
     await this.closeSetting.click();
@@ -106,11 +117,13 @@ export default class DashboardSetting {
     await this.addtab.click();
     await this.tabName.fill(tabnewName);
   }
+
+  //save new tab setting//
   async saveTabSetting() {
     await this.saveTab.click();
   }
 
-  //Edit tab
+  //Edit tab in settings//
   editTabnewName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
@@ -120,44 +133,29 @@ export default class DashboardSetting {
     await this.fullScreen.waitFor({ state: "visible" });
     await this.fullScreen.click();
   }
+
+  //cancel changes
   async cancelTabwithoutSave() {
     await this.page.locator('[data-test="dashboard-add-cancel"]').click();
   }
 
-  async saveEditedtab() {
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
-      .click();
-  }
-  // async saveEditedtab() {
-  //   const saveBtn = this.page.locator(
-  //     '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
-  //   );
-  //   // await expect(saveBtn).toBeVisible({ timeout: 3000 });
-
-  //   // Retry click if DOM re-renders
-  //   for (let attempt = 0; attempt < 3; attempt++) {
-  //     try {
-  //       await saveBtn.click({ timeout: 3000 });
-  //       break;
-  //     } catch (e) {
-  //       if (attempt === 2) throw e; // rethrow on final attempt
-  //       await this.page.waitForTimeout(500); // wait before retry
-  //     }
-  //   }
-  // }
-
+  //Cabcel edit tab name//
   async cancelEditedtab() {
     await this.page
       .locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]')
       .click();
   }
+
+  //Veribales Settings//
+  //Open Variables tab
+
   async openVariables() {
     await this.page
       .locator('[data-test="dashboard-settings-variable-tab"]')
       .click();
   }
 
+  //Generate unique variable name
   variableName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
@@ -193,7 +191,7 @@ export default class DashboardSetting {
     await this.page.getByRole("option", { name: field }).click();
   }
 
-  //select Constand type
+  //select Constant type
   async selectConstantType(type, variableName, value) {
     await this.page
       .locator('[data-test="dashboard-variable-add-btn"]')
@@ -269,7 +267,7 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-custom-variable-0-value"]')
       .fill(value);
   }
-
+  //add max record size
   async addMaxRecord(value) {
     await this.page
       .locator('[data-test="dashboard-variable-max-record-size"]')
@@ -279,18 +277,17 @@ export default class DashboardSetting {
       .fill(value);
   }
 
+  //enable multi select
   async enableMultiSelect() {
     await this.page
       .locator('[data-test="dashboard-query_values-show_multiple_values"]')
       .click();
   }
 
+  //enable default value
   async addCustomValue(value) {
-    await this.page
-      .locator(
-        '[data-test="dashboard-multi-select-default-value-toggle-custom"]'
-      )
-      .click();
+    await this.page;
+    '[data-test="dashboard-multi-select-default-value-toggle-custom"]'.click();
     await this.page
       .locator('[data-test="dashboard-variable-custom-value-0"]')
       .click();
@@ -298,29 +295,36 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-variable-custom-value-0"]')
       .fill(value);
   }
+
+  //save variable
   async saveVariable() {
     await this.page
       .locator('[data-test="dashboard-variable-save-btn"]')
       .click();
   }
 
+  //Cancel variable
   async cancelVariable() {
     await this.page
       .locator('[data-test="dashboard-variable-cancel-btn"]')
       .click();
   }
 
+  //hide variable
   async hideVariable() {
     await this.page
       .locator('[data-test="dashboard-variable-hide_on_dashboard"]')
       .click();
   }
+
+  //close setting window
   async closeSettingWindow() {
     await this.page
       .locator('[data-test="dashboard-settings-close-btn"]')
       .click();
   }
 
+  // Update tab name in edit tab options//
   async updateDashboardTabName(oldTabName, updatedTabName) {
     const page = this.page;
 
@@ -353,7 +357,9 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
       .click();
   }
-  // Delete tab
+
+  // Delete tab in edit tab options//
+
   async deleteTab(oldTabName) {
     const page = this.page;
 
