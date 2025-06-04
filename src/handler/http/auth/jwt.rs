@@ -45,7 +45,7 @@ use crate::{
         organization::{DEFAULT_ORG, Organization, USER_DEFAULT},
         telemetry,
     },
-    service::organization::{accept_invitation, list_orgs_by_user},
+    service::organization::list_orgs_by_user,
     service::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
 };
 
@@ -561,7 +561,6 @@ fn format_role_name(org: &str, role: String) -> String {
 #[cfg(feature = "cloud")]
 pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
     use config::{ider, utils::json};
-    use o2_enterprise::enterprise::cloud::org_invites::list_by_invitee;
     use o2_openfga::authorizer::authz::save_org_tuples;
 
     use crate::service::users::{add_admin_to_org, create_new_user};
@@ -596,32 +595,6 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
             }
         }
     }
-
-    match list_by_invitee(user_email).await {
-        Ok(invites) => {
-            if !invites.is_empty() {
-                for invite in invites {
-                    let org_id = invite.org_id.clone();
-                    let invite_token = invite.token.clone();
-                    if let Err(e) = accept_invitation(user_email, &invite_token).await {
-                        log::error!(
-                            "Error accepting invite for user: {} org: {} error: {}",
-                            user_email,
-                            org_id,
-                            e
-                        );
-                    }
-                }
-            }
-        }
-
-        Err(e) => {
-            log::error!(
-                "Error fetching invites for user: {}, error: {e}",
-                user_email
-            );
-        }
-    };
 
     // Check if the user is part of any organization
     let orgs = list_orgs_by_user(user_email).await;
