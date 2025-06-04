@@ -115,8 +115,7 @@ impl TreeNodeRewriter for DeduplicationRewriter {
         }
 
         // insert deduplication to first plan that contains deduplication columns
-        let mut is_stop = true;
-        let mut plan = match node {
+        let plan = match node {
             LogicalPlan::Projection(_) | LogicalPlan::SubqueryAlias(_) => {
                 let schema = node.inputs().first().unwrap().schema();
                 for column in self.deduplication_columns.iter() {
@@ -125,22 +124,17 @@ impl TreeNodeRewriter for DeduplicationRewriter {
                             Arc::new(node),
                             self.deduplication_columns.clone(),
                         );
-                        return Ok(Transformed::yes(plan));
+                        return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
                     }
                 }
-                is_stop = false;
                 Transformed::no(node)
             }
             _ => {
                 let plan =
                     generate_deduplication_plan(Arc::new(node), self.deduplication_columns.clone());
-                Transformed::new(plan, is_stop, TreeNodeRecursion::Stop)
+                Transformed::new(plan, true, TreeNodeRecursion::Stop)
             }
         };
-
-        if is_stop {
-            plan.tnr = TreeNodeRecursion::Stop;
-        }
 
         Ok(plan)
     }
