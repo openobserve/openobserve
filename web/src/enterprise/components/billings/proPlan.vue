@@ -99,7 +99,7 @@ export default defineComponent({
       { name: 'Query Volume', price: '$0.01/GB' , is_parent: true},
       { name: 'Pipelines', price: '' , is_parent: true},
       { name: 'Data Processed', price: '$0.10/ GB' , is_parent: false},
-      { name: 'Each additional destinations', price: '$0.30/ GB' , is_parent: false},
+      { name: 'Each additional destination', price: '$0.30/ GB' , is_parent: false},
       { name: 'RUM & Session Replay', price: '$1/ 1K sessions' , is_parent: true},
       { name: 'Error Tracking', price: '$0.15/ 1K events' , is_parent: true},
       { name: 'Action Script', price: '$1/ 1K runs' , is_parent: true},
