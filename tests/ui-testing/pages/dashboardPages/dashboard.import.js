@@ -1,3 +1,5 @@
+//Dashboard Import Page Object
+//Methods: Import dashboard, import button, input files, delete imported dashboard
 export default class DashboardImport {
   constructor(page) {
     this.page = page;
@@ -17,6 +19,7 @@ export default class DashboardImport {
     await this.importButtonByRole.click();
   }
 
+  // Import dashboard file
   async inputFiles1(fileContentPath) {
     await this.inputFile.setInputFiles(fileContentPath);
   }
