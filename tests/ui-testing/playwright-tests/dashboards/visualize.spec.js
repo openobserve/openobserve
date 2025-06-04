@@ -2,11 +2,7 @@ import { test, expect } from "@playwright/test";
 import LogsVisualise from "../../pages/dashboardPages/visualise";
 import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
-import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
-
 import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
-import { log } from "console";
 
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -201,14 +197,15 @@ test.describe("logs testcases", () => {
   });
 
   test("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
-    // Apply the changes
     page,
-    // Render the chart
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and set relative time
     await logsVisualise.openLogs();
     await logsVisualise.setRelative("6", "w");
 
+    // Add kubernetes_container_image field to the search query
     await page.getByLabel('Expand "kubernetes_container_image"').click();
     await page
       .locator(
@@ -222,6 +219,7 @@ test.describe("logs testcases", () => {
       )
       .click();
 
+    // Add kubernetes_container_image field with a different value to the search query
     await page
       .locator(
         '[data-test="logs-search-subfield-add-kubernetes_container_image-sha256\\:90e0a12eae07ad3d0bbfbb73b076ba3ce6e5ad38fb93babc22fba4d19206ca6b"] [data-test="log-search-subfield-list-not-equal-kubernetes_container_image-field-btn"]'
@@ -233,9 +231,14 @@ test.describe("logs testcases", () => {
         '[data-test="logs-search-subfield-add-kubernetes_container_image-sha256\\:90e0a12eae07ad3d0bbfbb73b076ba3ce6e5ad38fb93babc22fba4d19206ca6b"] [data-test="log-search-subfield-list-not-equal-kubernetes_container_image-field-btn"]'
       )
       .click();
+
+    // Apply the changes
     await logsVisualise.logsApplyQueryButton();
+
+    // Open the visualization tab
     await logsVisualise.openVisualiseTab();
 
+    // Add kubernetes_annotations_kubernetes_io_psp field to the visualization
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
@@ -248,20 +251,26 @@ test.describe("logs testcases", () => {
       )
       .click();
 
+    // Apply the changes in the visualization
     await logsVisualise.applyQueryButtonVisualise();
+
+    // Go back to the logs page
     await logsVisualise.backToLogs();
   });
+
   test("should handle an empty query in visualization without displaying an error.", async ({
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and the query editor and apply a relative time
     await logsVisualise.openLogs();
     await logsVisualise.openQueryEditior();
-
     await logsVisualise.setRelative("6", "w");
     await logsVisualise.logsApplyQueryButton();
-    await logsVisualise.openVisualiseTab();
 
+    // Open the visualization tab
+    await logsVisualise.openVisualiseTab();
     await expect(page.locator(".view-line").first()).toBeVisible();
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
@@ -275,10 +284,12 @@ test.describe("logs testcases", () => {
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and the query editor
     await logsVisualise.openLogs();
     await logsVisualise.openQueryEditior();
     await logsVisualise.setRelative("6", "w");
-    // Enter an invalid query into the search bar
+
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
       .getByLabel("Editor content;Press Alt+F1")
@@ -287,11 +298,12 @@ test.describe("logs testcases", () => {
     // Refresh the search
     await logsVisualise.logsApplyQueryButton();
 
-    // Wait for the error message to appear
     await page.getByText("Search field not found: as");
+
+    //open the visualization tab
     await logsVisualise.openVisualiseTab();
 
-    // Verify that X and Y axis items are visible
+    // Verify that X and Y axis items are visible and apply
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
     ).toBeVisible();
@@ -308,15 +320,18 @@ test.describe("logs testcases", () => {
     await logsVisualise.setRelative("6", "w");
     await logsVisualise.applyQueryButtonVisualise();
   });
+
   test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
 
+    // Open the logs page and set relative time
     await logsVisualise.openLogs();
     await logsVisualise.setRelative("6", "w");
     await logsVisualise.logsApplyQueryButton();
 
+    // Add the kubernetes_container_hash field to the search query
     await page.getByLabel('Expand "kubernetes_container_hash"').click();
     await page
       .locator(
@@ -330,6 +345,8 @@ test.describe("logs testcases", () => {
       )
       .click();
     await logsVisualise.logsApplyQueryButton();
+
+    // Open the visualization tab
     await logsVisualise.openVisualiseTab();
     await logsVisualise.applyQueryButtonVisualise();
     let exceptionBefore = null;
@@ -370,14 +387,15 @@ test.describe("logs testcases", () => {
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
-    await logsVisualise.openLogs();
 
-    // Perform the initial actions
+    // Open the logs page and set relative time
+    await logsVisualise.openLogs();
     await logsVisualise.setRelative("6", "w");
 
-    // await page.locator('[data-test="logs-visualize-toggle"]').click();
+    //open the visualization tab
     await logsVisualise.openVisualiseTab();
 
+    // Add a field to the Y-axis
     await page
       .locator('[data-test="index-field-search-input"]')
       .fill("kubernetes_container_hash");
@@ -398,6 +416,7 @@ test.describe("logs testcases", () => {
       .locator('[data-test="index-field-search-input"]')
       .fill("kubernetes_container_name");
 
+    // Add a field to the breakdown
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
@@ -421,6 +440,8 @@ test.describe("logs testcases", () => {
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page, fill the query editor, and apply a relative time and Apply the query
     await logsVisualise.openLogs();
 
     const sqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
@@ -436,15 +457,16 @@ test.describe("logs testcases", () => {
     FROM "e2e_automate" 
     WHERE kubernetes_namespace_name IS NOT NULL 
     GROUP BY x_axis_1, breakdown_1`;
-    await logsVisualise.fillQueryEditor(sqlQuery);
 
+    await logsVisualise.fillQueryEditor(sqlQuery);
     await logsVisualise.setRelative("6", "w");
     await logsVisualise.logsApplyQueryButton();
-    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await logsVisualise.enableSQLMode();
 
+    // Enable SQL mode
+    await logsVisualise.enableSQLMode();
     await logsVisualise.logsApplyQueryButton();
-    // Toggle visualization
+
+    // Open the visualization tab
     await logsVisualise.openVisualiseTab();
 
     // Check for any error messages or indicators
@@ -452,25 +474,28 @@ test.describe("logs testcases", () => {
     const errorCount = await errorMessage.count();
 
     // Assert that no error messages are displayed
-    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
+    await expect(errorCount).toBe(0);
   });
+
   test("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and set relative time
     await logsVisualise.openLogs();
-    // Interact with various elements
-    //   await page.locator('[data-test="date-time-btn"]').click();
     await logsVisualise.setRelative("6", "w");
+
+    // Apply query and switch to the visualise tab
     await logsVisualise.logsApplyQueryButton();
     await logsVisualise.openVisualiseTab();
+
+    // Switch back to logs and again to visualise
     await logsVisualise.backToLogs();
     await logsVisualise.openVisualiseTab();
 
-    //   // Open the dropdown
+    // Open the dropdown to check its state
     await page.locator('[data-test="index-dropdown-stream"]').click();
-
-    // Check if the dropdown is blank
     const dropdownOptions = await page.getByRole("option");
     const dropdownCount = await dropdownOptions.count();
     console.log("Dropdown count:", dropdownCount); // Debugging line
@@ -484,16 +509,23 @@ test.describe("logs testcases", () => {
     // Alternative assertions
     await expect(row).toBeDefined();
   });
+
   test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and set relative time
     await logsVisualise.openLogs();
     await logsVisualise.setRelative("4", "d");
 
+    // Open the visualization tab
     await logsVisualise.openVisualiseTab();
 
+    // Remove a field from the y-axis
     await logsVisualise.removeField("_timestamp", "y");
+
+    // Switch back to logs
     await logsVisualise.backToLogs();
   });
 });
