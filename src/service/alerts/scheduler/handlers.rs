@@ -705,7 +705,7 @@ async fn handle_report_triggers(
         }
     }
 
-    if report.frequency.align_time && report.frequency.frequency_type != ReportFrequencyType::Cron {
+    if report.frequency.frequency_type != ReportFrequencyType::Cron {
         new_trigger.next_run_at = TriggerCondition::align_time(
             new_trigger.next_run_at,
             report.tz_offset,
@@ -713,7 +713,6 @@ async fn handle_report_triggers(
         );
     }
 
-    let now = now_micros();
     let triggered_at = trigger.start_time.unwrap_or_default();
     let processing_delay = triggered_at - trigger.next_run_at;
     let time_in_queue = Utc::now().timestamp_micros() - triggered_at;
