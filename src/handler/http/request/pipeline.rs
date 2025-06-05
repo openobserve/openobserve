@@ -21,6 +21,7 @@ use config::{ider, meta::pipeline::Pipeline};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::pipelines::{ListPipelinesResponseBody, Pipeline as HttpPipeline},
     service::{db::pipeline::PipelineError, pipeline},
 };
 
@@ -126,7 +127,73 @@ async fn list_pipelines(
     }
 
     match pipeline::list_pipelines(org_id.into_inner(), _permitted).await {
-        Ok(pipeline_list) => Ok(HttpResponse::Ok().json(pipeline_list)),
+        Ok((pipeline_list, meta_functions)) => {
+            let list = pipeline_list
+                .into_iter()
+                .map(|pipeline| {
+                    HttpPipeline::from_meta_pipeline_and_function(pipeline, &meta_functions)
+                })
+                .collect();
+            let list = ListPipelinesResponseBody { list };
+            Ok(HttpResponse::Ok().json(list))
+        }
+        Err(e) => Ok(e.into()),
+    }
+}
+
+/// GetPipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "getPipeline",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("pipeline_id" = String, Path, description = "Pipeline id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Pipeline),
+    )
+)]
+#[get("/{org_id}/pipelines/{pipeline_id}")]
+async fn get_pipeline(
+    path: web::Path<(String, String)>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, pipeline_id) = path.into_inner();
+    let mut _permitted = None;
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_openfga::meta::mapping::OFGA_MODELS;
+
+        let user_id = _req.headers().get("user_id").unwrap();
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            user_id.to_str().unwrap(),
+            "GET",
+            OFGA_MODELS
+                .get("pipelines")
+                .map_or("pipelines", |model| model.key),
+        )
+        .await
+        {
+            Ok(list) => {
+                _permitted = list;
+            }
+            Err(e) => {
+                return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                    e.to_string(),
+                ));
+            }
+        }
+    }
+
+    match pipeline::get_pipeline(org_id, pipeline_id, _permitted).await {
+        Ok(pipeline) => Ok(HttpResponse::Ok().json(pipeline)),
         Err(e) => Ok(e.into()),
     }
 }

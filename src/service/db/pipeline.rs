@@ -45,6 +45,8 @@ pub enum PipelineError {
     // bad request
     #[error("A realtime pipeline with same source stream already exists")]
     StreamInUse,
+    #[error("Error getting functions associated with the pipelines")]
+    ListFunctionError,
     #[error("Invalid pipeline {0}")]
     InvalidPipeline(String),
     #[error("Invalid DerivedStream config: {0}")]
