@@ -17,7 +17,7 @@ env:
   ZO_RESULT_CACHE_ENABLED: true
 
 jobs:
-  build:
+  unit_tests:
 
     runs-on: 
       labels: ubicloud-standard-8

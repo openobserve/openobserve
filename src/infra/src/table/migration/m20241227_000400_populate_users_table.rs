@@ -175,7 +175,7 @@ mod meta {
     pub enum UserRole {
         #[serde(rename = "root")]
         Root = 0,
-        #[serde(rename = "admin")]
+        #[serde(rename = "admin", alias = "member")]
         Admin = 1,
         #[serde(rename = "editor")]
         Editor = 2,
