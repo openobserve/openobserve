@@ -26,14 +26,21 @@ export default class DashboardPanel {
       '[data-test="dashboard-move-to-another-panel"]'
     );
     this.deleteconfrimBtn = page.locator('[data-test="confirm-button"]');
-    this.fullscreen = page.locator('[data-test="dashboard-panel-fullscreen-btn"]');
-    this.refreshBtn = page.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
+    this.fullscreen = page.locator(
+      '[data-test="dashboard-panel-fullscreen-btn"]'
+    );
+    this.refreshBtn = page.locator(
+      '[data-test="dashboard-panel-refresh-panel-btn"]'
+    );
     this.editLayout = page.locator('[data-test="dashboard-edit-layout"]');
-    this.panelHeight = page.locator('[data-test="panel-layout-settings-height-input"]');
+    this.panelHeight = page.locator(
+      '[data-test="panel-layout-settings-height-input"]'
+    );
     this.saveLayout = page.locator('[data-test="panel-layout-settings-save"]');
-    this.cancelLayout = page.locator('data-test="panel-layout-settings-cancel"]');
+    this.cancelLayout = page.locator(
+      'data-test="panel-layout-settings-cancel"]'
+    );
     this.goToLogs = page.locator('[data-test="dashboard-move-to-logs-module"]');
-
   }
 
   // Duplicate panel
@@ -93,11 +100,14 @@ export default class DashboardPanel {
 
   //fullscreen panel
   async fullscreenPanel() {
-    await this.fullscreen.hover();
+    await this.page.locator('[data-test="dashboard-panel-container"]').hover();
     await this.fullscreen.waitFor({ state: "visible" });
     await this.fullscreen.click();
+    await this.page.waitForSelector('[data-test="dashboard-viewpanel-close-btn"]'),
+      { state: "visible" };
+    await this.page.locator('[data-test="dashboard-viewpanel-close-btn"]').click();
   }
-
+ 
   //refresh panel
   async refreshPanel(panelName) {
     await this.page
@@ -109,7 +119,6 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
-    
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .waitFor({ state: "visible" });
@@ -123,7 +132,7 @@ export default class DashboardPanel {
     await this.panelHeight.fill(height);
     await this.saveLayout.click();
   }
-  
+
   //Edit Panel: Go to logs
   async goToLogsPanel(panelName) {
     await this.page
