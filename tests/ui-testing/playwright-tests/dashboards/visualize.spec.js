@@ -289,11 +289,15 @@ test.describe("logs testcases", () => {
     await logsVisualise.openLogs();
     await logsVisualise.openQueryEditior();
     await logsVisualise.setRelative("6", "w");
+    const queryEditor = page.locator(
+      '[data-test="logs-search-bar-query-editor"] textarea'
+    );
 
-    await page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill("select from user whare ID =1");
+    // Wait for the query editor to be visible
+    await expect(queryEditor).toBeVisible();
+
+    // Fill invalid query
+    await queryEditor.fill("select from user whare ID =1");
 
     // Refresh the search
     await logsVisualise.logsApplyQueryButton();
@@ -496,18 +500,30 @@ test.describe("logs testcases", () => {
 
     // Open the dropdown to check its state
     await page.locator('[data-test="index-dropdown-stream"]').click();
-    const dropdownOptions = await page.getByRole("option");
-    const dropdownCount = await dropdownOptions.count();
-    console.log("Dropdown count:", dropdownCount); // Debugging line
-    expect(dropdownCount).toBeGreaterThan(0);
 
-    // Get the row element
+    let previousCount = -1;
+    let currentCount = 0;
+    const maxRetries = 10;
+
+    for (let i = 0; i < maxRetries; i++) {
+      const options = await page.getByRole("option");
+      currentCount = await options.count();
+
+      if (currentCount > 0 && currentCount === previousCount) {
+        break; // Options loaded and stable
+      }
+
+      previousCount = currentCount;
+      await page.waitForTimeout(300); // Small delay before checking again
+    }
+
+    expect(currentCount).toBeGreaterThan(0);
+
+    // Validate the row element
     const row = page
       .getByRole("row", { name: "_timestamp +X +Y +B +F" })
       .first();
-
-    // Alternative assertions
-    await expect(row).toBeDefined();
+    await expect(row).toBeVisible();
   });
 
   test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
