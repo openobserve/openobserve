@@ -146,11 +146,12 @@ pub async fn chat_stream(
 
         return MetaHttpResponse::bad_request("AI is not enabled");
     }
+    let auth_str = crate::common::utils::auth::extract_auth_str(&in_req);
 
     let stream = match ai::service::chat_stream(
         ai::AiServerRequest::new(req_body.messages, req_body.model),
         org_id.clone(),
-        "".to_string(),
+        auth_str,
     )
     .await
     {
