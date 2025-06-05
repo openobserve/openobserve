@@ -27,7 +27,7 @@ test.describe("dashboard Import testcases", () => {
 
     await dashboardPage.menuItem("dashboards-item");
 
-    // await waitForDashboardPage(page);
+    await waitForDashboardPage(page);
 
     await dashboardImport.clickImportDashboard();
 
