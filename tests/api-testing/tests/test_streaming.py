@@ -163,6 +163,13 @@ test_data_histog = [
         1,
         3846,
     ),
+
+    (
+        "re_match",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        100,
+    ),
   
   
  
@@ -481,6 +488,13 @@ test_data_sql = [
         1,
     ),
 
+    (
+        "re_match",
+        f"SELECT * FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox')",
+        50,
+        50,
+    ),
+
 
 
 
@@ -641,8 +655,69 @@ def test_sql_query_range(create_session, base_url):
     assert "function_error" in res_data_sql_cache_query_range, "function_error key is missing from the response"        
     assert expected_error_message in res_data_sql_cache_query_range["function_error"], "Expected error message not found in function_error"
 
+def test_search_partition(create_session, base_url):
+    """Test the search partition API."""
+    session = create_session
+    url = base_url
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    # Define the payload
+    PAYLOAD = {
+    "sql": f"SELECT * FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox')",
+    "start_time": ten_min_ago,
+    "end_time": end_time,
+    "sql_mode": "full",
+    "streaming_output": True
+    }
 
+    response = session.post(f"{url}api/{org_id}/_search_partition?type=logs", json=PAYLOAD)
+    
+    # Check the response status code
+    assert response.status_code == 200, f"Expected status code 200 but got {response.status_code}"
+    
+    # Optionally, check for specific content in the response
+    response_data = response.json()
 
+    print(f"Response {url} Search Partition:", response_data)
+
+    assert 'file_num' in response_data, "Response does not contain 'file_num'"
+    assert response_data['file_num'] == 0, "Unexpected 'file_num' value"
+    
+    assert 'records' in response_data, "Response does not contain 'records'"
+    assert response_data['records'] == 0, "Unexpected 'records' value"
+    
+    assert 'original_size' in response_data, "Response does not contain 'original_size'"
+    assert response_data['original_size'] == 0, "Unexpected 'original_size' value"
+    
+    assert 'compressed_size' in response_data, "Response does not contain 'compressed_size'"
+    assert response_data['compressed_size'] == 0, "Unexpected 'compressed_size' value"
+    
+    assert 'max_query_range' in response_data, "Response does not contain 'max_query_range'"
+    assert response_data['max_query_range'] == 1, "Unexpected 'max_query_range' value"
+    
+    assert 'partitions' in response_data, "Response does not contain 'partitions'"
+    assert isinstance(response_data['partitions'], list), "'partitions' should be a list"
+    assert len(response_data['partitions']) == 2, "Expected 2 partitions"
+    
+   
+    assert 'order_by' in response_data, "Response does not contain 'order_by'"
+    assert response_data['order_by'] == "desc", "Unexpected 'order_by' value"
+    
+    assert 'limit' in response_data, "Response does not contain 'limit'"
+    assert response_data['limit'] == 0, "Unexpected 'limit' value"
+    
+    assert 'streaming_output' in response_data, "Response does not contain 'streaming_output'"
+    assert response_data['streaming_output'] is True, "Unexpected 'streaming_output' value"
+    
+    assert 'streaming_aggs' in response_data, "Response does not contain 'streaming_aggs'"
+    assert response_data['streaming_aggs'] is False, "Unexpected 'streaming_aggs' value"
+    
+    assert 'streaming_id' in response_data, "Response does not contain 'streaming_id'"
+    assert response_data['streaming_id'] is None, "Unexpected 'streaming_id' value"
+
+    # Add more assertions based on the expected response structure
 # Define test data with different queries and expected response details for streaming enable
 def test_enable_streaming(create_session, base_url):
     """Fixture to enable Streaming"""
