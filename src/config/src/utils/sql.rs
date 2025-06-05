@@ -53,7 +53,8 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
     Ok(false)
 }
 
-// Only select from one table, have no join, no subquery, no union, and has aggreation
+// Only select from one table, have no join, no subquery, no union, no window functions, no CTE, no
+// distinct, and has aggregation
 pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
@@ -64,6 +65,7 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
                 && !has_union(query)
                 && !has_window_functions(statement)
                 && !has_cte(query)
+                && !has_distinct(query)
             {
                 return Ok(true);
             }
@@ -167,10 +169,49 @@ fn has_group_by(query: &Query) -> bool {
 
 // Check if has distinct
 fn has_distinct(query: &Query) -> bool {
-    if let SetExpr::Select(ref select) = *query.body {
-        select.distinct.is_some()
-    } else {
-        false
+    let mut visitor = DistinctVisitor::new();
+    query.visit(&mut visitor);
+    visitor.has_distinct
+}
+
+struct DistinctVisitor {
+    pub has_distinct: bool,
+}
+
+impl DistinctVisitor {
+    fn new() -> Self {
+        Self {
+            has_distinct: false,
+        }
+    }
+}
+
+impl Visitor for DistinctVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        // Check for SELECT DISTINCT
+        if let SetExpr::Select(select) = query.body.as_ref() {
+            if select.distinct.is_some() {
+                self.has_distinct = true;
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        // Check for DISTINCT inside functions like COUNT(DISTINCT column)
+        // For now, this is a simplified check - we could enhance it further if needed
+        if let Expr::Function(Function { args, .. }) = expr {
+            // Convert the function arguments to string and check for DISTINCT
+            let args_str = format!("{:?}", args);
+            if args_str.to_lowercase().contains("distinct") {
+                self.has_distinct = true;
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
     }
 }
 
@@ -629,6 +670,34 @@ mod tests {
                    )
                    SELECT COUNT(*), AVG(region_total) FROM complex_cte"#,
                 "Query with CTE containing window functions should not be simple",
+            ),
+            // Test case 15: Query with DISTINCT (should be false)
+            (
+                r#"SELECT DISTINCT user_id, COUNT(*) 
+                   FROM events 
+                   GROUP BY user_id"#,
+                "Query with DISTINCT should not be simple",
+            ),
+            // Test case 16: Query with DISTINCT and aggregate (should be false)
+            (
+                r#"SELECT DISTINCT region, SUM(amount) as total
+                   FROM sales 
+                   GROUP BY region"#,
+                "Query with DISTINCT and aggregate should not be simple",
+            ),
+            // Test case 17: Query with DISTINCT on multiple columns (should be false)
+            (
+                r#"SELECT DISTINCT user_id, product_id, COUNT(*) as purchase_count
+                   FROM purchases
+                   GROUP BY user_id, product_id"#,
+                "Query with DISTINCT on multiple columns should not be simple",
+            ),
+            // Test case 18: Query with COUNT(DISTINCT) (should be false)
+            (
+                r#"SELECT COUNT(DISTINCT user_id) as unique_users,
+                          SUM(amount) as total_amount
+                   FROM orders"#,
+                "Query with COUNT(DISTINCT) should not be simple",
             ),
         ];
 
