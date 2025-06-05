@@ -218,6 +218,11 @@ export class IamPage {
         await refreshButtonLocator.click({ force: true });
     }
 
+    async enterDescriptionSA() {
+        const descriptionField = this.page.getByLabel('Description');
+        await descriptionField.click();
+        await descriptionField.fill('Description Details for Service Account');
+    }
 
 
 }

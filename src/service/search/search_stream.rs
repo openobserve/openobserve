@@ -581,7 +581,7 @@ pub async fn do_partitioned_search(
 
         let total_hits = search_res.total as i64;
 
-        if total_hits > req.query.size {
+        if req.query.size > 0 && total_hits > req.query.size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
