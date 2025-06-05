@@ -699,6 +699,12 @@ mod tests {
                    FROM orders"#,
                 "Query with COUNT(DISTINCT) should not be simple",
             ),
+            // Test case 19: Query with DISTINCT and no group by (should be false)
+            (
+                r#"SELECT DISTINCT user_id
+                   FROM orders"#,
+                "Query with DISTINCT and no group by should not be simple",
+            ),
         ];
 
         for (i, (query, description)) in queries.iter().enumerate() {
