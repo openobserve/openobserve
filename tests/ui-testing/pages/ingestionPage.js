@@ -72,7 +72,8 @@ export class IngestionPage {
     }
   }
 
-  async ingestionMultiOrg(orgId) {
+  async ingestionMultiOrg() {
+    const orgId = "defaulttestmulti";
     const streamName = "e2e_automate";
     const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
     const headers = {
@@ -104,4 +105,6 @@ export class IngestionPage {
       console.error("Failed to parse JSON response:", error);
     }
   }
+
+  
 }

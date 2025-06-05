@@ -15,12 +15,12 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        function::{RESULT_ARRAY, VRLResultResolver},
+        function::VRLResultResolver,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
@@ -47,7 +47,6 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
     service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
@@ -190,7 +189,12 @@ pub async fn search_multi(
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
-                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+                return Ok(HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        e.to_string(),
+                    ),
+                ));
             }
         };
         vrl_stream_name = stream_name.clone();
@@ -223,14 +227,14 @@ pub async fn search_multi(
         {
             use o2_openfga::meta::mapping::OFGA_MODELS;
 
-            use crate::{
-                common::utils::auth::{AuthExtractor, is_root_user},
-                service::users::get_user,
+            use crate::common::{
+                infra::config::USERS,
+                utils::auth::{AuthExtractor, is_root_user},
             };
 
             if !is_root_user(user_id) {
-                let user: config::meta::user::User =
-                    get_user(Some(&org_id), user_id).await.unwrap();
+                let user: meta::user::User =
+                    USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
                 let stream_type_str = stream_type.as_str();
 
                 if !crate::handler::http::auth::validator::check_permissions(
@@ -261,7 +265,12 @@ pub async fn search_multi(
             let keys_used = match get_cipher_key_names(&req.query.sql) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Ok(map_error_to_http_response(&e, Some(trace_id)));
+                    return Ok(HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            e.to_string(),
+                        ),
+                    ));
                 }
             };
             if !keys_used.is_empty() {
@@ -271,8 +280,8 @@ pub async fn search_multi(
             // Check permissions on keys
             for key in keys_used {
                 if !is_root_user(user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), user_id).await.unwrap();
+                    let user: meta::user::User =
+                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         user_id,
@@ -315,15 +324,35 @@ pub async fn search_multi(
         // add search type to request
         req.search_type = search_type;
 
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .inc();
+        // get a local search queue lock
+        #[cfg(not(feature = "enterprise"))]
+        let locker = SearchService::QUEUE_LOCKER.clone();
+        #[cfg(not(feature = "enterprise"))]
+        let locker = locker.lock().await;
+        #[cfg(not(feature = "enterprise"))]
+        if !cfg.common.feature_query_queue_enabled {
+            drop(locker);
+        }
+        #[cfg(not(feature = "enterprise"))]
+        let took_wait = start.elapsed().as_millis() as usize;
+        #[cfg(feature = "enterprise")]
+        let took_wait = 0;
+        log::info!("http search multi API wait in queue took: {}", took_wait);
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
+
         let trace_id = trace_id.clone();
         // do search
-        let search_res = SearchService::cache::search(
+        let search_res = SearchService::search(
             &trace_id,
             &org_id,
             stream_type,
             Some(user_id.to_string()),
             &req,
-            range_error.clone(),
         )
         .instrument(http_span.clone())
         .await;
@@ -352,7 +381,7 @@ pub async fn search_multi(
                     ])
                     .inc();
                 res.set_trace_id(trace_id);
-                res.set_took(start.elapsed().as_millis() as usize);
+                res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
                 let req_stats = RequestStats {
                     records: res.hits.len() as i64,
@@ -366,7 +395,13 @@ pub async fn search_multi(
                     search_type,
                     search_event_context: search_event_context.clone(),
                     trace_id: Some(res.trace_id.clone()),
-                    took_wait_in_queue: Some(res.took_detail.wait_in_queue),
+                    took_wait_in_queue: if res.took_detail.is_some() {
+                        let resp_took = res.took_detail.as_ref().unwrap();
+                        // Consider only the cluster wait queue duration
+                        Some(resp_took.cluster_wait_queue)
+                    } else {
+                        None
+                    },
                     work_group: res.work_group,
                     ..Default::default()
                 };
@@ -449,7 +484,7 @@ pub async fn search_multi(
                     if let errors::ErrorCodes::SearchCancelQuery(_) = code {
                         return Ok(HttpResponse::TooManyRequests().json(
                             meta::http::HttpResponse::error_code_with_trace_id(
-                                &code,
+                                code,
                                 Some(trace_id),
                             ),
                         ));
@@ -464,9 +499,11 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
-        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+            input_fn = SearchService::RESULT_ARRAY
+                .replace(&input_fn, "")
+                .to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
@@ -581,6 +618,7 @@ pub async fn search_multi(
             max_ts: None,
             cached_ratio: None,
             trace_id: None,
+            // took_wait_in_queue: multi_res.t,
             search_type: multi_req.search_type,
             search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
@@ -738,7 +776,15 @@ pub async fn _search_partition_multi(
                 ])
                 .inc();
             log::error!("search error: {:?}", err);
-            Ok(map_error_to_http_response(&err, Some(trace_id)))
+            Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                ),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            })
         }
     }
 }
@@ -877,7 +923,25 @@ pub async fn around_multi(
                     ])
                     .inc();
                 log::error!("multi search around error: {:?}", err);
-                return Ok(map_error_to_http_response(&err, Some(trace_id)));
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code_with_trace_id(
+                                code,
+                                Some(trace_id),
+                            )),
+                        _ => HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error_code_with_trace_id(
+                                code,
+                                Some(trace_id),
+                            ),
+                        ),
+                    },
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
             }
         };
 

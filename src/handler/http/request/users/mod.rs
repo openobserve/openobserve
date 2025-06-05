@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{io::Error, sync::Arc};
 
 use actix_web::{
     HttpRequest, HttpResponse, cookie, delete, get,
@@ -23,17 +23,17 @@ use actix_web::{
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     Config, get_config,
-    meta::user::UserRole,
     utils::{base64, json},
 };
 use serde::Serialize;
+use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
     crate::service::self_reporting::audit,
     config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
-    o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
+    o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
     o2_openfga::config::get_config as get_openfga_config,
 };
 
@@ -42,8 +42,8 @@ use crate::{
         meta::{
             self,
             user::{
-                AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRoleRequest, get_roles,
+                AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
+                UserRequest, UserRole,
             },
         },
         utils::auth::{UserEmail, generate_presigned_url},
@@ -71,18 +71,8 @@ pub mod service_accounts;
     )
 )]
 #[get("/{org_id}/users")]
-pub async fn list(
-    org_id: web::Path<String>,
-    user_email: UserEmail,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let list_all = match query.get("list_all") {
-        Some(v) => v.parse::<bool>().unwrap_or(false),
-        None => false,
-    };
-
     let mut _user_list_from_rbac = None;
 
     #[cfg(feature = "enterprise")]
@@ -100,15 +90,7 @@ pub async fn list(
     {
         _user_list_from_rbac = Some(vec![]);
     }
-
-    users::list_users(
-        &user_email.user_id,
-        &org_id,
-        None,
-        _user_list_from_rbac,
-        list_all,
-    )
-    .await
+    users::list_users(&user_email.user_id, &org_id, None, _user_list_from_rbac).await
 }
 
 /// CreateUser
@@ -124,7 +106,7 @@ pub async fn list(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
+    request_body(content = UserRequest, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -132,25 +114,25 @@ pub async fn list(
 #[post("/{org_id}/users")]
 pub async fn save(
     org_id: web::Path<String>,
-    user: web::Json<PostUserRequest>,
+    user: web::Json<UserRequest>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let initiator_id = user_email.user_id;
-    let mut user = UserRequest::from(&user.into_inner());
-    user.email = user.email.trim().to_lowercase();
+    let mut user = user.into_inner();
+    user.email = user.email.trim().to_string();
 
-    if user.role.base_role.eq(&config::meta::user::UserRole::Root) {
+    if user.role.eq(&meta::user::UserRole::Root) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "Not allowed",
+                http::StatusCode::BAD_REQUEST.into(),
+                "Not allowed".to_string(),
             )),
         );
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role.base_role = config::meta::user::UserRole::Admin;
+        user.role = meta::user::UserRole::Admin;
     }
     users::post_user(&org_id, user, &initiator_id).await
 }
@@ -181,7 +163,7 @@ pub async fn update(
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    let email_id = email_id.trim().to_lowercase();
+    let email_id = email_id.trim().to_string();
     #[cfg(not(feature = "enterprise"))]
     let mut user = user.into_inner();
     #[cfg(feature = "enterprise")]
@@ -189,17 +171,14 @@ pub async fn update(
     if user.eq(&UpdateUser::default()) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "Please specify appropriate fields to update user",
+                http::StatusCode::BAD_REQUEST.into(),
+                "Please specify appropriate fields to update user".to_string(),
             )),
         );
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role = Some(UserRoleRequest {
-            role: config::meta::user::UserRole::Admin.to_string(),
-            custom: None,
-        });
+        user.role = Some(meta::user::UserRole::Admin);
     }
     let initiator_id = &user_email.user_id;
     let self_update = user_email.user_id.eq(&email_id);
@@ -220,7 +199,7 @@ pub async fn update(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "User's email id"),
     ),
-    request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
+    request_body(content = UserOrgRole, description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -228,12 +207,12 @@ pub async fn update(
 #[post("/{org_id}/users/{email_id}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
-    role: web::Json<UserRoleRequest>,
+    role: web::Json<UserOrgRole>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let initiator_id = user_email.user_id;
-    let role = UserOrgRole::from(&role.into_inner());
+    let role = role.into_inner().role;
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 
@@ -244,7 +223,6 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     cookie_expiry: E,
 ) -> cookie::Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
-    let tokens = base64::encode(&tokens);
     let mut auth_cookie = cookie::Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(cookie_expiry.into());
     auth_cookie.set_http_only(true);
@@ -290,7 +268,7 @@ pub async fn delete(
 ///
 /// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
-context_path = "/auth",
+    context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
@@ -318,25 +296,19 @@ pub async fn authentication(
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
-        protocol: Protocol::Http,
-        response_meta: ResponseMeta {
-            http_method: "POST".to_string(),
-            http_path: "/auth/login".to_string(),
-            http_body: "".to_string(),
-            http_query_params: _req.query_string().to_string(),
-            http_response_code: 200,
+        protocol: Protocol::Http(HttpMeta {
+            method: "POST".to_string(),
+            path: "/auth/login".to_string(),
+            body: "".to_string(),
+            query_params: _req.query_string().to_string(),
+            response_code: 200,
             error_msg: None,
-            trace_id: None,
-        },
+        }),
     };
 
     let mut resp = SignInResponse::default();
     let auth = match auth {
-        Some(auth) => {
-            let mut auth = auth.into_inner();
-            auth.name = auth.name.to_lowercase();
-            auth
-        }
+        Some(auth) => auth.into_inner(),
         None => {
             // get Authorization header from request
             #[cfg(feature = "enterprise")]
@@ -377,6 +349,7 @@ pub async fn authentication(
             return unauthorized_error(resp);
         }
     }
+
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
@@ -406,7 +379,6 @@ pub async fn authentication(
         })
         .unwrap();
 
-        let tokens = base64::encode(&tokens);
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
@@ -473,16 +445,14 @@ pub async fn get_presigned_url(
             user_email: basic_auth.user_id().to_string(),
             org_id: "".to_string(),
             _timestamp: now_micros(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
-                http_method: "GET".to_string(),
-                http_path: "/auth/presigned-url".to_string(),
-                http_body: "".to_string(),
-                http_query_params: _req.query_string().to_string(),
-                http_response_code: 200,
+            protocol: Protocol::Http(HttpMeta {
+                method: "GET".to_string(),
+                path: "/auth/presigned-url".to_string(),
+                body: "".to_string(),
+                query_params: _req.query_string().to_string(),
+                response_code: 200,
                 error_msg: None,
-                trace_id: None,
-            },
+            }),
         };
         audit(audit_message).await;
     }
@@ -515,17 +485,15 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             user_email: "".to_string(),
             org_id: "".to_string(),
             _timestamp: now_micros(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
-                http_method: "GET".to_string(),
-                http_path: "/auth/login".to_string(),
-                http_body: "".to_string(),
+            protocol: Protocol::Http(HttpMeta {
+                method: "GET".to_string(),
+                path: "/auth/login".to_string(),
+                body: "".to_string(),
                 // Don't include query string as it may contain the auth token
-                http_query_params: "".to_string(),
-                http_response_code: 302,
+                query_params: "".to_string(),
+                response_code: 302,
                 error_msg: None,
-                trace_id: None,
-            },
+            }),
         };
 
         let (name, password) = {
@@ -561,6 +529,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 }
                 format!("q_auth {}", s)
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
+                log::debug!("get_auth: auth header found: {:?}", auth_header);
                 match auth_header.to_str() {
                     Ok(auth_header_str) => auth_header_str.to_string(),
                     Err(_) => {
@@ -702,27 +671,23 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 )]
 #[get("/{org_id}/users/roles")]
 pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let roles = get_roles()
-        .iter()
-        .filter_map(check_role_available)
+    let roles = UserRole::iter()
+        .filter_map(|role| {
+            if role.eq(&UserRole::Root)
+                || role.eq(&UserRole::Member)
+                || role.eq(&UserRole::ServiceAccount)
+            {
+                None
+            } else {
+                Some(RolesResponse {
+                    label: role.get_label(),
+                    value: role.to_string(),
+                })
+            }
+        })
         .collect::<Vec<RolesResponse>>();
 
     Ok(HttpResponse::Ok().json(roles))
-}
-
-fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
-    if role.eq(&UserRole::Root) || role.eq(&UserRole::ServiceAccount) {
-        None
-    } else {
-        #[cfg(feature = "enterprise")]
-        if !get_openfga_config().enabled && role.ne(&UserRole::Admin) {
-            return None;
-        }
-        Some(RolesResponse {
-            label: role.get_label(),
-            value: role.to_string(),
-        })
-    }
 }
 
 fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
@@ -736,37 +701,11 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     use chrono::Utc;
 
     audit_message._timestamp = Utc::now().timestamp_micros();
-    audit_message.response_meta.http_response_code = 401;
+    if let Protocol::Http(http_meta) = &mut audit_message.protocol {
+        http_meta.response_code = 401;
+    }
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;
-}
-
-/// ListUserInvitations
-#[cfg(feature = "cloud")]
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Users",
-    operation_id = "UserInvitations",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-      ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
-    )
-)]
-#[get("/invites")]
-pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
-    let user_id = user_email.user_id.as_str();
-    users::list_user_invites(user_id).await
-}
-
-#[cfg(not(feature = "cloud"))]
-#[get("/invites")]
-pub async fn list_invitations(_user_email: UserEmail) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(test)]

@@ -23,8 +23,7 @@ use crate::{
         cli::{Cli as dataCli, args as dataArgs},
         export, import,
     },
-    common::{infra::config::USERS, meta},
-    migration,
+    common::{infra::config::USERS, meta, migration},
     service::{compact, db, file_list, users},
 };
 
@@ -112,19 +111,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
-                .args([
-                    clap::Arg::new("account")
-                        .short('a')
-                        .long("account")
-                        .required(false)
-                        .value_name("account")
-                        .help("the account name"),
+                .arg(
                     clap::Arg::new("file")
                         .short('f')
                         .long("file")
                         .value_name("file")
                         .help("the parquet file name"),
-                ]),
+                ),
             clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
             clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
                 .subcommand(
@@ -136,28 +129,21 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .about("rollback last N SeaORM migration steps")
                     .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
                 ),
-            clap::Command::new("recover-file-list").about("recover file list from s3")
-                .args([
-                    clap::Arg::new("account")
-                        .short('a')
-                        .long("account")
-                        .value_name("account")
-                        .required(true)
-                        .help("the account name"),
-                    clap::Arg::new("prefix")
-                        .short('p')
-                        .long("prefix")
-                        .value_name("prefix")
-                        .required(true)
-                        .help("only migrate specified prefix"),
-                    clap::Arg::new("insert")
-                        .short('i')
-                        .long("insert")
-                        .value_name("insert")
-                        .required(false)
-                        .action(clap::ArgAction::SetTrue)
-                        .help("insert file list into db"),
-                ]),
+            clap::Command::new("recover-file-list").about("recover file list from s3").args([
+                clap::Arg::new("prefix")
+                    .short('p')
+                    .long("prefix")
+                    .value_name("prefix")
+                    .required(true)
+                    .help("only migrate specified prefix"),
+                clap::Arg::new("insert")
+                    .short('i')
+                    .long("insert")
+                    .value_name("insert")
+                    .required(false)
+                    .action(clap::ArgAction::SetTrue)
+                    .help("insert file list into db"),
+            ]),
             clap::Command::new("node").about("node command").subcommands([
                 clap::Command::new("offline").about("offline node"),
                 clap::Command::new("online").about("online node"),
@@ -231,23 +217,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .required(true)
                     .help("snowflake id"),
             ]),
-            clap::Command::new("consistent-hash").about("consistent hash").args([
-                clap::Arg::new("file")
-                    .short('f')
-                    .long("file")
-                    .required(true)
-                    .num_args(1..)
-                    .help("file"),
-            ]),
-            clap::Command::new("upgrade-db")
-                .about("upgrade db table schemas").args(dataArgs()),
         ])
         .get_matches();
 
     if app.subcommand().is_none() {
         return Ok(false);
     }
-
+    let cfg = config::get_config();
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
@@ -266,7 +242,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     }
 
     // init infra, create data dir & tables
-    let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
     match name {
         "reset" => {
@@ -282,10 +257,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             change_password: true,
                             old_password: None,
                             new_password: Some(cfg.auth.root_user_password.clone()),
-                            role: Some(crate::common::meta::user::UserRoleRequest {
-                                role: config::meta::user::UserRole::Root.to_string(),
-                                custom: None,
-                            }),
+                            role: Some(meta::user::UserRole::Root),
                             first_name: Some("root".to_owned()),
                             last_name: Some("".to_owned()),
                             token: if cfg.auth.root_user_token.is_empty() {
@@ -313,13 +285,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
-                    // init nats client
-                    let (tx, _rx) = tokio::sync::mpsc::channel::<infra::db::nats::NatsEvent>(1);
-                    if !cfg.common.local_mode
-                        && cfg.common.cluster_coordinator.to_lowercase() == "nats"
-                    {
-                        infra::db::nats::init_nats_client(tx).await?;
-                    }
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
@@ -343,11 +308,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "version" => {
-                    println!("version: {}", db::metas::version::get().await?);
+                    println!("version: {}", db::version::get().await?);
                 }
                 "user" => {
                     db::user::cache().await?;
-                    db::org_users::cache().await?;
                     let mut id = 0;
                     for user in USERS.iter() {
                         id += 1;
@@ -393,12 +357,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::pipeline_func::run(drop_table).await?;
         }
         "delete-parquet" => {
-            let account = command
-                .get_one::<String>("account")
-                .map(|s| s.to_string())
-                .unwrap_or_default();
             let file = command.get_one::<String>("file").unwrap();
-            match file_list::delete_parquet_file(&account, file, true).await {
+            match file_list::delete_parquet_file(file, true).await {
                 Ok(_) => {
                     println!("delete parquet file {} successfully", file);
                 }
@@ -443,13 +403,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         },
         "recover-file-list" => {
-            let account = command
-                .get_one::<String>("account")
-                .map(|s| s.to_string())
-                .unwrap_or_default();
             let prefix = command.get_one::<String>("prefix").unwrap();
             let insert = command.get_flag("insert");
-            super::load::load_file_list_from_s3(&account, prefix, insert).await?;
+            super::load::load_file_list_from_s3(prefix, insert).await?;
         }
         "node" => {
             let command = command.subcommand();
@@ -514,17 +470,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let t = chrono::Utc.timestamp_nanos(ts * 1_000_000);
             let td = t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
             println!("datetimes: {}", td);
-        }
-        "consistent-hash" => {
-            let files = command
-                .get_many::<String>("file")
-                .unwrap()
-                .collect::<Vec<_>>();
-            let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
-            super::http::consistent_hash(files).await?;
-        }
-        "upgrade-db" => {
-            crate::migration::init_db().await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

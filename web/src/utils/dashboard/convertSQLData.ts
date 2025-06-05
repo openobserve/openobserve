@@ -60,10 +60,7 @@ export const convertMultiSQLData = async (
   annotations: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
-    // this sets a blank object until it loads
-    // because of this, it will go to UI and draw something, even 0 or a blank chart
-    // this will give a sence of progress to the user
-    searchQueryData = [[]];
+    return { options: null };
   }
 
   // loop on all search query data
@@ -349,9 +346,7 @@ export const convertSQLData = async (
 
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = resultMetaData?.map(
-      (it: any) => it?.histogram_interval,
-    )?.[0];
+    const interval = resultMetaData?.map((it: any) => it.histogram_interval)[0];
 
     if (
       !interval ||
@@ -681,17 +676,11 @@ export const convertSQLData = async (
         customCols = 1;
       }
 
-      // When group_by_y_axis is enabled, create separate charts for each breakdown category,
-      // with each chart containing multiple series (one per y-axis metric)
-      const group_by_y_axis = panelSchema.config.trellis?.group_by_y_axis;
-
       // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
         chartPanelRef.value.offsetHeight,
-        group_by_y_axis
-          ? options.series.length / yAxisKeys.length
-          : options.series.length,
+        options.series.length,
         yAxisNameGap,
         customCols,
         panelSchema.config?.axis_width,
@@ -711,81 +700,59 @@ export const convertSQLData = async (
       const originalSeries = [...options.series];
       options.series = [];
 
-      let seriesUniqueIndex = 0;
-
       // Configure each series with its corresponding grid index
       originalSeries.forEach((series: any, index: number) => {
-        let gridIndex = index;
-        let existingSeriesIndex = -1;
-        if (group_by_y_axis) {
-          // Find if there's already a series with the same originalSeriesName
-          existingSeriesIndex = options.series.findIndex(
-            (existingSeries: any) =>
-              existingSeries.originalSeriesName === series.originalSeriesName,
-          );
-
-          // Use existing gridIndex if found, otherwise use current index
-          gridIndex =
-            existingSeriesIndex !== -1
-              ? options.series[existingSeriesIndex].gridIndex
-              : seriesUniqueIndex++;
-        }
         // Add the original series
         const updatedSeries = {
           ...series,
-          xAxisIndex: gridIndex,
-          yAxisIndex: gridIndex,
-          gridIndex: gridIndex,
+          xAxisIndex: index,
+          yAxisIndex: index,
           zlevel: 2,
         };
         options.series.push(updatedSeries);
 
-        if (existingSeriesIndex === -1) {
-          options.series.push({
-            type: "line",
-            xAxisIndex: gridIndex,
-            yAxisIndex: gridIndex,
-            gridIndex: gridIndex,
-            data: [[convertedTimeStampToDataFormat, null]],
-            markArea: getSeriesMarkArea(),
-            markLine: getAnnotationMarkLine(),
-            zlevel: 1,
-          });
-        }
+        options.series.push({
+          type: "line",
+          xAxisIndex: index,
+          yAxisIndex: index,
+          data: [[convertedTimeStampToDataFormat, null]],
+          markArea: getSeriesMarkArea(),
+          markLine: getAnnotationMarkLine(),
+          zlevel: 1,
+        });
 
-        if (gridIndex > 0 && existingSeriesIndex === -1) {
+        if (index > 0) {
           options.xAxis.push({
             ...deepCopy(options.xAxis[0]),
-            gridIndex: gridIndex,
+            gridIndex: index,
           });
           options.yAxis.push({
             ...deepCopy(options.yAxis[0]),
-            gridIndex: gridIndex,
+            gridIndex: index,
           });
+
+          series.xAxisIndex = index;
+          series.yAxisIndex = index;
         }
 
         // Add title for each chart
-        if (existingSeriesIndex === -1) {
-          options.title.push({
-            text: group_by_y_axis
-              ? series.originalSeriesName || series.name
-              : series.name,
-            textStyle: {
-              fontSize: 12,
-              width:
-                parseInt(gridData.gridArray[gridIndex].width) *
-                  (chartPanelRef.value.offsetWidth / 100) -
-                8,
-              overflow: "truncate",
-              ellipsis: "...",
-            },
-            top:
-              parseFloat(gridData.gridArray[gridIndex].top) -
-              (20 / (gridData.panelHeight as number)) * 100 +
-              "%",
-            left: gridData.gridArray[gridIndex].left,
-          });
-        }
+        options.title.push({
+          text: series.name,
+          textStyle: {
+            fontSize: 12,
+            width:
+              parseInt(gridData.gridArray[index].width) *
+                (chartPanelRef.value.offsetWidth / 100) -
+              8,
+            overflow: "truncate",
+            ellipsis: "...",
+          },
+          top:
+            parseFloat(gridData.gridArray[index].top) -
+            (20 / (gridData.panelHeight as number)) * 100 +
+            "%",
+          left: gridData.gridArray[index].left,
+        });
       });
 
       updateYAxisOption(yAxisNameGap, gridData);
@@ -968,8 +935,7 @@ export const convertSQLData = async (
       enterable: true,
       backgroundColor:
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-      extraCssText:
-        "max-height: 200px; overflow: auto; max-width: 400px; user-select: text;",
+      extraCssText: "max-height: 200px; overflow: auto; max-width: 400px",
       axisPointer: {
         type: "cross",
         label: {
@@ -1422,7 +1388,6 @@ export const convertSQLData = async (
                 ...(["stacked", "h-stacked"].includes(panelSchema.type) && {
                   stack: `stack-${index}`,
                 }),
-                yAxisGroup: index,
               };
               // Can create different method to get series
               return getSeriesObj(
@@ -1434,11 +1399,7 @@ export const convertSQLData = async (
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
-            const updatedSeriesConfig = {
-              ...seriesConfig,
-              yAxisGroup: index,
-            };
-            return getSeriesObj(yAxisName, seriesData, updatedSeriesConfig, "");
+            return getSeriesObj(yAxisName, seriesData, seriesConfig, "");
           }
         })
         .flat() || []
@@ -2089,7 +2050,7 @@ export const convertSQLData = async (
       const gridDataForGauge = calculateGridPositions(
         chartPanelRef.value.offsetWidth,
         chartPanelRef.value.offsetHeight,
-        yAxisValue.length || 1,
+        yAxisValue.length,
       );
 
       options.dataset = { source: [[]] };
@@ -2116,8 +2077,7 @@ export const convertSQLData = async (
           store.state.theme === "dark"
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
-        extraCssText:
-          "max-height: 200px; overflow: auto; max-width: 500px; user-select: text;",
+        extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       };
       options.angleAxis = {
         show: false,
@@ -2131,10 +2091,7 @@ export const convertSQLData = async (
       // for each gague we have separate grid
       options.grid = gridDataForGauge.gridArray;
 
-      const gaugeData = yAxisValue.length > 0 ? yAxisValue : [0];
-      const gaugeNames = xAxisValue.length > 0 ? xAxisValue : [""];
-
-      options.series = gaugeData.map((it: any, index: any) => {
+      options.series = yAxisValue.map((it: any, index: any) => {
         return {
           ...defaultSeriesProps,
           min: panelSchema?.queries[0]?.config?.min || 0,
@@ -2192,7 +2149,7 @@ export const convertSQLData = async (
           data: [
             {
               // gauge name may have or may not have
-              name: gaugeNames[index] ?? "",
+              name: xAxisValue[index] ?? "",
               value: it,
               detail: {
                 formatter: function (value: any) {
@@ -2209,7 +2166,7 @@ export const convertSQLData = async (
                 color:
                   getSeriesColor(
                     panelSchema?.config?.color,
-                    gaugeNames[index] ?? "",
+                    xAxisValue[index] ?? "",
                     [it],
                     chartMin,
                     chartMax,
@@ -2324,12 +2281,12 @@ export const convertSQLData = async (
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
 
-        // if (
-        //   showTrellisConfig(panelSchema.type) &&
-        //   panelSchema.config.trellis?.layout &&
-        //   breakDownKeys.length
-        // )
-        //   name = [name[0]];
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
 
         if (
           hoveredSeriesState?.value &&
@@ -2490,12 +2447,12 @@ export const convertSQLData = async (
 
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
-        // if (
-        //   showTrellisConfig(panelSchema.type) &&
-        //   panelSchema.config.trellis?.layout &&
-        //   breakDownKeys.length
-        // )
-        //   name = [name[0]];
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
 
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (

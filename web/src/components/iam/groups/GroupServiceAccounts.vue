@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             class="q-ml-auto q-mb-xs no-border"
-            placeholder="Search Service Accounts"
+            placeholder="Search"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-service-accounts-selection-table-title"
           class="q-my-sm text-bold"
         >
-          {{ rows.length }} {{t('iam.serviceAccounts')}}
+          {{ rows.length }} Users
         </div>
         <template v-if="rows.length">
           <app-table
@@ -189,14 +189,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       field: "",
       label: "",
       align: "left",
-      sortable: false,
+      sortable: true,
       slot: true,
       slotName: "select",
     },
     {
       name: "email",
       field: "email",
-      label: t("iam.serviceAccountsName"),
+      label: t("iam.userName"),
       align: "left",
       sortable: true,
     },

@@ -53,19 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="row justify-start items-start" style="width: 1024px">
         <div style="width: calc(100% - 401px)">
-          <q-form
-            class="add-alert-form"
-            data-test="add-alert-form"
-            ref="addAlertForm"
-            @submit="onSubmit"
-          >
+          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <div
               class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap"
             >
               <div
                 data-test="add-alert-name-input"
                 class="alert-name-input o2-input"
-                style="padding-top: 12px"
+                style="padding-top: 12px;"
               >
                 <q-input
                   v-model="formData.name"
@@ -96,8 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @folder-selected="updateActiveFolderId"
                     :activeFolderId="activeFolderId"
                     :style="'height: 30px'"
-                  />
+                />
                 </div>
+               
               </div>
 
               <div
@@ -510,6 +506,7 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
+import { convertDateToTimestamp } from "@/utils/date";
 
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import cronParser from "cron-parser";
@@ -565,7 +562,7 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
-    folder_id: "",
+    folder_id : "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -658,10 +655,8 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
-
-    const activeFolderId = ref(
-      router.currentRoute.value.query.folder || "default",
-    );
+    
+    const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
 
     const isAlertSaving = ref(false);
 
@@ -1222,8 +1217,8 @@ export default defineComponent({
       query.query.start_time = query.query.start_time + 780000000;
 
       query.query.sql = formData.value.query_condition.sql;
-      //removed the encoding as it is not required for the alert queries
-      if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
+      //removed the encoding as it is not required for the alert queries 
+      if(store.state.zoConfig.sql_base64_enabled && query?.encoding){
         delete query.encoding;
       }
 
@@ -1370,6 +1365,7 @@ export default defineComponent({
       sqlQueryErrorMsg,
       vrlFunctionError,
       updateFunctionVisibility,
+      convertDateToTimestamp,
       getTimezonesByOffset,
       showTimezoneWarning,
       updateMultiTimeRange,
@@ -1386,10 +1382,10 @@ export default defineComponent({
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
-    if (!this.isUpdated) {
-      this.formData.is_real_time = this.alertType === "realTime" ? true : false;
+    if(!this.isUpdated){
+      this.formData.is_real_time = this.alertType === 'realTime'? true : false;
     }
-    this.formData.is_real_time = this.formData.is_real_time.toString();
+      this.formData.is_real_time = this.formData.is_real_time.toString();
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
@@ -1502,9 +1498,30 @@ export default defineComponent({
         this.formData.is_real_time == "false" &&
         this.formData.trigger_condition.frequency_type == "cron"
       ) {
-        this.formData.tz_offset = getTimezoneOffset(
+        const now = new Date();
+
+        // Get the day, month, and year from the date object
+        const day = String(now.getDate()).padStart(2, "0");
+        const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+        const year = now.getFullYear();
+
+        // Combine them in the DD-MM-YYYY format
+        const date = `${day}-${month}-${year}`;
+
+        // Get the hours and minutes, ensuring they are formatted with two digits
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+
+        // Combine them in the HH:MM format
+        const time = `${hours}:${minutes}`;
+
+        const convertedDateTime = this.convertDateToTimestamp(
+          date,
+          time,
           this.formData.trigger_condition.timezone,
         );
+
+        this.formData.tz_offset = convertedDateTime.offset;
       }
 
       this.addAlertForm.validate().then(async (valid: any) => {
@@ -1544,16 +1561,15 @@ export default defineComponent({
         }
 
         if (this.beingUpdated) {
-          payload.folder_id =
-            this.router.currentRoute.value.query.folder || "default";
+          payload.folder_id = this.router.currentRoute.value.query.folder || "default";
           callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload,
-            this.activeFolderId,
+            this.activeFolderId
           );
           callAlert
             .then((res: { data: any }) => {
-              this.formData = { ...defaultValue() };
+              this.formData = { ...defaultValue };
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
@@ -1582,7 +1598,7 @@ export default defineComponent({
           callAlert = alertsService.create_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload,
-            this.activeFolderId,
+            this.activeFolderId
           );
 
           callAlert

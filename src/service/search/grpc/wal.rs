@@ -261,7 +261,12 @@ pub async fn search_parquet(
     }
 
     // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let latest_schema = Arc::new(
+        schema
+            .as_ref()
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -273,9 +278,12 @@ pub async fn search_parquet(
         if files.is_empty() {
             continue;
         }
+        if files.is_empty() {
+            continue;
+        }
         let schema = schema_versions[ver]
             .clone()
-            .with_metadata(Default::default());
+            .with_metadata(std::collections::HashMap::new());
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
@@ -428,7 +436,12 @@ pub async fn search_memtable(
     }
 
     // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let latest_schema = Arc::new(
+        schema
+            .as_ref()
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -436,19 +449,16 @@ pub async fn search_memtable(
 
     let mut tables = Vec::new();
     let start = std::time::Instant::now();
-    for (schema, record_batches) in batch_groups {
+    for (schema, mut record_batches) in batch_groups {
         if record_batches.is_empty() {
             continue;
         }
 
         let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        let mut adapt_batches = Vec::with_capacity(record_batches.len());
-        for batch in record_batches {
-            adapt_batches.push(adapt_batch(latest_schema.clone(), batch));
-        }
-        let record_batches = adapt_batches;
 
-        tokio::task::coop::consume_budget().await;
+        for batch in record_batches.iter_mut() {
+            *batch = adapt_batch(latest_schema.clone(), batch);
+        }
 
         // merge small batches into big batches
         let mut merge_groupes = Vec::new();
@@ -471,8 +481,6 @@ pub async fn search_memtable(
             .into_iter()
             .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
             .collect::<Vec<_>>();
-
-        tokio::task::coop::consume_budget().await;
 
         let table = match NewMemTable::try_new(
             record_batches[0].schema().clone(),
@@ -556,10 +564,6 @@ async fn get_file_list_inner(
         })
         .collect::<Vec<_>>();
 
-    // use same lock to combine the operations of filter by pending delete and lock files
-    let wal_lock = infra::local_lock::lock("wal").await?;
-    let lock_guard = wal_lock.lock().await;
-
     // filter by pending delete
     let files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
@@ -568,7 +572,6 @@ async fn get_file_list_inner(
 
     // lock theses files
     wal::lock_files(&files);
-    drop(lock_guard);
 
     let stream_params = Arc::new(StreamParams::new(
         &query.org_id,
@@ -635,7 +638,7 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
+pub fn adapt_batch(latest_schema: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 

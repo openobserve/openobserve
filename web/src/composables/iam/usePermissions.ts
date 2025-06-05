@@ -34,10 +34,10 @@ const permissions = {
 
 const users = {
   users: [] as any[],
-  getOrgUsers: (org_identifier: string, queryParams?: { list_all?: boolean } ) => {
+  getOrgUsers: (org_identifier: string) => {
     return new Promise((resolve, reject) => {
       usersService
-        .orgUsers(org_identifier)
+        .orgUsers(0, 100000, "email", false, "", org_identifier)
         .then((res) => {
           resolve(res.data.data);
         })

@@ -103,11 +103,6 @@ async fn create(
         }
     }
 
-    if let Some(enable_streaming_search) = settings.enable_streaming_search {
-        field_found = true;
-        data.enable_streaming_search = enable_streaming_search;
-    }
-
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }

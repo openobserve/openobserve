@@ -193,6 +193,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else-if="
+                    (!searchObj.data.stream.selectedStreamFields ||
+                      searchObj.data.stream.selectedStreamFields.length == 0) &&
+                    searchObj.loading == false
+                  "
+                  class="row q-mt-lg"
+                >
+                  <h6
+                    data-test="logs-search-no-stream-selected-text"
+                    class="text-center col-10 q-mx-none"
+                  >
+                    <q-icon name="info" color="primary" size="md" /> No field
+                    found in selected stream.
+                  </h6>
+                </div>
+                <div
+                  v-else-if="
                     searchObj.data.queryResults.hasOwnProperty('hits') &&
                     searchObj.data.queryResults.hits.length == 0 &&
                     searchObj.loading == false &&
@@ -353,7 +369,6 @@ import {
   defineComponent,
   ref,
   onActivated,
-  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -388,8 +403,7 @@ import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
-import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
-import useAiChat from "@/composables/useAiChat";
+import { isWebSocketEnabled } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -567,12 +581,9 @@ export default defineComponent({
       isLimitQuery,
       enableRefreshInterval,
       buildWebSocketPayload,
-      initializeSearchConnection,
-      addTraceId,
+      initializeWebSocketConnection,
+      addRequestId,
       sendCancelSearchMessage,
-      isDistinctQuery,
-      isWithQuery,
-      getStream,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -599,8 +610,6 @@ export default defineComponent({
     const visualizeErrorData: any = reactive({
       errors: [],
     });
-
-    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 
     // function restoreUrlQueryParams() {
     //   const queryParams = router.currentRoute.value.query;
@@ -660,14 +669,11 @@ export default defineComponent({
           router.back();
         }
       }
-
-      registerAiContextHandler();
     });
 
     onBeforeUnmount(() => {
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
-      removeAiContextHandler();
     });
 
     onActivated(() => {
@@ -847,7 +853,6 @@ export default defineComponent({
         }
 
         searchObj.meta.quickMode = isQuickModeEnabled();
-        searchObj.meta.showHistogram = isHistogramEnabled();
 
         isLogsMounted.value = true;
       } catch (error) {
@@ -877,11 +882,6 @@ export default defineComponent({
     // Helper function to check if quick mode is enabled
     function isQuickModeEnabled() {
       return store.state.zoConfig.quick_mode_enabled;
-    }
-
-    // Helper function to check if histogram is enabled
-    function isHistogramEnabled() {
-      return store.state.zoConfig.histogram_enabled;
     }
 
     const handleActivation = async () => {
@@ -1550,82 +1550,10 @@ export default defineComponent({
     // [END] cancel running queries
 
     const cancelOnGoingSearchQueries = () => {
-      sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
+      sendCancelSearchMessage(
+        searchObj.data.searchWebSocketRequestIdsAndTraceIds,
+      );
     };
-
-    // [START] O2 AI Context Handler
-
-    const registerAiContextHandler = () => {
-      registerAiChatHandler(getContext);
-    };
-
-    const getContext = async () => {
-      return new Promise(async (resolve, reject) => {
-        try {
-          const isLogsPage = router.currentRoute.value.name === "logs";
-
-          const isStreamSelectedInLogsPage =
-            searchObj.meta.logsVisualizeToggle === "logs" &&
-            searchObj.data.stream.selectedStream.length;
-
-          const isStreamSelectedInDashboardPage =
-            searchObj.meta.logsVisualizeToggle === "visualize" &&
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream;
-
-          if (
-            !isLogsPage ||
-            !(isStreamSelectedInLogsPage || isStreamSelectedInDashboardPage)
-          ) {
-            resolve("");
-            return;
-          }
-
-          const payload = {};
-
-          const streams =
-            searchObj.meta.logsVisualizeToggle === "logs"
-              ? searchObj.data.stream.selectedStream
-              : [
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields.stream,
-                ];
-
-          const streamType =
-            searchObj.meta.logsVisualizeToggle === "logs"
-              ? searchObj.data.stream.streamType
-              : dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream_type;
-
-          if (!streamType || !streams?.length) {
-            resolve("");
-            return;
-          }
-
-          for (let i = 0; i < streams.length; i++) {
-            const schema = await getStream(streams[i], streamType, true);
-
-            payload["stream_name_" + (i + 1)] = streams[i];
-            payload["schema_" + (i + 1)] =
-              schema.uds_schema || schema.schema || [];
-          }
-
-          resolve(payload);
-        } catch (error) {
-          console.error("Error in getContext for logs page", error);
-          resolve("");
-        }
-      });
-    };
-
-    const removeAiContextHandler = () => {
-      removeAiChatHandler();
-    };
-
-    // [END] O2 AI Context Handler
 
     return {
       t,
@@ -1675,15 +1603,12 @@ export default defineComponent({
       fnParsedSQL,
       isLimitQuery,
       buildWebSocketPayload,
-      initializeSearchConnection,
-      addTraceId,
+      initializeWebSocketConnection,
+      addRequestId,
       isWebSocketEnabled,
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
-      isDistinctQuery,
-      isWithQuery,
-      isStreamingEnabled,
     };
   },
   computed: {
@@ -1749,16 +1674,7 @@ export default defineComponent({
         ? this.searchObj.config.lastSplitterPosition
         : 0;
     },
-    async showHistogram(newVal, oldVal) {
-      if (
-        newVal == true &&
-        oldVal == false &&
-        this.searchObj.meta.histogramDirtyFlag == true &&
-        this.searchObj.data.queryResults.hits.length > 0
-      ) {
-        this.searchObj.meta.resetPlotChart = true;
-        this.searchObj.data.queryResults.aggs = [];
-      }
+    async showHistogram() {
       let parsedSQL = null;
 
       if (this.searchObj.meta.sqlMode) parsedSQL = this.fnParsedSQL();
@@ -1771,19 +1687,8 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1,
+            "Histogram is not available for limit queries.",
           );
-          this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          this.searchObj.meta.sqlMode &&
-          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
-        ) {
-          this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1,
-          );
-          this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
@@ -1797,12 +1702,12 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          const shouldUseWebSocket = this.isWebSocketEnabled(this.store.state);
-          const shouldUseStreaming = this.isStreamingEnabled(this.store.state);
+          const shouldUseWebSocket = this.isWebSocketEnabled();
+
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (shouldUseWebSocket || shouldUseStreaming) {
+          if (shouldUseWebSocket) {
             // Use WebSocket for histogram data
             const payload = this.buildWebSocketPayload(
               this.searchObj.data.histogramQuery,
@@ -1812,10 +1717,10 @@ export default defineComponent({
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
               },
             );
-            const requestId = this.initializeSearchConnection(payload);
+            const requestId = this.initializeWebSocketConnection(payload);
 
             if (requestId) {
-              this.addTraceId(payload.traceId);
+              this.addRequestId(requestId, payload.traceId);
             }
 
             return;
@@ -1880,12 +1785,8 @@ export default defineComponent({
     async fullSQLMode(newVal) {
       if (newVal) {
         await nextTick();
-        if (this.searchObj.meta.sqlModeManualTrigger) {
-          this.searchObj.meta.sqlModeManualTrigger = false;
-        } else {
-          this.setQuery(newVal);
-          this.updateUrlQueryParams();
-        }
+        this.setQuery(newVal);
+        this.updateUrlQueryParams();
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
@@ -1915,7 +1816,7 @@ export default defineComponent({
       this.refreshHistogramChart();
     },
   },
-}) as any;
+});
 </script>
 
 <style lang="scss">

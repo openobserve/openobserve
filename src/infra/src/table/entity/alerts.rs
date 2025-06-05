@@ -42,7 +42,6 @@ pub struct Model {
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,
     pub updated_at: Option<i64>,
-    pub align_time: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

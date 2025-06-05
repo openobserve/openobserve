@@ -42,7 +42,6 @@ mod tests {
                 router::*,
             },
         },
-        migration,
         service::{alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
     };
     use prost::Message;
@@ -63,7 +62,6 @@ mod tests {
             env::set_var("ZO_RESULT_CACHE_ENABLED", "false");
             env::set_var("ZO_PRINT_KEY_SQL", "true");
             env::set_var("ZO_SMTP_ENABLED", "true");
-            env::set_var("ZO_CREATE_ORG_THROUGH_INGESTION", "true");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -130,7 +128,6 @@ mod tests {
         // init config
         config::init().await.unwrap();
         // init infra
-        migration::init_db().await.unwrap();
         infra::init().await.unwrap();
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
@@ -728,7 +725,7 @@ mod tests {
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
                                 "password": "Abcd12345",
-                                "role": "admin"
+                                "role": "member"
                             }"#;
         let app = test::init_service(
             App::new()
@@ -747,7 +744,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("post user resp: {:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -755,8 +751,8 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
-                                "new_password": "12345678",
-                                "change_password": true
+                                "password": "Abcd12345",
+                                "role": "member"
                             }"#;
         let app = test::init_service(
             App::new()

@@ -15,20 +15,18 @@
 
 use std::sync::Arc;
 
-use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{
-        Column, Result,
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
+        Result,
+        tree_node::{Transformed, TreeNode},
     },
-    logical_expr::{Extension, LogicalPlan, Sort, SortExpr},
+    logical_expr::LogicalPlan,
     optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
-    prelude::{Expr, col},
+    prelude::Expr,
 };
 use itertools::Itertools;
 
-use super::utils::{AddSortAndLimit, is_contain_deduplication_plan};
-use crate::service::search::datafusion::plan::deduplication::DeduplicationLogicalNode;
+use super::utils::AddSortAndLimit;
 
 #[derive(Default, Debug)]
 pub struct LimitJoinRightSide {
@@ -59,9 +57,6 @@ impl OptimizerRule for LimitJoinRightSide {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        if self.limit == 0 {
-            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
-        }
         match plan {
             LogicalPlan::Join(mut join) => {
                 let right_column = join
@@ -75,102 +70,29 @@ impl OptimizerRule for LimitJoinRightSide {
                         }
                     })
                     .collect_vec();
-                // limit the right side output size
-                let mut plan = (*join.right)
-                    .clone()
-                    .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
-                    .data;
-                if !right_column.is_empty() {
-                    // deduplication on join key
-                    plan = plan
-                        .rewrite(&mut DeduplicationRewriter::new(right_column))?
+                if right_column.is_empty() {
+                    let plan = (*join.right)
+                        .clone()
+                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
                         .data;
+                    join.right = Arc::new(plan);
+                    Ok(Transformed::yes(LogicalPlan::Join(join)))
+                } else {
+                    let plan = (*join.right)
+                        .clone()
+                        .rewrite(&mut AddSortAndLimit::new_with_deduplication(
+                            self.limit,
+                            0,
+                            right_column,
+                        ))?
+                        .data;
+                    join.right = Arc::new(plan);
+                    Ok(Transformed::yes(LogicalPlan::Join(join)))
                 }
-                join.right = Arc::new(plan);
-                Ok(Transformed::yes(LogicalPlan::Join(join)))
             }
             _ => Ok(Transformed::no(plan)),
         }
     }
-}
-
-struct DeduplicationRewriter {
-    pub deduplication_columns: Vec<Column>,
-}
-
-impl DeduplicationRewriter {
-    pub fn new(deduplication_columns: Vec<Column>) -> Self {
-        Self {
-            deduplication_columns,
-        }
-    }
-}
-
-impl TreeNodeRewriter for DeduplicationRewriter {
-    type Node = LogicalPlan;
-
-    fn f_down(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
-        if is_contain_deduplication_plan(&node) {
-            return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
-        }
-
-        // insert deduplication to first plan that contains deduplication columns
-        let plan = match node {
-            LogicalPlan::Projection(_) | LogicalPlan::SubqueryAlias(_) => {
-                let schema = node.inputs().first().unwrap().schema();
-                for column in self.deduplication_columns.iter() {
-                    if schema.field_with_name(None, column.name()).is_err() {
-                        let plan = generate_deduplication_plan(
-                            Arc::new(node),
-                            self.deduplication_columns.clone(),
-                        );
-                        return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-                    }
-                }
-                Transformed::no(node)
-            }
-            _ => {
-                let plan =
-                    generate_deduplication_plan(Arc::new(node), self.deduplication_columns.clone());
-                Transformed::new(plan, true, TreeNodeRecursion::Stop)
-            }
-        };
-
-        Ok(plan)
-    }
-}
-
-fn generate_deduplication_plan(
-    node: Arc<LogicalPlan>,
-    deduplication_columns: Vec<Column>,
-) -> LogicalPlan {
-    let mut sort_columns = Vec::with_capacity(deduplication_columns.len() + 1);
-    let schema = node.schema().clone();
-
-    for column in deduplication_columns.iter() {
-        sort_columns.push(SortExpr {
-            expr: col(column.name()),
-            asc: false,
-            nulls_first: false,
-        });
-    }
-
-    if schema.field_with_name(None, TIMESTAMP_COL_NAME).is_ok() {
-        sort_columns.push(SortExpr {
-            expr: col(TIMESTAMP_COL_NAME.to_string()),
-            asc: false,
-            nulls_first: false,
-        });
-    }
-
-    let sort = LogicalPlan::Sort(Sort {
-        expr: sort_columns,
-        input: node,
-        fetch: None,
-    });
-    LogicalPlan::Extension(Extension {
-        node: Arc::new(DeduplicationLogicalNode::new(sort, deduplication_columns)),
-    })
 }
 
 #[cfg(test)]
@@ -237,28 +159,27 @@ mod tests {
         // );
 
         let expected = vec![
-            "ProjectionExec: expr=[count(Int64(1))@0 as count(*)]",
-            "  AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]",
-            "    CoalescePartitionsExec",
-            "      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]",
-            "        ProjectionExec: expr=[]",
-            "          CoalesceBatchesExec: target_batch_size=8192",
-            "            HashJoinExec: mode=Partitioned, join_type=LeftSemi, on=[(name@0, name@0)]",
-            "              CoalesceBatchesExec: target_batch_size=8192",
-            "                RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=1",
-            "                  DataSourceExec: partitions=1, partition_sizes=[1]",
-            "              CoalesceBatchesExec: target_batch_size=8192",
-            "                RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "                  RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "                    DeduplicationExec: columns: [Column { name: \"name\", index: 0 }]",
-            "                      SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
-            "                        CoalescePartitionsExec",
-            "                          AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
-            "                            CoalesceBatchesExec: target_batch_size=8192",
-            "                              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "                                RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "                                  AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
-            "                                    DataSourceExec: partitions=1, partition_sizes=[1]",
+            "AggregateExec: mode=Final, gby=[], aggr=[count(*)]",
+            "  CoalescePartitionsExec",
+            "    AggregateExec: mode=Partial, gby=[], aggr=[count(*)]",
+            "      ProjectionExec: expr=[]",
+            "        CoalesceBatchesExec: target_batch_size=8192",
+            "          HashJoinExec: mode=Partitioned, join_type=LeftSemi, on=[(name@0, name@0)]",
+            "            CoalesceBatchesExec: target_batch_size=8192",
+            "              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=1",
+            "                MemoryExec: partitions=1, partition_sizes=[1]",
+            "            CoalesceBatchesExec: target_batch_size=8192",
+            "              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
+            "                  DeduplicationExec: columns: [Column { name: \"name\", index: 0 }]",
+            "                    SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "                      CoalescePartitionsExec",
+            "                        AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
+            "                          CoalesceBatchesExec: target_batch_size=8192",
+            "                            RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "                              RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
+            "                                AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
+            "                                  MemoryExec: partitions=1, partition_sizes=[1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -319,8 +240,8 @@ mod tests {
             "        SortExec: expr=[id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
             "          SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
             "            SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
-            "              DataSourceExec: partitions=2, partition_sizes=[1, 1]",
-            "    DataSourceExec: partitions=1, partition_sizes=[1]",
+            "              MemoryExec: partitions=2, partition_sizes=[1, 1]",
+            "    MemoryExec: partitions=1, partition_sizes=[1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -399,8 +320,8 @@ mod tests {
             "                    SortExec: expr=[usr_id@0 DESC NULLS LAST, _timestamp@2 DESC NULLS LAST], preserve_partitioning=[false]",
             "                      SortPreservingMergeExec: [_timestamp@2 DESC NULLS LAST], fetch=50000",
             "                        SortExec: TopK(fetch=50000), expr=[_timestamp@2 DESC NULLS LAST], preserve_partitioning=[true]",
-            "                          DataSourceExec: partitions=2, partition_sizes=[1, 1]",
-            "                DataSourceExec: partitions=1, partition_sizes=[1]",
+            "                          MemoryExec: partitions=2, partition_sizes=[1, 1]",
+            "                MemoryExec: partitions=1, partition_sizes=[1]",
             "    CoalesceBatchesExec: target_batch_size=8192",
             "      RepartitionExec: partitioning=Hash([prod_id@0], 12), input_partitions=1",
             "        ProjectionExec: expr=[prod_id@0 as prod_id]",
@@ -408,7 +329,7 @@ mod tests {
             "            SortExec: expr=[prod_id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
             "              SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
             "                SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
-            "                  DataSourceExec: partitions=3, partition_sizes=[1, 1, 1]",
+            "                  MemoryExec: partitions=3, partition_sizes=[1, 1, 1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));

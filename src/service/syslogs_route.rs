@@ -160,18 +160,17 @@ impl From<Response> for HttpResponse {
     fn from(resp: Response) -> Self {
         match resp {
             Response::OkMessage(message) => {
-                Self::Ok().json(MetaHttpResponse::message(StatusCode::OK, message))
+                Self::Ok().json(MetaHttpResponse::message(StatusCode::OK.into(), message))
             }
             Response::NotFound => Self::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND,
-                "Syslog route not found",
+                StatusCode::NOT_FOUND.into(),
+                "Syslog route not found".to_owned(),
             )),
             Response::InternalServerError(err) => Self::InternalServerError().json(
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR, err),
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.into(), err.to_string()),
             ),
-            Response::BadRequest(err) => {
-                Self::BadRequest().json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err))
-            }
+            Response::BadRequest(err) => Self::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST.into(), err)),
         }
     }
 }

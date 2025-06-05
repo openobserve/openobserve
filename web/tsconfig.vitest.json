@@ -1,7 +1,6 @@
 {
   "extends": "./tsconfig.app.json",
-  "include": ["src/**/*.spec.{ts,js}", "vitest.config.*"],
-  "exclude": ["node_modules", "dist"],
+  "exclude": [],
   "compilerOptions": {
     "allowJs": true,
     "target": "esnext",
@@ -20,8 +19,5 @@
     "types": ["node"],
     "baseUrl": ".",
     "downlevelIteration": true,
-    "paths": {
-      "@/*": ["./src/*"]
-    }
   }
 }

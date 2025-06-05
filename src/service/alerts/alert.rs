@@ -68,7 +68,6 @@ use crate::common::utils::auth::check_permissions;
 use crate::common::utils::http::get_or_create_trace_id;
 use crate::{
     common::{
-        infra::config::ORGANIZATIONS,
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
@@ -280,16 +279,10 @@ async fn prepare_alert(
         alert.trigger_condition.cron = update_cron_expression(&alert.trigger_condition.cron, now);
         // Check the cron expression
         Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
-    } else {
-        // if cron is not empty, set it to empty string
-        if !alert.trigger_condition.cron.is_empty() {
-            alert.trigger_condition.cron = "".to_string();
-        }
-        if alert.trigger_condition.frequency == 0 {
-            // default frequency is 60 seconds
-            alert.trigger_condition.frequency =
-                std::cmp::max(60, get_config().limit.alert_schedule_interval);
-        }
+    } else if alert.trigger_condition.frequency == 0 {
+        // default frequency is 60 seconds
+        alert.trigger_condition.frequency =
+            std::cmp::max(60, get_config().limit.alert_schedule_interval);
     }
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
@@ -683,15 +676,6 @@ pub async fn list(
     }
 }
 
-/// Gets a list of alerts from the database `ORM_CLIENT`.
-pub async fn list_with_folders_db(
-    params: ListAlertsParams,
-) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    db::alerts::alert::list_with_folders(conn, params)
-        .await
-        .map_err(|e| e.into())
-}
 /// Gets a list of alerts.
 pub async fn list_v2<C: ConnectionTrait>(
     conn: &C,
@@ -958,19 +942,13 @@ async fn send_notification(
     start_time: Option<i64>,
     evaluation_timestamp: i64,
 ) -> Result<String, anyhow::Error> {
-    let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
-        org.name.clone()
-    } else {
-        alert.org_id.to_string()
-    };
     let rows_tpl_val = if alert.row_template.is_empty() {
         vec!["".to_string()]
     } else {
-        process_row_template(&org_name, &alert.row_template, alert, rows)
+        process_row_template(&alert.row_template, alert, rows)
     };
     let is_email = matches!(dest_type, DestinationType::Email(_));
     let msg: String = process_dest_template(
-        &org_name,
         &template.body,
         alert,
         rows,
@@ -986,7 +964,6 @@ async fn send_notification(
 
     let email_subject = if let TemplateType::Email { title } = &template.template_type {
         process_dest_template(
-            &org_name,
             title,
             alert,
             rows,
@@ -1165,12 +1142,7 @@ async fn send_sns_notification(
     }
 }
 
-fn process_row_template(
-    org_name: &str,
-    tpl: &String,
-    alert: &Alert,
-    rows: &[Map<String, Value>],
-) -> Vec<String> {
+fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -1233,7 +1205,7 @@ fn process_row_template(
         };
 
         resp = resp
-            .replace("{org_name}", org_name)
+            .replace("{org_name}", &alert.org_id)
             .replace("{stream_type}", alert.stream_type.as_str())
             .replace("{stream_name}", &alert.stream_name)
             .replace("{alert_name}", &alert.name)
@@ -1280,7 +1252,6 @@ struct ProcessTemplateOptions {
 }
 
 async fn process_dest_template(
-    org_name: &str,
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
@@ -1454,7 +1425,7 @@ async fn process_dest_template(
     let evaluation_timestamp_millis = evaluation_timestamp / 1000;
     let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
     let mut resp = tpl
-        .replace("{org_name}", org_name)
+        .replace("{org_name}", &alert.org_id)
         .replace("{stream_type}", alert.stream_type.as_str())
         .replace("{stream_name}", &alert.stream_name)
         .replace("{alert_name}", &alert.name)

@@ -51,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       `Use alphanumeric and '_' characters only, without spaces.`
                     : t('common.nameRequired'),
               ]"
-              maxlength="100"
             >
               <template v-slot:hint>
                 Use alphanumeric and '_' characters only, without spaces.
@@ -139,7 +138,7 @@ const saveRole = () => {
     .catch((err) => {
       if(err.response.status != 403){
         q.notify({
-        message: err?.response?.data?.message,
+        message: "Error while creating role",
         color: "negative",
         position: "bottom",
         timeout: 3000,

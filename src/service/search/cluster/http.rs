@@ -18,7 +18,7 @@ use std::sync::Arc;
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
-    metrics::QUERY_PARQUET_CACHE_RATIO,
+    metrics::{QUERY_PARQUET_CACHE_RATIO, QUERY_PARQUET_CACHE_REQUESTS},
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -81,7 +81,7 @@ pub async fn search(
     // handle query function
     #[cfg(feature = "enterprise")]
     let ret = if _need_super_cluster
-        && o2_enterprise::enterprise::common::config::get_config()
+        && o2_enterprise::enterprise::common::infra::config::get_config()
             .super_cluster
             .enabled
         && !local_cluster_search
@@ -101,7 +101,7 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let ret = flight::search(&trace_id, sql.clone(), req, query).await;
 
-    let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
+    let (merge_batches, scan_stats, took_wait, is_partial, idx_took, partial_err) = match ret {
         Ok(v) => v,
         Err(e) => {
             log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
@@ -265,31 +265,32 @@ pub async fn search(
             .unwrap_or_default()
     };
 
-    let took_time = start.elapsed().as_millis() as usize;
-
     result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
     result.set_partial(is_partial, partial_err);
-    result.set_took(took_time);
-    result.set_wait_in_queue(took_wait);
-    result.set_search_took(
-        took_time - took_wait,
-        scan_stats.file_list_took as usize,
-        scan_stats.idx_took as usize,
-    );
+    result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
+    result.set_idx_took(if idx_took > 0 {
+        idx_took
+    } else {
+        scan_stats.idx_took as usize
+    });
 
     if scan_stats.querier_files > 0 {
-        let cached_ratio = (scan_stats.querier_memory_cached_files
-            + scan_stats.querier_disk_cached_files) as f64
-            / scan_stats.querier_files as f64;
-        result.set_cached_ratio((cached_ratio * 100.0) as usize);
+        let parquet_cached_ratio = (((scan_stats.querier_memory_cached_files
+            + scan_stats.querier_disk_cached_files)
+            * 100) as f64
+            / scan_stats.querier_files as f64) as usize;
+        result.set_cached_ratio(parquet_cached_ratio);
         QUERY_PARQUET_CACHE_RATIO
             .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
-            .observe(cached_ratio);
+            .inc_by(parquet_cached_ratio as u64);
+        QUERY_PARQUET_CACHE_REQUESTS
+            .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
+            .inc();
     }
 
     if query_type == "table" {

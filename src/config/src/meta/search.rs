@@ -13,34 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::VecDeque;
-
-use bytes::Bytes as BytesImpl;
-use hashbrown::HashMap;
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
+use crate::meta::stream::StreamType;
 
 use crate::{
-    config::get_config,
-    meta::{sql::OrderBy, stream::StreamType},
+    meta::sql::OrderBy,
     utils::{base64, json},
 };
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
 
-/// To represent the query start and end time based of partition or cache
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeOffset {
-    pub start_time: i64,
-    pub end_time: i64,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
     Memory,
     Wal,
+    Tmpfs,
 }
 
 #[derive(Clone, Debug)]
@@ -187,7 +177,8 @@ impl Request {
 pub struct Response {
     pub took: usize,
     #[serde(default)]
-    pub took_detail: ResponseTook,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub took_detail: Option<ResponseTook>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub columns: Vec<String>,
@@ -229,145 +220,41 @@ pub struct Response {
     pub order_by: Option<OrderBy>,
 }
 
-/// Iterator for Streaming response of search `Response`
-///
-/// This is used to split the search response to smaller chunks based on
-/// env variable
-/// The format of the iterator is as follows:
-/// - Chunk 1: Response Metadata
-/// - Chunk 2: Hits (1MB)
-/// - Chunk 3: Hits (1MB)
-pub struct ResponseChunkIterator {
-    // Original response (will be split into chunks)
-    response: Response,
-    // Target size for each chunk in bytes
-    chunk_size: usize,
-    // Hits waiting to be processed
-    remaining_hits: VecDeque<crate::utils::json::Value>,
-    // Whether metadata has been sent
-    metadata_sent: bool,
-    // Current position in the iteration
-    position: usize,
-}
-
-impl ResponseChunkIterator {
-    /// Create a new response chunk iterator
-    pub fn new(mut response: Response, chunk_size: Option<usize>) -> Self {
-        // Get the configured chunk size or use the provided one or default
-        let chunk_size = chunk_size.unwrap_or_else(|| {
-            // Get from config, convert from MB to bytes
-            let mb = 1024 * 1024;
-            crate::get_config().websocket.streaming_response_chunk_size * mb
-        });
-
-        let hits = response.hits.drain(..).collect::<Vec<_>>();
-
-        Self {
-            response,
-            chunk_size,
-            remaining_hits: VecDeque::from(hits),
-            metadata_sent: false,
-            position: 0,
-        }
-    }
-}
-
-// Define the possible chunk types
-#[derive(Debug, Clone)]
-pub enum ResponseChunk {
-    Metadata {
-        response: Box<Response>,
-    },
-    Hits {
-        hits: Vec<crate::utils::json::Value>,
-    },
-}
-
-impl Iterator for ResponseChunkIterator {
-    type Item = ResponseChunk;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // First send metadata
-        if !self.metadata_sent {
-            self.metadata_sent = true;
-            self.position += 1;
-
-            // Clone response but remove hits
-            let mut metadata_response = self.response.clone();
-            metadata_response.hits = vec![];
-
-            return Some(ResponseChunk::Metadata {
-                response: Box::new(metadata_response),
-            });
-        }
-
-        // If we have no hits left, we're done
-        if self.remaining_hits.is_empty() {
-            return None;
-        }
-
-        // Create the next chunk of hits
-        let mut current_chunk: Vec<crate::utils::json::Value> = Vec::new();
-        let mut current_chunk_size: usize = 0;
-
-        // Keep adding hits until we reach the target chunk size
-        while !self.remaining_hits.is_empty() {
-            // Peek at the front hit
-            let hit = &self.remaining_hits[0];
-            let hit_size = crate::utils::json::estimate_json_bytes(hit);
-
-            if hit_size > self.chunk_size {
-                return Some(ResponseChunk::Hits {
-                    hits: vec![hit.to_owned()],
-                });
-            }
-
-            // If adding this hit would exceed target size, break
-            if !current_chunk.is_empty() && current_chunk_size + hit_size > self.chunk_size {
-                break;
-            }
-
-            // Add hit to current chunk - using pop_front() for O(1) complexity
-            if let Some(hit) = self.remaining_hits.pop_front() {
-                current_chunk.push(hit);
-                current_chunk_size += hit_size;
-            }
-        }
-
-        self.position += 1;
-
-        // Return the hits chunk
-        Some(ResponseChunk::Hits {
-            hits: current_chunk,
-        })
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseTook {
     pub total: usize,
-    pub cache_took: usize,
-    pub file_list_took: usize,
-    pub wait_in_queue: usize,
     pub idx_took: usize,
-    pub search_took: usize,
+    pub wait_queue: usize,
+    pub cluster_total: usize,
+    pub cluster_wait_queue: usize,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<ResponseNodeTook>,
 }
 
 impl ResponseTook {
     pub fn add(&mut self, other: &ResponseTook) {
-        self.cache_took += other.cache_took;
-        self.file_list_took += other.file_list_took;
-        self.wait_in_queue += other.wait_in_queue;
+        self.total += other.total;
         self.idx_took += other.idx_took;
-        self.search_took += other.search_took;
+        self.wait_queue += other.wait_queue;
+        self.cluster_total += other.cluster_total;
+        self.cluster_wait_queue += other.cluster_wait_queue;
+        self.nodes.extend(other.nodes.clone());
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
+pub struct ResponseNodeTook {
+    pub node: String,
+    pub is_ingester: bool,
+    pub took: usize,
 }
 
 impl Response {
     pub fn new(from: i64, size: i64) -> Self {
         Response {
             took: 0,
-            took_detail: ResponseTook::default(),
+            took_detail: None,
             total: 0,
             from,
             size,
@@ -407,6 +294,7 @@ impl Response {
             .take(size as usize)
             .cloned()
             .collect();
+        // self.total = self.hits.len();
     }
 
     pub fn add_hit(&mut self, hit: &json::Value) {
@@ -414,24 +302,31 @@ impl Response {
         self.total += 1;
     }
 
-    // set the total took time of the search request, it includes everything.
-    pub fn set_took(&mut self, val: usize) {
-        self.took = val;
-        self.took_detail.total = val;
+    pub fn set_cluster_took(&mut self, val: usize, wait: usize) {
+        self.took = val - wait;
+        self.took_detail = Some(ResponseTook {
+            total: 0,
+            idx_took: 0,
+            wait_queue: 0,
+            cluster_total: val,
+            cluster_wait_queue: wait,
+            nodes: Vec::new(),
+        });
     }
 
-    pub fn set_cache_took(&mut self, val: usize) {
-        self.took_detail.cache_took = val;
+    pub fn set_local_took(&mut self, val: usize, wait: usize) {
+        if self.took_detail.is_some() {
+            self.took_detail.as_mut().unwrap().total = val;
+            if wait > 0 {
+                self.took_detail.as_mut().unwrap().wait_queue = wait;
+            }
+        }
     }
 
-    pub fn set_wait_in_queue(&mut self, val: usize) {
-        self.took_detail.wait_in_queue = val;
-    }
-
-    pub fn set_search_took(&mut self, total: usize, file_list: usize, idx: usize) {
-        self.took_detail.search_took = total - file_list - idx;
-        self.took_detail.file_list_took = file_list;
-        self.took_detail.idx_took = idx;
+    pub fn set_idx_took(&mut self, val: usize) {
+        if self.took_detail.is_some() {
+            self.took_detail.as_mut().unwrap().idx_took = val;
+        }
     }
 
     pub fn set_total(&mut self, val: usize) {
@@ -769,7 +664,6 @@ pub struct ScanStats {
     pub querier_disk_cached_files: i64,
     pub idx_scan_size: i64,
     pub idx_took: i64,
-    pub file_list_took: i64,
 }
 
 impl ScanStats {
@@ -787,7 +681,6 @@ impl ScanStats {
         self.querier_disk_cached_files += other.querier_disk_cached_files;
         self.idx_scan_size += other.idx_scan_size;
         self.idx_took = std::cmp::max(self.idx_took, other.idx_took);
-        self.file_list_took = std::cmp::max(self.file_list_took, other.file_list_took);
     }
 
     pub fn format_to_mb(&mut self) {
@@ -828,7 +721,6 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
-            file_list_took: req.file_list_took,
         }
     }
 }
@@ -845,7 +737,6 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
-            file_list_took: req.file_list_took,
         }
     }
 }
@@ -1204,16 +1095,6 @@ pub struct ValuesRequest {
     pub sql: String,
 }
 
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct HashFileRequest {
-    pub files: Vec<String>,
-}
-
-#[derive(Debug, Default, Deserialize, Clone, Serialize)]
-pub struct HashFileResponse {
-    pub files: HashMap<String, HashMap<String, String>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1448,185 +1329,6 @@ mod search_history_utils {
             AND user_email = 'user123@gmail.com'";
 
             assert_eq!(query, expected_query);
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum StreamResponses {
-    // Original variant - to be deprecated but kept for backward compatibility
-    SearchResponse {
-        results: Response,
-        streaming_aggs: bool,
-        time_offset: TimeOffset,
-    },
-    // New focused variants
-    SearchResponseMetadata {
-        results: Response,
-        streaming_aggs: bool,
-        time_offset: TimeOffset,
-    },
-    SearchResponseHits {
-        hits: Vec<json::Value>,
-    },
-    Progress {
-        percent: usize,
-    },
-    Error {
-        code: u16,
-        message: String,
-        error_detail: Option<String>,
-    },
-    Done,
-    Cancelled,
-}
-
-/// An iterator that yields formatted chunks from a StreamResponse
-pub struct StreamResponseChunks {
-    /// The inner iterator for search responses with multiple chunks
-    chunks_iter: Option<Box<dyn Iterator<Item = Result<BytesImpl, std::io::Error>> + Send>>,
-    /// Single chunk for simple responses
-    single_chunk: Option<Result<BytesImpl, std::io::Error>>,
-}
-
-impl Iterator for StreamResponseChunks {
-    type Item = Result<BytesImpl, std::io::Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(iter) = &mut self.chunks_iter {
-            iter.next()
-        } else {
-            self.single_chunk.take()
-        }
-    }
-}
-
-impl StreamResponses {
-    /// Convert a response to an iterator of formatted chunks
-    /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
-    /// chunks For other response types, this will return an iterator with a single chunk
-    pub fn to_chunks(&self) -> StreamResponseChunks {
-        // Helper function to format event data
-        let format_event = |event_type: &str, data: &str| -> BytesImpl {
-            let formatted = format!("event: {}\ndata: {}\n\n", event_type, data);
-            BytesImpl::from(formatted.into_bytes())
-        };
-
-        match self {
-            // Handle search responses with chunking
-            StreamResponses::SearchResponse {
-                results,
-                streaming_aggs,
-                time_offset,
-            } => {
-                log::info!(
-                    "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
-                    results.hits.len()
-                );
-
-                // Create the iterator
-                let iterator = ResponseChunkIterator::new(
-                    results.clone(),
-                    None, // Use configured chunk size from environment
-                );
-
-                // Add a log message to show the chunk size being used
-                log::info!(
-                    "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
-                    get_config().websocket.streaming_response_chunk_size
-                );
-
-                // Capture needed values for the closure
-                let streaming_aggs = *streaming_aggs;
-                let time_offset = time_offset.clone();
-
-                // Create an iterator that maps each chunk to a formatted BytesImpl
-                let chunks_iter = iterator.map(move |chunk| {
-                    let (event_type, data) = match chunk {
-                        ResponseChunk::Metadata { response } => {
-                            // Add streaming_aggs and time_offset from the original response
-                            let metadata = StreamResponses::SearchResponseMetadata {
-                                results: *response,
-                                streaming_aggs,
-                                time_offset: time_offset.clone(),
-                            };
-                            let data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
-                                log::error!("Failed to serialize metadata: {:?}", metadata);
-                                String::new()
-                            });
-                            ("search_response_metadata", data)
-                        }
-                        ResponseChunk::Hits { hits } => {
-                            let data =
-                                serde_json::to_string(&StreamResponses::SearchResponseHits {
-                                    hits,
-                                })
-                                .unwrap_or_else(|e| {
-                                    log::error!("Failed to serialize hits: {:?}", e);
-                                    String::new()
-                                });
-                            ("search_response_hits", data)
-                        }
-                    };
-
-                    // Format and encode the chunk
-                    Ok(format_event(event_type, &data))
-                });
-
-                StreamResponseChunks {
-                    chunks_iter: Some(Box::new(chunks_iter)),
-                    single_chunk: None,
-                }
-            }
-
-            // Handle other response types with a single chunk
-            StreamResponses::SearchResponseMetadata { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("search_response_metadata", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::SearchResponseHits { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("search_response_hits", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Progress { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("progress", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Error { .. } => {
-                let data = serde_json::to_string(self).unwrap_or_default();
-                let bytes = format_event("error", &data);
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Done => {
-                let bytes = BytesImpl::from("data: [[DONE]]\n\n");
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
-            StreamResponses::Cancelled => {
-                let bytes = BytesImpl::from("data: [[CANCELLED]]\n\n");
-                StreamResponseChunks {
-                    chunks_iter: None,
-                    single_chunk: Some(Ok(bytes)),
-                }
-            }
         }
     }
 }

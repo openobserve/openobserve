@@ -64,7 +64,7 @@ export class DashboardPage {
     await expect(this.page.locator('[data-test="dashboard-apply"]')).toBeVisible();
     await this.page.locator('[data-test="dashboard-apply"]').click();
     await this.page.waitForTimeout(5000);
-  }
+  } 
   async deleteDashboard() {
     await this.page.reload();
     await this.page.waitForTimeout(2000);
@@ -99,18 +99,17 @@ export class DashboardPage {
   }
 
   async dashboardPageDefaultMultiOrg() {
-    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();    
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
-  }
+}
 
-  async dashboardPageURLValidation() {
-    // TODO: Fix this test
-    // await expect(this.page).not.toHaveURL(/default/);
-  }
+async dashboardPageURLValidation() {
+ await expect(this.page).toHaveURL(/defaulttestmulti/);
+}
 
-  async dashboardURLValidation() {
-    await expect(this.page).toHaveURL(/dashboard/);
-  }
+async dashboardURLValidation() {
+  await expect(this.page).toHaveURL(/dashboard/);
+}
 
   async signOut() {
     await this.profileButton.click();
@@ -194,6 +193,31 @@ async addCustomChart(page, pictorialJSON) {
   await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"]').click();
   await this.page.keyboard.press('Control+A');
   await this.page.keyboard.press('Delete');
+}
+
+async navigateToDashboardFolder() {
+  await this.page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=otlp-production&folder=default");
+  await this.page.waitForTimeout(5000);
+  await this.page.getByRole('cell', { name: '7307881789123463472' }).click();
+  await this.page.waitForTimeout(5000);
+}
+
+async refreshDashboard() {
+  await this.page.waitForSelector('[data-test="dashboard-refresh-btn"]');
+  await this.page.locator('[data-test="dashboard-refresh-btn"]').click();
+  await this.page.waitForTimeout(10000);
+}
+
+async selectQuery4DayTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-4-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+  await this.page.waitForSelector('[data-test="date-time-apply-btn"]');
+  await this.page.locator('[data-test="date-time-apply-btn"]').click();
+  
+  
+
 }
 
 

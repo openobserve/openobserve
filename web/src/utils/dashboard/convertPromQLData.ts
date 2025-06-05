@@ -251,8 +251,7 @@ export const convertPromQLData = async (
       enterable: true,
       backgroundColor:
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-      extraCssText:
-        "max-height: 200px; overflow: auto; max-width: 500px; user-select: text;",
+      extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
@@ -658,8 +657,7 @@ export const convertPromQLData = async (
             store.state.theme === "dark"
               ? "rgba(0,0,0,1)"
               : "rgba(255,255,255,1)",
-          extraCssText:
-            "max-height: 200px; overflow: auto; max-width: 500px; user-select: text;",
+          extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
         };
 
         // Set coordinate system options

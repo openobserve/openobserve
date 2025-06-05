@@ -88,7 +88,7 @@ class PipelinePage:
                         "query_condition": {
                             "type": "sql",
                             "conditions": None,
-                            "sql": f"select * from {stream_name}",
+                            "sql": "select * from default",
                             "promql": None,
                             "promql_condition": None,
                             "aggregation": None,
