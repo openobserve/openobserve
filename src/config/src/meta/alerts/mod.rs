@@ -148,7 +148,11 @@ impl TriggerCondition {
         let minutes_to_subtract = match frequency {
             Some(freq) if freq > 0 => {
                 // Convert frequency from seconds to minutes
-                let frequency_minutes = freq / 60;
+                let mut frequency_minutes = freq / 60;
+
+                if frequency_minutes == 0 {
+                    frequency_minutes = 1;
+                }
 
                 // Calculate how many minutes to subtract to reach the previous interval boundary
                 let minutes_to_subtract = minute % frequency_minutes;
