@@ -368,11 +368,11 @@ mod tests {
         assert!(resp.status().is_success());
 
         // test case : ndjson
-        let body_str = r#"""
+        let body_str = r#"
                 { "index": "hec_test", "event": "test log", "time": 1749113798091 }
                 { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "fields": {"cluster":"c1", "namespace":"n1"} }
-                { "index": "hec_test", "event": {"log":"test log","severity":"info"} , "source" : "e2e_test", "fields": {"cluster":"c1", "namespace":"n1"}}
-            """#;
+                { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "source" : "e2e_test", "fields": {"cluster":"c1", "namespace":"n1"}}
+            "#;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/_hec", "e2e"))
             .insert_header(ContentType::json())

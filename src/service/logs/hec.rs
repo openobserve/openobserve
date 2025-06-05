@@ -36,14 +36,15 @@ pub async fn ingest(
     // for non ndjson, there will only be one item.
     for line in reader.lines() {
         let line = line?;
-        if line.is_empty() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
             continue;
         }
 
-        let value: HecEntry = match json::from_slice(line.as_bytes()) {
+        let value: HecEntry = match json::from_slice(trimmed.as_bytes()) {
             Ok(v) => v,
             Err(e) => {
-                log::info!("error in ingesting hec data : {e}");
+                log::info!("error in ingesting hec data '{trimmed}' : {e}");
                 return Ok(HecStatus::InvalidFormat.into());
             }
         };

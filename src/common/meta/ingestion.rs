@@ -393,6 +393,6 @@ impl From<HecStatus> for HecResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct HecResponse {
-    text: String,
-    code: u32,
+    pub text: String,
+    pub code: u32,
 }

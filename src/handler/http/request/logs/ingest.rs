@@ -431,7 +431,13 @@ pub async fn hec(
     };
 
     let mut resp = match logs::hec::ingest(**thread_id, &org_id, body, user_email).await {
-        Ok(v) => MetaHttpResponse::json(v),
+        Ok(v) => {
+            if v.code > 299 {
+                HttpResponse::BadRequest().json(v)
+            } else {
+                MetaHttpResponse::json(v)
+            }
+        }
         Err(e) => {
             log::error!("Error processing request {org_id}/_hec: {:?}", e);
             let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
