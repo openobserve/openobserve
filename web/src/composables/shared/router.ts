@@ -321,6 +321,7 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+      props: true,
     },
     {
       path: "rum",

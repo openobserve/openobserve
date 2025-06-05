@@ -1,7 +1,10 @@
 <template>
-  <div class="loading-container">
-    <div class="spinner"></div>
-    <div class="message">Redirecting...</div>
+  <div
+    data-test="loading-container"
+    class="tw-h-[100vh] tw-flex tw-flex-col tw-items-center tw-justify-center"
+  >
+    <q-spinner data-test="spinner" color="primary" size="3em" :thickness="2" />
+    <div data-test="message" class="message">Redirecting...</div>
   </div>
 </template>
 
@@ -13,7 +16,13 @@ import { useStore } from "vuex";
 
 export default defineComponent({
   name: "ShortUrl",
-  setup() {
+  props: {
+    id: {
+      type: String,
+      required: true,
+    },
+  },
+  setup(props, { emit }) {
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -41,10 +50,9 @@ export default defineComponent({
 
     const fetchAndRedirect = async () => {
       try {
-        const id = route.params.id as string;
         const response = await shortURL.get(
           store.state.selectedOrganization.identifier,
-          id,
+          props.id,
         );
 
         if (typeof response.data === "string") {
