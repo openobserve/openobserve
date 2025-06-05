@@ -25,10 +25,7 @@ test.describe("dashboard Import testcases", () => {
     const dashboardPage = new DashboardListPage(page);
     const dashboardImport = new DashboardImport(page);
 
-    await Promise.all([
-      waitForDashboardPage(page),
-      dashboardPage.menuItem("dashboards-item"),
-    ]);
+    await dashboardPage.menuItem("dashboards-item");
 
     // await waitForDashboardPage(page);
 
