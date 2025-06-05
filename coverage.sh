@@ -29,7 +29,7 @@ _cov_test() {
     cargo llvm-cov test \
         --workspace \
         --verbose \
-        --ignore-filename-regex job \
+        --ignore-filename-regex '.*job.*|.*mysql.*|.*postgres.*' \
         "$@"
 }
 
