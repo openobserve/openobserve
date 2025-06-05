@@ -63,6 +63,7 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
                 && !has_subquery(statement)
                 && !has_union(query)
                 && !has_window_functions(statement)
+                && !has_cte(query)
             {
                 return Ok(true);
             }
@@ -358,6 +359,11 @@ impl Visitor for WindowFunctionVisitor {
     }
 }
 
+fn has_cte(query: &Query) -> bool {
+    // Check if query has WITH clause (CTEs)
+    !query.with.is_none()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -576,6 +582,54 @@ mod tests {
                    )"#,
                 "Query with nested UNION should not be simple",
             ),
+            // Test case 11: Query with simple CTE (should be false)
+            (
+                r#"WITH user_totals AS (
+                     SELECT user_id, SUM(amount) as total
+                     FROM orders 
+                     GROUP BY user_id
+                   )
+                   SELECT COUNT(*) FROM user_totals WHERE total > 100"#,
+                "Query with simple CTE should not be simple",
+            ),
+            // Test case 12: Query with multiple CTEs (should be false)
+            (
+                r#"WITH sales_summary AS (
+                     SELECT region, SUM(amount) as total_sales
+                     FROM sales 
+                     GROUP BY region
+                   ),
+                   top_regions AS (
+                     SELECT region FROM sales_summary WHERE total_sales > 10000
+                   )
+                   SELECT COUNT(*) FROM top_regions"#,
+                "Query with multiple CTEs should not be simple",
+            ),
+            // Test case 13: Query with recursive CTE (should be false)
+            (
+                r#"WITH RECURSIVE hierarchy AS (
+                     SELECT id, parent_id, name, 1 as level
+                     FROM categories WHERE parent_id IS NULL
+                     UNION ALL
+                     SELECT c.id, c.parent_id, c.name, h.level + 1
+                     FROM categories c 
+                     JOIN hierarchy h ON c.parent_id = h.id
+                   )
+                   SELECT COUNT(*) FROM hierarchy"#,
+                "Query with recursive CTE should not be simple",
+            ),
+            // Test case 14: Query with CTE containing complex operations (should be false)
+            (
+                r#"WITH complex_cte AS (
+                     SELECT user_id, 
+                            ROW_NUMBER() OVER (ORDER BY created_at) as rank,
+                            SUM(amount) OVER (PARTITION BY region) as region_total
+                     FROM orders
+                     WHERE created_at >= '2024-01-01'
+                   )
+                   SELECT COUNT(*), AVG(region_total) FROM complex_cte"#,
+                "Query with CTE containing window functions should not be simple",
+            ),
         ];
 
         for (i, (query, description)) in queries.iter().enumerate() {
@@ -592,7 +646,6 @@ mod tests {
         }
     }
 
-    // Add a separate test for queries that SHOULD be simple
     #[test]
     fn check_is_simple_aggregate_for_simple_queries_should_be_true() {
         let queries = [
