@@ -195,16 +195,37 @@ fn has_join(query: &Query) -> bool {
 }
 
 fn has_union(query: &Query) -> bool {
-    if let SetExpr::SetOperation { .. } = *query.body {
-        return true;
-    }
-    false
+    let mut visitor = UnionVisitor::new();
+    query.visit(&mut visitor);
+    visitor.has_union
 }
 
 fn has_subquery(stat: &Statement) -> bool {
     let mut visitor = SubqueryVisitor::new();
     stat.visit(&mut visitor);
     visitor.is_subquery
+}
+
+struct UnionVisitor {
+    pub has_union: bool,
+}
+
+impl UnionVisitor {
+    fn new() -> Self {
+        Self { has_union: false }
+    }
+}
+
+impl Visitor for UnionVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::SetOperation { .. } = *query.body {
+            self.has_union = true;
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 struct SubqueryVisitor {
@@ -227,6 +248,19 @@ impl Visitor for SubqueryVisitor {
                 return ControlFlow::Break(());
             }
             _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        // Check for table subqueries in FROM clause
+        if let SetExpr::Select(select) = query.body.as_ref() {
+            for table_with_joins in &select.from {
+                if let sqlparser::ast::TableFactor::Derived { .. } = &table_with_joins.relation {
+                    self.is_subquery = true;
+                    return ControlFlow::Break(());
+                }
+            }
         }
         ControlFlow::Continue(())
     }
