@@ -13,7 +13,7 @@ use crate::{
 #[derive(Deserialize, Clone)]
 struct HecEntry {
     index: String,
-    timestamp: Option<i64>,
+    time: Option<i64>,
     fields: Option<json::Value>,
     event: json::Value,
 }
@@ -54,7 +54,7 @@ pub async fn ingest(
             json::Value::Object(_) => value.event.to_owned(),
             _ => return Ok(HecStatus::InvalidFormat.into()),
         };
-        if let Some(s) = value.timestamp {
+        if let Some(s) = value.time {
             data["_timestamp"] = s.into();
         }
         if let Some(fields) = value.fields {

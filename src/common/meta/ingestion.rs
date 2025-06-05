@@ -81,7 +81,7 @@ pub struct StreamSchemaChk {
     pub has_metadata: bool,
 }
 
-pub const INGESTION_EP: [&str; 14] = [
+pub const INGESTION_EP: [&str; 15] = [
     "_bulk",
     "_json",
     "_multi",
@@ -96,6 +96,7 @@ pub const INGESTION_EP: [&str; 14] = [
     "logs",
     "metrics",
     "_json_arrow",
+    "_hec",
 ];
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
