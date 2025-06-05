@@ -325,6 +325,7 @@ pub enum IngestionRequest<'a> {
     KinesisFH(&'a KinesisFHRequest),
     RUM(&'a web::Bytes),
     Usage(&'a web::Bytes),
+    Hec(&'a Vec<json::Value>),
 }
 
 pub enum IngestionData<'a> {
@@ -365,4 +366,32 @@ pub enum IngestionDataIter<'a> {
         std::vec::IntoIter<json::Value>,
         Option<KinesisFHIngestionResponse>,
     ),
+}
+
+pub enum HecStatus {
+    Success,
+    InvalidFormat,
+    InvalidIndex,
+    Custom(String, u32),
+}
+
+impl From<HecStatus> for HecResponse {
+    fn from(value: HecStatus) -> Self {
+        let (text, code) = match value {
+            HecStatus::Success => ("Success".to_string(), 200),
+            HecStatus::InvalidFormat => ("Invalid data format".to_string(), 400),
+            HecStatus::InvalidIndex => ("Incorrect index".to_string(), 400),
+            HecStatus::Custom(s, c) => (s, c),
+        };
+        Self {
+            text: text.to_string(),
+            code,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct HecResponse {
+    text: String,
+    code: u32,
 }
