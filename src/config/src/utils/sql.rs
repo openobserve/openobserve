@@ -58,20 +58,22 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
 pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
+        if has_subquery(statement) || has_window_functions(statement) {
+            return Ok(false);
+        }
         if let Statement::Query(query) = statement {
-            if is_aggregate_in_select(query)
-                && !has_join(query)
-                && !has_subquery(statement)
-                && !has_union(query)
-                && !has_window_functions(statement)
-                && !has_cte(query)
-                && !has_distinct(query)
+            if !is_aggregate_in_select(query)
+                || has_join(query)
+                || has_union(query)
+                || has_cte(query)
+                // TODO: check if it can be supported
+                || has_distinct(query)
             {
-                return Ok(true);
+                return Ok(false);
             }
         }
     }
-    Ok(false)
+    Ok(true)
 }
 
 /// distinct with no group by
@@ -760,6 +762,63 @@ mod tests {
                 "Failed test case [{}]: '{}' - should be simple but returned false",
                 i, description
             );
+        }
+    }
+
+    #[test]
+    fn check_is_simple_aggregate_for_complex_queries_should_be_false_2() {
+        let queries = [r#"
+            SELECT 
+                SUM(event_count) OVER (PARTITION BY time_bucket) AS total_events,
+                time_bucket,
+                (
+                    SUM(error_events) OVER (PARTITION BY time_bucket) / 
+                    SUM(event_count) OVER (PARTITION BY time_bucket)
+                ) AS error_rate,
+                (
+                    CASE 
+                        WHEN (SUM(error_events) OVER (PARTITION BY time_bucket) / 
+                              SUM(event_count) OVER (PARTITION BY time_bucket)) > 0.001 
+                             AND SUM(event_count) OVER (PARTITION BY time_bucket) > 1 
+                        THEN 1 
+                        ELSE 0 
+                    END
+                ) AS alert_flag,
+                ROW_NUMBER() OVER (PARTITION BY time_bucket) AS row_num
+            FROM (
+                SELECT 
+                    histogram(event_time, '5 minutes') AS time_bucket,
+                    0 AS error_events,
+                    'source_a' AS source_type,
+                    CAST(COUNT(event_time) AS FLOAT) AS event_count
+                FROM "event_logs_source_a"
+                WHERE service_name = 'service-a'
+                    AND (
+                        path = '/' OR path LIKE '/?%' OR path = '/variant' OR path LIKE '/variant?%'
+                    )
+                GROUP BY time_bucket
+    
+                UNION ALL
+    
+                SELECT 
+                    histogram(event_time, '5 minutes') AS time_bucket,
+                    CAST(SUM(CASE WHEN status_code = '500' THEN 1 END) AS FLOAT) AS error_events,
+                    'source_b' AS source_type,
+                    CAST(COUNT(event_time) AS FLOAT) AS event_count
+                FROM "event_logs_source_b"
+                WHERE url LIKE 'https://example.com/%'
+                    AND metric_name LIKE 'query_%'
+                    AND category = 'log'
+                GROUP BY time_bucket
+                ORDER BY time_bucket
+            )
+            LIMIT 500000
+            "#];
+
+        for (i, query) in queries.iter().enumerate() {
+            let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
+            println!("Query [{}] is_simple: {:?}", i, is_simple_aggregate);
+            assert_eq!(is_simple_aggregate, false);
         }
     }
 }
