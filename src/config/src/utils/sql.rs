@@ -402,7 +402,7 @@ impl Visitor for WindowFunctionVisitor {
 
 fn has_cte(query: &Query) -> bool {
     // Check if query has WITH clause (CTEs)
-    !query.with.is_none()
+    query.with.is_some()
 }
 
 #[cfg(test)]
