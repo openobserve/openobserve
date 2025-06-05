@@ -66,8 +66,6 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
                 || has_join(query)
                 || has_union(query)
                 || has_cte(query)
-                // TODO: check if it can be supported
-                || has_distinct(query)
             {
                 return Ok(false);
             }
@@ -673,40 +671,6 @@ mod tests {
                    SELECT COUNT(*), AVG(region_total) FROM complex_cte"#,
                 "Query with CTE containing window functions should not be simple",
             ),
-            // Test case 15: Query with DISTINCT (should be false)
-            (
-                r#"SELECT DISTINCT user_id, COUNT(*) 
-                   FROM events 
-                   GROUP BY user_id"#,
-                "Query with DISTINCT should not be simple",
-            ),
-            // Test case 16: Query with DISTINCT and aggregate (should be false)
-            (
-                r#"SELECT DISTINCT region, SUM(amount) as total
-                   FROM sales 
-                   GROUP BY region"#,
-                "Query with DISTINCT and aggregate should not be simple",
-            ),
-            // Test case 17: Query with DISTINCT on multiple columns (should be false)
-            (
-                r#"SELECT DISTINCT user_id, product_id, COUNT(*) as purchase_count
-                   FROM purchases
-                   GROUP BY user_id, product_id"#,
-                "Query with DISTINCT on multiple columns should not be simple",
-            ),
-            // Test case 18: Query with COUNT(DISTINCT) (should be false)
-            (
-                r#"SELECT COUNT(DISTINCT user_id) as unique_users,
-                          SUM(amount) as total_amount
-                   FROM orders"#,
-                "Query with COUNT(DISTINCT) should not be simple",
-            ),
-            // Test case 19: Query with DISTINCT and no group by (should be false)
-            (
-                r#"SELECT DISTINCT user_id
-                   FROM orders"#,
-                "Query with DISTINCT and no group by should not be simple",
-            ),
         ];
 
         for (i, (query, description)) in queries.iter().enumerate() {
@@ -748,6 +712,40 @@ mod tests {
                    GROUP BY category 
                    HAVING COUNT(*) > 5"#,
                 "Aggregate with GROUP BY and HAVING should be simple",
+            ),
+            // Test case 5: Query with DISTINCT (should be true)
+            (
+                r#"SELECT DISTINCT user_id, COUNT(*) 
+                   FROM events 
+                   GROUP BY user_id"#,
+                "Query with DISTINCT should be simple",
+            ),
+            // Test case 6: Query with DISTINCT and aggregate (should be true)
+            (
+                r#"SELECT DISTINCT region, SUM(amount) as total
+                   FROM sales 
+                   GROUP BY region"#,
+                "Query with DISTINCT and aggregate should be simple",
+            ),
+            // Test case 7: Query with DISTINCT on multiple columns (should be true)
+            (
+                r#"SELECT DISTINCT user_id, product_id, COUNT(*) as purchase_count
+                   FROM purchases
+                   GROUP BY user_id, product_id"#,
+                "Query with DISTINCT on multiple columns should be simple",
+            ),
+            // Test case 8: Query with COUNT(DISTINCT) (should be true)
+            (
+                r#"SELECT COUNT(DISTINCT user_id) as unique_users,
+                          SUM(amount) as total_amount
+                   FROM orders"#,
+                "Query with COUNT(DISTINCT) should be simple",
+            ),
+            // Test case 9: Query with DISTINCT and no group by (should be true)
+            (
+                r#"SELECT DISTINCT user_id
+                   FROM orders"#,
+                "Query with DISTINCT and no group by should be simple",
             ),
         ];
 
