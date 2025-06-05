@@ -139,8 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-tooltip>
         </q-btn>
+        {{ isPartialData }}
         <q-btn
-          v-if="isPartialData"
+          v-if="isPartialData && !isPanelLoading"
           :icon="outlinedWarning"
           flat
           size="xs"
