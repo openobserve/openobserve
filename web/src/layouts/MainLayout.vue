@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             loading="lazy"
             :src="
               store?.state?.theme == 'dark'
-                ? getImageURL('images/common/open_observe_logo_2.svg')
-                : getImageURL('images/common/open_observe_logo.svg')
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
             "
             @click="goToHome"
           />
@@ -70,7 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img
             class="appLogo"
             loading="lazy"
-            :src="getImageURL('images/common/open_observe_logo.svg')"
+            :src="
+              store?.state?.theme == 'dark'
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
             @click="goToHome"
           />
         </div>
@@ -1402,9 +1406,7 @@ export default defineComponent({
   }
 
   .appLogo {
-    margin-left: 0.5rem;
-    margin-right: 0;
-    width: 150px;
+    width: 120px;
     max-width: 150px;
     max-height: 31px;
     cursor: pointer;

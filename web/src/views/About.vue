@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <img
         :src="
           store.state.theme == 'dark'
-            ? getImageURL('images/common/open_observe_logo_2.svg')
-            : getImageURL('images/common/open_observe_logo.svg')
+            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+            : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
         class="logo"
         width="177"
@@ -122,7 +122,8 @@ export default defineComponent({
   }
 
   .logo {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.1rem;
+    margin-left: -0.5rem;
     display: block;
   }
 
