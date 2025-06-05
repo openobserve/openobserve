@@ -286,7 +286,8 @@ impl StreamingAggsCache {
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
             log::info!(
-                "[StreamingAggs] remove the oldest entry: max_entries={}, current_entries={}",
+                "[StreamingAggs] [streaming_id: {}] remove the oldest entry: max_entries={}, current_entries={}",
+                k,
                 self.max_entries,
                 w.len()
             );
