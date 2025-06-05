@@ -173,7 +173,7 @@ pub async fn search(
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
     );
-    if in_req.query.streaming_output {
+    if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
     if let Some(v) = in_req.local_mode {
@@ -760,7 +760,7 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        streaming_output: req.streaming_output,
+        streaming_output: req.streaming_output && is_streaming_aggregate,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),
     };
