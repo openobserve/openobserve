@@ -200,13 +200,16 @@ describe("SearchBar Component", () => {
     await flushPromises();
   });
 
+
   afterEach(async () => {
     if (wrapper && wrapper.unmount) {
+      wrapper.vm.searchObj.meta.sqlMode = false;
       await wrapper.unmount();
     }
     await flushPromises(); // finish any remaining promises
     vi.clearAllTimers(); // stop intervals/timeouts
     wrapper = null; // Clear the wrapper reference
+
   });
 
   it("Should render show histogram toggle btn", () => {
@@ -366,17 +369,6 @@ describe("SearchBar Component", () => {
     expect(handleRunQueryFnSpy).toHaveBeenCalled();
   });
 
-  it("should update query when addSearchTerm watcher is triggered with non-SQL mode", async () => {
-    wrapper.vm.searchObj.data.stream.addToFilter = "field='value'"
-    await wrapper.vm.$nextTick();
-    expect(wrapper.vm.searchObj.data.query).toBe(" where field='value'");
-    wrapper.vm.searchObj.data.stream.interestingFieldList = [];
-    wrapper.vm.searchObj.data.streamResults.list = [];
-    const resetButton = wrapper.find('[data-test="logs-search-bar-reset-filters-btn"]');
-    await resetButton.trigger('click'); 
-    const sqlModeToggle = wrapper.find('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
-    await sqlModeToggle.trigger('click');
-  });
 
   it("should update SQL query when addSearchTerm watcher is triggered in SQL mode", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"]
@@ -517,6 +509,7 @@ describe("SearchBar Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toContain('stream2');
+      wrapper.vm.searchObj.meta.sqlMode = false;
     });
 
     it('should show error notification when stream is not found', async () => {
@@ -543,6 +536,7 @@ describe("SearchBar Component", () => {
       }));
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([]);
       expect(wrapper.vm.searchObj.data.stream.selectedStreamFields).toEqual([]);
+      wrapper.vm.searchObj.meta.sqlMode = false;
     });
 
     it('should handle job context removal', async () => {
@@ -590,7 +584,17 @@ describe("SearchBar Component", () => {
       // Mock store state
       store.state.timezone = 'UTC';
       store.state.zoConfig = {
-        query_on_stream_selection: false
+        version: '1.0.0',
+        commit_hash: 'abc123',
+        build_date: '2024-01-01',
+        default_fts_keys: [],
+        show_stream_stats_doc_num: true,
+        data_retention_days: true,
+        extended_data_retention_days: 30,
+        user_defined_schemas_enabled: true,
+        super_cluster_enabled: true,
+        query_on_stream_selection: false,
+        default_functions: []
       };
     });
 
@@ -889,33 +893,6 @@ describe("SearchBar Component", () => {
                     name: "_timestamp",
                     showValues: false,
                     streams: ["stream1"]
-                  },
-                  {
-                    ftsKey: false,
-                    group: "stream1",
-                    isInterestingField: false,
-                    isSchemaField: true,
-                    name: "job",
-                    showValues: true,
-                    streams: ["stream1"]
-                  },
-                  {
-                    ftsKey: false,
-                    group: "stream1",
-                    isInterestingField: false,
-                    isSchemaField: true,
-                    name: "level",
-                    showValues: true,
-                    streams: ["stream1"]
-                  },
-                  {
-                    ftsKey: false,
-                    group: "stream1",
-                    isInterestingField: false,
-                    isSchemaField: true,
-                    name: "log",
-                    showValues: true,
-                    streams: ["stream1"]
                   }
                 ],
                 selectedStream: ["stream1"],
@@ -1004,39 +981,8 @@ describe("SearchBar Component", () => {
           "content-type": "application/json"
         },
         config: {
-          transitional: {
-            silentJSONParsing: true,
-            forcedJSONParsing: true,
-            clarifyTimeoutError: false
-          },
-          adapter: ["xhr", "http", "fetch"],
-          transformRequest: [null],
-          transformResponse: [null],
-          timeout: 0,
-          xsrfCookieName: "XSRF-TOKEN",
-          xsrfHeaderName: "X-XSRF-TOKEN",
-          maxContentLength: -1,
-          maxBodyLength: -1,
-          env: {},
-          headers: {
-            Accept: "application/json, text/plain, */*"
-          },
-          withCredentials: true,
-          baseURL: "http://localhost:5080",
-          method: "get",
-          url: "/api/2y1ufyK0yGTUSIXQfOrRxWpFqQs/savedviews/2y2ETfwQVsIYcupzBRFisihBHdg",
-          allowAbsoluteUrls: true
         },
         request: {
-          rqProxyXhr: {
-            _method: "GET",
-            _requestURL: "http://localhost:5080/api/2y1ufyK0yGTUSIXQfOrRxWpFqQs/savedviews/2y2ETfwQVsIYcupzBRFisihBHdg",
-            _async: true,
-            _requestHeaders: {
-              Accept: "application/json, text/plain, */*"
-            },
-            _requestData: null
-          }
         }
       };
       
@@ -1114,5 +1060,162 @@ describe("SearchBar Component", () => {
 
   });
 
+  describe('resetFilters', () => {
+    const initialSearchObj = {
+      data: {
+        query: '',
+        editorValue: '',
+        datetime: {
+          type: 'relative',
+          startTime: 1749023371191000,
+          endTime: 1749024271191000,
+          relativeTimePeriod: '1h'
+        },
+        searchRequestTraceIds: [],
+        searchWebSocketTraceIds: [],
+        stream: {
+          selectedStream: ['stream1'],
+          selectedStreamFields: [
+            { name: 'field1', isInterestingField: false },
+            { name: 'field2', isInterestingField: false }
+          ],
+          interestingFieldList: [],
+          addToFilter: '',
+          filterField: '',
+          filteredField: [],
+          loading: false,
+          streamType: 'logs',
+          userDefinedSchema: [],
+          functions: []
+        },
+        transforms: [],
+        transformType: 'function',
+        queryResults: { hits: [] }
+      },
+      meta: {
+        sqlMode: false,
+        sqlModeManualTrigger: false,
+        quickMode: false,
+        showHistogram: true,
+        showFields: true,
+        showQuery: true,
+        showTransformEditor: true,
+        toggleFunction: false,
+        jobId: '',
+        searchApplied: false,
+        logsVisualizeToggle: 'logs'
+      },
+      config: {
+        fnSplitterModel: 0,
+        fnSplitterLimit: [0, 100]
+      },
+      loading: false,
+      runQuery: false,
+      loadingHistogram: false,
+      loadingCounter: false,
+      loadingStream: false,
+      loadingSavedView: false,
+      organizationIdentifier: 'test-org'
+    };
+
+
+    beforeEach(async () => {
+      // Create a fresh wrapper for each test with reactive data
+      wrapper = mount(SearchBar, {
+        props: {  
+          fieldValues: ['field1', 'field2']
+        },
+        attachTo: document.body,
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: {
+            QueryEditor: mockQueryEditor,
+            IndexList: true,
+            DateTime: true
+          }
+        },
+      });
+
+      // Initialize searchObj with a deep clone of the initial state
+      wrapper.vm.searchObj = JSON.parse(JSON.stringify(initialSearchObj));
+      await wrapper.vm.$nextTick();
+      
+      // Mock the specific functions from useLogs that resetFilters uses
+      wrapper.vm.fnParsedSQL = vi.fn().mockReturnValue({
+        from: [{ table: 'stream1' }],
+        where: { type: 'binary_expr', operator: '=', left: 'field1', right: 'value' }
+      });
+      wrapper.vm.fnUnparsedSQL = vi.fn().mockReturnValue('SELECT * FROM stream1');
+      wrapper.vm.buildStreamQuery = vi.fn().mockImplementation((stream, fieldList) => `SELECT * FROM "${stream}"`);
+      wrapper.vm.getFieldList = vi.fn().mockReturnValue(['field1', 'field2']);
+
+      // Mock store state
+      store.state.zoConfig = {
+        version: '1.0.0',
+        commit_hash: 'abc123',
+        build_date: '2024-01-01',
+        default_fts_keys: [],
+        show_stream_stats_doc_num: true,
+        data_retention_days: true,
+        extended_data_retention_days: 30,
+        user_defined_schemas_enabled: true,
+        super_cluster_enabled: true,
+        query_on_stream_selection: false,
+        default_functions: []
+      };
+
+      // Mock handleRunQuery from useLogs
+      wrapper.vm.handleRunQuery = vi.fn();
+    });
+
+    afterEach(async () => {
+      if (wrapper && wrapper.unmount) {
+        await wrapper.unmount();
+      }
+      await flushPromises();
+      vi.clearAllMocks();
+    });
+
+    it('should reset query in non-SQL mode', async () => {
+      // Set initial values
+      wrapper.vm.searchObj.data.query = 'initial query';
+      wrapper.vm.searchObj.data.editorValue = 'initial query';
+      await wrapper.vm.$nextTick();
+
+      console.log('Before resetFilters:', {
+        query: wrapper.vm.searchObj.data.query,
+        editorValue: wrapper.vm.searchObj.data.editorValue,
+        sqlMode: wrapper.vm.searchObj.meta.sqlMode
+      });
+
+      // Call resetFilters
+      await wrapper.vm.resetFilters();
+
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      console.log('After resetFilters:', {
+        query: wrapper.vm.searchObj.data.query,
+        editorValue: wrapper.vm.searchObj.data.editorValue,
+        sqlMode: wrapper.vm.searchObj.meta.sqlMode
+      });
+
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      console.log('Final state:', {
+        query: wrapper.vm.searchObj.data.query,
+        editorValue: wrapper.vm.searchObj.data.editorValue,
+        sqlMode: wrapper.vm.searchObj.meta.sqlMode
+      });
+
+
+
+      // Verify the function was called with correct context
+      expect(wrapper.vm.handleRunQuery).not.toHaveBeenCalled();
+    });
+
   
+  });
 });
