@@ -28,17 +28,6 @@ test.describe.configure({ mode: "parallel" });
 // Refactored test cases using Page Object Model
 
 test.describe("dashboard UI testcases", () => {
-  let dashboardCreate;
-  let dashboardList;
-  let dashboardActions;
-  let dashboardDrilldown;
-  let dashboardRefresh;
-  let chartTypeSelector;
-  let dashboardPanel;
-  let dashboardPanelConfigs;
-  let dashboardShareExport;
-  let dashboardSetting;
-
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(1000);
@@ -50,20 +39,15 @@ test.describe("dashboard UI testcases", () => {
     );
   });
   test("should add and delete the dashboard", async ({ page }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    dashboardPanel = new DashboardPanel(page);
-    chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
 
-    dashboardPanelConfigs = new DashboardPanelConfigs(page);
-
+    // Navigate to the dashboard list
     await dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
 
+    //create a new dashboard and delete it
     await dashboardCreate.createDashboard(randomDashboardName);
 
     await dashboardCreate.backToDashboardList();
@@ -75,13 +59,15 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should create a duplicate of the dashboard", async ({ page }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
+  test("should create a duplicate of the dashboard", async ({ page }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
 
+    //navigate to the dashboard list
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    //create a new dashboard and duplicate it
     await dashboardCreate.createDashboard(randomDashboardName);
 
     await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
@@ -91,11 +77,22 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
-    await dashboardCreate.searchDashboard(randomDashboardName);
 
+    // Search for the created dashboard
+    await dashboardCreate.searchDashboard(randomDashboardName);
     await dashboardList.duplicateDashboard(randomDashboardName);
-    await dashboardCreate.searchDashboard(randomDashboardName);
+    console.log("Duplicate dashboard created", randomDashboardName);
 
+    //Name of the duplicate dashboard
+
+    const duplicateDashboardName = randomDashboardName + " -" + " Copy";
+
+    // search dupliacte dashboard with its randomDashboardName +- Copy is added to the dashboard name
+    await dashboardCreate.searchDashboard(duplicateDashboardName);
+
+    // Delete the duplicate dashboard and original dashboard
+    await dashboardList.deleteDuplicateDashboard(page, duplicateDashboardName);
+    await dashboardCreate.searchDashboard(randomDashboardName);
     await deleteDashboard(page, randomDashboardName);
   });
 
@@ -217,7 +214,7 @@ test.describe("dashboard UI testcases", () => {
     // Fill in the SQL query
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator('.inputarea')
+      .locator(".inputarea")
       .fill(
         'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
       );
@@ -244,7 +241,6 @@ test.describe("dashboard UI testcases", () => {
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
 
     // Generate a unique panel name
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
@@ -285,22 +281,23 @@ test.describe("dashboard UI testcases", () => {
   test.skip("should navigate to another dashboard using the DrillDown feature.", async ({
     page,
   }) => {
-    dashboardCreate = new DashboardCreate(page);
-    dashboardList = new DashboardListPage(page);
-    dashboardActions = new DashboardactionPage(page);
-    dashboardDrilldown = new DashboardDrilldownPage(page);
-    dashboardRefresh = new DashboardTimeRefresh(page);
-    chartTypeSelector = new DashboardPanelConfigs(page);
-    dashboardPanel = new DashboardPanel(page);
-    chartTypeSelector = new ChartTypeSelector(page);
-    dashboardPanelConfigs = new DashboardPanelConfigs(page);
-
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardDrilldown = new DashboardDrilldownPage(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    // Create a new dashboard and add a panel
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
+
+    // Select chart type and stream
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField(
       "kubernetes_labels_app_kubernetes_io_component",
@@ -317,6 +314,7 @@ test.describe("dashboard UI testcases", () => {
 
     await dashboardActions.applyDashboardBtn();
 
+    // Add drilldown to another dashboard
     const drilldownName = dashboardDrilldown.generateUniqueDrilldownName();
     const folderName = "default";
     const tabName = "Default";
@@ -330,9 +328,13 @@ test.describe("dashboard UI testcases", () => {
     );
 
     await dashboardActions.applyDashboardBtn();
+
+    // Save the panel
     await dashboardActions.addPanelName(panelName);
     await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
+
+    //Delete the created dashboard
     await deleteDashboard(page, randomDashboardName);
   });
 
@@ -341,21 +343,23 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardAction = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardActions = new DashboardactionPage(page);
     const dashboardPanel = new DashboardPanel(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
 
     const dashboardRefresh = new DashboardTimeRefresh(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
+    // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Create a new dashboard and add a panel
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
+
+    // Select chart type and stream
     await chartTypeSelector.selectChartType("bar");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
@@ -387,12 +391,14 @@ test.describe("dashboard UI testcases", () => {
       );
     await dashboardRefresh.setRelative("3", "h");
 
-    await dashboardAction.savePanel();
+    await dashboardActions.savePanel();
 
     await dashboardPanel.editPanel(panelName);
-    await dashboardAction.applyDashboardBtn();
-    await dashboardAction.savePanel();
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.savePanel();
     await dashboardPanel.deletePanel(panelName);
+
+    // Return to dashboard list and delete the created dashboard
     await dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
     await deleteDashboard(page, randomDashboardName);
@@ -462,6 +468,7 @@ test.describe("dashboard UI testcases", () => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardShareExport = new DashboardShareExportPage(page);
     const dateTimeHelper = new DateTimeHelper(page);
+    const panelEdit = new DashboardPanel(page);
 
     const panelName = dashboardAction.generateUniquePanelName("panel-test");
 
@@ -498,13 +505,8 @@ test.describe("dashboard UI testcases", () => {
     await dashboardShareExport.shareDashboard();
     await expect(page.getByText("Link copied successfully")).toBeHidden();
 
-    // Test Fullscreen feature
-    await expect(
-      page.locator('[data-test="dashboard-fullscreen-btn"]')
-    ).toBeVisible();
-    await page.locator('[data-test="dashboard-fullscreen-btn"]').click();
-
-    await page.locator('[data-test="dashboard-viewpanel-close-btn"]').click();
+    // Hover over the panel container to make the fullscreen button visible
+    await panelEdit.fullscreenPanel(panelName);
 
     // Delete the panel
     await dashboardCreate.backToDashboardList();
@@ -520,7 +522,6 @@ test.describe("dashboard UI testcases", () => {
     const dashboardAction = new DashboardactionPage(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPanel = new DashboardPanel(page);
     const panelName = dashboardAction.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
@@ -559,8 +560,7 @@ test.describe("dashboard UI testcases", () => {
     );
     await dashboardAction.savePanel();
 
-    // Delete the panel
-    // await dashboardPanel.deletePanel(panelName);
+    // Back to dashboard list and delete the dashboard
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
@@ -687,7 +687,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardAction = new DashboardactionPage(page);
+    const dashboardActions = new DashboardactionPage(page);
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const dashboardDrilldown = new DashboardDrilldownPage(page);
@@ -704,7 +704,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Add a panel
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
     await chartTypeSelector.selectChartType("area");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
@@ -721,7 +721,7 @@ test.describe("dashboard UI testcases", () => {
     // Set date-time filter and timezone
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardTimeRefresh.setRelative("4", "w");
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Verify chart is visible
     await dashboardAction.waitForChartToRender();
@@ -732,8 +732,8 @@ test.describe("dashboard UI testcases", () => {
       drilldownName,
       "https://google.com"
     );
-    await dashboardAction.applyDashboardBtn();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.addPanelName(panelName);
     await dashboardActions.savePanel();
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
@@ -744,13 +744,10 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardAction = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const dashboardActions = new DashboardactionPage(page);
     const dashboardTimeRefresh = new DashboardTimeRefresh(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardAction.generateUniquePanelName("panel-test");
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardSetting = new DashboardSetting(page);
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -761,7 +758,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Add a panel
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
