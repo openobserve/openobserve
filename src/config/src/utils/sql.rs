@@ -676,6 +676,17 @@ mod tests {
                    SELECT COUNT(*), AVG(region_total) FROM complex_cte"#,
                 "Query with CTE containing window functions should not be simple",
             ),
+            // Test case 15: Query with histogram in subquery in FROM clause (should be false)
+            (
+                r#"SELECT SUM(x_axis_1) AS "y_axis_1"
+                   FROM (
+                     SELECT histogram(_timestamp) AS "xaxis",
+                            COUNT(_timestamp) AS "x_axis_1"
+                     FROM "default"
+                     GROUP BY xaxis
+                   )"#,
+                "Query with histogram in subquery should not be simple",
+            ),
         ];
 
         for (i, (query, description)) in queries.iter().enumerate() {
