@@ -149,6 +149,7 @@ mod tests {
         e2e_post_multi().await;
         e2e_post_trace().await;
         e2e_post_metrics().await;
+        e2e_post_hec().await;
         // e2e_post_kinesis_data().await;
 
         // streams
@@ -309,6 +310,71 @@ mod tests {
         .await;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_hec() {
+        let auth = setup();
+        let thread_id: usize = 0;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .app_data(web::Data::new(thread_id))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+
+        // test case : invalid index
+        let body_str = "{\"event\":\"hello\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_client_error());
+
+        // test case : valid payload
+        let body_str = "{\"event\":\"hello\",\"index\":\"hec_test\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // test case : json event
+        let body_str =
+            "{\"event\":{\"log\":\"hello\",\"severity\":\"info\"},\"index\":\"hec_test\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // test case : ndjson
+        let body_str = r#"""
+                { "index": "hec_test", "event": "test log", "time": 1749113798091 }
+                { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "fields": {"cluster":"c1", "namespace":"n1"} }
+                { "index": "hec_test", "event": {"log":"test log","severity":"info"} , "source" : "e2e_test", "fields": {"cluster":"c1", "namespace":"n1"}}
+            """#;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
