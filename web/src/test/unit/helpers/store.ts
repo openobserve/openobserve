@@ -18,7 +18,8 @@ import { createStore } from "vuex";
 const store = createStore({
   state: {
     API_ENDPOINT: "http://localhost:5080",
-
+    isAiChatEnabled: false,
+    
     theme: "dark",
     timezone: "UTC",
     selectedOrganization: {
@@ -49,7 +50,9 @@ const store = createStore({
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
+      sql_mode: false,
       version: "v0.2.0",
+      sql_mode_manual_trigger: false,
       commit_hash: "dc2b38c0f8be27bde395922d61134f09a3b4c",
       build_date: "2023-03-11T03:55:28Z",
       default_fts_keys: ["log", "message", "msg", "content", "data"],
