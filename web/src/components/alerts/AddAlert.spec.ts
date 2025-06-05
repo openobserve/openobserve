@@ -47,7 +47,7 @@ describe("AddAlert Component", () => {
   beforeEach(async () => {
     const updateStreamsMock = vi.fn().mockResolvedValue({ success: true });
 
-    vi.useFakeTimers();
+    
 
     wrapper = mount(AddAlert, {
       global: {

@@ -37,7 +37,7 @@ installQuasar({
 describe("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    vi.useFakeTimers();
+    
     wrapper = mount(DestinationList, {
       attachTo: "#app",
       global: {

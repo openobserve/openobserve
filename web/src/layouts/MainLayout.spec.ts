@@ -34,7 +34,7 @@ installQuasar({
 describe("Main Layout", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    vi.useFakeTimers();
+    
     wrapper = shallowMount(MainLayout, {
       global: {
         provide: {

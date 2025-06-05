@@ -36,7 +36,7 @@ document.body.appendChild(node);
 describe("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    vi.useFakeTimers();
+    
     wrapper = mount(AddTemplate, {
       attachTo: "#app",
       props: {
