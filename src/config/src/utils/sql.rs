@@ -206,15 +206,17 @@ impl Visitor for DistinctVisitor {
     fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
         // Check for DISTINCT inside functions like COUNT(DISTINCT column)
         // from field names, string literals, or comments containing "distinct"
-        if let Expr::Function(Function { args, .. }) = expr {
-            if let FunctionArguments::List(FunctionArgumentList {
-                duplicate_treatment: Some(DuplicateTreatment::Distinct),
-                ..
-            }) = args
-            {
-                self.has_distinct = true;
-                return ControlFlow::Break(());
-            }
+        if let Expr::Function(Function {
+            args:
+                FunctionArguments::List(FunctionArgumentList {
+                    duplicate_treatment: Some(DuplicateTreatment::Distinct),
+                    ..
+                }),
+            ..
+        }) = expr
+        {
+            self.has_distinct = true;
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
