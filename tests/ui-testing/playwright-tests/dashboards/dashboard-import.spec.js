@@ -21,14 +21,16 @@ test.describe("dashboard Import testcases", () => {
     );
     await orgNavigation;
   });
-
   test("should import the dashbaord", async ({ page }) => {
     const dashboardPage = new DashboardListPage(page);
     const dashboardImport = new DashboardImport(page);
 
-    await dashboardPage.menuItem("dashboards-item");
+    await Promise.all([
+      waitForDashboardPage(page),
+      dashboardPage.menuItem("dashboards-item"),
+    ]);
 
-    await waitForDashboardPage(page);
+    // await waitForDashboardPage(page);
 
     await dashboardImport.clickImportDashboard();
 
