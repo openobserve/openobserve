@@ -31,7 +31,7 @@ describe("Streams", async () => {
   let wrapper: any;
 
   beforeEach(async () => {
-    vi.useFakeTimers();
+    
     const updateStream = vi.spyOn(StreamService, "updateSettings");
 
     wrapper = mount(LogStream, {
@@ -171,7 +171,7 @@ describe("Streams", async () => {
   describe("When user make changes and update settings", () => {
     const updateStream = vi.spyOn(StreamService, "updateSettings");
 
-    vi.useFakeTimers();
+    
 
     let logPartition, timeStampCheckbox, updateSettingsButton: any;
     beforeEach(async () => {
@@ -670,7 +670,7 @@ describe("Streams", async () => {
       let wrapper: any;
 
       beforeEach(async () => {
-        vi.useFakeTimers();
+        
         wrapper = mount(LogStream, {
           props: {
             modelValue: {

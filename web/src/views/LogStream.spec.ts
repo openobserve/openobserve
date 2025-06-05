@@ -38,7 +38,7 @@ installQuasar({
 describe("Streams", async () => {
   let wrapper: any;
   beforeEach(() => {
-    vi.useFakeTimers();
+    
     wrapper = mount(LogStream, {
       props: {
         currOrgIdentifier: "zinc_next",
