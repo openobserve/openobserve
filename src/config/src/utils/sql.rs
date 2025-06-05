@@ -16,7 +16,10 @@
 use std::ops::ControlFlow;
 
 use sqlparser::{
-    ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr, Statement, Visit, Visitor},
+    ast::{
+        DuplicateTreatment, Expr, Function, FunctionArgumentList, FunctionArguments, GroupByExpr,
+        Query, SelectItem, SetExpr, Statement, Visit, Visitor,
+    },
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -202,11 +205,13 @@ impl Visitor for DistinctVisitor {
 
     fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
         // Check for DISTINCT inside functions like COUNT(DISTINCT column)
-        // For now, this is a simplified check - we could enhance it further if needed
+        // from field names, string literals, or comments containing "distinct"
         if let Expr::Function(Function { args, .. }) = expr {
-            // Convert the function arguments to string and check for DISTINCT
-            let args_str = format!("{:?}", args);
-            if args_str.to_lowercase().contains("distinct") {
+            if let FunctionArguments::List(FunctionArgumentList {
+                duplicate_treatment: Some(DuplicateTreatment::Distinct),
+                ..
+            }) = args
+            {
                 self.has_distinct = true;
                 return ControlFlow::Break(());
             }
