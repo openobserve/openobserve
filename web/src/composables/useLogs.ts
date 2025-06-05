@@ -1588,7 +1588,7 @@ const useLogs = () => {
         !searchObj.meta.sqlMode;
 
       // Determine communication method based on available options and constraints
-      if (shouldUseStreaming) {
+      if (shouldUseStreaming && !isMultiStreamSearch) {
         searchObj.communicationMethod = "streaming";
       } else if (shouldUseWebSocket && !isMultiStreamSearch) {
         searchObj.communicationMethod = "ws";
