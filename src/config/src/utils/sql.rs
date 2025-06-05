@@ -487,58 +487,151 @@ mod tests {
 
     #[test]
     fn check_is_simple_aggregate_for_complex_queries_should_be_false() {
-        let queries = [r#"
-            SELECT 
-                SUM(event_count) OVER (PARTITION BY time_bucket) AS total_events,
-                time_bucket,
-                (
-                    SUM(error_events) OVER (PARTITION BY time_bucket) / 
-                    SUM(event_count) OVER (PARTITION BY time_bucket)
-                ) AS error_rate,
-                (
-                    CASE 
-                        WHEN (SUM(error_events) OVER (PARTITION BY time_bucket) / 
-                              SUM(event_count) OVER (PARTITION BY time_bucket)) > 0.001 
-                             AND SUM(event_count) OVER (PARTITION BY time_bucket) > 1 
-                        THEN 1 
-                        ELSE 0 
-                    END
-                ) AS alert_flag,
-                ROW_NUMBER() OVER (PARTITION BY time_bucket) AS row_num
-            FROM (
-                SELECT 
-                    histogram(event_time, '5 minutes') AS time_bucket,
-                    0 AS error_events,
-                    'source_a' AS source_type,
-                    CAST(COUNT(event_time) AS FLOAT) AS event_count
-                FROM "event_logs_source_a"
-                WHERE service_name = 'service-a'
-                    AND (
-                        path = '/' OR path LIKE '/?%' OR path = '/variant' OR path LIKE '/variant?%'
-                    )
-                GROUP BY time_bucket
-    
-                UNION ALL
-    
-                SELECT 
-                    histogram(event_time, '5 minutes') AS time_bucket,
-                    CAST(SUM(CASE WHEN status_code = '500' THEN 1 END) AS FLOAT) AS error_events,
-                    'source_b' AS source_type,
-                    CAST(COUNT(event_time) AS FLOAT) AS event_count
-                FROM "event_logs_source_b"
-                WHERE url LIKE 'https://example.com/%'
-                    AND metric_name LIKE 'query_%'
-                    AND category = 'log'
-                GROUP BY time_bucket
-                ORDER BY time_bucket
-            )
-            LIMIT 500000
-            "#];
+        let queries = [
+            // Test case 1: Query with JOINs (should be false)
+            (
+                r#"SELECT COUNT(*), SUM(a.value) 
+                   FROM table_a a 
+                   JOIN table_b b ON a.id = b.id"#,
+                "Query with JOIN should not be simple",
+            ),
+            // Test case 2: Query with table subquery in FROM clause (should be false)
+            (
+                r#"SELECT COUNT(*), AVG(total) 
+                   FROM (SELECT SUM(value) as total FROM events GROUP BY user_id) subq"#,
+                "Query with table subquery should not be simple",
+            ),
+            // Test case 3: Query with expression subquery (should be false)
+            (
+                r#"SELECT COUNT(*), AVG(salary) 
+                   FROM employees 
+                   WHERE department_id IN (SELECT id FROM departments WHERE active = 1)"#,
+                "Query with expression subquery should not be simple",
+            ),
+            // Test case 4: Query with UNION (should be false)
+            (
+                r#"SELECT COUNT(*) FROM (
+                     SELECT user_id FROM events_2023 
+                     UNION ALL 
+                     SELECT user_id FROM events_2024
+                   ) combined"#,
+                "Query with UNION should not be simple",
+            ),
+            // Test case 5: Query with window functions (should be false)
+            (
+                r#"SELECT COUNT(*), 
+                          SUM(value) OVER (PARTITION BY category) as window_sum
+                   FROM events"#,
+                "Query with window functions should not be simple",
+            ),
+            // Test case 6: Query with multiple window functions (should be false)
+            (
+                r#"SELECT user_id, event_time,
+                          ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_time) as row_num,
+                          SUM(value) OVER (PARTITION BY user_id) as user_total
+                   FROM events"#,
+                "Query with multiple window functions should not be simple",
+            ),
+            // Test case 7: Complex query with multiple complexity factors (should be false)
+            (
+                r#"SELECT 
+                     SUM(event_count) OVER (PARTITION BY time_bucket) AS total_events,
+                     time_bucket,
+                     ROW_NUMBER() OVER (PARTITION BY time_bucket) AS row_num
+                   FROM (
+                     SELECT histogram(event_time, '5 minutes') AS time_bucket,
+                            COUNT(event_time) AS event_count
+                     FROM events_a
+                     GROUP BY time_bucket
+                     UNION ALL
+                     SELECT histogram(event_time, '5 minutes') AS time_bucket,
+                            COUNT(event_time) AS event_count
+                     FROM events_b
+                     GROUP BY time_bucket
+                   )"#,
+                "Query with subquery + union + window functions should not be simple",
+            ),
+            // Test case 8: Query with EXISTS subquery (should be false)
+            (
+                r#"SELECT COUNT(*), AVG(amount) 
+                   FROM orders o
+                   WHERE EXISTS (SELECT 1 FROM customers c WHERE c.id = o.customer_id AND c.active = 1)"#,
+                "Query with EXISTS subquery should not be simple",
+            ),
+            // Test case 9: Query with self-join (should be false)
+            (
+                r#"SELECT COUNT(*), SUM(a.value + b.value)
+                   FROM events a
+                   JOIN events b ON a.user_id = b.user_id AND a.event_time > b.event_time"#,
+                "Query with self-join should not be simple",
+            ),
+            // Test case 10: Query with nested UNION (should be false)
+            (
+                r#"SELECT total FROM (
+                     SELECT SUM(amount) as total FROM sales_q1
+                     UNION
+                     (SELECT SUM(amount) as total FROM sales_q2
+                      UNION 
+                      SELECT SUM(amount) as total FROM sales_q3)
+                   )"#,
+                "Query with nested UNION should not be simple",
+            ),
+        ];
 
-        for (i, query) in queries.iter().enumerate() {
+        for (i, (query, description)) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
-            println!("Query [{}] is_simple: {:?}", i, is_simple_aggregate);
-            assert_eq!(is_simple_aggregate, false);
+            println!(
+                "Query [{}]: {} - is_simple: {:?}",
+                i, description, is_simple_aggregate
+            );
+            assert_eq!(
+                is_simple_aggregate, false,
+                "Failed test case [{}]: '{}' - should not be simple but returned true",
+                i, description
+            );
+        }
+    }
+
+    // Add a separate test for queries that SHOULD be simple
+    #[test]
+    fn check_is_simple_aggregate_for_simple_queries_should_be_true() {
+        let queries = [
+            // Test case 1: Basic COUNT
+            (
+                r#"SELECT COUNT(*) FROM events"#,
+                "Simple COUNT query should be simple",
+            ),
+            // Test case 2: SUM with GROUP BY
+            (
+                r#"SELECT user_id, SUM(amount) FROM orders GROUP BY user_id"#,
+                "Simple SUM with GROUP BY should be simple",
+            ),
+            // Test case 3: Multiple aggregates
+            (
+                r#"SELECT COUNT(*), AVG(price), MAX(created_at) FROM products WHERE active = 1"#,
+                "Multiple aggregates with WHERE should be simple",
+            ),
+            // Test case 4: Aggregate with GROUP BY and HAVING
+            (
+                r#"SELECT category, COUNT(*), AVG(price) 
+                   FROM products 
+                   GROUP BY category 
+                   HAVING COUNT(*) > 5"#,
+                "Aggregate with GROUP BY and HAVING should be simple",
+            ),
+        ];
+
+        for (i, (query, description)) in queries.iter().enumerate() {
+            let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
+            println!(
+                "Simple Query [{}]: {} - is_simple: {:?}",
+                i, description, is_simple_aggregate
+            );
+            assert_eq!(
+                is_simple_aggregate, true,
+                "Failed test case [{}]: '{}' - should be simple but returned false",
+                i, description
+            );
         }
     }
 }
