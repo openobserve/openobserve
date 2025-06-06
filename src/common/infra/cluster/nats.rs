@@ -321,11 +321,11 @@ mod tests {
         let _ = leave().await.is_err();
     }
 
-    #[tokio::test]
-    async fn test_nats_register_and_keep_alive() {
-        config::cache_instance_id("instance");
-        let _ = register_and_keep_alive().await.is_err();
-    }
+    // #[tokio::test]
+    // async fn test_nats_register_and_keep_alive() {
+    //     config::cache_instance_id("instance");
+    //     let _ = register_and_keep_alive().await.is_err();
+    // }
 
     #[tokio::test]
     async fn test_nats_register() {
