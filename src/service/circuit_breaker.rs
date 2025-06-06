@@ -189,9 +189,11 @@ impl CircuitBreaker {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::Duration;
+
     use tokio::time;
+
+    use super::*;
 
     // Helper function to create a test circuit breaker with custom parameters
     fn create_test_circuit_breaker(
@@ -216,12 +218,15 @@ mod tests {
     #[test]
     fn test_circuit_breaker_new() {
         let cb = create_test_circuit_breaker(5, 3, 10, 2000);
-        
+
         assert_eq!(cb.watching_window, 5);
         assert_eq!(cb.reset_window_num, 3);
         assert_eq!(cb.slow_request_threshold, 10);
         assert_eq!(cb.http_slow_log_threshold, 2000);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 0);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 0);
     }
@@ -229,80 +234,101 @@ mod tests {
     #[test]
     fn test_circuit_breaker_watch_fast_requests() {
         let cb = create_default_test_circuit_breaker();
-        
+
         // Send fast requests (below slow threshold)
         for _ in 0..10 {
             cb.watch(500); // 500ms, below 1000ms threshold
         }
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 10);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 0);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
     }
 
     #[test]
     fn test_circuit_breaker_watch_slow_requests_below_threshold() {
         let cb = create_default_test_circuit_breaker();
-        
+
         // Send slow requests but below threshold
         for _ in 0..4 {
             cb.watch(1500); // 1500ms, above 1000ms threshold
         }
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 4);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 4);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
     }
 
     #[tokio::test]
     async fn test_circuit_breaker_opens_when_threshold_exceeded() {
         let cb = create_default_test_circuit_breaker();
-        
+
         // Send enough slow requests to trigger circuit breaker
         // Need 6 requests because fetch_add returns previous value
         for _ in 0..6 {
             cb.watch(1500); // 1500ms, above 1000ms threshold
         }
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 6);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 6);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
         assert!(cb.will_reset_at.load(Ordering::Relaxed) > Utc::now().timestamp());
     }
 
     #[tokio::test]
     async fn test_circuit_breaker_mixed_requests() {
         let cb = create_default_test_circuit_breaker();
-        
+
         // Send mix of fast and slow requests
         for _ in 0..3 {
-            cb.watch(500);  // Fast request
+            cb.watch(500); // Fast request
             cb.watch(1500); // Slow request
         }
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 6);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 3);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
-        
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
+
         // Add 3 more slow requests to exceed threshold (need total of 6 slow requests)
         cb.watch(1500);
         cb.watch(1500);
         cb.watch(1500);
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 9);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 6);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
     }
 
     #[tokio::test]
     async fn test_circuit_breaker_open_directly() {
         let cb = create_default_test_circuit_breaker();
-        
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
-        
+
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
+
         cb.open();
-        
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
         let reset_time = cb.will_reset_at.load(Ordering::Relaxed);
         let expected_reset_time = Utc::now().timestamp() + cb.watching_window * cb.reset_window_num;
         // Allow 1 second tolerance for timing
@@ -312,29 +338,29 @@ mod tests {
     #[test]
     fn test_get_current_window_timestamp() {
         let cb = create_test_circuit_breaker(10, 2, 5, 1000);
-        
+
         let now = Utc::now().timestamp();
         let window_timestamp = cb.get_current_window_timestamp();
         let expected_window = now / 10;
-        
+
         assert_eq!(window_timestamp, expected_window);
     }
 
     #[test]
     fn test_reset_current_window_same_window() {
         let cb = create_default_test_circuit_breaker();
-        
+
         // Add some requests
         cb.watch(500);
         cb.watch(1500);
-        
+
         let initial_total = cb.total_requests.load(Ordering::Relaxed);
         let initial_slow = cb.slow_requests.load(Ordering::Relaxed);
         let initial_window = cb.current_window.load(Ordering::Relaxed);
-        
+
         // Reset current window when still in same window should not change counters
         cb.reset_current_window();
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), initial_total);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), initial_slow);
         assert_eq!(cb.current_window.load(Ordering::Relaxed), initial_window);
@@ -343,35 +369,47 @@ mod tests {
     #[tokio::test]
     async fn test_reset_state_when_conditions_met() {
         let cb = create_test_circuit_breaker(1, 1, 3, 500); // 1s window, 1x reset, 3 slow req threshold
-        
+
         // Open the circuit breaker
         cb.open();
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
-        
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
+
         // Wait for reset time to pass
         time::sleep(Duration::from_secs(2)).await;
-        
+
         // Make sure slow requests are below threshold
         assert!(cb.slow_requests.load(Ordering::Relaxed) < cb.slow_request_threshold);
-        
+
         // Trigger reset state check
         cb.reset_state();
-        
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
+
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
     }
 
     #[tokio::test]
     async fn test_reset_state_when_conditions_not_met() {
         let cb = create_default_test_circuit_breaker();
-        
+
         // Open the circuit breaker
         cb.open();
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
-        
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
+
         // Reset should not happen immediately (reset time not reached)
         cb.reset_state();
-        
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
     }
 
     #[test]
@@ -385,94 +423,115 @@ mod tests {
     async fn test_circuit_breaker_boundary_conditions() {
         // Test with threshold of 1
         let cb = create_test_circuit_breaker(5, 2, 1, 1000);
-        
+
         // First slow request should not trigger due to fetch_add behavior
         cb.watch(1500);
-        
+
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 1);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
-        
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
+
         // Second slow request should trigger circuit breaker
         cb.watch(1500);
-        
+
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 2);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
     }
 
     #[tokio::test]
     async fn test_circuit_breaker_zero_threshold() {
         // Test with threshold of 0 (circuit breaker opens immediately on first slow request)
         let cb = create_test_circuit_breaker(5, 2, 0, 1000);
-        
+
         // First slow request should open the circuit breaker (0 >= 0)
         cb.watch(1500);
-        
+
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 1);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
     }
 
     #[tokio::test]
     async fn test_circuit_breaker_exact_threshold_boundary() {
         let cb = create_test_circuit_breaker(5, 2, 3, 1000);
-        
+
         // Send exactly 2 slow requests (below threshold)
         cb.watch(1500);
         cb.watch(1500);
-        
+
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 2);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
-        
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
+
         // Send 3rd slow request (still below due to fetch_add behavior)
         cb.watch(1500);
-        
+
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 3);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
-        
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
+
         // Send 4th slow request (meets threshold due to fetch_add behavior)
         cb.watch(1500);
-        
+
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 4);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
     }
 
     #[tokio::test]
     async fn test_circuit_breaker_concurrent_watch_calls() {
         let cb = create_default_test_circuit_breaker();
         let cb_clone = cb.clone();
-        
+
         // Simulate concurrent watch calls using tokio tasks
         let handle1 = tokio::task::spawn(async move {
             for _ in 0..10 {
                 cb_clone.watch(1500); // Slow requests
             }
         });
-        
+
         let cb_clone2 = cb.clone();
         let handle2 = tokio::task::spawn(async move {
             for _ in 0..10 {
                 cb_clone2.watch(500); // Fast requests
             }
         });
-        
+
         handle1.await.expect("Task 1 should complete successfully");
         handle2.await.expect("Task 2 should complete successfully");
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 20);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 10);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
     }
 
     #[test]
     fn test_circuit_breaker_watch_request_threshold_edge() {
         let cb = create_test_circuit_breaker(5, 2, 5, 1000);
-        
+
         // Send requests at exactly the slow threshold
         cb.watch(999); // Just below threshold - should be considered fast
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 0);
-        
+
         cb.watch(1000); // Exactly at threshold - should be considered slow (>= threshold)
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 1);
-        
+
         cb.watch(1001); // Just above threshold - should be considered slow
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 2);
     }
@@ -480,14 +539,17 @@ mod tests {
     #[test]
     fn test_circuit_breaker_large_values() {
         let cb = create_test_circuit_breaker(3600, 10, 1000, 5000); // 1 hour window
-        
+
         // Test with large request times
         cb.watch(10000); // 10 seconds
         cb.watch(u64::MAX); // Maximum value
-        
+
         assert_eq!(cb.total_requests.load(Ordering::Relaxed), 2);
         assert_eq!(cb.slow_requests.load(Ordering::Relaxed), 2);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Closed as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Closed as u64
+        );
     }
 
     #[tokio::test]
@@ -495,7 +557,7 @@ mod tests {
         // Test the global watch_request function
         watch_request(500); // Fast request
         watch_request(2000); // Slow request (assuming default threshold)
-        
+
         // This test mainly verifies the function doesn't panic
         // Since CIRCUIT_BREAKER is a singleton, we can't easily verify state
         // without affecting other tests, but we can ensure it doesn't crash
@@ -504,13 +566,13 @@ mod tests {
     #[test]
     fn test_circuit_breaker_window_timestamp_calculation() {
         let cb = create_test_circuit_breaker(60, 2, 5, 1000); // 60 second window
-        
+
         let now = Utc::now().timestamp();
         let window = cb.get_current_window_timestamp();
-        
+
         // Window should be the current timestamp divided by window size
         assert_eq!(window, now / 60);
-        
+
         // Test with different window sizes
         let cb2 = create_test_circuit_breaker(3600, 2, 5, 1000); // 1 hour window
         let window2 = cb2.get_current_window_timestamp();
@@ -520,15 +582,15 @@ mod tests {
     #[tokio::test]
     async fn test_circuit_breaker_reset_calculation() {
         let cb = create_test_circuit_breaker(10, 3, 5, 1000);
-        
+
         let before_open = Utc::now().timestamp();
         cb.open();
         let after_open = Utc::now().timestamp();
-        
+
         let reset_time = cb.will_reset_at.load(Ordering::Relaxed);
         let expected_min = before_open + (10 * 3); // watching_window * reset_window_num
         let expected_max = after_open + (10 * 3);
-        
+
         assert!(reset_time >= expected_min);
         assert!(reset_time <= expected_max);
     }
@@ -536,17 +598,20 @@ mod tests {
     #[tokio::test]
     async fn test_circuit_breaker_doesnt_open_when_already_open() {
         let cb = create_default_test_circuit_breaker();
-        
+
         // Open the circuit breaker
         cb.open();
         let first_reset_time = cb.will_reset_at.load(Ordering::Relaxed);
-        
+
         // Try to open again
         cb.open();
         let second_reset_time = cb.will_reset_at.load(Ordering::Relaxed);
-        
+
         // Reset time should be updated
         assert!(second_reset_time >= first_reset_time);
-        assert_eq!(cb.state.load(Ordering::Relaxed), CircuitBreakerState::Open as u64);
+        assert_eq!(
+            cb.state.load(Ordering::Relaxed),
+            CircuitBreakerState::Open as u64
+        );
     }
 }
