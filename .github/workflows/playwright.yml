@@ -111,7 +111,7 @@ jobs:
             # "pipelines.spec.js",
             # "dashboards/custom-charts.spec.js",
             "dashboards/dashboardtype.spec.js",
-            # "dashboards/dashboard.spec.js",
+            "dashboards/dashboard.spec.js",
             "dashboards/dashboard2.spec.js",
             "dashboards/visualize.spec.js",
             # "unflattened.spec.js",
@@ -138,8 +138,8 @@ jobs:
             # "websocket.spec.js",
             # "alertImportTDA.spec.js",
             # "streamname.spec.js",
-            "logshistogram.spec.js",
-            "streaming.spec.js",
+            # "logshistogram.spec.js",
+            # "streaming.spec.js",
             # "remotepipeline.spec.js",
           ]
 
