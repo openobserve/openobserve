@@ -22,16 +22,6 @@ jobs:
     runs-on: 
       labels: ubicloud-standard-8
 
-    services:
-      postgres:
-        image: postgres:17.5-alpine3.22
-        env:
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
-        # needed because the postgres container does not provide a healthcheck
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-
     steps:
 
       - name: Clone the current repo
@@ -61,9 +51,5 @@ jobs:
       #   run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Run unit tests
-        run: |
-          export ZO_META_STORE=postgres
-          export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
-          ./coverage.sh run-cov
-          rm -r data
+        run: ./coverage.sh
       
