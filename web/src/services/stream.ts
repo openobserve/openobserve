@@ -103,6 +103,8 @@ const stream = {
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;
     if (clusters) url += "&clusters=" + clusters;
+    url += `&use_cache=${(window as any).use_cache !== undefined ? (window as any).use_cache : true}`;
+
     return http().get(url);
   },
 
@@ -123,6 +125,7 @@ const stream = {
     if (filter) url = url + `&filter=${filter}`;
     if (type) url += "&type=" + type;
     if (keyword) url += "&keyword=" + keyword;
+    url += `&use_cache=${(window as any).use_cache !== undefined ? (window as any).use_cache : true}`;
 
     return http().get(url);
   },
