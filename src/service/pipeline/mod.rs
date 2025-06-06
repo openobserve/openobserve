@@ -181,7 +181,7 @@ pub async fn enable_pipeline(
     };
 
     pipeline.enabled = value;
-    // add or remove trigger if it's a scheduled pipeline
+    // bring next_run_at to now if enabled
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if pipeline.enabled {
@@ -193,12 +193,40 @@ pub async fn enable_pipeline(
             )
             .await
             .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
-        } else {
-            super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
-                .await
-                .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
         }
+        // else, scheduled will skip at next_run_at, no additional work here
     }
+
+    pipeline::update(&pipeline, None).await?;
+    Ok(())
+}
+
+#[tracing::instrument]
+pub async fn reset_pipeline(org_id: &str, pipeline_id: &str) -> Result<(), PipelineError> {
+    let Ok(mut pipeline) = pipeline::get_by_id(pipeline_id).await else {
+        return Err(PipelineError::NotFound(pipeline_id.to_string()));
+    };
+
+    // add or remove trigger if it's a scheduled pipeline
+    let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source else {
+        return Err(PipelineError::PipelineDoesNotApply);
+    };
+
+    // delete existing trigger
+    super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
+        .await
+        .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+
+    derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
+    pipeline.enabled = true;
+    super::alerts::derived_streams::save(
+        derived_stream.clone(),
+        &pipeline.name,
+        pipeline_id,
+        false,
+    )
+    .await
+    .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
 
     pipeline::update(&pipeline, None).await?;
     Ok(())

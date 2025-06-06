@@ -269,3 +269,35 @@ pub async fn enable_pipeline(
         Err(e) => Ok(e.into()),
     }
 }
+
+/// ResetScheduledPipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "resetScheduledPipeline",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/pipelines/{pipeline_id}/reset")]
+pub async fn reset_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, pipeline_id) = path.into_inner();
+    let resp_msg = "Pipeline reset successfully ".to_string();
+    match pipeline::reset_pipeline(&org_id, &pipeline_id).await {
+        Ok(()) => {
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
+        }
+        Err(e) => Ok(e.into()),
+    }
+}

@@ -927,7 +927,7 @@ async fn handle_derived_stream_triggers(
             "Pipeline associated with trigger not enabled: {}/{}/{}/{}. Checking after 5 mins.",
             org_id, stream_type, pipeline_name, pipeline_id
         );
-        new_trigger.next_run_at += Duration::try_minutes(5)
+        new_trigger.next_run_at += Duration::try_minutes(1)
             .unwrap()
             .num_microseconds()
             .unwrap();
@@ -939,9 +939,9 @@ async fn handle_derived_stream_triggers(
             next_run_at: new_trigger.next_run_at,
             is_realtime: new_trigger.is_realtime,
             is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
-            start_time: 0,
-            end_time: 0,
+            status: TriggerDataStatus::Skipped,
+            start_time: new_trigger.start_time.unwrap_or_default(),
+            end_time: new_trigger.end_time.unwrap_or_default(),
             retries: new_trigger.retries,
             error: Some(msg.clone()),
             success_response: None,
@@ -954,8 +954,6 @@ async fn handle_derived_stream_triggers(
             time_in_queue_ms: Some(time_in_queue),
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {}", msg);
-        new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
         publish_triggers_usage(trigger_data_stream).await;
         return Ok(());
