@@ -648,6 +648,7 @@ const deletePipeline = async () => {
         position: "bottom",
         timeout: 3000,
       });
+      selectedPipelines.value = [];
     })
     .catch((error) => {
       if(error.response.status != 403){
