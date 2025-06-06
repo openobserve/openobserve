@@ -298,13 +298,15 @@ fn generate_vertical_partition_recordbatch(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::sync::Arc;
+
     use arrow::{
         array::{Array, ArrayRef, StringArray},
         record_batch::RecordBatch,
     };
     use arrow_schema::{DataType, Field, Schema};
-    use std::sync::Arc;
+
+    use super::*;
 
     // Helper function to create a record batch with the "_all" field
     fn create_test_batch_with_all_field(
@@ -354,13 +356,13 @@ mod tests {
             ("field2", vec![Some("100"), Some("200")]),
         ]);
         let batches = vec![batch.clone()];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         // Should return the original batch unchanged since there's no "_all" field
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), batch.num_rows());
@@ -373,48 +375,48 @@ mod tests {
             Some(r#"{"name": "Alice", "age": "30"}"#),
             Some(r#"{"name": "Bob", "age": "25"}"#),
         ];
-        
-        let batch = create_test_batch_with_all_field(
-            json_values,
-            vec![("id", vec![Some("1"), Some("2")])],
-        );
+
+        let batch =
+            create_test_batch_with_all_field(json_values, vec![("id", vec![Some("1"), Some("2")])]);
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), 2);
-        
+
         // Should have original fields + extracted JSON fields
         let schema = output_batch.schema();
         let field_names: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
-        
+
         assert!(field_names.contains(&"_all")); // Should be null column now
-        assert!(field_names.contains(&"id"));   // Original field
-        assert!(field_names.contains(&"name"));  // Extracted from JSON
-        assert!(field_names.contains(&"age"));   // Extracted from JSON
-        
+        assert!(field_names.contains(&"id")); // Original field
+        assert!(field_names.contains(&"name")); // Extracted from JSON
+        assert!(field_names.contains(&"age")); // Extracted from JSON
+
         // Check that "_all" field is now null
         let all_field_index = schema.index_of("_all").unwrap();
         let all_column = output_batch.column(all_field_index);
         assert!(all_column.is_null(0));
         assert!(all_column.is_null(1));
-        
+
         // Check extracted values
         let name_index = schema.index_of("name").unwrap();
-        let name_column = output_batch.column(name_index)
+        let name_column = output_batch
+            .column(name_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
         assert_eq!(name_column.value(0), "Alice");
         assert_eq!(name_column.value(1), "Bob");
-        
+
         let age_index = schema.index_of("age").unwrap();
-        let age_column = output_batch.column(age_index)
+        let age_column = output_batch
+            .column(age_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
@@ -427,56 +429,60 @@ mod tests {
         let json_values = vec![
             Some(r#"{"name": "Alice", "age": "30", "city": "NYC"}"#),
             Some(r#"{"name": "Bob", "country": "USA"}"#), // Missing age and city, has country
-            Some(r#"{"age": "35"}"#), // Missing name, city, and country
+            Some(r#"{"age": "35"}"#),                     // Missing name, city, and country
         ];
-        
+
         let batch = create_test_batch_with_all_field(json_values, vec![]);
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), 3);
-        
+
         let schema = output_batch.schema();
-        
+
         // Check name field
         let name_index = schema.index_of("name").unwrap();
-        let name_column = output_batch.column(name_index)
+        let name_column = output_batch
+            .column(name_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
         assert_eq!(name_column.value(0), "Alice");
         assert_eq!(name_column.value(1), "Bob");
         assert!(name_column.is_null(2)); // Missing in third row
-        
+
         // Check age field
         let age_index = schema.index_of("age").unwrap();
-        let age_column = output_batch.column(age_index)
+        let age_column = output_batch
+            .column(age_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
         assert_eq!(age_column.value(0), "30");
         assert!(age_column.is_null(1)); // Missing in second row
         assert_eq!(age_column.value(2), "35");
-        
+
         // Check city field
         let city_index = schema.index_of("city").unwrap();
-        let city_column = output_batch.column(city_index)
+        let city_column = output_batch
+            .column(city_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
         assert_eq!(city_column.value(0), "NYC");
         assert!(city_column.is_null(1)); // Missing in second row
         assert!(city_column.is_null(2)); // Missing in third row
-        
+
         // Check country field
         let country_index = schema.index_of("country").unwrap();
-        let country_column = output_batch.column(country_index)
+        let country_column = output_batch
+            .column(country_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
@@ -488,30 +494,31 @@ mod tests {
     #[test]
     fn test_generate_vertical_partition_recordbatch_empty_json() {
         let json_values = vec![
-            Some(""), // Empty string
-            Some("{}"), // Empty JSON object
+            Some(""),                     // Empty string
+            Some("{}"),                   // Empty JSON object
             Some(r#"{"name": "Alice"}"#), // Normal JSON
         ];
-        
+
         let batch = create_test_batch_with_all_field(json_values, vec![]);
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), 3);
-        
+
         let schema = output_batch.schema();
-        
+
         // Should only have _all field and name field (name appears in row 3)
         assert!(schema.index_of("name").is_ok());
-        
+
         let name_index = schema.index_of("name").unwrap();
-        let name_column = output_batch.column(name_index)
+        let name_column = output_batch
+            .column(name_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
@@ -526,33 +533,35 @@ mod tests {
             Some(r#"{"name": "Alice", "age": null, "city": "NYC"}"#),
             Some(r#"{"name": null, "age": "25"}"#),
         ];
-        
+
         let batch = create_test_batch_with_all_field(json_values, vec![]);
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), 2);
-        
+
         let schema = output_batch.schema();
-        
+
         // Check name field (Alice in first row, null in second)
         let name_index = schema.index_of("name").unwrap();
-        let name_column = output_batch.column(name_index)
+        let name_column = output_batch
+            .column(name_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
         assert_eq!(name_column.value(0), "Alice");
         assert!(name_column.is_null(1)); // null in JSON becomes null in column
-        
+
         // Check age field (null in first row, 25 in second)
         let age_index = schema.index_of("age").unwrap();
-        let age_column = output_batch.column(age_index)
+        let age_column = output_batch
+            .column(age_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
@@ -564,15 +573,15 @@ mod tests {
     fn test_generate_vertical_partition_recordbatch_invalid_json() {
         let json_values = vec![
             Some(r#"{"name": "Alice"}"#), // Valid JSON
-            Some(r#"invalid json"#), // Invalid JSON
+            Some(r#"invalid json"#),      // Invalid JSON
         ];
-        
+
         let batch = create_test_batch_with_all_field(json_values, vec![]);
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_err());
-        
+
         // Should return an error due to invalid JSON parsing
         let error = result.unwrap_err();
         assert!(error.to_string().contains("parse all fields value error"));
@@ -584,24 +593,25 @@ mod tests {
             Some(r#"{"user": {"name": "Alice", "details": {"age": 30}}, "active": true}"#),
             Some(r#"{"score": 95.5, "tags": ["tag1", "tag2"], "metadata": {"version": "1.0"}}"#),
         ];
-        
+
         let batch = create_test_batch_with_all_field(json_values, vec![]);
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), 2);
-        
+
         let schema = output_batch.schema();
-        
+
         // Complex JSON values should be converted to strings
         let user_index = schema.index_of("user").unwrap();
-        let user_column = output_batch.column(user_index)
+        let user_column = output_batch
+            .column(user_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
@@ -613,13 +623,13 @@ mod tests {
     #[test]
     fn test_generate_vertical_partition_recordbatch_zero_rows() {
         let json_values: Vec<Option<&str>> = vec![]; // No rows
-        
+
         let batch = create_test_batch_with_all_field(json_values, vec![]);
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert!(output_batches.is_empty()); // Should return empty vec when no rows
     }
@@ -632,21 +642,21 @@ mod tests {
             Field::new("id", DataType::Utf8, true),
         ];
         let schema = Arc::new(Schema::new(fields));
-        
+
         let columns: Vec<ArrayRef> = vec![
             Arc::new(arrow::array::Int64Array::from(vec![Some(1), Some(2)])),
             Arc::new(StringArray::from(vec![Some("a"), Some("b")])),
         ];
-        
+
         let batch = RecordBatch::try_new(schema, columns).unwrap();
         let batches = vec![batch.clone()];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         // Should return the original batch unchanged since "_all" is not a StringArray
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), batch.num_rows());
@@ -659,42 +669,44 @@ mod tests {
             vec![Some(r#"{"name": "Alice", "age": "30"}"#)],
             vec![("id", vec![Some("1")])],
         );
-        
+
         let batch2 = create_test_batch_with_all_field(
             vec![Some(r#"{"name": "Bob", "city": "NYC"}"#)],
             vec![("id", vec![Some("2")])],
         );
-        
+
         let batches = vec![batch1, batch2];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1); // Should concatenate into one batch
-        
+
         let output_batch = &output_batches[0];
         assert_eq!(output_batch.num_rows(), 2); // Combined rows from both batches
-        
+
         let schema = output_batch.schema();
-        
+
         // Should have all fields from both batches
         assert!(schema.index_of("name").is_ok());
         assert!(schema.index_of("age").is_ok());
         assert!(schema.index_of("city").is_ok());
         assert!(schema.index_of("id").is_ok());
-        
+
         // Check that missing fields are properly handled with nulls
         let age_index = schema.index_of("age").unwrap();
-        let age_column = output_batch.column(age_index)
+        let age_column = output_batch
+            .column(age_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
         assert_eq!(age_column.value(0), "30"); // From first batch
         assert!(age_column.is_null(1)); // Missing in second batch
-        
+
         let city_index = schema.index_of("city").unwrap();
-        let city_column = output_batch.column(city_index)
+        let city_column = output_batch
+            .column(city_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
@@ -712,33 +724,35 @@ mod tests {
             ],
         );
         let batches = vec![batch];
-        
+
         let result = generate_vertical_partition_recordbatch(&batches);
         assert!(result.is_ok());
-        
+
         let output_batches = result.unwrap();
         assert_eq!(output_batches.len(), 1);
-        
+
         let output_batch = &output_batches[0];
         let schema = output_batch.schema();
-        
+
         // Should preserve original fields
         assert!(schema.index_of("original_field1").is_ok());
         assert!(schema.index_of("original_field2").is_ok());
-        
+
         // Should add extracted fields
         assert!(schema.index_of("extracted").is_ok());
-        
+
         // Check values are preserved
         let orig1_index = schema.index_of("original_field1").unwrap();
-        let orig1_column = output_batch.column(orig1_index)
+        let orig1_column = output_batch
+            .column(orig1_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
         assert_eq!(orig1_column.value(0), "orig1");
-        
+
         let extracted_index = schema.index_of("extracted").unwrap();
-        let extracted_column = output_batch.column(extracted_index)
+        let extracted_column = output_batch
+            .column(extracted_index)
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
