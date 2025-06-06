@@ -634,7 +634,15 @@ const useLogs = () => {
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
-    // query["timezone"] = store.state.timezone;
+
+    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
+      query["regions"] = searchObj.meta.regions.join(",");
+    }
+
+    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
+      query["clusters"] = searchObj.meta.clusters.join(",");
+    }
+
     return query;
   };
 
@@ -4221,6 +4229,16 @@ const useLogs = () => {
     ) {
       delete queryParams.type;
     }
+
+
+    if(store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
+      searchObj.meta.regions = queryParams.regions.split(",");
+    }
+
+    if(store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
+      searchObj.meta.clusters = queryParams.clusters.split(",");
+    }
+
     // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
