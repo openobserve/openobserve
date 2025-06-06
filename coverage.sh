@@ -48,9 +48,6 @@ EOF
 
 cmd_check() {
     _cov_test --json --summary-only --output-path report.json "$@"
-    
-    echo "Coverage report JSON:"
-    cat report.json
 
     python3 <(
     cat <<'EOF'
