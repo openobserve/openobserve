@@ -126,42 +126,54 @@ pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::na
             log::info!(
                 "[infra::config] received NATs event: {event}, refreshing in-memory cache for Alerts, Pipelines, RealtimeTriggers, Schema, Users, and UserSessions"
             );
+            log::info!("refreshing session cache");
             if let Err(e) = crate::service::db::session::cache().await {
                 log::error!(
                     "[infra::config] Error refreshing in-memory cache \"UserSessions\": {}",
                     e
                 );
             }
+            log::info!("session cache refreshed");
+            log::info!("refreshing user cache");
             if let Err(e) = crate::service::db::user::cache().await {
                 log::error!(
                     "[infra::config] Error refreshing in-memory cache \"Users\": {}",
                     e
                 );
             }
+            log::info!("user cache refreshed");
+            log::info!("refreshing alerts cache");
             if let Err(e) = crate::service::db::alerts::alert::cache().await {
                 log::error!(
                     "[infra::config] Error refreshing in-memory cache \"Alerts\": {}",
                     e
                 );
             }
+            log::info!("alerts cache refreshed");
+            log::info!("refreshing pipeline cache");
             if let Err(e) = crate::service::db::pipeline::cache().await {
                 log::error!(
                     "[infra::config] Error refreshing in-memory cache \"Pipelines\": {}",
                     e
                 );
             }
+            log::info!("pipeline cache refreshed");
+            log::info!("refreshing triggers cache");
             if let Err(e) = crate::service::db::alerts::realtime_triggers::cache().await {
                 log::error!(
                     "Error refreshing in-memory cache \"RealtimeTriggers\": {}",
                     e
                 );
             }
+            log::info!("triggers cache refreshed");
+            log::info!("refreshing schema cache");
             if let Err(e) = crate::service::db::schema::cache().await {
                 log::error!(
                     "[infra::config] Error refreshing in-memory cache \"Schema\": {}",
                     e
                 );
             }
+            log::info!("schema cache refreshed");
         }
     }
 
