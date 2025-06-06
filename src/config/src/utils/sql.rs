@@ -16,7 +16,10 @@
 use std::ops::ControlFlow;
 
 use sqlparser::{
-    ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr, Statement, Visit, Visitor},
+    ast::{
+        DuplicateTreatment, Expr, Function, FunctionArgumentList, FunctionArguments, GroupByExpr,
+        Query, SelectItem, SetExpr, Statement, Visit, Visitor,
+    },
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -202,14 +205,18 @@ impl Visitor for DistinctVisitor {
 
     fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
         // Check for DISTINCT inside functions like COUNT(DISTINCT column)
-        // For now, this is a simplified check - we could enhance it further if needed
-        if let Expr::Function(Function { args, .. }) = expr {
-            // Convert the function arguments to string and check for DISTINCT
-            let args_str = format!("{:?}", args);
-            if args_str.to_lowercase().contains("distinct") {
-                self.has_distinct = true;
-                return ControlFlow::Break(());
-            }
+        // from field names, string literals, or comments containing "distinct"
+        if let Expr::Function(Function {
+            args:
+                FunctionArguments::List(FunctionArgumentList {
+                    duplicate_treatment: Some(DuplicateTreatment::Distinct),
+                    ..
+                }),
+            ..
+        }) = expr
+        {
+            self.has_distinct = true;
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -670,6 +677,17 @@ mod tests {
                    )
                    SELECT COUNT(*), AVG(region_total) FROM complex_cte"#,
                 "Query with CTE containing window functions should not be simple",
+            ),
+            // Test case 15: Query with histogram in subquery in FROM clause (should be false)
+            (
+                r#"SELECT SUM(x_axis_1) AS "y_axis_1"
+                   FROM (
+                     SELECT histogram(_timestamp) AS "xaxis",
+                            COUNT(_timestamp) AS "x_axis_1"
+                     FROM "default"
+                     GROUP BY xaxis
+                   )"#,
+                "Query with histogram in subquery should not be simple",
             ),
         ];
 
