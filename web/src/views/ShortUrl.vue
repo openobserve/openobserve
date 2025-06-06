@@ -1,10 +1,6 @@
 <template>
   <div class="loading-container">
-    <q-spinner
-      class="!tw-border-l-primary tw-mb-2"
-      size="3em"
-      color="primary"
-    />
+    <q-spinner class="tw-mb-2" size="3em" color="primary" />
     <div class="message">Redirecting...</div>
   </div>
 </template>
