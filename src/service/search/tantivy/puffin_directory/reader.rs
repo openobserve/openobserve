@@ -306,7 +306,7 @@ mod tests {
 
     use super::*;
     use crate::service::search::tantivy::puffin::{
-        BlobMetadata, BlobMetadataBuilder, BlobTypes, PuffinMeta,
+        BlobMetadata, BlobMetadataBuilder, BlobTypes,
         reader::PuffinBytesReader,
     };
 
