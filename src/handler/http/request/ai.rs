@@ -61,8 +61,11 @@ pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
 
     if config.ai.enabled {
         let req_body = body.into_inner();
-        let response =
-            ai::service::chat(ai::AiServerRequest::new(req_body.messages, req_body.model)).await;
+        let response = ai::service::chat(ai::meta::AiServerRequest::new(
+            req_body.messages,
+            req_body.model,
+        ))
+        .await;
         match response {
             Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
             Err(e) => {
@@ -149,7 +152,7 @@ pub async fn chat_stream(
     let auth_str = crate::common::utils::auth::extract_auth_str(&in_req);
 
     let stream = match ai::service::chat_stream(
-        ai::AiServerRequest::new(req_body.messages, req_body.model),
+        ai::meta::AiServerRequest::new(req_body.messages, req_body.model),
         org_id.clone(),
         auth_str,
     )
