@@ -4084,13 +4084,13 @@ const useLogs = () => {
       ) {
         delete router.currentRoute.value.query.type;
       }
-      const queryTimeout = setTimeout(() => {
-        if (searchObj.loading) {
-          searchObj.meta.showSearchScheduler = true;
-        }
-      }, 120000);
+      // const queryTimeout = setTimeout(() => {
+      //   if (searchObj.loading) {
+      //     searchObj.meta.showSearchScheduler = true;
+      //   }
+      // }, 120000);
       await getQueryData();
-      clearTimeout(queryTimeout);
+      // clearTimeout(queryTimeout);
     } catch (e: any) {
       console.log("Error while loading logs data");
     }

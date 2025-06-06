@@ -1356,10 +1356,10 @@ export default defineComponent({
         });
     },
     handleKeyDown(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          this.handleRunQueryFn();
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        this.handleRunQueryFn();
       }
-    }
+    },
   },
   props: {
     fieldValues: {
@@ -2668,6 +2668,8 @@ export default defineComponent({
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
+
+        delete savedSearchObj.data.parsedQuery;
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
