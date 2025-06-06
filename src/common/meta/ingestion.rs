@@ -373,7 +373,7 @@ pub enum HecStatus {
     Success,
     InvalidFormat,
     InvalidIndex,
-    Custom(String, u32),
+    Custom(String, u16),
 }
 
 impl From<HecStatus> for HecResponse {
@@ -384,15 +384,12 @@ impl From<HecStatus> for HecResponse {
             HecStatus::InvalidIndex => ("Incorrect index".to_string(), 400),
             HecStatus::Custom(s, c) => (s, c),
         };
-        Self {
-            text: text.to_string(),
-            code,
-        }
+        Self { text, code }
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct HecResponse {
     pub text: String,
-    pub code: u32,
+    pub code: u16,
 }

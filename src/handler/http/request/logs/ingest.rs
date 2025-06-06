@@ -396,7 +396,7 @@ pub async fn otlp_logs_write(
     }
 }
 
-/// _bulk ES compatible ingestion API
+/// HEC format compatible ingestion API
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
