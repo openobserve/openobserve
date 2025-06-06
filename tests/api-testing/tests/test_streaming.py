@@ -168,7 +168,7 @@ test_data_histog = [
         "re_match",
         f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
         1,
-        100,
+        2002,
     ),
   
   
