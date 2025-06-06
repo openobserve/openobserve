@@ -132,7 +132,9 @@ pub async fn retrieve(
     // TODO: Remove this once we are sure there is no more legacy short urls
     if original_url.is_some() {
         let redirect_url = short_url::construct_short_url(&org_id, &short_id);
-        let redirect_http = RedirectResponseBuilder::new(&redirect_url).build().redirect_http();
+        let redirect_http = RedirectResponseBuilder::new(&redirect_url)
+            .build()
+            .redirect_http();
         Ok(redirect_http)
     } else {
         let redirect = RedirectResponseBuilder::default().build();
