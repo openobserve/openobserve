@@ -251,7 +251,6 @@ export default {
   font-size: 13px;
   font-style: normal;
   font-weight: 600;
-  line-height: normal;
 }
 
 .text-label-normal {
@@ -259,12 +258,12 @@ export default {
   font-size: 13px;
   font-style: normal;
   font-weight: 400;
-  line-height: normal;
 }
 
 .edit-input {
   flex: 1;
-  border: 1px solid var(--q-primary);
+  border: 1px solid #e0e0e0;
+  line-height: 0px;
   border-radius: 4px;
   padding: 2px;
   outline: none;
@@ -272,7 +271,7 @@ export default {
   width: 100%;
 
   &:focus {
-    border-color: var(--q-secondary);
+    border-color: var(--q-primary);
   }
 }
 </style>
