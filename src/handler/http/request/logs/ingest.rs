@@ -24,7 +24,8 @@ use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
         ingestion::{
-            GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
+            GCPIngestionRequest, HecResponse, HecStatus, IngestionRequest,
+            KinesisFHIngestionResponse, KinesisFHRequest,
         },
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
@@ -393,4 +394,63 @@ pub async fn otlp_logs_write(
                 .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)))
         }
     }
+}
+
+/// HEC format compatible ingestion API
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Logs",
+    operation_id = "LogsIngestionHec",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = String, description = "Ingest data (hec)"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HecResponse, example = json!({"text":"Success","code": 200})),
+        (status = 200, description = "Failure", content_type = "application/json", body = HecResponse, example = json!({"text":"Invalid data format","code": 400})),
+    )
+)]
+#[post("/{org_id}/_hec")]
+pub async fn hec(
+    thread_id: web::Data<usize>,
+    org_id: web::Path<String>,
+    body: web::Bytes,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    };
+
+    let mut resp = match logs::hec::ingest(**thread_id, &org_id, body, user_email).await {
+        Ok(v) => {
+            if v.code > 299 {
+                HttpResponse::BadRequest().json(v)
+            } else {
+                MetaHttpResponse::json(v)
+            }
+        }
+        Err(e) => {
+            log::error!("Error processing request {org_id}/_hec: {:?}", e);
+            let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
+            HttpResponse::BadRequest().json(res)
+        }
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
+    }
+
+    Ok(resp)
 }

@@ -23,8 +23,10 @@ test.describe("Change Organisation", () => {
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage,
         reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage,
         multiOrgIdentifier;
+        const timestamp = Date.now(); 
+        const randomSuffix = Math.floor(Math.random() * 1000); 
+        const newOrgName = `org${timestamp}${randomSuffix}`;
 
-    const newOrgName = `organisation${Math.floor(Math.random() * 10000)}`;
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
         ingestionPage = new IngestionPage(page);
@@ -118,7 +120,7 @@ test.describe("Change Organisation", () => {
 
 
         await tracesPage.navigateToTraces();
-        await homePage.homePageDefaultOrg();
+        await tracesPage.tracesPageDefaultOrg();
         await homePage.homePageURLValidationDefaultOrg();
         await tracesPage.validateTracesPage();
         await tracesPage.tracesURLValidation();
@@ -199,7 +201,7 @@ test.describe("Change Organisation", () => {
 
 
         await streamsPage.gotoStreamsPage();
-        await homePage.homePageDefaultOrg();
+        await streamsPage.streamsPageDefaultOrg();
         await homePage.homePageURLValidationDefaultOrg();
         await streamsPage.streamsURLValidation();
         
@@ -309,7 +311,8 @@ test.describe("Change Organisation", () => {
         await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
         await homePage.homePageOrg(newOrgName);
         await managementPage.goToManagement();
-        await homePage.homeURLContains(multiOrgIdentifier);
+        await managementPage.managementURLValidation();
+      
 
     });
 

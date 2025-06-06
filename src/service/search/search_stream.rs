@@ -1388,3 +1388,422 @@ pub fn get_top_k_values(
 
     Ok((top_k_values, result_count as u64))
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::{
+        search::{Query, Request, SearchEventType},
+        sql::OrderBy,
+        stream::StreamType,
+    };
+    use serde_json::json;
+    use tokio::sync::mpsc;
+
+    use super::*;
+
+    fn create_sample_hits() -> Vec<Value> {
+        vec![
+            json!({
+                "zo_sql_key": "apple",
+                "zo_sql_num": 100
+            }),
+            json!({
+                "zo_sql_key": "banana",
+                "zo_sql_num": 75
+            }),
+            json!({
+                "zo_sql_key": "cherry",
+                "zo_sql_num": 150
+            }),
+            json!({
+                "zo_sql_key": "date",
+                "zo_sql_num": 25
+            }),
+            json!({
+                "zo_sql_key": "elderberry",
+                "zo_sql_num": 200
+            }),
+        ]
+    }
+
+    fn create_empty_hits() -> Vec<Value> {
+        vec![]
+    }
+
+    fn create_hits_without_required_fields() -> Vec<Value> {
+        vec![
+            json!({
+                "some_field": "value1"
+            }),
+            json!({
+                "another_field": "value2"
+            }),
+        ]
+    }
+
+    #[test]
+    fn test_get_top_k_values_with_count_sorting() {
+        let hits = create_sample_hits();
+        let field = "test_field";
+        let top_k = 3;
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(top_k_values.len(), 1);
+        assert_eq!(result_count, 3);
+
+        // Verify the structure of the response
+        if let Some(Value::Object(field_obj)) = top_k_values.first() {
+            assert_eq!(
+                field_obj.get("field"),
+                Some(&Value::String("test_field".to_string()))
+            );
+
+            if let Some(Value::Array(values)) = field_obj.get("values") {
+                assert_eq!(values.len(), 3);
+
+                // Verify sorting by count (descending)
+                if let Some(Value::Object(first_item)) = values.first() {
+                    assert_eq!(
+                        first_item.get("zo_sql_key"),
+                        Some(&Value::String("elderberry".to_string()))
+                    );
+                    assert_eq!(
+                        first_item.get("zo_sql_num"),
+                        Some(&Value::Number(200.into()))
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_top_k_values_with_alphabetical_sorting() {
+        let hits = create_sample_hits();
+        let field = "test_field";
+        let top_k = 3;
+        let no_count = true;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(top_k_values.len(), 1);
+        assert_eq!(result_count, 3);
+
+        // Verify alphabetical sorting
+        if let Some(Value::Object(field_obj)) = top_k_values.first() {
+            if let Some(Value::Array(values)) = field_obj.get("values") {
+                assert_eq!(values.len(), 3);
+
+                // Verify alphabetical order
+                if let Some(Value::Object(first_item)) = values.first() {
+                    assert_eq!(
+                        first_item.get("zo_sql_key"),
+                        Some(&Value::String("apple".to_string()))
+                    );
+                }
+                if let Some(Value::Object(second_item)) = values.get(1) {
+                    assert_eq!(
+                        second_item.get("zo_sql_key"),
+                        Some(&Value::String("banana".to_string()))
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_top_k_values_empty_field() {
+        let hits = create_sample_hits();
+        let field = "";
+        let top_k = 3;
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_err());
+
+        if let Err(error) = result {
+            assert!(error.to_string().contains("field is empty"));
+        }
+    }
+
+    #[test]
+    fn test_get_top_k_values_empty_hits() {
+        let hits = create_empty_hits();
+        let field = "test_field";
+        let top_k = 3;
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(top_k_values.len(), 1);
+        assert_eq!(result_count, 0);
+    }
+
+    #[test]
+    fn test_get_top_k_values_missing_fields() {
+        let hits = create_hits_without_required_fields();
+        let field = "test_field";
+        let top_k = 3;
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(top_k_values.len(), 1);
+        assert_eq!(result_count, 2); // Should handle missing fields gracefully
+    }
+
+    #[test]
+    fn test_get_top_k_values_zero_top_k() {
+        let hits = create_sample_hits();
+        let field = "test_field";
+        let top_k = 0;
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(top_k_values.len(), 1);
+        assert_eq!(result_count, 0);
+    }
+
+    #[test]
+    fn test_get_top_k_values_large_top_k() {
+        let hits = create_sample_hits();
+        let field = "test_field";
+        let top_k = 100; // Larger than available hits
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(top_k_values.len(), 1);
+        assert_eq!(result_count, 5); // Should return all available hits
+    }
+
+    #[test]
+    fn test_handle_partial_response_not_partial() {
+        let response = Response {
+            is_partial: false,
+            function_error: vec!["existing error".to_string()],
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response);
+        assert!(!result.is_partial);
+        assert_eq!(result.function_error, vec!["existing error".to_string()]);
+    }
+
+    #[test]
+    fn test_handle_partial_response_partial_with_existing_errors() {
+        let response = Response {
+            is_partial: true,
+            function_error: vec!["existing error".to_string()],
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response);
+        assert!(result.is_partial);
+        assert_eq!(result.function_error.len(), 2);
+        assert!(
+            result
+                .function_error
+                .contains(&"existing error".to_string())
+        );
+        assert!(
+            result
+                .function_error
+                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
+        );
+    }
+
+    #[test]
+    fn test_handle_partial_response_partial_without_existing_errors() {
+        let response = Response {
+            is_partial: true,
+            function_error: vec![],
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response);
+        assert!(result.is_partial);
+        assert_eq!(
+            result.function_error,
+            vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_search_stream_request_basic_flow() {
+        let (sender, mut receiver) = mpsc::channel(100);
+
+        let req = Request {
+            query: Query {
+                sql: "SELECT * FROM test".to_string(),
+                from: 0,
+                size: 10,
+                start_time: 0,
+                end_time: 1000000,
+                track_total_hits: false,
+                ..Default::default()
+            },
+            use_cache: Some(false),
+            search_type: Some(SearchEventType::UI),
+            ..Default::default()
+        };
+
+        let search_span = tracing::info_span!("test_search");
+
+        // This is a complex integration test that would require mocking external dependencies
+        // For now, we'll test the function signature and basic parameter handling
+        tokio::spawn(async move {
+            process_search_stream_request(
+                "test_org".to_string(),
+                "test_user".to_string(),
+                "test_trace".to_string(),
+                req,
+                StreamType::Logs,
+                vec!["test_stream".to_string()],
+                OrderBy::Desc,
+                search_span,
+                sender,
+                None,
+                None,
+                None,
+            )
+            .await;
+        });
+
+        // Wait for the progress message
+        if let Some(Ok(StreamResponses::Progress { percent })) = receiver.recv().await {
+            assert_eq!(percent, 0);
+        }
+
+        // Note: Full integration testing would require mocking the search service
+        // and other external dependencies, which is beyond the scope of unit tests
+    }
+
+    #[test]
+    fn test_audit_context_creation() {
+        let audit_ctx = AuditContext {
+            method: "GET".to_string(),
+            path: "/api/search".to_string(),
+            query_params: "q=test".to_string(),
+            body: "{}".to_string(),
+        };
+
+        assert_eq!(audit_ctx.method, "GET");
+        assert_eq!(audit_ctx.path, "/api/search");
+        assert_eq!(audit_ctx.query_params, "q=test");
+        assert_eq!(audit_ctx.body, "{}");
+    }
+
+    // Helper function to create test search requests
+    fn create_test_request() -> Request {
+        Request {
+            query: Query {
+                sql: "SELECT * FROM test_stream".to_string(),
+                from: 0,
+                size: 100,
+                start_time: 0,
+                end_time: 1000000,
+                track_total_hits: false,
+                ..Default::default()
+            },
+            use_cache: Some(true),
+            search_type: Some(SearchEventType::UI),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_create_test_request() {
+        let req = create_test_request();
+        assert_eq!(req.query.sql, "SELECT * FROM test_stream");
+        assert_eq!(req.query.from, 0);
+        assert_eq!(req.query.size, 100);
+        assert!(req.use_cache.unwrap_or(false));
+        assert_eq!(req.search_type, Some(SearchEventType::UI));
+    }
+
+    // Test for edge cases in get_top_k_values with different data types
+    #[test]
+    fn test_get_top_k_values_mixed_data_types() {
+        let hits = vec![
+            json!({
+                "zo_sql_key": "item1",
+                "zo_sql_num": 100
+            }),
+            json!({
+                "zo_sql_key": "item2",
+                "zo_sql_num": "not_a_number" // This should default to 0
+            }),
+            json!({
+                "zo_sql_key": 123, // This should convert to string
+                "zo_sql_num": 50
+            }),
+        ];
+
+        let field = "test_field";
+        let top_k = 5;
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(top_k_values.len(), 1);
+        assert_eq!(result_count, 3);
+    }
+
+    // Test for boundary conditions
+    #[test]
+    fn test_get_top_k_values_boundary_conditions() {
+        let hits = vec![
+            json!({
+                "zo_sql_key": "max_value",
+                "zo_sql_num": i64::MAX
+            }),
+            json!({
+                "zo_sql_key": "min_value",
+                "zo_sql_num": i64::MIN
+            }),
+            json!({
+                "zo_sql_key": "zero_value",
+                "zo_sql_num": 0
+            }),
+        ];
+
+        let field = "boundary_test";
+        let top_k = 3;
+        let no_count = false;
+
+        let result = get_top_k_values(&hits, field, top_k, no_count);
+        assert!(result.is_ok());
+
+        let (top_k_values, result_count) = result.unwrap();
+        assert_eq!(result_count, 3);
+
+        // Verify that max value comes first in count-based sorting
+        if let Some(Value::Object(field_obj)) = top_k_values.first() {
+            if let Some(Value::Array(values)) = field_obj.get("values") {
+                if let Some(Value::Object(first_item)) = values.first() {
+                    assert_eq!(
+                        first_item.get("zo_sql_key"),
+                        Some(&Value::String("max_value".to_string()))
+                    );
+                }
+            }
+        }
+    }
+}

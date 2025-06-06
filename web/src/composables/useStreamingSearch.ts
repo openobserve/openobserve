@@ -194,9 +194,6 @@ const useHttpStreaming = () => {
         if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
         if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
         if (meta?.fallback_order_by_col) url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
-        if (typeof queryReq.query.sql != "string") {
-          url = `/_search_multi_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
-        }
       } else if(type === "values") {
         url = `/_values_stream`
       }

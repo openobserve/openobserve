@@ -19,5 +19,8 @@ const shortURL = {
       original_url: url,
     });
   },
+  get: (org_identifier: string, id: string) => {
+    return http().get(`/api/${org_identifier}/short/${id}?type=ui`);
+  },
 };
 export default shortURL;
