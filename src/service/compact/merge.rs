@@ -1449,11 +1449,13 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use arrow_schema::{DataType, Field, Schema};
-    use config::meta::{stream::{FileKey, FileMeta}};
-    use hashbrown::HashMap;
     use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::stream::{FileKey, FileMeta};
+    use hashbrown::HashMap;
+
+    use super::*;
 
     // Helper function to create test FileKey
     fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {
@@ -1484,7 +1486,7 @@ mod tests {
         ];
         let result = sort_by_time_range(files);
         assert_eq!(result.len(), 3);
-        
+
         // Adjacent files should be able to be in the same group
         assert_eq!(result[0].key, "file1.parquet");
         assert_eq!(result[1].key, "file2.parquet");
@@ -1545,7 +1547,7 @@ mod tests {
         ];
         let result = sort_by_time_range(files);
         assert_eq!(result.len(), 3);
-        
+
         // Verify all files are present
         let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
         assert!(keys.contains(&&"file1.parquet".to_string()));
@@ -1565,7 +1567,7 @@ mod tests {
         ];
         let result = sort_by_time_range(files);
         assert_eq!(result.len(), 6);
-        
+
         // Should be sorted by min_ts (all adjacent files)
         assert_eq!(result[0].key, "file_a.parquet");
         assert_eq!(result[1].key, "file_b.parquet");
@@ -1584,7 +1586,7 @@ mod tests {
         ];
         let result = sort_by_time_range(files);
         assert_eq!(result.len(), 3);
-        
+
         // Should be sorted by min_ts
         assert_eq!(result[0].key, "file1.parquet");
         assert_eq!(result[1].key, "file3.parquet");
@@ -1646,10 +1648,10 @@ mod tests {
         ];
         let result = sort_by_time_range(files);
         assert_eq!(result.len(), 3);
-        
+
         // First file should be file1 (min_ts = 1000)
         assert_eq!(result[0].key, "file1.parquet");
-        
+
         // Due to overlapping, file3 should come next (can fit in same group as file1)
         // file2 would be in a separate group since it overlaps with file1
         let mut found_file2 = false;
@@ -1677,7 +1679,7 @@ mod tests {
         ];
         let result = sort_by_time_range(files);
         assert_eq!(result.len(), 5);
-        
+
         // Verify all files are present
         let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
         assert!(keys.contains(&&"file1.parquet".to_string()));
@@ -1696,7 +1698,7 @@ mod tests {
         ];
         let result = sort_by_time_range(files);
         assert_eq!(result.len(), 3);
-        
+
         // All files have same timestamp, so they should all be in separate groups
         // due to overlap, but ordering should be maintained based on original order after sorting
         let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
@@ -1713,12 +1715,12 @@ mod tests {
         let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
         let field2 = Arc::new(Field::new("field2", DataType::Int64, false));
         let schema = Schema::new(vec![field1.clone(), field2.clone()]);
-        
+
         // Create latest schema map with same types
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(field1.name(), &field1);
         latest_schema_map.insert(field2.name(), &field2);
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
@@ -1731,19 +1733,19 @@ mod tests {
         let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
         let field2 = Arc::new(Field::new("field2", DataType::Int32, false));
         let schema = Schema::new(vec![field1.clone(), field2.clone()]);
-        
+
         // Create latest schema with different types
         let latest_field1 = Arc::new(Field::new("field1", DataType::Utf8, true)); // Same type
         let latest_field2 = Arc::new(Field::new("field2", DataType::Int64, false)); // Different type
-        
+
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(latest_field1.name(), &latest_field1);
         latest_schema_map.insert(latest_field2.name(), &latest_field2);
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
-        
+
         assert_eq!(diff.len(), 1);
         assert!(diff.contains_key("field2"));
         assert_eq!(diff.get("field2").unwrap(), &DataType::Int64);
@@ -1756,21 +1758,21 @@ mod tests {
         let field2 = Arc::new(Field::new("field2", DataType::Float32, false));
         let field3 = Arc::new(Field::new("field3", DataType::Boolean, true));
         let schema = Schema::new(vec![field1.clone(), field2.clone(), field3.clone()]);
-        
+
         // Create latest schema with different types
         let latest_field1 = Arc::new(Field::new("field1", DataType::Int64, true)); // Different
         let latest_field2 = Arc::new(Field::new("field2", DataType::Float64, false)); // Different
         let latest_field3 = Arc::new(Field::new("field3", DataType::Boolean, true)); // Same
-        
+
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(latest_field1.name(), &latest_field1);
         latest_schema_map.insert(latest_field2.name(), &latest_field2);
         latest_schema_map.insert(latest_field3.name(), &latest_field3);
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
-        
+
         assert_eq!(diff.len(), 2);
         assert!(diff.contains_key("field1"));
         assert!(diff.contains_key("field2"));
@@ -1785,16 +1787,16 @@ mod tests {
         let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
         let field2 = Arc::new(Field::new("field2", DataType::Int64, false));
         let schema = Schema::new(vec![field1.clone(), field2.clone()]);
-        
+
         // Create latest schema map missing field2
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(field1.name(), &field1);
         // field2 is missing from latest_schema_map
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
-        
+
         // Should be empty since field2 is not found in latest_schema_map
         assert!(diff.is_empty());
     }
@@ -1803,7 +1805,7 @@ mod tests {
     fn test_generate_schema_diff_empty_schema() {
         let schema = Schema::empty();
         let latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
@@ -1815,7 +1817,7 @@ mod tests {
         let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
         let schema = Schema::new(vec![field1]);
         let latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
@@ -1826,37 +1828,37 @@ mod tests {
     fn test_generate_schema_diff_complex_data_types() {
         // Test with complex data types like List, Struct, etc.
         let list_field = Arc::new(Field::new(
-            "list_field", 
-            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))), 
-            true
+            "list_field",
+            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
+            true,
         ));
         let timestamp_field = Arc::new(Field::new(
-            "timestamp_field", 
-            DataType::Timestamp(arrow_schema::TimeUnit::Microsecond, None), 
-            false
+            "timestamp_field",
+            DataType::Timestamp(arrow_schema::TimeUnit::Microsecond, None),
+            false,
         ));
         let schema = Schema::new(vec![list_field.clone(), timestamp_field.clone()]);
-        
+
         // Create latest schema with different complex types
         let latest_list_field = Arc::new(Field::new(
-            "list_field", 
-            DataType::List(Arc::new(Field::new("item", DataType::Int64, true))), // Different inner type
-            true
+            "list_field",
+            DataType::List(Arc::new(Field::new("item", DataType::Int64, true))), /* Different inner type */
+            true,
         ));
         let latest_timestamp_field = Arc::new(Field::new(
-            "timestamp_field", 
+            "timestamp_field",
             DataType::Timestamp(arrow_schema::TimeUnit::Nanosecond, None), // Different time unit
-            false
+            false,
         ));
-        
+
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(latest_list_field.name(), &latest_list_field);
         latest_schema_map.insert(latest_timestamp_field.name(), &latest_timestamp_field);
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
-        
+
         assert_eq!(diff.len(), 2);
         assert!(diff.contains_key("list_field"));
         assert!(diff.contains_key("timestamp_field"));
@@ -1867,16 +1869,16 @@ mod tests {
         // Test that nullable differences are detected when data types are same
         let field1 = Arc::new(Field::new("field1", DataType::Utf8, false)); // Not nullable
         let schema = Schema::new(vec![field1.clone()]);
-        
+
         let latest_field1 = Arc::new(Field::new("field1", DataType::Utf8, true)); // Nullable
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(latest_field1.name(), &latest_field1);
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
-        
-        // Note: This test verifies current behavior - the function only compares data_type(), 
+
+        // Note: This test verifies current behavior - the function only compares data_type(),
         // not the nullable property. If nullable differences should be detected,
         // the function would need to be modified.
         assert!(diff.is_empty()); // Current implementation doesn't detect nullable differences
@@ -1893,31 +1895,31 @@ mod tests {
             Arc::new(Field::new("metadata", DataType::Utf8, true)),
         ];
         let schema = Schema::new(original_fields);
-        
+
         // Latest schema with some changes
         let latest_id = Arc::new(Field::new("id", DataType::Int64, false)); // Changed type
         let latest_name = Arc::new(Field::new("name", DataType::Utf8, true)); // Same
         let latest_score = Arc::new(Field::new("score", DataType::Float64, true)); // Changed type
         let latest_active = Arc::new(Field::new("active", DataType::Boolean, false)); // Same
         // metadata field missing from latest schema
-        
+
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(latest_id.name(), &latest_id);
         latest_schema_map.insert(latest_name.name(), &latest_name);
         latest_schema_map.insert(latest_score.name(), &latest_score);
         latest_schema_map.insert(latest_active.name(), &latest_active);
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
-        
+
         assert_eq!(diff.len(), 2);
         assert!(diff.contains_key("id"));
         assert!(diff.contains_key("score"));
         assert!(!diff.contains_key("name")); // Same type
         assert!(!diff.contains_key("active")); // Same type
         assert!(!diff.contains_key("metadata")); // Missing from latest
-        
+
         assert_eq!(diff.get("id").unwrap(), &DataType::Int64);
         assert_eq!(diff.get("score").unwrap(), &DataType::Float64);
     }
@@ -1926,27 +1928,30 @@ mod tests {
     fn test_generate_schema_diff_decimal_types() {
         // Test with decimal types that have precision and scale
         let decimal_field = Arc::new(Field::new(
-            "decimal_field", 
+            "decimal_field",
             DataType::Decimal128(10, 2), // precision=10, scale=2
-            true
+            true,
         ));
         let schema = Schema::new(vec![decimal_field.clone()]);
-        
+
         let latest_decimal_field = Arc::new(Field::new(
-            "decimal_field", 
+            "decimal_field",
             DataType::Decimal128(12, 4), // Different precision and scale
-            true
+            true,
         ));
-        
+
         let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
         latest_schema_map.insert(latest_decimal_field.name(), &latest_decimal_field);
-        
+
         let result = generate_schema_diff(&schema, &latest_schema_map);
         assert!(result.is_ok());
         let diff = result.unwrap();
-        
+
         assert_eq!(diff.len(), 1);
         assert!(diff.contains_key("decimal_field"));
-        assert_eq!(diff.get("decimal_field").unwrap(), &DataType::Decimal128(12, 4));
+        assert_eq!(
+            diff.get("decimal_field").unwrap(),
+            &DataType::Decimal128(12, 4)
+        );
     }
 }
