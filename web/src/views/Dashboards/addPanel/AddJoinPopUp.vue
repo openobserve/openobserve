@@ -26,7 +26,7 @@
     >
       <div style="flex: 1; gap: 8px">
         <div style="display: flex; align-items: center; gap: 8px">
-          <LeftJoinSvg />
+          <LeftJoinSvg class="tw-h-[21px]" />
           <label>Join</label>
         </div>
         <q-select
@@ -41,9 +41,16 @@
         />
       </div>
       <div
-        style="display: flex; align-items: center; gap: 8px; padding-top: 21px"
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding-top: 21px;
+          padding-right: 10px;
+          padding-left: 10px;
+        "
       >
-        <LeftJoinLineSvg />
+        <LeftJoinLineSvg class="tw-h-[40px] tw-w-[58px]" />
       </div>
 
       <div>
@@ -67,7 +74,11 @@
           >
             <LeftJoinTypeSvg :shouldFill="modelValue.joinType === 'left'" />
             <div
-              :class="[modelValue.joinType === 'left' ? 'text-primary' : '']"
+              :class="[
+                modelValue.joinType === 'left'
+                  ? 'text-primary tw-font-[600]'
+                  : '',
+              ]"
             >
               Left
             </div>
@@ -83,7 +94,11 @@
           >
             <InnerJoinTypeSvg :shouldFill="modelValue.joinType === 'inner'" />
             <div
-              :class="[modelValue.joinType === 'inner' ? 'text-primary' : '']"
+              :class="[
+                modelValue.joinType === 'inner'
+                  ? 'text-primary tw-font-[600]'
+                  : '',
+              ]"
             >
               Inner
             </div>
@@ -99,7 +114,11 @@
           >
             <RightJoinTypeSvg :shouldFill="modelValue.joinType === 'right'" />
             <div
-              :class="[modelValue.joinType === 'right' ? 'text-primary' : '']"
+              :class="[
+                modelValue.joinType === 'right'
+                  ? 'text-primary tw-font-[600]'
+                  : '',
+              ]"
             >
               Right
             </div>
@@ -108,14 +127,21 @@
       </div>
 
       <div
-        style="display: flex; align-items: center; gap: 8px; padding-top: 21px"
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding-top: 21px;
+          padding-right: 10px;
+          padding-left: 10px;
+        "
       >
-        <RightJoinLineSvg />
+        <RightJoinLineSvg class="tw-h-[40px] tw-w-[58px]" />
       </div>
 
       <div style="flex: 1">
         <div style="display: flex; align-items: center; gap: 8px">
-          <RightJoinSvg />
+          <RightJoinSvg class="tw-h-[21px]" />
           <label>On</label>
         </div>
 
@@ -234,13 +260,15 @@
             />
           </div>
 
-          <q-btn
-            @click="addCondition(argIndex)"
-            no-caps
-            dense
-            flat
-            icon="add"
-          />
+          <q-btn @click="addCondition(argIndex)" no-caps dense flat icon="add">
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+            >
+              Add another clause
+            </q-tooltip>
+          </q-btn>
 
           <q-btn
             :data-test="`dashboard-join-condition-remove-${argIndex}`"
@@ -251,7 +279,15 @@
             :disable="modelValue.conditions.length === 1"
             @click="removeCondition(argIndex)"
             class="tw-h-10 tw-w-10"
-          />
+          >
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+            >
+              Remove clause
+            </q-tooltip>
+          </q-btn>
         </div>
       </div>
     </div>
