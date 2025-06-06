@@ -381,3 +381,94 @@ impl StreamingIdItem {
         self.start_ok && self.end_ok
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::{
+        array::{Int32Array, RecordBatch},
+        datatypes::{DataType, Field, Schema},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_streaming_aggs_cache_insert_max_entries() {
+        // Create a cache with max_entries = 2
+        let cache = StreamingAggsCache::new(2);
+
+        // Create test schema and record batches
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+
+        let batch1 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
+
+        let batch2 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![4, 5, 6]))],
+        )
+        .unwrap();
+
+        let batch3 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![7, 8, 9]))],
+        )
+        .unwrap();
+
+        // Insert first entry
+        cache.insert("key1".to_string(), batch1);
+        assert!(cache.get("key1").is_some());
+        assert_eq!(cache.data.len(), 1);
+
+        // Insert second entry
+        cache.insert("key2".to_string(), batch2);
+        assert!(cache.get("key1").is_some());
+        assert!(cache.get("key2").is_some());
+        assert_eq!(cache.data.len(), 2);
+
+        // Insert third entry - should evict the first (oldest) entry
+        cache.insert("key3".to_string(), batch3);
+        assert!(cache.get("key1").is_none()); // Should be evicted
+        assert!(cache.get("key2").is_some());
+        assert!(cache.get("key3").is_some());
+        assert_eq!(cache.data.len(), 2); // Should still be 2 (max_entries)
+
+        // Verify that the cacher queue length matches max_entries
+        let cacher_len = cache.cacher.lock().len();
+        assert_eq!(cacher_len, 2);
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_insert_within_limit() {
+        // Create a cache with max_entries = 5
+        let cache = StreamingAggsCache::new(5);
+
+        // Create test schema and record batch
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
+
+        // Insert 3 entries (within limit)
+        cache.insert("key1".to_string(), batch.clone());
+        cache.insert("key2".to_string(), batch.clone());
+        cache.insert("key3".to_string(), batch.clone());
+
+        // All entries should be present
+        assert!(cache.get("key1").is_some());
+        assert!(cache.get("key2").is_some());
+        assert!(cache.get("key3").is_some());
+        assert_eq!(cache.data.len(), 3);
+
+        // Verify that the cacher queue length matches number of entries
+        let cacher_len = cache.cacher.lock().len();
+        assert_eq!(cacher_len, 3);
+    }
+}
