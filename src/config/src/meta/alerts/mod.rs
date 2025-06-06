@@ -93,9 +93,13 @@ impl TriggerCondition {
                 // Check for the cron timestamp after the silence period
                 Ok(schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance)
             } else {
+                // This is important, if provided start_utc was `Some`, it should use the next run
+                // after the start_utc. If it was `None`, it should use the next run after the
+                // current time.
+                let start_utc = start_utc.with_timezone(&timezone_offset);
                 // Check for the cron timestamp in the future
                 Ok(schedule
-                    .upcoming(timezone_offset)
+                    .after(&start_utc)
                     .next()
                     .unwrap()
                     .timestamp_micros()

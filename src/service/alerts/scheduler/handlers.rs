@@ -1010,6 +1010,10 @@ async fn handle_derived_stream_triggers(
         })
         .unwrap_or_default();
     let supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
+    let is_cron_frequency = derived_stream
+        .trigger_condition
+        .frequency_type
+        .eq(&config::meta::alerts::FrequencyType::Cron);
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
@@ -1037,17 +1041,20 @@ async fn handle_derived_stream_triggers(
         );
         (
             Some(t0),
-            std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds),
+            if is_cron_frequency {
+                // For cron frequency, don't believe the period, the period can be dynamic for cron.
+                // For example, if cron expression evaluates to "run every weekend 12am", the period
+                // is dynamic here.
+                supposed_to_be_run_at
+            } else {
+                std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
+            },
         )
     } else {
         (None, supposed_to_be_run_at)
     };
     // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
-    let aligned_curr_time = if !derived_stream
-        .trigger_condition
-        .frequency_type
-        .eq(&config::meta::alerts::FrequencyType::Cron)
-    {
+    let aligned_curr_time = if !is_cron_frequency {
         // For non-cron frequency, we need to align the current time so that the end_time is
         // divisible by the period For example, if the current time is 5:19pm, period is 5
         // mins, and delay is 4mins (supposed to be run at 5:15pm), we need to ingest data
