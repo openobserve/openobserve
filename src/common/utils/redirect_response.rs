@@ -59,6 +59,7 @@ impl RedirectResponse {
                 .append_header((LOCATION, redirect_uri))
                 .finish()
         } else {
+            // if the URL is too long, we send the original URL and let FE handle the redirect.
             let html = format!(
                 r#"
                 <!DOCTYPE html>

@@ -22,21 +22,21 @@ use infra::{
 
 use crate::service::db;
 
-const SHORT_URL_WEB_PATH: &str = "/short/";
+const SHORT_URL_WEB_PATH: &str = "short/";
 
 pub fn get_base_url() -> String {
     let config = get_config();
     format!("{}{}", config.common.web_url, config.common.base_uri)
 }
 
-fn construct_short_url(org_id: &str, short_id: &str) -> String {
+pub fn construct_short_url(org_id: &str, short_id: &str) -> String {
     format!(
-        "{}/{}/{}{}{}",
+        "{}/{}/{}{}?org_identifier={}",
         get_base_url(),
-        "api",
-        org_id,
+        "web",
         SHORT_URL_WEB_PATH,
-        short_id
+        short_id,
+        org_id,
     )
 }
 
