@@ -105,8 +105,17 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_zo_logger_enabled() {
+    fn enable_log() {
+        unsafe {
+            std::env::set_var("ZO_EVENTS_ENABLED", "true");
+        }
+        config::refresh_config().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_zo_logger_enabled() {
+        enable_log();
+
         let logger = ZoLogger {
             sender: EVENT_SENDER.clone(),
         };
@@ -117,8 +126,9 @@ mod tests {
         assert_eq!(logger.enabled(&metadata), get_config().log.events_enabled);
     }
 
-    #[test]
-    fn test_zo_logger_log() {
+    #[tokio::test]
+    async fn test_zo_logger_log() {
+        enable_log();
         let (tx, mut rx) = broadcast::channel(1024);
         let logger = ZoLogger { sender: tx };
         let metadata = MetadataBuilder::new()
@@ -133,6 +143,7 @@ mod tests {
             .build();
 
         logger.log(&record);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         // Verify the event was sent
         let event = rx.try_recv().unwrap();
@@ -143,8 +154,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_zo_logger_log_without_file_line() {
+    #[tokio::test]
+    async fn test_zo_logger_log_without_file_line() {
+        enable_log();
         let (tx, mut rx) = broadcast::channel(1024);
         let logger = ZoLogger { sender: tx };
         let metadata = MetadataBuilder::new()
@@ -160,14 +172,14 @@ mod tests {
 
         // Verify the event was sent
         let event = rx.try_recv().unwrap();
-        let data: serde_json::Value =
-            serde_json::from_str(event.data().unwrap().to_string().as_str()).unwrap();
+        let data: serde_json::Value = event.data().unwrap().to_owned().try_into().unwrap();
         assert_eq!(data["file"], "");
         assert_eq!(data["line"], 0);
     }
 
     #[tokio::test]
-    async fn test_send_logs() {
+    async fn test_zo_logger_send_logs() {
+        enable_log();
         let (tx, _) = broadcast::channel(1024);
         let logger = ZoLogger { sender: tx.clone() };
         let metadata = MetadataBuilder::new()
@@ -184,13 +196,14 @@ mod tests {
             logger.log(&record);
         }
 
-        // Verify logs were stored
+        // Verify logs were stored, already sent, so no logs left
         let logs = LOGS.read().await;
-        assert_eq!(logs.len(), get_config().log.events_batch_size);
+        assert_eq!(logs.len(), 0);
     }
 
     #[test]
     fn test_zo_logger_flush() {
+        enable_log();
         let logger = ZoLogger {
             sender: EVENT_SENDER.clone(),
         };
@@ -200,12 +213,14 @@ mod tests {
 
     #[test]
     fn test_event_sender_initialization() {
+        enable_log();
         let sender = EVENT_SENDER.clone();
         assert_eq!(sender.receiver_count(), 0);
     }
 
     #[test]
     fn test_logs_initialization() {
+        enable_log();
         let logs = LOGS.clone();
         assert_eq!(logs.blocking_read().len(), 0);
     }
