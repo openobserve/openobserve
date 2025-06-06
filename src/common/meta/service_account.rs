@@ -38,3 +38,144 @@ pub struct UpdateServiceAccountRequest {
     #[serde(default)]
     pub last_name: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_account_request() {
+        let request = ServiceAccountRequest {
+            email: "test@example.com".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        assert_eq!(request.email, "test@example.com");
+        assert_eq!(request.first_name, "Test");
+        assert_eq!(request.last_name, "User");
+    }
+
+    #[test]
+    fn test_service_account_request_default() {
+        let request = ServiceAccountRequest::default();
+        assert_eq!(request.email, "");
+        assert_eq!(request.first_name, "");
+        assert_eq!(request.last_name, "");
+    }
+
+    #[test]
+    fn test_service_account_request_serialization() {
+        let request = ServiceAccountRequest {
+            email: "test@example.com".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&request).unwrap();
+        let deserialized: ServiceAccountRequest = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(request, deserialized);
+    }
+
+    #[test]
+    fn test_service_account_request_equality() {
+        let request1 = ServiceAccountRequest {
+            email: "test@example.com".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        let request2 = ServiceAccountRequest {
+            email: "test@example.com".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        let request3 = ServiceAccountRequest {
+            email: "different@example.com".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        assert_eq!(request1, request2);
+        assert_ne!(request1, request3);
+    }
+
+    #[test]
+    fn test_api_token() {
+        let token = APIToken {
+            token: "test-token".to_string(),
+            user: "test-user".to_string(),
+        };
+
+        assert_eq!(token.token, "test-token");
+        assert_eq!(token.user, "test-user");
+    }
+
+    #[test]
+    fn test_api_token_serialization() {
+        let token = APIToken {
+            token: "test-token".to_string(),
+            user: "test-user".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&token).unwrap();
+        let deserialized: APIToken = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(token.token, deserialized.token);
+        assert_eq!(token.user, deserialized.user);
+    }
+
+    #[test]
+    fn test_update_service_account_request() {
+        let request = UpdateServiceAccountRequest {
+            first_name: "Updated".to_string(),
+            last_name: "Name".to_string(),
+        };
+
+        assert_eq!(request.first_name, "Updated");
+        assert_eq!(request.last_name, "Name");
+    }
+
+    #[test]
+    fn test_update_service_account_request_default() {
+        let request = UpdateServiceAccountRequest::default();
+        assert_eq!(request.first_name, "");
+        assert_eq!(request.last_name, "");
+    }
+
+    #[test]
+    fn test_update_service_account_request_serialization() {
+        let request = UpdateServiceAccountRequest {
+            first_name: "Updated".to_string(),
+            last_name: "Name".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&request).unwrap();
+        let deserialized: UpdateServiceAccountRequest = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(request, deserialized);
+    }
+
+    #[test]
+    fn test_update_service_account_request_equality() {
+        let request1 = UpdateServiceAccountRequest {
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        let request2 = UpdateServiceAccountRequest {
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        let request3 = UpdateServiceAccountRequest {
+            first_name: "Different".to_string(),
+            last_name: "User".to_string(),
+        };
+
+        assert_eq!(request1, request2);
+        assert_ne!(request1, request3);
+    }
+}
