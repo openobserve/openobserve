@@ -635,11 +635,11 @@ const useLogs = () => {
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
 
-    if(searchObj.meta.regions.length) {
+    if(searchObj.meta?.regions?.length) {
       query["regions"] = searchObj.meta.regions.join(",");
     }
 
-    if(searchObj.meta.clusters.length) {
+    if(searchObj.meta?.clusters?.length) {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
 
