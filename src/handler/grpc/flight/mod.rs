@@ -409,7 +409,7 @@ fn add_scan_stats_to_schema(schema: Arc<Schema>, scan_stats: ScanStats) -> Arc<S
 
 fn clear_session_data(trace_id: &str) {
     // clear session data
-    crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+    crate::service::search::datafusion::storage::file_list::clear(trace_id);
     // release wal lock files
-    crate::common::infra::wal::release_request(&trace_id);
+    crate::common::infra::wal::release_request(trace_id);
 }
