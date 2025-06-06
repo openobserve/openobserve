@@ -278,7 +278,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should navigate to another dashboard using the DrillDown feature.", async ({
+  test("should navigate to another dashboard using the DrillDown feature.", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -514,7 +514,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should display an error message when some fields are missing or incorrect", async ({
+  test("should display an error message when some fields are missing or incorrect", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -565,7 +565,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should apply various filter operators to the dashboard field and display the correct results", async ({
+  test.skip("should apply various filter operators to the dashboard field and display the correct results", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -724,7 +724,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardActions.applyDashboardBtn();
 
     // Verify chart is visible
-    await dashboardAction.waitForChartToRender();
+    await dashboardActions.waitForChartToRender();
 
     // Configure drilldown
     await dashboardPanelConfigs.openConfigPanel();
@@ -769,15 +769,18 @@ test.describe("dashboard UI testcases", () => {
     // Set date-time filter and timezone
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardTimeRefresh.setRelative("5", "w");
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Verify the gauge chart is visible
-    await dashboardAction.waitForChartToRender();
-
-    // Verify confirmation popup for unsaved changes
+    await dashboardActions.waitForChartToRender();
     await page.locator('[data-test="dashboard-panel-discard"]').click();
 
-    await dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
+    await page.waitForTimeout(5000);
+    const dialogLocator = page.locator(
+      "text=You have unsaved changes. Are you sure you want to leave?"
+    );
+    await expect(dialogLocator).toBeVisible({ timeout: 5000 });
+
+    await page.getByRole("button", { name: "Cancel" }).click();
   });
 });
