@@ -564,9 +564,21 @@ async fn get_file_list_inner(
     let lock_guard = wal_lock.lock().await;
 
     // filter by pending delete
-    let files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
+    let mut files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
         return Ok(vec![]);
+    }
+
+    let files_num = files.len();
+    files.sort_unstable();
+    files.dedup();
+    if files_num != files.len() {
+        log::warn!(
+            "[trace_id {}] wal->parquet->search: found duplicate files from {} to {}",
+            query.trace_id,
+            files_num,
+            files.len()
+        );
     }
 
     // lock theses files

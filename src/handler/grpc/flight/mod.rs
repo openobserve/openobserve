@@ -136,9 +136,7 @@ impl FlightService for FlightServiceImpl {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
-                crate::service::search::datafusion::storage::file_list::clear(&trace_id);
-                // release wal lock files
-                crate::common::infra::wal::release_request(&trace_id);
+                clear_session_data(&trace_id);
                 log::error!(
                     "[trace_id {}] flight->search: do_get physical plan generate error: {e:?}",
                     trace_id,
@@ -183,20 +181,31 @@ impl FlightService for FlightServiceImpl {
         let start = std::time::Instant::now();
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
             .try_with_compression(Some(CompressionType::ZSTD))
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                // clear session data
+                clear_session_data(&trace_id);
+                log::error!(
+                    "[trace_id {}] flight->search: do_get create IPC write options error: {e:?}",
+                    trace_id,
+                );
+                Status::internal(e.to_string())
+            })?;
+        let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
+            // clear session data
+            clear_session_data(&trace_id);
+            log::error!(
+                "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
+                trace_id,
+            );
+            Status::internal(e.to_string())
+        })?;
         let flight_data_stream = FlightDataEncoderBuilder::new()
             .with_schema(schema)
             .with_max_flight_data_size(33554432) // 32MB
             .with_options(write_options)
             .build(FlightSenderStream::new(
                 trace_id.to_string(),
-                execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-                    log::error!(
-                        "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
-                        trace_id,
-                    );
-                    Status::internal(e.to_string())
-                })?,
+                stream,
                 defer,
                 start,
                 timeout,
@@ -353,9 +362,7 @@ impl Drop for FlightSenderStream {
                 self.trace_id
             );
             // clear session data
-            crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
-            // release wal lock files
-            crate::common::infra::wal::release_request(&self.trace_id);
+            clear_session_data(&self.trace_id);
         }
     }
 }
@@ -398,4 +405,11 @@ fn add_scan_stats_to_schema(schema: Arc<Schema>, scan_stats: ScanStats) -> Arc<S
     let stats_string = serde_json::to_string(&scan_stats).unwrap_or_default();
     metadata.insert("scan_stats".to_string(), stats_string);
     Arc::new(schema.as_ref().clone().with_metadata(metadata))
+}
+
+fn clear_session_data(trace_id: &str) {
+    // clear session data
+    crate::service::search::datafusion::storage::file_list::clear(trace_id);
+    // release wal lock files
+    crate::common::infra::wal::release_request(trace_id);
 }
