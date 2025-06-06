@@ -137,4 +137,15 @@ mod tests {
         // Should return the same short_id
         assert_eq!(short_url1, short_url2);
     }
+
+    #[tokio::test]
+    async fn test_generate_short_id() {
+        let original_url = "https://www.example.com/some/long/url";
+        let short_id = generate_short_id(original_url, None);
+        assert_eq!(short_id.len(), 16);
+        let timestamp = Utc::now().timestamp_micros();
+        let short_id2 = generate_short_id(original_url, Some(timestamp));
+        assert_eq!(short_id2.len(), 16);
+        assert_ne!(short_id, short_id2);
+    }
 }
