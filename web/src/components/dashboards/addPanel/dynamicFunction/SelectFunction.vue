@@ -17,7 +17,7 @@
       option-value="value"
       emit-value
       map-options
-      class="tw-w-72 tw-border tw-border-solid tw-border-gray-200 tw-pl-2"
+      class="tw-w-72 tw-h-10 tw-border tw-border-solid tw-border-gray-200 tw-pl-2"
     >
       <!-- <template v-slot:append>
           <q-icon
@@ -69,7 +69,7 @@
             <div>
               <div class="tw-flex tw-items-center tw-gap-x-2">
                 <label :for="'arg-' + argIndex"
-                  >Parameters {{ argIndex + 1 }}</label
+                  >Parameter {{ argIndex + 1 }}</label
                 >
               </div>
               <div class="tw-flex">
@@ -158,7 +158,6 @@
 
                 <SelectFunction
                   v-if="fields.args[argIndex]?.type === 'function'"
-                  class="tw-ml-4"
                   v-model="fields.args[argIndex].value"
                   :allowAggregation="allowAggregation"
                   :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
