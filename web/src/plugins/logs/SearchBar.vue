@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <syntax-guide
-        v-if="!store.state.isAiChatEnabled"
+          v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         >
@@ -374,100 +374,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn-group>
         <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
         <q-btn
-          v-if="store.state.isAiChatEnabled "
-            class="tw-text-[12px]  tw-font-[500] q-ml-xs q-px-sm   "
-            no-caps
-            menu-anchor="bottom left"
-            menu-self="top left"
-            icon="menu"
-            size="sm"
-            dense
-            >
-            <q-menu>
-              <div class="row tw-gap-2">
-                <div class="q-mt-xs">
-                  <div class="row no-wrap q-pl-sm  q-mt-sm tw-w-[140px] tw-flex tw-items-center">
-                    <div class="tw-w-[30%]">
-                      <q-toggle 
-                        data-test="logs-search-bar-show-histogram-toggle-btn"
-                        v-model="searchObj.meta.showHistogram" 
-                        dense
-                        class="q-pb-xs"
-                        size="32px"
-                        ></q-toggle>
-                    </div>
-                        <q-item-label>
-                          {{ t('search.showHistogramLabel') }}
-                        </q-item-label>
-
-
-                  </div>
-
-                  <q-separator />
-
-                  <div class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-start ">
+          v-if="store.state.isAiChatEnabled"
+          class="tw-text-[12px] tw-font-[500] q-ml-xs q-px-sm"
+          no-caps
+          menu-anchor="bottom left"
+          menu-self="top left"
+          icon="menu"
+          size="sm"
+          dense
+        >
+          <q-menu>
+            <div class="row tw-gap-2">
+              <div class="q-mt-xs">
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-center"
+                >
                   <div class="tw-w-[30%]">
-                    <q-toggle 
+                    <q-toggle
+                      data-test="logs-search-bar-show-histogram-toggle-btn"
+                      v-model="searchObj.meta.showHistogram"
+                      dense
+                      class="q-pb-xs"
+                      size="32px"
+                    ></q-toggle>
+                  </div>
+                  <q-item-label>
+                    {{ t("search.showHistogramLabel") }}
+                  </q-item-label>
+                </div>
+
+                <q-separator />
+
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-start"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-toggle
                       data-test="logs-search-bar-wrap-table-content-toggle-btn"
                       v-model="searchObj.meta.toggleSourceWrap"
                       icon="wrap_text"
-                      style="margin: 0px;"
+                      style="margin: 0px"
                       size="32px"
                       class="q-pb-xs"
                       dense
-                      ></q-toggle>
+                    ></q-toggle>
                   </div>
-                      <q-item-label>
-                      Wrap Content
-                      </q-item-label>
-
-
+                  <q-item-label> Wrap Content </q-item-label>
                 </div>
                 <q-separator />
 
-                <div class="row no-wrap q-pl-sm  q-mt-sm tw-w-[140px] tw-flex tw-items-start ">
-                <div class="tw-w-[30%]">
-                <q-toggle 
-                  data-test="logs-search-bar-quick-mode-toggle-btn"
-                  v-model="searchObj.meta.quickMode"
-                  @click="handleQuickMode"
-                  class="q-pb-xs"
-                  size="32px"
-
-                  dense
-                  ></q-toggle>
-                </div>
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-start"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-toggle
+                      data-test="logs-search-bar-quick-mode-toggle-btn"
+                      v-model="searchObj.meta.quickMode"
+                      @click="handleQuickMode"
+                      class="q-pb-xs"
+                      size="32px"
+                      dense
+                    ></q-toggle>
+                  </div>
                   <q-item-label>
                     {{ t("search.quickModeLabel") }}
                   </q-item-label>
-
-
                 </div>
                 <q-separator />
 
-                <div class="row tw-h-[30px] q-pl-sm  q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center">
-                    <div class="tw-w-[30%]">
-                      <syntax-guide
+                <div
+                  class="row tw-h-[30px] q-pl-sm q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                >
+                  <div class="tw-w-[30%]">
+                    <syntax-guide
                       data-test="logs-search-bar-sql-mode-toggle-btn"
                       :sqlmode="searchObj.meta.sqlMode"
                       size="10px"
-                      style="margin: 0px; "
+                      style="margin: 0px"
                       :style="{
-                        border: !searchObj.meta.sqlMode ? '1px solid #c4c4c4' : 'none'
+                        border: !searchObj.meta.sqlMode
+                          ? '1px solid #c4c4c4'
+                          : 'none',
                       }"
-                      
-                  >
-                  </syntax-guide>
-                    </div>
-                      <q-item-label>
-                        Syntax Guide
-                      </q-item-label>
-
+                    >
+                    </syntax-guide>
                   </div>
-                  <q-separator />
-                  <div class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center">
-                    <div class="tw-w-[30%]">
-                      <q-btn
+                  <q-item-label> Syntax Guide </q-item-label>
+                </div>
+                <q-separator />
+                <div
+                  class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-btn
                       data-test="logs-search-bar-reset-filters-btn"
                       no-caps
                       icon="restart_alt"
@@ -477,19 +476,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="resetFilters"
                     >
                     </q-btn>
-                    </div>
-                    <q-item-label>
-                      {{ t('search.resetFilters') }}
-                    </q-item-label>
-
                   </div>
-                </div>
-                <div>
-
+                  <q-item-label>
+                    {{ t("search.resetFilters") }}
+                  </q-item-label>
                 </div>
               </div>
-            </q-menu>
-          </q-btn>
+              <div></div>
+            </div>
+          </q-menu>
+        </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
           style="border: 1px solid #c4c4c4; border-radius: 5px"
@@ -535,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @save:function="fnSavedFunctionDialog"
         />
         <function-selector
-        v-else
+          v-else
           :function-options="functionOptions"
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
@@ -678,7 +674,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
-        <div class="float-left" >
+        <div class="float-left">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -1483,10 +1479,10 @@ export default defineComponent({
         });
     },
     handleKeyDown(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          this.handleRunQueryFn();
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        this.handleRunQueryFn();
       }
-    }
+    },
   },
   props: {
     fieldValues: {
@@ -2613,7 +2609,7 @@ export default defineComponent({
               await updatedLocalLogFilterField();
             }
 
-            if(searchObj.meta.toggleFunction == false) {
+            if (searchObj.meta.toggleFunction == false) {
               searchObj.config.fnSplitterModel = 99.5;
               resetFunctionContent();
             }
@@ -2800,6 +2796,8 @@ export default defineComponent({
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
+
+        delete savedSearchObj.data.parsedQuery;
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
