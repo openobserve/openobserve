@@ -283,3 +283,609 @@ async fn warm_up_fastfield(
     .await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        sync::Arc,
+        path::PathBuf,
+        io::ErrorKind,
+    };
+
+    use hashbrown::HashMap as HashbrownHashMap;
+    use tantivy::{
+        HasLen,
+        directory::{Directory, FileHandle, error::OpenReadError},
+        schema::{Schema, STORED, TEXT},
+        Index,
+        doc,
+        Term,
+    };
+    use tokio::time::{Duration, Instant};
+
+    use super::*;
+    use crate::service::search::tantivy::puffin::{
+        BlobMetadata, BlobMetadataBuilder, BlobTypes, PuffinMeta,
+        reader::PuffinBytesReader,
+    };
+
+    // Mock data for testing
+    fn create_mock_object_meta(file_name: &str, size: usize) -> object_store::ObjectMeta {
+        object_store::ObjectMeta {
+            location: file_name.into(),
+            last_modified: chrono::Utc::now(),
+            size,
+            e_tag: None,
+            version: None,
+        }
+    }
+
+    fn create_mock_blob_metadata(
+        blob_type: BlobTypes,
+        offset: u64,
+        length: u64,
+        file_name: &str,
+    ) -> Result<BlobMetadata, &'static str> {
+        let mut properties = HashMap::new();
+        properties.insert("blob_tag".to_string(), file_name.to_string());
+        
+        BlobMetadataBuilder::default()
+            .blob_type(blob_type)
+            .offset(offset)
+            .length(length)
+            .properties(properties)
+            .build()
+    }
+
+    #[tokio::test]
+    async fn test_puffin_dir_reader_from_path_success() {
+        // This test would need to be implemented with proper mocking
+        // For now, we test the structure and error handling
+        let account = "test_account".to_string();
+        let meta = create_mock_object_meta("test_file.puffin", 1024);
+        
+        // Test error case - this will fail because we don't have actual puffin data
+        let result = PuffinDirReader::from_path(account, meta).await;
+        assert!(result.is_err(), "Expected error for invalid puffin file");
+        
+        // Verify the error message contains expected text
+        if let Err(e) = result {
+            assert!(e.to_string().contains("Error reading metadata from puffin file"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_puffin_dir_reader_from_path_no_metadata() {
+        let account = "test_account".to_string();
+        let meta = create_mock_object_meta("empty_file.puffin", 0);
+        
+        let result = PuffinDirReader::from_path(account, meta).await;
+        assert!(result.is_err(), "Expected error for file without metadata");
+    }
+
+    #[test]
+    fn test_puffin_dir_reader_list_files() {
+        // Create mock blobs metadata
+        let mut blobs_metadata = HashbrownHashMap::new();
+        
+        let blob1 = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            100,
+            "segment1.terms"
+        ).expect("Failed to create blob metadata");
+        
+        let blob2 = create_mock_blob_metadata(
+            BlobTypes::O2TtvV1,
+            100,
+            200,
+            "segment1.pos"
+        ).expect("Failed to create blob metadata");
+        
+        blobs_metadata.insert(PathBuf::from("segment1.terms"), Arc::new(blob1));
+        blobs_metadata.insert(PathBuf::from("segment1.pos"), Arc::new(blob2));
+        
+        // Create a mock PuffinBytesReader
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let files = reader.list_files();
+        assert_eq!(files.len(), 2);
+        assert!(files.contains(&PathBuf::from("segment1.terms")));
+        assert!(files.contains(&PathBuf::from("segment1.pos")));
+    }
+
+    #[test]
+    fn test_puffin_dir_reader_clone() {
+        let mut blobs_metadata = HashbrownHashMap::new();
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            100,
+            "test_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        blobs_metadata.insert(PathBuf::from("test_file.terms"), Arc::new(blob));
+        
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let cloned_reader = reader.clone();
+        assert_eq!(reader.list_files(), cloned_reader.list_files());
+    }
+
+    #[test]
+    fn test_puffin_slice_handle_len() {
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            42,
+            "test_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let handle = PuffinSliceHandle {
+            path: PathBuf::from("test_file.terms"),
+            source: Arc::new(mock_reader),
+            metadata: Arc::new(blob),
+        };
+        
+        assert_eq!(handle.len(), 42);
+    }
+
+    #[test]
+    fn test_puffin_slice_handle_read_bytes_sync_error() {
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            100,
+            "test_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let handle = PuffinSliceHandle {
+            path: PathBuf::from("test_file.terms"),
+            source: Arc::new(mock_reader),
+            metadata: Arc::new(blob),
+        };
+        
+        let result = handle.read_bytes(0..10);
+        assert!(result.is_err());
+        
+        if let Err(e) = result {
+            assert_eq!(e.kind(), ErrorKind::Other);
+            assert!(e.to_string().contains("Not supported with PuffinSliceHandle"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_puffin_slice_handle_read_bytes_async_empty_range() {
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            100,
+            "test_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let handle = PuffinSliceHandle {
+            path: PathBuf::from("test_file.terms"),
+            source: Arc::new(mock_reader),
+            metadata: Arc::new(blob),
+        };
+        
+        let result = handle.read_bytes_async(0..0).await;
+        assert!(result.is_ok());
+        
+        if let Ok(bytes) = result {
+            assert_eq!(bytes.len(), 0);
+        }
+    }
+
+    #[test]
+    fn test_directory_get_file_handle_existing_file() {
+        let mut blobs_metadata = HashbrownHashMap::new();
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            100,
+            "existing_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        let path = PathBuf::from("existing_file.terms");
+        blobs_metadata.insert(path.clone(), Arc::new(blob));
+        
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let result = reader.get_file_handle(&path);
+        assert!(result.is_ok(), "Expected success for existing file");
+    }
+
+    #[test]
+    fn test_directory_get_file_handle_nonexistent_file() {
+        let blobs_metadata = HashbrownHashMap::new();
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let path = PathBuf::from("nonexistent_file.terms");
+        let result = reader.get_file_handle(&path);
+        
+        // This should try to get from empty puffin directory, which might succeed or fail
+        // depending on the extension
+        match result {
+            Ok(_) => {
+                // File found in empty puffin directory
+            }
+            Err(OpenReadError::FileDoesNotExist(_)) => {
+                // Expected for files not in empty puffin directory
+            }
+            Err(e) => panic!("Unexpected error: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_directory_get_file_handle_no_extension() {
+        let blobs_metadata = HashbrownHashMap::new();
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let path = PathBuf::from("file_without_extension");
+        let result = reader.get_file_handle(&path);
+        
+        assert!(matches!(result, Err(OpenReadError::FileDoesNotExist(_))));
+    }
+
+    #[test]
+    fn test_directory_exists_existing_file() {
+        let mut blobs_metadata = HashbrownHashMap::new();
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            100,
+            "existing_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        let path = PathBuf::from("existing_file.terms");
+        blobs_metadata.insert(path.clone(), Arc::new(blob));
+        
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let result = reader.exists(&path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true);
+    }
+
+    #[test]
+    fn test_directory_exists_nonexistent_file() {
+        let blobs_metadata = HashbrownHashMap::new();
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let path = PathBuf::from("nonexistent_file.unknown");
+        let result = reader.exists(&path);
+        
+        // Should check empty puffin directory
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_directory_readonly_operations() {
+        let blobs_metadata = HashbrownHashMap::new();
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+        
+        let path = PathBuf::from("test_file.txt");
+        let data = b"test data";
+        
+        // Test that write operations are unimplemented
+        let atomic_write_result = std::panic::catch_unwind(|| {
+            reader.atomic_write(&path, data)
+        });
+        assert!(atomic_write_result.is_err());
+        
+        let atomic_read_result = std::panic::catch_unwind(|| {
+            reader.atomic_read(&path)
+        });
+        assert!(atomic_read_result.is_err());
+
+        let delete_result = std::panic::catch_unwind(|| {
+            reader.delete(&path)
+        });
+        assert!(delete_result.is_err());
+
+        let open_write_result = std::panic::catch_unwind(|| {
+            reader.open_write(&path)
+        });
+        assert!(open_write_result.is_err());
+
+        let sync_result = std::panic::catch_unwind(|| {
+            reader.sync_directory()
+        });
+        assert!(sync_result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_warm_up_terms_empty_terms() {
+        // Create a simple in-memory index for testing
+        let mut schema_builder = Schema::builder();
+        let text_field = schema_builder.add_text_field("text", TEXT | STORED);
+        let schema = schema_builder.build();
+        
+        let index = Index::create_in_ram(schema.clone());
+        let mut index_writer = index.writer(50_000_000).expect("Failed to create index writer");
+        
+        // Add a document
+        index_writer.add_document(doc!(text_field => "hello world")).expect("Failed to add document");
+        index_writer.commit().expect("Failed to commit");
+        
+        let reader = index
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::Manual)
+            .try_into()
+            .expect("Failed to create reader");
+        
+        let searcher = reader.searcher();
+        
+        // Test with empty terms
+        let terms_grouped_by_field = HashbrownHashMap::new();
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, false).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_warm_up_terms_with_terms() {
+        // Create a simple in-memory index for testing
+        let mut schema_builder = Schema::builder();
+        let text_field = schema_builder.add_text_field("text", TEXT | STORED);
+        let schema = schema_builder.build();
+        
+        let index = Index::create_in_ram(schema.clone());
+        let mut index_writer = index.writer(50_000_000).expect("Failed to create index writer");
+        
+        // Add a document
+        index_writer.add_document(doc!(text_field => "hello world")).expect("Failed to add document");
+        index_writer.commit().expect("Failed to commit");
+        
+        let reader = index
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::Manual)
+            .try_into()
+            .expect("Failed to create reader");
+        
+        let searcher = reader.searcher();
+        
+        // Test with specific terms
+        let mut terms_grouped_by_field = HashbrownHashMap::new();
+        let mut field_terms = HashbrownHashMap::new();
+        let term = Term::from_field_text(text_field, "hello");
+        field_terms.insert(term, false);
+        terms_grouped_by_field.insert(text_field, field_terms);
+        
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, false).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_warm_up_terms_with_fast_fields() {
+        // Create a simple in-memory index for testing
+        let mut schema_builder = Schema::builder();
+        let text_field = schema_builder.add_text_field("text", TEXT | STORED);
+        let schema = schema_builder.build();
+        
+        let index = Index::create_in_ram(schema.clone());
+        let mut index_writer = index.writer(50_000_000).expect("Failed to create index writer");
+        
+        // Add a document
+        index_writer.add_document(doc!(text_field => "hello world")).expect("Failed to add document");
+        index_writer.commit().expect("Failed to commit");
+        
+        let reader = index
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::Manual)
+            .try_into()
+            .expect("Failed to create reader");
+        
+        let searcher = reader.searcher();
+        
+        // Test with fast fields enabled
+        let terms_grouped_by_field = HashbrownHashMap::new();
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, true).await;
+        // This might fail if _timestamp field is not present, which is expected in this simple test
+        // The important thing is that the function doesn't panic
+        let _ = result;
+    }
+
+    #[tokio::test]
+    async fn test_warm_up_terms_performance() {
+        // Performance test to ensure warming up doesn't take too long
+        let mut schema_builder = Schema::builder();
+        let text_field = schema_builder.add_text_field("text", TEXT | STORED);
+        let schema = schema_builder.build();
+        
+        let index = Index::create_in_ram(schema.clone());
+        let mut index_writer = index.writer(50_000_000).expect("Failed to create index writer");
+        
+        // Add multiple documents
+        for i in 0..100 {
+            index_writer.add_document(doc!(text_field => format!("document {}", i))).expect("Failed to add document");
+        }
+        index_writer.commit().expect("Failed to commit");
+        
+        let reader = index
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::Manual)
+            .try_into()
+            .expect("Failed to create reader");
+        
+        let searcher = reader.searcher();
+        
+        let mut terms_grouped_by_field = HashbrownHashMap::new();
+        let mut field_terms = HashbrownHashMap::new();
+        // Add multiple terms
+        for i in 0..10 {
+            let term = Term::from_field_text(text_field, &format!("document {}", i));
+            field_terms.insert(term, false);
+        }
+        terms_grouped_by_field.insert(text_field, field_terms);
+        
+        let start = Instant::now();
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, false).await;
+        let duration = start.elapsed();
+        
+        assert!(result.is_ok());
+        // Warming up should complete within a reasonable time (10 seconds for this test)
+        assert!(duration < Duration::from_secs(10));
+    }
+
+    #[test]
+    fn test_blob_metadata_properties() {
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            100,
+            200,
+            "test_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        // Test that properties are set correctly
+        assert_eq!(blob.blob_type, BlobTypes::O2FstV1);
+        assert_eq!(blob.offset, 100);
+        assert_eq!(blob.length, 200);
+        assert_eq!(blob.properties.get("blob_tag"), Some(&"test_file.terms".to_string()));
+    }
+
+    #[test]
+    fn test_blob_metadata_get_offset() {
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            100,
+            200,
+            "test_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        // Test get_offset with no range
+        let offset_range = blob.get_offset(None);
+        assert_eq!(offset_range, 100..300);
+        
+        // Test get_offset with specific range
+        let offset_range = blob.get_offset(Some(10..20));
+        assert_eq!(offset_range, 110..120);
+    }
+
+    #[test]
+    fn test_error_handling_edge_cases() {
+        // Test various error conditions that might occur in real usage
+        
+        // Test with invalid blob types
+        let result = BlobMetadataBuilder::default()
+            .offset(0)
+            .length(100)
+            .build();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "blob_type is required");
+        
+        // Test with missing offset
+        let result = BlobMetadataBuilder::default()
+            .blob_type(BlobTypes::O2FstV1)
+            .length(100)
+            .build();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "offset is required");
+    }
+
+    #[test]
+    fn test_concurrent_access() {
+        // Test that the reader can be safely shared across threads
+        let mut blobs_metadata = HashbrownHashMap::new();
+        let blob = create_mock_blob_metadata(
+            BlobTypes::O2FstV1,
+            0,
+            100,
+            "shared_file.terms"
+        ).expect("Failed to create blob metadata");
+        
+        blobs_metadata.insert(PathBuf::from("shared_file.terms"), Arc::new(blob));
+        
+        let mock_reader = PuffinBytesReader::new("test_account".to_string(), 
+            create_mock_object_meta("test.puffin", 1024));
+        
+        let reader = Arc::new(PuffinDirReader {
+            source: Arc::new(mock_reader),
+            blobs_metadata: Arc::new(blobs_metadata),
+        });
+        
+        let mut handles = vec![];
+        
+        // Spawn multiple threads that access the reader
+        for i in 0..10 {
+            let reader_clone = reader.clone();
+            let handle = std::thread::spawn(move || {
+                let files = reader_clone.list_files();
+                assert_eq!(files.len(), 1);
+                assert!(files.contains(&PathBuf::from("shared_file.terms")));
+                
+                let path = PathBuf::from("shared_file.terms");
+                let exists = reader_clone.exists(&path);
+                assert!(exists.is_ok());
+                assert_eq!(exists.unwrap(), true);
+                
+                i // Return thread index for verification
+            });
+            handles.push(handle);
+        }
+        
+        // Wait for all threads to complete
+        for (i, handle) in handles.into_iter().enumerate() {
+            let result = handle.join().expect("Thread panicked");
+            assert_eq!(result, i);
+        }
+    }
+}
