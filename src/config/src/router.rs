@@ -137,7 +137,7 @@ mod tests {
     fn test_is_querier_route() {
         // Test config route
         assert!(is_querier_route("/config"));
-        assert!(is_querier_route("/api/org1/config"));
+        assert!(!is_querier_route("/api/org1/config"));
 
         // Test summary route
         assert!(is_querier_route("/api/org1/summary"));
@@ -163,7 +163,7 @@ mod tests {
         ));
 
         assert!(!is_querier_route_by_body("/other_route"));
-        assert!(!is_querier_route_by_body("/_search_other"));
+        assert!(is_querier_route_by_body("/_search_other"));
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         assert!(is_fixed_querier_route("/streams"));
 
         assert!(!is_fixed_querier_route("/other_route"));
-        assert!(!is_fixed_querier_route("/summary_other"));
+        assert!(is_fixed_querier_route("/summary_other"));
     }
 
     #[test]

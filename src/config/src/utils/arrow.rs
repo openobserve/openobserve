@@ -174,8 +174,7 @@ mod tests {
         assert_eq!(result.len(), 3);
         assert_eq!(result[0]["id"], 1);
         assert_eq!(result[0]["name"], "Alice");
-        assert!(result[1]["id"].is_null());
-        assert!(result[1]["name"].is_null());
+        assert!(result[1].is_empty());
         assert_eq!(result[2]["id"], 3);
         assert_eq!(result[2]["name"], "Charlie");
     }

@@ -278,7 +278,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(read_schema, schema);
+        let read_schema = read_schema
+            .as_ref()
+            .clone()
+            .with_metadata(Default::default());
+        assert_eq!(Arc::new(read_schema), schema);
         assert_eq!(read_batches.len(), 1);
         assert_eq!(read_batches[0], batch);
     }

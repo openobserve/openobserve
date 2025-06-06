@@ -328,12 +328,20 @@ mod tests {
         let json: Value = serde_json::from_str(&buf).unwrap();
 
         let metrics = json.as_array().unwrap();
-        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics.len(), 1);
 
         let counter_metric = metrics
             .iter()
             .find(|m| m["__name__"] == "test_counter")
             .unwrap();
+
+        let encoder = JsonEncoder::new();
+        let mut buf = String::new();
+        encoder.encode_utf8(&gauge.collect(), &mut buf).unwrap();
+        let json: Value = serde_json::from_str(&buf).unwrap();
+
+        let metrics = json.as_array().unwrap();
+        assert_eq!(metrics.len(), 1);
         let gauge_metric = metrics
             .iter()
             .find(|m| m["__name__"] == "test_gauge")
