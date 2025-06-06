@@ -37,3 +37,56 @@ pub fn get_rand_u128() -> Option<u128> {
     getrandom::getrandom(&mut buf).ok()?;
     Some(u128::from_le_bytes(buf))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_rand_element() {
+        let arr = vec![1, 2, 3, 4, 5];
+        let element = get_rand_element(&arr);
+        assert!(arr.contains(element));
+    }
+
+    #[test]
+    fn test_generate_random_string() {
+        let len = 10;
+        let s = generate_random_string(len);
+        assert_eq!(s.len(), len);
+        assert!(s.chars().all(|c| c.is_ascii_alphanumeric()));
+    }
+
+    #[test]
+    fn test_get_rand_num_within() {
+        let min = 5;
+        let max = 10;
+        let num = get_rand_num_within(min, max);
+        assert!(num >= min && num < max);
+    }
+
+    #[test]
+    fn test_get_rand_num_within_same_range() {
+        let num = get_rand_num_within(5, 5);
+        assert_eq!(num, 5);
+    }
+
+    #[test]
+    fn test_get_rand_u128() {
+        let num = get_rand_u128();
+        assert!(num.is_some());
+        let num = num.unwrap();
+        assert!(num > 0);
+    }
+
+    #[test]
+    fn test_random_distribution() {
+        // Test that we get different values on multiple calls
+        let mut values = std::collections::HashSet::new();
+        for _ in 0..100 {
+            values.insert(get_rand_u128().unwrap());
+        }
+        // We should have at least 90 different values out of 100 calls
+        assert!(values.len() > 90);
+    }
+}

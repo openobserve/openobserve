@@ -96,3 +96,117 @@ pub async fn send_logs() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use cloudevents::AttributesReader;
+    use log::{Level, Log, MetadataBuilder};
+    use tokio::sync::broadcast;
+
+    use super::*;
+
+    #[test]
+    fn test_zo_logger_enabled() {
+        let logger = ZoLogger {
+            sender: EVENT_SENDER.clone(),
+        };
+        let metadata = MetadataBuilder::new()
+            .level(Level::Info)
+            .target("test")
+            .build();
+        assert_eq!(logger.enabled(&metadata), get_config().log.events_enabled);
+    }
+
+    #[test]
+    fn test_zo_logger_log() {
+        let (tx, mut rx) = broadcast::channel(1024);
+        let logger = ZoLogger { sender: tx };
+        let metadata = MetadataBuilder::new()
+            .level(Level::Info)
+            .target("test")
+            .build();
+        let record = Record::builder()
+            .metadata(metadata)
+            .args(format_args!("test message"))
+            .file(Some("test.rs"))
+            .line(Some(42))
+            .build();
+
+        logger.log(&record);
+
+        // Verify the event was sent
+        let event = rx.try_recv().unwrap();
+        assert_eq!(event.ty(), "debug_log");
+        assert_eq!(
+            event.source().to_string(),
+            get_config().common.instance_name.to_string()
+        );
+    }
+
+    #[test]
+    fn test_zo_logger_log_without_file_line() {
+        let (tx, mut rx) = broadcast::channel(1024);
+        let logger = ZoLogger { sender: tx };
+        let metadata = MetadataBuilder::new()
+            .level(Level::Info)
+            .target("test")
+            .build();
+        let record = Record::builder()
+            .metadata(metadata)
+            .args(format_args!("test message"))
+            .build();
+
+        logger.log(&record);
+
+        // Verify the event was sent
+        let event = rx.try_recv().unwrap();
+        let data: serde_json::Value =
+            serde_json::from_str(event.data().unwrap().to_string().as_str()).unwrap();
+        assert_eq!(data["file"], "");
+        assert_eq!(data["line"], 0);
+    }
+
+    #[tokio::test]
+    async fn test_send_logs() {
+        let (tx, _) = broadcast::channel(1024);
+        let logger = ZoLogger { sender: tx.clone() };
+        let metadata = MetadataBuilder::new()
+            .level(Level::Info)
+            .target("test")
+            .build();
+
+        // Send enough logs to trigger a batch
+        for _ in 0..get_config().log.events_batch_size {
+            let record = Record::builder()
+                .metadata(metadata.clone())
+                .args(format_args!("test message"))
+                .build();
+            logger.log(&record);
+        }
+
+        // Verify logs were stored
+        let logs = LOGS.read().await;
+        assert_eq!(logs.len(), get_config().log.events_batch_size);
+    }
+
+    #[test]
+    fn test_zo_logger_flush() {
+        let logger = ZoLogger {
+            sender: EVENT_SENDER.clone(),
+        };
+        // Flush should not panic
+        logger.flush();
+    }
+
+    #[test]
+    fn test_event_sender_initialization() {
+        let sender = EVENT_SENDER.clone();
+        assert_eq!(sender.receiver_count(), 0);
+    }
+
+    #[test]
+    fn test_logs_initialization() {
+        let logs = LOGS.clone();
+        assert_eq!(logs.blocking_read().len(), 0);
+    }
+}
