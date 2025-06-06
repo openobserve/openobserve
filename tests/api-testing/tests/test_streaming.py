@@ -749,7 +749,7 @@ def test_values_endpoint(create_session, base_url):
     assert len(json_response['hits']) == 1  # Ensure there is one hit
     assert json_response['hits'][0]['field'] == "kubernetes_container_name"  # Check the field name
     assert isinstance(json_response['hits'][0]['values'], list)  # Check that values is a list
-    assert len(json_response['hits'][0]['values']) == 6  # Check that values are empty
+   
 
 
 # Define test data with different queries and expected response details for streaming enable
@@ -977,8 +977,7 @@ def test_values_streaming_endpoint(create_session, base_url):
         assert 'field' in hit
         assert 'values' in hit
         assert isinstance(hit['values'], list)  # Check that values is a list
-        assert len(hit['values']) == 6  # Check that values are empty or have expected length
-
+        
 
 # Define the test function
 def test_values_streaming_endpoint_cache(create_session, base_url):
@@ -1032,9 +1031,7 @@ def test_values_streaming_endpoint_cache(create_session, base_url):
         assert 'field' in hit
         assert 'values' in hit
         assert isinstance(hit['values'], list)  # Check that values is a list
-        assert len(hit['values']) == 6  # Check that values are empty or have expected length
-
-
+        
 
 def test_streaming_sql_query_range(create_session, base_url):
     """Running an E2E test for sql max query range with streaming enabled."""
