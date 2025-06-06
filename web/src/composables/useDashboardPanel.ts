@@ -1258,7 +1258,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         end_time: new Date(
           dashboardPanelData.meta.dateTime["end_time"].toISOString(),
         ).getTime(),
-        fields: [name],
+        field: name,
         size: 100,
         type: currentQuery.fields.stream_type,
         no_count: true,
@@ -1297,7 +1297,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       end_time: new Date(
         dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
       ).getTime(),
-      fields: [name],
+      field: name,
       size: 100,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
