@@ -1,6 +1,6 @@
 <template>
   Sort By:
-  <q-btn-group>
+  <q-btn-group class="tw-border-none">
     <q-btn
       :class="[!fieldObj.sortBy ? 'selected' : '', 'tw-px-2.5']"
       @click="updateSortOption(null)"
@@ -9,7 +9,7 @@
       data-test="dashboard-sort-by-item-clear"
     />
     <q-btn
-      :class="[fieldObj.sortBy === 'ASC' ? 'selected' : '', 'tw-px-2.5']"
+      :class="[fieldObj.sortBy === 'ASC' ? 'selected' : 'custom-border no-border', 'tw-px-2.5']"
       @click="updateSortOption('ASC')"
       data-test="dashboard-sort-by-item-asc"
       ><AscSort
@@ -64,5 +64,18 @@ export default defineComponent({
   background-color: var(--q-primary) !important;
   font-weight: bold;
   color: white;
+}
+
+.no-border {
+  border: none !important;
+}
+.custom-border {
+  border-top: 2px solid #d5d5d5 !important;
+  border-bottom: 2px solid #d5d5d5 !important;
+  border-left: 0px solid !important;
+  border-right: 0px solid !important;
+}
+.q-btn {
+  border: none;
 }
 </style>

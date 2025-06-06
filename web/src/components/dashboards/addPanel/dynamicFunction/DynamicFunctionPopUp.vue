@@ -258,6 +258,8 @@ export default {
   font-size: 13px;
   font-style: normal;
   font-weight: 400;
+  line-height: 70%;
+  padding-bottom: 3px;
 }
 
 .edit-input {
