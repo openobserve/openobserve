@@ -177,6 +177,7 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
+import usePipelines from "@/composables/usePipelines";
 
 import AddStream from "@/components/logstream/AddStream.vue";
 
@@ -194,6 +195,7 @@ const { t } = useI18n();
 const store = useStore();
 
 const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
+const { getUsedStreamsList } = usePipelines();
 
 const { getStreams } = useStreams();
 
@@ -218,7 +220,7 @@ onMounted(async () => {
     if(pipelineObj.userSelectedNode){
       pipelineObj.userSelectedNode = {};
     }
-  await getUsedStreamsList();
+  usedStreams.value = await getUsedStreamsList();
   await getStreamList();
 });
 
@@ -246,24 +248,6 @@ watch(() => dynamic_stream_name.value,
    
   }
 })
-async function getUsedStreamsList() {
-    const org_identifier = store.state.selectedOrganization.identifier;
-  try {
-    const res = await pipelineService.getPipelineStreams(org_identifier);
-    usedStreams.value = res.data.list;
-  } catch (error:any) {
-    usedStreams.value = [];
-    if(error.response.status != 403){
-      $q.notify({
-      message: error.response?.data?.message || "Error fetching used streams",
-      color: "negative",
-      position: "bottom",
-      timeout: 2000,
-    });
-    }
-   
-  }
-}
 async function getStreamList() {
   const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty("stream_type")
     ? pipelineObj.currentSelectedNodeData.data.stream_type

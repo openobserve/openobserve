@@ -212,23 +212,9 @@ import { MarkedOptions } from 'marked';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
-
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL } from '@/utils/zincutils';
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface ChatHistoryEntry {
-  id: number;
-  timestamp: string;
-  title: string;
-  messages: ChatMessage[];
-  provider: string;
-  model: string;
-}
+import { ChatMessage, ChatHistoryEntry } from '@/types/chat';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -917,7 +903,7 @@ export default defineComponent({
       currentChatTimestamp,
       o2AiTitleLogo,
       getGenerateAiIcon,
-      saveHistoryLoading
+      saveHistoryLoading,
     }
   }
 });

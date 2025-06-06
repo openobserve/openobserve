@@ -518,6 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import destinationService from "@/services/alert_destination";
   import AppTabs from "../common/AppTabs.vue";
   import jstransform from "@/services/jstransform";
+  import usePipelines from "@/composables/usePipelines";
   
   export default defineComponent({
     name: "ImportPipeline",
@@ -557,6 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const jsonStr: any = ref("");
       const q = useQuasar();
       const { getStreams } = useStreams();
+      const { getPipelineDestinations } = usePipelines();
   
       const templateErrorsToDisplay = ref([]);
   
@@ -801,7 +803,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       onMounted(async () => {
         await getFunctions();
         await getAlertDestinations();
-        await getPipelineDestinations();
+        pipelineDestinations.value = await getPipelineDestinations();
         await getScheduledPipelines();
       });
 
@@ -809,19 +811,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         const functions = await jstransform.list(1, 100, "created_at", true, "", store.state.selectedOrganization.identifier);
         existingFunctions.value = functions.data.list.map((fun: any)=>{
           return fun.name;
-        });
-      }
-      const getPipelineDestinations = async () => {
-        const destinations = await destinationService.list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "pipeline",
-        });
-        pipelineDestinations.value = destinations.data.map((dest: any)=>{
-          return dest.name;
         });
       }
       const getAlertDestinations = async () => {
