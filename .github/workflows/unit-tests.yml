@@ -27,6 +27,9 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v4
 
+      - name: Install postgres and Mysql
+        run: sudo apt-get update && sudo apt-get install -y postgresql mysql-server
+
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
