@@ -191,8 +191,8 @@ impl FlightService for FlightServiceImpl {
                 Status::internal(e.to_string())
             })?;
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-                // clear session data
-                clear_session_data(&trace_id);
+            // clear session data
+            clear_session_data(&trace_id);
             log::error!(
                 "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
                 trace_id,
@@ -361,8 +361,8 @@ impl Drop for FlightSenderStream {
                 "[trace_id {}] flight->search: drop FlightSenderStream",
                 self.trace_id
             );
-                // clear session data
-                clear_session_data(&self.trace_id);
+            // clear session data
+            clear_session_data(&self.trace_id);
         }
     }
 }
