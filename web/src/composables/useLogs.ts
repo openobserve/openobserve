@@ -635,11 +635,11 @@ const useLogs = () => {
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
 
-    if(searchObj.meta?.regions?.length) {
+    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
       query["regions"] = searchObj.meta.regions.join(",");
     }
 
-    if(searchObj.meta?.clusters?.length) {
+    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
 
@@ -4231,11 +4231,11 @@ const useLogs = () => {
     }
 
 
-    if(queryParams.regions) {
+    if(store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
       searchObj.meta.regions = queryParams.regions.split(",");
     }
 
-    if(queryParams.clusters) {
+    if(store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
       searchObj.meta.clusters = queryParams.clusters.split(",");
     }
 
