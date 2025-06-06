@@ -92,6 +92,10 @@ main() {
             shift
             cmd_check "$@"
             ;;
+        run-cov)
+            shift
+            _cov_test --json --summary-only --output-path report.json "$@"
+            ;;
         html)
             shift
             cmd_html "$@"
