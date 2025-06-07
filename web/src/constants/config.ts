@@ -22,3 +22,8 @@ export const config = {
   responseType: "CODE",
   scope: "",
 };
+
+export const siteURL = {
+  contactSales: "https://openobserve.ai/contactus/",
+  contactSupport: "https://openobserve.ai/contactus/"
+}

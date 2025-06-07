@@ -119,3 +119,57 @@
   outline-width: 0px;
   outline-style: none;
 }
+
+.o2-page-title {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 36px;
+}
+
+.o2-page-subtitle {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.o2-page-subtitle1 {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 15.72px;
+}
+
+.o2-page-subtitle2 {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.o2-page-subtitle3 {
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.o2-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 20.96px;
+}
+
+.o2-card-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 15.72px;
+}
+
+.o2-card-wrapper {
+  box-shadow: none;
+  border: 1px solid #E4E7EC;
+}
+
+.body--dark {
+  .o2-card-wrapper {
+    box-shadow: none;
+    border: 1px solid #454F5B;
+    background-color: #212121;
+  } 
+}
