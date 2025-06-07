@@ -1,0 +1,1120 @@
+    [
+        {
+            "functionName": null,
+            "functionLabel": "None",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "histogram",
+            "functionLabel": "Histogram",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Histogram Interval",
+                            "value": "histogramInterval"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "defaultValue": null,
+                    "required": false
+                }
+            ]
+        },
+        {
+            "functionName": "count",
+            "functionLabel": "Count",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "count-distinct",
+            "functionLabel": "Count (Distinct)",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "sum",
+            "functionLabel": "Sum",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "avg",
+            "functionLabel": "Avg",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "min",
+            "functionLabel": "Min",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "max",
+            "functionLabel": "Max",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "p50",
+            "functionLabel": "P50",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "p90",
+            "functionLabel": "P90",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "p95",
+            "functionLabel": "P95",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "p99",
+            "functionLabel": "P99",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ],
+            "isAggregation": true
+        },
+        {
+            "functionName": "abs",
+            "functionLabel": "Abs",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "acos",
+            "functionLabel": "ArcCos",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "asin",
+            "functionLabel": "ArcSin",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "atan",
+            "functionLabel": "ArcTan",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "atan2",
+            "functionLabel": "ArcTan2",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "ceil",
+            "functionLabel": "Ceil",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "cos",
+            "functionLabel": "Cos",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "exp",
+            "functionLabel": "Exp",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "floor",
+            "functionLabel": "Floor",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "log",
+            "functionLabel": "Log",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "log10",
+            "functionLabel": "Log10",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "log2",
+            "functionLabel": "Log2",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "pow",
+            "functionLabel": "Pow",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "round",
+            "functionLabel": "Round",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "sin",
+            "functionLabel": "Sin",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "sqrt",
+            "functionLabel": "Sqrt",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "tan",
+            "functionLabel": "Tan",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "string_length",
+            "functionLabel": "String Length",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "char_length",
+            "functionLabel": "Char Length",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "concat",
+            "functionLabel": "Concat",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        },
+                        {
+                            "label": "Function",
+                            "value": "function"
+                        }
+                    ],
+                    "required": true,
+                    "min": 2
+                }
+            ],
+            "allowAddArgAt": "n"
+        },
+        {
+            "functionName": "lower",
+            "functionLabel": "Lower",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "upper",
+            "functionLabel": "Upper",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "substring",
+            "functionLabel": "Substring",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": false
+                }
+            ]
+        },
+        {
+            "functionName": "trim",
+            "functionLabel": "Trim",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "ltrim",
+            "functionLabel": "LTrim",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "rtrim",
+            "functionLabel": "RTrim",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "date_add",
+            "functionLabel": "Date Add",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "date_sub",
+            "functionLabel": "Date Sub",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "datediff",
+            "functionLabel": "Date Diff",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "from_unixtime",
+            "functionLabel": "From Unix Time",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": false
+                }
+            ]
+        },
+        {
+            "functionName": "to_unixtime",
+            "functionLabel": "To Unix Time",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "array_length",
+            "functionLabel": "Array Length",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "array_sort",
+            "functionLabel": "Array Sort",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "array_append",
+            "functionLabel": "Array Append",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        },
+        {
+            "functionName": "array_contains",
+            "functionLabel": "Array Contains",
+            "args": [
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        }
+                    ],
+                    "required": true
+                },
+                {
+                    "type": [
+                        {
+                            "label": "Field",
+                            "value": "field"
+                        },
+                        {
+                            "label": "String",
+                            "value": "string"
+                        },
+                        {
+                            "label": "Number",
+                            "value": "number"
+                        }
+                    ],
+                    "required": true
+                }
+            ]
+        }
+    ]
