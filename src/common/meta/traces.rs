@@ -123,3 +123,236 @@ pub struct ExportTracePartialSuccess {
     // is equivalent to it not being set.
     pub error_message: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_span() {
+        let mut attributes = HashMap::new();
+        attributes.insert("key".to_string(), json::json!("value"));
+
+        let mut service = HashMap::new();
+        service.insert("version".to_string(), json::json!("1.0"));
+
+        let mut reference = HashMap::new();
+        reference.insert("parent".to_string(), "parent-id".to_string());
+
+        let span = Span {
+            trace_id: "trace-1".to_string(),
+            span_id: "span-1".to_string(),
+            flags: 1,
+            span_status: "OK".to_string(),
+            span_kind: "SERVER".to_string(),
+            operation_name: "test-operation".to_string(),
+            start_time: 1000,
+            end_time: 2000,
+            duration: 1000,
+            reference,
+            service_name: "test-service".to_string(),
+            attributes,
+            service,
+            events: "[]".to_string(),
+            links: "[]".to_string(),
+        };
+
+        assert_eq!(span.trace_id, "trace-1");
+        assert_eq!(span.span_id, "span-1");
+        assert_eq!(span.flags, 1);
+        assert_eq!(span.span_status, "OK");
+        assert_eq!(span.span_kind, "SERVER");
+        assert_eq!(span.operation_name, "test-operation");
+        assert_eq!(span.start_time, 1000);
+        assert_eq!(span.end_time, 2000);
+        assert_eq!(span.duration, 1000);
+        assert_eq!(span.service_name, "test-service");
+        assert_eq!(span.events, "[]");
+        assert_eq!(span.links, "[]");
+    }
+
+    #[test]
+    fn test_span_serialization() {
+        let span = Span {
+            trace_id: "trace-1".to_string(),
+            span_id: "span-1".to_string(),
+            flags: 1,
+            span_status: "OK".to_string(),
+            span_kind: "SERVER".to_string(),
+            operation_name: "test-operation".to_string(),
+            start_time: 1000,
+            end_time: 2000,
+            duration: 1000,
+            reference: HashMap::new(),
+            service_name: "test-service".to_string(),
+            attributes: HashMap::new(),
+            service: HashMap::new(),
+            events: "[]".to_string(),
+            links: "[]".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&span).unwrap();
+        let deserialized: Span = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(span, deserialized);
+    }
+
+    #[test]
+    fn test_span_ref_type() {
+        assert_eq!(SpanRefType::default(), SpanRefType::ChildOf);
+        assert_eq!(SpanRefType::ChildOf, SpanRefType::ChildOf);
+        assert_ne!(SpanRefType::ChildOf, SpanRefType::ParentOf);
+    }
+
+    #[test]
+    fn test_span_ref_type_serialization() {
+        let child_of = SpanRefType::ChildOf;
+        let parent_of = SpanRefType::ParentOf;
+
+        let serialized_child = serde_json::to_string(&child_of).unwrap();
+        let serialized_parent = serde_json::to_string(&parent_of).unwrap();
+
+        assert_eq!(serialized_child, "\"CHILD_OF\"");
+        assert_eq!(serialized_parent, "\"PARENT_OF\"");
+    }
+
+    #[test]
+    fn test_event() {
+        let mut attributes = HashMap::new();
+        attributes.insert("key".to_string(), json::json!("value"));
+
+        let event = Event {
+            name: "test-event".to_string(),
+            _timestamp: 1000,
+            attributes,
+        };
+
+        assert_eq!(event.name, "test-event");
+        assert_eq!(event._timestamp, 1000);
+    }
+
+    #[test]
+    fn test_event_serialization() {
+        let event = Event {
+            name: "test-event".to_string(),
+            _timestamp: 1000,
+            attributes: HashMap::new(),
+        };
+
+        let serialized = serde_json::to_string(&event).unwrap();
+        let deserialized: Event = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(event, deserialized);
+    }
+
+    #[test]
+    fn test_span_link_context() {
+        let context = SpanLinkContext {
+            trace_id: "trace-1".to_string(),
+            span_id: "span-1".to_string(),
+            trace_flags: Some(1),
+            trace_state: Some("state".to_string()),
+        };
+
+        assert_eq!(context.trace_id, "trace-1");
+        assert_eq!(context.span_id, "span-1");
+        assert_eq!(context.trace_flags, Some(1));
+        assert_eq!(context.trace_state, Some("state".to_string()));
+    }
+
+    #[test]
+    fn test_span_link_context_serialization() {
+        let context = SpanLinkContext {
+            trace_id: "trace-1".to_string(),
+            span_id: "span-1".to_string(),
+            trace_flags: Some(1),
+            trace_state: Some("state".to_string()),
+        };
+
+        let serialized = serde_json::to_string(&context).unwrap();
+        let deserialized: SpanLinkContext = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(context, deserialized);
+    }
+
+    #[test]
+    fn test_span_link() {
+        let mut attributes = HashMap::new();
+        attributes.insert("key".to_string(), json::json!("value"));
+
+        let link = SpanLink {
+            context: SpanLinkContext {
+                trace_id: "trace-1".to_string(),
+                span_id: "span-1".to_string(),
+                trace_flags: None,
+                trace_state: None,
+            },
+            attributes,
+            dropped_attributes_count: 0,
+        };
+
+        assert_eq!(link.context.trace_id, "trace-1");
+        assert_eq!(link.context.span_id, "span-1");
+        assert_eq!(link.dropped_attributes_count, 0);
+    }
+
+    #[test]
+    fn test_span_link_serialization() {
+        let link = SpanLink {
+            context: SpanLinkContext {
+                trace_id: "trace-1".to_string(),
+                span_id: "span-1".to_string(),
+                trace_flags: None,
+                trace_state: None,
+            },
+            attributes: HashMap::new(),
+            dropped_attributes_count: 0,
+        };
+
+        let serialized = serde_json::to_string(&link).unwrap();
+        let deserialized: SpanLink = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(link, deserialized);
+    }
+
+    #[test]
+    fn test_export_trace_service_response() {
+        let response = ExportTraceServiceResponse {
+            partial_success: Some(ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            }),
+        };
+
+        assert!(response.partial_success.is_some());
+        let partial = response.partial_success.unwrap();
+        assert_eq!(partial.rejected_spans, 0);
+        assert_eq!(partial.error_message, "");
+    }
+
+    #[test]
+    fn test_export_trace_service_response_default() {
+        let response = ExportTraceServiceResponse::default();
+        assert!(response.partial_success.is_none());
+    }
+
+    #[test]
+    fn test_export_trace_partial_success() {
+        let partial = ExportTracePartialSuccess {
+            rejected_spans: 5,
+            error_message: "test error".to_string(),
+        };
+
+        assert_eq!(partial.rejected_spans, 5);
+        assert_eq!(partial.error_message, "test error");
+    }
+
+    #[test]
+    fn test_export_trace_partial_success_default() {
+        let partial = ExportTracePartialSuccess::default();
+        assert_eq!(partial.rejected_spans, 0);
+        assert_eq!(partial.error_message, "");
+    }
+}

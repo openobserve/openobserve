@@ -3269,6 +3269,7 @@ mod tests {
                 file_download_priority_queue_window_secs: Default::default(),
                 file_download_enable_priority_queue: Default::default(),
                 histogram_enabled: Default::default(),
+                calculate_stats_step_limit: Default::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
