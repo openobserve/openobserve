@@ -25,3 +25,4 @@ pub mod billings;
 pub mod dashboards;
 pub mod destinations;
 pub mod folders;
+pub mod pipelines;

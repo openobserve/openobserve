@@ -361,11 +361,6 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct PipelineList {
-    pub list: Vec<Pipeline>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct PipelineDependencyItem {
     pub id: String,
