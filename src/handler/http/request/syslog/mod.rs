@@ -135,3 +135,45 @@ async fn delete_route(path: web::Path<(String, String)>) -> impl Responder {
     let (_, id) = path.into_inner();
     syslogs_route::delete_route(&id).await
 }
+
+/// GetSyslogTCPServerCACert
+///
+/// #{"ratelimit_module":"Syslog Routes", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Syslog Routes",
+    operation_id = "GetSyslogTCPServerCACert",
+    security(
+        ("Authorization" = [])
+    ),
+    responses(
+        (status = StatusCode::OK, description = "PEM-formatted TLS CA certificate", body = String, content_type = "application/x-pem-file"),
+        (status = StatusCode::NOT_FOUND, description = "Certificate not found"),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal server error")
+    ),
+)]
+#[get("/syslog-tcp-server-ca-cert")]
+async fn get_tcp_tls_ca_cert() -> impl Responder {
+    syslogs_route::get_tcp_tls_ca_cert().await
+}
+
+/// GetSyslogTCPServerCert
+///
+/// #{"ratelimit_module":"Syslog Routes", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Syslog Routes",
+    operation_id = "GetSyslogTCPServerCert",
+    security(
+        ("Authorization" = [])
+    ),
+    responses(
+        (status = StatusCode::OK, description = "PEM-formatted TLS certificate", body = String, content_type = "application/x-pem-file"),
+        (status = StatusCode::NOT_FOUND, description = "Certificate not found"),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal server error")
+    ),
+)]
+#[get("/syslog-tcp-server-cert")]
+async fn get_tcp_tls_cert() -> impl Responder {
+    syslogs_route::get_tcp_tls_cert().await
+}
