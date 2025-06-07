@@ -1,3 +1,6 @@
+//dashboard panel configs page object
+//methods: All configs related to dashboard panels
+
 export default class DashboardPanelConfigs {
   constructor(page) {
     this.page = page;
