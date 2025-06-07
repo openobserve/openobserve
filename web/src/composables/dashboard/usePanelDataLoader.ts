@@ -166,6 +166,7 @@ export const usePanelDataLoader = (
     loadingTotal: 0,
     loadingCompleted: 0,
     loadingProgressPercentage: 0,
+    isPartialData: false,
   });
 
   // observer for checking if panel is visible on the screen
@@ -175,14 +176,14 @@ export const usePanelDataLoader = (
   const isVisible: any = ref(false);
 
   const saveCurrentStateToCache = () => {
-    savePanelCache(
-      getCacheKey(),
-      { ...toRaw(state) },
-      {
-        start_time: selectedTimeObj?.value?.start_time?.getTime(),
-        end_time: selectedTimeObj?.value?.end_time?.getTime(),
-      },
-    );
+    const cacheData = {
+      ...toRaw(state),
+      isPartialData: state.isPartialData, // Ensure partial data flag is saved
+    };
+    savePanelCache(getCacheKey(), cacheData, {
+      start_time: selectedTimeObj?.value?.start_time?.getTime(),
+      end_time: selectedTimeObj?.value?.end_time?.getTime(),
+    });
   };
 
   // currently dependent variables data
@@ -335,16 +336,25 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
-    state.loading = false;
+    console.log("cancelQueryAbort: entering...");
 
+    state.loading = false;
     state.isOperationCancelled = true;
 
-    if (
-      isWebSocketEnabled(store.state) &&
-      state.searchRequestTraceIds
-    ) {
+    // For WebSocket and HTTP streaming, we need to check if we're still receiving data
+    if (isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)) {
+      console.log(
+        "cancelQueryAbort: cleaning up WebSocket or HTTP streaming listeners...",
+      );
+
+      // If we're still loading or haven't received end event, mark as partial
+      if (state.loading || state.loadingProgressPercentage < 100) {
+        state.isPartialData = true;
+      }
+    }
+
+    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
       try {
-        // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
@@ -360,6 +370,7 @@ export const usePanelDataLoader = (
     if (abortController) {
       abortController?.abort();
     }
+    saveCurrentStateToCache();
   };
 
   const getHistogramSearchRequest = async (
@@ -436,6 +447,10 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        // Set partial data when partition API call is interrupted
+        state.isPartialData = true;
+        // Save current state to cache with partial data flag
+        saveCurrentStateToCache();
         return;
       }
 
@@ -638,6 +653,10 @@ export const usePanelDataLoader = (
     } catch (error) {
       // Process API error for "sql"
       processApiError(error, "sql");
+      // Set partial data when partition API call fails
+      state.isPartialData = true;
+      // Save current state to cache with partial data flag
+      saveCurrentStateToCache();
       return { result: null, metadata: metadata };
     } finally {
       // set loading to false
@@ -709,8 +728,9 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.order_by
-        ?.toLowerCase() === "asc"
+      state?.resultMetaData?.[
+        payload?.meta?.currentQueryIndex
+      ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
       state.data[payload?.meta?.currentQueryIndex] = [
@@ -732,54 +752,58 @@ export const usePanelDataLoader = (
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
-      // console.log("panel data loader response", payload.traceId, response);
-
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response_hits") {
         handleStreamingHistogramHits(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "error") {
-        // set loading to false
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
         state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
-
+        state.isPartialData = true;
+        saveCurrentStateToCache();
         processApiError(response?.content, "sql");
       }
 
       if (response.type === "end") {
-        // set loading to false
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
-        state.loadingProgressPercentage = 0;
+        state.loadingProgressPercentage = 100; // Set to 100% when complete
         state.isOperationCancelled = false;
+        state.isPartialData = false;
+        saveCurrentStateToCache();
       }
+
       if (response.type === "event_progress") {
-        // The loadingProgressPercentage value is now in 0-100 format, no need to multiply
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
+        saveCurrentStateToCache();
       }
     } catch (error: any) {
-      // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
       state.loadingTotal = 0;
       state.loadingCompleted = 0;
       state.loadingProgressPercentage = 0;
+      state.isPartialData = true;
       state.errorDetail = {
         message: error?.message || "Unknown error in search response",
         code: error?.code ?? "",
       };
+      saveCurrentStateToCache();
     }
   };
 
@@ -824,6 +848,7 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchClose = (payload: any, response: any) => {
+    console.log("Search closed", response);
     removeTraceId(payload?.traceId);
 
     if (response.type === "error") {
@@ -853,6 +878,10 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchReset = (payload: any, traceId?: string) => {
+    // Set partial data flag when resetting
+    // state.isPartialData = true;
+    // Save current state to cache
+    saveCurrentStateToCache();
     loadData();
   };
 
@@ -865,8 +894,13 @@ export const usePanelDataLoader = (
     state.loadingCompleted = 0;
     state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
+    // Set partial data flag for errors
+    // state.isPartialData = true;
 
     processApiError(response?.content, "sql");
+
+    // Save current state to cache with partial data flag
+    saveCurrentStateToCache();
   };
 
   const getDataThroughWebSocket = async (
@@ -880,6 +914,9 @@ export const usePanelDataLoader = (
     try {
       const { traceId } = generateTraceContext();
       addTraceId(traceId);
+
+      // Set partial data flag at start of WebSocket connection
+      // state.isPartialData = true;
 
       const payload: {
         queryReq: any;
@@ -928,6 +965,10 @@ export const usePanelDataLoader = (
       };
       state.loading = false;
       state.isOperationCancelled = false;
+      // Set partial data flag on error
+      // state.isPartialData = true;
+      // Save current state to cache
+      saveCurrentStateToCache();
     }
   };
 
@@ -942,6 +983,9 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
+
+      // Set partial data flag at start of streaming
+      // state.isPartialData = true;
 
       const payload: {
         queryReq: any;
@@ -999,6 +1043,10 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        // Set partial data flag on abort
+        state.isPartialData = true;
+        // Save current state to cache
+        saveCurrentStateToCache();
         return;
       }
 
@@ -1017,10 +1065,17 @@ export const usePanelDataLoader = (
       };
       state.loading = false;
       state.isOperationCancelled = false;
+      // Set partial data flag on error
+      // state.isPartialData = true;
+      // Save current state to cache
+      saveCurrentStateToCache();
     }
   };
 
   const loadData = async () => {
+    // Reset partial data flag when starting new load
+    state.isPartialData = false;
+
     try {
       log("loadData: entering...");
       state.loadingTotal = 0;
@@ -1472,7 +1527,6 @@ export const usePanelDataLoader = (
                   abortControllerRef,
                 );
               }
-
               saveCurrentStateToCache();
             }
           }
@@ -2159,19 +2213,32 @@ export const usePanelDataLoader = (
 
   // remove intersection observer
   onUnmounted(() => {
+    console.log("-----------------onUnmounted-----------------");
+
     // abort on unmount
     if (abortController) {
-      // this will stop partition api call
+      console.log("PanelSchema/Time: aborting the controller on unmount");
+      // Only set isPartialData to true if we haven't received complete response
+      if (!state.isPartialData) {
+        state.isPartialData = true;
+      }
       abortController.abort();
     }
     if (observer) {
       observer.disconnect();
     }
 
-    // for websocket
-    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
+    // Cancel WebSocket queries
+    if (
+      isWebSocketEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
       try {
-        // loop on state.searchRequestTraceIds
+        console.log(
+          "PanelSchema/Time: cleaning up WebSocket requests",
+          state.searchRequestTraceIds,
+        );
+
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
@@ -2243,6 +2310,7 @@ export const usePanelDataLoader = (
       state.resultMetaData = tempPanelCacheValue.resultMetaData;
       state.annotations = tempPanelCacheValue.annotations;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
+      state.isPartialData = tempPanelCacheValue.isPartialData;
 
       // set that the cache is restored
       isRestoredFromCache = true;

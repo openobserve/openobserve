@@ -151,7 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
+        {{ loadingProgressPercentage }}
+        <LoadingProgress
+          :loading="loading"
+          :loadingProgressPercentage="loadingProgressPercentage"
+        />
       </div>
       <div
         v-if="allowAnnotationsAdd && isCursorOverPanel"
@@ -397,6 +401,7 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "is-partial-data-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -447,6 +452,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
       loadingProgressPercentage,
+      isPartialData,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -1855,6 +1861,11 @@ export default defineComponent({
       }
     };
 
+    // Watch isPartialData changes and emit them
+    watch(isPartialData, (newValue) => {
+      emit("is-partial-data-update", newValue);
+    });
+
     return {
       store,
       chartPanelRef,
@@ -1889,6 +1900,7 @@ export default defineComponent({
       downloadDataAsCSV,
       downloadDataAsJSON,
       loadingProgressPercentage,
+      isPartialData,
     };
   },
 });
