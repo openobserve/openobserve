@@ -170,6 +170,7 @@ const props = defineProps({
   enableNewValueMode: {
       type: Boolean,
       default: false,
+      required: false,
     }
   
 });
