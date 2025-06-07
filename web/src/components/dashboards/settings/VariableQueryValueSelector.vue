@@ -16,6 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
+    <!-- loading: {{ variableItem.isLoading }} values:
+    {{ variableItem.value }} isVariableLoadingPending:
+    {{ variableItem.isVariableLoadingPending }} options:
+    {{ variableItem.options.map((it) => it.label) }} -->
     <q-select
       style="min-width: 150px"
       filled
@@ -24,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="selectedValue"
       :display-value="displayValue"
       :label="variableItem?.label || variableItem?.name"
-      :options="fieldsFilteredOptions"
+      :options="filteredOptions"
       input-debounce="0"
       emit-value
       option-value="value"
@@ -32,16 +36,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="menu"
       use-input
       stack-label
-      @filter="fieldsFilterFn"
+      @filter="filterOptions"
       class="textbox col no-case"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
-      @blur="applyChanges"
-      @focus="loadFieldValues"
+      @popup-show="onPopupShow"
+      @popup-hide="onPopupHide"
+      @update:model-value="onUpdateValue"
+      ref="selectRef"
     >
+      <!-- transition-show="scale"
+      transition-hide="scale" -->
       <template v-slot:no-option>
         <q-item>
           <q-item-section class="text-italic text-grey">
@@ -50,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
       <template
-        v-if="variableItem.multiSelect && fieldsFilteredOptions.length > 0"
+        v-if="variableItem.multiSelect && filteredOptions.length > 0"
         v-slot:before-options
       >
         <q-item>
@@ -60,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="toggleSelectAll"
               dense
               class="q-ma-none"
+              @click.stop
             />
           </q-item-section>
           <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
@@ -83,75 +92,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
+      <template v-slot:loading> Loading... </template>
     </q-select>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRef, watch, computed } from "vue";
-import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
+import { defineComponent, ref, watch, computed, nextTick } from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
+    const filterText = ref("");
+    const selectRef = ref(null);
+    const isOpen = ref(false);
 
-    const options = toRef(props.variableItem, "options");
+    const availableOptions = computed(() => props.variableItem?.options || []);
 
-    // get filtered options
-    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSelectAutoComplete(options, "value");
-
-    // set watcher on variable item changes at that time change the option value
-    watch(
-      () => props.variableItem,
-      () => {
-        options.value = props.variableItem?.options;
-      },
-    );
-
-    // isAllSelected should be true if all options are selected and false otherwise
-    const isAllSelected = computed(() => {
-      return (
-        fieldsFilteredOptions.value.length > 0 &&
-        selectedValue.value.length === fieldsFilteredOptions.value.length
+    const filteredOptions = computed(() => {
+      if (!filterText.value) return availableOptions.value;
+      const searchText = filterText.value.toLowerCase();
+      return availableOptions.value.filter((opt: any) =>
+        opt.label.toLowerCase().includes(searchText),
       );
     });
 
-    // Function to toggle select/deselect all options
+    const filterOptions = (val: string, update: Function) => {
+      filterText.value = val;
+      update();
+    };
+
+    const isAllSelected = computed(() => {
+      return (
+        filteredOptions.value.length > 0 &&
+        selectedValue.value?.length === filteredOptions.value.length
+      );
+    });
+
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
-        selectedValue.value = fieldsFilteredOptions.value.map(
+        selectedValue.value = filteredOptions.value.map(
           (option: any) => option.value,
         );
       } else {
         selectedValue.value = [];
       }
-    };
-
-    const applyChanges = () => {
-      if (props.variableItem.multiSelect) {
-        emitSelectedValues();
-      }
-    };
-
-    // update selected value
-    watch(selectedValue, () => {
-      if (!props.variableItem.multiSelect) {
-        emitSelectedValues();
-      }
-    });
-
-    const emitSelectedValues = () => {
       emit("update:modelValue", selectedValue.value);
     };
 
-    // Display the selected value
+    const onUpdateValue = (val: any) => {
+      selectedValue.value = val;
+      if (!props.variableItem.multiSelect) {
+        emit("update:modelValue", val);
+      }
+    };
+
+    const onPopupShow = () => {
+      isOpen.value = true;
+      if (props.loadOptions) {
+        props.loadOptions(props.variableItem);
+      }
+    };
+
+    const onPopupHide = () => {
+      isOpen.value = false;
+      if (props.variableItem.multiSelect) {
+        emit("update:modelValue", selectedValue.value);
+      }
+    };
+
     const displayValue = computed(() => {
-      if (selectedValue.value || selectedValue.value == "") {
+      if (selectedValue.value || selectedValue.value === "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
             const firstTwoValues = selectedValue.value
@@ -160,14 +174,14 @@ export default defineComponent({
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
-          } else if (props.variableItem.options.length == 0) {
+          } else if (props.variableItem.options.length === 0) {
             return "(No Data Found)";
           } else {
             return selectedValue.value
               .map((it: any) => (it === "" ? "<blank>" : it))
               .join(", ");
           }
-        } else if (selectedValue.value == "") {
+        } else if (selectedValue.value === "") {
           return "<blank>";
         } else {
           return selectedValue.value;
@@ -179,29 +193,49 @@ export default defineComponent({
       }
     });
 
-    const loadFieldValues = () => {
-      if (props.variableItem.isLoading || !props.loadOptions) {
-        return;
-      }
-      loadVariableTemp();
-    };
+    watch(
+      () => props.variableItem.options,
+      () => {
+        if (isOpen.value && selectRef.value) {
+          nextTick(() => {
+            if (selectRef.value) {
+              (selectRef.value as any).updateInputValue();
+            }
+          });
+        }
+      },
+      { deep: true },
+    );
 
-    const loadVariableTemp = () => {
-      try {
-        props.loadOptions(props.variableItem);
-        options.value = props.variableItem.options;
-      } catch (error) {}
-    };
+    // Add watch for modelValue changes
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        selectedValue.value = newVal;
+      },
+      { immediate: true },
+    );
+
+    // Add watch for variableItem value changes
+    watch(
+      () => props.variableItem.value,
+      (newVal) => {
+        selectedValue.value = newVal;
+      },
+      { immediate: true },
+    );
 
     return {
       selectedValue,
-      fieldsFilterFn,
-      fieldsFilteredOptions,
+      filteredOptions,
+      filterOptions,
       isAllSelected,
       toggleSelectAll,
       displayValue,
-      applyChanges,
-      loadFieldValues,
+      onUpdateValue,
+      onPopupShow,
+      onPopupHide,
+      selectRef,
     };
   },
 });
