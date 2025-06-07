@@ -659,6 +659,14 @@ pub struct TCP {
     pub tcp_port: u16,
     #[env_config(name = "ZO_UDP_PORT", default = 5514)]
     pub udp_port: u16,
+    #[env_config(name = "ZO_TCP_TLS_ENABLED", default = false)]
+    pub tcp_tls_enabled: bool,
+    #[env_config(name = "ZO_TCP_TLS_CERT_PATH", default = "")]
+    pub tcp_tls_cert_path: String,
+    #[env_config(name = "ZO_TCP_TLS_KEY_PATH", default = "")]
+    pub tcp_tls_key_path: String,
+    #[env_config(name = "ZO_TCP_TLS_CA_CERT_PATH", default = "")]
+    pub tcp_tls_ca_cert_path: String,
 }
 
 #[derive(EnvConfig)]

@@ -18,7 +18,8 @@ use std::io;
 use actix_web::{HttpResponse, http::StatusCode};
 use config::ider;
 use ipnetwork::IpNetwork;
-
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
@@ -146,6 +147,38 @@ pub async fn toggle_state(server: SyslogServer) -> Result<HttpResponse, io::Erro
         .into());
     }
     Ok(HttpResponse::Created().json(server.state))
+}
+
+#[tracing::instrument(skip_all)]
+pub async fn get_tcp_tls_ca_cert() -> Result<HttpResponse, io::Error> {
+    let cfg = config::get_config();
+    let ca_cert_path = &cfg.tcp.tcp_tls_ca_cert_path;
+    log::info!("ca_cert_path: {}", ca_cert_path);
+    let mut file = File::open(ca_cert_path).await?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).await?;
+    log::info!("contents: {}", contents);
+
+    Ok(HttpResponse::Ok()
+        .content_type("application/x-pem-file")
+        .insert_header(("Content-Disposition", "attachment; filename=\"ca-cert.pem\""))
+        .body(contents))
+}
+
+#[tracing::instrument(skip_all)]
+pub async fn get_tcp_tls_cert() -> Result<HttpResponse, io::Error> {
+    let cfg = config::get_config();
+    let cert_path = &cfg.tcp.tcp_tls_cert_path;
+    log::info!("cert_path: {}", cert_path);
+    let mut file = File::open(cert_path).await?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).await?;
+    log::info!("contents: {}", contents);
+
+    Ok(HttpResponse::Ok()
+        .content_type("application/x-pem-file")
+        .insert_header(("Content-Disposition", "attachment; filename=\"server-cert.pem\""))
+        .body(contents))
 }
 
 #[derive(Debug)]
