@@ -21,6 +21,7 @@ use config::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
             SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
         },
+        self_reporting::usage::{RequestStats, UsageType},
         sql::OrderBy,
         stream::StreamType,
         websocket::SearchResultType,
@@ -44,6 +45,7 @@ use crate::{
     },
     service::{
         search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
+        self_reporting::report_request_usage_stats,
         websocket_events::{
             search::write_results_to_cache, sort::order_search_results,
             utils::calculate_progress_percentage,
@@ -112,11 +114,13 @@ pub async fn process_search_stream_request(
         log::error!("[HTTP2_STREAM] Error sending progress event: {}", e);
     }
 
+    let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
     let use_cache = req.use_cache.unwrap_or(false);
     let start_time = req.query.start_time;
     let end_time = req.query.end_time;
+    let all_streams = stream_names.join(",");
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
@@ -232,6 +236,8 @@ pub async fn process_search_stream_request(
                 &mut start,
                 sender.clone(),
                 values_ctx,
+                &all_streams,
+                started_at,
             )
             .instrument(search_span.clone())
             .await
@@ -793,6 +799,8 @@ pub async fn handle_cache_responses_and_deltas(
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
+    all_streams: &str,
+    started_at: i64,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -899,6 +907,11 @@ pub async fn handle_cache_responses_and_deltas(
                     cache_order_by,
                     start_timer,
                     sender.clone(),
+                    user_id,
+                    org_id,
+                    all_streams,
+                    stream_type,
+                    started_at,
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -941,6 +954,11 @@ pub async fn handle_cache_responses_and_deltas(
                 cache_order_by,
                 start_timer,
                 sender.clone(),
+                user_id,
+                org_id,
+                all_streams,
+                stream_type,
+                started_at,
             )
             .await?;
         }
@@ -1253,6 +1271,11 @@ async fn send_cached_responses(
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    user_id: &str,
+    org_id: &str,
+    all_streams: &str,
+    stream_type: StreamType,
+    started_at: i64,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
@@ -1298,7 +1321,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
     let response = StreamResponses::SearchResponse {
-        results: cached.cached_response,
+        results: cached.cached_response.clone(),
         streaming_aggs: false,
         time_offset: TimeOffset {
             start_time: cached.response_start_time,
@@ -1327,6 +1350,37 @@ async fn send_cached_responses(
             ));
         }
     }
+
+    // TODO: report usage stats
+    let num_fn = req.query.query_fn.is_some() as u16;
+    let req_stats = RequestStats {
+        records: cached.cached_response.hits.len() as i64,
+        response_time: cached.cached_response.took as f64,
+        size: cached.cached_response.scan_size as f64,
+        request_body: Some(req.query.sql.clone()),
+        function: req.query.query_fn.clone(),
+        user_email: Some(user_id.to_string()),
+        min_ts: Some(req.query.start_time),
+        max_ts: Some(req.query.end_time),
+        cached_ratio: Some(cached.cached_response.cached_ratio),
+        search_type: req.search_type,
+        search_event_context: req.search_event_context.clone(),
+        trace_id: Some(trace_id.to_string()),
+        took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
+        work_group: None, // TODO: add work group
+        result_cache_ratio: Some(cached.cached_response.cached_ratio),
+        ..Default::default()
+    };
+    report_request_usage_stats(
+        req_stats,
+        org_id,
+        all_streams,
+        stream_type,
+        UsageType::Search,
+        num_fn,
+        started_at,
+    )
+    .await;
 
     Ok(())
 }

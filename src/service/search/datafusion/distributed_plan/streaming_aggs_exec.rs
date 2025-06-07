@@ -16,12 +16,14 @@
 use std::{
     any::Any,
     collections::VecDeque,
+    fs::File,
+    path::Path,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 
-use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader as ArrowFileReader};
 use dashmap::DashMap;
 use datafusion::{
     common::{Result, Statistics},
@@ -37,6 +39,10 @@ use datafusion::{
 use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
 
+use crate::service::search::cache::streaming_aggs::{
+    cache_streaming_aggs_to_disk, get_streaming_aggs_records_from_disk,
+};
+
 pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
     Lazy::new(|| Arc::new(StreamingAggsCache::default()));
 
@@ -44,13 +50,13 @@ pub static GLOBAL_ID_CACHE: Lazy<Arc<StreamingIdCache>> =
     Lazy::new(|| Arc::new(StreamingIdCache::default()));
 
 // init streaming cache for the id
-pub fn init_cache(id: &str, start_time: i64, end_time: i64) {
-    GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time);
+pub fn init_cache(id: &str, start_time: i64, end_time: i64, file_path: &str) {
+    GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time, file_path.to_string());
     log::debug!(
         "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}",
         id,
         start_time,
-        end_time
+        end_time,
     );
 }
 
@@ -218,6 +224,14 @@ impl MonitorStream {
             stream,
         }
     }
+
+    fn is_complete_partition_window(&self) -> bool {
+        let window_micros = config::get_config()
+            .common
+            .streaming_aggs_partition_window_secs
+            * 1_000_000;
+        (self.end_time - self.start_time) == window_micros
+    }
 }
 
 impl Stream for MonitorStream {
@@ -236,7 +250,26 @@ impl Stream for MonitorStream {
             Poll::Ready(None) => {
                 let streaming_done =
                     GLOBAL_ID_CACHE.check_time(&self.id, self.start_time, self.end_time);
+                if self.is_complete_partition_window() {
+                    // get all the record batches
+                    let all_records = GLOBAL_CACHE.get(&self.id);
+                    let file_path = get_file_path_from_streaming_id(&self.id);
+                    let file_name = format!("{}_{}.arrow", self.start_time, self.end_time);
+                    // write the record batches to the file
+                    if let Some(records) = all_records {
+                        if let Err(e) =
+                            cache_streaming_aggs_to_disk(&file_path, &file_name, records)
+                        {
+                            log::error!(
+                                "[streaming_id: {}] Error caching streaming aggs record batches to disk: {:?}",
+                                self.id,
+                                e
+                            );
+                        }
+                    }
+                }
                 if streaming_done {
+                    // remove the cache
                     remove_cache(&self.id);
                 }
                 Poll::Ready(None)
@@ -302,6 +335,25 @@ impl StreamingAggsCache {
         entry.push(Arc::new(v));
     }
 
+    pub fn insert_many(&self, k: String, v: Vec<RecordBatch>) {
+        let mut w = self.cacher.lock();
+        if w.len() >= self.max_entries {
+            log::info!(
+                "[StreamingAggs] remove the oldest entry: max_entries={}, current_entries={}",
+                self.max_entries,
+                w.len()
+            );
+            if let Some(k) = w.pop_front() {
+                self.data.remove(&k);
+                GLOBAL_ID_CACHE.remove(&k);
+            }
+        }
+        w.push_back(k.clone());
+        drop(w);
+        let mut entry = self.data.entry(k).or_default();
+        entry.extend(v.into_iter().map(|v| Arc::new(v)));
+    }
+
     pub fn remove(&self, k: &str) {
         self.data.remove(k);
     }
@@ -328,9 +380,9 @@ impl StreamingIdCache {
         }
     }
 
-    pub fn insert(&self, k: String, start_time: i64, end_time: i64) {
+    pub fn insert(&self, k: String, start_time: i64, end_time: i64, file_path: String) {
         self.data
-            .insert(k, StreamingIdItem::new(start_time, end_time));
+            .insert(k, StreamingIdItem::new(start_time, end_time, file_path));
     }
 
     pub fn exists(&self, k: &str) -> bool {
@@ -347,6 +399,20 @@ impl StreamingIdCache {
     pub fn remove(&self, k: &str) {
         self.data.remove(k);
     }
+
+    pub fn get(&self, k: &str) -> Option<StreamingIdItem> {
+        self.data.get(k).map(|v| v.value().clone())
+    }
+
+    pub fn get_file_path(&self, k: &str) -> Option<String> {
+        let entry = self.data.get(k);
+        if let Some(v) = entry {
+            let file_path = v.value().get_file_path();
+            Some(file_path)
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for StreamingIdCache {
@@ -355,20 +421,23 @@ impl Default for StreamingIdCache {
     }
 }
 
+#[derive(Clone)]
 struct StreamingIdItem {
     start_time: i64,
     end_time: i64,
     start_ok: bool,
     end_ok: bool,
+    file_path: String,
 }
 
 impl StreamingIdItem {
-    pub fn new(start_time: i64, end_time: i64) -> Self {
+    pub fn new(start_time: i64, end_time: i64, file_path: String) -> Self {
         Self {
             start_time,
             end_time,
             start_ok: false,
             end_ok: false,
+            file_path,
         }
     }
 
@@ -381,6 +450,46 @@ impl StreamingIdItem {
         }
         self.start_ok && self.end_ok
     }
+
+    pub fn get_file_path(&self) -> String {
+        self.file_path.clone()
+    }
+}
+
+fn get_file_path_from_streaming_id(streaming_id: &str) -> String {
+    let file_path = GLOBAL_ID_CACHE.get_file_path(streaming_id);
+    file_path.unwrap_or_default()
+}
+
+// prepare cache for the streaming_id
+pub async fn prepare_cache(streaming_id: &str) -> anyhow::Result<bool> {
+    let streaming_item = match GLOBAL_ID_CACHE.get(streaming_id) {
+        Some(v) => v,
+        None => return Err(anyhow::anyhow!("StreamingId not found")),
+    };
+
+    let file_path = streaming_item.get_file_path();
+
+    let cache_result = get_streaming_aggs_records_from_disk(
+        &file_path,
+        streaming_item.start_time,
+        streaming_item.end_time,
+    )
+    .await?;
+
+    log::info!(
+        "[streaming_id {}] loaded {} cached record batches from {}",
+        streaming_id,
+        cache_result.cache_result.len(),
+        file_path
+    );
+
+    if !cache_result.cache_result.is_empty() {
+        let all_record_batches = cache_result.get_record_batches();
+        GLOBAL_CACHE.insert_many(streaming_id.to_string(), all_record_batches);
+    }
+
+    Ok(cache_result.is_complete_match)
 }
 
 #[cfg(test)]

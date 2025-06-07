@@ -763,6 +763,12 @@ pub struct Common {
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
     pub feature_query_streaming_aggs: bool,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_STREAMING_AGGS_PARTITION_WINDOW_SECS",
+        default = 3600,
+        help = "Streaming aggregate partition window in seconds, default is 1 hour, should be either 15mins, 30mins, 1hour"
+    )]
+    pub streaming_aggs_partition_window_secs: i64,
     #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
     pub feature_join_match_one_enabled: bool,
     #[env_config(
