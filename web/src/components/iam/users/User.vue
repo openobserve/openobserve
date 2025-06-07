@@ -260,7 +260,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value || config.isCloud == "true") await _getRoles();
+      await _getRoles();
 
       // if (config.isCloud == "true") {
         // columns.value.push({
