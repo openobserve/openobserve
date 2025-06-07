@@ -69,7 +69,7 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move {
             _ = udp_server(udp_socket).await;
         });
-        toggle_syslog_setting(start_srv).await.unwrap();
+        toggle_syslog_setting(start_srv).await?;
     } else if server_running && !start_srv {
         // stop running server
         let sender = BROADCASTER.read().await;
@@ -96,7 +96,7 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
             let mut stream = TcpStream::connect(tcp_addr).await?;
             stream.write_all(STOP_SRV.as_bytes()).await?;
         }
-        toggle_syslog_setting(start_srv).await.unwrap();
+        toggle_syslog_setting(start_srv).await?;
     }
 
     Ok(())

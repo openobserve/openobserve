@@ -153,11 +153,9 @@ pub async fn toggle_state(server: SyslogServer) -> Result<HttpResponse, io::Erro
 pub async fn get_tcp_tls_ca_cert() -> Result<HttpResponse, io::Error> {
     let cfg = config::get_config();
     let ca_cert_path = &cfg.tcp.tcp_tls_ca_cert_path;
-    log::info!("ca_cert_path: {}", ca_cert_path);
     let mut file = File::open(ca_cert_path).await?;
     let mut contents = String::new();
     file.read_to_string(&mut contents).await?;
-    log::info!("contents: {}", contents);
 
     Ok(HttpResponse::Ok()
         .content_type("application/x-pem-file")
@@ -169,11 +167,9 @@ pub async fn get_tcp_tls_ca_cert() -> Result<HttpResponse, io::Error> {
 pub async fn get_tcp_tls_cert() -> Result<HttpResponse, io::Error> {
     let cfg = config::get_config();
     let cert_path = &cfg.tcp.tcp_tls_cert_path;
-    log::info!("cert_path: {}", cert_path);
     let mut file = File::open(cert_path).await?;
     let mut contents = String::new();
     file.read_to_string(&mut contents).await?;
-    log::info!("contents: {}", contents);
 
     Ok(HttpResponse::Ok()
         .content_type("application/x-pem-file")
