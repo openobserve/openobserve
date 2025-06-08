@@ -1,34 +1,3 @@
-//syntax = "proto3";
-//
-//package loki;
-//
-//import "google/protobuf/timestamp.proto";
-//
-//option go_package = "github.com/grafana/loki/pkg/push";
-//
-//message PushRequest {
-//  repeated StreamAdapter streams = 1;
-//}
-//
-//message StreamAdapter {
-//  string labels = 1;  // JSON-encoded labels: {"service":"api","env":"prod"}
-//  repeated EntryAdapter entries = 2;
-//  uint64 hash = 3;
-//}
-//
-//message EntryAdapter {
-//  string timestamp = 1;
-//  string line = 2;
-//  repeated LabelPairAdapter structured_metadata = 3;
-//}
-//
-//message LabelPairAdapter {
-//  string name = 1;
-//  string value = 2;
-//}
-//
-//
-
 syntax = "proto3";
 
 package loki;
