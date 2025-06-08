@@ -95,6 +95,7 @@ pub enum LokiError {
 
     #[error("Gzip decompression failed: {source}")]
     GzipDecompression {
+        #[from]
         #[source]
         source: std::io::Error,
     },
