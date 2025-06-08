@@ -18,13 +18,13 @@ use std::io::{Error, Read};
 use actix_web::{HttpRequest, HttpResponse, post, web};
 use flate2::read::GzDecoder;
 use prost::Message;
+use proto::loki_rpc;
 
 use crate::{
+    common::meta::loki::{LokiError, LokiPushRequest},
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::logs,
-    common::meta::loki::{LokiError, LokiPushRequest},
 };
-use proto::loki_rpc;
 
 #[utoipa::path(
     context_path = "/api",
@@ -48,15 +48,18 @@ pub async fn loki_push(
 ) -> Result<HttpResponse, Error> {
     let thread_id = **thread_id;
     let org_id = org_id.into_inner();
-    
-    let content_type = req.headers()
+
+    let content_type = req
+        .headers()
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or(CONTENT_TYPE_PROTO);
-    let content_encoding = req.headers()
+    let content_encoding = req
+        .headers()
         .get("Content-Encoding")
         .and_then(|h| h.to_str().ok());
-    let user_email = req.headers()
+    let user_email = req
+        .headers()
         .get("user_id")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("loki_user");
@@ -83,8 +86,15 @@ pub async fn loki_push(
             logs::loki::LokiRequest::Protobuf(protobuf_request)
         }
         _ => {
-            log::error!("[LOKI] Unsupported content type '{}' for org '{}'", content_type, org_id);
-            return Ok(LokiError::UnsupportedContentType { content_type: content_type.to_string() }.into());
+            log::error!(
+                "[LOKI] Unsupported content type '{}' for org '{}'",
+                content_type,
+                org_id
+            );
+            return Ok(LokiError::UnsupportedContentType {
+                content_type: content_type.to_string(),
+            }
+            .into());
         }
     };
 
@@ -97,7 +107,10 @@ pub async fn loki_push(
     }
 }
 
-fn parse_json_request(content_encoding: Option<&str>, body: web::Bytes) -> Result<LokiPushRequest, LokiError> {
+fn parse_json_request(
+    content_encoding: Option<&str>,
+    body: web::Bytes,
+) -> Result<LokiPushRequest, LokiError> {
     let json_data = match content_encoding {
         Some("gzip") => {
             let mut decoder = GzDecoder::new(body.as_ref());
@@ -108,32 +121,40 @@ fn parse_json_request(content_encoding: Option<&str>, body: web::Bytes) -> Resul
             }
         }
         None | Some("identity") => body.to_vec(),
-        Some(encoding) => return Err(LokiError::UnsupportedContentEncoding { encoding: encoding.to_string() }),
+        Some(encoding) => {
+            return Err(LokiError::UnsupportedContentEncoding {
+                encoding: encoding.to_string(),
+            });
+        }
     };
     serde_json::from_slice::<LokiPushRequest>(&json_data).map_err(LokiError::from)
 }
 
-fn parse_protobuf_request(content_encoding: Option<&str>, body: web::Bytes) -> Result<loki_rpc::PushRequest, LokiError> {
+fn parse_protobuf_request(
+    content_encoding: Option<&str>,
+    body: web::Bytes,
+) -> Result<loki_rpc::PushRequest, LokiError> {
     let decompressed = match content_encoding {
-        Some("snappy") | None => {
-            snap::raw::Decoder::new()
-                .decompress_vec(&body)
-                .map_err(|e| LokiError::UnsupportedContentEncoding { 
-                    encoding: format!("snappy decompression failed: {}", e) 
-                })?
-        }
+        Some("snappy") | None => snap::raw::Decoder::new()
+            .decompress_vec(&body)
+            .map_err(|e| LokiError::UnsupportedContentEncoding {
+                encoding: format!("snappy decompression failed: {}", e),
+            })?,
         Some("identity") => body.to_vec(),
-        Some(encoding) => return Err(LokiError::UnsupportedContentEncoding { 
-            encoding: encoding.to_string() 
-        }),
+        Some(encoding) => {
+            return Err(LokiError::UnsupportedContentEncoding {
+                encoding: encoding.to_string(),
+            });
+        }
     };
     loki_rpc::PushRequest::decode(&*decompressed).map_err(LokiError::from)
 }
 
 #[cfg(test)]
 mod tests {
+    use actix_web::{App, test};
+
     use super::*;
-    use actix_web::{test, App};
 
     fn create_valid_loki_json() -> &'static str {
         r#"{"streams":[{"stream":{"service":"test"},"values":[["1701432000000000000","Test message"]]}]}"#
@@ -141,7 +162,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_loki_push_routing() {
-        let app = test::init_service(App::new().app_data(web::Data::new(0_usize)).service(loki_push)).await;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(0_usize))
+                .service(loki_push),
+        )
+        .await;
 
         // Test JSON routing
         let req = test::TestRequest::post()

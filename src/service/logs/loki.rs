@@ -18,8 +18,8 @@ use std::collections::HashMap;
 use anyhow::Result;
 use config::{meta::self_reporting::usage::UsageType, utils::json};
 use promql_parser::{
-    label::MatchOp, 
-    parser::{self, Expr as PromExpr}
+    label::MatchOp,
+    parser::{self, Expr as PromExpr},
 };
 use proto::loki_rpc;
 
@@ -217,7 +217,6 @@ fn validate_protobuf_request(request: &loki_rpc::PushRequest) -> Result<(), Loki
             });
         }
 
-
         if stream.entries.is_empty() {
             return Err(LokiError::InvalidLabels {
                 message: format!("Stream {} has no log entries", stream_idx),
@@ -253,12 +252,11 @@ fn validate_protobuf_request(request: &loki_rpc::PushRequest) -> Result<(), Loki
 fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, LokiError> {
     // Add dummy metric name to make it a valid PromQL expression
     let full_query = format!("dummy{}", labels_str);
-    
-    let ast = parser::parse(&full_query)
-        .map_err(|e| LokiError::InvalidLabels { 
-            message: format!("Invalid Prometheus label format: {}", e) 
-        })?;
-    
+
+    let ast = parser::parse(&full_query).map_err(|e| LokiError::InvalidLabels {
+        message: format!("Invalid Prometheus label format: {}", e),
+    })?;
+
     if let PromExpr::VectorSelector(vs) = ast {
         let mut labels = HashMap::new();
         for matcher in vs.matchers.matchers.iter() {
@@ -268,8 +266,8 @@ fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, 
         }
         Ok(labels)
     } else {
-        Err(LokiError::InvalidLabels { 
-            message: "Could not parse as label selector".to_string() 
+        Err(LokiError::InvalidLabels {
+            message: "Could not parse as label selector".to_string(),
         })
     }
 }
@@ -577,7 +575,7 @@ mod tests {
         // Test valid Prometheus label format
         let labels_str = r#"{service="api",environment="prod"}"#;
         let result = parse_prometheus_labels(labels_str).unwrap();
-        
+
         assert_eq!(result.get("service"), Some(&"api".to_string()));
         assert_eq!(result.get("environment"), Some(&"prod".to_string()));
         assert_eq!(result.len(), 2);
@@ -593,7 +591,7 @@ mod tests {
         let result = parse_prometheus_labels(labels_str).unwrap();
         assert_eq!(result.len(), 0);
 
-        // Test invalid format should error  
+        // Test invalid format should error
         let labels_str = "invalid{format";
         let result = parse_prometheus_labels(labels_str);
         assert!(result.is_err());
