@@ -1171,6 +1171,8 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
 async fn init_enterprise() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::search::init().await?;
 
+    o2_enterprise::enterprise::metrics::init();
+
     if let Err(e) = o2_enterprise::enterprise::actions::action_manager::init_client() {
         log::warn!("Failed to init action manager client: {e}");
     }
