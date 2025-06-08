@@ -6,6 +6,7 @@ from pathlib import Path # For file paths
 import pytest # For fixtures
 import random
 import string
+import base64
 from requests.auth import HTTPBasicAuth
 
 # Constants for Streaming URL and user credentials
@@ -162,6 +163,13 @@ test_data_histog = [
         f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_image IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
         1,
         3846,
+    ),
+
+    (
+        "re_match",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        1,
+        2002,
     ),
   
   
@@ -481,6 +489,13 @@ test_data_sql = [
         1,
     ),
 
+    (
+        "re_match",
+        f"SELECT * FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox')",
+        50,
+        50,
+    ),
+
 
 
 
@@ -641,6 +656,100 @@ def test_sql_query_range(create_session, base_url):
     assert "function_error" in res_data_sql_cache_query_range, "function_error key is missing from the response"        
     assert expected_error_message in res_data_sql_cache_query_range["function_error"], "Expected error message not found in function_error"
 
+def test_search_partition(create_session, base_url):
+    """Test the search partition API."""
+    session = create_session
+    url = base_url
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    # Define the payload
+    PAYLOAD = {
+    "sql": f"SELECT * FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox')",
+    "start_time": ten_min_ago,
+    "end_time": end_time,
+    "sql_mode": "full",
+    "streaming_output": True
+    }
+
+    response = session.post(f"{url}api/{org_id}/_search_partition?type=logs", json=PAYLOAD)
+    
+    # Check the response status code
+    assert response.status_code == 200, f"Expected status code 200 but got {response.status_code}"
+    
+    # Optionally, check for specific content in the response
+    response_data = response.json()
+
+    print(f"Response {url} Search Partition:", response_data)
+
+    assert 'file_num' in response_data, "Response does not contain 'file_num'"
+    assert response_data['file_num'] == 0, "Unexpected 'file_num' value"
+    
+    assert 'records' in response_data, "Response does not contain 'records'"
+    assert response_data['records'] == 0, "Unexpected 'records' value"
+    
+    assert 'original_size' in response_data, "Response does not contain 'original_size'"
+    assert response_data['original_size'] == 0, "Unexpected 'original_size' value"
+    
+    assert 'compressed_size' in response_data, "Response does not contain 'compressed_size'"
+    assert response_data['compressed_size'] == 0, "Unexpected 'compressed_size' value"
+    
+    assert 'max_query_range' in response_data, "Response does not contain 'max_query_range'"
+    assert response_data['max_query_range'] == 1, "Unexpected 'max_query_range' value"
+    
+    assert 'partitions' in response_data, "Response does not contain 'partitions'"
+    assert isinstance(response_data['partitions'], list), "'partitions' should be a list"
+    assert len(response_data['partitions']) == 2, "Expected 2 partitions"
+    
+   
+    assert 'order_by' in response_data, "Response does not contain 'order_by'"
+    assert response_data['order_by'] == "desc", "Unexpected 'order_by' value"
+    
+    assert 'limit' in response_data, "Response does not contain 'limit'"
+    assert response_data['limit'] == 0, "Unexpected 'limit' value"
+    
+    assert 'streaming_output' in response_data, "Response does not contain 'streaming_output'"
+    assert response_data['streaming_output'] is True, "Unexpected 'streaming_output' value"
+    
+    assert 'streaming_aggs' in response_data, "Response does not contain 'streaming_aggs'"
+    assert response_data['streaming_aggs'] is False, "Unexpected 'streaming_aggs' value"
+    
+    assert 'streaming_id' in response_data, "Response does not contain 'streaming_id'"
+    assert response_data['streaming_id'] is None, "Unexpected 'streaming_id' value"
+
+
+def test_values_endpoint(create_session, base_url):
+    session = create_session
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    url = f"{base_url}api/{org_id}/{stream_name}/_values?fields=kubernetes_container_name&size=10&start_time={ten_min_ago}&end_time={end_time}&sql=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&type=logs"
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Basic {base64.b64encode(f"{ZO_ROOT_USER_EMAIL}:{ZO_ROOT_USER_PASSWORD}".encode()).decode()}'
+    }
+    
+    response = session.get(url, headers=headers)
+
+    # Assert the response status code
+    assert response.status_code == 200
+
+    # Assert the expected response structure
+    json_response = response.json()
+    print(f"Response {url} Values:", json_response)
+    assert 'took' in json_response
+    assert 'hits' in json_response
+    assert 'total' in json_response
+    assert isinstance(json_response['hits'], list)
+
+    # Additional assertions based on expected values
+    assert json_response['total'] == 1  # Adjust based on expected output
+    assert len(json_response['hits']) == 1  # Ensure there is one hit
+    assert json_response['hits'][0]['field'] == "kubernetes_container_name"  # Check the field name
+    assert isinstance(json_response['hits'][0]['values'], list)  # Check that values is a list
+   
 
 
 # Define test data with different queries and expected response details for streaming enable
@@ -815,6 +924,114 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     # Adjust the assertion based on our expectations
     expected_hits_sql_cache = total_exp  # what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
+
+# Define the test function
+def test_values_streaming_endpoint(create_session, base_url):
+    session = create_session
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    url = f"{base_url}api/{org_id}/_values_stream"
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Basic {base64.b64encode(f"{ZO_ROOT_USER_EMAIL}:{ZO_ROOT_USER_PASSWORD}".encode()).decode()}'
+    }
+    # Define the JSON payload
+    payload = {
+    "fields": ["kubernetes_container_name"],
+    "size": 10,
+    "no_count": False,
+    "regions": [],
+    "clusters": [],
+    "vrl_fn": "",
+    "start_time": ten_min_ago,
+    "end_time": end_time,
+    "timeout": 30000,
+    "stream_name": f"{stream_name}",
+    "stream_type": "logs",
+    "use_cache": False,
+    "sql": "U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg"
+}
+    res_values_streaming = session.post(url, headers=headers, json=payload)
+
+    # Assert the response status code
+    assert res_values_streaming.status_code == 200
+
+    # Assert the expected response structure
+    res_data_values_streaming = read_response(res_values_streaming)
+    print(f"Response {url} Values Streaming:", res_data_values_streaming)
+
+    assert isinstance(res_data_values_streaming, dict)  # Check that the response is a dictionary
+    assert 'results' in res_data_values_streaming
+    assert isinstance(res_data_values_streaming['results'], dict)
+    assert 'cached_ratio' in res_data_values_streaming['results']
+    assert 'from' in res_data_values_streaming['results']
+    assert 'hits' in res_data_values_streaming['results']
+    assert isinstance(res_data_values_streaming['results']['hits'], list)
+
+    # Additional assertions based on expected values
+    assert res_data_values_streaming['results']['total'] >= 0  # Total should be non-negative
+    assert len(res_data_values_streaming['results']['hits']) <= 10  # Check that hits do not exceed requested size
+    for hit in res_data_values_streaming['results']['hits']:
+        assert 'field' in hit
+        assert 'values' in hit
+        assert isinstance(hit['values'], list)  # Check that values is a list
+        
+
+# Define the test function
+def test_values_streaming_endpoint_cache(create_session, base_url):
+    session = create_session
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    url = f"{base_url}api/{org_id}/_values_stream"
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Basic {base64.b64encode(f"{ZO_ROOT_USER_EMAIL}:{ZO_ROOT_USER_PASSWORD}".encode()).decode()}'
+    }
+    # Define the JSON payload
+    payload = {
+    "fields": ["kubernetes_container_name"],
+    "size": 10,
+    "no_count": False,
+    "regions": [],
+    "clusters": [],
+    "vrl_fn": "",
+    "start_time": ten_min_ago,
+    "end_time": end_time,
+    "timeout": 30000,
+    "stream_name": f"{stream_name}",
+    "stream_type": "logs",
+    "use_cache": True,
+    "sql": "U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg"
+}
+    res_values_streaming_cache = session.post(url, headers=headers, json=payload)
+
+    # Assert the response status code
+    assert res_values_streaming_cache.status_code == 200
+
+    # Assert the expected response structure
+    res_data_values_streaming_cache = read_response(res_values_streaming_cache)
+    print(f"Response {url} Values Streaming:", res_data_values_streaming_cache)
+
+    assert isinstance(res_data_values_streaming_cache, dict)  # Check that the response is a dictionary
+    assert 'results' in res_data_values_streaming_cache
+    assert isinstance(res_data_values_streaming_cache['results'], dict)
+    assert 'cached_ratio' in res_data_values_streaming_cache['results']
+    assert 'from' in res_data_values_streaming_cache['results']
+    assert 'hits' in res_data_values_streaming_cache['results']
+    assert isinstance(res_data_values_streaming_cache['results']['hits'], list)
+
+    # Additional assertions based on expected values
+    assert res_data_values_streaming_cache['results']['total'] >= 0  # Total should be non-negative
+    assert len(res_data_values_streaming_cache['results']['hits']) <= 10  # Check that hits do not exceed requested size
+    for hit in res_data_values_streaming_cache['results']['hits']:
+        assert 'field' in hit
+        assert 'values' in hit
+        assert isinstance(hit['values'], list)  # Check that values is a list
+        
 
 def test_streaming_sql_query_range(create_session, base_url):
     """Running an E2E test for sql max query range with streaming enabled."""
