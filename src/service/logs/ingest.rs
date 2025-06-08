@@ -162,6 +162,11 @@ pub async fn ingest(
                 IngestionData::JSON(&json_req),
             )
         }
+        IngestionRequest::Hec(logs) => (
+            "/api/org/ingest/logs/_hec",
+            UsageType::Hec,
+            IngestionData::JSON(logs),
+        ),
     };
 
     let mut stream_status = StreamStatus::new(&stream_name);
