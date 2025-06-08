@@ -81,7 +81,7 @@ pub struct StreamSchemaChk {
     pub has_metadata: bool,
 }
 
-pub const INGESTION_EP: [&str; 14] = [
+pub const INGESTION_EP: [&str; 15] = [
     "_bulk",
     "_json",
     "_multi",
@@ -96,6 +96,7 @@ pub const INGESTION_EP: [&str; 14] = [
     "logs",
     "metrics",
     "_json_arrow",
+    "_hec",
 ];
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -325,6 +326,7 @@ pub enum IngestionRequest<'a> {
     KinesisFH(&'a KinesisFHRequest),
     RUM(&'a web::Bytes),
     Usage(&'a web::Bytes),
+    Hec(&'a Vec<json::Value>),
 }
 
 pub enum IngestionData<'a> {
@@ -365,6 +367,31 @@ pub enum IngestionDataIter<'a> {
         std::vec::IntoIter<json::Value>,
         Option<KinesisFHIngestionResponse>,
     ),
+}
+
+pub enum HecStatus {
+    Success,
+    InvalidFormat,
+    InvalidIndex,
+    Custom(String, u16),
+}
+
+impl From<HecStatus> for HecResponse {
+    fn from(value: HecStatus) -> Self {
+        let (text, code) = match value {
+            HecStatus::Success => ("Success".to_string(), 200),
+            HecStatus::InvalidFormat => ("Invalid data format".to_string(), 400),
+            HecStatus::InvalidIndex => ("Incorrect index".to_string(), 400),
+            HecStatus::Custom(s, c) => (s, c),
+        };
+        Self { text, code }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct HecResponse {
+    pub text: String,
+    pub code: u16,
 }
 
 #[cfg(test)]

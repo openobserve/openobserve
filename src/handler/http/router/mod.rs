@@ -413,6 +413,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(logs::ingest::bulk)
         .service(logs::ingest::multi)
         .service(logs::ingest::json)
+        .service(logs::ingest::hec)
         .service(logs::ingest::otlp_logs_write)
         .service(logs::loki::loki_push)
         .service(traces::traces_write)
