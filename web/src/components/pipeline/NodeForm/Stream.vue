@@ -234,9 +234,9 @@ watch(
   }
 );
   function sanitizeStreamName(input: string): string {
-    if(input.length > 60){
+    if(input.length > 100){
       $q.notify({
-        message: "Stream name should be less than 60 characters",
+        message: "Stream name should be less than 100 characters",
         color: "negative",
         position: "bottom",
         timeout: 2000,
