@@ -503,6 +503,19 @@ pub async fn prepare_cache(streaming_id: &str) -> anyhow::Result<bool> {
         GLOBAL_CACHE.insert_many(streaming_id.to_string(), all_record_batches);
     }
 
+    if cache_result.is_complete_match {
+        log::info!(
+            "[streaming_id {}] found complete cache match for streaming aggregate query",
+            streaming_id
+        );
+        // indicate that the cache is complete match
+        GLOBAL_ID_CACHE.check_time(
+            streaming_id,
+            streaming_item.start_time,
+            streaming_item.end_time,
+        );
+    }
+
     Ok(cache_result.is_complete_match)
 }
 

@@ -3325,6 +3325,7 @@ mod tests {
                 gc_size: usize::default(),
                 gc_interval: u64::default(),
                 multi_dir: String::default(),
+                record_batch_max_size: usize::default(),
             },
             log: config::Log {
                 level: String::default(),
