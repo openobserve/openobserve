@@ -1068,20 +1068,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <q-card  class="tw-h-full editor-dialog-card "
+  <div class="tw-flex tw-h-full">
+
+
+    <q-card  class="tw-h-full  editor-dialog-card tw-flex "
     :style="{
-      width: isFullScreen ? '100vw' : '90vw'
+      width: isFullScreen  ? '100vw' : store.state.isAiChatEnabled ? '65vw' : '90vw'
     }"
     >
-      <div class="tw-h-full  tw-px-6 tw-py-2">
+      <div class="tw-h-full tw-w-full tw-px-6 tw-py-2 "
+      >
       <div class="tw-h-16 tw-flex tw-items-center tw-justify-between" style="font-size: 20px ;">
         <div class="tw-flex tw-items-center tw-gap-2">
           <q-icon name="close" size="20px" class="tw-cursor-pointer" @click="viewSqlEditor = false" />
           <span>Add Conditions</span>
         </div>
+        <div class="tw-flex tw-items-center tw-gap-2">
 
-        <q-btn icon="fullscreen" size="16px"  dense class="tw-cursor-pointer" @click="() => isFullScreen = !isFullScreen" ></q-btn>
+          <q-btn icon="fullscreen" size="16px" :color="isFullScreen ? 'primary' : ''"  dense class="tw-cursor-pointer" @click="() => isFullScreen = !isFullScreen" ></q-btn>
+          <q-btn
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            dense
+            class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%;"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
 
+          >
+            <div class="row items-center no-wrap tw-gap-2  ">
+              <img  :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
+        </div>
       </div>
       <div class="tw-h-[calc(100vh-100px)]">
         <div class="row tw-gap-4 tw-h-[100%] ">
@@ -1272,7 +1297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- this is for multi time range to select -->
                 <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
                     <div class="tw-text-sm tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
-                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
+                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff] tw-cursor-pointer' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
                     >
                   {{triggerData.period  }} minute(s) ago
                 </div>
@@ -1350,8 +1375,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- this is for multi time range to select -->
                 <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
-                    <div class="tw-text-sm tw-bg-white tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
-                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : ''"
+                    <div class="tw-text-sm tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
+                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff] tw-cursor-pointer' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
                     >
                   {{triggerData.period  }} minute(s) ago
                 </div>
@@ -1423,30 +1448,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         </div>
-        <div v-if="false" class="flex justify-end items-center q-px-lg tw-w-full tw-h-16 " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky;  bottom: 0 !important; top: 0; ">
-              <q-btn
-                data-test="add-alert-cancel-btn"
-                v-close-popup="true"
-                class=" text-bold"
-                :label="t('alerts.cancel')"
-                text-color="light-text"
-                padding="sm md"
-                no-caps
-              />
-              <q-btn
-                data-test="add-alert-submit-btn"
-                :label="t('alerts.save')"
-                class=" text-bold no-border q-ml-md"
-                padding="sm xl"
-                type="submit"
-                no-caps
-                :disable="true"
-                style="background-color: #4A4E4c; color: #ffffff;"
-
-              />
-            </div>
       </div>
+
     </q-card>
+    <div  class="q-ml-sm " v-if="store.state.isAiChatEnabled " style="width: 24.5vw; max-width: 100%; min-width: 75px;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+              <O2AIChat :header-height="60" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 10px) !important;" />
+
+            </div>
+
+  </div>
+
   </q-dialog>
 
 
@@ -1483,6 +1494,8 @@ import searchService from "@/services/search";
 import AlertsContainer from "./AlertsContainer.vue";
 import useQuery from "@/composables/useQuery";
 import { pick } from "lodash-es";
+import config from "@/aws-exports";
+import O2AIChat from "../O2AIChat.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -1612,9 +1625,11 @@ const tempRunQuery = ref(false);
 
 const runQueryLoading = ref(false);
 
+const isHovered = ref(false);
+
 const runPromqlError = ref("");
 
-const selectedColumn = ref("");
+const selectedColumn = ref<any>({});
 
 const filteredTimezone: any = ref([]);
 
@@ -2124,6 +2139,8 @@ const routeToCreateDestination = () => {
   };
 
   const onColumnSelect = () => {
+    query.value += ` ${selectedColumn.value.value} `
+    selectedColumn.value = ""
   };
   const buildMulitWindowQuery = (sql: any, fn: boolean = false) => {
   const queryToSend: any = [
@@ -2338,6 +2355,24 @@ const routeToCreateDestination = () => {
   }
 
 
+    const toggleAIChat = () => {
+      const isEnabled = !store.state.isAiChatEnabled;
+      store.dispatch("setIsAiChatEnabled", isEnabled);
+    }
+
+
+    const getBtnLogo = computed(() => {
+          if (isHovered.value || store.state.isAiChatEnabled) {
+            return getImageURL('images/common/ai_icon_dark.svg')
+          }
+
+          return store.state.theme === 'dark'
+            ? getImageURL('images/common/ai_icon_dark.svg')
+            : getImageURL('images/common/ai_icon.svg')
+        })
+
+
+
 
 
 
@@ -2367,7 +2402,10 @@ defineExpose({
   inputData,
   updateGroup,
   removeConditionGroup,
-  runPromqlError
+  runPromqlError,
+  toggleAIChat,
+  isHovered,
+  getBtnLogo
 });
 </script>
 
