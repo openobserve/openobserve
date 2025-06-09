@@ -291,9 +291,14 @@ impl StreamingAggsCache {
                 self.max_entries,
                 w.len()
             );
-            if let Some(k) = w.pop_front() {
+            if let Some(key_removed) = w.pop_front() {
                 self.data.remove(&k);
                 GLOBAL_ID_CACHE.remove(&k);
+                log::info!(
+                    "[StreamingAggs] [streaming_id: {}] old streaming_id removed: {}",
+                    k,
+                    key_removed
+                );
             }
         }
         w.push_back(k.clone());
