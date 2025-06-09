@@ -40,7 +40,7 @@ use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
 
 use crate::service::search::cache::streaming_aggs::{
-    cache_streaming_aggs_to_disk, get_streaming_aggs_records_from_disk,
+    RecordBatchCacheRequest, cache_record_batches_to_disk, get_streaming_aggs_records_from_disk,
 };
 
 pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
@@ -257,9 +257,13 @@ impl Stream for MonitorStream {
                     let file_name = format!("{}_{}.arrow", self.start_time, self.end_time);
                     // write the record batches to the file
                     if let Some(records) = all_records {
-                        if let Err(e) =
-                            cache_streaming_aggs_to_disk(&file_path, &file_name, records)
-                        {
+                        let request = RecordBatchCacheRequest {
+                            streaming_id: self.id.clone(),
+                            file_path: file_path.clone(),
+                            file_name: file_name.clone(),
+                            records,
+                        };
+                        if let Err(e) = cache_record_batches_to_disk(request) {
                             log::error!(
                                 "[streaming_id: {}] Error caching streaming aggs record batches to disk: {:?}",
                                 self.id,
