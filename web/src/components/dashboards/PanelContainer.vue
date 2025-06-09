@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ isPartialData }}
         <q-btn
           v-if="isPartialData && !isPanelLoading"
-          :icon="outlinedWarning"
+          :icon="symOutlinedClockLoader20"
           flat
           size="xs"
           padding="2px"
@@ -394,7 +394,10 @@ import {
   outlinedWarning,
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
-import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import {
+  symOutlinedClockLoader20,
+  symOutlinedDataInfoAlert,
+} from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
@@ -817,6 +820,7 @@ export default defineComponent({
       deletePanelDialog,
       isCurrentlyHoveredPanel,
       outlinedWarning,
+      symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
       store,
