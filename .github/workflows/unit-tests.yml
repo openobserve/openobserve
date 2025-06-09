@@ -10,7 +10,7 @@ on:
     branches:
       - "*"
     paths-ignore:
-      - "**.md" 
+      - "**.md"
 
 env:
   COLUMNS: 150
@@ -18,12 +18,20 @@ env:
 
 jobs:
   unit_tests:
-
-    runs-on: 
+    runs-on:
       labels: ubicloud-standard-8
 
-    steps:
+    services:
+      postgres:
+        image: postgres:17.5-alpine3.22
+        env:
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        # needed because the postgres container does not provide a healthcheck
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
+    steps:
       - name: Clone the current repo
         uses: actions/checkout@v4
 
@@ -40,10 +48,9 @@ jobs:
         with:
           version: "21.12"
 
-      
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
-      
+
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
@@ -51,5 +58,18 @@ jobs:
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Run unit tests
-        run: ./coverage.sh
+        run: |
+          # required for all dbs
+          export ZO_INTERNAL_GRPC_TOKEN=fake
+          export ZO_TEXT_DATA_TYPE=text
+
+          # setup and run with postgres
+          export ZO_META_STORE=postgres
+          export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
+          ./coverage.sh run-cov
+          
+          # cleanup
+          rm -r data
+          rm -r ./json
+          rm -r ./src/infra/data
       
