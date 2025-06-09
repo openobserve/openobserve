@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     computed,
     defineAsyncComponent,
     defineComponent,
+    onBeforeMount,
     onBeforeUnmount,
     onMounted,
     ref,
@@ -231,8 +232,9 @@ export default defineComponent({
 
       const router = useRouter();
 
+
       onMounted(async () => {
-        if(store.state.organizationData.foldersByType.length == 0) {
+        if(Object.keys(store.state.organizationData.foldersByType).length == 0) {
           await getFoldersListByType(store, "alerts");
         }
         if(router.currentRoute.value.query.folder) {
@@ -242,6 +244,7 @@ export default defineComponent({
           activeFolderId.value = "default";
         }
       });
+      
       watch(()=> router.currentRoute.value.query.folder, (newVal)=> {
         activeFolderId.value = newVal;
       })
