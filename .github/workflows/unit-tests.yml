@@ -64,8 +64,8 @@ jobs:
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
-      #- name: Setup cargo config
-      #  run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+      - name: Setup cargo config
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Run unit tests
         run: |
