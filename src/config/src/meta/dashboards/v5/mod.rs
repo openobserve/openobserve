@@ -489,6 +489,12 @@ pub struct VariableList {
     pub select_all_value_for_multi_select: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_multi_select_value: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tabs: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panels: Option<Vec<String>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
