@@ -1643,14 +1643,14 @@ export default defineComponent({
         return false;
       }
 
-      if (this.formData.stream_name == "") {
-        this.q.notify({
-          type: "negative",
-          message: "Please select stream name.",
-          timeout: 1500,
-        });
-        return false;
-      }
+      // if (this.formData.stream_name == "") {
+      //   this.q.notify({
+      //     type: "negative",
+      //     message: "Please select stream name.",
+      //     timeout: 1500,
+      //   });
+      //   return false;
+      // }
 
       if (
         this.formData.is_real_time == "false" &&
