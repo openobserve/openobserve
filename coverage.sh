@@ -30,13 +30,14 @@ _cov_test() {
         --workspace \
         --verbose \
         --ignore-filename-regex 'job|.*generated.*' \
-        --test-threads=1
+        --test-threads=1 \
+        --no-fail-fast \
         "$@"
 }
 
 cmd_html() {
     _cov_test --html "$@"
-    open target/llvm-cov/html/index.html  # HACK: `open` is not portable
+    open target/llvm-cov/html/index.html # HACK: `open` is not portable
 }
 
 cmd_show_env() {
@@ -51,7 +52,7 @@ cmd_check() {
     _cov_test --json --summary-only --output-path report.json "$@"
 
     python3 <(
-    cat <<'EOF'
+        cat <<'EOF'
 import json
 import os
 import sys
@@ -81,37 +82,37 @@ for k, threshold in thresholds.items():
         exit_status = 1
 sys.exit(exit_status)
 EOF
-)
+    )
 }
 
 main() {
     case "${1:-}" in
-        '')
-            cmd_check
-            ;;
-        check)
-            shift
-            cmd_check "$@"
-            ;;
-        html)
-            shift
-            cmd_html "$@"
-            ;;
-        run-cov)
-            shift
-            _cov_test --json --summary-only --output-path report.json "$@"
-            ;;
-        show-env)
-            cmd_show_env
-            ;;
-        -h|--help|help)
-            usage
-            ;;
-        *)
-            echo >&2 "Invalid argument: $1"
-            echo >&2 "Type '$0 --help' for usage"
-            exit 1
-            ;;
+    '')
+        cmd_check
+        ;;
+    check)
+        shift
+        cmd_check "$@"
+        ;;
+    html)
+        shift
+        cmd_html "$@"
+        ;;
+    run-cov)
+        shift
+        _cov_test --json --summary-only --output-path report.json "$@"
+        ;;
+    show-env)
+        cmd_show_env
+        ;;
+    -h | --help | help)
+        usage
+        ;;
+    *)
+        echo >&2 "Invalid argument: $1"
+        echo >&2 "Type '$0 --help' for usage"
+        exit 1
+        ;;
     esac
 }
 
