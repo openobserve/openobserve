@@ -168,7 +168,10 @@
     <div class="tw-flex tw-items-center tw-gap-4">
       <div class="tw-border-t tw-border-gray-200 tw-flex-1"></div>
       <div
-        class="tw-py-2 tw-text-center tw-text-xs tw-text-gray-700"
+        :class="[
+          'tw-py-2 tw-text-center tw-text-xs',
+          store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-700',
+        ]"
         v-if="
           modelValue.stream &&
           modelValue.streamAlias &&
@@ -178,7 +181,7 @@
       >
         Joining <span className="tw-font-semibold">{{ mainStream }}</span> with
         <span className="tw-font-semibold">{{ modelValue.stream }}</span> with
-        <span className="tw-text-indigo-600"
+        <span className="text-primary"
           >{{
             modelValue?.joinType?.charAt(0)?.toUpperCase() +
             modelValue?.joinType?.slice(1)
@@ -358,8 +361,6 @@ export default defineComponent({
     },
   },
 
-  emits: ["close"],
-
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -499,6 +500,7 @@ export default defineComponent({
       getStreamsBasedJoinIndex,
       filteredStreamOptions,
       filterStreamOptions,
+      store,
     };
   },
 });
