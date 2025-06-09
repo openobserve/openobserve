@@ -353,7 +353,10 @@ export const usePanelDataLoader = (
       });
     }
 
-    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
+    if (
+      isWebSocketEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
       try {
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
@@ -909,6 +912,21 @@ export const usePanelDataLoader = (
     processApiError(response?.content, "sql");
   };
 
+  const shouldSkipSearchDueToEmptyVariables = () => {
+    // variablesData is an array of variable objects with a 'value' property
+    const allVars = [
+      ...(getDependentVariablesData() || []),
+      ...(getDynamicVariablesData() || []),
+    ];
+    return allVars.some(
+      (v) =>
+        v.value === null ||
+        v.value === undefined ||
+        v.value === "" ||
+        (Array.isArray(v.value) && v.value.length === 0),
+    );
+  };
+
   const getDataThroughWebSocket = async (
     query: string,
     it: any,
@@ -952,6 +970,13 @@ export const usePanelDataLoader = (
         },
       };
 
+      // Add guard here
+      if (shouldSkipSearchDueToEmptyVariables()) {
+        console.log(
+          "[PanelDataLoader] Skipping search API call: some variable values are null/empty",
+        );
+        return;
+      }
       fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
@@ -1043,6 +1068,11 @@ export const usePanelDataLoader = (
         state.isPartialData = true;
         // Save current state to cache
         saveCurrentStateToCache();
+        return;
+      }
+
+      // Add guard here
+      if (shouldSkipSearchDueToEmptyVariables()) {
         return;
       }
 
