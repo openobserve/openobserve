@@ -649,7 +649,7 @@ impl TimeRange {
         result
     }
 }
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
@@ -834,7 +834,11 @@ impl From<&str> for StreamSettings {
         let approx_partition = settings
             .get("approx_partition")
             .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .unwrap_or(
+                get_config()
+                    .common
+                    .use_stream_settings_for_partitions_enabled,
+            );
 
         let mut distinct_value_fields = Vec::new();
         let fields = settings.get("distinct_value_fields");
