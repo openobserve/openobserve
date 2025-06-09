@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding: 3px 16px 16px 16px; display: flex; gap: 16px;">
+  <div style="padding: 3px 16px 16px 16px; display: flex; gap: 16px">
     <div>
       <q-input
         dense
@@ -75,14 +75,4 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.field-function-menu-popup {
-  width: 771px;
-  height: 323px;
-  border-radius: 4px;
-  border: 1px solid #d5d5d5;
-  background: #fff;
-  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.05);
-  padding: 16px;
-}
-</style>
+<style lang="scss" scoped></style>
