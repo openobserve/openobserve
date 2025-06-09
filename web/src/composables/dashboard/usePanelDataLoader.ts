@@ -913,18 +913,37 @@ export const usePanelDataLoader = (
   };
 
   const shouldSkipSearchDueToEmptyVariables = () => {
-    // variablesData is an array of variable objects with a 'value' property
+    // Retrieve all variables data
     const allVars = [
       ...(getDependentVariablesData() || []),
       ...(getDynamicVariablesData() || []),
     ];
-    return allVars.some(
-      (v) =>
-        v.value === null ||
-        v.value === undefined ||
-        v.value === "" ||
-        (Array.isArray(v.value) && v.value.length === 0),
+    console.log("shouldSkipSearchDueToEmptyVariables: all variables", allVars);
+
+    // Identify variables with empty values
+    const variablesToSkip = allVars
+      .filter(
+        (v) =>
+          v.value === null ||
+          v.value === undefined ||
+          v.value === "" ||
+          (Array.isArray(v.value) && v.value.length === 0),
+      )
+      .map((v) => v.name);
+
+    console.log(
+      "shouldSkipSearchDueToEmptyVariables: variables to skip",
+      variablesToSkip,
     );
+
+    // Log variables for which the API will be skipped
+    variablesToSkip.forEach((variableName) => {
+      state.loading = false;
+      console.log(`Skipping API for variable: ${variableName}`);
+    });
+
+    // Return true if there are any variables to skip, indicating loading should be continued
+    return variablesToSkip.length > 0;
   };
 
   const getDataThroughWebSocket = async (
@@ -973,7 +992,7 @@ export const usePanelDataLoader = (
       // Add guard here
       if (shouldSkipSearchDueToEmptyVariables()) {
         console.log(
-          "[PanelDataLoader] Skipping search API call: some variable values are null/empty",
+          "shouldSkipSearchDueToEmptyVariables [PanelDataLoader] Skipping search API call: some variable values are null/empty",
         );
         return;
       }
