@@ -14,10 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::net::SocketAddr;
+
 use bytes::BytesMut;
-use tokio::{io::AsyncReadExt, net::{TcpListener, UdpSocket}};
-use tokio::io::AsyncRead;
+use tokio::{
+    io::{AsyncRead, AsyncReadExt},
+    net::{TcpListener, UdpSocket},
+};
 use tokio_rustls::TlsAcceptor;
+
 use crate::{job::syslog_server::BROADCASTER, service::logs::syslog};
 
 pub static STOP_SRV: &str = "ZO_STOP_TCP_UDP";
@@ -70,7 +74,7 @@ pub async fn tls_tcp_server(listener: TcpListener, tls_acceptor: Option<TlsAccep
                 Ok(tls_stream) => {
                     log::info!("accepted TLS connection for peer {}", peer_addr);
                     tokio::task::spawn(handle_connection(tls_stream, peer_addr));
-                },
+                }
                 Err(e) => {
                     log::error!("TLS accept error: {}", e);
                 }

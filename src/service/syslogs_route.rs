@@ -18,8 +18,8 @@ use std::io;
 use actix_web::{HttpResponse, http::StatusCode};
 use config::ider;
 use ipnetwork::IpNetwork;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::{fs::File, io::AsyncReadExt};
+
 use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
@@ -159,7 +159,10 @@ pub async fn get_tcp_tls_ca_cert() -> Result<HttpResponse, io::Error> {
 
     Ok(HttpResponse::Ok()
         .content_type("application/x-pem-file")
-        .insert_header(("Content-Disposition", "attachment; filename=\"ca-cert.pem\""))
+        .insert_header((
+            "Content-Disposition",
+            "attachment; filename=\"ca-cert.pem\"",
+        ))
         .body(contents))
 }
 
@@ -173,7 +176,10 @@ pub async fn get_tcp_tls_cert() -> Result<HttpResponse, io::Error> {
 
     Ok(HttpResponse::Ok()
         .content_type("application/x-pem-file")
-        .insert_header(("Content-Disposition", "attachment; filename=\"server-cert.pem\""))
+        .insert_header((
+            "Content-Disposition",
+            "attachment; filename=\"server-cert.pem\"",
+        ))
         .body(contents))
 }
 

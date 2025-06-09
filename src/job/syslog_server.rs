@@ -13,25 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    net::{SocketAddr},
-};
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
+
 use once_cell::sync::Lazy;
 use rustls::pki_types::ServerName;
 use tokio::{
-    net::{TcpListener, UdpSocket},
+    io::AsyncWriteExt,
+    net::{TcpListener, TcpStream, UdpSocket},
     sync::{RwLock, broadcast},
 };
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
 use tokio_rustls::{TlsAcceptor, TlsConnector};
+
 use crate::{
     common::infra::config::SYSLOG_ENABLED,
     handler::tcp_udp::{STOP_SRV, tls_tcp_server, udp_server},
-    service::db::syslog::toggle_syslog_setting,
+    service::{
+        db::syslog::toggle_syslog_setting,
+        tls::{tcp_tls_self_connect_client_config, tcp_tls_server_config},
+    },
 };
-use crate::service::tls::{tcp_tls_self_connect_client_config, tcp_tls_server_config};
 
 // TCP UDP Server
 pub static BROADCASTER: Lazy<RwLock<broadcast::Sender<bool>>> = Lazy::new(|| {
@@ -58,9 +58,7 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
         } else {
             None
         };
-        let tls_acceptor = tls_server_config
-            .map(Arc::new)
-            .map(TlsAcceptor::from);
+        let tls_acceptor = tls_server_config.map(Arc::new).map(TlsAcceptor::from);
 
         tokio::task::spawn(async move {
             _ = tls_tcp_server(tcp_listener, tls_acceptor).await;
@@ -78,13 +76,15 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.send_to(STOP_SRV.as_bytes(), udp_addr).await?;
         drop(socket);
-        
+
         if tcp_tls_enabled {
-            let config= tcp_tls_self_connect_client_config()?;
+            let config = tcp_tls_self_connect_client_config()?;
             let connector = TlsConnector::from(config);
             match TcpStream::connect(tcp_addr).await {
                 Ok(stream) => {
-                    let mut tls_stream = connector.connect(ServerName::try_from("127.0.0.1").unwrap(), stream).await?;
+                    let mut tls_stream = connector
+                        .connect(ServerName::try_from("127.0.0.1").unwrap(), stream)
+                        .await?;
                     tls_stream.write_all(STOP_SRV.as_bytes()).await?;
                 }
                 Err(e) => {
