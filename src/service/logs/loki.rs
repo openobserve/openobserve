@@ -16,7 +16,11 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use config::{meta::self_reporting::usage::UsageType, utils::json};
+use config::{
+    MESSAGE_COL_NAME, TIMESTAMP_COL_NAME,
+    meta::self_reporting::usage::UsageType,
+    utils::{json, schema::format_stream_name},
+};
 use promql_parser::{
     label::MatchOp,
     parser::{self, Expr as PromExpr},
@@ -27,6 +31,8 @@ use crate::common::meta::{
     ingestion::{IngestionResponse, IngestionStatus, RecordStatus},
     loki::{LokiError, LokiPushRequest},
 };
+
+const STREAM_NAME_LABEL: &str = "stream_name";
 
 pub enum LokiRequest {
     Json(LokiPushRequest),
@@ -41,18 +47,12 @@ pub async fn handle_request(
 ) -> Result<IngestionResponse, LokiError> {
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
-    let mut json_data_by_stream: HashMap<String, super::O2IngestJsonData> = HashMap::new();
-
-    match request {
-        LokiRequest::Json(json_request) => {
-            validate_json_request(&json_request)?;
-            process_json_request(json_request, &mut json_data_by_stream)?;
-        }
+    let json_data_by_stream = match request {
+        LokiRequest::Json(json_request) => validate_and_process_json_request(json_request)?,
         LokiRequest::Protobuf(protobuf_request) => {
-            validate_protobuf_request(&protobuf_request)?;
-            process_protobuf_request(protobuf_request, &mut json_data_by_stream)?;
+            validate_and_process_protobuf_request(protobuf_request)?
         }
-    }
+    };
 
     let mut status = IngestionStatus::Record(RecordStatus::default());
     super::write_logs_by_stream(
@@ -70,18 +70,55 @@ pub async fn handle_request(
         LokiError::from(anyhow::anyhow!("Multi-stream ingestion failed: {:?}", e))
     })?;
 
-    log::info!("[LOKI] Successfully processed streams for org '{}'", org_id);
+    log::info!("[Loki] Successfully processed streams for org '{}'", org_id);
     Ok(IngestionResponse::new(200, vec![]))
 }
 
-fn process_json_request(
+fn validate_and_process_json_request(
     request: LokiPushRequest,
-    json_data_by_stream: &mut HashMap<String, super::O2IngestJsonData>,
-) -> Result<(), LokiError> {
-    for loki_stream in request.streams {
+) -> Result<HashMap<String, super::O2IngestJsonData>, LokiError> {
+    let mut json_data_by_stream = HashMap::new();
+    if request.streams.is_empty() {
+        return Err(LokiError::EmptyStream);
+    }
+
+    for (stream_idx, loki_stream) in request.streams.into_iter().enumerate() {
+        if loki_stream.stream.is_empty() {
+            return Err(LokiError::InvalidLabels {
+                message: format!("Stream {} has empty labels", stream_idx),
+            });
+        }
+
+        if loki_stream.values.is_empty() {
+            return Err(LokiError::InvalidLabels {
+                message: format!("Stream {} has no log entries", stream_idx),
+            });
+        }
+
         let stream_name = determine_service_stream_name(&loki_stream.stream);
 
-        for entry in loki_stream.values {
+        for (entry_idx, entry) in loki_stream.values.into_iter().enumerate() {
+            if entry.line.trim().is_empty() {
+                return Err(LokiError::InvalidTimestamp {
+                    message: format!(
+                        "Stream {} entry {} has empty log line",
+                        stream_idx, entry_idx
+                    ),
+                });
+            }
+
+            let timestamp_us =
+                entry
+                    .timestamp
+                    .parse::<i64>()
+                    .map_err(|e| LokiError::InvalidTimestamp {
+                        message: format!(
+                            "Stream {} entry {} has invalid timestamp '{}': {}",
+                            stream_idx, entry_idx, entry.timestamp, e
+                        ),
+                    })?
+                    / 1_000;
+
             let mut record = json::Map::new();
 
             for (key, value) in &loki_stream.stream {
@@ -93,137 +130,50 @@ fn process_json_request(
                 }
             }
 
-            let timestamp_us =
-                entry
-                    .timestamp
-                    .parse::<i64>()
-                    .map_err(|e| LokiError::InvalidTimestamp {
-                        message: format!("Invalid timestamp '{}': {}", entry.timestamp, e),
-                    })?
-                    / 1_000;
-
-            record.insert("message".to_string(), json::Value::String(entry.line));
             record.insert(
-                "_timestamp".to_string(),
+                MESSAGE_COL_NAME.to_string(),
+                json::Value::String(entry.line),
+            );
+            record.insert(
+                TIMESTAMP_COL_NAME.to_string(),
                 json::Value::Number(timestamp_us.into()),
             );
 
             json_data_by_stream
                 .entry(stream_name.clone())
-                .or_insert((Vec::new(), Some(0)))
+                .or_insert((Vec::new(), None))
                 .0
                 .push((timestamp_us, record));
         }
     }
-    Ok(())
+    Ok(json_data_by_stream)
 }
 
-fn process_protobuf_request(
+fn validate_and_process_protobuf_request(
     request: loki_rpc::PushRequest,
-    json_data_by_stream: &mut HashMap<String, super::O2IngestJsonData>,
-) -> Result<(), LokiError> {
-    for loki_stream in request.streams {
-        let labels = parse_prometheus_labels(&loki_stream.labels)?;
+) -> Result<HashMap<String, super::O2IngestJsonData>, LokiError> {
+    let mut json_data_by_stream = HashMap::new();
+    if request.streams.is_empty() {
+        return Err(LokiError::EmptyStream);
+    }
 
+    for (stream_idx, loki_stream) in request.streams.into_iter().enumerate() {
+        if loki_stream.labels.trim().is_empty() {
+            return Err(LokiError::InvalidLabels {
+                message: format!("Stream {} has empty labels", stream_idx),
+            });
+        }
+
+        if loki_stream.entries.is_empty() {
+            return Err(LokiError::InvalidLabels {
+                message: format!("Stream {} has no log entries", stream_idx),
+            });
+        }
+
+        let labels = parse_prometheus_labels(&loki_stream.labels)?;
         let stream_name = determine_service_stream_name(&labels);
 
-        for entry in loki_stream.entries {
-            let mut record = json::Map::new();
-
-            for (key, value) in &labels {
-                record.insert(key.clone(), json::Value::String(value.clone()));
-            }
-
-            let timestamp_us = if let Some(ts) = entry.timestamp {
-                let seconds_us = ts.seconds * 1_000_000;
-                let nanos_us = ts.nanos as i64 / 1_000;
-                seconds_us + nanos_us
-            } else {
-                chrono::Utc::now().timestamp_micros()
-            };
-
-            record.insert("message".to_string(), json::Value::String(entry.line));
-
-            for label_pair in entry.structured_metadata {
-                record.insert(label_pair.name, json::Value::String(label_pair.value));
-            }
-
-            record.insert(
-                "_timestamp".to_string(),
-                json::Value::Number(timestamp_us.into()),
-            );
-
-            json_data_by_stream
-                .entry(stream_name.clone())
-                .or_insert((Vec::new(), Some(0)))
-                .0
-                .push((timestamp_us, record));
-        }
-    }
-    Ok(())
-}
-
-fn validate_json_request(request: &LokiPushRequest) -> Result<(), LokiError> {
-    if request.streams.is_empty() {
-        return Err(LokiError::EmptyStream);
-    }
-
-    for (stream_idx, stream) in request.streams.iter().enumerate() {
-        if stream.stream.is_empty() {
-            return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has empty labels", stream_idx),
-            });
-        }
-
-        if stream.values.is_empty() {
-            return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has no log entries", stream_idx),
-            });
-        }
-
-        for (entry_idx, entry) in stream.values.iter().enumerate() {
-            if entry.line.trim().is_empty() {
-                return Err(LokiError::InvalidTimestamp {
-                    message: format!(
-                        "Stream {} entry {} has empty log line",
-                        stream_idx, entry_idx
-                    ),
-                });
-            }
-
-            if let Err(_) = entry.timestamp.parse::<i64>() {
-                return Err(LokiError::InvalidTimestamp {
-                    message: format!(
-                        "Stream {} entry {} has invalid timestamp format",
-                        stream_idx, entry_idx
-                    ),
-                });
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn validate_protobuf_request(request: &loki_rpc::PushRequest) -> Result<(), LokiError> {
-    if request.streams.is_empty() {
-        return Err(LokiError::EmptyStream);
-    }
-
-    for (stream_idx, stream) in request.streams.iter().enumerate() {
-        if stream.labels.trim().is_empty() {
-            return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has empty labels", stream_idx),
-            });
-        }
-
-        if stream.entries.is_empty() {
-            return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has no log entries", stream_idx),
-            });
-        }
-
-        for (entry_idx, entry) in stream.entries.iter().enumerate() {
+        for (entry_idx, entry) in loki_stream.entries.into_iter().enumerate() {
             if entry.line.trim().is_empty() {
                 return Err(LokiError::InvalidTimestamp {
                     message: format!(
@@ -243,10 +193,41 @@ fn validate_protobuf_request(request: &loki_rpc::PushRequest) -> Result<(), Loki
                     });
                 }
             }
+
+            let timestamp_us = if let Some(ts) = entry.timestamp {
+                let seconds_us = ts.seconds * 1_000_000;
+                let nanos_us = ts.nanos as i64 / 1_000;
+                seconds_us + nanos_us
+            } else {
+                chrono::Utc::now().timestamp_micros()
+            };
+
+            let mut record = json::Map::new();
+
+            for (key, value) in &labels {
+                record.insert(key.clone(), json::Value::String(value.clone()));
+            }
+            for label_pair in entry.structured_metadata {
+                record.insert(label_pair.name, json::Value::String(label_pair.value));
+            }
+
+            record.insert(
+                MESSAGE_COL_NAME.to_string(),
+                json::Value::String(entry.line),
+            );
+            record.insert(
+                TIMESTAMP_COL_NAME.to_string(),
+                json::Value::Number(timestamp_us.into()),
+            );
+
+            json_data_by_stream
+                .entry(stream_name.clone())
+                .or_insert((Vec::new(), None))
+                .0
+                .push((timestamp_us, record));
         }
     }
-
-    Ok(())
+    Ok(json_data_by_stream)
 }
 
 fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, LokiError> {
@@ -273,56 +254,11 @@ fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, 
 }
 
 fn determine_service_stream_name(labels: &HashMap<String, String>) -> String {
-    // Priority 1: service (most common in Loki)
-    if let Some(service) = labels.get("service") {
-        let sanitized = sanitize_stream_name(service);
-        if !sanitized.is_empty() {
-            return sanitized;
-        }
-    }
-
-    // Priority 2: service_name (OpenTelemetry standard)
-    if let Some(service_name) = labels.get("service_name") {
-        let sanitized = sanitize_stream_name(service_name);
-        if !sanitized.is_empty() {
-            return sanitized;
-        }
-    }
-
-    // Priority 3: app (common in Kubernetes)
-    if let Some(app) = labels.get("app") {
-        let sanitized = sanitize_stream_name(app);
-        if !sanitized.is_empty() {
-            return sanitized;
-        }
-    }
-
-    // Priority 4: job (Prometheus ecosystem)
-    if let Some(job) = labels.get("job") {
-        let sanitized = sanitize_stream_name(job);
-        if !sanitized.is_empty() {
-            return sanitized;
-        }
-    }
-
-    // Fallback: Use environment + default
-    let env_suffix = labels
-        .get("environment")
-        .or_else(|| labels.get("env"))
-        .map(|s| format!("_{}", sanitize_stream_name(s)))
-        .unwrap_or_default();
-
-    format!("unknown_service{}", env_suffix)
-}
-
-fn sanitize_stream_name(name: &str) -> String {
-    name.to_lowercase()
-        .replace("-", "_")
-        .replace(".", "_")
-        .replace(" ", "_")
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .collect()
+    labels
+        .get(STREAM_NAME_LABEL)
+        .map(|name| format_stream_name(name))
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "default".to_string())
 }
 
 #[cfg(test)]
@@ -333,63 +269,36 @@ mod tests {
 
     #[test]
     fn test_determine_service_stream_name() {
-        // Test service label (highest priority)
+        let mut labels = HashMap::new();
+        labels.insert(
+            STREAM_NAME_LABEL.to_string(),
+            "my-custom-stream".to_string(),
+        );
+        labels.insert("service".to_string(), "should-be-ignored".to_string());
+        assert_eq!(determine_service_stream_name(&labels), "my_custom_stream");
+
+        // Test with complex stream name that needs formatting
+        let mut labels = HashMap::new();
+        labels.insert(
+            STREAM_NAME_LABEL.to_string(),
+            "Auth-Service.logs".to_string(),
+        );
+        assert_eq!(determine_service_stream_name(&labels), "auth_service_logs");
+
+        // Test fallback when no stream_name label
         let mut labels = HashMap::new();
         labels.insert("service".to_string(), "auth-api".to_string());
-        labels.insert("app".to_string(), "should-be-ignored".to_string());
-        assert_eq!(determine_service_stream_name(&labels), "auth_api");
-
-        // Test service_name label (second priority)
-        let mut labels = HashMap::new();
-        labels.insert("service_name".to_string(), "payment-service".to_string());
-        labels.insert("job".to_string(), "should-be-ignored".to_string());
-        assert_eq!(determine_service_stream_name(&labels), "payment_service");
-
-        // Test app label (third priority)
-        let mut labels = HashMap::new();
-        labels.insert("app".to_string(), "notification-worker".to_string());
-        labels.insert("job".to_string(), "should-be-ignored".to_string());
-        assert_eq!(
-            determine_service_stream_name(&labels),
-            "notification_worker"
-        );
-
-        // Test job label (fourth priority)
-        let mut labels = HashMap::new();
-        labels.insert("job".to_string(), "prometheus-scraper".to_string());
-        assert_eq!(determine_service_stream_name(&labels), "prometheus_scraper");
-
-        // Test fallback with environment
-        let mut labels = HashMap::new();
         labels.insert("environment".to_string(), "production".to_string());
-        assert_eq!(
-            determine_service_stream_name(&labels),
-            "unknown_service_production"
-        );
+        assert_eq!(determine_service_stream_name(&labels), "default");
 
-        // Test fallback with env
-        let mut labels = HashMap::new();
-        labels.insert("env".to_string(), "staging".to_string());
-        assert_eq!(
-            determine_service_stream_name(&labels),
-            "unknown_service_staging"
-        );
-
-        // Test complete fallback
+        // Test complete fallback with empty labels
         let labels = HashMap::new();
-        assert_eq!(determine_service_stream_name(&labels), "unknown_service");
-    }
+        assert_eq!(determine_service_stream_name(&labels), "default");
 
-    #[test]
-    fn test_sanitize_stream_name() {
-        assert_eq!(sanitize_stream_name("auth-api"), "auth_api");
-        assert_eq!(sanitize_stream_name("payment.service"), "payment_service");
-        assert_eq!(
-            sanitize_stream_name("NOTIFICATION SERVICE"),
-            "notification_service"
-        );
-        assert_eq!(sanitize_stream_name("test@#$%service"), "testservice");
-        assert_eq!(sanitize_stream_name("service_123"), "service_123");
+        // Test empty stream_name falls back to default
+        let mut labels = HashMap::new();
+        labels.insert(STREAM_NAME_LABEL.to_string(), "".to_string());
+        assert_eq!(determine_service_stream_name(&labels), "default");
     }
 
     #[test]
@@ -490,25 +399,25 @@ mod tests {
 
     #[test]
     fn test_stream_naming_edge_cases() {
-        // Test stream naming with special characters
+        // Test stream naming with special characters via stream_name
         let mut labels = HashMap::new();
-        labels.insert("service".to_string(), "my-service@v1.2.3".to_string());
-        assert_eq!(determine_service_stream_name(&labels), "my_servicev1_2_3");
-
-        // Test with unicode characters
-        labels.clear();
-        labels.insert("service".to_string(), "test-service-🚀".to_string());
-        let result = determine_service_stream_name(&labels);
-        assert!(result.starts_with("test_service_"));
-
-        // Test empty service name (should fall back)
-        labels.clear();
-        labels.insert("service".to_string(), "".to_string());
-        labels.insert("environment".to_string(), "test".to_string());
-        assert_eq!(
-            determine_service_stream_name(&labels),
-            "unknown_service_test"
+        labels.insert(
+            STREAM_NAME_LABEL.to_string(),
+            "my-service@v1.2.3".to_string(),
         );
+        assert_eq!(determine_service_stream_name(&labels), "my_service_v1_2_3");
+
+        // Test with unicode characters via stream_name
+        labels.clear();
+        labels.insert(STREAM_NAME_LABEL.to_string(), "test-service-🚀".to_string());
+        let result = determine_service_stream_name(&labels);
+        assert!(result.starts_with("test_service"));
+
+        // Test with no stream_name (should fall back to default)
+        labels.clear();
+        labels.insert("service".to_string(), "ignored-service".to_string());
+        labels.insert("environment".to_string(), "test".to_string());
+        assert_eq!(determine_service_stream_name(&labels), "default");
     }
 
     #[test]
@@ -519,7 +428,7 @@ mod tests {
         let proto_request = loki_rpc::PushRequest {
             streams: vec![
                 loki_rpc::StreamAdapter {
-                    labels: r#"{"service":"auth"}"#.to_string(),
+                    labels: r#"{"stream_name":"auth"}"#.to_string(),
                     entries: vec![loki_rpc::EntryAdapter {
                         timestamp: Some(Timestamp {
                             seconds: 1702834800,
@@ -531,7 +440,7 @@ mod tests {
                     hash: 1,
                 },
                 loki_rpc::StreamAdapter {
-                    labels: r#"{"service":"payment"}"#.to_string(),
+                    labels: r#"{"stream_name":"payment"}"#.to_string(),
                     entries: vec![loki_rpc::EntryAdapter {
                         timestamp: Some(Timestamp {
                             seconds: 1702834801,
@@ -565,7 +474,7 @@ mod tests {
     fn test_validate_protobuf_request_empty_streams() {
         let empty_request = loki_rpc::PushRequest { streams: vec![] };
 
-        let result = validate_protobuf_request(&empty_request);
+        let result = validate_and_process_protobuf_request(empty_request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), LokiError::EmptyStream));
     }
@@ -601,7 +510,7 @@ mod tests {
     fn test_validate_json_request_empty_streams() {
         let empty_request = LokiPushRequest { streams: vec![] };
 
-        let result = validate_json_request(&empty_request);
+        let result = validate_and_process_json_request(empty_request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), LokiError::EmptyStream));
     }

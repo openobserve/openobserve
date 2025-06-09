@@ -39,7 +39,7 @@ use crate::{
         (status = 500, description = "Internal Server Error", content_type = "text/plain", body = String),
     )
 )]
-#[post("/{org_id}/loki/api/v1/push")]
+#[post("/{org_id}/loki/v1/push")]
 pub async fn loki_push(
     thread_id: web::Data<usize>,
     org_id: web::Path<String>,
@@ -69,7 +69,7 @@ pub async fn loki_push(
             let loki_request = match parse_json_request(content_encoding, body) {
                 Ok(req) => req,
                 Err(e) => {
-                    log::error!("[LOKI_JSON] Parse error for org '{}': {:?}", org_id, e);
+                    log::error!("[Loki::JSON] Parse error for org '{}': {:?}", org_id, e);
                     return Ok(e.into());
                 }
             };
@@ -79,7 +79,7 @@ pub async fn loki_push(
             let protobuf_request = match parse_protobuf_request(content_encoding, body) {
                 Ok(req) => req,
                 Err(e) => {
-                    log::error!("[LOKI_PROTOBUF] Parse error for org '{}': {:?}", org_id, e);
+                    log::error!("[Loki::Protobuf] Parse error for org '{}': {:?}", org_id, e);
                     return Ok(e.into());
                 }
             };
@@ -87,7 +87,7 @@ pub async fn loki_push(
         }
         _ => {
             log::error!(
-                "[LOKI] Unsupported content type '{}' for org '{}'",
+                "[Loki] Unsupported content type '{}' for org '{}'",
                 content_type,
                 org_id
             );
@@ -101,7 +101,7 @@ pub async fn loki_push(
     match logs::loki::handle_request(thread_id, &org_id, request, user_email).await {
         Ok(_) => Ok(HttpResponse::NoContent().finish()),
         Err(e) => {
-            log::error!("[LOKI] Processing error for org '{}': {:?}", org_id, e);
+            log::error!("[Loki] Processing error for org '{}': {:?}", org_id, e);
             Ok(e.into())
         }
     }
@@ -171,7 +171,7 @@ mod tests {
 
         // Test JSON routing
         let req = test::TestRequest::post()
-            .uri("/test_org/loki/api/v1/push")
+            .uri("/test_org/loki/v1/push")
             .insert_header(("content-type", "application/json"))
             .set_payload(create_valid_loki_json())
             .to_request();
@@ -180,7 +180,7 @@ mod tests {
 
         // Test invalid JSON
         let req = test::TestRequest::post()
-            .uri("/test_org/loki/api/v1/push")
+            .uri("/test_org/loki/v1/push")
             .insert_header(("content-type", "application/json"))
             .set_payload("invalid")
             .to_request();
@@ -189,7 +189,7 @@ mod tests {
 
         // Test unsupported content type
         let req = test::TestRequest::post()
-            .uri("/test_org/loki/api/v1/push")
+            .uri("/test_org/loki/v1/push")
             .insert_header(("content-type", "text/plain"))
             .set_payload("data")
             .to_request();

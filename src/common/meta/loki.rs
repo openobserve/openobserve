@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Internal Loki JSON types for native Loki push API format
-
 /// Loki push request - matches native JSON format exactly
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LokiPushRequest {
