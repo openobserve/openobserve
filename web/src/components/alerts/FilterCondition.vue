@@ -16,6 +16,7 @@
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm mini-select conditions-input"
+            :class="store.state.isAiChatEnabled ? 'o2-ai-condition-input' : 'o2-condition-input'"
             filled
             emit-value
             dense
@@ -27,9 +28,12 @@
             @filter="filterColumns"
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width:200px;"
             @update:model-value="emits('input:update', 'conditions', condition)"
-          />
+          >
+          <q-tooltip v-if="condition.column"> 
+            {{ condition.column }}
+          </q-tooltip>
+        </q-select>
         </div>
         <div
           data-test="alert-conditions-operator-select"
@@ -40,6 +44,7 @@
             :options="triggerOperators"
             :popup-content-style="{ textTransform: 'capitalize' }"
             color="input-border"
+            :class="store.state.isAiChatEnabled ? 'tw-w-[70px]' : 'tw-min-w-[200px]'"
             bg-color="input-bg"
             class="q-py-sm mini-select conditions-input"
             stack-label
@@ -47,9 +52,12 @@
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 200px"
             @update:model-value="emits('input:update', 'conditions', condition)"
-          />
+          >
+          <q-tooltip v-if="condition.operator">
+            {{ condition.operator }}
+          </q-tooltip>
+        </q-select>
         </div>
         <div
           data-test="alert-conditions-value-input"
@@ -61,6 +69,7 @@
             :popup-content-style="{ textTransform: 'capitalize' }"
             :placeholder="t('common.value')"
             color="input-border"
+            :class="store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'tw-min-w-[200px]'"
             bg-color="input-bg"
             class="q-py-sm mini-select conditions-input" 
             stack-label
@@ -68,9 +77,12 @@
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 200px"
             @update:model-value="emits('input:update', 'conditions', condition)"
-          />
+          >
+          <q-tooltip v-if="condition.value">
+            {{ condition.value }}
+          </q-tooltip>
+        </q-input>
         </div>
     </div>
   </template>
@@ -163,6 +175,9 @@ const filterColumns = (val: string, update: Function) => {
   <style > 
   .conditions-input .q-field__control{
     border: 1px solid #424242 !important;
+  }
+  .o2-ai-condition-input .q-field__control{
+    width: 130px !important;
   }
 </style>
   
