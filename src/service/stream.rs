@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
 use config::{
-    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, is_local_disk_storage,
+    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         stream::{
@@ -182,6 +182,12 @@ pub fn stream_res(
     };
 
     let mut settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    if settings == StreamSettings::default() {
+        settings.approx_partition = get_config()
+            .common
+            .use_stream_settings_for_partitions_enabled;
+    }
+
     settings.partition_time_level = Some(unwrap_partition_time_level(
         settings.partition_time_level,
         stream_type,
