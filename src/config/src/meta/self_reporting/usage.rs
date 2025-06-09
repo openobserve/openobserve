@@ -184,6 +184,8 @@ pub enum UsageType {
     Json,
     #[serde(rename = "/logs/_multi")]
     Multi,
+    #[serde(rename = "/logs/_hec")]
+    Hec,
     #[serde(rename = "/_kinesis_firehose")]
     KinesisFirehose,
     #[serde(rename = "/gcp/_sub")]
@@ -262,6 +264,7 @@ impl std::fmt::Display for UsageType {
             UsageType::Bulk => write!(f, "/logs/_bulk"),
             UsageType::Json => write!(f, "/logs/_json"),
             UsageType::Multi => write!(f, "/logs/_multi"),
+            UsageType::Hec => write!(f, "/logs/_hec"),
             UsageType::KinesisFirehose => write!(f, "/_kinesis_firehose"),
             UsageType::GCPSubscription => write!(f, "/gcp/_sub"),
             UsageType::Logs => write!(f, "/otlp/v1/logs"),

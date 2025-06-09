@@ -40,3 +40,43 @@ pub fn get_open_fds() -> usize {
 pub fn get_open_fds() -> usize {
     0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_os_name() {
+        let os_name = get_os_name();
+        assert!(!os_name.is_empty());
+        assert_ne!(os_name, "unknown");
+    }
+
+    #[test]
+    fn test_get_os_version() {
+        let os_version = get_os_version();
+        assert!(!os_version.is_empty());
+        assert_ne!(os_version, "unknown");
+    }
+
+    #[test]
+    fn test_get_hostname() {
+        let hostname = get_hostname();
+        assert!(!hostname.is_empty());
+        assert_ne!(hostname, "unknown");
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_get_open_fds() {
+        let open_fds = get_open_fds();
+        assert!(open_fds > 0);
+    }
+
+    #[test]
+    #[cfg(not(target_os = "linux"))]
+    fn test_get_open_fds() {
+        let open_fds = get_open_fds();
+        assert_eq!(open_fds, 0);
+    }
+}
