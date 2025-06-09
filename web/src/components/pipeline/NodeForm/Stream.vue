@@ -233,27 +233,50 @@ watch(
     getStreamList();
   }
 );
-function sanitizeStreamName(input: string): string {
-  //check whether it is dynamic stream name or not
-  //if it is wrapped in curly braces then it is dynamic stream name
-  const isWrapped = input.startsWith("{") && input.endsWith("}");
-  //if it is dynamic stream name then remove the curly braces to get the core name
-  const actualName = isWrapped ? input.slice(1, -1) : input;
+  function sanitizeStreamName(input: string): string {
+    if(input.length > 60){
+      $q.notify({
+        message: "Stream name should be less than 60 characters",
+        color: "negative",
+        position: "bottom",
+        timeout: 2000,
+      });
+      return;
+    }
+    const regex = /\{[^{}]+\}/g;
+    const parts: string[] = [];
+    let lastIndex = 0;
+    let match;
 
-  // Replace all non-alphanumeric characters with "_"
-  const sanitizedName = actualName
-    .split("")
-    .map((char, index) => {
+    while ((match = regex.exec(input)) !== null) {
+      // Sanitize and add the static part before the dynamic part
+      if (match.index > lastIndex) {
+        const staticPart = input.slice(lastIndex, match.index);
+        parts.push(...sanitizeStaticPart(staticPart));
+      }
 
-      //if the character is not a letter or a number then replace it with "_"
-      return /[a-zA-Z0-9]/.test(char) ? char : "_";
-    })
-    .join("")
+      // Push the dynamic part as-is
+      parts.push(match[0]);
 
-    //if it is wrapped return { sanitizedName } else return sanitizedName
+      lastIndex = regex.lastIndex;
+    }
 
-  return isWrapped ? `{${sanitizedName}}` : sanitizedName;
-}
+    // Sanitize and add the remaining static part (after the last dynamic part)
+    if (lastIndex < input.length) {
+      const staticPart = input.slice(lastIndex);
+      parts.push(...sanitizeStaticPart(staticPart));
+    }
+
+    return parts.join('');
+  }
+
+  // Only sanitize non-dynamic parts
+  //this will convert all the characters that are not allowed in stream name to _
+  function sanitizeStaticPart(str: string): string[] {
+    return str.split('').map(char => /[a-zA-Z0-9]/.test(char) ? char : '_');
+  }
+
+
 
 
 watch(() => dynamic_stream_name.value, () => {
