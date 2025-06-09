@@ -16,6 +16,28 @@ use tokio::sync::mpsc;
 
 use crate::common::meta::search::{StreamingAggsCacheResult, StreamingAggsCacheResultRecordBatch};
 
+// Global queue for cache requests
+static CACHE_QUEUE: Lazy<mpsc::UnboundedSender<RecordBatchCacheRequest>> = Lazy::new(|| {
+    let (sender, mut receiver) = mpsc::unbounded_channel::<RecordBatchCacheRequest>();
+
+    // Spawn background task to process cache requests
+    tokio::spawn(async move {
+        while let Some(request) = receiver.recv().await {
+            let streaming_id = request.streaming_id.clone();
+            log::debug!("[streaming_id: {}] Received cache request", streaming_id);
+            if let Err(e) = cache_record_batches_to_disk_impl(request).await {
+                log::error!(
+                    "[streaming_id: {}] Failed to cache record batches to disk: {:?}",
+                    streaming_id,
+                    e
+                );
+            }
+        }
+    });
+
+    sender
+});
+
 const STREAMING_AGGS_CACHE_DIR: &str = "record_batches";
 
 #[derive(Debug)]
@@ -24,6 +46,30 @@ pub struct RecordBatchCacheRequest {
     pub file_path: String,
     pub file_name: String,
     pub records: Vec<Arc<RecordBatch>>,
+}
+
+pub fn cache_record_batches_to_disk(
+    request: RecordBatchCacheRequest,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if request.records.is_empty() {
+        return Ok(());
+    }
+    let streaming_id = request.streaming_id.clone();
+
+    // Send to background queue (non-blocking)
+    CACHE_QUEUE.send(request).map_err(|e| {
+        log::error!(
+            "[streaming_id: {}] Failed to queue cache request: {:?}",
+            streaming_id,
+            e
+        );
+        Box::new(std::io::Error::new(
+            ErrorKind::Other,
+            "Failed to queue cache request",
+        )) as Box<dyn std::error::Error + Send + Sync>
+    })?;
+
+    Ok(())
 }
 
 async fn cache_record_batches_to_disk_impl(
@@ -63,52 +109,6 @@ async fn cache_record_batches_to_disk_impl(
     }
 }
 
-// Global queue for cache requests
-static CACHE_QUEUE: Lazy<mpsc::UnboundedSender<RecordBatchCacheRequest>> = Lazy::new(|| {
-    let (sender, mut receiver) = mpsc::unbounded_channel::<RecordBatchCacheRequest>();
-
-    // Spawn background task to process cache requests
-    tokio::spawn(async move {
-        while let Some(request) = receiver.recv().await {
-            let streaming_id = request.streaming_id.clone();
-            log::debug!("[streaming_id: {}] Received cache request", streaming_id);
-            if let Err(e) = cache_record_batches_to_disk_impl(request).await {
-                log::error!(
-                    "[streaming_id: {}] Failed to cache record batches to disk: {:?}",
-                    streaming_id,
-                    e
-                );
-            }
-        }
-    });
-
-    sender
-});
-
-pub fn cache_record_batches_to_disk(
-    request: RecordBatchCacheRequest,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    if request.records.is_empty() {
-        return Ok(());
-    }
-    let streaming_id = request.streaming_id.clone();
-
-    // Send to background queue (non-blocking)
-    CACHE_QUEUE.send(request).map_err(|e| {
-        log::error!(
-            "[streaming_id: {}] Failed to queue cache request: {:?}",
-            streaming_id,
-            e
-        );
-        Box::new(std::io::Error::new(
-            ErrorKind::Other,
-            "Failed to queue cache request",
-        )) as Box<dyn std::error::Error + Send + Sync>
-    })?;
-
-    Ok(())
-}
-
 pub fn serialize_record_batches(batches: &[Arc<RecordBatch>]) -> arrow::error::Result<Vec<u8>> {
     if batches.is_empty() {
         return Ok(vec![]);
@@ -126,12 +126,39 @@ pub fn serialize_record_batches(batches: &[Arc<RecordBatch>]) -> arrow::error::R
     Ok(buffer.into_inner())
 }
 
+pub async fn get_record_batches(
+    file_path: &str,
+    file_name: &str,
+) -> std::io::Result<Vec<RecordBatch>> {
+    let file = format!("record_batches/{}/{}", file_path, file_name);
+    let data = disk::get(&file, None)
+        .await
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"))?;
+    let reader = ArrowFileReader::try_new(Cursor::new(data), None).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Arrow error: {}", e),
+        )
+    })?;
+    let mut batches = Vec::new();
+    for batch in reader {
+        batches.push(batch.map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Arrow error: {}", e),
+            )
+        })?);
+    }
+    Ok(batches)
+}
+
 pub async fn get_streaming_aggs_records_from_disk(
     file_path: &str,
     start_time: i64,
     end_time: i64,
 ) -> std::io::Result<StreamingAggsCacheResult> {
     let cache_path = construct_cache_path(file_path);
+    // TODO: use infra/disk.rs methods
     if !Path::new(&cache_path).exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -150,6 +177,7 @@ pub async fn get_streaming_aggs_records_from_disk(
     let files_num = files.len();
     log::info!("Found {} files in cache path: {}", files_num, cache_path);
 
+    let mut count = 0;
     for file in files {
         let file_name = file.file_name();
         let file_name_str = file_name.to_str().ok_or_else(|| {
@@ -184,32 +212,54 @@ pub async fn get_streaming_aggs_records_from_disk(
         // Check if file time range overlaps with requested time range
         // Overlap condition:
         if file_start_time <= end_time && file_end_time >= start_time {
+            log::debug!(
+                "File {} matches time range: file_time=[{}, {}], query_time=[{}, {}]",
+                file_name_str,
+                file_start_time,
+                file_end_time,
+                start_time,
+                end_time
+            );
             let file_path_full = format!("{}/{}", cache_path, file_name_str);
-            let file = File::open(&file_path_full)?;
-            let reader = ArrowFileReader::try_new(file, None).map_err(|e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    format!("Arrow error: {}", e),
-                )
-            })?;
-            for batch_result in reader {
-                let batch = batch_result.map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        format!("Arrow error: {}", e),
-                    )
-                })?;
-                let record_batch_cache_result = StreamingAggsCacheResultRecordBatch {
-                    record_batch: batch,
-                    cache_start_time: file_start_time,
-                    cache_end_time: file_end_time,
-                };
-                cached_records.push(record_batch_cache_result);
+            match get_record_batches(&file_path, &file_name_str).await {
+                Ok(cached_record_batches) => {
+                    for batch in cached_record_batches {
+                        let record_batch_cache_result = StreamingAggsCacheResultRecordBatch {
+                            record_batch: batch,
+                            cache_start_time: file_start_time,
+                            cache_end_time: file_end_time,
+                        };
+                        cached_records.push(record_batch_cache_result);
+                    }
+                    cache_start_time = std::cmp::min(cache_start_time, file_start_time);
+                    cache_end_time = std::cmp::max(cache_end_time, file_end_time);
+                    count += 1;
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Failed to load cached record batches from {}: {:?}",
+                        file_name_str,
+                        e
+                    );
+                }
             }
-            cache_start_time = std::cmp::min(cache_start_time, file_start_time);
-            cache_end_time = std::cmp::max(cache_end_time, file_end_time);
+        } else {
+            log::debug!(
+                "File {} does NOT match time range: file_time=[{}, {}], query_time=[{}, {}]",
+                file_name_str,
+                file_start_time,
+                file_end_time,
+                start_time,
+                end_time
+            );
         }
     }
+
+    log::info!(
+        "Found {} cached record batches in cache path: {}",
+        count,
+        cache_path
+    );
 
     // Return the cached records if any were found
     if !cached_records.is_empty() {
