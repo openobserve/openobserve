@@ -331,10 +331,21 @@ impl Accumulator for SummaryPercentileAccumulator {
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {
-        // value array: 3, 2, 5, 1, 4, 2, 3, 4, 5
-        // count array: 2, 3, 2, 3, 3, 2, 1, 1, 1
-        // percentile: 0.75
-        // calculate percentile based on the value and count array
+        if self.value.is_empty() {
+            return Ok(match &self.return_type {
+                DataType::Int8 => ScalarValue::Int8(None),
+                DataType::Int16 => ScalarValue::Int16(None),
+                DataType::Int32 => ScalarValue::Int32(None),
+                DataType::Int64 => ScalarValue::Int64(None),
+                DataType::UInt8 => ScalarValue::UInt8(None),
+                DataType::UInt16 => ScalarValue::UInt16(None),
+                DataType::UInt32 => ScalarValue::UInt32(None),
+                DataType::UInt64 => ScalarValue::UInt64(None),
+                DataType::Float32 => ScalarValue::Float32(None),
+                DataType::Float64 => ScalarValue::Float64(None),
+                v => unreachable!("unexpected return type {:?}", v),
+            });
+        }
 
         // 1. sort the value array and merge the count array based on value array
         let mut value_count = self.value.iter().zip(self.count.iter()).collect::<Vec<_>>();
