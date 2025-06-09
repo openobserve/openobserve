@@ -30,6 +30,13 @@ jobs:
           - 5432:5432
         # needed because the postgres container does not provide a healthcheck
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      mysql:
+        image: mysql:9.3
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: mysql
+        ports:
+          - 3306:3306
 
     steps:
       - name: Clone the current repo
@@ -67,12 +74,34 @@ jobs:
           export ZO_TEXT_DATA_TYPE=text
 
           # setup and run with postgres
+          echo "Running with postgres"
           export ZO_META_STORE=postgres
           export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
           ./coverage.sh run-cov
           
           # cleanup
-          rm -r data
-          rm -r ./json
-          rm -r ./src/infra/data
-      
+          rm -rf data
+          rm -rf ./json
+          rm -rf ./src/infra/data
+
+          # Run wih sqlite
+          echo "Running with sqlite"
+          export ZO_META_STORE=sqlite
+          export ZO_META_POSTGRES_DSN=""
+          ./coverage.sh run-cov
+
+          # cleanup
+          rm -rf data
+          rm -rf ./json
+          rm -rf ./src/infra/data
+
+          # setup and run with mysql
+          echo "Running with mysql"
+          export ZO_META_STORE=mysql
+          export ZO_META_MYSQL_DSN=mysql://root:password@localhost:3306/mysql
+          ./coverage.sh run-cov
+
+          # finally print the coverage data
+          ./coverage.sh check
+          
+
