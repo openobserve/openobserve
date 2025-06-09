@@ -2370,9 +2370,6 @@ export const usePanelDataLoader = (
       }
     }
 
-    // Save current state to cache with partial data flag
-    saveCurrentStateToCache();
-
     // remove cancelquery event
     window.removeEventListener("cancelQuery", cancelQueryAbort);
   });
