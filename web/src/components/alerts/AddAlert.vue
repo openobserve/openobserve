@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="full-width q-mx-lg "  >
     <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center">
-        <div
+      <div class="flex items-center justify-between tw-w-full">
+        <div class="flex items-center">
+          <div
           data-test="add-alert-back-btn"
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
@@ -37,6 +38,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-else class="text-h6" data-test="add-alert-title">
           {{ t("alerts.addTitle") }}
+        </div>
+        </div>
+        <div>
+          <q-btn
+            outline
+            class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
+            size="sm"
+            no-caps
+            icon="code"
+            data-test="pipeline-json-edit-btn"
+            @click="openJsonEditor"
+            >
+        <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+        </q-btn>
         </div>
       </div>
     </div>
@@ -415,7 +430,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   
-
+  <q-dialog
+        v-model="showJsonEditorDialog"
+        position="right"
+        full-height
+        maximized
+        :persistent="true"
+      >
+        <JsonEditor
+          :data="formData"
+          :title="'Edit Alert JSON'"
+          :type="'alerts'"
+          :validation-errors="validationErrors"
+          @close="showJsonEditorDialog = false"
+          @saveJson="saveAlertJson"
+          :isEditing="beingUpdated"
+        />
+      </q-dialog>
 
 </template>
 
@@ -461,6 +492,9 @@ import { convertDateToTimestamp } from "@/utils/date";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import cronParser from "cron-parser";
 import AlertsContainer from "./AlertsContainer.vue";
+import JsonEditor from "../common/JsonEditor.vue";
+
+import { validateAlert } from "@/utils/validateAlert";
 
 const defaultValue: any = () => {
   return {
@@ -543,6 +577,7 @@ export default defineComponent({
     PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
     SelectFolderDropDown,
     AlertsContainer,
+    JsonEditor
   },
   setup(props, { emit }) {
     const store: any = useStore();
@@ -618,8 +653,14 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
+
+    const showJsonEditorDialog = ref(false);
+
+    const validationErrors = ref([]);
     
     const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
+
+
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
@@ -1449,6 +1490,157 @@ export default defineComponent({
     };
   }
 
+    const openJsonEditor = () => {
+      showJsonEditorDialog.value = true;
+    };
+
+    const saveAlertJson = async (json: any) => {
+      let jsonPayload = JSON.parse(json);
+      let destinationsList = [];
+      props.destinations.forEach((destination: any) => {
+        destinationsList.push(destination.name);
+      });
+      let streamList = [];
+      if(!streams.value[jsonPayload.stream_type]){
+        const response: any = await getStreams(jsonPayload.stream_type,false);
+        streams.value[jsonPayload.stream_type] = response.list;
+      }
+      streams.value[jsonPayload.stream_type].forEach((stream: any) => {
+        streamList.push(stream.name);
+      });
+
+      const validationResult = validateAlert(jsonPayload,{
+        streamList: streamList,
+        selectedOrgId: store.state.selectedOrganization.identifier,
+        destinationsList: destinationsList
+      });
+      
+      if (!validationResult.isValid) {
+        validationErrors.value = validationResult.errors;
+        return;
+      }
+      
+      // Validate SQL query if type is sql and not real-time
+      if (jsonPayload.is_real_time === false && jsonPayload.query_condition.type === 'sql') {
+        try {
+          // First check if query has SELECT *
+          if (!getParser(jsonPayload.query_condition.sql)) {
+            validationErrors.value = ['Selecting all columns is not allowed. Please specify the columns explicitly'];
+            return;
+          }
+
+          // Set up query for validation
+          const query = buildQueryPayload({
+            sqlMode: true,
+            streamName: jsonPayload.stream_name,
+          });
+
+          delete query.aggs;
+          query.query.start_time = query.query.start_time + 780000000;
+          query.query.sql = jsonPayload.query_condition.sql;
+
+          if (jsonPayload.query_condition.vrl_function) {
+            query.query.query_fn = b64EncodeUnicode(jsonPayload.query_condition.vrl_function);
+          }
+
+          // Validate SQL query
+          await searchService.search({
+            org_identifier: store.state.selectedOrganization.identifier,
+            query,
+            page_type: jsonPayload.stream_type,
+          });
+
+          // If we get here, SQL is valid
+          showJsonEditorDialog.value = false;
+          formData.value = jsonPayload;
+          await prepareAndSaveAlert(jsonPayload);
+
+        } catch (err: any) {
+          // Handle SQL validation errors
+          const errorMessage = err.response?.data?.message || 'Invalid SQL Query';
+          validationErrors.value = [`SQL validation error: ${errorMessage}`];
+          return;
+        }
+      } else {
+        // If not SQL or is real-time, just close and update
+        showJsonEditorDialog.value = false;
+        formData.value = jsonPayload;
+        await prepareAndSaveAlert(jsonPayload);
+      }
+    };
+
+    const prepareAndSaveAlert = async (data: any) => {
+      const payload = cloneDeep(data);
+      if(!isAggregationEnabled.value){
+        payload.query_condition.aggregation = null;
+      }
+      if(payload.context_attributes.length == 0){
+        payload.context_attributes = {};
+      }
+      
+      // Transform conditions to backend format
+      payload.query_condition.conditions = transformFEToBE(payload.query_condition.conditions);
+      
+      // Convert string boolean to actual boolean
+      payload.is_real_time = payload.is_real_time === "true" || payload.is_real_time === true;
+      
+      // Handle VRL function encoding if present
+      if (payload.query_condition.vrl_function) {
+        payload.query_condition.vrl_function = b64EncodeUnicode(
+          payload.query_condition.vrl_function.trim()
+        );
+      }
+
+      // Set timestamps and metadata
+      if (props.isUpdated) {
+        payload.updatedAt = new Date().toISOString();
+        payload.lastEditedBy = store.state.userInfo.email;
+        payload.folder_id = router.currentRoute.value.query.folder || "default";
+      } else {
+        payload.createdAt = new Date().toISOString();
+        payload.owner = store.state.userInfo.email;
+        payload.lastTriggeredAt = new Date().getTime();
+        payload.lastEditedBy = store.state.userInfo.email;
+        payload.folder_id = activeFolderId.value;
+      }
+
+      try {
+        const dismiss = q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
+
+
+        if (props.isUpdated) {
+          await alertsService.update_by_alert_id(
+            store.state.selectedOrganization.identifier,
+            payload,
+            activeFolderId.value
+          );
+          emit("update:list", activeFolderId.value);
+          q.notify({
+            type: "positive",
+            message: "Alert updated successfully.",
+          });
+        } else {
+          await alertsService.create_by_alert_id(
+            store.state.selectedOrganization.identifier,
+            payload,
+            activeFolderId.value
+          );
+          emit("update:list", activeFolderId.value);
+          q.notify({
+            type: "positive",
+            message: "Alert saved successfully.",
+          });
+        }
+        dismiss();
+      } catch (err: any) {
+        handleAlertError(err);
+      }
+    };
+
 
 
     return {
@@ -1529,7 +1721,11 @@ export default defineComponent({
       updateGroup,
       removeConditionGroup,
       transformFEToBE,
-      retransformBEToFE
+      retransformBEToFE,
+      openJsonEditor,
+      showJsonEditorDialog,
+      saveAlertJson,
+      validationErrors
     };
   },
 
