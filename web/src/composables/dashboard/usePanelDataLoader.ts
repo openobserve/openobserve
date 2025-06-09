@@ -348,10 +348,28 @@ export const usePanelDataLoader = (
         "cancelQueryAbort: cleaning up WebSocket or HTTP streaming listeners...",
       );
 
-      // If we're still loading or haven't received end event, mark as partial
-      if (state.loading || state.loadingProgressPercentage < 100) {
+      // Set isPartialData to true if we're still loading or haven't received complete response
+      if (
+        state.loading ||
+        state.loadingProgressPercentage < 100 ||
+        state.isOperationCancelled
+      ) {
         state.isPartialData = true;
       }
+    }
+
+    if (
+      isStreamingEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
+      console.log("cancelQueryAbort: cancelling http2 queries...");
+
+      state.searchRequestTraceIds.forEach((traceId) => {
+        cancelStreamQueryBasedOnRequestId({
+          trace_id: traceId,
+          org_id: store?.state?.selectedOrganization?.identifier,
+        });
+      });
     }
 
     if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
@@ -900,7 +918,7 @@ export const usePanelDataLoader = (
     state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
     // Set partial data flag for errors
-    // state.isPartialData = true;
+    state.isPartialData = true;
 
     processApiError(response?.content, "sql");
 
@@ -2247,14 +2265,44 @@ export const usePanelDataLoader = (
     // abort on unmount
     if (abortController) {
       console.log("PanelSchema/Time: aborting the controller on unmount");
-      // Only set isPartialData to true if we haven't received complete response
-      if (!state.isPartialData) {
+      // Set isPartialData to true if we're still loading or haven't received complete response
+      if (state.loading || state.loadingProgressPercentage < 100) {
         state.isPartialData = true;
       }
       abortController.abort();
     }
     if (observer) {
       observer.disconnect();
+    }
+    // cancel http2 queries using http streaming api
+    if (
+      isStreamingEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
+      try {
+        console.log(
+          "PanelSchema/Time: cleaning up HTTP2 requests",
+          state.searchRequestTraceIds,
+        );
+        // Set isPartialData to true for HTTP2 streaming if still loading
+        if (state.loading || state.loadingProgressPercentage < 100) {
+          state.isPartialData = true;
+        }
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelStreamQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      } catch (error) {
+        console.error("Error during HTTP2 cleanup:", error);
+      } finally {
+        console.log(
+          "PanelSchema/Time: HTTP2 cleanup done",
+          state.searchRequestTraceIds,
+        );
+        state.searchRequestTraceIds = [];
+      }
     }
 
     // Cancel WebSocket queries
@@ -2267,7 +2315,10 @@ export const usePanelDataLoader = (
           "PanelSchema/Time: cleaning up WebSocket requests",
           state.searchRequestTraceIds,
         );
-
+        // Set isPartialData to true for WebSocket if still loading
+        if (state.loading || state.loadingProgressPercentage < 100) {
+          state.isPartialData = true;
+        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
@@ -2280,6 +2331,9 @@ export const usePanelDataLoader = (
         state.searchRequestTraceIds = [];
       }
     }
+
+    // Save current state to cache with partial data flag
+    saveCurrentStateToCache();
 
     // remove cancelquery event
     window.removeEventListener("cancelQuery", cancelQueryAbort);
