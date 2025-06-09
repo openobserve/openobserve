@@ -91,7 +91,7 @@ impl Writer {
         if let Some(header) = header {
             let header_bytes = Self::serialize_header(&header);
             // write header len, 4 bytes
-            header_len = header_bytes.len();
+            header_len = header_bytes.len() as u32;
             f.write_all(&header_len.to_be_bytes())
                 .context(FileWriteSnafu { path: path.clone() })?;
             // write header value
@@ -99,7 +99,7 @@ impl Writer {
                 .context(FileWriteSnafu { path: path.clone() })?;
         } else {
             // write header len, 4 bytes
-            header_len = 0;
+            header_len = 0u32;
             f.write_all(&header_len.to_be_bytes())
                 .context(FileWriteSnafu { path: path.clone() })?;
         }
@@ -116,7 +116,7 @@ impl Writer {
             uncompressed_bytes_written: bytes_written,
             buffer: Vec::with_capacity(buffer_size),
             synced: true,
-        }, header_len))
+        }, header_len as usize))
     }
 
     pub fn path(&self) -> &PathBuf {
