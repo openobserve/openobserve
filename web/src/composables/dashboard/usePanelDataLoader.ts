@@ -341,21 +341,13 @@ export const usePanelDataLoader = (
 
     state.loading = false;
     state.isOperationCancelled = true;
+    state.isPartialData = true; // Set to true when cancelled
 
     // For WebSocket and HTTP streaming, we need to check if we're still receiving data
     if (isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)) {
       console.log(
         "cancelQueryAbort: cleaning up WebSocket or HTTP streaming listeners...",
       );
-
-      // Set isPartialData to true if we're still loading or haven't received complete response
-      if (
-        state.loading ||
-        state.loadingProgressPercentage < 100 ||
-        state.isOperationCancelled
-      ) {
-        state.isPartialData = true;
-      }
     }
 
     if (
@@ -1122,8 +1114,10 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
-    // Reset partial data flag when starting new load
-    state.isPartialData = false;
+    // Only reset isPartialData if we're starting a fresh load and not restoring from cache
+    if (runCount > 0 && !state.isOperationCancelled) {
+      state.isPartialData = false;
+    }
 
     try {
       log("loadData: entering...");
@@ -2428,9 +2422,9 @@ export const usePanelDataLoader = (
       state.resultMetaData = tempPanelCacheValue.resultMetaData;
       state.annotations = tempPanelCacheValue.annotations;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
-      // Only restore isPartialData if we have data and it was marked as partial
-      state.isPartialData =
-        tempPanelCacheValue.isPartialData && state.data.length > 0;
+      // Restore isPartialData and isOperationCancelled from cache
+      state.isPartialData = tempPanelCacheValue.isPartialData;
+      state.isOperationCancelled = tempPanelCacheValue.isOperationCancelled;
 
       // set that the cache is restored
       isRestoredFromCache = true;
