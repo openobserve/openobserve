@@ -46,7 +46,7 @@ pub static GLOBAL_ID_CACHE: Lazy<Arc<StreamingIdCache>> =
 // init streaming cache for the id
 pub fn init_cache(id: &str, start_time: i64, end_time: i64) {
     GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time);
-    log::debug!(
+    log::info!(
         "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}",
         id,
         start_time,
@@ -58,7 +58,7 @@ pub fn init_cache(id: &str, start_time: i64, end_time: i64) {
 pub fn remove_cache(id: &str) {
     GLOBAL_CACHE.remove(id);
     GLOBAL_ID_CACHE.remove(id);
-    log::debug!("[StreamingAggs] remove_cache: id={}", id);
+    log::info!("[StreamingAggs] remove_cache: id={}", id);
 }
 
 #[derive(Debug)]
