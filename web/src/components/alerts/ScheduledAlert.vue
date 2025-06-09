@@ -1178,7 +1178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         query === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
-                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-90px)]' : 'tw-h-[calc(100%-70px)]'
+                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-100px)]' : 'tw-h-[calc(100%-70px)]'
                       ]"
                       @update:query="updateQueryValue"
                       @focus="queryEditorPlaceholderFlag = false"
@@ -1186,7 +1186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="min-height: 10rem;"
                     />
 
-                    <div v-show="!!sqlQueryErrorMsg && tab === 'sql'" class="text-negative q-py-sm invalid-sql-error">
+                    <div style="height: 50px; overflow: auto;" v-show="!!sqlQueryErrorMsg && tab === 'sql'" class="text-negative q-py-sm invalid-sql-error">
                     <span v-show="!!sqlQueryErrorMsg">
                       Error: {{ sqlQueryErrorMsg }}</span
                     >
