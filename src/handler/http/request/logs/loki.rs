@@ -32,11 +32,23 @@ use crate::{
     operation_id = "LogsIngestionLoki",
     security(("Authorization"= [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = String, description = "Loki push data", content_type = "application/json"),
+    request_body(content = LokiPushRequest, description = "Loki-compatible log push data in JSON format. Stream names are extracted from 'stream_name' label in the stream labels. Also supports Protobuf format (application/x-protobuf) with optional compression (gzip for JSON, snappy for Protobuf)", content_type = "application/json", example = json!({
+        "streams": [{
+            "stream": {
+                "stream_name": "application_logs",
+                "service": "api",
+                "environment": "production"
+            },
+            "values": [
+                ["1609459200000000000", "API request processed successfully"],
+                ["1609459201000000000", "Database connection established", {"trace_id": "abc123", "span_id": "def456"}]
+            ]
+        }]
+    })),
     responses(
-        (status = 204, description = "Success"),
-        (status = 400, description = "Bad Request", content_type = "text/plain", body = String),
-        (status = 500, description = "Internal Server Error", content_type = "text/plain", body = String),
+        (status = 204, description = "Success - logs ingested successfully"),
+        (status = 400, description = "Bad Request - Possible causes: empty stream data, invalid labels format (e.g., empty labels), invalid timestamp format (e.g., non-numeric timestamp), unsupported content type (only application/json and application/x-protobuf supported), unsupported content encoding (only gzip for JSON and snappy for Protobuf), protobuf decode errors, JSON parsing errors, or compression/decompression failures", content_type = "text/plain", body = String),
+        (status = 500, description = "Internal Server Error - Server error during log processing", content_type = "text/plain", body = String),
     )
 )]
 #[post("/{org_id}/loki/v1/push")]

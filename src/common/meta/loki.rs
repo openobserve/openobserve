@@ -20,30 +20,33 @@ use utoipa::ToSchema;
 
 /// Internal Loki JSON types for native Loki push API format
 /// Loki push request - matches native JSON format exactly
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct LokiPushRequest {
+    /// Array of log streams, each containing labels and log entries
     pub streams: Vec<LokiStream>,
 }
 
-/// Loki stream - matches native JSON format  
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Loki stream containing labels and log entries
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct LokiStream {
-    pub stream: HashMap<String, String>, // Native format: "stream": {"label": "value"}
-    pub values: Vec<LokiEntry>,          /* Native format: "values": [["timestamp", "message",
-                                          * {...}]] */
+    /// Stream labels as key-value pairs (e.g., {"service": "api", "stream_name": "logs"})
+    pub stream: HashMap<String, String>,
+    /// Array of log entries, each containing timestamp, message, and optional structured metadata
+    pub values: Vec<LokiEntry>,
 }
 
-/// Loki log entry - uses serde aliases to parse from array format
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+/// Loki log entry containing timestamp, message, and optional metadata
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct LokiEntry {
+    /// Timestamp as nanosecond unix epoch string (e.g., "1609459200000000000")
     #[serde(alias = "0")]
-    pub timestamp: String, // First array element: nanosecond unix epoch as string
-
+    pub timestamp: String,
+    /// Log message content
     #[serde(alias = "1")]
-    pub line: String, // Second array element: log message
-
+    pub line: String,
+    /// Optional structured metadata as key-value pairs
     #[serde(alias = "2", default, skip_serializing_if = "Option::is_none")]
-    pub structured_metadata: Option<HashMap<String, String>>, // Optional third element
+    pub structured_metadata: Option<HashMap<String, String>>,
 }
 
 /// Loki Push Response (for documentation only - actual responses are 204 No Content or plain text)
