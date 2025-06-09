@@ -1084,9 +1084,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="close" size="20px" class="tw-cursor-pointer" @click="viewSqlEditor = false" />
           <span>Add Conditions</span>
         </div>
-        <div class="tw-flex tw-items-center tw-gap-2">
+        <div class="tw-flex tw-items-center">
 
-          <q-btn icon="fullscreen" size="16px" :color="isFullScreen ? 'primary' : ''"  dense class="tw-cursor-pointer" @click="() => isFullScreen = !isFullScreen" ></q-btn>
           <q-btn
             v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
             :ripple="false"
@@ -1107,6 +1106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
           </q-btn>
+          <q-btn icon="fullscreen" size="16px" :color="isFullScreen ? 'primary' : ''"  dense class="tw-cursor-pointer" @click="() => isFullScreen = !isFullScreen" ></q-btn>
+
         </div>
       </div>
       <div class="tw-h-[calc(100vh-100px)]">
