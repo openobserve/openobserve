@@ -52,7 +52,7 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search as SearchService,
+        search::{self as SearchService, datafusion::distributed_plan::streaming_aggs_exec},
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -364,6 +364,10 @@ pub async fn search(
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
+            if let Some(streaming_id) = req.query.streaming_id {
+                // if a single search has an error, the rest of the partitioned will also fail
+                streaming_aggs_exec::remove_cache(&streaming_id);
+            };
             let search_type = req
                 .search_type
                 .map(|t| t.to_string())
