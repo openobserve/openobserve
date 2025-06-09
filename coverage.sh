@@ -26,10 +26,11 @@ EOF
 
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
-    cargo llvm-cov test \
+    cargo llvm-cov nextest \
         --workspace \
         --verbose \
         --ignore-filename-regex 'job|.*generated.*' \
+        --test-threads=1
         "$@"
 }
 

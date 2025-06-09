@@ -1216,9 +1216,9 @@ mod tests {
 
     async fn set_up() {
         // clear the table here as previous tests could have written to it
-        infra::table::org_users::clear().await;
-        infra::table::users::clear().await;
-        infra::table::organizations::clear().await;
+        infra::table::org_users::clear().await.unwrap();
+        infra::table::users::clear().await.unwrap();
+        infra::table::organizations::clear().await.unwrap();
         infra_db::create_table().await.unwrap();
         infra_table::create_user_tables().await.unwrap();
         organization::check_and_create_org_without_ofga("dummy")
