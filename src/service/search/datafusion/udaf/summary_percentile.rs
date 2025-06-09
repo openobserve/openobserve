@@ -504,4 +504,45 @@ mod test {
         let result = as_uint32_array(results[0].column(0)).unwrap();
         assert_eq!(result.value(0), 2433);
     }
+
+    #[tokio::test]
+    async fn test_multi_percentile_cont_udaf() {
+        let ctx = SessionContext::new();
+        // Create two fields with the same data but different data types
+        let schema = Schema::new(vec![
+            Field::new("f1", DataType::Float64, false),
+            Field::new("f2", DataType::UInt32, false),
+            Field::new("total_count", DataType::Int64, false),
+        ]);
+        let f1: Vec<f64> = vec![1.0, 3.0, 2.0, 4.0, 2.0, 3.0, 1.0, 3.0, 2.0, 4.0, 2.0, 3.0];
+        let f2: Vec<u32> = vec![2, 3, 4, 5, 6, 1, 4, 5, 1, 1, 2, 3];
+        let counts: Vec<i64> = vec![3, 2, 3, 2, 3, 1, 3, 4, 5, 2, 4, 2];
+        let batch = RecordBatch::try_new(
+            Arc::new(schema.clone()),
+            vec![
+                Arc::new(Float64Array::from(f1)),
+                Arc::new(UInt32Array::from(f2)),
+                Arc::new(Int64Array::from(counts)),
+            ],
+        )
+        .unwrap();
+        let table = MemTable::try_new(Arc::new(schema), vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let percentile = 0.75;
+        let sql = &format!(
+            "select summary_percentile(f1, total_count, {}), summary_percentile(f2, total_count, {}) from t",
+            percentile, percentile
+        );
+        let acc_udaf = AggregateUDF::from(SummaryPercentile::new());
+        ctx.register_udaf(acc_udaf);
+
+        let df = ctx.sql(sql).await.unwrap();
+        let results = df.collect().await.unwrap();
+        // downcast the array to the expected type
+        let result1 = as_float64_array(results[0].column(0)).unwrap();
+        let result2 = as_uint32_array(results[0].column(1)).unwrap();
+        assert_eq!(result1.value(0), 3.0);
+        assert_eq!(result2.value(0), 5);
+    }
 }
