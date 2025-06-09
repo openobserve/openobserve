@@ -18,7 +18,6 @@ use std::collections::HashMap;
 use anyhow::Result;
 use config::{
     MESSAGE_COL_NAME, TIMESTAMP_COL_NAME,
-    meta::self_reporting::usage::UsageType,
     utils::{json, schema::format_stream_name},
 };
 use promql_parser::{
@@ -27,9 +26,12 @@ use promql_parser::{
 };
 use proto::loki_rpc;
 
-use crate::common::meta::{
-    ingestion::{IngestionResponse, IngestionStatus, RecordStatus},
-    loki::{LokiError, LokiPushRequest},
+use crate::{
+    common::meta::{
+        ingestion::{IngestionRequest, IngestionResponse},
+        loki::{LokiError, LokiPushRequest},
+    },
+    service::logs,
 };
 
 const STREAM_NAME_LABEL: &str = "stream_name";
@@ -45,30 +47,48 @@ pub async fn handle_request(
     request: LokiRequest,
     user_email: &str,
 ) -> Result<IngestionResponse, LokiError> {
-    let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
-    let json_data_by_stream = match request {
+    let streams_data = match request {
         LokiRequest::Json(json_request) => validate_and_process_json_request(json_request)?,
         LokiRequest::Protobuf(protobuf_request) => {
             validate_and_process_protobuf_request(protobuf_request)?
         }
     };
 
-    let mut status = IngestionStatus::Record(RecordStatus::default());
-    super::write_logs_by_stream(
-        thread_id,
-        org_id,
-        user_email,
-        (started_at, &start),
-        UsageType::Logs,
-        &mut status,
-        json_data_by_stream,
-    )
-    .await
-    .map_err(|e| {
-        log::error!("Error while writing logs: {}", e);
-        LokiError::from(anyhow::anyhow!("Multi-stream ingestion failed: {:?}", e))
-    })?;
+    for (stream_name, records) in streams_data {
+        let json_bytes = serde_json::to_vec(&records).map_err(|e| {
+            log::error!(
+                "[Loki] JSON serialization error for stream '{}' in org '{}': {}",
+                stream_name,
+                org_id,
+                e
+            );
+            LokiError::JsonParse { source: e }
+        })?;
+        let json_bytes = actix_web::web::Bytes::from(json_bytes);
+
+        logs::ingest::ingest(
+            thread_id,
+            org_id,
+            &stream_name,
+            IngestionRequest::JSON(&json_bytes),
+            user_email,
+            None,
+        )
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[Loki] Stream '{}' ingestion failed for org '{}': {}",
+                stream_name,
+                org_id,
+                e
+            );
+            LokiError::from(anyhow::anyhow!(
+                "Stream '{}' ingestion failed: {:?}",
+                stream_name,
+                e
+            ))
+        })?;
+    }
 
     log::info!("[Loki] Successfully processed streams for org '{}'", org_id);
     Ok(IngestionResponse::new(200, vec![]))
@@ -76,11 +96,12 @@ pub async fn handle_request(
 
 fn validate_and_process_json_request(
     request: LokiPushRequest,
-) -> Result<HashMap<String, super::O2IngestJsonData>, LokiError> {
-    let mut json_data_by_stream = HashMap::new();
+) -> Result<HashMap<String, Vec<json::Value>>, LokiError> {
     if request.streams.is_empty() {
         return Err(LokiError::EmptyStream);
     }
+
+    let mut streams_data = HashMap::new();
 
     for (stream_idx, loki_stream) in request.streams.into_iter().enumerate() {
         if loki_stream.stream.is_empty() {
@@ -124,6 +145,7 @@ fn validate_and_process_json_request(
             for (key, value) in &loki_stream.stream {
                 record.insert(key.clone(), json::Value::String(value.clone()));
             }
+
             if let Some(metadata) = entry.structured_metadata {
                 for (key, value) in metadata {
                     record.insert(key, json::Value::String(value));
@@ -139,23 +161,24 @@ fn validate_and_process_json_request(
                 json::Value::Number(timestamp_us.into()),
             );
 
-            json_data_by_stream
+            streams_data
                 .entry(stream_name.clone())
-                .or_insert((Vec::new(), None))
-                .0
-                .push((timestamp_us, record));
+                .or_insert_with(Vec::new)
+                .push(json::Value::Object(record));
         }
     }
-    Ok(json_data_by_stream)
+
+    Ok(streams_data)
 }
 
 fn validate_and_process_protobuf_request(
     request: loki_rpc::PushRequest,
-) -> Result<HashMap<String, super::O2IngestJsonData>, LokiError> {
-    let mut json_data_by_stream = HashMap::new();
+) -> Result<HashMap<String, Vec<json::Value>>, LokiError> {
     if request.streams.is_empty() {
         return Err(LokiError::EmptyStream);
     }
+
+    let mut streams_data = HashMap::new();
 
     for (stream_idx, loki_stream) in request.streams.into_iter().enumerate() {
         if loki_stream.labels.trim().is_empty() {
@@ -207,6 +230,7 @@ fn validate_and_process_protobuf_request(
             for (key, value) in &labels {
                 record.insert(key.clone(), json::Value::String(value.clone()));
             }
+
             for label_pair in entry.structured_metadata {
                 record.insert(label_pair.name, json::Value::String(label_pair.value));
             }
@@ -220,18 +244,17 @@ fn validate_and_process_protobuf_request(
                 json::Value::Number(timestamp_us.into()),
             );
 
-            json_data_by_stream
+            streams_data
                 .entry(stream_name.clone())
-                .or_insert((Vec::new(), None))
-                .0
-                .push((timestamp_us, record));
+                .or_insert_with(Vec::new)
+                .push(json::Value::Object(record));
         }
     }
-    Ok(json_data_by_stream)
+
+    Ok(streams_data)
 }
 
 fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, LokiError> {
-    // Add dummy metric name to make it a valid PromQL expression
     let full_query = format!("dummy{}", labels_str);
 
     let ast = parser::parse(&full_query).map_err(|e| LokiError::InvalidLabels {
