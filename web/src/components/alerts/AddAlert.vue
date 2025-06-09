@@ -1918,10 +1918,10 @@ export default defineComponent({
         else{
           isRealTimeAlertValid = this.realTimeAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
         }
-        if(!isScheduledAlertValid){
+        if( isAlertValid && !isScheduledAlertValid){
           this.navigateToErrorField(this.scheduledAlertRef); 
         }
-        if(!isRealTimeAlertValid){
+        if( isAlertValid && !isRealTimeAlertValid){
           this.navigateToErrorField(this.realTimeAlertRef);
         }
         if (!isAlertValid || !isScheduledAlertValid || !isRealTimeAlertValid) return false;
