@@ -54,9 +54,9 @@ const SUMMARY_PERCENTILE: &str = "summary_percentile";
 ///     f2,
 ///     f3
 /// the summary_percentile sql(use for calculate multi filed percentile):
-/// SELECT percentile_cont(f1, total_count, 0.5) as f1_median,
-///     percentile_cont(f2, total_count, 0.5) as f2_median,
-///     percentile_cont(f3, total_count, 0.5) as f3_median
+/// SELECT summary_percentile(f1, total_count, 0.5) as f1_median,
+///     summary_percentile(f2, total_count, 0.5) as f2_median,
+///     summary_percentile(f3, total_count, 0.5) as f3_median
 /// FROM summary_percentile
 pub(crate) struct SummaryPercentile(Signature);
 
@@ -217,7 +217,6 @@ impl SummaryPercentileAccumulator {
         }
     }
 
-    // public for approx_percentile_cont_with_weight
     pub fn convert_to_float(values: &ArrayRef) -> Result<Vec<f64>> {
         match values.data_type() {
             DataType::Float64 => {
@@ -300,7 +299,7 @@ impl SummaryPercentileAccumulator {
                     .filter_map(|v| v.try_as_f64().transpose())
                     .collect::<Result<Vec<_>>>()?)
             }
-            e => internal_err!("PERCENTILE_CONT is not expected to receive the type {e:?}"),
+            e => internal_err!("SUMMART_PERCENTILE is not expected to receive the type {e:?}"),
         }
     }
 
@@ -464,7 +463,7 @@ mod test {
     }
 
     #[test]
-    fn test_percentile_cont() {
+    fn test_summary_percentile() {
         let mut acc = SummaryPercentileAccumulator::new(0.75, DataType::Float64);
         let values: Vec<_> = VALUES.into_iter().map(|v| v as f64).collect();
         let counts: Vec<_> = COUNTS.into_iter().map(|v| v as i64).collect();
@@ -478,7 +477,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_percentile_cont_udaf() {
+    async fn test_summary_percentile_udaf() {
         let ctx = create_context();
         let percentile = 0.75;
         let sql_float_field = &format!(
@@ -506,7 +505,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_multi_percentile_cont_udaf() {
+    async fn test_multi_summary_percentile_udaf() {
         let ctx = SessionContext::new();
         // Create two fields with the same data but different data types
         let schema = Schema::new(vec![
