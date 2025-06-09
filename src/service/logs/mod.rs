@@ -58,6 +58,7 @@ use crate::{
 };
 
 pub mod bulk;
+pub mod hec;
 pub mod ingest;
 pub mod otlp;
 pub mod syslog;

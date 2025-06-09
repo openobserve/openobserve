@@ -300,3 +300,41 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_etcd_update_local_node() {
+        let node = Node::default();
+        let _ = update_local_node(&node).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_set_status() {
+        let _ = set_status(NodeStatus::Online, true).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_set_offline() {
+        let _ = set_offline(true).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_leave() {
+        let _ = leave().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_register_and_keep_alive() {
+        config::cache_instance_id("instance");
+        let _ = register_and_keep_alive().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_register() {
+        config::cache_instance_id("instance");
+        let _ = register().await.is_err();
+    }
+}

@@ -138,7 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
           </div>
-          <div class="col-3 q-py-xs destination-method-select">
+          <div  class=" q-py-xs destination-method-select"
+          :class="{ 'col-3': !isAlerts, 'col-6': isAlerts }"
+          >
             <q-select
               data-test="add-destination-method-select"
               v-model="formData.method"
@@ -157,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             
           </div>
-          <div class="col-3 q-py-xs destination-method-select">
+          <div v-if="!isAlerts" class="col-3 q-py-xs destination-method-select">
             <q-select
               data-test="add-destination-output-format-select"
               v-model="formData.output_format"
@@ -568,8 +570,12 @@ const saveDestination = () => {
     template: props.isAlerts ? formData.value.template : "",
     headers: headers,
     name: formData.value.name,
-    output_format: formData.value.output_format,
+    
   };
+
+  if(!props.isAlerts){
+    payload["output_format"] = formData.value.output_format;
+  }
 
   if (formData.value.type === "email") {
     payload["type"] = "email";

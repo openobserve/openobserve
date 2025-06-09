@@ -22,21 +22,21 @@ use infra::{
 
 use crate::service::db;
 
-const SHORT_URL_WEB_PATH: &str = "/short/";
+const SHORT_URL_WEB_PATH: &str = "short/";
 
 pub fn get_base_url() -> String {
     let config = get_config();
     format!("{}{}", config.common.web_url, config.common.base_uri)
 }
 
-fn construct_short_url(org_id: &str, short_id: &str) -> String {
+pub fn construct_short_url(org_id: &str, short_id: &str) -> String {
     format!(
-        "{}/{}/{}{}{}",
+        "{}/{}/{}{}?org_identifier={}",
         get_base_url(),
-        "api",
-        org_id,
+        "web",
         SHORT_URL_WEB_PATH,
-        short_id
+        short_id,
+        org_id,
     )
 }
 
@@ -136,5 +136,16 @@ mod tests {
 
         // Should return the same short_id
         assert_eq!(short_url1, short_url2);
+    }
+
+    #[tokio::test]
+    async fn test_generate_short_id() {
+        let original_url = "https://www.example.com/some/long/url";
+        let short_id = generate_short_id(original_url, None);
+        assert_eq!(short_id.len(), 16);
+        let timestamp = Utc::now().timestamp_micros();
+        let short_id2 = generate_short_id(original_url, Some(timestamp));
+        assert_eq!(short_id2.len(), 16);
+        assert_ne!(short_id, short_id2);
     }
 }
