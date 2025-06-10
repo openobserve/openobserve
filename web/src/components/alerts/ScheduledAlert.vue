@@ -449,6 +449,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="scheduled-alert-period-error-text"
             v-if="!Number(triggerData.period)"
             class="text-red-8 q-pt-xs"
+            :class="{
+              'q-field--error': triggerData.frequency_type == 'cron' && (triggerData.cron == '' || !triggerData.timezone)
+            }"
             style="font-size: 11px; line-height: 12px"
           >
             Field is required!
@@ -751,7 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   data-test="add-alert-delay-error"
-                  v-if="triggerData.silence < 0"
+                 v-if="triggerData.silence < 0 || triggerData.silence == undefined || triggerData.silence == ''"
                   class="text-red-8 q-pt-xs"
                   style="font-size: 11px; line-height: 12px"
                 >
@@ -782,7 +785,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   multiple
                   use-input
                   fill-input
-                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :rules="[(val: any) =>{
+                    return val.length > 0 || 'Field is required!'
+                  }]"
+                  :required="true"
                   style="width: 200px"
                   @update:model-value="updateDestinations"
                 >

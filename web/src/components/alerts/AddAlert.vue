@@ -208,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-alert-query-input-title"
             >
               <real-time-alert
+                ref="realTimeAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
                 @field:add="addField"
@@ -567,6 +568,7 @@ export default defineComponent({
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
+    const realTimeAlertRef: any = ref(null);
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
@@ -1448,6 +1450,24 @@ export default defineComponent({
       items
     };
   }
+  const validateFormAndNavigateToErrorField = async (formRef: any) => {
+      const isValid = await formRef.validate().then(async (valid: any) => {
+        return valid;
+      });
+      if (!isValid) {
+        navigateToErrorField(formRef);
+        return false;
+      }
+      return true;
+    }
+
+    const navigateToErrorField = (formRef: any) => {
+      const errorField = formRef.$el.querySelector('.q-field--error');
+      if (errorField) { 
+        errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
 
 
 
@@ -1529,7 +1549,10 @@ export default defineComponent({
       updateGroup,
       removeConditionGroup,
       transformFEToBE,
-      retransformBEToFE
+      retransformBEToFE,
+      validateFormAndNavigateToErrorField,
+      navigateToErrorField,
+      realTimeAlertRef
     };
   },
 
@@ -1682,10 +1705,28 @@ export default defineComponent({
         this.formData.tz_offset = convertedDateTime.offset;
       }
 
-      this.addAlertForm.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
+            //from here validation starts so if there are any errors we need to navigate user to that paricular field
+      //this is for main form validation
+      let isAlertValid = true;
+      let isScheduledAlertValid = true;
+      let isRealTimeAlertValid = true;
+        isAlertValid = await this.validateFormAndNavigateToErrorField(this.addAlertForm);
+        //we need to handle scheduled alert validation separately 
+        //if there are any scheduled alert errors then we need to navigate user to that field
+        if(this.formData.is_real_time == "false"){
+          isScheduledAlertValid = this.scheduledAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
         }
+        else{
+          isRealTimeAlertValid = this.realTimeAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
+        }
+        if(!isScheduledAlertValid){
+          this.navigateToErrorField(this.scheduledAlertRef); 
+        }
+        if(!isRealTimeAlertValid){
+          this.navigateToErrorField(this.realTimeAlertRef);
+        }
+        if (!isAlertValid || !isScheduledAlertValid || !isRealTimeAlertValid) return false;
+
 
         const payload = this.getAlertPayload();
         if (!this.validateInputs(payload)) return;
@@ -1779,7 +1820,7 @@ export default defineComponent({
             page: "Add/Update Alert",
           });
         }
-      });
+
     },
   },
 });
@@ -1846,7 +1887,7 @@ export default defineComponent({
 .dark-mode{
   .alert-setup-container{
   background-color: #212121;
-  padding: 12px 12px 24px 0px;
+  padding: 12px 12px 24px 12px;
   margin-left: 24px;
   border-radius: 4px;
   border: 1px solid #343434;
