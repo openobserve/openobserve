@@ -115,8 +115,15 @@ impl StreamingAggsCacheResult {
             .collect::<Vec<_>>()
     }
 
-    pub fn calculate_deltas(&self, query_start_time: i64, query_end_time: i64) -> Vec<QueryDelta> {
-        calculate_record_batches_deltas(query_start_time, query_end_time, &self.cache_result)
+    pub fn calculate_deltas(
+        &mut self,
+        query_start_time: i64,
+        query_end_time: i64,
+    ) -> Vec<QueryDelta> {
+        let deltas =
+            calculate_record_batches_deltas(query_start_time, query_end_time, &self.cache_result);
+        self.deltas = deltas.clone();
+        deltas
     }
 }
 

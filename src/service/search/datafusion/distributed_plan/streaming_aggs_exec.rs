@@ -27,6 +27,7 @@ use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader as
 use dashmap::DashMap;
 use datafusion::{
     common::{Result, Statistics},
+    error::DataFusionError,
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::EquivalenceProperties,
     physical_plan::{
@@ -39,8 +40,11 @@ use datafusion::{
 use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
 
-use crate::service::search::cache::streaming_aggs::{
-    RecordBatchCacheRequest, cache_record_batches_to_disk, get_streaming_aggs_records_from_disk,
+use crate::{
+    common::meta::search::StreamingAggsCacheResult,
+    service::search::cache::streaming_aggs::{
+        RecordBatchCacheRequest, cache_record_batches_to_disk, get_streaming_aggs_records_from_disk,
+    },
 };
 
 pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
@@ -50,13 +54,26 @@ pub static GLOBAL_ID_CACHE: Lazy<Arc<StreamingIdCache>> =
     Lazy::new(|| Arc::new(StreamingIdCache::default()));
 
 // init streaming cache for the id
-pub fn init_cache(id: &str, start_time: i64, end_time: i64, file_path: &str) {
-    GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time, file_path.to_string());
+pub fn init_cache(
+    id: &str,
+    start_time: i64,
+    end_time: i64,
+    file_path: &str,
+    is_complete_cache_hit: bool,
+) {
+    GLOBAL_ID_CACHE.insert(
+        id.to_string(),
+        start_time,
+        end_time,
+        file_path.to_string(),
+        is_complete_cache_hit,
+    );
     log::info!(
-        "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}",
+        "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}, is_complete_cache_hit={}",
         id,
         start_time,
         end_time,
+        is_complete_cache_hit,
     );
 }
 
@@ -77,10 +94,11 @@ pub struct StreamingAggsExec {
     cache: PlanProperties,
     cached_data: Vec<Arc<RecordBatch>>,
     cached_partition_num: usize,
+    is_complete_cache_hit: bool,
 }
 
 impl StreamingAggsExec {
-    /// Create a new UnionExec
+    /// Create a new StreamingAggsExec
     pub fn new(
         id: String,
         start_time: i64,
@@ -88,12 +106,31 @@ impl StreamingAggsExec {
         cached_data: Vec<Arc<RecordBatch>>,
         input: Arc<dyn ExecutionPlan>,
     ) -> Self {
-        let partitions_num = input.output_partitioning().partition_count();
-        let cached_partition_num = 1; // the first partition is used to store the cache
-        let cache = Self::compute_properties(
-            Arc::clone(&input.schema()),
-            partitions_num + cached_partition_num,
-        );
+        Self::new_with_cache_strategy(id, start_time, end_time, cached_data, input, false)
+    }
+
+    /// Create a new StreamingAggsExec with explicit cache strategy
+    pub fn new_with_cache_strategy(
+        id: String,
+        start_time: i64,
+        end_time: i64,
+        cached_data: Vec<Arc<RecordBatch>>,
+        input: Arc<dyn ExecutionPlan>,
+        is_complete_cache_hit: bool,
+    ) -> Self {
+        let cached_partition_num = if cached_data.is_empty() { 0 } else { 1 };
+
+        let total_partitions = if is_complete_cache_hit {
+            // Complete cache hit: only cached partitions, no input partitions
+            cached_partition_num
+        } else {
+            // Partial or no cache: cached partitions + input partitions
+            let input_partitions = input.output_partitioning().partition_count();
+            cached_partition_num + input_partitions
+        };
+
+        let cache = Self::compute_properties(Arc::clone(&input.schema()), total_partitions);
+
         Self {
             id,
             start_time,
@@ -102,6 +139,7 @@ impl StreamingAggsExec {
             cache,
             cached_data,
             cached_partition_num,
+            is_complete_cache_hit,
         }
     }
 
@@ -129,7 +167,21 @@ impl DisplayAs for StreamingAggsExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(f, "StreamingAggsExec: streaming_id={}", self.id)
+                let strategy = if self.is_complete_cache_hit {
+                    "complete_cache_hit"
+                } else if !self.cached_data.is_empty() {
+                    "partial_cache_hit"
+                } else {
+                    "cache_miss"
+                };
+                write!(
+                    f,
+                    "StreamingAggsExec: streaming_id={}, cache_strategy={}, cached_partitions={}, total_partitions={}",
+                    self.id,
+                    strategy,
+                    self.cached_partition_num,
+                    self.properties().output_partitioning().partition_count()
+                )
             }
         }
     }
@@ -165,8 +217,29 @@ impl ExecutionPlan for StreamingAggsExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        // self data
+        // Complete cache hit: only return cached data, never execute input
+        if self.is_complete_cache_hit {
+            if partition < self.cached_partition_num {
+                return Ok(Box::pin(MemoryStream::try_new(
+                    self.cached_data
+                        .iter()
+                        .map(|v| v.as_ref().clone())
+                        .collect::<Vec<_>>(),
+                    Arc::clone(&self.schema()),
+                    None,
+                )?));
+            } else {
+                // This should never happen with complete cache hit
+                return Err(DataFusionError::Internal(format!(
+                    "StreamingAggsExec: Invalid partition {} for complete cache hit with {} cached partitions",
+                    partition, self.cached_partition_num
+                )));
+            }
+        }
+
+        // Partial or no cache: handle both cached and input partitions
         if partition < self.cached_partition_num {
+            // Return cached data
             return Ok(Box::pin(MemoryStream::try_new(
                 self.cached_data
                     .iter()
@@ -176,7 +249,8 @@ impl ExecutionPlan for StreamingAggsExec {
                 None,
             )?));
         }
-        // input data
+
+        // Execute input for missing data
         Ok(Box::pin(MonitorStream::new(
             self.id.clone(),
             self.start_time,
@@ -394,9 +468,18 @@ impl StreamingIdCache {
         }
     }
 
-    pub fn insert(&self, k: String, start_time: i64, end_time: i64, file_path: String) {
-        self.data
-            .insert(k, StreamingIdItem::new(start_time, end_time, file_path));
+    pub fn insert(
+        &self,
+        k: String,
+        start_time: i64,
+        end_time: i64,
+        file_path: String,
+        is_complete_cache_hit: bool,
+    ) {
+        self.data.insert(
+            k,
+            StreamingIdItem::new(start_time, end_time, file_path, is_complete_cache_hit),
+        );
     }
 
     pub fn exists(&self, k: &str) -> bool {
@@ -436,22 +519,29 @@ impl Default for StreamingIdCache {
 }
 
 #[derive(Clone)]
-struct StreamingIdItem {
-    start_time: i64,
-    end_time: i64,
+pub struct StreamingIdItem {
+    pub start_time: i64,
+    pub end_time: i64,
     start_ok: bool,
     end_ok: bool,
     file_path: String,
+    is_complete_cache_hit: bool,
 }
 
 impl StreamingIdItem {
-    pub fn new(start_time: i64, end_time: i64, file_path: String) -> Self {
+    pub fn new(
+        start_time: i64,
+        end_time: i64,
+        file_path: String,
+        is_complete_cache_hit: bool,
+    ) -> Self {
         Self {
             start_time,
             end_time,
             start_ok: false,
             end_ok: false,
             file_path,
+            is_complete_cache_hit,
         }
     }
 
@@ -462,11 +552,16 @@ impl StreamingIdItem {
         if end_time == self.end_time {
             self.end_ok = true;
         }
-        self.start_ok && self.end_ok
+        self.is_complete_cache_hit = true;
+        self.is_complete_cache_hit
     }
 
     pub fn get_file_path(&self) -> String {
         self.file_path.clone()
+    }
+
+    pub fn is_complete_cache_hit(&self) -> bool {
+        self.is_complete_cache_hit
     }
 }
 
@@ -475,27 +570,25 @@ fn get_file_path_from_streaming_id(streaming_id: &str) -> String {
     file_path.unwrap_or_default()
 }
 
+pub async fn check_record_batches_cache(
+    query_start_time: i64,
+    query_end_time: i64,
+    file_path: &str,
+) -> anyhow::Result<StreamingAggsCacheResult> {
+    let cache_result =
+        get_streaming_aggs_records_from_disk(file_path, query_start_time, query_end_time).await?;
+    Ok(cache_result)
+}
+
 // prepare cache for the streaming_id
-pub async fn prepare_cache(streaming_id: &str) -> anyhow::Result<bool> {
-    let streaming_item = match GLOBAL_ID_CACHE.get(streaming_id) {
-        Some(v) => v,
-        None => return Err(anyhow::anyhow!("StreamingId not found")),
-    };
-
-    let file_path = streaming_item.get_file_path();
-
-    let cache_result = get_streaming_aggs_records_from_disk(
-        &file_path,
-        streaming_item.start_time,
-        streaming_item.end_time,
-    )
-    .await?;
-
+pub fn prepare_cache(
+    streaming_id: &str,
+    cache_result: StreamingAggsCacheResult,
+) -> anyhow::Result<()> {
     log::info!(
-        "[streaming_id {}] loaded {} cached record batches from {}",
+        "[streaming_id {}] loaded {} cached record batches from disk",
         streaming_id,
-        cache_result.cache_result.len(),
-        file_path
+        cache_result.cache_result.len()
     );
 
     if !cache_result.cache_result.is_empty() {
@@ -503,20 +596,7 @@ pub async fn prepare_cache(streaming_id: &str) -> anyhow::Result<bool> {
         GLOBAL_CACHE.insert_many(streaming_id.to_string(), all_record_batches);
     }
 
-    if cache_result.is_complete_match {
-        log::info!(
-            "[streaming_id {}] found complete cache match for streaming aggregate query",
-            streaming_id
-        );
-        // indicate that the cache is complete match
-        GLOBAL_ID_CACHE.check_time(
-            streaming_id,
-            streaming_item.start_time,
-            streaming_item.end_time,
-        );
-    }
-
-    Ok(cache_result.is_complete_match)
+    Ok(())
 }
 
 #[cfg(test)]

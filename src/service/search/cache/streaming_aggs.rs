@@ -210,8 +210,19 @@ pub async fn get_streaming_aggs_records_from_disk(
         };
 
         // Check if file time range overlaps with requested time range
-        // Overlap condition:
-        if file_start_time <= end_time && file_end_time >= start_time {
+        // Overlap condition: file_start_time < end_time && file_end_time > start_time
+        // This excludes files that only touch at boundaries
+        // eg:
+        // Cache files:
+        // File 1: [3-4]   ← SKIPPED (only touches boundary at 4)
+        // File 2: [4-5]   ← LOADED ✓
+        // File 3: [5-6]   ← LOADED ✓
+        // File 4: [6-7]   ← LOADED ✓
+        // File 5: [7-8]   ← LOADED ✓
+        // File 6: [8-9]   ← SKIPPED (only touches boundary at 8)
+        // Query: [4-8]
+        // Result: Loads files 2,3,4,5 covering [4-8]
+        if file_start_time < end_time && file_end_time > start_time {
             log::debug!(
                 "File {} matches time range: file_time=[{}, {}], query_time=[{}, {}]",
                 file_name_str,
@@ -220,7 +231,6 @@ pub async fn get_streaming_aggs_records_from_disk(
                 start_time,
                 end_time
             );
-            let file_path_full = format!("{}/{}", cache_path, file_name_str);
             match get_record_batches(&file_path, &file_name_str).await {
                 Ok(cached_record_batches) => {
                     for batch in cached_record_batches {
@@ -264,10 +274,12 @@ pub async fn get_streaming_aggs_records_from_disk(
     // Return the cached records if any were found
     if !cached_records.is_empty() {
         log::info!(
-            "Loaded {} cached record batches cache_start_time: {}, cache_end_time: {}",
+            "Loaded {} cached record batches cache_start_time: {}, cache_end_time: {}, query_start_time: {}, query_end_time: {}",
             cached_records.len(),
             cache_start_time,
-            cache_end_time
+            cache_end_time,
+            start_time,
+            end_time,
         );
         if cache_start_time == start_time && cache_end_time == end_time {
             log::info!("Found cached records for the entire time range");

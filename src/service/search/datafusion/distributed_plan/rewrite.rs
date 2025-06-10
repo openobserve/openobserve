@@ -222,17 +222,40 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
                     self.id
                 )));
             }
+
             let cached_data = streaming_aggs_exec::GLOBAL_CACHE
                 .get(&self.id)
                 .unwrap_or_default();
-            let streaming_node: Arc<dyn ExecutionPlan> =
-                Arc::new(streaming_aggs_exec::StreamingAggsExec::new(
+
+            // Check if this is a complete cache hit
+            let streaming_item = streaming_aggs_exec::GLOBAL_ID_CACHE.get(&self.id);
+            let is_complete_cache_hit = if let Some(item) = streaming_item {
+                item.is_complete_cache_hit()
+            } else {
+                false
+            };
+
+            log::info!(
+                "[streaming_id {}] StreamingAggsRewriter: cache_strategy={}, cached_batches={}",
+                self.id,
+                if is_complete_cache_hit {
+                    "complete_hit"
+                } else {
+                    "partial_or_miss"
+                },
+                cached_data.len()
+            );
+
+            let streaming_node: Arc<dyn ExecutionPlan> = Arc::new(
+                streaming_aggs_exec::StreamingAggsExec::new_with_cache_strategy(
                     self.id.clone(),
                     self.start_time,
                     self.end_time,
                     cached_data,
                     node,
-                )) as _;
+                    is_complete_cache_hit,
+                ),
+            ) as _;
             return Ok(Transformed::yes(streaming_node));
         }
         Ok(Transformed::no(node))
