@@ -872,7 +872,7 @@ export default defineComponent({
           if (condition.column && condition.operator && condition.value !== undefined) {
             if (
               input.query_condition.type === "custom" &&
-              !["=", ">", "<", ">=", "<=", "Contains", "NotContains"].includes(
+              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
                 condition.operator,
               )
             ) {
@@ -1072,11 +1072,11 @@ export default defineComponent({
 
       if (
         isNaN(Number(triggerCondition.silence)) ||
-        triggerCondition.silence < 1 ||
+        triggerCondition.silence < 0 ||
         typeof triggerCondition.silence !== "number"
       ) {
         alertErrors.push(
-          `Alert - ${index}: Silence should be a positive number greater than 0 and should be a number.`,
+          `Alert - ${index}: Silence should be a positive number greater than or equal to 0 and should be a number.`,
         );
       }
 
