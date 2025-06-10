@@ -89,14 +89,17 @@ impl Writer {
             return Err(Error::WriteFileType { source: e });
         }
 
-        Ok((Self {
-            path,
-            f: BufWriter::with_capacity(buffer_size, f),
-            bytes_written,
-            uncompressed_bytes_written: bytes_written,
-            buffer: Vec::with_capacity(buffer_size),
-            synced: true,
-        }, header_len as usize))
+        Ok((
+            Self {
+                path,
+                f: BufWriter::with_capacity(buffer_size, f),
+                bytes_written,
+                uncompressed_bytes_written: bytes_written,
+                buffer: Vec::with_capacity(buffer_size),
+                synced: true,
+            },
+            header_len as usize,
+        ))
     }
 
     pub fn path(&self) -> &PathBuf {
