@@ -2009,8 +2009,8 @@ export const usePanelDataLoader = (
     }
 
     // Sort both arrays
-    const sortedArray1 = array1?.slice().sort();
-    const sortedArray2 = array2?.slice().sort();
+    const sortedArray1 = array1?.slice()?.sort();
+    const sortedArray2 = array2?.slice()?.sort();
 
     // Compare sorted arrays element by element
     for (let i = 0; i < sortedArray1?.length; i++) {
