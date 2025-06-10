@@ -643,7 +643,8 @@ export default defineComponent({
           item.type === "query_values" &&
           item.selectAllValueForMultiSelect === "custom" &&
           item.customMultiSelectValue?.length > 0 &&
-          !initialValue // Only set custom value if no URL value exists
+          ((Array.isArray(initialValue) && initialValue.length === 0) ||
+            !initialValue) // Only set custom value if no URL value exists
         ) {
           console.log(
             `Setting custom multi-select value for--------------- ${item.name}:`,
@@ -655,6 +656,15 @@ export default defineComponent({
           variableData.value = item.multiSelect
             ? item.customMultiSelectValue
             : item.customMultiSelectValue[0];
+        } else if (
+          item.type === "query_values" &&
+          item.selectAllValueForMultiSelect === "all" &&
+          ((Array.isArray(initialValue) && initialValue.length === 0) ||
+            !initialValue)
+        ) {
+          variableData.value = item.multiSelect
+            ? [SELECT_ALL_VALUE]
+            : SELECT_ALL_VALUE;
         } else if (item.type != "constant") {
           // for textbox type variable, if initial value is not exist, use the default value
           if (item.type == "textbox") {
@@ -848,10 +858,6 @@ export default defineComponent({
         }
         return;
       } else {
-        if (currentVariable.selectAllValueForMultiSelect === "all") {
-          currentVariable.value = SELECT_ALL_VALUE;
-          return;
-        }
         // For single select, we need to ensure the value is valid
         if (
           currentVariable.value !== null &&
