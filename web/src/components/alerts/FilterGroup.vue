@@ -1,7 +1,7 @@
 <template>
     <div :class="[`  tw-px-2 tw-mb-2 tw-border group-border tw-mt-6  `, 
         store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
-        store.state.isAiChatEnabled ? `tw-w-full tw-ml-[${depth * 10}px]` : `tw-w-fit tw-ml-[${depth * 20}px]`
+        store.state.isAiChatEnabled ? `tw-w-full tw-ml-[${depth * 10}px]` : `xl:tw-w-fit tw-ml-[${depth * 20}px]`
     ]"
     :style="{
         opacity: computedOpacity,
