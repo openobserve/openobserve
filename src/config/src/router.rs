@@ -50,13 +50,14 @@ const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
     "/prometheus/api/v1/query_exemplars",
 ];
 const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
-pub const INGESTER_ROUTES: [&str; 11] = [
+pub const INGESTER_ROUTES: [&str; 12] = [
     "/_json",
     "/_bulk",
     "/_multi",
     "/_kinesis_firehose",
     "/_sub",
     "/v1/logs",
+    "/loki/v1/push",
     "/ingest/metrics/_json",
     "/v1/metrics",
     "/traces",
