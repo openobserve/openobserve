@@ -69,6 +69,8 @@ pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").u
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 
+const DASHBOARD_ALL: &str = "_o2_all_";
+
 #[derive(Clone, Debug)]
 pub struct Sql {
     pub sql: String,
@@ -249,7 +251,11 @@ impl Sql {
         }
 
         // NOTE: only this place modify the sql
-        // 11. generate tantivy query
+        // 11. replace all filter that include DASHBOARD_ALL with true
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+
+        // 12. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
         #[allow(deprecated)]
@@ -268,7 +274,7 @@ impl Sql {
             can_optimize = index_visitor.can_optimize;
         }
 
-        // 12. check `select * from table where match_all()` optimizer
+        // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
@@ -281,7 +287,7 @@ impl Sql {
             ));
         }
 
-        // 13. check `select count(*) from table where match_all` optimizer
+        // 14. check `select count(*) from table where match_all` optimizer
         if can_optimize && is_simple_count_query(&mut statement) {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
         }
@@ -1893,9 +1899,70 @@ impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
     }
 }
 
+// replace _o2_all_ with true
+struct RemoveDashboardAllVisitor {}
+
+impl RemoveDashboardAllVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for RemoveDashboardAllVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            Expr::BinaryOp { left, op, right }
+                if matches!(
+                    op,
+                    BinaryOperator::Eq
+                        | BinaryOperator::GtEq
+                        | BinaryOperator::LtEq
+                        | BinaryOperator::Gt
+                        | BinaryOperator::Lt
+                ) =>
+            {
+                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
+                    if value == DASHBOARD_ALL {
+                        *expr = Expr::Value(Value::Boolean(true));
+                    }
+                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
+                    if value == DASHBOARD_ALL {
+                        *expr = Expr::Value(Value::Boolean(true));
+                    }
+                }
+            }
+            // In list
+            Expr::InList { list, negated, .. } if !(*negated) => {
+                for item in list.iter() {
+                    if let Expr::Value(Value::SingleQuotedString(value)) = item {
+                        if value == DASHBOARD_ALL {
+                            *expr = Expr::Value(Value::Boolean(true));
+                            break;
+                        }
+                    }
+                }
+            }
+            // Not in list
+            Expr::InList { list, negated, .. } if *negated => {
+                for item in list.iter() {
+                    if let Expr::Value(Value::SingleQuotedString(value)) = item {
+                        if value == DASHBOARD_ALL {
+                            *expr = Expr::Value(Value::Boolean(false));
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-
     use sqlparser::dialect::GenericDialect;
 
     use super::*;
@@ -2522,5 +2589,71 @@ mod tests {
 
         // we support this type of query
         assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor() {
+        let sql = "select * from t where field1 = '_o2_all_'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_in_list() {
+        let sql = "select * from t where field1 in ('_o2_all_')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_in_list_and_negated() {
+        let sql = "select * from t where field1 not in ('_o2_all_')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE false";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_in_list_and_negated_and_other_filter() {
+        let sql = "select * from t where field1 not in ('_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE false AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    // test multi and/or with _o2_all_
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_multi_and_or_with_o2_all() {
+        let sql = "select * from t where field1 = '_o2_all_' and (field2 = '_o2_all_' or field3 = '_o2_all_')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND (true OR true)";
+        assert_eq!(statement.to_string(), expected);
     }
 }
