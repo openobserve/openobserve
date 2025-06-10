@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-item-section>
           <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
-            <q-item-label>Select All</q-item-label>
+            <q-item-label>{{ variableItem.multiSelect ? 'Select All' : 'All' }}</q-item-label>
           </q-item-section>
         </q-item>
         <q-separator />
@@ -128,12 +128,10 @@ export default defineComponent({
         return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
       }
       return selectedValue.value === SELECT_ALL_VALUE;
-    });
-
-    const toggleSelectAll = () => {
-      const newValue = !isAllSelected.value
-        ? props.variableItem.multiSelect ? [SELECT_ALL_VALUE] : SELECT_ALL_VALUE
-        : props.variableItem.multiSelect ? [] : '';
+    });    const toggleSelectAll = () => {
+      const newValue = props.variableItem.multiSelect
+        ? isAllSelected.value ? [] : [SELECT_ALL_VALUE]
+        : SELECT_ALL_VALUE;
       
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
