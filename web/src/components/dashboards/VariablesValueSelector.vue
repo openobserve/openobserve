@@ -848,6 +848,10 @@ export default defineComponent({
         }
         return;
       } else {
+        if (currentVariable.selectAllValueForMultiSelect === "all") {
+          currentVariable.value = SELECT_ALL_VALUE;
+          return;
+        }
         // For single select, we need to ensure the value is valid
         if (
           currentVariable.value !== null &&
@@ -984,7 +988,7 @@ export default defineComponent({
               break;
             case "all":
               // Select all available options
-              currentVariable.value = [SELECT_ALL_VALUE]
+              currentVariable.value = [SELECT_ALL_VALUE];
               break;
             default:
               // Default to first option
@@ -1750,7 +1754,9 @@ export default defineComponent({
         }
 
         const filtered = currentVariable.value.filter((val: any) =>
-          currentVariable.options.some((opt: any) => opt.value === val || val == SELECT_ALL_VALUE),
+          currentVariable.options.some(
+            (opt: any) => opt.value === val || val == SELECT_ALL_VALUE,
+          ),
         );
         console.log(
           `[Debug] Filtered multiSelect values for ${currentVariable.name}:`,
