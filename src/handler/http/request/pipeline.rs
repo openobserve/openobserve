@@ -270,19 +270,20 @@ pub async fn enable_pipeline(
     }
 }
 
-/// ResetScheduledPipeline
+/// PauseScheduledPipeline
 ///
 /// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
-    operation_id = "resetScheduledPipeline",
+    operation_id = "pauseScheduledPipeline",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("pipeline_id" = String, Path, description = "Pipeline ID"),
+        ("value" = bool, Query, description = "Pause or unpause pipeline"),
     ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
@@ -290,11 +291,19 @@ pub async fn enable_pipeline(
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/{org_id}/pipelines/{pipeline_id}/reset")]
-pub async fn reset_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+#[put("/{org_id}/pipelines/{pipeline_id}/pause")]
+pub async fn pause_pipeline(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let (org_id, pipeline_id) = path.into_inner();
-    let resp_msg = "Pipeline reset successfully ".to_string();
-    match pipeline::reset_pipeline(&org_id, &pipeline_id).await {
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let pause = match query.get("value") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    let resp_msg = "Pipeline successfully ".to_string() + if pause { "paused" } else { "unpaused" };
+    match pipeline::pause_pipeline(&org_id, &pipeline_id, pause).await {
         Ok(()) => {
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
         }

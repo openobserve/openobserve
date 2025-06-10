@@ -157,7 +157,7 @@ use crate::{common::meta, handler::http::request};
         request::pipeline::delete_pipeline,
         request::pipeline::update_pipeline,
         request::pipeline::enable_pipeline,
-        request::pipeline::reset_pipeline,
+        request::pipeline::pause_pipeline,
         request::dashboards::reports::create_report,
         request::dashboards::reports::update_report,
         request::dashboards::reports::list_reports,
