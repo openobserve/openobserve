@@ -172,9 +172,10 @@ export default defineComponent({
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
-          } else if (props.variableItem.options.length === 0) {
+          } else if (props.variableItem.options.length === 0 && selectedValue.value.length === 0) {
             return "(No Data Found)";
-          } else {            return selectedValue.value
+          } else {            
+            return selectedValue.value
               .map((it: any) => {
                 if (it === "") return "<blank>";
                 if (it === SELECT_ALL_VALUE) return "<ALL>";

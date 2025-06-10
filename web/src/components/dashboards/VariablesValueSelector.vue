@@ -709,6 +709,8 @@ export default defineComponent({
         oldVariablesData["Dynamic filters"] = initialValue;
       }
 
+      console.log("[WebSocket] variablesData.values:", JSON.stringify(variablesData.values, null ,2));
+
       // need to build variables dependency graph on variables config list change
       variablesDependencyGraph = buildVariablesDependencyGraph(
         variablesData.values,
