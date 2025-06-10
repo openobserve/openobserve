@@ -542,6 +542,9 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
     ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::summary_percentile::SummaryPercentile::new(),
+    ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
     let udf_list = get_all_transform(org_id)?;
     for udf in udf_list {

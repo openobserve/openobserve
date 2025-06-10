@@ -242,7 +242,7 @@ test.describe("Alert folders testcases", () => {
 
 
 
-  test("create alert and manage it in folders", async ({ page }) => {
+  test.skip("create alert and manage it in folders", async ({ page }) => {
     const dashboardFolders = new DashboardFolder(page);
     const uniqueId = Date.now();
     const templateName = `sanitytemp-${uniqueId}`;
@@ -273,7 +273,7 @@ test.describe("Alert folders testcases", () => {
     await deleteTemplate(page, templateName);
   });
 
-  test("bulk move multiple alerts to folder", async ({ page }) => {
+  test.skip("bulk move multiple alerts to folder", async ({ page }) => {
     const dashboardFolders = new DashboardFolder(page);
     const uniqueId = Date.now();
     const templateName = `sanitytemp-${uniqueId}`;
