@@ -1766,7 +1766,7 @@ export default defineComponent({
           );
           callAlert
             .then((res: { data: any }) => {
-              this.formData = defaultValue();
+              this.formData = { ...defaultValue() };
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
@@ -1798,7 +1798,7 @@ export default defineComponent({
 
           callAlert
             .then((res: { data: any }) => {
-              this.formData = defaultValue();
+              this.formData = { ...defaultValue() };
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
