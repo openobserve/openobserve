@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </button>
                 </div>
 
-                <div v-if="variableData.multiSelect">
+                <div>
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-all-values"
                     :class="
