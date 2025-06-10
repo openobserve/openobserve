@@ -15,7 +15,6 @@
 
 use std::{
     any::Any,
-    collections::VecDeque,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -35,6 +34,7 @@ use datafusion::{
     },
 };
 use futures::{Stream, StreamExt};
+use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 
 pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
@@ -265,7 +265,6 @@ impl RecordBatchStream for MonitorStream {
 /// Cache is invalided when file size or last modification has changed
 pub struct StreamingAggsCache {
     data: DashMap<String, Vec<Arc<RecordBatch>>>,
-    cacher: parking_lot::Mutex<VecDeque<String>>,
     max_entries: usize,
 }
 
@@ -273,7 +272,6 @@ impl StreamingAggsCache {
     pub fn new(max_entries: usize) -> Self {
         Self {
             data: DashMap::new(),
-            cacher: parking_lot::Mutex::new(VecDeque::new()),
             max_entries,
         }
     }
@@ -283,21 +281,24 @@ impl StreamingAggsCache {
     }
 
     pub fn insert(&self, k: String, v: RecordBatch) {
-        let mut w = self.cacher.lock();
-        if w.len() >= self.max_entries {
+        let item_len = self.data.len();
+        if item_len >= self.max_entries {
             log::info!(
-                "[StreamingAggs] [streaming_id: {}] remove the oldest entry: max_entries={}, current_entries={}",
+                "[StreamingAggs] [streaming_id: {}] remove the oldest 1% entries: max_entries={}, current_entries={}",
                 k,
                 self.max_entries,
-                w.len()
+                item_len
             );
-            if let Some(k) = w.pop_front() {
-                self.data.remove(&k);
-                GLOBAL_ID_CACHE.remove(&k);
+            let gc_keys = GLOBAL_ID_CACHE.gc(item_len / 100);
+            for gc_key in gc_keys {
+                self.data.remove(&gc_key);
+                log::info!(
+                    "[StreamingAggs] [streaming_id: {}] old streaming_id removed: {}",
+                    k,
+                    gc_key
+                );
             }
         }
-        w.push_back(k.clone());
-        drop(w);
         let mut entry = self.data.entry(k).or_default();
         entry.push(Arc::new(v));
     }
@@ -318,40 +319,59 @@ impl Default for StreamingAggsCache {
 }
 
 pub struct StreamingIdCache {
-    data: DashMap<String, StreamingIdItem>,
+    data: parking_lot::RwLock<LruCache<String, StreamingIdItem>>,
 }
 
 impl StreamingIdCache {
-    pub fn new() -> Self {
+    pub fn new(max_entries: usize) -> Self {
         Self {
-            data: DashMap::new(),
+            data: parking_lot::RwLock::new(LruCache::new(max_entries)),
         }
     }
 
     pub fn insert(&self, k: String, start_time: i64, end_time: i64) {
-        self.data
-            .insert(k, StreamingIdItem::new(start_time, end_time));
+        let mut w = self.data.write();
+        if w.get(&k).is_some() {
+            return; // trigger the key as last recently used
+        }
+        w.insert(k, StreamingIdItem::new(start_time, end_time));
     }
 
     pub fn exists(&self, k: &str) -> bool {
-        self.data.contains_key(k)
+        self.data.read().contains_key(k)
     }
 
     pub fn check_time(&self, k: &str, start_time: i64, end_time: i64) -> bool {
-        match self.data.get_mut(k) {
-            Some(mut v) => v.check_time(start_time, end_time),
+        match self.data.write().get_mut(k) {
+            Some(v) => v.check_time(start_time, end_time),
             None => false,
         }
     }
 
     pub fn remove(&self, k: &str) {
-        self.data.remove(k);
+        self.data.write().remove(k);
+    }
+
+    pub fn gc(&self, len: usize) -> Vec<String> {
+        let mut w = self.data.write();
+        let mut remove_keys = Vec::new();
+        for _ in 0..len {
+            let Some((k, _)) = w.remove_lru() else {
+                break;
+            };
+            remove_keys.push(k);
+        }
+        remove_keys
     }
 }
 
 impl Default for StreamingIdCache {
     fn default() -> Self {
-        Self::new()
+        Self::new(
+            config::get_config()
+                .limit
+                .datafusion_streaming_aggs_cache_max_entries,
+        )
     }
 }
 
@@ -439,7 +459,7 @@ mod tests {
         assert_eq!(cache.data.len(), 2); // Should still be 2 (max_entries)
 
         // Verify that the cacher queue length matches max_entries
-        let cacher_len = cache.cacher.lock().len();
+        let cacher_len = cache.data.len();
         assert_eq!(cacher_len, 2);
     }
 
@@ -469,7 +489,7 @@ mod tests {
         assert_eq!(cache.data.len(), 3);
 
         // Verify that the cacher queue length matches number of entries
-        let cacher_len = cache.cacher.lock().len();
+        let cacher_len = cache.data.len();
         assert_eq!(cacher_len, 3);
     }
 }
