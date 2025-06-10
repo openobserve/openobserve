@@ -839,7 +839,7 @@ export default defineComponent({
             }
             break;
           case "all":
-            currentVariable.value = SELECT_ALL_VALUE;
+            currentVariable.value = [SELECT_ALL_VALUE];
             break;
           default:
             // Default to first option if nothing else is set
