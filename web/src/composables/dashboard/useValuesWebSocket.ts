@@ -174,25 +174,13 @@ const useValuesWebSocket = () => {
           });
         }
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const initializeWebSocketConnection = (
     payload: any,
     variableObject: any,
   ): any => {
-    if (isWebSocketEnabled()) {
-      fetchQueryDataWithWebSocket(payload, {
-        open: sendSearchMessage,
-        close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-        message: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
-        reset: handleSearchReset,
-      }) as string;
-      return;
-    }
-
     if (isStreamingEnabled()) {
       fetchQueryDataWithHttpStream(payload, {
         data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
@@ -221,7 +209,6 @@ const useValuesWebSocket = () => {
     dashboardPanelData: any,
     name: any,
   ) => {
-
     if (isWebSocketEnabled()) {
       // Use WebSocket
       const wsPayload = {
