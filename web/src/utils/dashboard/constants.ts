@@ -1,2 +1,2 @@
 
-export const SELECT_ALL_VALUE = "__o2_all__";
+export const SELECT_ALL_VALUE = "_o2_all_";
