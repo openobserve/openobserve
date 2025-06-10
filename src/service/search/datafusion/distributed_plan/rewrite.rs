@@ -246,13 +246,35 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
                 cached_data.len()
             );
 
+            // For complete cache hits, create minimal execution plan to avoid expensive operations
+            let input_plan = if is_complete_cache_hit {
+                log::info!(
+                    "[streaming_id {}] Complete cache hit detected - creating minimal execution plan to bypass: RemoteScanExec->AggregateExec->CoalesceBatchesExec->FilterExec->NewEmptyExec",
+                    self.id
+                );
+                // Create a minimal NewEmptyExec as placeholder since we won't execute it
+                // Use the schema from the original RemoteScanExec for consistency
+                let schema = node.schema();
+                Arc::new(NewEmptyExec::new(
+                    "streaming_cache_hit",
+                    schema.clone(),
+                    None,
+                    &[],
+                    None,
+                    false,
+                    schema.clone(),
+                )) as Arc<dyn ExecutionPlan>
+            } else {
+                node
+            };
+
             let streaming_node: Arc<dyn ExecutionPlan> = Arc::new(
                 streaming_aggs_exec::StreamingAggsExec::new_with_cache_strategy(
                     self.id.clone(),
                     self.start_time,
                     self.end_time,
                     cached_data,
-                    node,
+                    input_plan,
                     is_complete_cache_hit,
                 ),
             ) as _;
