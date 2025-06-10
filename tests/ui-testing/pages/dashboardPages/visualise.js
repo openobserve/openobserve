@@ -8,6 +8,13 @@ export default class LogsVisualise {
     this.indexListDropdown = page.locator(
       '[data-test="log-search-index-list-select-stream"]'
     );
+    this.functionEditor = page.locator(
+      '[data-test="logs-vrl-function-editor"]'
+    );
+
+    this.queryEditor = page.locator("#fnEditor").locator(".inputarea");
+
+    //Functions
   }
   async openLogs() {
     // Open Logs Page
@@ -26,7 +33,6 @@ export default class LogsVisualise {
       .click();
   }
 
-  
   //set relative time selection
   async setRelative(date, time) {
     await this.timeTab.waitFor({ state: "visible" });
@@ -158,7 +164,6 @@ export default class LogsVisualise {
     console.log(`Removed field: ${fieldName} from ${target}`);
   }
 
-
   //chart render
   async chartRender(x, y) {
     await this.page
@@ -198,10 +203,13 @@ export default class LogsVisualise {
     await queryEditor.type(sqlQuery);
   }
 
+  // Open the first VRL Function Editor
+  async vrlFunctionEditor(vrl) {
+    await this.functionEditor.first().click();
+    await this.queryEditor.fill(vrl);
+  }
 
-  //Visualization run query button
-
-async runQueryAndWaitForCompletion() {
+  async runQueryAndWaitForCompletion() {
     console.log("Running query and waiting for completion...");
     const runBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-refresh-btn"]'
@@ -226,4 +234,6 @@ async runQueryAndWaitForCompletion() {
     // Optional: small buffer to ensure UI is stable
     await this.page.waitForTimeout(300);
   }
+
+  // ...existing code...
 }
