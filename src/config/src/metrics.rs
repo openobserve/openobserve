@@ -1100,7 +1100,7 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
 }
 
-fn create_const_labels() -> HashMap<String, String> {
+pub fn create_const_labels() -> HashMap<String, String> {
     let cfg = crate::config::get_config();
     let mut labels = HashMap::new();
     labels.insert("cluster".to_string(), cfg.common.cluster_name.clone());
