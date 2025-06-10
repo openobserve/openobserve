@@ -196,7 +196,6 @@ async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
-rcgen = "0.13"
 
 [workspace]
 members = [

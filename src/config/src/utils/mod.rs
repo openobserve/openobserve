@@ -16,7 +16,6 @@
 pub mod arrow;
 pub mod async_file;
 pub mod base64;
-pub mod cert;
 pub mod download_utils;
 pub mod file;
 pub mod flatten;

@@ -82,8 +82,9 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
             let connector = TlsConnector::from(config);
             match TcpStream::connect(tcp_addr).await {
                 Ok(stream) => {
+                    let peer_addr = stream.peer_addr()?;
                     let mut tls_stream = connector
-                        .connect(ServerName::try_from("127.0.0.1").unwrap(), stream)
+                        .connect(ServerName::from(peer_addr.ip()), stream)
                         .await?;
                     tls_stream.write_all(STOP_SRV.as_bytes()).await?;
                 }

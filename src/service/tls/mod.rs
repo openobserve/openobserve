@@ -16,7 +16,6 @@
 use std::{io::BufReader, sync::Arc};
 
 use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert_store};
-use config::utils::cert::SelfSignedCertVerifier;
 use itertools::Itertools as _;
 use rustls::{
     ClientConfig, ServerConfig,
@@ -132,52 +131,23 @@ pub fn tcp_tls_server_config() -> Result<ServerConfig, anyhow::Error> {
 pub fn tcp_tls_self_connect_client_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
     let config = if cfg.tcp.tcp_tls_enabled {
-        if !cfg.tcp.tcp_tls_ca_cert_path.is_empty() {
-            // Case 1: CA certificate is provided - use it to verify the server
-            let mut cert_store = webpki_roots_cert_store();
-            let cert_file = &mut BufReader::new(
-                std::fs::File::open(&cfg.tcp.tcp_tls_ca_cert_path).map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to open TLS CA certificate file {}: {}",
-                        &cfg.tcp.tcp_tls_ca_cert_path,
-                        e
-                    )
-                })?,
-            );
-            let cert_chain = certs(cert_file);
-            cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
+        let mut cert_store = webpki_roots_cert_store();
+        let cert_file = &mut BufReader::new(
+            std::fs::File::open(&cfg.tcp.tcp_tls_ca_cert_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to open TLS CA certificate file {}: {}",
+                    &cfg.tcp.tcp_tls_ca_cert_path,
+                    e
+                )
+            })?,
+        );
+        let cert_chain = certs(cert_file);
+        cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
 
-            ClientConfig::builder()
-                .with_root_certificates(cert_store)
-                .with_no_client_auth()
-        } else if !cfg.tcp.tcp_tls_cert_path.is_empty() {
-            // Case 2: Self-signed certificate - use the server's certificate as a trusted root
-            // We're only using the public certificate, not the private key
-            let cert_file = &mut BufReader::new(
-                std::fs::File::open(&cfg.tcp.tcp_tls_cert_path).map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to open TLS certificate file {}: {}",
-                        &cfg.tcp.tcp_tls_cert_path,
-                        e
-                    )
-                })?,
-            );
-            let server_certs = certs(cert_file).try_collect::<_, Vec<_>, _>()?;
-
-            ClientConfig::builder()
-                .dangerous()
-                .with_custom_certificate_verifier(Arc::new(SelfSignedCertVerifier::new(
-                    server_certs,
-                )))
-                .with_no_client_auth()
-        } else {
-            // Case 3: No certificates provided but TLS is enabled - use system root certificates
-            ClientConfig::builder()
-                .with_root_certificates(native_roots_cert_store()?)
-                .with_no_client_auth()
-        }
+        ClientConfig::builder()
+            .with_root_certificates(cert_store)
+            .with_no_client_auth()
     } else {
-        // Case 4: TLS is disabled, but we still need a config for the function to work
         ClientConfig::builder()
             .with_root_certificates(webpki_roots_cert_store())
             .with_no_client_auth()
