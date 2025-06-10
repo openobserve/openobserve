@@ -711,7 +711,10 @@ export default defineComponent({
         oldVariablesData["Dynamic filters"] = initialValue;
       }
 
-      console.log("[WebSocket] variablesData.values:", JSON.stringify(variablesData.values, null ,2));
+      console.log(
+        "[WebSocket] variablesData.values:",
+        JSON.stringify(variablesData.values, null, 2),
+      );
 
       // need to build variables dependency graph on variables config list change
       variablesDependencyGraph = buildVariablesDependencyGraph(
@@ -1222,6 +1225,21 @@ export default defineComponent({
               : variableObject.customMultiSelectValue[0];
             console.log(
               `[WebSocket] handleVariableType: set custom values for -------------- ${variableObject.name}`,
+            );
+            // Emit the updated values immediately
+            emitVariablesData();
+            return true;
+          } else if (
+            variableObject?.selectAllValueForMultiSelect === "all" &&
+            !oldVariablesData[variableObject.name] && // Only set during initial load
+            !props.initialVariableValues?.value[variableObject.name] // Don't set if URL value exists
+          ) {
+            // Set the all values before making the API call
+            variableObject.value = variableObject.multiSelect
+              ? [SELECT_ALL_VALUE]
+              : SELECT_ALL_VALUE;
+            console.log(
+              `[WebSocket] handleVariableType: set all values for -------------- ${variableObject.name}`,
             );
             // Emit the updated values immediately
             emitVariablesData();
