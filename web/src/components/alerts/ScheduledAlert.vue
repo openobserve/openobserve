@@ -1453,7 +1453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     </q-card>
     <div  class="q-ml-sm " v-if="store.state.isAiChatEnabled " style="width: 24.5vw; max-width: 100%; min-width: 75px;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-              <O2AIChat :header-height="60" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 10px) !important;" />
+              <O2AIChat :header-height="60" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 0px) !important;" />
 
             </div>
 
