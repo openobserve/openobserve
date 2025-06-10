@@ -26,7 +26,7 @@ use sqlparser::{
 
 use crate::TIMESTAMP_COL_NAME;
 
-pub const AGGREGATE_UDF_LIST: [&str; 9] = [
+pub const AGGREGATE_UDF_LIST: [&str; 10] = [
     "min",
     "max",
     "avg",
@@ -36,6 +36,7 @@ pub const AGGREGATE_UDF_LIST: [&str; 9] = [
     "array_agg",
     "approx_percentile_cont",
     "percentile_cont",
+    "summary_percentile",
 ];
 
 pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {

@@ -15,3 +15,4 @@
 
 pub mod cluster;
 pub mod prometheus;
+pub mod loki;

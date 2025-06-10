@@ -147,5 +147,39 @@ fn main() -> Result<()> {
         .unwrap();
     file.write_all(code.as_str().as_ref()).unwrap();
 
+    tonic_build::configure()
+        .build_server(false)
+        .build_client(false)
+        .type_attribute(
+            "PushRequest",
+            "#[derive(serde::Deserialize,serde::Serialize)]",
+        )
+        .type_attribute(
+            "StreamAdapter",
+            "#[derive(serde::Deserialize,serde::Serialize)]",
+        )
+        .type_attribute(
+            "EntryAdapter",
+            "#[derive(serde::Deserialize,serde::Serialize)]",
+        )
+        .type_attribute(
+            "LabelPairAdapter",
+            "#[derive(serde::Deserialize,serde::Serialize)]",
+        )
+        .extern_path(".google.protobuf.Timestamp", "::prost_wkt_types::Timestamp")
+        .compile(&["proto/loki/loki.proto"], &["proto"])
+        .unwrap();
+
+    let path = "src/generated/loki.rs";
+    let generated_source_path = out.join("loki.rs");
+    let code = std::fs::read_to_string(generated_source_path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+    file.write_all(code.as_str().as_ref()).unwrap();
+
     Ok(())
 }
