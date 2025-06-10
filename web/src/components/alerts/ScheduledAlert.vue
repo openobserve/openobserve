@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scheduled-alerts q-pa-none q-ma-none">
+  <div ref="scheduledAlertRef" class="scheduled-alerts q-pa-none q-ma-none">
 
     <!-- first section -->
 
@@ -416,12 +416,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="scheduled-alert-period-input"
               style="width: 87px; margin-left: 0 !important"
-              class=""
+              class="period-input-container"
             >
               <q-input
                 v-model="triggerData.period"
-                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                 type="number"
+                class="scheduled-alert-period-input"
                 dense
                 filled
                 min="1"
@@ -878,10 +879,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
               <div class="tw-w-full lg:tw-w-[300px] running-text">
-                Runnig for 1 hour in the interval of every 30mins
+                Running for {{ convertMinutesToDisplayValue(triggerData.period) }} in the interval of every {{
+                triggerData.frequency_type == 'minutes' ? convertMinutesToDisplayValue(triggerData.frequency) : triggerData.cron 
+                   }}
               </div>
               <div>
-                <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" />
+                <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" @click="editCurrentWindow" />
               </div>
             </div>
           </div>
@@ -1630,6 +1633,8 @@ const isHovered = ref(false);
 
 const runPromqlError = ref("");
 
+const scheduledAlertRef = ref<any>(null);
+
 const selectedColumn = ref<any>({
   label: "",
   value: ""
@@ -2291,7 +2296,7 @@ const routeToCreateDestination = () => {
   const removeConditionGroup = (targetGroupId: string, currentGroup: any = inputData.value) => {
     emits('remove:group', targetGroupId)
 
-    // No emit here — you’re handling data directly in parent
+    // No emit here — you're handling data directly in parent
   };
   const multiWindowImage = computed(() => {
   if(store.state.theme === 'dark'){
@@ -2377,6 +2382,66 @@ const routeToCreateDestination = () => {
             : getImageURL('images/common/ai_icon.svg')
         })
 
+    const convertMinutesToDisplayValue = (value: number) => {
+      if (!value || value < 0) return '0 minutes';
+      
+      // Constants for time unit conversions
+      const MINUTES_IN_HOUR = 60;
+      const MINUTES_IN_DAY = 24 * MINUTES_IN_HOUR;
+      const MINUTES_IN_WEEK = 7 * MINUTES_IN_DAY;
+      const MINUTES_IN_MONTH = 30 * MINUTES_IN_DAY; // Approximate
+
+      // Convert to the most appropriate unit
+      if (value < 60) {
+        return `${value} minute${value !== 1 ? 's' : ''}`;
+      } else if (value < MINUTES_IN_DAY) {
+        const hours = Math.floor(value / MINUTES_IN_HOUR);
+        const remainingMinutes = value % MINUTES_IN_HOUR;
+        return remainingMinutes > 0 
+          ? `${hours} hour${hours !== 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`
+          : `${hours} hour${hours !== 1 ? 's' : ''}`;
+      } else if (value < MINUTES_IN_WEEK) {
+        const days = Math.floor(value / MINUTES_IN_DAY);
+        const remainingHours = Math.floor((value % MINUTES_IN_DAY) / MINUTES_IN_HOUR);
+        return remainingHours > 0 
+          ? `${days} day${days !== 1 ? 's' : ''} ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`
+          : `${days} day${days !== 1 ? 's' : ''}`;
+      } else if (value < MINUTES_IN_MONTH) {
+        const weeks = Math.floor(value / MINUTES_IN_WEEK);
+        const remainingDays = Math.floor((value % MINUTES_IN_WEEK) / MINUTES_IN_DAY);
+        return remainingDays > 0 
+          ? `${weeks} week${weeks !== 1 ? 's' : ''} ${remainingDays} day${remainingDays !== 1 ? 's' : ''}`
+          : `${weeks} week${weeks !== 1 ? 's' : ''}`;
+      } else {
+        const months = Math.floor(value / MINUTES_IN_MONTH);
+        const remainingWeeks = Math.floor((value % MINUTES_IN_MONTH) / MINUTES_IN_WEEK);
+        return remainingWeeks > 0 
+          ? `${months} month${months !== 1 ? 's' : ''} ${remainingWeeks} week${remainingWeeks !== 1 ? 's' : ''}`
+          : `${months} month${months !== 1 ? 's' : ''}`;
+      }
+    }
+
+    const editCurrentWindow = () => {
+      // Find the period input container
+      //usign the class name to find the element
+      const periodInputContainer = scheduledAlertRef.value.querySelector('.period-input-container');
+      
+      if (periodInputContainer) {
+        // Scroll the element into view with smooth behavior
+        periodInputContainer.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center'
+        });
+        
+        // Adding focus to the input for better UX
+        //user might be editing the period input so we need to focus on it
+        const input = periodInputContainer.querySelector('input');
+        if (input) {
+          input.focus();
+        }
+      }
+    }
+
 
 
 
@@ -2411,7 +2476,9 @@ defineExpose({
   runPromqlError,
   toggleAIChat,
   isHovered,
-  getBtnLogo
+  getBtnLogo,
+  convertMinutesToDisplayValue,
+  scheduledAlertRef
 });
 </script>
 
