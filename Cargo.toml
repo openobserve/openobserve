@@ -164,6 +164,7 @@ utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
 vector-enrichment.workspace = true
+x509-parser = "0.17.0"
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -197,6 +198,7 @@ async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
+rcgen = "0.13"
 
 [workspace]
 members = [

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{io::BufReader, net::SocketAddr, sync::Arc};
 
 use once_cell::sync::Lazy;
 use rustls::pki_types::ServerName;
@@ -29,7 +29,9 @@ use crate::{
     handler::tcp_udp::{STOP_SRV, tls_tcp_server, udp_server},
     service::{
         db::syslog::toggle_syslog_setting,
-        tls::{tcp_tls_self_connect_client_config, tcp_tls_server_config},
+        tls::{
+            get_server_url_from_cert, tcp_tls_self_connect_client_config, tcp_tls_server_config,
+        },
     },
 };
 
@@ -82,10 +84,29 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
             let connector = TlsConnector::from(config);
             match TcpStream::connect(tcp_addr).await {
                 Ok(stream) => {
-                    let peer_addr = stream.peer_addr()?;
-                    let mut tls_stream = connector
-                        .connect(ServerName::from(peer_addr.ip()), stream)
-                        .await?;
+                    let cert_file = &mut BufReader::new(
+                        std::fs::File::open(&cfg.tcp.tcp_tls_cert_path).map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to open TLS certificate file {}: {}",
+                                &cfg.tcp.tcp_tls_cert_path,
+                                e
+                            )
+                        })?,
+                    );
+
+                    let cert_chain = rustls_pemfile::certs(cert_file)
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| anyhow::anyhow!("Failed to parse TLS certificate: {}", e))?;
+                    let der_encoded_cert = cert_chain
+                        .first()
+                        .ok_or(anyhow::anyhow!("TLS certificate not found"))?;
+                    let server_san = get_server_url_from_cert(der_encoded_cert)?;
+                    let server_name = ServerName::try_from(server_san)?;
+                    log::info!(
+                        "Connecting to TLS server for stop signal: {}",
+                        server_name.to_str()
+                    );
+                    let mut tls_stream = connector.connect(server_name, stream).await?;
                     tls_stream.write_all(STOP_SRV.as_bytes()).await?;
                 }
                 Err(e) => {
