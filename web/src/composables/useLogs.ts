@@ -1503,7 +1503,11 @@ const useLogs = () => {
                   recordSize = rowsPerPage - lastPartitionSize;
                 }
 
-                if (total < recordSize) {
+                if (total == 0) {
+                  recordSize = 0;
+                }
+      
+                if (total !== -1 && total < recordSize) {
                   recordSize = total;
                 }
               }
