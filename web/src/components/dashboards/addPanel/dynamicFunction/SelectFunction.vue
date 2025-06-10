@@ -211,7 +211,7 @@
 
 <script lang="ts">
 import { ref, watch, toRef, computed, inject } from "vue";
-import functionValidation from "./functionValidation.json";
+import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useSelectAutoComplete } from "@/composables/useSelectAutocomplete";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -289,7 +289,7 @@ export default {
 
     const getValidationForFunction = (functionName: string) => {
       return (
-        functionValidation.find((v) => v.functionName === functionName) ?? {}
+        functionValidation.find((v) => v.functionName === (functionName ?? null)) ?? {}
       );
     };
 
@@ -495,7 +495,6 @@ export default {
 
     return {
       fields,
-      functionValidation,
       // availableFunctions,
       getValidationForFunction,
       canAddArgument,

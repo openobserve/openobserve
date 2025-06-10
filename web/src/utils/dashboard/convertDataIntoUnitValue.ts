@@ -1,6 +1,6 @@
 import { date } from "quasar";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import functionValidation from "../../components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 
 const units: any = {
   bytes: [
@@ -651,7 +651,7 @@ const validateChartFieldsConfiguration = (
     aggregationFunctionError?.forEach((it: any) => {
       // get the selected function schema
       const selectedFunction: any = functionValidation?.find(
-        (fn: any) => fn?.functionName === it?.functionName,
+        (fn: any) => fn?.functionName === (it?.functionName ?? null),
       );
 
       // if function is not found, push error
@@ -1005,14 +1005,9 @@ export function buildSQLQueryFromInput(
   const functionName = fields.functionName;
   const args = Array.isArray(fields.args) ? fields.args : [];
 
-  // If no functionName is provided, return empty string
-  if (!functionName && functionName !== null) {
-    return "";
-  }
-
   // Find the function definition based on the functionName
   const selectedFunction = functionValidation.find(
-    (fn: any) => fn.functionName === functionName,
+    (fn: any) => fn.functionName === (functionName ?? null),
   );
 
   // If the function is not found, return empty string instead of throwing
@@ -1190,7 +1185,7 @@ export function addMissingArgs(fields: any): any {
 
   // Find the function definition in functionValidation
   const functionDef = functionValidation.find(
-    (fn: any) => fn.functionName === functionName,
+    (fn: any) => fn.functionName === (functionName ?? null),
   );
 
   if (!functionDef) {
