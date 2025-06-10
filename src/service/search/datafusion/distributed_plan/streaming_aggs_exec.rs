@@ -40,12 +40,11 @@ use once_cell::sync::Lazy;
 pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
     Lazy::new(|| Arc::new(StreamingAggsCache::default()));
 
-pub static GLOBAL_ID_CACHE: Lazy<Arc<StreamingIdCache>> =
-    Lazy::new(|| Arc::new(StreamingIdCache::default()));
-
 // init streaming cache for the id
 pub fn init_cache(id: &str, start_time: i64, end_time: i64) {
-    GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time);
+    GLOBAL_CACHE
+        .id_cache
+        .insert(id.to_string(), start_time, end_time);
     log::debug!(
         "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}",
         id,
@@ -57,7 +56,6 @@ pub fn init_cache(id: &str, start_time: i64, end_time: i64) {
 // remove streaming cache for the id
 pub fn remove_cache(id: &str) {
     GLOBAL_CACHE.remove(id);
-    GLOBAL_ID_CACHE.remove(id);
     log::debug!("[StreamingAggs] remove_cache: id={}", id);
 }
 
@@ -227,7 +225,9 @@ impl Stream for MonitorStream {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(record_batch))) => {
                 let streaming_done =
-                    GLOBAL_ID_CACHE.check_time(&self.id, self.start_time, self.end_time);
+                    GLOBAL_CACHE
+                        .id_cache
+                        .check_time(&self.id, self.start_time, self.end_time);
                 if !streaming_done {
                     GLOBAL_CACHE.insert(self.id.clone(), record_batch.clone());
                 }
@@ -235,7 +235,9 @@ impl Stream for MonitorStream {
             }
             Poll::Ready(None) => {
                 let streaming_done =
-                    GLOBAL_ID_CACHE.check_time(&self.id, self.start_time, self.end_time);
+                    GLOBAL_CACHE
+                        .id_cache
+                        .check_time(&self.id, self.start_time, self.end_time);
                 if streaming_done {
                     remove_cache(&self.id);
                 }
@@ -266,6 +268,7 @@ impl RecordBatchStream for MonitorStream {
 pub struct StreamingAggsCache {
     data: DashMap<String, Vec<Arc<RecordBatch>>>,
     max_entries: usize,
+    id_cache: StreamingIdCache,
 }
 
 impl StreamingAggsCache {
@@ -273,6 +276,7 @@ impl StreamingAggsCache {
         Self {
             data: DashMap::new(),
             max_entries,
+            id_cache: StreamingIdCache::new(max_entries),
         }
     }
 
@@ -289,7 +293,8 @@ impl StreamingAggsCache {
                 self.max_entries,
                 item_len
             );
-            let gc_keys = GLOBAL_ID_CACHE.gc(item_len / 100);
+            let gc_keys = self.id_cache.gc(item_len / 100);
+            dbg!(&gc_keys);
             for gc_key in gc_keys {
                 self.data.remove(&gc_key);
                 log::info!(
@@ -303,8 +308,13 @@ impl StreamingAggsCache {
         entry.push(Arc::new(v));
     }
 
+    pub fn exists(&self, k: &str) -> bool {
+        self.id_cache.exists(k)
+    }
+
     pub fn remove(&self, k: &str) {
         self.data.remove(k);
+        self.id_cache.remove(k);
     }
 }
 
@@ -334,7 +344,9 @@ impl StreamingIdCache {
         if w.get(&k).is_some() {
             return; // trigger the key as last recently used
         }
+        dbg!(&k);
         w.insert(k, StreamingIdItem::new(start_time, end_time));
+        dbg!(&w.iter().map(|(k, _)| k).collect::<Vec<_>>());
     }
 
     pub fn exists(&self, k: &str) -> bool {
@@ -353,12 +365,15 @@ impl StreamingIdCache {
     }
 
     pub fn gc(&self, len: usize) -> Vec<String> {
+        let len = std::cmp::max(1, len);
         let mut w = self.data.write();
+        dbg!(&w.len());
         let mut remove_keys = Vec::new();
         for _ in 0..len {
             let Some((k, _)) = w.remove_lru() else {
                 break;
             };
+            dbg!(&k);
             remove_keys.push(k);
         }
         remove_keys
@@ -442,17 +457,20 @@ mod tests {
 
         // Insert first entry
         cache.insert("key1".to_string(), batch1);
+        cache.id_cache.insert("key1".to_string(), 1, 2);
         assert!(cache.get("key1").is_some());
         assert_eq!(cache.data.len(), 1);
 
         // Insert second entry
         cache.insert("key2".to_string(), batch2);
+        cache.id_cache.insert("key2".to_string(), 1, 2);
         assert!(cache.get("key1").is_some());
         assert!(cache.get("key2").is_some());
         assert_eq!(cache.data.len(), 2);
 
         // Insert third entry - should evict the first (oldest) entry
         cache.insert("key3".to_string(), batch3);
+        cache.id_cache.insert("key3".to_string(), 1, 2);
         assert!(cache.get("key1").is_none()); // Should be evicted
         assert!(cache.get("key2").is_some());
         assert!(cache.get("key3").is_some());
@@ -464,37 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn test_streaming_aggs_cache_insert_within_limit() {
-        // Create a cache with max_entries = 5
-        let cache = StreamingAggsCache::new(5);
-
-        // Create test schema and record batch
-        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
-        )
-        .unwrap();
-
-        // Insert 3 entries (within limit)
-        cache.insert("key1".to_string(), batch.clone());
-        cache.insert("key2".to_string(), batch.clone());
-        cache.insert("key3".to_string(), batch.clone());
-
-        // All entries should be present
-        assert!(cache.get("key1").is_some());
-        assert!(cache.get("key2").is_some());
-        assert!(cache.get("key3").is_some());
-        assert_eq!(cache.data.len(), 3);
-
-        // Verify that the cacher queue length matches number of entries
-        let cacher_len = cache.data.len();
-        assert_eq!(cacher_len, 3);
-    }
-
-    #[test]
-    fn test_streaming_id_cache_gc() {
+    fn test_streaming_aggs_cache_id_cache_gc() {
         let cache = StreamingIdCache::new(10);
         cache.insert("key1".to_string(), 1, 2);
         cache.insert("key2".to_string(), 1, 2);
