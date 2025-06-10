@@ -645,6 +645,13 @@ export default defineComponent({
           item.customMultiSelectValue?.length > 0 &&
           !initialValue // Only set custom value if no URL value exists
         ) {
+          console.log(
+            `Setting custom multi-select value for--------------- ${item.name}:`,
+            {
+              customValue: item.customMultiSelectValue,
+            },
+          );
+
           variableData.value = item.multiSelect
             ? item.customMultiSelectValue
             : item.customMultiSelectValue[0];
@@ -883,6 +890,11 @@ export default defineComponent({
         currentVariable?.selectAllValueForMultiSelect === "custom" &&
         currentVariable?.customMultiSelectValue?.length > 0
       ) {
+        console.log(
+          "[Debug] Using custom values for variable--------------",
+          currentVariable,
+        );
+
         currentVariable.value = currentVariable.multiSelect
           ? currentVariable.customMultiSelectValue
           : currentVariable.customMultiSelectValue[0];
@@ -907,6 +919,11 @@ export default defineComponent({
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
           if (currentVariable.selectAllValueForMultiSelect === "custom") {
+            console.log(
+              "[Debug] Using custom value for single select variable--------------",
+              currentVariable,
+            );
+
             const customValue = currentVariable.options.find(
               (variableOption: any) =>
                 variableOption.value ===
@@ -1184,8 +1201,6 @@ export default defineComponent({
           if (
             variableObject?.selectAllValueForMultiSelect === "custom" &&
             variableObject?.customMultiSelectValue?.length > 0 &&
-            !variableObject.isVariableLoadingPending &&
-            isInitialLoad.value && // Check if this is initial load
             !oldVariablesData[variableObject.name] && // Only set during initial load
             !props.initialVariableValues?.value[variableObject.name] // Don't set if URL value exists
           ) {
@@ -1193,9 +1208,12 @@ export default defineComponent({
             variableObject.value = variableObject.multiSelect
               ? variableObject.customMultiSelectValue
               : variableObject.customMultiSelectValue[0];
-
+            console.log(
+              `[WebSocket] handleVariableType: set custom values for -------------- ${variableObject.name}`,
+            );
             // Emit the updated values immediately
             emitVariablesData();
+            return true;
           }
 
           try {
@@ -1727,7 +1745,7 @@ export default defineComponent({
             JSON.stringify(currentVariable.customMultiSelectValue)
         ) {
           console.log(
-            `[Debug] Keeping custom values for ${currentVariable.name}`,
+            `[Debug] Keeping custom values for-------- ${currentVariable.name}`,
             currentVariable.value,
           );
           return;
