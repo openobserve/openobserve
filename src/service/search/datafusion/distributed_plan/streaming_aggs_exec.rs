@@ -492,4 +492,21 @@ mod tests {
         let cacher_len = cache.data.len();
         assert_eq!(cacher_len, 3);
     }
+
+    #[test]
+    fn test_streaming_id_cache_gc() {
+        let cache = StreamingIdCache::new(10);
+        cache.insert("key1".to_string(), 1, 2);
+        cache.insert("key2".to_string(), 1, 2);
+        cache.insert("key3".to_string(), 1, 2);
+        cache.insert("key4".to_string(), 1, 2);
+        cache.insert("key5".to_string(), 1, 2);
+        assert_eq!(cache.data.read().len(), 5);
+        let gc_keys = cache.gc(2);
+        assert_eq!(gc_keys, vec!["key1", "key2"]);
+        assert_eq!(cache.data.read().len(), 3);
+        assert!(cache.exists("key3"));
+        assert!(cache.exists("key4"));
+        assert!(cache.exists("key5"));
+    }
 }
