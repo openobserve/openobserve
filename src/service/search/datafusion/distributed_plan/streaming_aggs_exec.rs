@@ -501,12 +501,14 @@ mod tests {
         cache.insert("key3".to_string(), 1, 2);
         cache.insert("key4".to_string(), 1, 2);
         cache.insert("key5".to_string(), 1, 2);
+        // trigger the key as last recently used
+        cache.insert("key1".to_string(), 1, 2);
         assert_eq!(cache.data.read().len(), 5);
         let gc_keys = cache.gc(2);
-        assert_eq!(gc_keys, vec!["key1", "key2"]);
+        assert_eq!(gc_keys, vec!["key2", "key3"]);
         assert_eq!(cache.data.read().len(), 3);
-        assert!(cache.exists("key3"));
         assert!(cache.exists("key4"));
         assert!(cache.exists("key5"));
+        assert!(cache.exists("key1"));
     }
 }
