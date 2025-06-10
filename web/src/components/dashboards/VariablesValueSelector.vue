@@ -1227,15 +1227,15 @@ export default defineComponent({
               queryContext,
             );
 
-            if (
-              isWebSocketEnabled(store.state) ||
-              isStreamingEnabled(store.state)
-            ) {
-              // For WebSocket, we don't need to wait for the response here
-              // as it will be handled by the WebSocket handlers
-              fetchFieldValuesWithWebsocket(variableObject, queryContext);
-              return true;
-            } else {
+            // if (
+            //   isWebSocketEnabled(store.state) ||
+            //   isStreamingEnabled(store.state)
+            // ) {
+            //   // For WebSocket, we don't need to wait for the response here
+            //   // as it will be handled by the WebSocket handlers
+            //   fetchFieldValuesWithWebsocket(variableObject, queryContext);
+            //   return true;
+            // } else {
               // For REST API, we handle the response directly
               const response = await fetchFieldValuesREST(
                 variableObject,
@@ -1252,7 +1252,7 @@ export default defineComponent({
                 );
                 return true;
               }
-            }
+            // }
             return false;
           } catch (error) {
             console.log(
@@ -1469,91 +1469,34 @@ export default defineComponent({
     ) => {
       const { name } = variableObject;
 
-      console.log(
-        `[WebSocket] Finalizing load for ${name} with success=${success}`,
-      );
-
       // Clear the currently executing promise
       currentlyExecutingPromises[name] = null;
 
-      // If load failed, reset the variable and mark it as pending
-      if (!success) {
-        resetVariableState(variableObject);
+      if (success) {
+        // Update old variables data
+        oldVariablesData[name] = variableObject.value;
+
+        // Update loading states
         variableObject.isLoading = false;
-        variableObject.isVariableLoadingPending = true;
-        emitVariablesData();
-        return;
-      }
+        variableObject.isVariableLoadingPending = false;
 
-      // Update old variables data
-      const oldValue = oldVariablesData[name];
-      oldVariablesData[name] = variableObject.value;
-
-      console.log(
-        `[WebSocket] Updated old variables data for ${name}`,
-        oldVariablesData,
-      );
-
-      // Update loading states
-      variableObject.isLoading = false;
-      variableObject.isVariableLoadingPending = false;
-
-      console.log(
-        `[WebSocket] Updated loading states for ${name}`,
-        variableObject,
-      );
-
-      // Update global loading state
-      variablesData.isVariablesLoading = variablesData.values.some(
-        (val: { isLoading: any; isVariableLoadingPending: any }) =>
-          val.isLoading || val.isVariableLoadingPending,
-      );
-
-      console.log(
-        `[WebSocket] Updated global loading state to ${variablesData.isVariablesLoading}`,
-      );
-
-      // Handle child variables
-      const childVariables =
-        variablesDependencyGraph[name]?.childVariables || [];
-      if (childVariables.length > 0) {
-        const childVariableObjects = variablesData.values.filter(
-          (variable: any) => childVariables.includes(variable.name),
+        // Update global loading state
+        variablesData.isVariablesLoading = variablesData.values.some(
+          (val: { isLoading: any; isVariableLoadingPending: any }) =>
+            val.isLoading || val.isVariableLoadingPending,
         );
 
-        console.log(
-          `[WebSocket] Found child variables for ${name}`,
-          childVariableObjects,
-        );
-
-        // Check if value actually changed or we have no value set
-        const valueChanged = oldValue !== variableObject.value;
-        const hasValidValue =
-          variableObject.value !== null &&
-          variableObject.value !== undefined &&
-          (!Array.isArray(variableObject.value) ||
-            variableObject.value.length > 0);
-
-        if (valueChanged || !hasValidValue) {
-          console.log(
-            `[WebSocket] Loading child variables for ${name} - value changed or no valid value`,
+        // Don't load child variables on dropdown open events
+        // Load child variables if any
+        const childVariables =
+          variablesDependencyGraph[name]?.childVariables || [];
+        if (childVariables.length > 0) {
+          const childVariableObjects = variablesData.values.filter(
+            (variable: any) => childVariables.includes(variable.name),
           );
 
-          // Reset all child variables first
-          childVariableObjects.forEach(
-            (childVariable: {
-              isVariableLoadingPending: boolean;
-              isLoading: boolean;
-              name: string;
-            }) => {
-              resetVariableState(childVariable);
-              childVariable.isVariableLoadingPending = true;
-              childVariable.isLoading = false;
-            },
-          );
-
-          // Only attempt to load children if parent has a valid value
-          if (hasValidValue) {
+          // Only load children if the parent value actually changed
+          if (oldVariablesData[name] !== variableObject.value) {
             await Promise.all(
               childVariableObjects.map((childVariable: any) =>
                 loadSingleVariableDataByName(childVariable),
@@ -1569,6 +1512,7 @@ export default defineComponent({
         variableObject.isVariableLoadingPending = false;
       }
     };
+
 
     /**
      * Loads options for a variable when its dropdown is opened.
