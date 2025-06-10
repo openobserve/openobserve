@@ -1933,6 +1933,56 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                     }
                 }
             }
+            // Not equal
+            Expr::BinaryOp {
+                left,
+                op: BinaryOperator::NotEq,
+                right,
+            } => {
+                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
+                    if value == DASHBOARD_ALL {
+                        *expr = Expr::Value(Value::Boolean(false));
+                    }
+                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
+                    if value == DASHBOARD_ALL {
+                        *expr = Expr::Value(Value::Boolean(false));
+                    }
+                }
+            }
+            // Like
+            Expr::Like {
+                pattern,
+                negated: false,
+                ..
+            }
+            | Expr::ILike {
+                pattern,
+                negated: false,
+                ..
+            } => {
+                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
+                    if value == DASHBOARD_ALL {
+                        *expr = Expr::Value(Value::Boolean(true));
+                    }
+                }
+            }
+            // Not Like
+            Expr::Like {
+                pattern,
+                negated: true,
+                ..
+            }
+            | Expr::ILike {
+                pattern,
+                negated: true,
+                ..
+            } => {
+                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
+                    if value == DASHBOARD_ALL {
+                        *expr = Expr::Value(Value::Boolean(false));
+                    }
+                }
+            }
             // In list
             Expr::InList { list, negated, .. } if !(*negated) => {
                 for item in list.iter() {
@@ -2654,6 +2704,34 @@ mod tests {
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
         statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND (true OR true)";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    // test _o2_all_ with like and not like
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_like_and_not_like() {
+        let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND false";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    // test _o2_all_ with like and not like
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_like_and_not_like_and_other_filter() {
+        let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_' and field3 = 'value3'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND false AND field3 = 'value3'";
         assert_eq!(statement.to_string(), expected);
     }
 }
