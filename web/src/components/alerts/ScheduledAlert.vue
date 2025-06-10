@@ -1630,7 +1630,10 @@ const isHovered = ref(false);
 
 const runPromqlError = ref("");
 
-const selectedColumn = ref<any>({});
+const selectedColumn = ref<any>({
+  label: "",
+  value: ""
+});
 
 const filteredTimezone: any = ref([]);
 
