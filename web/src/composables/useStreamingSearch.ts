@@ -296,6 +296,7 @@ const useHttpStreaming = () => {
             }
           } catch (error) {
             console.error('Error reading stream:', error);
+            reader.releaseLock();
             onError(traceId, error);
           }
         })();
