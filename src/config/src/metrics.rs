@@ -866,6 +866,46 @@ pub static FILE_ACCESS_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Metrics for pipeline wal writer
+pub static PIPELINE_WAL_WRITER_DESTINATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "pipeline_wal_writer_destinations",
+            "Total number of pipeline wal writer destinations",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_WAL_WRITERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "pipeline_wal_writers",
+            "Total number of wal writer across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_WAL_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "pipeline_wal_files",
+            "Total number of wal files across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1096,6 +1136,15 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(FILE_ACCESS_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_WRITER_DESTINATIONS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_WRITERS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_FILES.clone()))
         .expect("Metric registered");
 }
 
