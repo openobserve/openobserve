@@ -41,6 +41,7 @@ export default class DashboardPanel {
       'data-test="panel-layout-settings-cancel"]'
     );
     this.goToLogs = page.locator('[data-test="dashboard-move-to-logs-module"]');
+    this.queryInspector = page.locator('[data-test="dashboard-query-inspector-panel"]');
   }
 
   // Duplicate panel
@@ -140,5 +141,15 @@ export default class DashboardPanel {
       .click();
     await this.goToLogs.waitFor({ state: "visible" });
     await this.goToLogs.click();
+  }
+
+  //open Query inspector
+
+  async openQueryInspector(panelName) {
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.queryInspector.waitFor({ state: "visible" });
+    await this.queryInspector.click();
   }
 }
