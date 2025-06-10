@@ -1,16 +1,18 @@
 import { test, expect } from "./baseFixtures.js";
 import { LoginPage } from '../pages/loginPage.js';
 import { UserPage } from "../pages/userPage.js";
+import { CreateOrgPage } from "../pages/createOrgPage.js";
 
 
 
 test.describe("Users and Organizations", () => {
-    let loginPage, userPage;
+    let loginPage, userPage, createOrgPage;
 
    
     const timestamp = Date.now(); 
     const randomSuffix = Math.floor(Math.random() * 1000); 
     const emailName = `email${timestamp}${randomSuffix}@gmail.com`;
+    const orgName = `Organ${timestamp}${randomSuffix}`;
    
 
     test.beforeEach(async ({ page }) => {
@@ -18,6 +20,7 @@ test.describe("Users and Organizations", () => {
         
         loginPage = new LoginPage(page);
         userPage = new UserPage(page);
+        createOrgPage = new CreateOrgPage(page);
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -213,6 +216,52 @@ test.describe("Users and Organizations", () => {
         
     });
 
+    test('Add Organization Successfully', async ({ page }) => {
+        
+        await createOrgPage.navigateToOrg();
+        await createOrgPage.clickAddOrg();
+        await createOrgPage.fillOrgName(orgName);
+        await createOrgPage.clickSaveOrg();
+        await userPage.verifySuccessMessage('Organization added successfully.');
+        
+     
+      });
+
+      test('Save button disabled if Add Organization with Empty Name', async ({ page }) => {
+        
+        await createOrgPage.navigateToOrg();
+        await createOrgPage.clickAddOrg();
+        await createOrgPage.fillOrgName('');
+        await createOrgPage.checkSaveEnabled();
+        
+        
+     
+      });
+
+      test('Organization not added if Cancel clicked', async ({ page }) => {
+        
+        await createOrgPage.navigateToOrg();
+        await createOrgPage.clickAddOrg();
+        await createOrgPage.fillOrgName(orgName);
+        await createOrgPage.clickCancelButton();
+        await createOrgPage.navigateToOrg();
+        await createOrgPage.searchOrg(orgName);
+        await createOrgPage.verifyOrgNotExists(expect);
+        
+     
+      });
+
+      test('Error Message displayed if Add Organization is blank', async ({ page }) => {
+        
+        await createOrgPage.navigateToOrg();
+        await createOrgPage.clickAddOrg();
+        await createOrgPage.fillOrgName('');
+        await page.locator('.q-field__bottom').click();
+        await userPage.verifySuccessMessage('Name is required');
+        
+        
+     
+      });
 
 
 });
