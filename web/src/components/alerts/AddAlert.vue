@@ -866,7 +866,7 @@ export default defineComponent({
 
       await nextTick();
       if (getSelectedTab.value !== "sql") {
-        previewAlertRef.value.refreshData();
+        previewAlertRef.value?.refreshData();
       }
     };
 
@@ -1766,7 +1766,7 @@ export default defineComponent({
           );
           callAlert
             .then((res: { data: any }) => {
-              this.formData = { ...defaultValue };
+              this.formData = defaultValue();
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
