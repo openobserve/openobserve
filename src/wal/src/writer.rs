@@ -91,7 +91,7 @@ impl Writer {
 
         Ok((
             Self {
-                path,
+                path: path.to_path_buf(),
                 f: BufWriter::with_capacity(buffer_size, f),
                 bytes_written,
                 uncompressed_bytes_written: bytes_written,
