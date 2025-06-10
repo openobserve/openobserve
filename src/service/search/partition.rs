@@ -198,7 +198,12 @@ impl PartitionGenerator {
             * 1_000_000;
         let mut end_window_hour = end_time - (end_time % window_micros);
 
-        let mut partitions = vec![[end_window_hour, end_time]];
+        let mut partitions = Vec::new();
+
+        // Only add the first partition if it's not empty (end_time != end_window_hour)
+        if end_time != end_window_hour {
+            partitions.push([end_window_hour, end_time]);
+        }
 
         while end_window_hour > start_time {
             let start = std::cmp::max(end_window_hour - window_micros, start_time);
@@ -487,5 +492,53 @@ mod tests {
             generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true);
         expected_partitions.reverse();
         assert_eq!(partitions_asc, expected_partitions);
+    }
+
+    #[test]
+    fn test_partition_generator_with_streaming_aggregate_aligned_boundary() {
+        // Test case where end_time is exactly aligned to window boundary
+        // This should not create empty partitions
+        let start_time: i64 = 1748966400000000; // Aligned to hour
+        let end_time: i64 = 1749153600000000; // Aligned to hour (52 hours later)
+
+        let min_step = 300000000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
+        let step = 300000000; // 5 minutes
+
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true);
+
+        // Verify no empty partitions exist
+        for [start, end] in &partitions {
+            assert!(
+                *end > *start,
+                "Partition [{}, {}] should not be empty",
+                start,
+                end
+            );
+        }
+
+        // Verify full coverage
+        assert_eq!(
+            partitions.last().unwrap()[0],
+            start_time,
+            "First partition should start at start_time"
+        );
+        assert_eq!(
+            partitions.first().unwrap()[1],
+            end_time,
+            "Last partition should end at end_time"
+        );
+
+        // Verify partitions are contiguous
+        for i in 1..partitions.len() {
+            assert_eq!(
+                partitions[i][1],
+                partitions[i - 1][0],
+                "Partitions should be contiguous"
+            );
+        }
     }
 }
