@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-item v-bind="itemProps">
           <q-item-section side v-if="variableItem.multiSelect">
             <q-checkbox
-              :model-value="selected"
+              :model-value="selected || isAllSelected"
               @update:model-value="toggleOption(opt)"
               class="q-ma-none"
               dense
@@ -98,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { defineComponent, ref, watch, computed, nextTick } from "vue";
 
 export default defineComponent({
@@ -126,28 +127,30 @@ export default defineComponent({
     };
 
     const isAllSelected = computed(() => {
-      return (
-        filteredOptions.value.length > 0 &&
-        selectedValue.value?.length === filteredOptions.value.length
-      );
+      if (props.variableItem.multiSelect) {
+        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
+      }
+      return selectedValue.value === SELECT_ALL_VALUE;
     });
 
     const toggleSelectAll = () => {
-      if (!isAllSelected.value) {
-        selectedValue.value = filteredOptions.value.map(
-          (option: any) => option.value,
-        );
-      } else {
-        selectedValue.value = [];
-      }
-      emit("update:modelValue", selectedValue.value);
+      const newValue = !isAllSelected.value
+        ? props.variableItem.multiSelect ? [SELECT_ALL_VALUE] : SELECT_ALL_VALUE
+        : props.variableItem.multiSelect ? [] : '';
+      
+      selectedValue.value = newValue;
+      emit("update:modelValue", newValue);
     };
 
     const onUpdateValue = (val: any) => {
-      selectedValue.value = val;
-      if (!props.variableItem.multiSelect) {
-        emit("update:modelValue", val);
+      // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
+      if (props.variableItem.multiSelect && Array.isArray(val) && val.length > 0) {
+        if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
+          val = val.filter(v => v !== SELECT_ALL_VALUE);
+        }
       }
+      selectedValue.value = val;
+      emit("update:modelValue", val);
     };
 
     const onPopupShow = () => {
@@ -176,13 +179,18 @@ export default defineComponent({
             return `${firstTwoValues} ...+${remainingCount} more`;
           } else if (props.variableItem.options.length === 0) {
             return "(No Data Found)";
-          } else {
-            return selectedValue.value
-              .map((it: any) => (it === "" ? "<blank>" : it))
+          } else {            return selectedValue.value
+              .map((it: any) => {
+                if (it === "") return "<blank>";
+                if (it === SELECT_ALL_VALUE) return "<ALL>";
+                return it;
+              })
               .join(", ");
           }
         } else if (selectedValue.value === "") {
           return "<blank>";
+        } else if (selectedValue.value === SELECT_ALL_VALUE) {
+          return "<ALL>";
         } else {
           return selectedValue.value;
         }

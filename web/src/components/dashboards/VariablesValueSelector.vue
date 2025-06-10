@@ -984,9 +984,7 @@ export default defineComponent({
               break;
             case "all":
               // Select all available options
-              currentVariable.value = currentVariable.options.map(
-                (option: any) => option.value,
-              );
+              currentVariable.value = [SELECT_ALL_VALUE]
               break;
             default:
               // Default to first option
@@ -1752,7 +1750,7 @@ export default defineComponent({
         }
 
         const filtered = currentVariable.value.filter((val: any) =>
-          currentVariable.options.some((opt: any) => opt.value === val),
+          currentVariable.options.some((opt: any) => opt.value === val || val == SELECT_ALL_VALUE),
         );
         console.log(
           `[Debug] Filtered multiSelect values for ${currentVariable.name}:`,
