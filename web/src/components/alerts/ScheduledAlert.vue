@@ -875,7 +875,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-flex lg:tw-flex-col  tw-items-start tw-gap-2">
             <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
               Cycle
-              <span><q-icon name="info" size="16px" /></span>
+              <span class="tw-cursor-pointer"><q-icon name="info" size="16px" />
+                <q-tooltip anchor="center right" self="center left" max-width="300px">
+                  Compare results with the same time in the previous cycle.
+                </q-tooltip>
+              </span>
             </div>
             <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
               <div class="tw-w-full lg:tw-w-[300px] running-text">
@@ -884,7 +888,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    }}
               </div>
               <div>
-                <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" @click="editCurrentWindow" />
+                <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" @click="editCurrentWindow">
+                  <q-tooltip anchor="center right" self="center left" max-width="300px">
+                    Edit Period and Frequency.
+                  </q-tooltip>
+                </q-btn>
               </div>
             </div>
           </div>
@@ -907,7 +915,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw-flex tw-items-center">
                 <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
                 Time Frame 
-                <span class="tw-ml-2"><q-icon name="info" size="16px" /></span>
+                <span class="tw-ml-2 tw-cursor-pointer"><q-icon name="info" size="16px" />
+                  <q-tooltip anchor="center right" self="center left" max-width="300px">
+                    Time range for your query.
+                  </q-tooltip>
+                </span>
               </div>
               <CustomDateTimePicker
                     v-model="picker.offSet"
@@ -920,7 +932,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
               <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
                   Cycle
-                  <span><q-icon name="info" size="16px" /></span>
+                  <span class="tw-cursor-pointer"><q-icon name="info" size="16px" />
+                  <q-tooltip anchor="center right" self="center left" max-width="300px">
+                    Compare results with the same time in the previous cycle.
+                  </q-tooltip>
+                  </span>
                 </div>
               <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
                 <div class="tw-w-full lg:tw-w-[300px] reference-text">
