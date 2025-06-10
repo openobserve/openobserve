@@ -217,7 +217,7 @@ export default class LogsVisualise {
     const cancelBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-cancel-btn"]'
     );
-    
+
     await runBtn.waitFor({ state: "visible" });
     // Click "Run query"
     console.log("Clicking 'Run query' button...");
@@ -225,16 +225,14 @@ export default class LogsVisualise {
 
     console.log("Waiting for 'Cancel query' button to appear...");
     // Wait for "Cancel query" to appear (query is running)
-    await cancelBtn.waitFor({ state: "visible", timeout: 10000 });
+    await cancelBtn.waitFor({ state: "visible" });
 
     console.log("Waiting for 'Run query' button to reappear...");
     // Wait for "Run query" to reappear (query is finished)
-    await runBtn.waitFor({ state: "visible", timeout: 60000 });
+    await runBtn.waitFor({ state: "visible" });
 
     console.log("Query completed successfully.");
     // Optional: small buffer to ensure UI is stable
     await this.page.waitForTimeout(300);
   }
-
-  
 }
