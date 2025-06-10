@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use config::{
-    MESSAGE_COL_NAME, TIMESTAMP_COL_NAME,
+    DEFAULT_STREAM_NAME, MESSAGE_COL_NAME, STREAM_NAME_LABEL, TIMESTAMP_COL_NAME,
     utils::{json, schema::format_stream_name},
 };
 use promql_parser::{
@@ -33,8 +33,6 @@ use crate::{
     },
     service::logs,
 };
-
-const STREAM_NAME_LABEL: &str = "stream_name";
 
 pub enum LokiRequest {
     Json(LokiPushRequest),
@@ -281,7 +279,7 @@ fn determine_service_stream_name(labels: &HashMap<String, String>) -> String {
         .get(STREAM_NAME_LABEL)
         .map(|name| format_stream_name(name))
         .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| "default".to_string())
+        .unwrap_or_else(|| DEFAULT_STREAM_NAME.to_string())
 }
 
 #[cfg(test)]
@@ -321,7 +319,7 @@ mod tests {
         // Test empty stream_name falls back to default
         let mut labels = HashMap::new();
         labels.insert(STREAM_NAME_LABEL.to_string(), "".to_string());
-        assert_eq!(determine_service_stream_name(&labels), "default");
+        assert_eq!(determine_service_stream_name(&labels), DEFAULT_STREAM_NAME);
     }
 
     #[test]
