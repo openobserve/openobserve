@@ -552,8 +552,7 @@ impl StreamingIdItem {
         if end_time == self.end_time {
             self.end_ok = true;
         }
-        self.is_complete_cache_hit = true;
-        self.is_complete_cache_hit
+        self.start_ok && self.end_ok
     }
 
     pub fn get_file_path(&self) -> String {
