@@ -1200,6 +1200,7 @@ export default defineComponent({
     const handleVariableType = async (variableObject: any) => {
       console.log(
         `[WebSocket] handleVariableType: starting handle for ${variableObject.name}`,
+        variableObject,
       );
       switch (variableObject.type) {
         case "query_values": {
@@ -1212,44 +1213,18 @@ export default defineComponent({
             variablesDependencyGraph[variableObject.name]?.parentVariables
               ?.length > 0;
 
-          // Only apply custom values during initial load and if variable is not pending and no URL value exists
-          if (
-            variableObject?.selectAllValueForMultiSelect === "custom" &&
-            variableObject?.customMultiSelectValue?.length > 0 &&
-            !oldVariablesData[variableObject.name] && // Only set during initial load
-            !props.initialVariableValues?.value[variableObject.name] // Don't set if URL value exists
-          ) {
-            // Set the custom values before making the API call
-            variableObject.value = variableObject.multiSelect
-              ? variableObject.customMultiSelectValue
-              : variableObject.customMultiSelectValue[0];
-            console.log(
-              `[WebSocket] handleVariableType: set custom values for -------------- ${variableObject.name}`,
-            );
-            // Emit the updated values immediately
-            emitVariablesData();
-            return true;
-          } else if (
-            variableObject?.selectAllValueForMultiSelect === "all" &&
-            !oldVariablesData[variableObject.name] && // Only set during initial load
-            !props.initialVariableValues?.value[variableObject.name] // Don't set if URL value exists
-          ) {
-            // Set the all values before making the API call
-            variableObject.value = variableObject.multiSelect
-              ? [SELECT_ALL_VALUE]
-              : SELECT_ALL_VALUE;
-            console.log(
-              `[WebSocket] handleVariableType: set all values for -------------- ${variableObject.name}`,
-            );
-            // Emit the updated values immediately
-            emitVariablesData();
-            return true;
-          }
+          console.log(
+            `[WebSocket] handleVariableType: IF `, 
+            JSON.stringify(variableObject, null ,2),
+            JSON.stringify(props.initialVariableValues?.value, null, 2),
+            JSON.stringify(oldVariablesData, null, 2)
+          )
 
           try {
             const queryContext: any = await buildQueryContext(variableObject);
             console.log(
               `[WebSocket] handleVariableType: built query context for ${variableObject.name}`,
+              queryContext,
             );
 
             if (
