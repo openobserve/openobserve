@@ -1954,6 +1954,11 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 pattern,
                 negated: false,
                 ..
+            }
+            | Expr::ILike {
+                pattern,
+                negated: false,
+                ..
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
                     if value == DASHBOARD_ALL {
@@ -1963,6 +1968,11 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             }
             // Not Like
             Expr::Like {
+                pattern,
+                negated: true,
+                ..
+            }
+            | Expr::ILike {
                 pattern,
                 negated: true,
                 ..
