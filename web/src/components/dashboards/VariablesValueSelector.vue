@@ -274,6 +274,8 @@ export default defineComponent({
         return;
       }
 
+      variableObject.isLoading = true;
+
       console.log(`[WebSocket] Received response for ${variableObject.name}:`, {
         responseType: response.type,
         hasResults: !!response.content?.results?.hits?.length,

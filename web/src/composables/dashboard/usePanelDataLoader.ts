@@ -1953,7 +1953,7 @@ export const usePanelDataLoader = (
     newDependentVariablesData: any,
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => it.isLoading || it.isVariableLoadingPending,
+      (it: any) => (it.value == null || (Array.isArray(it.value) && it.value.length === 0)) && (it.isLoading || it.isVariableLoadingPending),
     );
 
   const getDependentVariablesData = () =>

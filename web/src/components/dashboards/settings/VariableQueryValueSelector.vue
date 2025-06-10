@@ -89,7 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
-      <template v-slot:loading> Loading... </template>
     </q-select>
   </div>
 </template>
