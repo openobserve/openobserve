@@ -449,7 +449,7 @@ mod tests {
         let proto_request = loki_rpc::PushRequest {
             streams: vec![
                 loki_rpc::StreamAdapter {
-                    labels: r#"{"stream_name":"auth"}"#.to_string(),
+                    labels: r#"{"o2_stream_name":"auth"}"#.to_string(),
                     entries: vec![loki_rpc::EntryAdapter {
                         timestamp: Some(Timestamp {
                             seconds: 1702834800,
@@ -461,7 +461,7 @@ mod tests {
                     hash: 1,
                 },
                 loki_rpc::StreamAdapter {
-                    labels: r#"{"stream_name":"payment"}"#.to_string(),
+                    labels: r#"{"o2_stream_name":"payment"}"#.to_string(),
                     entries: vec![loki_rpc::EntryAdapter {
                         timestamp: Some(Timestamp {
                             seconds: 1702834801,
