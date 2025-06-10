@@ -102,6 +102,7 @@ import {
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -831,7 +832,7 @@ export default defineComponent({
             }
             break;
           case "all":
-            currentVariable.value = optionsValues;
+            currentVariable.value = SELECT_ALL_VALUE;
             break;
           default:
             // Default to first option if nothing else is set
