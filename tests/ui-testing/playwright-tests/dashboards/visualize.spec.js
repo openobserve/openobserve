@@ -3,6 +3,13 @@ import LogsVisualise from "../../pages/dashboardPages/visualise";
 import { login } from "../utils/dashLogin";
 import { ingestion } from "../utils/dashIngestion";
 import logData from "../../cypress/fixtures/log.json";
+import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
+import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
+import {
+  waitForDashboardPage,
+  deleteDashboard,
+} from "../utils/dashCreation.js";
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -84,7 +91,7 @@ test.describe("logs testcases", () => {
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
 
     // Apply the changes
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await expect(page.getByText("There are some errors, please")).toBeVisible();
     await page
       .locator(
@@ -98,7 +105,7 @@ test.describe("logs testcases", () => {
       .click();
 
     // Apply the changes
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
 
     // Remove the _timestamp field from the Y-axis
     await logsVisualise.removeField("_timestamp", "y");
@@ -116,7 +123,7 @@ test.describe("logs testcases", () => {
     // Apply the changes
     const search = page.waitForResponse(logData.applyQuery);
 
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await expect
       .poll(async () => (await search).status(), { timeout: 15000 })
       .toBe(200);
@@ -147,7 +154,7 @@ test.describe("logs testcases", () => {
       )
       .click();
 
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
 
     // Change the chart types
     await logsVisualise.selectChartType("line");
@@ -162,37 +169,37 @@ test.describe("logs testcases", () => {
 
     // Change the chart type to area
     await logsVisualise.selectChartType("area");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(590, 127);
 
     // Change the chart type to area-stacked
     await logsVisualise.selectChartType("area-stacked");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(475, 45);
 
     // Change the chart type to horizontal bar
     await logsVisualise.selectChartType("h-bar");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(722, 52);
 
     // Change the chart type to scatter and apply
     await logsVisualise.selectChartType("scatter");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(362, 30);
 
     // Change the chart type to pie and apply
     await logsVisualise.selectChartType("pie");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(650, 85);
 
     // Change the chart type to donut and apply
     await logsVisualise.selectChartType("donut");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(216, 53);
 
     // Change the chart type to gauge and apply
     await logsVisualise.selectChartType("gauge");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(423, 127);
   });
 
@@ -252,7 +259,7 @@ test.describe("logs testcases", () => {
       .click();
 
     // Apply the changes in the visualization
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
 
     // Go back to the logs page
     await logsVisualise.backToLogs();
@@ -320,9 +327,9 @@ test.describe("logs testcases", () => {
       .locator("i")
       .click();
 
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.setRelative("6", "w");
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
@@ -352,7 +359,7 @@ test.describe("logs testcases", () => {
 
     // Open the visualization tab
     await logsVisualise.openVisualiseTab();
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     let exceptionBefore = null;
     let exceptionAfter = null;
 
@@ -368,7 +375,7 @@ test.describe("logs testcases", () => {
     }
 
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.backToLogs();
 
     await logsVisualise.logsApplyQueryButton();
@@ -384,7 +391,7 @@ test.describe("logs testcases", () => {
       exceptionAfter = e;
     }
     expect(exceptionBefore).toBe(exceptionAfter);
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
@@ -432,7 +439,7 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-   await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
 
     // Reload the page
     await page.reload();
@@ -543,5 +550,98 @@ test.describe("logs testcases", () => {
 
     // Switch back to logs
     await logsVisualise.backToLogs();
+  });
+
+  test("should create dashboard from the visualization chart sucessfully", async ({ page }) => {
+    const randomDashboardName =
+      "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
+    const logsVisualise = new LogsVisualise(page);
+    const dashboardPanel = new DashboardPanel(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardActions = new DashboardactionPage(page);
+
+    // Open the logs page and set relative time
+    await logsVisualise.openLogs();
+    await logsVisualise.setRelative("4", "d");
+
+    // Open the visualization tab and add fields
+    await logsVisualise.openVisualiseTab();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
+      )
+      .waitFor({ state: "visible" });
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
+      )
+      .click();
+
+    await logsVisualise.runQueryAndWaitForCompletion();
+
+    // Change the chart types
+    await logsVisualise.selectChartType("line");
+
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas').last()
+    ).toBeVisible();
+
+    //add to dashboard and submit it
+    await page.getByRole("button", { name: "Add To Dashboard" }).click();
+    await page.waitForTimeout(3000);
+    await page
+      .locator('[data-test="dashboard-dashboard-new-add"]')
+      .waitFor({ state: "visible" });
+
+    //Adding dashboard
+    await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+
+    await page.waitForTimeout(3000);
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .waitFor({ state: "visible" });
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .click();
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .fill(panelName);
+    await page.waitForTimeout(3000);
+    await page
+      .locator('[data-test="metrics-schema-update-settings-button"]')
+      .click();
+    await page.waitForTimeout(3000);
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+
+    //redirecting to the dashboard and edit panel and save it
+    await dashboardPanel.editPanel(panelName);
+    await page
+      .locator('[data-test="dashboard-panel-name"]')
+      .waitFor({ state: "visible" });
+    await page.waitForTimeout(3000);
+    await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+    await page.waitForTimeout(3000);
+    await expect(
+      page.getByText(
+        'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1", kubernetes_annotations_kubernetes_io_psp AS "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1',
+        { exact: true }
+      )
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.savePanel();
+
+    // Return to dashboards list and delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
   });
 });
