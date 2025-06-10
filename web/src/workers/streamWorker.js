@@ -1,7 +1,5 @@
 // Worker to handle stream processing
 // This offloads decoding and parsing from the main thread
-
-let activeStreams = {};
 let activeBuffers = {};
 // Handle messages from main thread
 self.onmessage = async (event) => {
@@ -27,17 +25,14 @@ self.onmessage = async (event) => {
         traceId,
       });
       
-      delete activeStreams[traceId];
       delete activeBuffers[traceId];
       break;
 
     case 'cancelStream':
-      delete activeStreams[traceId];
       delete activeBuffers[traceId];
       break;
 
     case 'closeAll':
-      activeStreams = {};
       activeBuffers = {};
       break;
   }
