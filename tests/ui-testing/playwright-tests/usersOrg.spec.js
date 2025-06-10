@@ -7,18 +7,23 @@ import { UserPage } from "../pages/userPage.js";
 test.describe("Users and Organizations", () => {
     let loginPage, userPage;
 
+   
     const timestamp = Date.now(); 
     const randomSuffix = Math.floor(Math.random() * 1000); 
     const emailName = `email${timestamp}${randomSuffix}@gmail.com`;
-
-    
+   
 
     test.beforeEach(async ({ page }) => {
+
+        
         loginPage = new LoginPage(page);
         userPage = new UserPage(page);
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser();
         await loginPage.login();
+
+        
+    
 
     });
 

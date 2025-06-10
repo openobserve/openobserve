@@ -109,6 +109,7 @@ export class UserPage {
     async searchUser(email) {
         await this.page.getByPlaceholder('Search User').click();
         await this.page.getByPlaceholder('Search User').fill(email);
+        await this.page.waitForTimeout(5000);
        
 
     }
