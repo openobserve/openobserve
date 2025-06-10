@@ -91,6 +91,8 @@ pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 pub const MESSAGE_COL_NAME: &str = "message";
+pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
+pub const DEFAULT_STREAM_NAME: &str = "default";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
@@ -462,7 +464,7 @@ pub struct WebSocket {
     pub streaming_response_chunk_size: usize,
     #[env_config(
         name = "ZO_STREAMING_ENABLED",
-        default = false,
+        default = true,
         help = "Enable streaming"
     )]
     pub streaming_enabled: bool,
@@ -802,7 +804,7 @@ pub struct Common {
         help = "Comma separated list of fields to use for search around"
     )]
     pub search_around_default_fields: String,
-    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
+    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = true)]
     pub wal_fsync_disabled: bool,
     #[env_config(
         name = "ZO_WAL_WRITE_QUEUE_ENABLED",
@@ -1148,10 +1150,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1184,7 +1186,7 @@ pub struct Limit {
         help = "MemTable bucket num, default is 1"
     )] // default is 1
     pub mem_table_bucket_num: usize,
-    #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
+    #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
@@ -1484,7 +1486,7 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
