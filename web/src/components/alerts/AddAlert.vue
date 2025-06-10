@@ -1359,20 +1359,28 @@ export default defineComponent({
 //we need to remove the condition group if it is empty because we cannot simply show empty group in the UI
   const removeConditionGroup = (targetGroupId: string, currentGroup: any = formData.value.query_condition.conditions) => {
     if (!currentGroup?.items || !Array.isArray(currentGroup.items)) return;
-    //here we are iterating over the items and removing the condition group
-    currentGroup.items = currentGroup.items.filter((item: any) => {
-      if (item.items && item.groupId === targetGroupId) {
-        // Remove matching group
-        return false;
-      }
 
-      if (item.items) {
-        // Recurse into nested group
-        removeConditionGroup(targetGroupId, item);
-      }
+    // Recursive function to filter empty groups
+    const filterEmptyGroups = (items: any[]): any[] => {
+      return items.filter((item: any) => {
+        // If this is the target group to remove, filter it out
+        if (item.groupId === targetGroupId) {
+          return false;
+        }
 
-      return true;
-    });
+        // If it's a group, recursively filter its items
+        if (item.items && Array.isArray(item.items)) {
+          item.items = filterEmptyGroups(item.items);
+          // Remove groups that are empty after filtering
+          return item.items.length > 0;
+        }
+
+        return true;
+      });
+    };
+
+    // Apply the filtering to the root group
+    currentGroup.items = filterEmptyGroups(currentGroup.items);
   };
 
 
