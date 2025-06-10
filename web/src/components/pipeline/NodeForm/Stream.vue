@@ -241,7 +241,7 @@ watch(
         position: "bottom",
         timeout: 2000,
       });
-      return;
+      return "";
     }
     const regex = /\{[^{}]+\}/g;
     const parts: string[] = [];
