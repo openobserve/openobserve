@@ -15,8 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="chartPanelRef" style="height: 100%; position: relative">
-    <div style="height: 200px" data-test="alert-preview-chart">
+  <div class="preview-alert-container q-mt-lg" :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative">
+    <div class="text-bold"
+    style="width: 100%; padding: 16px 10px; "
+    :style="{ backgroundColor: store.state.theme === 'dark' ? '#212121' : '#ffffff',
+      borderBottom: store.state.theme === 'dark' ? '' : '1px solid #e6e6e6'
+     }"
+
+
+    >
+      Preview
+    </div>
+    <div style="height: 240px !important" data-test="alert-preview-chart" class="preview-alert-chart">
       <p class="sql-preview" v-if="selectedTab === 'sql'">
         Preview is not available in SQL mode
       </p>
@@ -248,5 +258,11 @@ defineExpose({ refreshData });
   justify-content: center;
   align-items: center;
   margin-top: 5vh;
+}
+.preview-alert-container{
+  border: 1px solid rgb(39, 39, 39) !important;
+}
+.preview-alert-container-light{
+  border: 1px solid #e6e6e6 !important;
 }
 </style>
