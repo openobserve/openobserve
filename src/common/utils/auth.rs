@@ -399,6 +399,10 @@ impl FromRequest for AuthExtractor {
             } else if path_columns[2].starts_with("_values")
                 || path_columns[2].starts_with("_around")
             {
+                if method.eq("POST") {
+                    // For _around search, the rbac check will be "GET"
+                    method = "GET".to_string();
+                }
                 // special case of _values/_around , where we need permission on that stream,
                 // as it is part of search, but still 3-part route
                 format!(

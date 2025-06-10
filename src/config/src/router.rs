@@ -50,13 +50,14 @@ const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
     "/prometheus/api/v1/query_exemplars",
 ];
 const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
-pub const INGESTER_ROUTES: [&str; 11] = [
+pub const INGESTER_ROUTES: [&str; 12] = [
     "/_json",
     "/_bulk",
     "/_multi",
     "/_kinesis_firehose",
     "/_sub",
     "/v1/logs",
+    "/loki/v1/push",
     "/ingest/metrics/_json",
     "/v1/metrics",
     "/traces",
@@ -126,5 +127,65 @@ fn remove_base_uri(path: &str) -> &str {
         stripped
     } else {
         path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_querier_route() {
+        // Test config route
+        assert!(is_querier_route("/config"));
+        assert!(!is_querier_route("/api/org1/config"));
+
+        // Test summary route
+        assert!(is_querier_route("/api/org1/summary"));
+        assert!(!is_querier_route("/summary")); // Should fail as it needs org_id
+
+        // Test streams route
+        assert!(is_querier_route("/api/org1/streams"));
+        assert!(is_querier_route("/api/org1/streams/mystream"));
+
+        // Test prometheus routes
+        assert!(is_querier_route("/api/org1/prometheus/api/v1/query"));
+        assert!(is_querier_route("/api/org1/prometheus/api/v1/query_range"));
+    }
+
+    #[test]
+    fn test_is_querier_route_by_body() {
+        assert!(is_querier_route_by_body("/_search"));
+        assert!(is_querier_route_by_body("/_search_stream"));
+        assert!(is_querier_route_by_body("/_values_stream"));
+        assert!(is_querier_route_by_body("/prometheus/api/v1/query_range"));
+        assert!(is_querier_route_by_body(
+            "/prometheus/api/v1/query_exemplars"
+        ));
+
+        assert!(!is_querier_route_by_body("/other_route"));
+        assert!(is_querier_route_by_body("/_search_other"));
+    }
+
+    #[test]
+    fn test_is_fixed_querier_route() {
+        assert!(is_fixed_querier_route("/summary"));
+        assert!(is_fixed_querier_route("/schema"));
+        assert!(is_fixed_querier_route("/streams"));
+
+        assert!(!is_fixed_querier_route("/other_route"));
+        assert!(is_fixed_querier_route("/summary_other"));
+    }
+
+    #[test]
+    fn test_is_ws_route() {
+        // Valid WS routes
+        assert!(is_ws_route("/api/org1/stream1/ws"));
+        assert!(is_ws_route("/api/org1/stream1/ws/"));
+
+        // Invalid WS routes
+        assert!(!is_ws_route("/ws")); // Missing org and stream
+        assert!(!is_ws_route("/api/org1/ws")); // Missing stream
+        assert!(!is_ws_route("/api/org1/stream1/ws/_json")); // Contains ingester route
     }
 }

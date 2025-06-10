@@ -170,7 +170,7 @@ pub async fn test_run_function(
             }
 
             let transform = if !ret_val.is_null() {
-                config::utils::flatten::flatten(ret_val).unwrap()
+                config::utils::flatten::flatten(ret_val).unwrap_or("".into())
             } else {
                 "".into()
             };

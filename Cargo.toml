@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.14.8"
+version = "0.15.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -102,8 +102,9 @@ etcd-client.workspace = true
 faststr.workspace = true
 flate2.workspace = true
 futures.workspace = true
-hex.workspace = true
+hashlink.workspace = true
 hashbrown.workspace = true
+hex.workspace = true
 http-auth-basic = "0.3"
 ipnetwork.workspace = true
 itertools.workspace = true
@@ -121,6 +122,7 @@ parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser = "0.4"
 prost.workspace = true
+prost-wkt-types.workspace = true
 proto.workspace = true
 prettytable-rs = "0.10.0"
 pyroscope = { version = "0.5.8", optional = true }
@@ -293,6 +295,7 @@ ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
 prometheus = { version = "0.13", features = ["process"] }
 prost = "0.13.1"
+prost-wkt-types = "0.6"
 rand = "0.8"
 rayon = "1.10"
 regex = "1.11"

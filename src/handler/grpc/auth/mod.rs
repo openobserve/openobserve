@@ -103,9 +103,14 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-    use config::{cache_instance_id, get_config, meta::user::User};
+    use config::{
+        cache_instance_id, get_config,
+        meta::user::{User, UserRole},
+    };
+    use infra::table::org_users::OrgUserRecord;
 
     use super::*;
+    use crate::common::infra::config::ORG_USERS;
 
     #[tokio::test]
     async fn test_check_no_auth() {
@@ -154,9 +159,21 @@ mod tests {
                 last_name: "".to_owned(),
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
-                org: "dummy".to_owned(),
+                org: "default".to_owned(),
                 is_external: false,
                 password_ext: Some("Complexpass#123".to_string()),
+            },
+        );
+
+        ORG_USERS.insert(
+            "default/root@example.com".to_string(),
+            OrgUserRecord {
+                role: UserRole::Root,
+                token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
+                org_id: "default".to_string(),
+                email: "root@example.com".to_string(),
+                created_at: 0,
             },
         );
 
@@ -164,11 +181,14 @@ mod tests {
         request.set_timeout(std::time::Duration::from_secs(
             get_config().limit.query_timeout,
         ));
-        let token: MetadataValue<_> = "instance".parse().unwrap();
+        let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
+            .parse()
+            .unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
+        meta.insert("organization", "default".parse().unwrap());
 
-        assert!(check_auth(request).is_ok())
+        assert!(check_auth(request).is_ok());
     }
 
     #[tokio::test]

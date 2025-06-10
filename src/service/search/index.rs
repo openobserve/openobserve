@@ -663,3 +663,235 @@ fn is_blank_or_alphanumeric(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_condition_get_tantivy_fields_equal() {
+        let condition = Condition::Equal("field1".to_string(), "value1".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_in() {
+        let condition = Condition::In(
+            "field2".to_string(),
+            vec![
+                "value1".to_string(),
+                "value2".to_string(),
+                "value3".to_string(),
+            ],
+        );
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_regex() {
+        let condition = Condition::Regex("field3".to_string(), "pattern.*".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field3"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_match_all() {
+        let condition = Condition::MatchAll("search_term".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_fuzzy_match_all() {
+        let condition = Condition::FuzzyMatchAll("search_term".to_string(), 2);
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_all() {
+        let condition = Condition::All();
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 0);
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_or_simple() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Equal("field2".to_string(), "value2".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_and_simple() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::In("field2".to_string(), vec!["value1".to_string()]);
+        let condition = Condition::And(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_or_with_overlap() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Equal("field1".to_string(), "value2".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        // Should only have one field since both conditions use the same field
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_and_with_overlap() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Regex("field1".to_string(), "pattern.*".to_string());
+        let condition = Condition::And(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        // Should only have one field since both conditions use the same field
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_nested_complex() {
+        // Create a complex nested condition: (field1 = value1 OR field2 = value2) AND (field3 =
+        // value3 OR match_all(term))
+        let left_or = Condition::Or(
+            Box::new(Condition::Equal("field1".to_string(), "value1".to_string())),
+            Box::new(Condition::Equal("field2".to_string(), "value2".to_string())),
+        );
+        let right_or = Condition::Or(
+            Box::new(Condition::Equal("field3".to_string(), "value3".to_string())),
+            Box::new(Condition::MatchAll("search_term".to_string())),
+        );
+        let condition = Condition::And(Box::new(left_or), Box::new(right_or));
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 4);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+        assert!(fields.contains("field3"));
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_all_types_mixed() {
+        // Test with all different condition types mixed together
+        let equal_cond = Condition::Equal("equal_field".to_string(), "value".to_string());
+        let in_cond = Condition::In("in_field".to_string(), vec!["val1".to_string()]);
+        let regex_cond = Condition::Regex("regex_field".to_string(), "pattern.*".to_string());
+        let match_all_cond = Condition::MatchAll("search_term".to_string());
+        let fuzzy_match_cond = Condition::FuzzyMatchAll("fuzzy_term".to_string(), 1);
+        let all_cond = Condition::All();
+
+        // Create nested structure: ((equal OR in) AND (regex OR match_all)) OR (fuzzy_match_all AND
+        // all)
+        let left_or = Condition::Or(Box::new(equal_cond), Box::new(in_cond));
+        let right_or = Condition::Or(Box::new(regex_cond), Box::new(match_all_cond));
+        let left_and = Condition::And(Box::new(left_or), Box::new(right_or));
+        let right_and = Condition::And(Box::new(fuzzy_match_cond), Box::new(all_cond));
+        let condition = Condition::Or(Box::new(left_and), Box::new(right_and));
+
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 4); // equal_field, in_field, regex_field, _all (match_all and fuzzy_match_all both use _all, so deduplicated)
+        assert!(fields.contains("equal_field"));
+        assert!(fields.contains("in_field"));
+        assert!(fields.contains("regex_field"));
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_empty_field_names() {
+        let condition = Condition::Equal("".to_string(), "value".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(""));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_special_characters() {
+        let condition = Condition::Equal("field.with.dots".to_string(), "value".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field.with.dots"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_unicode_field_names() {
+        let condition = Condition::Equal("поле".to_string(), "значение".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("поле"));
+    }
+
+    #[test]
+    fn test_index_condition_get_tantivy_fields() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        index_condition.add_condition(Condition::MatchAll("search_term".to_string()));
+        index_condition.add_condition(Condition::In(
+            "field2".to_string(),
+            vec!["val1".to_string()],
+        ));
+
+        let fields = index_condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 3);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_index_condition_get_tantivy_fields_empty() {
+        let index_condition = IndexCondition::new();
+        let fields = index_condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 0);
+    }
+
+    #[test]
+    fn test_index_condition_get_tantivy_fields_duplicate_fields() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value2".to_string()));
+        index_condition.add_condition(Condition::Regex(
+            "field1".to_string(),
+            "pattern.*".to_string(),
+        ));
+
+        let fields = index_condition.get_tantivy_fields();
+
+        // Should deduplicate the field names
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+}

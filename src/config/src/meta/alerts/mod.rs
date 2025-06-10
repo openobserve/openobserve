@@ -99,9 +99,13 @@ impl TriggerCondition {
                 // Check for the cron timestamp after the silence period
                 Ok(schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance)
             } else {
+                // This is important, if provided start_utc was `Some`, it should use the next run
+                // after the start_utc. If it was `None`, it should use the next run after the
+                // current time.
+                let start_utc = start_utc.with_timezone(&timezone_offset);
                 // Check for the cron timestamp in the future
                 Ok(schedule
-                    .upcoming(timezone_offset)
+                    .after(&start_utc)
                     .next()
                     .unwrap()
                     .timestamp_micros()
@@ -140,31 +144,38 @@ impl TriggerCondition {
     /// Next trigger time should align with the pipeline timezone time
     /// if the frequency is 5 mins., and it is 11:03:00 now, the next trigger time should be
     /// 11:05:00
-    pub fn align_time(next_run_at: i64, timezone_offset: i32, frequency: i64) -> i64 {
+    pub fn align_time(next_run_at: i64, timezone_offset: i32, frequency: Option<i64>) -> i64 {
         // Convert the timestamp to a DateTime with the specified timezone offset
         let timezone = FixedOffset::east_opt(timezone_offset * 60).unwrap();
         let dt = chrono::DateTime::from_timestamp_micros(next_run_at)
             .unwrap_or_default()
             .with_timezone(&timezone);
 
-        // Convert frequency from seconds to minutes
-        let mut frequency_minutes = frequency / 60;
-        if frequency_minutes == 0 {
-            frequency_minutes = 1;
-        }
-
         // Get the minute and second of the next_run_at time
         let minute = dt.minute() as i64;
         let second = dt.second() as i64;
 
-        // Calculate how many minutes to subtract to reach the previous interval boundary
-        let minutes_to_subtract = minute % frequency_minutes;
+        let minutes_to_subtract = match frequency {
+            Some(freq) if freq > 0 => {
+                // Convert frequency from seconds to minutes
+                let mut frequency_minutes = freq / 60;
 
-        // If we're exactly at an interval boundary and seconds are 0, don't adjust
-        let minutes_to_subtract = if minutes_to_subtract == 0 && second == 0 {
-            0
-        } else {
-            minutes_to_subtract
+                // in case received frequency is less than 60 s
+                if frequency_minutes == 0 {
+                    frequency_minutes = 1;
+                }
+
+                // Calculate how many minutes to subtract to reach the previous interval boundary
+                let minutes_to_subtract = minute % frequency_minutes;
+
+                // If we're exactly at an interval boundary and seconds are 0, don't adjust
+                if minutes_to_subtract == 0 && second == 0 {
+                    0
+                } else {
+                    minutes_to_subtract
+                }
+            }
+            _ => 0,
         };
 
         // Create a new DateTime with the aligned time
@@ -205,7 +216,11 @@ impl TriggerCondition {
             } else {
                 self.frequency * 60
             };
-            Ok(Self::align_time(next_run_at, timezone_offset, frequency))
+            Ok(Self::align_time(
+                next_run_at,
+                timezone_offset,
+                Some(frequency),
+            ))
         } else {
             Ok(next_run_at)
         }
@@ -561,7 +576,7 @@ mod test {
         let timezone = FixedOffset::east_opt(0).unwrap(); // UTC
         let dt = timezone.with_ymd_and_hms(2025, 1, 1, 11, 3, 0).unwrap();
         let next_run_at = dt.timestamp_micros();
-        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 300); // 5 minutes in seconds
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, Some(300)); // 5 minutes in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
         assert_eq!(aligned_dt.hour(), 11);
         assert_eq!(aligned_dt.minute(), 0);
@@ -570,7 +585,7 @@ mod test {
         // Test case 2: Align to 1-hour intervals
         let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 19, 30).unwrap();
         let next_run_at = dt.timestamp_micros();
-        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 3600); // 1 hour in seconds
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, Some(3600)); // 1 hour in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
         assert_eq!(aligned_dt.hour(), 17);
         assert_eq!(aligned_dt.minute(), 0);
@@ -579,7 +594,7 @@ mod test {
         // Test case 3: Align to 1-minute intervals
         let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 19, 11).unwrap();
         let next_run_at = dt.timestamp_micros();
-        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 60); // 1 minute in seconds
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, Some(60)); // 1 minute in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
         assert_eq!(aligned_dt.hour(), 17);
         assert_eq!(aligned_dt.minute(), 19);
@@ -588,7 +603,7 @@ mod test {
         // Test case 4: Already at interval boundary
         let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 0, 0).unwrap();
         let next_run_at = dt.timestamp_micros();
-        let aligned_time = TriggerCondition::align_time(next_run_at, 0, 3600); // 1 hour in seconds
+        let aligned_time = TriggerCondition::align_time(next_run_at, 0, Some(3600)); // 1 hour in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time).unwrap();
         assert_eq!(aligned_dt.hour(), 17);
         assert_eq!(aligned_dt.minute(), 0);
@@ -599,7 +614,7 @@ mod test {
         let dt = timezone.with_ymd_and_hms(2025, 1, 1, 17, 19, 30).unwrap();
         let next_run_at = dt.timestamp_micros();
         // `align_time` expects frequency in minutes, so convert 8 hours to minutes
-        let aligned_time = TriggerCondition::align_time(next_run_at, 8 * 60, 3600); // 1 hour in seconds
+        let aligned_time = TriggerCondition::align_time(next_run_at, 8 * 60, Some(3600)); // 1 hour in seconds
         let aligned_dt = DateTime::from_timestamp_micros(aligned_time)
             .unwrap()
             .with_timezone(&timezone);

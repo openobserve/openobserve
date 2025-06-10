@@ -179,3 +179,17 @@ pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::na
 
     log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_update_cache() {
+        let (tx, rx) = mpsc::channel(100);
+        tokio::spawn(async move { update_cache(rx).await });
+        tx.send(infra::db::nats::NatsEvent::Connected)
+            .await
+            .unwrap();
+    }
+}

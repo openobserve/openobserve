@@ -1206,12 +1206,20 @@ async fn update_cache(user_email: &str, roles: Vec<String>) {
 #[cfg(test)]
 mod tests {
     use config::meta::user::{UserRole, UserType};
-    use infra::{db as infra_db, table as infra_table};
+    use infra::{
+        db::{self as infra_db, ORM_CLIENT, connect_to_orm},
+        table as infra_table,
+    };
 
     use super::*;
     use crate::common::infra::config::USERS;
 
     async fn set_up() {
+        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        // clear the table here as previous tests could have written to it
+        infra::table::org_users::clear().await.unwrap();
+        infra::table::users::clear().await.unwrap();
+        infra::table::organizations::clear().await.unwrap();
         infra_db::create_table().await.unwrap();
         infra_table::create_user_tables().await.unwrap();
         organization::check_and_create_org_without_ofga("dummy")

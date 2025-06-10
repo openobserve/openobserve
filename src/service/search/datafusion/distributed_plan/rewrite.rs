@@ -216,7 +216,7 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             && node.children().first().unwrap().name() == "AggregateExec"
             && config::get_config().common.feature_query_streaming_aggs
         {
-            if !streaming_aggs_exec::GLOBAL_ID_CACHE.exists(&self.id) {
+            if !streaming_aggs_exec::GLOBAL_CACHE.exists(&self.id) {
                 return Err(DataFusionError::Plan(format!(
                     "streaming aggregation cache not found with id: {}",
                     self.id
