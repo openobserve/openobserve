@@ -39,7 +39,7 @@ pub async fn ingest(
     user_email: &str,
 ) -> Result<HecResponse, anyhow::Error> {
     // check system resource
-    if check_ingestion_allowed(org_id, None).is_err() {
+    if check_ingestion_allowed(org_id, None).await.is_err() {
         return Ok(HecStatus::InvalidIndex.into());
     }
 
