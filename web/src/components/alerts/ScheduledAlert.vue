@@ -2143,7 +2143,9 @@ const routeToCreateDestination = () => {
   };
 
   const onColumnSelect = () => {
-    query.value += ` ${selectedColumn.value.value} `
+    if(selectedColumn.value.value){
+      query.value += ` ${selectedColumn.value.value} `
+    }
     selectedColumn.value = ""
   };
   const buildMulitWindowQuery = (sql: any, fn: boolean = false) => {

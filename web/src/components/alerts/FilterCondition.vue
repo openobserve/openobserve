@@ -76,7 +76,7 @@
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-              :class="store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'tw-min-w-[200px]'"
+            :class="store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'tw-min-w-[200px]'"
             @update:model-value="emits('input:update', 'conditions', condition)"
 
           >

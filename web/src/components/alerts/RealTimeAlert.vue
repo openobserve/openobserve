@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   data-test="add-alert-delay-error"
-                  v-if="triggerData.silence < 0 || !triggerData.silence"
+                  v-if="triggerData.silence < 0 || triggerData.silence === undefined || triggerData.silence === null"
                   class="text-red-8 q-pt-xs q-field--error"
                   style="font-size: 11px; line-height: 12px"
                 >
