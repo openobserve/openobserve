@@ -1,5 +1,5 @@
 //logs visualise page object
-//Methods: openLogs, openVisualiseTab, logsApplyQueryButton, applyQueryButtonVisualise, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditior, fillQueryEditor
+//Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditior, fillQueryEditor
 export default class LogsVisualise {
   constructor(page) {
     this.page = page;
@@ -26,16 +26,7 @@ export default class LogsVisualise {
       .click();
   }
 
-  //apply: Visualise
-  async applyQueryButtonVisualise() {
-    await this.page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .waitFor({ state: "visible" });
-    await this.page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-  }
-
+  
   //set relative time selection
   async setRelative(date, time) {
     await this.timeTab.waitFor({ state: "visible" });
@@ -166,6 +157,8 @@ export default class LogsVisualise {
     await removeButton.click();
     console.log(`Removed field: ${fieldName} from ${target}`);
   }
+
+
   //chart render
   async chartRender(x, y) {
     await this.page
@@ -196,10 +189,41 @@ export default class LogsVisualise {
   async openQueryEditior() {
     await this.page.locator(".view-lines").first().click();
   }
+
+  //fill query editor
   async fillQueryEditor(sqlQuery) {
     const queryEditor = this.page.locator(".view-lines").first();
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
     await queryEditor.click();
     await queryEditor.type(sqlQuery);
+  }
+
+
+  //Visualization run query button
+
+async runQueryAndWaitForCompletion() {
+    console.log("Running query and waiting for completion...");
+    const runBtn = this.page.locator(
+      '[data-test="logs-search-bar-visualize-refresh-btn"]'
+    );
+    const cancelBtn = this.page.locator(
+      '[data-test="logs-search-bar-visualize-cancel-btn"]'
+    );
+
+    // Click "Run query"
+    console.log("Clicking 'Run query' button...");
+    await runBtn.click();
+
+    console.log("Waiting for 'Cancel query' button to appear...");
+    // Wait for "Cancel query" to appear (query is running)
+    await cancelBtn.waitFor({ state: "visible", timeout: 10000 });
+
+    console.log("Waiting for 'Run query' button to reappear...");
+    // Wait for "Run query" to reappear (query is finished)
+    await runBtn.waitFor({ state: "visible", timeout: 60000 });
+
+    console.log("Query completed successfully.");
+    // Optional: small buffer to ensure UI is stable
+    await this.page.waitForTimeout(300);
   }
 }

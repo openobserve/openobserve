@@ -84,7 +84,7 @@ test.describe("logs testcases", () => {
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
 
     // Apply the changes
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await expect(page.getByText("There are some errors, please")).toBeVisible();
     await page
       .locator(
@@ -98,7 +98,7 @@ test.describe("logs testcases", () => {
       .click();
 
     // Apply the changes
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
 
     // Remove the _timestamp field from the Y-axis
     await logsVisualise.removeField("_timestamp", "y");
@@ -116,7 +116,7 @@ test.describe("logs testcases", () => {
     // Apply the changes
     const search = page.waitForResponse(logData.applyQuery);
 
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await expect
       .poll(async () => (await search).status(), { timeout: 15000 })
       .toBe(200);
@@ -147,7 +147,7 @@ test.describe("logs testcases", () => {
       )
       .click();
 
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
 
     // Change the chart types
     await logsVisualise.selectChartType("line");
@@ -162,37 +162,37 @@ test.describe("logs testcases", () => {
 
     // Change the chart type to area
     await logsVisualise.selectChartType("area");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(590, 127);
 
     // Change the chart type to area-stacked
     await logsVisualise.selectChartType("area-stacked");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(475, 45);
 
     // Change the chart type to horizontal bar
     await logsVisualise.selectChartType("h-bar");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(722, 52);
 
     // Change the chart type to scatter and apply
     await logsVisualise.selectChartType("scatter");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(362, 30);
 
     // Change the chart type to pie and apply
     await logsVisualise.selectChartType("pie");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(650, 85);
 
     // Change the chart type to donut and apply
     await logsVisualise.selectChartType("donut");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(216, 53);
 
     // Change the chart type to gauge and apply
     await logsVisualise.selectChartType("gauge");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.chartRender(423, 127);
   });
 
@@ -252,7 +252,7 @@ test.describe("logs testcases", () => {
       .click();
 
     // Apply the changes in the visualization
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
 
     // Go back to the logs page
     await logsVisualise.backToLogs();
@@ -320,9 +320,9 @@ test.describe("logs testcases", () => {
       .locator("i")
       .click();
 
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.setRelative("6", "w");
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
@@ -352,7 +352,7 @@ test.describe("logs testcases", () => {
 
     // Open the visualization tab
     await logsVisualise.openVisualiseTab();
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     let exceptionBefore = null;
     let exceptionAfter = null;
 
@@ -368,7 +368,7 @@ test.describe("logs testcases", () => {
     }
 
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
     await logsVisualise.backToLogs();
 
     await logsVisualise.logsApplyQueryButton();
@@ -384,7 +384,7 @@ test.describe("logs testcases", () => {
       exceptionAfter = e;
     }
     expect(exceptionBefore).toBe(exceptionAfter);
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
@@ -432,7 +432,7 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await logsVisualise.applyQueryButtonVisualise();
+   await logsVisualise.runQueryAndWaitForCompletion();
 
     // Reload the page
     await page.reload();
