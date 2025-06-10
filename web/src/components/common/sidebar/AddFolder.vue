@@ -171,6 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
             //else new folder
             else {
+              //trim the folder name here
+              folderData.value.name = folderData.value.name.trim();
               const newFolder: any = await createFolderByType(store, folderData.value, props.type);
               emit("update:modelValue", newFolder);
               showPositiveNotification("Folder added successfully", {
