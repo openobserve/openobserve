@@ -121,6 +121,7 @@ parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser = "0.4"
 prost.workspace = true
+prost-wkt-types.workspace = true
 proto.workspace = true
 prettytable-rs = "0.10.0"
 pyroscope = { version = "0.5.8", optional = true }
@@ -293,6 +294,7 @@ ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
 prometheus = { version = "0.13", features = ["process"] }
 prost = "0.13.1"
+prost-wkt-types = "0.6"
 rand = "0.8"
 rayon = "1.10"
 regex = "1.11"
