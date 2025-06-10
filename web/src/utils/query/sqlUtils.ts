@@ -525,7 +525,11 @@ function parseCondition(condition: any) {
       ];
 
       // function without field name and with value
-      const conditionsWithoutFieldName = ["match_all"];
+      const conditionsWithoutFieldName = [
+        "match_all",
+        "match_all_raw",
+        "match_all_raw_ignore_case",
+      ];
 
       if (conditionsWithFieldName.includes(conditionName)) {
         return {
