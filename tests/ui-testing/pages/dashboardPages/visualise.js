@@ -217,7 +217,8 @@ export default class LogsVisualise {
     const cancelBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-cancel-btn"]'
     );
-
+    
+    await runBtn.waitFor({ state: "visible" });
     // Click "Run query"
     console.log("Clicking 'Run query' button...");
     await runBtn.click();
@@ -235,5 +236,5 @@ export default class LogsVisualise {
     await this.page.waitForTimeout(300);
   }
 
-  // ...existing code...
+  
 }
