@@ -155,7 +155,7 @@ export default defineComponent({
       )
         .then((res) => {
           dismiss();
-          const invoiceList = res.data;
+          const invoiceList = res.data.invoices;
           if (invoiceList.length > 0) {
             resultTotal.value = invoiceList.length;
             invoiceHistory.value = invoiceList.map((invoice, index) => {
@@ -168,7 +168,7 @@ export default defineComponent({
                 amount_paid: invoice.amount_paid,
                 amount_due: invoice.amount_due,
                 attempt_count: invoice.attempt_count,
-                status: invoice.status,
+                status: invoice.statue,
                 pdf: invoice.invoice_pdf,
                 action: "Download",
               };
