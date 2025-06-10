@@ -6207,7 +6207,6 @@ const useLogs = () => {
       total = getAggsTotal();
 
 
-      console.log("total ----", searchObj.data.queryResults.pageCountTotal, total);
 
       if((searchObj.data.queryResults.pageCountTotal || -1) > total) {
         total = searchObj.data.queryResults.pageCountTotal;
