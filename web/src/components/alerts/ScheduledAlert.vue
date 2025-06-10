@@ -1128,7 +1128,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
           </q-btn>
-          <q-btn icon="fullscreen" size="16px" :color="isFullScreen ? 'primary' : ''"  dense class="tw-cursor-pointer" @click="() => isFullScreen = !isFullScreen" ></q-btn>
+          <q-btn 
+            icon="fullscreen" 
+            size="16px" 
+            dense 
+            class="tw-cursor-pointer" 
+            :class="store.state.theme === 'dark' ? 'tw-text-white' : ''"
+            :color="isFullScreen ? 'primary' : undefined"
+            @click="() => isFullScreen = !isFullScreen" 
+          />
 
         </div>
       </div>
@@ -1261,6 +1269,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="filterFunctionOptions"
                       @update:modelValue="onFunctionSelect"
                       class="mini-select"
+                      clearable
+                      @clear="onFunctionClear"
                       input-style="height: 8px; min-height: 8px; margin: 0px; width: 200px;  "
                                             >
                       <template #no-option>
@@ -1825,6 +1835,9 @@ const testFields  = ref(
 
 
 const onFunctionSelect = (_function: any) => {
+  if(!_function){
+    return;
+  }
   selectedFunction.value = _function.name;
   vrlFunctionContent.value = _function.function;
 };
@@ -2461,6 +2474,12 @@ const routeToCreateDestination = () => {
         }
       }
     }
+
+
+    const onFunctionClear = () => {
+      selectedFunction.value = null;
+      vrlFunctionContent.value = "";
+    };
 
 
 

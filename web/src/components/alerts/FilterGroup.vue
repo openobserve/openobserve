@@ -336,6 +336,7 @@ const computedOpacity = computed(() => {
     }
     .dark-mode-group-tabs  .q-tab--inactive{
         background-color: #494A4A !important;
+        
         color: $white
     }
 
@@ -352,6 +353,7 @@ const computedOpacity = computed(() => {
       border: 1px solid #464646;
         .q-tab--inactive{
         background-color: #494A4A !important;
+        opacity: 1;
         color: $white;
       }      
     }

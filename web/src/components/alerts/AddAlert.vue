@@ -152,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="filteredStreams"
                     :label="t('alerts.stream_name') + ' *'"
                     :loading="isFetchingStreams"
-                    :popup-content-style="{ textTransform: 'lowercase' }"
                     color="input-border"
                     class="q-py-sm showLabelOnTop no-case col"
                     :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
@@ -1930,7 +1929,7 @@ export default defineComponent({
 .light-mode{
   .alert-setup-container{
     background-color: #ffffff;
-    padding: 12px 12px 24px 0px;
+    padding: 12px 12px 24px 12px;
     margin-left: 24px;
     border-radius: 4px;
     border: 1px solid #e6e6e6;
