@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.14.8"
+version = "0.15.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -102,8 +102,9 @@ etcd-client.workspace = true
 faststr.workspace = true
 flate2.workspace = true
 futures.workspace = true
-hex.workspace = true
+hashlink.workspace = true
 hashbrown.workspace = true
+hex.workspace = true
 http-auth-basic = "0.3"
 ipnetwork.workspace = true
 itertools.workspace = true

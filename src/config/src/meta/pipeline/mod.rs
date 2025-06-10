@@ -27,7 +27,7 @@ use crate::{
         function::VRLResultResolver,
         stream::{StreamParams, StreamType},
     },
-    utils::json,
+    utils::{json, schema::format_stream_name},
 };
 
 pub mod components;
@@ -144,7 +144,8 @@ impl Pipeline {
                     ));
                 }
                 if !cfg.common.skip_formatting_stream_name {
-                    stream_params.stream_name = stream_params.stream_name.to_lowercase().into();
+                    stream_params.stream_name =
+                        format_stream_name(&stream_params.stream_name).into();
                 }
             }
         }
