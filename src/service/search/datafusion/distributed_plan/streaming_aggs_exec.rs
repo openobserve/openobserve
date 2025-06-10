@@ -219,6 +219,12 @@ impl ExecutionPlan for StreamingAggsExec {
     ) -> Result<SendableRecordBatchStream> {
         // Complete cache hit: only return cached data, never execute input
         if self.is_complete_cache_hit {
+            log::debug!(
+                "[StreamingAggs] [streaming_id: {}] Complete cache hit: returning cached data for partition {}/{}",
+                self.id,
+                partition,
+                self.cached_partition_num
+            );
             if partition < self.cached_partition_num {
                 return Ok(Box::pin(MemoryStream::try_new(
                     self.cached_data
@@ -236,6 +242,13 @@ impl ExecutionPlan for StreamingAggsExec {
                 )));
             }
         }
+
+        log::debug!(
+            "[StreamingAggs] [streaming_id: {}] Partial cache hit: partition={}, cached_partitions={}, executing input for new data",
+            self.id,
+            partition,
+            self.cached_partition_num
+        );
 
         // Partial or no cache: handle both cached and input partitions
         if partition < self.cached_partition_num {

@@ -282,7 +282,13 @@ pub async fn get_streaming_aggs_records_from_disk(
             end_time,
         );
         if cache_start_time == start_time && cache_end_time == end_time {
-            log::info!("Found cached records for the entire time range");
+            log::info!(
+                "Found cached records covering the entire time range: cache=[{}, {}], query=[{}, {}]",
+                cache_start_time,
+                cache_end_time,
+                start_time,
+                end_time
+            );
             let cache_result = StreamingAggsCacheResult {
                 cache_result: cached_records,
                 is_complete_match: true,
@@ -292,9 +298,11 @@ pub async fn get_streaming_aggs_records_from_disk(
             return Ok(cache_result);
         } else {
             log::info!(
-                "Found cached records for the time range: {}, {}",
+                "Found cached records for partial time range: cache=[{}, {}], query=[{}, {}]",
                 cache_start_time,
-                cache_end_time
+                cache_end_time,
+                start_time,
+                end_time
             );
             let cache_result = StreamingAggsCacheResult {
                 cache_result: cached_records,
