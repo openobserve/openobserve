@@ -1913,16 +1913,16 @@ impl VisitorMut for RemoveDashboardAllVisitor {
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         match expr {
-            Expr::BinaryOp { left, op, right }
-                if matches!(
-                    op,
+            Expr::BinaryOp {
+                left,
+                op:
                     BinaryOperator::Eq
-                        | BinaryOperator::GtEq
-                        | BinaryOperator::LtEq
-                        | BinaryOperator::Gt
-                        | BinaryOperator::Lt
-                ) =>
-            {
+                    | BinaryOperator::GtEq
+                    | BinaryOperator::LtEq
+                    | BinaryOperator::Gt
+                    | BinaryOperator::Lt,
+                right,
+            } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
                     if value == DASHBOARD_ALL {
                         *expr = Expr::Value(Value::Boolean(true));
