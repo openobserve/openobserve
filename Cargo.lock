@@ -6233,6 +6233,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.2.15",
  "hashbrown 0.15.2",
+ "hashlink",
  "hex",
  "http-auth-basic",
  "infra",
