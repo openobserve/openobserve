@@ -635,7 +635,8 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 #[get("/dex_refresh")]
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     let token = if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
 
         // remove old session id from cluster co-ordinator
 
