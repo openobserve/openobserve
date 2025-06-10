@@ -885,10 +885,23 @@ export default defineComponent({
         case ">=":
           condition = column + ` ${operator} ${value}`;
           break;
-        case "Contains":
+          //this is done because when we get from BE the response includes the operator in lowercase
+          //so we need to handle it separately
+        case "contains":
           condition = column + ` LIKE '%${value}%'`;
           break;
-        case "NotContains":
+        //this is done because when we get from BE the response includes the operator in lowercase and converted NotContains to not_contains
+        //so we need to handle it separately
+        case "not_contains":
+          condition = column + ` NOT LIKE '%${value}%'`;
+          break;
+          //this is done because in the FE we are not converting the operator to lowercase
+          //so we need to handle it separately
+        case 'Contains':
+          condition = column + ` LIKE '%${value}%'`;
+          break;
+          //this is done because in the FE we are not converting the operator to lowercase
+        case 'NotContains':
           condition = column + ` NOT LIKE '%${value}%'`;
           break;
         default:
@@ -910,6 +923,8 @@ export default defineComponent({
       //else we need to return the value as a string and add single quotes to it
       function formatValue(column: any, operator: any, value: any) {
         return streamFieldsMap[column]?.type === "Int64" ||
+          operator === "contains" ||
+          operator === "not_contains" ||
           operator === "Contains" ||
           operator === "NotContains"
           ? value
@@ -939,7 +954,7 @@ export default defineComponent({
           // Single condition
           if (item.column && item.operator && item.value !== undefined) {
             const formattedValue = formatValue(item.column, item.operator, item.value);
-            return formatCondition(item.column, item.operator, formattedValue);
+              return getFormattedCondition(item.column, item.operator, formattedValue);
           }
 
           return "";
