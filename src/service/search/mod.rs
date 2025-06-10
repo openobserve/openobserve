@@ -675,49 +675,72 @@ pub async fn search_partition(
         log::info!(
             "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
         );
-        let mut cached_result = streaming_aggs_exec::check_record_batches_cache(
+        let cached_result = match streaming_aggs_exec::check_record_batches_cache(
             query.start_time,
             query.end_time,
             &file_path,
         )
-        .await?;
-        let _deltas = cached_result.calculate_deltas(query.start_time, query.end_time);
-        let is_complete_match = cached_result.is_complete_match;
-        streaming_aggs_exec::init_cache(
-            id,
-            query.start_time,
-            query.end_time,
-            &file_path,
-            is_complete_match,
-        );
-        // load cached results from disk
-        if let Err(e) = streaming_aggs_exec::prepare_cache(id, cached_result) {
-            log::error!(
-                "[trace_id {trace_id}] [streaming_id {id}] search_partition: error loading cached results: {:?}",
-                e
+        .await
+        {
+            Ok(v) => Some(v),
+            Err(e) => {
+                log::warn!(
+                    "[trace_id {trace_id}] [streaming_id {id}] search_partition: error checking cached results: {:?}",
+                    e
+                );
+                None
+            }
+        };
+
+        // if there is cached result, handle streaming aggs cache
+        if let Some(mut cached_result) = cached_result {
+            let _deltas = cached_result.calculate_deltas(query.start_time, query.end_time);
+            let is_complete_match = cached_result.is_complete_match;
+            streaming_aggs_exec::init_cache(
+                id,
+                query.start_time,
+                query.end_time,
+                &file_path,
+                is_complete_match,
             );
-        }
-        if is_complete_match {
-            log::info!(
-                "[trace_id {trace_id}] [streaming_id {id}] search_partition: found complete cache match for streaming aggregate query, returning entire query duration as a single partition"
+            // load cached results from disk
+            if let Err(e) = streaming_aggs_exec::prepare_cache(id, cached_result) {
+                log::error!(
+                    "[trace_id {trace_id}] [streaming_id {id}] search_partition: error loading cached results: {:?}",
+                    e
+                );
+            }
+            if is_complete_match {
+                log::info!(
+                    "[trace_id {trace_id}] [streaming_id {id}] search_partition: found complete cache match for streaming aggregate query, returning entire query duration as a single partition"
+                );
+                let single_partition = vec![[query.start_time, query.end_time]];
+                // TODO: fix response
+                return Ok(search::SearchPartitionResponse {
+                    trace_id: trace_id.to_string(),
+                    file_num: 0,
+                    records: 0,
+                    original_size: 0,
+                    compressed_size: 0,
+                    max_query_range: 0,
+                    histogram_interval: sql.histogram_interval,
+                    partitions: single_partition,
+                    order_by: OrderBy::Desc,
+                    limit: sql.limit,
+                    streaming_output: req.streaming_output && is_streaming_aggregate,
+                    streaming_aggs: req.streaming_output && is_streaming_aggregate,
+                    streaming_id: streaming_id.clone(),
+                });
+            }
+        } else {
+            // if there is no cached result, initialize cache
+            streaming_aggs_exec::init_cache(
+                id,
+                query.start_time,
+                query.end_time,
+                &file_path,
+                false,
             );
-            let single_partition = vec![[query.start_time, query.end_time]];
-            // TODO: fix response 
-            return Ok(search::SearchPartitionResponse {
-                trace_id: trace_id.to_string(),
-                file_num: 0,
-                records: 0,
-                original_size: 0,
-                compressed_size: 0,
-                max_query_range: 0,
-                histogram_interval: sql.histogram_interval,
-                partitions: single_partition,
-                order_by: OrderBy::Desc,
-                limit: sql.limit,
-                streaming_output: req.streaming_output && is_streaming_aggregate,
-                streaming_aggs: req.streaming_output && is_streaming_aggregate,
-                streaming_id: streaming_id.clone(),
-            });
         }
     }
 
