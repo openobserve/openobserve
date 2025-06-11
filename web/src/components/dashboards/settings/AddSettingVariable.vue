@@ -561,6 +561,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-hide_on_dashboard"
             />
           </div>
+
+          <!-- escape single quotes toggle -->
+          <div>
+            <div class="row items-center all-pointer-events">
+              <q-toggle
+                v-model="variableData.escapeSingleQuotes"
+                :label="t('dashboard.escapeSingleQuotes')"
+              />
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-limit-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  If enabled, single quotes will be escaped in the query. For
+                  example, a value like `O'Reilly` will be replaced as
+                  `O''Reilly`.
+                </q-tooltip>
+              </div>
+            </div>
+          </div>
           <div class="flex justify-center q-mt-lg">
             <q-btn
               class="q-mb-md text-bold"
@@ -685,6 +712,7 @@ export default defineComponent({
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
+      escapeSingleQuotes: false,
     });
 
     const filterCycleError: any = ref("");
@@ -724,6 +752,11 @@ export default defineComponent({
     // by default, use selectAllValueForMultiSelect as 'first'
     if (!variableData.selectAllValueForMultiSelect) {
       variableData.selectAllValueForMultiSelect = "first";
+    }
+
+    // by default, use escapeSingleQuotes as false
+    if (!variableData.escapeSingleQuotes) {
+      variableData.escapeSingleQuotes = false;
     }
 
     const filterUpdated = (index: number, filter: any) => {
