@@ -175,8 +175,8 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
-  const saveCurrentStateToCache = () => {
-    savePanelCache(
+  const saveCurrentStateToCache = async () => {
+    await savePanelCache(
       getCacheKey(),
       { ...toRaw(state) },
       {
@@ -1087,7 +1087,7 @@ export const usePanelDataLoader = (
       if (runCount == 0) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
-        const isRestoredFromCache = restoreFromCache();
+        const isRestoredFromCache = await restoreFromCache();
         log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
           state.loading = false;
@@ -2207,8 +2207,8 @@ export const usePanelDataLoader = (
     loadData(); // Loading the data
   });
 
-  const restoreFromCache: () => boolean = () => {
-    const cache = getPanelCache();
+  const restoreFromCache: () => Promise<boolean> = async () => {
+    const cache = await getPanelCache();
 
     if (!cache) {
       log("usePanelDataLoader: panelcache: cache is not there");
