@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{{
                           props.row.conditions != "" &&
                           props.row.conditions != "--"
-                            ? props.row?.conditions
+                            ? (props.row.type == 'sql' ? props.row.conditions : props.row.conditions.length != 2  ? `if ${props.row.conditions}` : 'No condition')
                             : "No condition"
                         }} </pre
                       >
@@ -503,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <ConfirmDialog
       title="Delete Alert"
-      message="Are you sure you want to delete alert?"
+      message="Are you sure you want to delete this alert?"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -718,7 +718,7 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const activeFolderId = ref("default");
+    const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
     const showMoveAlertDialog = ref(false);
     const expandedRow: Ref<any> = ref("");
     const triggerExpand = (props: any) => {
@@ -889,12 +889,66 @@ export default defineComponent({
           //localAllAlerts is the alerts that we use to store
           localAllAlerts = localAllAlerts.map((data: any) => {
             let conditions = "--";
-            if (data.condition.conditions?.length) {
-              conditions = data.condition.conditions
-                .map((condition: any) => {
-                  return `${condition.column} ${condition.operator} ${condition.value}`;
-                })
-                .join(" AND ");
+            //this is deprecated because we are using the new condition format
+            //the new format looks like this
+            //             {
+            //     "or": [
+            //         {
+            //             "column": "_timestamp",
+            //             "operator": "<=",
+            //             "value": "100",
+            //             "ignore_case": false
+            //         },
+            //         {
+            //             "column": "job",
+            //             "operator": "not_contains",
+            //             "value": "12",
+            //             "ignore_case": true
+            //         },
+            //         {
+            //             "or": [
+            //                 {
+            //                     "column": "job",
+            //                     "operator": "contains",
+            //                     "value": "1222",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "column": "level",
+            //                     "operator": "not_contains",
+            //                     "value": "dsff",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "or": [
+            //                         {
+            //                             "column": "job",
+            //                             "operator": "=",
+            //                             "value": "111",
+            //                             "ignore_case": true
+            //                         },
+            //                         {
+            //                             "column": "level",
+            //                             "operator": "contains",
+            //                             "value": "1222",
+            //                             "ignore_case": true
+            //                         }
+            //                     ]
+            //                 },
+            //                 {
+            //                     "column": "log",
+            //                     "operator": "!=",
+            //                     "value": "33",
+            //                     "ignore_case": true
+            //                 }
+            //             ]
+            //         }
+            //     ]
+            // }  
+            //converted into 
+            // (_timestamp <= '100' OR job not_contains '12' OR (job contains '1222' OR level not_contains 'dsff' OR (job = '111' OR level contains '1222') OR log != '33')) 
+            if (Object.keys(data.condition).length && data.condition.type == 'custom') {
+              conditions = transformToExpression(data.condition.conditions)
             } else if (data.condition.sql) {
               conditions = data.condition.sql;
             } else if (data.condition.promql) {
@@ -1014,23 +1068,37 @@ export default defineComponent({
       getDestinations();
     });
     onActivated(() => getDestinations());
-    onMounted(async () => {
-      if (!store.state.organizationData.foldersByType) {
-        await getFoldersListByType(store, "alerts");
-      }
-      if (
-        router.currentRoute.value.query.folder &&
-        store.state.organizationData?.foldersByType?.find(
-          (it: any) => it.folderId === router.currentRoute.value.query.folder,
-        )
-      ) {
-        activeFolderId.value = router.currentRoute.value.query.folder as string;
-      } else {
-        activeFolderId.value = "default";
-      }
-      await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
-      filterAlertsByTab();
-    });
+    // onMounted(async () => {
+    //   if (!store.state.organizationData.foldersByType) {
+    //     await getFoldersListByType(store, "alerts");
+    //   }
+    //   if (
+    //     router.currentRoute.value.query.folder &&
+    //     store.state.organizationData?.foldersByType?.find(
+    //       (it: any) => it.folderId === router.currentRoute.value.query.folder,
+    //     )
+    //   ) {
+    //     activeFolderId.value = router.currentRoute.value.query.folder as string;
+    //   } else {
+    //     activeFolderId.value = "default";
+    //   }
+    //   await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
+    //   filterAlertsByTab();
+    // });
+    watch(
+        () => store.state.organizationData.foldersByType["alerts"],
+        async (folders) => {
+          if (!folders) return;
+
+          const folderQuery = router.currentRoute.value.query.folder;
+          const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
+
+
+          activeFolderId.value = matchingFolder ? folderQuery : "default";
+          filterAlertsByTab();
+        },
+        { immediate: true }
+      );
     watch(
       () => activeFolderId.value,
       async (newVal) => {
@@ -1167,11 +1235,7 @@ export default defineComponent({
       toBeClonedAlert.value = await getAlertById(row.alert_id);
     };
     const submitForm = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
+
 
       if (!toBeClonedAlert.value) {
         $q.notify({
@@ -1198,6 +1262,11 @@ export default defineComponent({
         return;
       }
       isSubmitting.value = true;
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
 
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
@@ -1316,16 +1385,16 @@ export default defineComponent({
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       await getAlertsFn(store, folderId);
-      hideForm();
+      await hideForm();
       activeFolderId.value = folderId;
     };
-    const hideForm = () => {
+    const hideForm = async () => {
       showAddAlertDialog.value = false;
-      router.push({
+      await router.push({
         name: "alertList",
         query: {
-          folder: activeFolderId.value,
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
         },
       });
     };
@@ -1794,6 +1863,32 @@ export default defineComponent({
       folderIdToBeCloned.value = folderId.value;
     };
 
+    function transformToExpression(data: any, wrap = true): any {
+        if (!data) return null;
+
+        const keys = Object.keys(data);
+        if (keys.length !== 1) return null;
+
+        const label = keys[0].toUpperCase(); // AND or OR
+        const itemsArray = data[label.toLowerCase()];
+
+        const parts = itemsArray.map((item: any) => {
+          if (item.and || item.or) {
+            return transformToExpression(item, true); // wrap nested groups
+          } else {
+            const column = item.column;
+            const operator = item.operator;
+            const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
+            return `${column} ${operator} ${value}`;
+          }
+        });
+
+        const joined = parts.join(` ${label} `);
+        return wrap ? `(${joined})` : joined;
+      }
+
+
+
 
     return {
       t,
@@ -1897,6 +1992,7 @@ export default defineComponent({
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
+      transformToExpression,
     };
   },
 });

@@ -30,3 +30,59 @@ pub fn bytes_to_human_readable(bytes: f64) -> String {
 
     format!("{:.2} {}", bytes, units[index])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bytes_to_human_readable_zero() {
+        assert_eq!(bytes_to_human_readable(0.0), "0 B");
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_bytes() {
+        assert_eq!(bytes_to_human_readable(500.0), "500.00 B");
+        assert_eq!(bytes_to_human_readable(1023.0), "1023.00 B");
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_kilobytes() {
+        assert_eq!(bytes_to_human_readable(1024.0), "1.00 KB");
+        assert_eq!(bytes_to_human_readable(1536.0), "1.50 KB");
+        assert_eq!(bytes_to_human_readable(1024.0 * 1023.0), "1023.00 KB");
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_megabytes() {
+        assert_eq!(bytes_to_human_readable(1024.0 * 1024.0), "1.00 MB");
+        assert_eq!(bytes_to_human_readable(1024.0 * 1024.0 * 1.5), "1.50 MB");
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_gigabytes() {
+        assert_eq!(bytes_to_human_readable(1024.0 * 1024.0 * 1024.0), "1.00 GB");
+        assert_eq!(
+            bytes_to_human_readable(1024.0 * 1024.0 * 1024.0 * 2.5),
+            "2.50 GB"
+        );
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_large_values() {
+        assert_eq!(
+            bytes_to_human_readable(1024.0 * 1024.0 * 1024.0 * 1024.0),
+            "1.00 TB"
+        );
+        assert_eq!(
+            bytes_to_human_readable(1024.0 * 1024.0 * 1024.0 * 1024.0 * 1024.0),
+            "1.00 PB"
+        );
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_decimal_precision() {
+        assert_eq!(bytes_to_human_readable(1024.0 * 1.234), "1.23 KB");
+        assert_eq!(bytes_to_human_readable(1024.0 * 1024.0 * 1.234), "1.23 MB");
+    }
+}

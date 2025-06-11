@@ -16,12 +16,14 @@ export class StreamsPage {
 
 
     async streamsPageDefaultOrg() {
-
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-        await this.page.getByText('default', { exact: true }).click();
-
-
+    
+        await this.page.waitForSelector('text=default'); 
+    
+        const defaultOption = this.page.locator('text=default').first(); // Target the first occurrence
+        await defaultOption.click();
     }
+    
 
     async streamsPageDefaultMultiOrg() {
 

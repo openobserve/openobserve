@@ -36,7 +36,12 @@ export
   async tracesPageDefaultOrg() {
 
     await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-    await this.page.getByText('default', { exact: true }).click();
+    // Wait for the dropdown options to be visible
+    await this.page.waitForSelector('text=default'); // Wait for the text "default" to be present
+
+    // Click the specific "default" option within the dropdown
+    const defaultOption = this.page.locator('text=default').first(); // Target the first occurrence
+    await defaultOption.click();
 
 
   }

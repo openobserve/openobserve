@@ -173,7 +173,7 @@ pub async fn search(
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
     );
-    if in_req.query.streaming_output {
+    if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
     if let Some(v) = in_req.local_mode {
@@ -646,8 +646,13 @@ pub async fn search_partition(
         let stream_type = stream.get_stream_type(stream_type);
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let use_stream_stats_for_partition = cfg.common.use_stream_settings_for_partitions_enabled
-            || stream_settings.approx_partition;
+
+        let use_stream_stats_for_partition =
+            if stream_settings == config::meta::stream::StreamSettings::default() {
+                cfg.common.use_stream_settings_for_partitions_enabled
+            } else {
+                stream_settings.approx_partition
+            };
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
