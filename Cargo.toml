@@ -164,6 +164,7 @@ utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
 vector-enrichment.workspace = true
+x509-parser = "0.17.0"
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -190,12 +191,14 @@ actix-service = "2.0.3"
 actix-utils = "3.0.1"
 derive_more = { version = "2.0.1", features = ["full"] }
 brotli = "8.0.1"
+tokio-rustls.workspace = true
 
 [dev-dependencies]
 async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
+rcgen = "0.13"
 
 [workspace]
 members = [
@@ -342,6 +345,7 @@ tempfile = "3"
 thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
+tokio-rustls = "0.26"
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.12.3", features = ["gzip", "prost", "tls"] }

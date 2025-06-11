@@ -13,12 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::BufReader, sync::Arc};
+use std::{
+    io::BufReader,
+    net::{Ipv4Addr, Ipv6Addr},
+    sync::Arc,
+};
 
 use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert_store};
 use itertools::Itertools as _;
-use rustls::{ClientConfig, ServerConfig};
+use rustls::{
+    ClientConfig, ServerConfig,
+    crypto::{CryptoProvider, ring::default_provider},
+};
 use rustls_pemfile::{certs, private_key};
+use x509_parser::prelude::*;
 
 pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
     let cfg = config::get_config();
@@ -90,4 +98,178 @@ pub fn client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
 
 pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
     todo!()
+}
+
+pub fn tcp_tls_server_config() -> Result<ServerConfig, anyhow::Error> {
+    let cfg = config::get_config();
+    let _ = CryptoProvider::install_default(default_provider());
+    let cert_file = &mut BufReader::new(std::fs::File::open(&cfg.tcp.tcp_tls_cert_path).map_err(
+        |e| {
+            anyhow::anyhow!(
+                "Failed to open TLS certificate file {}: {}",
+                &cfg.tcp.tcp_tls_cert_path,
+                e
+            )
+        },
+    )?);
+    let key_file =
+        &mut BufReader::new(std::fs::File::open(&cfg.tcp.tcp_tls_key_path).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to open TLS key file {}: {}",
+                &cfg.tcp.tcp_tls_key_path,
+                e
+            )
+        })?);
+
+    let cert_chain = certs(cert_file);
+
+    let tls_config = ServerConfig::builder_with_protocol_versions(rustls::DEFAULT_VERSIONS)
+        .with_no_client_auth()
+        .with_single_cert(
+            cert_chain.try_collect::<_, Vec<_>, _>()?,
+            private_key(key_file)?.unwrap(),
+        )?;
+
+    Ok(tls_config)
+}
+
+pub fn tcp_tls_self_connect_client_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
+    let cfg = config::get_config();
+    let config = if cfg.tcp.tcp_tls_enabled {
+        let mut cert_store = webpki_roots_cert_store();
+        let cert_file = &mut BufReader::new(
+            std::fs::File::open(&cfg.tcp.tcp_tls_ca_cert_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to open TLS CA certificate file {}: {}",
+                    &cfg.tcp.tcp_tls_ca_cert_path,
+                    e
+                )
+            })?,
+        );
+        let cert_chain = certs(cert_file);
+        cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
+
+        ClientConfig::builder()
+            .with_root_certificates(cert_store)
+            .with_no_client_auth()
+    } else {
+        ClientConfig::builder()
+            .with_root_certificates(webpki_roots_cert_store())
+            .with_no_client_auth()
+    };
+
+    Ok(Arc::new(config))
+}
+
+pub fn get_server_url_from_cert(cert: &[u8]) -> Result<String, anyhow::Error> {
+    match parse_x509_certificate(cert) {
+        Ok((_, certificate)) => {
+            let result = String::new();
+            for ext in certificate.extensions() {
+                match ext.parsed_extension() {
+                    ParsedExtension::SubjectAlternativeName(san) => {
+                        if let Some(GeneralName::DNSName(dns_name)) =
+                            san.general_names.iter().find(|&san| {
+                                if let GeneralName::DNSName(_) = san {
+                                    return true;
+                                }
+                                false
+                            })
+                        {
+                            return Ok(dns_name.to_string());
+                        }
+
+                        if let Some(GeneralName::IPAddress(ip_addr)) =
+                            san.general_names.iter().find(|&san| {
+                                if let GeneralName::IPAddress(_) = san {
+                                    return true;
+                                }
+                                false
+                            })
+                        {
+                            if ip_addr.len() == 4 {
+                                let ip_addr = [ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]];
+                                return Ok(Ipv4Addr::from(ip_addr).to_string());
+                            } else if ip_addr.len() == 16 {
+                                let ip_addr = [
+                                    ip_addr[0],
+                                    ip_addr[1],
+                                    ip_addr[2],
+                                    ip_addr[3],
+                                    ip_addr[4],
+                                    ip_addr[5],
+                                    ip_addr[6],
+                                    ip_addr[7],
+                                    ip_addr[8],
+                                    ip_addr[9],
+                                    ip_addr[10],
+                                    ip_addr[11],
+                                    ip_addr[12],
+                                    ip_addr[13],
+                                    ip_addr[14],
+                                    ip_addr[15],
+                                ];
+                                return Ok(Ipv6Addr::from(ip_addr).to_string());
+                            } else {
+                                return Err(anyhow::anyhow!(
+                                    "Failed to parse certificate, invalid IP address length"
+                                ));
+                            }
+                        }
+                        return Err(anyhow::anyhow!(
+                            "Failed to parse certificate, could not find DNS name or IP address in SAN"
+                        ));
+                    }
+                    _ => {
+                        continue;
+                    }
+                }
+            }
+            if !result.is_empty() {
+                Ok(result)
+            } else {
+                Err(anyhow::anyhow!(
+                    "Failed to parse certificate, could not find SAN"
+                ))
+            }
+        }
+        Err(e) => Err(anyhow::anyhow!("Failed to parse certificate: {}", e)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rcgen::{CertifiedKey, generate_simple_self_signed};
+
+    use super::*;
+
+    #[test]
+    fn test_get_server_url_from_cert_prefers_dns_name() {
+        // Generate an example certificate
+        let subject_alt_names = vec!["127.0.0.1".to_string(), "example.com".to_string()];
+        let CertifiedKey { cert, key_pair: _ } =
+            generate_simple_self_signed(subject_alt_names).unwrap();
+        let result = get_server_url_from_cert(cert.der().iter().as_slice());
+        assert_eq!(result.unwrap(), "example.com");
+    }
+
+    #[test]
+    fn test_get_server_url_from_cert_gets_ip_addr_v4() {
+        // Generate an example certificate
+        let subject_alt_names = vec!["127.0.0.1".to_string()];
+        let CertifiedKey { cert, key_pair: _ } =
+            generate_simple_self_signed(subject_alt_names).unwrap();
+        let result = get_server_url_from_cert(cert.der().iter().as_slice());
+        assert_eq!(result.unwrap(), "127.0.0.1");
+    }
+
+    #[test]
+    fn test_get_server_url_from_cert_gets_ip_addr_v6() {
+        // Generate an example certificate
+        let subject_alt_names = vec!["2001:db8:85a3::8a2e:370:7334".to_string()];
+        let CertifiedKey { cert, key_pair: _ } =
+            generate_simple_self_signed(subject_alt_names).unwrap();
+        let result = get_server_url_from_cert(cert.der().iter().as_slice());
+        assert_eq!(result.unwrap(), "2001:db8:85a3::8a2e:370:7334");
+    }
 }
