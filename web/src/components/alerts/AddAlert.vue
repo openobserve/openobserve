@@ -1770,8 +1770,14 @@ export default defineComponent({
             // So waiting here for sql validation to complete
             await this.validateSqlQueryPromise;
           } catch (error) {
+
             dismiss();
-            console.log("Error while validating sql query");
+            this.q.notify({
+              type: "negative",
+              message: "Error while validating sql query. Please check the query and try again.",
+              timeout: 1500,
+            });
+            console.log("Error while validating sql query",error);
             return false;
           }
         }
