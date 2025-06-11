@@ -241,6 +241,8 @@ impl ExecutablePipeline {
             let pipeline_name = pipeline_name.clone();
             let stream_name = stream_name.clone();
 
+            // WARN: Do not change. Processing node can only be done in a task, as the internals of
+            // remote wal writer depends on the task id.
             let task = tokio::spawn(async move {
                 process_node(
                     pl_id_cp,
