@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="currentRouteName === 'pipelines'">
+  <div v-if="currentRouteName === 'pipelines'" :key="store.state.selectedOrganization.identifier">
     <div
       :class="store.state.theme === 'dark' ? 'dark-mode dark-theme' : 'light-theme light-mode'"
      class="full-wdith pipeline-list-table">
@@ -228,21 +228,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </div>
+    
+    <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
+      <stream-selection @save="savePipeline" />
+    </q-dialog>
+
+    <confirm-dialog
+      :title="confirmDialogMeta.title"
+      :message="confirmDialogMeta.message"
+      @update:ok="confirmDialogMeta.onConfirm()"
+      @update:cancel="resetConfirmDialog"
+      v-model="confirmDialogMeta.show"
+    />
   </div>
-
-  <router-view v-else />
-
-  <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
-    <stream-selection @save="savePipeline" />
-  </q-dialog>
-
-  <confirm-dialog
-    :title="confirmDialogMeta.title"
-    :message="confirmDialogMeta.message"
-    @update:ok="confirmDialogMeta.onConfirm()"
-    @update:cancel="resetConfirmDialog"
-    v-model="confirmDialogMeta.show"
-  />
 </template>
 <script setup lang="ts">
 import { ref, onBeforeMount, computed, watch, reactive, onActivated, onMounted } from "vue";

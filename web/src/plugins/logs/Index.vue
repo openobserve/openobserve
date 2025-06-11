@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage">
+  <q-page class="logPage q-my-xs" id="logPage" :key="store.state.selectedOrganization.identifier">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -275,10 +275,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
             :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
           >
-            <VisualizeLogsQuery
+            <!-- <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
-            ></VisualizeLogsQuery>
+            ></VisualizeLogsQuery> -->
           </div>
         </template>
       </q-splitter>

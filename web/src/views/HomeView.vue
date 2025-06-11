@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-lg">
+  <q-page class="q-pa-lg" :key="store.state.selectedOrganization.identifier">
     <div
       v-if="!no_data_ingest"
       class="q-pa-md row items-start q-gutter-md"
