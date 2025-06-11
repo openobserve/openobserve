@@ -133,8 +133,13 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             }
         }
         Value::String(s) => {
+            // count the " character in string, as it will be escaped in the input json
+            // also we use bytes() here as sometimes compiler can optimize it faster with sse
+            // see https://users.rust-lang.org/t/count-number-of-z-in-a-string/49763/5
+            let quote_count = s.bytes().filter(|b| *b == b'"').count();
+            let slash_count = s.bytes().filter(|b| *b == b'\\').count();
             // "?"=>2
-            size += s.len() + 2;
+            size += s.len() + 2 + quote_count + slash_count;
         }
         Value::Number(n) => {
             size += n.to_string().len();
