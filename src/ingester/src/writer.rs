@@ -218,7 +218,8 @@ impl Writer {
                     cfg.limit.wal_write_buffer_size,
                     None,
                 )
-                .expect("wal file create error"),
+                .expect("wal file create error")
+                .0,
             )),
             memtable: Arc::new(RwLock::new(MemTable::new())),
             next_seq,
@@ -413,7 +414,7 @@ impl Writer {
             &self.key.stream_type,
             wal_id
         );
-        let new_wal = WalWriter::new(
+        let (new_wal, _header_size) = WalWriter::new(
             build_file_path(
                 wal_dir,
                 &self.key.org_id,
