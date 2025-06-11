@@ -393,6 +393,11 @@ export default defineComponent({
           (response.type === "search_response" ||
             response.type === "search_response_hits")
         ) {
+
+          variableLog(
+            variableObject.name,
+            `Processing response: ${JSON.stringify(response.content)}`,
+          );
           // variableObject.isVariablePartialLoaded = true;
 
           const hits = response.content.results.hits;
@@ -419,9 +424,17 @@ export default defineComponent({
                     ? value.zo_sql_key.toString()
                     : "<blank>",
                 value: value.zo_sql_key.toString(),
-              }));
+              }))
+              // remove duplicates from previous options
+              .filter(
+                (option: any) =>
+                  !variableObject.options.some(
+                    (existingOption: any) =>
+                      existingOption.value === option.value,
+                  ),
+              );
 
-            variableObject.options = Array.from(new Set(...newOptions, ...variableObject.options));
+            variableObject.options = [...newOptions, ...variableObject.options];
             variableObject.options.sort((a: any, b: any) =>
               a.label.localeCompare(b.label),
             );
@@ -1154,27 +1167,27 @@ export default defineComponent({
 
           // for initial loading check if the value is already available,
           // do not load the values
-          if(isInitialLoad) {
+          // if(isInitialLoad) {
 
-            variableLog(
-              variableObject.name,
-              `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`
-            );
-            // check for value not null or in case of array it should not be empty array
-            // if the value is already set, we don't need to load it again
-            if (
-              variableObject.value !== null &&
-              variableObject.value !== undefined &&
-              (!Array.isArray(variableObject.value) ||
-                variableObject.value.length > 0)
-            ) {
-              variableObject.isLoading = false;
-              variableObject.isVariablePartialLoaded = true;
-              variableObject.isVariableLoadingPending = false;
-              emitVariablesData();
-              return true;
-            }
-          }
+          //   variableLog(
+          //     variableObject.name,
+          //     `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`
+          //   );
+          //   // check for value not null or in case of array it should not be empty array
+          //   // if the value is already set, we don't need to load it again
+          //   if (
+          //     variableObject.value !== null &&
+          //     variableObject.value !== undefined &&
+          //     (!Array.isArray(variableObject.value) ||
+          //       variableObject.value.length > 0)
+          //   ) {
+          //     variableObject.isLoading = false;
+          //     variableObject.isVariablePartialLoaded = true;
+          //     variableObject.isVariableLoadingPending = false;
+          //     emitVariablesData();
+          //     return true;
+          //   }
+          // }
 
           try {
             const queryContext: any = await buildQueryContext(variableObject);
