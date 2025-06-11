@@ -3398,6 +3398,10 @@ mod tests {
             tcp: config::TCP {
                 tcp_port: u16::default(),
                 udp_port: u16::default(),
+                tcp_tls_enabled: bool::default(),
+                tcp_tls_cert_path: String::default(),
+                tcp_tls_key_path: String::default(),
+                tcp_tls_ca_cert_path: String::default(),
             },
             prom: config::Prometheus {
                 ha_cluster_label: String::default(),
