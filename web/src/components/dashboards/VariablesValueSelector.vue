@@ -127,6 +127,7 @@ export default defineComponent({
       values: [],
     });
 
+    // ================== FOR DEBUGGING PURPOSES ONLY ==================
     // watch for changes in variablesData.values
     let previousValues: any[] = [];
     watch(
@@ -216,6 +217,13 @@ export default defineComponent({
       },
       { deep: true }
     );
+
+    const variableLog = (name: string, message: string) => {
+      console.log(`[Variable: ${name}] ${message}`);
+    };
+
+    // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================
+
 
     // variables dependency graph
     let variablesDependencyGraph: any = {};
@@ -612,6 +620,8 @@ export default defineComponent({
     };
 
     const initializeVariablesData = () => {
+      console.log("Initializing variables data");
+
       // reset the values
       resetVariablesData();
 
@@ -653,6 +663,11 @@ export default defineComponent({
           isVariableLoadingPending: true,
         };
 
+        variableLog(
+          variableData.name,
+          `Initializing with initial value: ${JSON.stringify(initialValue)} and object ${JSON.stringify(variableData)}`,
+        );
+
         // Set custom values immediately if they exist and no URL value is present
         if (
           item.type === "query_values" &&
@@ -682,6 +697,11 @@ export default defineComponent({
             variableData.value = initialValue;
           }
         }
+
+        variableLog(
+          variableData.name,
+          `Final value after initialization: ${JSON.stringify(variableData)}`,
+        );
 
         // push the variable to the list
         variablesData.values.push(variableData);
@@ -1487,6 +1507,10 @@ export default defineComponent({
         (variable: any) =>
           !variablesDependencyGraph[variable.name]?.parentVariables?.length,
       );
+
+      console.groupCollapsed("Loading independent variables:");
+      console.log(JSON.stringify(independentVariables, null, 2));
+      console.groupEnd();
 
       // Find all dependent variables (variables with dependencies)
       const dependentVariables = variablesData.values.filter(
