@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <q-page class="q-pa-none" style="min-height: inherit" :key="store.state.selectedOrganization.identifier">
     <q-btn
       data-test="logs-search-field-list-collapse-btn"
       :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
@@ -143,7 +143,12 @@ export default defineComponent({
       (routeName) => {
         // This is added to redirect to functionList if the user is on functions route
         // This case happens when user clicks on functions from menu when he is already on functions page
-        if (routeName === "pipeline") router.back();
+        if (routeName === "pipeline") router.replace({
+          name: "pipelines",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       },
     );
 
