@@ -67,7 +67,7 @@ test.describe("Alerts Module testcases", () => {
   test('Create and verify folder functionality', {
     tag: ['@createFolder', '@all', '@alerts']
   }, async ({ page }) => {
-    // Generate random folder name
+    // Generate random folder name once for this test
     const folderName = alertsPage.generateRandomFolderName();
     console.log('Created folder:', folderName);
     
@@ -88,14 +88,12 @@ test.describe("Alerts Module testcases", () => {
   test('Create, update, clone and delete alert in folder', {
     tag: ['@createAlert', '@editAlert', '@cloneAlert', '@deleteAlert', '@all', '@alerts']
   }, async ({ page }) => {
-    const alertName = 'Automation_Alert_';
-    const streamType = 'alertsTestQA';
-    const streamName = 'alertsTestQA';
+    const streamName = 'alertstestqa';
     const column = 'job';
     const value = 'test';
 
-    // Create a new folder for this test
-    const folderName = alertsPage.generateRandomFolderName();
+    // Generate folder name once for this test
+    const folderName = 'automationFolder_'+ alertsPage.generateRandomFolderName();
     console.log('Creating new folder for alert test:', folderName);
     await alertsPage.createFolder(folderName, 'Test Automation Folder');
     await alertsPage.verifyFolderCreated(folderName);
@@ -104,8 +102,8 @@ test.describe("Alerts Module testcases", () => {
     await alertsPage.navigateToFolder(folderName);
     console.log('Using folder:', folderName);
 
-    // Create alert
-    await alertsPage.createAlert(alertName, streamType, streamName, column, value);
+    // Create alert and store its name
+    const alertName = await alertsPage.createAlert(streamName, column, value);
     await alertsPage.verifyAlertCreated(alertName);
 
     // Update alert
@@ -113,9 +111,5 @@ test.describe("Alerts Module testcases", () => {
 
     // Clone alert
     await alertsPage.cloneAlert(alertName, 'logs', streamName);
-
-    // Delete both alerts
-    await alertsPage.deleteAlert(alertName);
-    await alertsPage.deleteAlert(alertName);
   });
-}); 
+});
