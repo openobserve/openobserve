@@ -235,7 +235,7 @@ export default defineComponent({
     const currentlyExecutingPromises: any = {};
 
     // Flag to track initial load
-    const isInitialLoad = ref(true);
+    // const isInitialLoad = ref(true);
 
     const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
@@ -761,14 +761,14 @@ export default defineComponent({
       loadAllVariablesData(true);
 
       // Set initial load flag to false after first load
-      isInitialLoad.value = false;
+      // isInitialLoad.value = false;
     });
 
     watch(
       () => props.variablesConfig,
       async () => {
         // Reset initial load flag when config changes
-        isInitialLoad.value = true;
+        // isInitialLoad.value = true;
 
         // make list of variables using variables config list
         initializeVariablesData();
@@ -780,7 +780,7 @@ export default defineComponent({
         loadAllVariablesData(true);
 
         // Set initial load flag to false after load
-        isInitialLoad.value = false;
+        // isInitialLoad.value = false;
       },
     );
 
@@ -1101,7 +1101,7 @@ export default defineComponent({
      * @param {object} variableObject - The variable object to load
      * @returns {Promise<boolean>} - true if the variable was loaded successfully, false if it was not
      */
-    const loadSingleVariableDataByName = async (variableObject: any) => {
+    const loadSingleVariableDataByName = async (variableObject: any, isInitialLoad: boolean = false) => {
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
 
@@ -1171,10 +1171,11 @@ export default defineComponent({
 
         // Set loading state
         variableObject.isLoading = true;
+        variableObject.isVariablePartialLoaded = false;
         emitVariablesData();
 
         try {
-          const success = await handleVariableType(variableObject);
+          const success = await handleVariableType(variableObject, isInitialLoad);
           await finalizeVariableLoading(variableObject, success);
           resolve(success);
         } catch (error) {
@@ -1190,13 +1191,36 @@ export default defineComponent({
      * @param {object} variableObject - The variable object to handle
      * @returns {Promise<boolean>} - true if the variable was handled successfully, false if it was not
      */
-    const handleVariableType = async (variableObject: any) => {
+    const handleVariableType = async (variableObject: any, isInitialLoad: boolean = false) => {
+      variableLog(
+        variableObject.name,
+        `Handling variable type: ${variableObject.type},  ${isInitialLoad}`
+      );
       switch (variableObject.type) {
         case "query_values": {
-          // Check if this is a child variable
-          const isChildVariable =
-            variablesDependencyGraph[variableObject.name]?.parentVariables
-              ?.length > 0;
+
+          // for initial loading check if the value is already available,
+          // do not load the values
+          if(isInitialLoad) {
+
+            variableLog(
+              variableObject.name,
+              `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`
+            );
+            // check for value not null or in case of array it should not be empty array
+            // if the value is already set, we don't need to load it again
+            if (
+              variableObject.value !== null &&
+              variableObject.value !== undefined &&
+              (!Array.isArray(variableObject.value) ||
+                variableObject.value.length > 0)
+            ) {
+              variableObject.isLoading = false;
+              variableObject.isVariableLoadingPending = false;
+              emitVariablesData();
+              return true;
+            }
+          }
 
           try {
             const queryContext: any = await buildQueryContext(variableObject);
@@ -1479,6 +1503,9 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when all variables data has been loaded.
      */
     const loadAllVariablesData = async (isInitialLoad = false) => {
+
+      console.log("Loading variables data...", isInitialLoad);
+
       if (isLoading) {
         return;
       }
@@ -1522,7 +1549,7 @@ export default defineComponent({
         // Load all independent variables
         await Promise.all(
           independentVariables.map((variable: any) =>
-            loadSingleVariableDataByName(variable),
+            loadSingleVariableDataByName(variable, isInitialLoad),
           ),
         );
       } catch (error) {
