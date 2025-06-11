@@ -362,3 +362,10 @@ fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::Extension(_))))
         .unwrap()
 }
+
+// avoid add new plan when the plan is empty relation
+// for example: select * from default where false
+pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
+    plan.exists(|plan| Ok(matches!(plan, LogicalPlan::EmptyRelation(_))))
+        .unwrap()
+}
