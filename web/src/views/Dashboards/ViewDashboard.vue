@@ -548,30 +548,9 @@ export default defineComponent({
     const refreshedVariablesDataUpdated = (variablesData: any) => {
       Object.assign(refreshedVariablesData, variablesData);
     };
+
     const isVariablesChanged = computed(() => {
-      // Convert both objects to a consistent format for comparison
-      const normalizeVariables = (obj) => {
-        const normalized = JSON.parse(JSON.stringify(obj));
-        // Sort arrays to ensure consistent ordering
-        if (normalized.values) {
-          normalized.values = normalized.values
-            .map((variable) => {
-              if (Array.isArray(variable.value)) {
-                variable.value.sort((a, b) =>
-                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
-                );
-              }
-              return variable;
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
-        }
-        return normalized;
-      };
-
-      const normalizedCurrent = normalizeVariables(variablesData);
-      const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
-
-      return !isEqual(normalizedCurrent, normalizedRefreshed);
+      return !isEqual(variablesData, refreshedVariablesData);
     });
     // ======= [START] default variable values
 

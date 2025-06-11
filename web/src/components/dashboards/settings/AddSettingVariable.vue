@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </button>
                 </div>
 
-                <div>
+                <div v-if="variableData.multiSelect">
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-all-values"
                     :class="
@@ -1174,6 +1174,7 @@ export default defineComponent({
       () => variableData?.multiSelect,
       (newVal) => {
         if (!newVal) {
+          variableData.selectAllValueForMultiSelect = "first";
           if (Array.isArray(variableData?.options)) {
             variableData.options.forEach((option: any, index: any) => {
               if (variableData.options[index]) {
