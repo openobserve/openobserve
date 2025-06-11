@@ -494,7 +494,7 @@ pub async fn run_datafusion(
                 "streaming_id is required for streaming aggregation query".to_string(),
             ));
         };
-        let mut rewriter = StreamingAggsRewriter::new(streaming_id, start_time, end_time);
+        let mut rewriter = StreamingAggsRewriter::new(streaming_id, start_time, end_time).await;
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 

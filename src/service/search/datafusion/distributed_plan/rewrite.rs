@@ -195,14 +195,51 @@ pub struct StreamingAggsRewriter {
     id: String,
     start_time: i64,
     end_time: i64,
+    is_complete_cache_hit: bool,
 }
 
 impl StreamingAggsRewriter {
-    pub fn new(id: String, start_time: i64, end_time: i64) -> Self {
+    pub async fn new(id: String, start_time: i64, end_time: i64) -> Self {
+        let mut is_complete_cache_hit = false;
+        let streaming_item = streaming_aggs_exec::GLOBAL_ID_CACHE.get(&id);
+        if let Some(item) = streaming_item {
+            // Check record batch cache for partition start time and end time
+            let cached_result = match streaming_aggs_exec::check_record_batches_cache(
+                start_time,
+                end_time,
+                &item.get_file_path(),
+            )
+            .await
+            {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    log::warn!(
+                        "[streaming_id {}] StreamingAggsRewriter: error checking cached results: {}",
+                        id,
+                        e
+                    );
+                    None
+                }
+            };
+
+            if let Some(cached_result) = cached_result {
+                is_complete_cache_hit = cached_result.is_complete_match;
+                // Load streaming aggs cache with results from disk
+                if let Err(e) = streaming_aggs_exec::prepare_cache(&id, cached_result) {
+                    log::error!(
+                        "[streaming_id {}] StreamingAggsRewriter: error preparing cache: {}",
+                        id,
+                        e
+                    );
+                }
+            }
+        }
+
         Self {
             id,
             start_time,
             end_time,
+            is_complete_cache_hit,
         }
     }
 }
@@ -229,16 +266,11 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
 
             // Check if this is a complete cache hit
             let streaming_item = streaming_aggs_exec::GLOBAL_ID_CACHE.get(&self.id);
-            let is_complete_cache_hit = if let Some(item) = streaming_item {
-                item.is_complete_cache_hit()
-            } else {
-                false
-            };
 
             log::info!(
                 "[streaming_id {}] StreamingAggsRewriter: cache_strategy={}, cached_batches={}",
                 self.id,
-                if is_complete_cache_hit {
+                if self.is_complete_cache_hit {
                     "complete_hit"
                 } else {
                     "partial_or_miss"
@@ -247,7 +279,7 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             );
 
             // For complete cache hits, create minimal execution plan to avoid expensive operations
-            let input_plan = if is_complete_cache_hit {
+            let input_plan = if self.is_complete_cache_hit {
                 log::info!(
                     "[streaming_id {}] Complete cache hit detected - creating minimal execution plan to bypass: RemoteScanExec->AggregateExec->CoalesceBatchesExec->FilterExec->NewEmptyExec",
                     self.id
@@ -275,7 +307,7 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
                     self.end_time,
                     cached_data,
                     input_plan,
-                    is_complete_cache_hit,
+                    self.is_complete_cache_hit,
                 ),
             ) as _;
             return Ok(Transformed::yes(streaming_node));

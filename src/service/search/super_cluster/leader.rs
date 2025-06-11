@@ -307,7 +307,8 @@ async fn run_datafusion(
 
     // check for streaming aggregation query
     if streaming_output {
-        let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
+        let mut rewriter =
+            StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time).await;
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 

@@ -54,26 +54,13 @@ pub static GLOBAL_ID_CACHE: Lazy<Arc<StreamingIdCache>> =
     Lazy::new(|| Arc::new(StreamingIdCache::default()));
 
 // init streaming cache for the id
-pub fn init_cache(
-    id: &str,
-    start_time: i64,
-    end_time: i64,
-    file_path: &str,
-    is_complete_cache_hit: bool,
-) {
-    GLOBAL_ID_CACHE.insert(
-        id.to_string(),
-        start_time,
-        end_time,
-        file_path.to_string(),
-        is_complete_cache_hit,
-    );
+pub fn init_cache(id: &str, start_time: i64, end_time: i64, file_path: &str) {
+    GLOBAL_ID_CACHE.insert(id.to_string(), start_time, end_time, file_path.to_string());
     log::info!(
-        "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}, is_complete_cache_hit={}",
+        "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}",
         id,
         start_time,
         end_time,
-        is_complete_cache_hit,
     );
 }
 
@@ -481,18 +468,9 @@ impl StreamingIdCache {
         }
     }
 
-    pub fn insert(
-        &self,
-        k: String,
-        start_time: i64,
-        end_time: i64,
-        file_path: String,
-        is_complete_cache_hit: bool,
-    ) {
-        self.data.insert(
-            k,
-            StreamingIdItem::new(start_time, end_time, file_path, is_complete_cache_hit),
-        );
+    pub fn insert(&self, k: String, start_time: i64, end_time: i64, file_path: String) {
+        self.data
+            .insert(k, StreamingIdItem::new(start_time, end_time, file_path));
     }
 
     pub fn exists(&self, k: &str) -> bool {
@@ -538,23 +516,16 @@ pub struct StreamingIdItem {
     start_ok: bool,
     end_ok: bool,
     file_path: String,
-    is_complete_cache_hit: bool,
 }
 
 impl StreamingIdItem {
-    pub fn new(
-        start_time: i64,
-        end_time: i64,
-        file_path: String,
-        is_complete_cache_hit: bool,
-    ) -> Self {
+    pub fn new(start_time: i64, end_time: i64, file_path: String) -> Self {
         Self {
             start_time,
             end_time,
             start_ok: false,
             end_ok: false,
             file_path,
-            is_complete_cache_hit,
         }
     }
 
@@ -570,10 +541,6 @@ impl StreamingIdItem {
 
     pub fn get_file_path(&self) -> String {
         self.file_path.clone()
-    }
-
-    pub fn is_complete_cache_hit(&self) -> bool {
-        self.is_complete_cache_hit
     }
 }
 
