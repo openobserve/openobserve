@@ -383,7 +383,7 @@ test.describe("visualization VRL testcases", () => {
       )
       .click();
 
-    await logsVisualise.applyQueryButtonVisualise();
+    await logsVisualise.runQueryAndWaitForCompletion();
 
     // Change chart types and check for errors each time
     const chartTypes = [
