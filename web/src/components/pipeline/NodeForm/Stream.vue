@@ -241,7 +241,9 @@ watch(
         position: "bottom",
         timeout: 2000,
       });
-      return;
+      //return empty string so that stream name is not saved and user will be notifid and 
+      //will be able to add another stream name
+      return "";
     }
     const regex = /\{[^{}]+\}/g;
     const parts: string[] = [];
