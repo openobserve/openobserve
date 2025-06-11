@@ -318,6 +318,8 @@ pub struct RequestStats {
     pub took_wait_in_queue: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result_cache_ratio: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aggs_cache_ratio: Option<usize>,
     #[serde(default)]
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -344,6 +346,7 @@ impl Default for RequestStats {
             trace_id: None,
             took_wait_in_queue: None,
             result_cache_ratio: None,
+            aggs_cache_ratio: None,
             is_partial: false,
             work_group: None,
             node_name: Some(get_config().common.instance_name.clone()),
@@ -370,6 +373,7 @@ impl From<FileMeta> for RequestStats {
             trace_id: None,
             took_wait_in_queue: None,
             result_cache_ratio: None,
+            aggs_cache_ratio: None,
             is_partial: false,
             work_group: None,
             node_name: None,
