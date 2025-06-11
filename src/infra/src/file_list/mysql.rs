@@ -737,7 +737,7 @@ SELECT date
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
-        let items:Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
+        let items: Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
             r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? ORDER BY created_at ASC LIMIT ?;"#,
         )
         .bind(org_id)
