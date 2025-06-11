@@ -133,6 +133,7 @@ export default defineComponent({
     watch(
       () => variablesData.values,
       (newValues) => {
+        return;
         // Track all changes to log them together
         const changes: any[] = [];
 
@@ -220,7 +221,7 @@ export default defineComponent({
     );
 
     const variableLog = (name: string, message: string) => {
-      console.log(`[Variable: ${name}] ${message}`);
+      // console.log(`[Variable: ${name}] ${message}`);
     };
 
     // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================
@@ -573,7 +574,7 @@ export default defineComponent({
       const endTime = props.selectedTimeDate?.end_time?.getTime();
 
       if (!startTime || !endTime) {
-        console.error("Invalid time range");
+        // console.error("Invalid time range");
         return;
       }
       // Set loading state before initiating WebSocket
@@ -624,7 +625,6 @@ export default defineComponent({
     };
 
     const initializeVariablesData = () => {
-      console.log("Initializing variables data");
 
       // reset the values
       resetVariablesData();
@@ -1121,7 +1121,7 @@ export default defineComponent({
         const { name } = variableObject;
 
         if (!name || !variableObject) {
-          console.error("Invalid variable object", variableObject);
+          // console.error("Invalid variable object", variableObject);
           resolve(false);
           return;
         }
@@ -1222,7 +1222,7 @@ export default defineComponent({
           // await finalizeVariableLoading(variableObject, success);
           resolve(success);
         } catch (error) {
-          console.error(`Error loading variable ${name}:`, error);
+          // console.error(`Error loading variable ${name}:`, error);
           await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
@@ -1312,10 +1312,10 @@ export default defineComponent({
                   return true;
                 }
               } catch (error) {
-                console.error(
-                  `Error fetching field values for variable ${variableObject.name}:`,
-                  error,
-                );
+                // console.error(
+                //   `Error fetching field values for variable ${variableObject.name}:`,
+                //   error,
+                // );
                 return false;
               }
             }
@@ -1632,7 +1632,7 @@ export default defineComponent({
       }
       }
       catch (error) {
-        console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
+        // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
       }
     }
 
@@ -1658,7 +1658,6 @@ export default defineComponent({
      */
     const loadAllVariablesData = async (isInitialLoad = false) => {
 
-      console.log("Loading variables data...", isInitialLoad);
 
       if (isLoading) {
         return;
@@ -1689,9 +1688,9 @@ export default defineComponent({
           !variablesDependencyGraph[variable.name]?.parentVariables?.length,
       );
 
-      console.groupCollapsed("Loading independent variables:");
-      console.log(JSON.stringify(independentVariables, null, 2));
-      console.groupEnd();
+      // console.groupCollapsed("Loading independent variables:");
+      // console.log(JSON.stringify(independentVariables, null, 2));
+      // console.groupEnd();
 
       // Find all dependent variables (variables with dependencies)
       const dependentVariables = variablesData.values.filter(
