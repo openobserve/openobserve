@@ -365,6 +365,7 @@ pub async fn search(
         took_wait_in_queue: Some(res.took_detail.wait_in_queue),
         work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
+        aggs_cache_ratio: Some(res.aggs_cache_ratio),
         ..Default::default()
     };
     report_request_usage_stats(
