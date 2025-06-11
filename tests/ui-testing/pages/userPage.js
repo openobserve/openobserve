@@ -32,6 +32,7 @@ export class UserPage {
 
     
     async selectUserRole(role) {
+        await this.page.waitForSelector('[data-test="user-role-field"]');
         await this.page.locator('[data-test="user-role-field"]').dblclick({ force: true });
         await this.page.waitForLoadState("networkidle");
         await this.page.locator('[data-test="user-role-field"]').pressSequentially(role, { delay: 100 });
@@ -85,7 +86,7 @@ export class UserPage {
 
     async addUserPassword(password) {
        
-        
+        await this.page.waitForSelector('[data-test="user-password-field"]');
         await this.page.locator('[data-test="user-password-field"]').click();
         await this.page.locator('[data-test="user-password-field"]').fill(password);
         

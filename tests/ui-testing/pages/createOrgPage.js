@@ -44,21 +44,29 @@ export class CreateOrgPage {
     }
 
     async navigateToOrg() {
-
+        // Wait for the IAM menu link to be visible
+        await this.page.waitForSelector('[data-test="menu-link-\\/iam-item"]');
         await this.page.locator('[data-test="menu-link-\\/iam-item"]').click();
-        await this.page.locator('[data-test="iam-organizations-tab"]').click();        
+    
+        // Wait for the IAM organizations tab to be visible
+        await this.page.waitForSelector('[data-test="iam-organizations-tab"]');
+        await this.page.locator('[data-test="iam-organizations-tab"]').click();
     }
+    
 
 
     async clickAddOrg() {
+        await this.page.waitForSelector('[data-test="Add Organization"]');
         await this.page.locator('[data-test="Add Organization"]').click();
     }
 
     async fillOrgName(orgName) {
+        await this.page.waitForSelector('[data-test="org-name"]');
         await this.page.locator('[data-test="org-name"]').fill(orgName);
     }
 
     async clickSaveOrg() {
+        await this.page.waitForSelector('[data-test="add-org"]');
         await this.page.locator('[data-test="add-org"]').click();
     }
 
