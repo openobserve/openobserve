@@ -546,15 +546,7 @@ export default defineComponent({
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
-      console.log(
-        "View Dashboard Updating refreshed variables data:",
-        variablesData,
-      );
       Object.assign(refreshedVariablesData, variablesData);
-      console.log(
-        "View Dashboard Updated refreshedVariablesData:",
-        refreshedVariablesData,
-      );
     };
     const isVariablesChanged = computed(() => {
       // Convert both objects to a consistent format for comparison
