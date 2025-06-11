@@ -580,6 +580,7 @@ export const usePanelDataLoader = (
               endISOTimestamp;
 
             // need to break the loop, save the cache
+            // this is async task, which will be executed in background(await is not required)
             saveCurrentStateToCache();
 
             break;
@@ -621,6 +622,7 @@ export const usePanelDataLoader = (
                   partition[0];
 
                 // need to break the loop, save the cache
+                // this is async task, which will be executed in background(await is not required)
                 saveCurrentStateToCache();
 
                 break;
@@ -633,6 +635,7 @@ export const usePanelDataLoader = (
 
         if (i == 0) {
           // if it is last partition, cache the result
+          // this is async task, which will be executed in background(await is not required)
           saveCurrentStateToCache();
         }
       }
@@ -850,6 +853,7 @@ export const usePanelDataLoader = (
     state.isOperationCancelled = false;
 
     // save current state to cache
+    // this is async task, which will be executed in background(await is not required)
     saveCurrentStateToCache();
   };
 
@@ -1180,6 +1184,7 @@ export const usePanelDataLoader = (
         };
         state.annotations = annotationList || [];
 
+        // this is async task, which will be executed in background(await is not required)
         saveCurrentStateToCache();
       } else {
         // copy of current abortController
@@ -1392,6 +1397,7 @@ export const usePanelDataLoader = (
                   state.annotations = annotationList;
 
                   // need to break the loop, save the cache
+                  // this is async task, which will be executed in background(await is not required)
                   saveCurrentStateToCache();
                 } finally {
                   removeTraceId(traceId);
@@ -1474,6 +1480,7 @@ export const usePanelDataLoader = (
                 );
               }
 
+              // this is async task, which will be executed in background(await is not required)
               saveCurrentStateToCache();
             }
           }
