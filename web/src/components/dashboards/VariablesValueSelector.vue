@@ -1214,11 +1214,11 @@ export default defineComponent({
               ?.length > 0;
 
           console.log(
-            `[WebSocket] handleVariableType: IF `, 
-            JSON.stringify(variableObject, null ,2),
+            `[WebSocket] handleVariableType: IF `,
+            JSON.stringify(variableObject, null, 2),
             JSON.stringify(props.initialVariableValues?.value, null, 2),
-            JSON.stringify(oldVariablesData, null, 2)
-          )
+            JSON.stringify(oldVariablesData, null, 2),
+          );
 
           try {
             const queryContext: any = await buildQueryContext(variableObject);
@@ -1227,15 +1227,15 @@ export default defineComponent({
               queryContext,
             );
 
-            // if (
-            //   isWebSocketEnabled(store.state) ||
-            //   isStreamingEnabled(store.state)
-            // ) {
-            //   // For WebSocket, we don't need to wait for the response here
-            //   // as it will be handled by the WebSocket handlers
-            //   fetchFieldValuesWithWebsocket(variableObject, queryContext);
-            //   return true;
-            // } else {
+            if (
+              isWebSocketEnabled(store.state) ||
+              isStreamingEnabled(store.state)
+            ) {
+              // For WebSocket, we don't need to wait for the response here
+              // as it will be handled by the WebSocket handlers
+              fetchFieldValuesWithWebsocket(variableObject, queryContext);
+              return true;
+            } else {
               // For REST API, we handle the response directly
               const response = await fetchFieldValuesREST(
                 variableObject,
@@ -1252,7 +1252,7 @@ export default defineComponent({
                 );
                 return true;
               }
-            // }
+            }
             return false;
           } catch (error) {
             console.log(
@@ -1512,7 +1512,6 @@ export default defineComponent({
         variableObject.isVariableLoadingPending = false;
       }
     };
-
 
     /**
      * Loads options for a variable when its dropdown is opened.
