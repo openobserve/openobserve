@@ -18,5 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <!-- <zinc-logs pageType="logs"></zinc-logs> -->
-  <zinc-logs></zinc-logs>
+  <zinc-logs key="zinc-logs"></zinc-logs>
 </template>
+
+<script setup lang="ts">
+import { useStore } from "vuex";
+
+const store = useStore();
+</script>
