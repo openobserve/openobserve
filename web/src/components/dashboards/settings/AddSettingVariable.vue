@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   flat
                   round
-                  :disable="variableData.options.length === 1"
+                  :disable="variableData?.options?.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
                   icon="cancel"
@@ -914,7 +914,7 @@ export default defineComponent({
     };
 
     const removeField = (index: any) => {
-      if (variableData.options.length === 1) {
+      if (variableData?.options?.length === 1) {
         return;
       }
       variableData.options.splice(index, 1);
