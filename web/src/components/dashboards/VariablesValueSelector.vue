@@ -664,8 +664,8 @@ export default defineComponent({
           isLoading: false,
           // isVariableLoadingPending is used to check that variable loading is pending
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
-          isVariableLoadingPending: true,
-          isVariablePartialLoaded: false,
+          isVariableLoadingPending: false,
+          isVariablePartialLoaded: true,
         };
 
         variableLog(
@@ -755,8 +755,13 @@ export default defineComponent({
 
     const rejectAllPromises = () => {
       Object.keys(currentlyExecutingPromises).forEach((key) => {
-        if (currentlyExecutingPromises[key])
+        if (currentlyExecutingPromises[key]) {
+          variableLog(
+            key,
+            `Rejecting currently executing promise: ${currentlyExecutingPromises[key]}`,
+          );
           currentlyExecutingPromises[key](false);
+        }
       });
     };
 
@@ -1123,6 +1128,7 @@ export default defineComponent({
 
         // If the variable is already being processed, cancel the previous request
         if (currentlyExecutingPromises[name]) {
+          variableLog(name, "Canceling previous request");
           currentlyExecutingPromises[name](false);
         }
         currentlyExecutingPromises[name] = reject;
@@ -1137,6 +1143,10 @@ export default defineComponent({
           if (!areDatesValid) {
             variableObject.isLoading = false;
             variableObject.isVariableLoadingPending = false;
+            variableLog(
+              variableObject.name,
+              `Invalid date range for variable ${name}, skipping load`
+            )
             resolve(false);
             return;
           }
@@ -1268,36 +1278,45 @@ export default defineComponent({
               fetchFieldValuesWithWebsocket(variableObject, queryContext);
               return true;
             } else {
-              // For REST API, we handle the response directly
-              const response = await fetchFieldValuesREST(
-                variableObject,
-                queryContext,
-              );
-              if (response?.data?.hits) {
 
-                const originalValue = JSON.parse(
-                  JSON.stringify(variableObject.value),
+              try {
+                // For REST API, we handle the response directly
+                const response = await fetchFieldValuesREST(
+                  variableObject,
+                  queryContext,
                 );
+                if (response?.data?.hits) {
 
-                updateVariableOptions(variableObject, response.data.hits);
+                  const originalValue = JSON.parse(
+                    JSON.stringify(variableObject.value),
+                  );
 
-                const hasValueChanged =
-                  Array.isArray(originalValue) &&
-                    Array.isArray(variableObject.value)
-                    ? JSON.stringify(originalValue) !==
-                    JSON.stringify(variableObject.value)
-                    : originalValue !== variableObject.value;
+                  updateVariableOptions(variableObject, response.data.hits);
+
+                  const hasValueChanged =
+                    Array.isArray(originalValue) &&
+                      Array.isArray(variableObject.value)
+                      ? JSON.stringify(originalValue) !==
+                      JSON.stringify(variableObject.value)
+                      : originalValue !== variableObject.value;
 
 
-                if (hasValueChanged) {
-                  finalizePartialVariableLoading(variableObject, true);
-                } else {
-                  // just set the partially loaded state
-                  variableObject.isVariablePartialLoaded = true;
+                  if (hasValueChanged) {
+                    finalizePartialVariableLoading(variableObject, true);
+                  } else {
+                    // just set the partially loaded state
+                    variableObject.isVariablePartialLoaded = true;
+                  }
+
+                  finalizeVariableLoading(variableObject, true);
+                  return true;
                 }
-
-                finalizeVariableLoading(variableObject, true);
-                return true;
+              } catch (error) {
+                console.error(
+                  `Error fetching field values for variable ${variableObject.name}:`,
+                  error,
+                );
+                return false;
               }
             }
             return false;
@@ -1558,6 +1577,10 @@ export default defineComponent({
       variableObject: any,
       success: boolean,
     ) => {
+
+      try {
+
+
       variableLog(
         variableObject.name,
         `finalizePartialVariableLoading: ${success}, ${JSON.stringify(variableObject)}`,
@@ -1596,12 +1619,20 @@ export default defineComponent({
             variableObject.name,
             `finalizePartialVariableLoading: loading child variables: ${childVariables}, ${JSON.stringify(childVariableObjects)}`,
           );
-          await Promise.all(
+          const results = await Promise.all(
             childVariableObjects.map((childVariable: any) =>
               loadSingleVariableDataByName(childVariable),
             ),
           );
+
+          variableLog(
+            variableObject.name,
+            `finalizePartialVariableLoading: child variables results: ${JSON.stringify(results)}`);
         }
+      }
+      }
+      catch (error) {
+        console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
       }
     }
 
@@ -1761,9 +1792,16 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when all dependent variables have been updated.
      */
     const onVariablesValueUpdated = async (variableIndex: number) => {
+
       if (variableIndex < 0) return;
 
       const currentVariable = variablesData.values[variableIndex];
+
+      variableLog(
+        currentVariable.name,
+        `onVariablesValueUpdated: ${JSON.stringify(currentVariable)}`,
+      );
+
       // if currentVariable is undefined, return
       if (!currentVariable) {
         return;
