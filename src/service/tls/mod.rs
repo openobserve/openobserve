@@ -20,15 +20,11 @@ use std::{
 };
 
 use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert_store};
-use itertools::Itertools as _;
-use rustls::{
-    ClientConfig, ServerConfig,
-    crypto::{CryptoProvider, ring::default_provider},
-};
+use itertools::Itertools;
 use rustls_pemfile::{certs, private_key};
 use x509_parser::prelude::*;
 
-pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
+pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
     let cfg = config::get_config();
     let cert_file =
         &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
@@ -56,7 +52,7 @@ pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
         _ => rustls::DEFAULT_VERSIONS,
     };
 
-    let tls_config = ServerConfig::builder_with_protocol_versions(versions)
+    let tls_config = rustls::ServerConfig::builder_with_protocol_versions(versions)
         .with_no_client_auth()
         .with_single_cert(
             cert_chain.try_collect::<_, Vec<_>, _>()?,
@@ -66,7 +62,7 @@ pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
     Ok(tls_config)
 }
 
-pub fn client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
+pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
     let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
         native_roots_cert_store()?
@@ -86,7 +82,7 @@ pub fn client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
         cert_store
     };
 
-    let mut config = ClientConfig::builder()
+    let mut config = rustls::ClientConfig::builder()
         .with_root_certificates(cert_store)
         .with_no_client_auth();
 
@@ -100,9 +96,8 @@ pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
     todo!()
 }
 
-pub fn tcp_tls_server_config() -> Result<ServerConfig, anyhow::Error> {
+pub fn tcp_tls_server_config() -> Result<rustls::ServerConfig, anyhow::Error> {
     let cfg = config::get_config();
-    let _ = CryptoProvider::install_default(default_provider());
     let cert_file = &mut BufReader::new(std::fs::File::open(&cfg.tcp.tcp_tls_cert_path).map_err(
         |e| {
             anyhow::anyhow!(
@@ -123,7 +118,7 @@ pub fn tcp_tls_server_config() -> Result<ServerConfig, anyhow::Error> {
 
     let cert_chain = certs(cert_file);
 
-    let tls_config = ServerConfig::builder_with_protocol_versions(rustls::DEFAULT_VERSIONS)
+    let tls_config = rustls::ServerConfig::builder_with_protocol_versions(rustls::DEFAULT_VERSIONS)
         .with_no_client_auth()
         .with_single_cert(
             cert_chain.try_collect::<_, Vec<_>, _>()?,
@@ -133,7 +128,7 @@ pub fn tcp_tls_server_config() -> Result<ServerConfig, anyhow::Error> {
     Ok(tls_config)
 }
 
-pub fn tcp_tls_self_connect_client_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
+pub fn tcp_tls_self_connect_client_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
     let config = if cfg.tcp.tcp_tls_enabled {
         let mut cert_store = webpki_roots_cert_store();
@@ -149,11 +144,11 @@ pub fn tcp_tls_self_connect_client_config() -> Result<Arc<ClientConfig>, anyhow:
         let cert_chain = certs(cert_file);
         cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
 
-        ClientConfig::builder()
+        rustls::ClientConfig::builder()
             .with_root_certificates(cert_store)
             .with_no_client_auth()
     } else {
-        ClientConfig::builder()
+        rustls::ClientConfig::builder()
             .with_root_certificates(webpki_roots_cert_store())
             .with_no_client_auth()
     };
