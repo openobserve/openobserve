@@ -216,13 +216,16 @@ pub fn get_server_url_from_cert(cert: &[u8]) -> Result<String, anyhow::Error> {
                                 ));
                             }
                         }
+                        return Err(anyhow::anyhow!(
+                            "Failed to parse certificate, could not find DNS name or IP address in SAN"
+                        ));
                     }
                     _ => {
                         continue;
                     }
                 }
             }
-            if result != "" {
+            if !result.is_empty() {
                 Ok(result)
             } else {
                 Err(anyhow::anyhow!(
@@ -244,7 +247,7 @@ mod tests {
     fn test_get_server_url_from_cert_prefers_dns_name() {
         // Generate an example certificate
         let subject_alt_names = vec!["127.0.0.1".to_string(), "example.com".to_string()];
-        let CertifiedKey { cert, key_pair } =
+        let CertifiedKey { cert, key_pair: _ } =
             generate_simple_self_signed(subject_alt_names).unwrap();
         let result = get_server_url_from_cert(cert.der().iter().as_slice());
         assert_eq!(result.unwrap(), "example.com");
@@ -254,7 +257,7 @@ mod tests {
     fn test_get_server_url_from_cert_gets_ip_addr_v4() {
         // Generate an example certificate
         let subject_alt_names = vec!["127.0.0.1".to_string()];
-        let CertifiedKey { cert, key_pair } =
+        let CertifiedKey { cert, key_pair: _ } =
             generate_simple_self_signed(subject_alt_names).unwrap();
         let result = get_server_url_from_cert(cert.der().iter().as_slice());
         assert_eq!(result.unwrap(), "127.0.0.1");
@@ -264,7 +267,7 @@ mod tests {
     fn test_get_server_url_from_cert_gets_ip_addr_v6() {
         // Generate an example certificate
         let subject_alt_names = vec!["2001:db8:85a3::8a2e:370:7334".to_string()];
-        let CertifiedKey { cert, key_pair } =
+        let CertifiedKey { cert, key_pair: _ } =
             generate_simple_self_signed(subject_alt_names).unwrap();
         let result = get_server_url_from_cert(cert.der().iter().as_slice());
         assert_eq!(result.unwrap(), "2001:db8:85a3::8a2e:370:7334");
