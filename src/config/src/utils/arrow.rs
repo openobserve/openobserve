@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,4 +54,128 @@ pub fn record_batches_to_json_rows(
     // }
 
     Ok(ret)
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::{
+        array::{Int32Array, StringArray, UInt64Array},
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    };
+
+    use super::*;
+
+    fn create_test_batch() -> RecordBatch {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("value", DataType::UInt64, false),
+        ]);
+
+        let id_array = Int32Array::from(vec![1, 2, 3]);
+        let name_array = StringArray::from(vec!["Alice", "Bob", "Charlie"]);
+        let value_array = UInt64Array::from(vec![100, 200, 300]);
+
+        RecordBatch::try_new(
+            schema.into(),
+            vec![
+                std::sync::Arc::new(id_array),
+                std::sync::Arc::new(name_array),
+                std::sync::Arc::new(value_array),
+            ],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_record_batches_to_json_rows_empty() {
+        let result = record_batches_to_json_rows(&[]).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_record_batches_to_json_rows_single_batch() {
+        let batch = create_test_batch();
+        let result = record_batches_to_json_rows(&[&batch]).unwrap();
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0]["id"], 1);
+        assert_eq!(result[0]["name"], "Alice");
+        assert_eq!(result[0]["value"], 100);
+        assert_eq!(result[1]["id"], 2);
+        assert_eq!(result[1]["name"], "Bob");
+        assert_eq!(result[1]["value"], 200);
+        assert_eq!(result[2]["id"], 3);
+        assert_eq!(result[2]["name"], "Charlie");
+        assert_eq!(result[2]["value"], 300);
+    }
+
+    #[test]
+    fn test_record_batches_to_json_rows_multiple_batches() {
+        let batch1 = create_test_batch();
+        let batch2 = create_test_batch();
+        let result = record_batches_to_json_rows(&[&batch1, &batch2]).unwrap();
+
+        assert_eq!(result.len(), 6);
+        // First batch
+        assert_eq!(result[0]["id"], 1);
+        assert_eq!(result[0]["name"], "Alice");
+        assert_eq!(result[0]["value"], 100);
+        // Second batch
+        assert_eq!(result[3]["id"], 1);
+        assert_eq!(result[3]["name"], "Alice");
+        assert_eq!(result[3]["value"], 100);
+    }
+
+    #[test]
+    fn test_record_batches_to_json_rows_empty_batch() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, false),
+        ]);
+
+        let id_array = Int32Array::from(Vec::<i32>::new());
+        let name_array = StringArray::from(Vec::<String>::new());
+
+        let batch = RecordBatch::try_new(
+            schema.into(),
+            vec![
+                std::sync::Arc::new(id_array),
+                std::sync::Arc::new(name_array),
+            ],
+        )
+        .unwrap();
+
+        let result = record_batches_to_json_rows(&[&batch]).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_record_batches_to_json_rows_nullable_fields() {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, true),
+            Field::new("name", DataType::Utf8, true),
+        ]);
+
+        let id_array = Int32Array::from(vec![Some(1), None, Some(3)]);
+        let name_array = StringArray::from(vec![Some("Alice"), None, Some("Charlie")]);
+
+        let batch = RecordBatch::try_new(
+            schema.into(),
+            vec![
+                std::sync::Arc::new(id_array),
+                std::sync::Arc::new(name_array),
+            ],
+        )
+        .unwrap();
+
+        let result = record_batches_to_json_rows(&[&batch]).unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0]["id"], 1);
+        assert_eq!(result[0]["name"], "Alice");
+        assert!(result[1].is_empty());
+        assert_eq!(result[2]["id"], 3);
+        assert_eq!(result[2]["name"], "Charlie");
+    }
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,8 +24,8 @@ use super::{cacher::get_results, sort_response};
 use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
     service::search::cache::{
-        result_utils::{get_ts_value, round_down_to_nearest_minute},
         CachedQueryResponse,
+        result_utils::{get_ts_value, round_down_to_nearest_minute},
     },
 };
 
@@ -249,6 +249,21 @@ async fn recursive_process_multiple_metas(
     Ok(())
 }
 
+/// Cache selection strategies determine how to choose the best cached result when multiple caches
+/// exist:
+///
+/// 1. Overlap: Selects cache with maximum overlap with query time range Example: Query:
+///    10:00-10:30, Cache1: 10:00-10:15, Cache2: 10:10-10:25 Chooses Cache2 (15min overlap) over
+///    Cache1 (10min overlap)
+///
+/// 2. Duration: Selects cache with longest duration regardless of overlap Example: Query:
+///    10:00-10:30, Cache1: 09:00-10:00, Cache2: 09:30-10:30   Chooses Cache1 (1hr) over Cache2
+///    (30min)
+///
+/// 3. Both: Calculates what percentage of the cache duration overlaps with query Example: Query:
+///    10:00-11:00 Cache1: 10:00-10:30 (duration: 30min, overlap: 30min) = (30/30)*100 = 100%
+///    Cache2: 10:15-11:15 (duration: 60min, overlap: 45min) = (45/60)*100 = 75% Chooses Cache1
+///    because 100% of its duration is useful for the query
 fn select_cache_meta(
     meta: &ResultCacheMeta,
     req: &CacheQueryRequest,
@@ -302,6 +317,224 @@ fn get_allowed_up_to(
             m_last_ts - discard_duration
         } else {
             last_ts
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use infra::cache::meta::ResultCacheMeta;
+
+    use super::*;
+
+    fn create_test_cache_meta(start_time: i64, end_time: i64) -> ResultCacheMeta {
+        ResultCacheMeta {
+            start_time,
+            end_time,
+            is_aggregate: false,
+            is_descending: false,
+        }
+    }
+
+    fn create_test_cache_request(q_start_time: i64, q_end_time: i64) -> CacheQueryRequest {
+        CacheQueryRequest {
+            q_start_time,
+            q_end_time,
+            is_aggregate: false,
+            ts_column: "_timestamp".to_string(),
+            discard_interval: 0,
+            is_descending: false,
+        }
+    }
+
+    #[test]
+    fn test_select_cache_meta_overlap_strategy() {
+        let strategy = ResultCacheSelectionStrategy::Overlap;
+
+        // Test case 1: Complete overlap
+        let meta = create_test_cache_meta(100, 200);
+        let req = create_test_cache_request(150, 180);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 30); // overlap: 180 - 150 = 30
+
+        // Test case 2: Partial overlap (cache starts before query)
+        let meta = create_test_cache_meta(50, 150);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 50); // overlap: 150 - 100 = 50
+
+        // Test case 3: Partial overlap (cache starts after query)
+        let meta = create_test_cache_meta(150, 250);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 50); // overlap: 200 - 150 = 50
+
+        // Test case 4: No overlap (cache is before query)
+        let meta = create_test_cache_meta(50, 80);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, -20); // overlap: 80 - 100 = -20 (negative means no overlap)
+
+        // Test case 5: No overlap (cache is after query)
+        let meta = create_test_cache_meta(250, 300);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, -50); // overlap: 200 - 250 = -50 (negative means no overlap)
+
+        // Test case 6: Cache completely contains query
+        let meta = create_test_cache_meta(50, 300);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 100); // overlap: 200 - 100 = 100
+    }
+
+    #[test]
+    fn test_select_cache_meta_duration_strategy() {
+        let strategy = ResultCacheSelectionStrategy::Duration;
+        let req = create_test_cache_request(100, 200); // Query parameters don't affect duration strategy
+
+        // Test case 1: Short duration cache
+        let meta = create_test_cache_meta(100, 150);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 50); // duration: 150 - 100 = 50
+
+        // Test case 2: Long duration cache
+        let meta = create_test_cache_meta(50, 300);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 250); // duration: 300 - 50 = 250
+
+        // Test case 3: Zero duration cache (edge case)
+        let meta = create_test_cache_meta(100, 100);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 0); // duration: 100 - 100 = 0
+
+        // Test case 4: Negative duration (edge case - shouldn't happen but testing robustness)
+        let meta = create_test_cache_meta(200, 100);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, -100); // duration: 100 - 200 = -100
+    }
+
+    #[test]
+    fn test_select_cache_meta_both_strategy() {
+        let strategy = ResultCacheSelectionStrategy::Both;
+
+        // Test case 1: 100% overlap (query completely within cache)
+        let meta = create_test_cache_meta(50, 300);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 40); // overlap: 100, cache_duration: 250, (100 * 100) / 250 = 40
+
+        // Test case 2: 50% overlap
+        let meta = create_test_cache_meta(100, 200);
+        let req = create_test_cache_request(150, 250);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 50); // overlap: 50, cache_duration: 100, (50 * 100) / 100 = 50
+
+        // Test case 3: 25% overlap
+        let meta = create_test_cache_meta(100, 400);
+        let req = create_test_cache_request(350, 450);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 16); // overlap: 50, cache_duration: 300, (50 * 100) / 300 = 16.66... = 16 (integer division)
+
+        // Test case 4: Zero duration cache (edge case)
+        let meta = create_test_cache_meta(100, 100);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 0); // Special case: cache_duration = 0, returns 0
+
+        // Test case 5: No overlap
+        let meta = create_test_cache_meta(100, 150);
+        let req = create_test_cache_request(200, 300);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, -100); // overlap: -50, cache_duration: 50, (-50 * 100) / 50 = -100
+
+        // Test case 6: Perfect match (cache and query have same time range)
+        let meta = create_test_cache_meta(100, 200);
+        let req = create_test_cache_request(100, 200);
+        let score = select_cache_meta(&meta, &req, &strategy);
+        assert_eq!(score, 100); // overlap: 100, cache_duration: 100, (100 * 100) / 100 = 100
+    }
+
+    #[test]
+    fn test_select_cache_meta_edge_cases() {
+        // Test with zero time ranges
+        let meta = create_test_cache_meta(0, 0);
+        let req = create_test_cache_request(0, 0);
+
+        let overlap_score = select_cache_meta(&meta, &req, &ResultCacheSelectionStrategy::Overlap);
+        assert_eq!(overlap_score, 0);
+
+        let duration_score =
+            select_cache_meta(&meta, &req, &ResultCacheSelectionStrategy::Duration);
+        assert_eq!(duration_score, 0);
+
+        let both_score = select_cache_meta(&meta, &req, &ResultCacheSelectionStrategy::Both);
+        assert_eq!(both_score, 0);
+    }
+
+    #[test]
+    fn test_select_cache_meta_large_numbers() {
+        // Test with large timestamp values (microseconds)
+        let meta = create_test_cache_meta(1_640_995_200_000_000, 1_640_995_260_000_000); // 60 seconds
+        let req = create_test_cache_request(1_640_995_230_000_000, 1_640_995_290_000_000); // 60 seconds, 30s overlap
+
+        let overlap_score = select_cache_meta(&meta, &req, &ResultCacheSelectionStrategy::Overlap);
+        assert_eq!(overlap_score, 30_000_000); // 30 seconds in microseconds
+
+        let duration_score =
+            select_cache_meta(&meta, &req, &ResultCacheSelectionStrategy::Duration);
+        assert_eq!(duration_score, 60_000_000); // 60 seconds in microseconds
+
+        let both_score = select_cache_meta(&meta, &req, &ResultCacheSelectionStrategy::Both);
+        assert_eq!(both_score, 50); // (30_000_000 * 100) / 60_000_000 = 50
+    }
+
+    #[test]
+    fn test_select_cache_meta_comparison_scenarios() {
+        let req = create_test_cache_request(100, 200);
+
+        // Cache 1: Shorter duration but worse overlap
+        let cache1 = create_test_cache_meta(120, 180);
+        // Cache 2: Longer duration but better overlap
+        let cache2 = create_test_cache_meta(50, 250);
+
+        // Overlap strategy should prefer cache2 (better overlap)
+        let overlap_score1 =
+            select_cache_meta(&cache1, &req, &ResultCacheSelectionStrategy::Overlap);
+        let overlap_score2 =
+            select_cache_meta(&cache2, &req, &ResultCacheSelectionStrategy::Overlap);
+        assert!(overlap_score2 > overlap_score1); // 100 > 60
+
+        // Duration strategy should prefer cache2 (longer duration)
+        let duration_score1 =
+            select_cache_meta(&cache1, &req, &ResultCacheSelectionStrategy::Duration);
+        let duration_score2 =
+            select_cache_meta(&cache2, &req, &ResultCacheSelectionStrategy::Duration);
+        assert!(duration_score2 > duration_score1); // 200 > 60
+
+        // Both strategy balances overlap efficiency
+        let both_score1 = select_cache_meta(&cache1, &req, &ResultCacheSelectionStrategy::Both);
+        let both_score2 = select_cache_meta(&cache2, &req, &ResultCacheSelectionStrategy::Both);
+        assert!(both_score1 > both_score2); // cache1: 100% efficiency (60/60), cache2: 50% efficiency (100/200)
+    }
+
+    #[test]
+    fn test_select_cache_meta_all_strategies_consistency() {
+        // Test that all strategies return expected types and don't panic
+        let meta = create_test_cache_meta(100, 200);
+        let req = create_test_cache_request(150, 250);
+
+        // All strategies should return i64 values without panicking
+        let strategies = [
+            ResultCacheSelectionStrategy::Overlap,
+            ResultCacheSelectionStrategy::Duration,
+            ResultCacheSelectionStrategy::Both,
+        ];
+
+        for strategy in strategies.iter() {
+            let score = select_cache_meta(&meta, &req, strategy);
+            // Score should be a valid i64 (no overflow/underflow for reasonable inputs)
+            assert!(score >= i64::MIN && score <= i64::MAX);
         }
     }
 }

@@ -25,8 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       class="flex"
     >
-      <div
-         :style="{ width: leftWidth + 'px' }"  >
+      <div :style="{ width: leftWidth + 'px' }">
         <div
           :style="{
             height: '100%',
@@ -99,12 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-red-6 q-mr-xs"
                 title="Error Span"
               />
-              <span class="text-subtitle2 text-bold q-mr-sm"  
-                  :class="{
-                  highlighted: isHighlighted(index),
-                  'tw-text-gray-900': store.state.theme === 'dark' && isHighlighted(index),
-                  'current-match': currentSelectedValue === index, // Current match class
-              }">
+              <span
+                class="text-subtitle2 text-bold q-mr-sm"
+                :class="{
+                  highlighted: isHighlighted(span.spanId),
+                  'tw-text-gray-900':
+                    store.state.theme === 'dark' && isHighlighted(span.spanId),
+                  'current-match': currentSelectedValue === span.spanId, // Current match class
+                }"
+              >
                 {{ span.serviceName }}
               </span>
               <span
@@ -156,7 +158,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, nextTick, ref,watch ,defineExpose, computed} from "vue";
+import {
+  defineComponent,
+  onBeforeMount,
+  nextTick,
+  ref,
+  watch,
+  defineExpose,
+  computed,
+} from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -203,14 +213,19 @@ export default defineComponent({
     },
     searchQuery: {
       type: String,
-      default: '',
+      default: "",
     },
     spanList: {
       type: Array,
       default: () => [],
     },
   },
-  emits: ["toggleCollapse", "selectSpan","update-current-index","search-result"],
+  emits: [
+    "toggleCollapse",
+    "selectSpan",
+    "update-current-index",
+    "search-result",
+  ],
   setup(props, { emit }) {
     const { searchObj, buildQueryDetails, navigateToLogs } = useTraces();
     const store = useStore();
@@ -242,10 +257,10 @@ export default defineComponent({
       return searchResults.value[currentIndex.value ?? 0];
     });
 
-    const findMatches = (spanList:any, searchQuery:any) => {
+    const findMatches = (spanList: any, searchQuery: any) => {
       const query = searchQuery.toLowerCase().trim();
       return spanList
-        .map((span:any, index:any) => {
+        .map((span: any, index: any) => {
           // Check if any span value matches the query
           const matches = Object.entries(span).some(([key, value]) => {
             if (typeof value === "string" || typeof value === "number") {
@@ -262,13 +277,14 @@ export default defineComponent({
             return false; // Skip non-string/non-number values
           });
           // Return the index if a match is found, otherwise return -1
-          return matches ? index : -1;
+          return matches ? span.span_id : -1;
         })
-        .filter((index:any) => index !== -1);
+        .filter((index: any) => index !== -1);
     };
     const updateSearch = () => {
       if (props.searchQuery?.trim()) {
         searchResults.value = findMatches(props.spanList, props.searchQuery);
+        console.log("Search Results", searchResults.value);
         currentIndex.value = 0; // Reset to first match
         nextTick(() => {
           scrollToMatch(); // Wait for DOM updates before scrolling
@@ -282,8 +298,8 @@ export default defineComponent({
     const isHighlighted = (path: any) => {
       // If the path is an array, join it and compare with resultPath joined
       if (Array.isArray(path)) {
-        return searchResults.value.some((resultPath: any) =>
-          resultPath.join(',') === path.join(',')
+        return searchResults.value.some(
+          (resultPath: any) => resultPath.join(",") === path.join(","),
         );
       }
 
@@ -296,15 +312,18 @@ export default defineComponent({
         const matchElement = document.querySelector(`.current-match`);
         if (matchElement) {
           matchElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
+            behavior: "smooth",
+            block: "center",
           });
         }
       }
     };
 
     const nextMatch = () => {
-     if (currentIndex.value !== null && currentIndex.value < searchResults.value.length - 1) {
+      if (
+        currentIndex.value !== null &&
+        currentIndex.value < searchResults.value.length - 1
+      ) {
         currentIndex.value++;
         nextTick(() => {
           scrollToMatch(); // Wait for DOM updates before scrolling
@@ -322,17 +341,20 @@ export default defineComponent({
     };
     defineExpose({
       nextMatch,
-      prevMatch
+      prevMatch,
     });
 
-    watch(() => props.searchQuery, (newValue) => {
-      updateSearch();
-    });
+    watch(
+      () => props.searchQuery,
+      (newValue) => {
+        updateSearch();
+      },
+    );
     watch(currentIndex, (newValue) => {
-      emit('update-current-index', newValue);
+      emit("update-current-index", newValue);
     });
     watch(searchResults, (newValue) => {
-      emit('search-result', newValue.length);
+      emit("search-result", newValue.length);
     });
 
     return {
@@ -349,7 +371,7 @@ export default defineComponent({
       nextMatch,
       prevMatch,
       isHighlighted,
-      currentSelectedValue
+      currentSelectedValue,
     };
   },
   components: { SpanBlock },
@@ -398,7 +420,7 @@ export default defineComponent({
     width: auto;
   }
 }
-.border-right{
+.border-right {
   border-right: 1px solid rgb(236, 236, 236);
 }
 .highlighted {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,3 +16,28 @@
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_constants() {
+        assert_eq!(LOGS, "logs");
+        assert_eq!(METRICS, "metrics");
+        assert_eq!(TRACES, "traces");
+    }
+
+    #[test]
+    fn test_service_constants_are_unique() {
+        let services = vec![LOGS, METRICS, TRACES];
+        for i in 0..services.len() {
+            for j in (i + 1)..services.len() {
+                assert_ne!(
+                    services[i], services[j],
+                    "Service constants should be unique"
+                );
+            }
+        }
+    }
+}

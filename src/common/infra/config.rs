@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,53 +16,61 @@
 use std::sync::Arc;
 
 use config::{
+    RwAHashMap, RwHashMap,
     meta::{
         alerts::alert::Alert,
         destinations::{Destination, Template},
+        folder::Folder,
         function::Transform,
         promql::ClusterLeader,
+        ratelimit::CachedUserRoles,
         stream::StreamParams,
+        user::User,
     },
-    RwAHashMap, RwHashMap,
 };
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use tokio::sync::{RwLock as TokioRwLock, mpsc};
 use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        maxmind::MaxmindClient, organization::OrganizationSetting, syslog::SyslogRoute, user::User,
+        maxmind::MaxmindClient,
+        organization::{Organization, OrganizationSetting},
+        syslog::SyslogRoute,
     },
-    handler::http::request::websocket::session::WsSession,
+    handler::http::request::ws::session::WsSession,
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
     },
 };
 
-// global version variables
-pub static VERSION: &str = env!("GIT_VERSION");
-pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
-pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
-
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
-pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
-pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
+pub static USERS: Lazy<RwHashMap<String, infra::table::users::UserRecord>> =
+    Lazy::new(DashMap::default);
+pub static ORG_USERS: Lazy<RwHashMap<String, infra::table::org_users::OrgUserRecord>> =
+    Lazy::new(DashMap::default);
+pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, infra::table::org_users::OrgUserRecord>>> =
     Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+pub static ORGANIZATIONS: Lazy<Arc<RwAHashMap<String, Organization>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<Alert>>> = Lazy::new(Default::default);
+pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<String>>> = Lazy::new(Default::default);
+pub static ALERTS: Lazy<RwAHashMap<String, (Folder, Alert)>> = Lazy::new(Default::default);
+// Key for realtime alert triggers cache is org/alert_id
 pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
@@ -93,4 +101,65 @@ pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 // TODO: Implement rate limiting for maximum number of sessions
-pub static WS_SESSIONS: Lazy<RwHashMap<String, WsSession>> = Lazy::new(DashMap::default);
+// Querier Connection Pool
+pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<TokioRwLock<WsSession>>>> =
+    Lazy::new(Default::default);
+pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
+    Lazy::new(Default::default);
+
+/// Refreshes in-memory cache in the event of NATs restart.
+///
+/// We should add all in-memory caches listed above that a CacheMiss is not followed by
+/// reading from db, e.g. UserSession, Pipeline
+pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::nats::NatsEvent>) {
+    let mut first_conenction = true;
+    while let Some(event) = nats_event_rx.recv().await {
+        if let infra::db::nats::NatsEvent::Connected = event {
+            // Skip refreshing if it's the first time connecting to the client
+            if first_conenction {
+                first_conenction = false;
+                continue;
+            }
+            log::info!(
+                "[infra::config] received NATs event: {event}, refreshing in-memory cache for Alerts, Pipelines, RealtimeTriggers, Schema, Users, and UserSessions"
+            );
+            if let Err(e) = crate::service::db::alerts::alert::cache().await {
+                log::error!("Error refreshing in-memory cache \"Alerts\": {}", e);
+            }
+            if let Err(e) = crate::service::db::pipeline::cache().await {
+                log::error!("Error refreshing in-memory cache \"Pipelines\": {}", e);
+            }
+            if let Err(e) = crate::service::db::alerts::realtime_triggers::cache().await {
+                log::error!(
+                    "Error refreshing in-memory cache \"RealtimeTriggers\": {}",
+                    e
+                );
+            }
+            if let Err(e) = crate::service::db::schema::cache().await {
+                log::error!("Error refreshing in-memory cache \"Schema\": {}", e);
+            }
+            if let Err(e) = crate::service::db::session::cache().await {
+                log::error!("Error refreshing in-memory cache \"UserSessions\": {}", e);
+            }
+            if let Err(e) = crate::service::db::user::cache().await {
+                log::error!("Error refreshing in-memory cache \"Users\": {}", e);
+            }
+        }
+    }
+
+    log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_update_cache() {
+        let (tx, rx) = mpsc::channel(100);
+        tokio::spawn(async move { update_cache(rx).await });
+        tx.send(infra::db::nats::NatsEvent::Connected)
+            .await
+            .unwrap();
+    }
+}

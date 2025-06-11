@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,9 @@ use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
+        ConditionList, QueryCondition as MetaQueryCondition,
+        TriggerCondition as MetaTriggerCondition,
         alert::{Alert as MetaAlert, ListAlertsParams},
-        QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
     },
     folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
@@ -27,8 +28,9 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DeriveIden, EntityTrait, ModelTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel, prelude::Expr,
+    sea_query::Func,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -72,7 +74,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .context_attributes
             .map(serde_json::from_value)
             .transpose()?;
-        let query_conditions: Option<Vec<intermediate::QueryCondition>> = value
+        let query_conditions: Option<ConditionList> = value
             .query_conditions
             .map(serde_json::from_value)
             .transpose()?;
@@ -96,50 +98,51 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .and_then(|secs| Utc.timestamp_opt(secs, 0).single())
             .map(|dt: DateTime<Utc>| dt.into());
 
-        let alert = Self {
-            id: Some(id),
-            name: value.name,
-            org_id: value.org,
-            stream_type: stream_type.into(),
-            stream_name: value.stream_name,
-            is_real_time: value.is_real_time,
-            destinations,
-            context_attributes,
-            row_template: value.row_template.unwrap_or_default(),
-            description: value.description.unwrap_or_default(),
-            enabled: value.enabled,
-            tz_offset: value.tz_offset,
-            last_triggered_at: value.last_triggered_at,
-            last_satisfied_at: value.last_satisfied_at,
-            owner: value.owner,
-            updated_at: updated_at_utc,
-            last_edited_by: value.last_edited_by,
-            query_condition: MetaQueryCondition {
-                query_type: query_type.into(),
-                conditions: query_conditions.map(|cs| cs.into_iter().map(|c| c.into()).collect()),
-                sql: value.query_sql,
-                promql: value.query_promql,
-                promql_condition: query_promql_condition.map(|c| c.into()),
-                aggregation: query_aggregation.map(|a| a.into()),
-                vrl_function: value.query_vrl_function,
-                search_event_type: query_search_event_type.map(|t| t.into()),
-                multi_time_range: query_multi_time_range
-                    .map(|ds| ds.into_iter().map(|d| d.into()).collect()),
-            },
-            trigger_condition: MetaTriggerCondition {
-                // DB model stores period in seconds, but service layer stores
-                // minutes.
-                period: value.trigger_period_seconds / 60,
-                operator: trigger_threshold_operator.into(),
-                threshold: value.trigger_threshold_count,
-                frequency: value.trigger_frequency_seconds,
-                cron: value.trigger_frequency_cron.unwrap_or_default(),
-                frequency_type: trigger_frequency_type.into(),
-                silence: value.trigger_silence_seconds / 60,
-                timezone: value.trigger_frequency_cron_timezone,
-                tolerance_in_secs: value.trigger_tolerance_seconds,
-            },
+        let mut alert: MetaAlert = Default::default();
+        alert.id = Some(id);
+        alert.name = value.name;
+        alert.org_id = value.org;
+        alert.stream_type = stream_type.into();
+        alert.stream_name = value.stream_name;
+        alert.is_real_time = value.is_real_time;
+        alert.destinations = destinations;
+        alert.context_attributes = context_attributes;
+        alert.row_template = value.row_template.unwrap_or_default();
+        alert.description = value.description.unwrap_or_default();
+        alert.enabled = value.enabled;
+        alert.tz_offset = value.tz_offset;
+        alert.owner = value.owner;
+        alert.last_edited_by = value.last_edited_by;
+        alert.updated_at = updated_at_utc;
+        alert.query_condition = MetaQueryCondition {
+            query_type: query_type.into(),
+            conditions: query_conditions,
+            sql: value.query_sql,
+            promql: value.query_promql,
+            promql_condition: query_promql_condition.map(|c| c.into()),
+            aggregation: query_aggregation.map(|a| a.into()),
+            vrl_function: value.query_vrl_function,
+            search_event_type: query_search_event_type.map(|t| t.into()),
+            multi_time_range: query_multi_time_range
+                .map(|ds| ds.into_iter().map(|d| d.into()).collect()),
         };
+        alert.trigger_condition = MetaTriggerCondition {
+            align_time: value.align_time,
+            // DB model stores period in seconds, but service layer stores
+            // minutes.
+            period: value.trigger_period_seconds / 60,
+            operator: trigger_threshold_operator.into(),
+            threshold: value.trigger_threshold_count,
+            frequency: value.trigger_frequency_seconds,
+            cron: value.trigger_frequency_cron.unwrap_or_default(),
+            frequency_type: trigger_frequency_type.into(),
+            silence: value.trigger_silence_seconds / 60,
+            timezone: value.trigger_frequency_cron_timezone,
+            tolerance_in_secs: value.trigger_tolerance_seconds,
+        };
+        alert.set_last_satisfied_at(value.last_satisfied_at);
+        alert.set_last_triggered_at(value.last_triggered_at);
+
         Ok(alert)
     }
 }
@@ -497,6 +500,17 @@ async fn list_models<C: ConnectionTrait>(
         query
     };
 
+    // Apply the optional alert name substring filter.
+    let name_substring = params.name_substring.filter(|n| !n.is_empty());
+    let query = if let Some(name_substring) = name_substring {
+        let name_pattern = format!("%{}%", name_substring.to_lowercase());
+        query.filter(
+            Expr::expr(Func::lower(Expr::col((Alerts::Table, Alerts::Name)))).like(name_pattern),
+        )
+    } else {
+        query
+    };
+
     // Apply the optional stream filter.
     let query = if let Some((stream_type, maybe_stream_name)) = &params.stream_type_and_name {
         let stream_type_str = intermediate::StreamType::from(*stream_type).to_string();
@@ -564,6 +578,8 @@ fn update_mutable_fields(
     alert_am: &mut alerts::ActiveModel,
     alert: MetaAlert,
 ) -> Result<(), errors::Error> {
+    let last_triggered_at = alert.get_last_triggered_at_from_table();
+    let last_satisfied_at = alert.get_last_satisfied_at_from_table();
     let is_real_time = alert.is_real_time;
     let destinations = serde_json::to_value(alert.destinations)?;
     let context_attributes = alert
@@ -574,17 +590,10 @@ fn update_mutable_fields(
     let description = Some(alert.description).filter(|s| !s.is_empty());
     let enabled = alert.enabled;
     let tz_offset = alert.tz_offset;
-    let last_triggered_at = alert.last_triggered_at;
-    let last_satisfied_at = alert.last_satisfied_at;
     let query_type: i16 = intermediate::QueryType::from(alert.query_condition.query_type).into();
     let query_conditions = alert
         .query_condition
         .conditions
-        .map(|cs| {
-            cs.into_iter()
-                .map(intermediate::QueryCondition::from)
-                .collect_vec()
-        })
         .map(serde_json::to_value)
         .transpose()?;
     let query_sql = alert.query_condition.sql.filter(|s| !s.is_empty());
@@ -637,7 +646,8 @@ fn update_mutable_fields(
     let trigger_tolerance_seconds = alert.trigger_condition.tolerance_in_secs;
     let owner = alert.owner.filter(|s| !s.is_empty());
     let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
-    let updated_at: i64 = chrono::Utc::now().timestamp();
+    let align_time = alert.trigger_condition.align_time;
+    let updated_at: i64 = chrono::Utc::now().timestamp_micros();
 
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
@@ -669,6 +679,12 @@ fn update_mutable_fields(
     alert_am.owner = Set(owner);
     alert_am.last_edited_by = Set(last_edited_by);
     alert_am.updated_at = Set(Some(updated_at));
-
+    alert_am.align_time = Set(align_time);
     Ok(())
+}
+
+#[derive(DeriveIden)]
+enum Alerts {
+    Table,
+    Name,
 }

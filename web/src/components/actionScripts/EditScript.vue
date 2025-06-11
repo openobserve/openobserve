@@ -100,7 +100,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               tabindex="0"
-              style="width: 600px"
+              style="width: 800px"
+            />
+          </div>
+
+          <div
+            data-test="add-action-script-type"
+            class="report-name-input o2-input q-px-sm q-pb-md"
+          >
+            <q-select
+              data-test="add-action-script-type-select"
+              v-model="formData.type"
+              :label="t('common.type') + ' *'"
+              :options="actionTypes"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop no-case tw-w-[400px]"
+              stack-label
+              map-options
+              emit-value
+              outlined
+              filled
+              dense
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              :disable="isEditingActionScript"
+              :readonly="isEditingActionScript"
             />
           </div>
 
@@ -115,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-step
               data-test="add-action-script-step-1"
               :name="1"
-              title="Upload Script Zip"
+              :title="t('actions.uploadCodeZip')"
               :icon="outlinedDashboard"
               :done="step > 1"
             >
@@ -129,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="primary"
                   filled
                   v-model="formData.codeZip"
-                  :label="t('actions.uploadCodeZip')"
+                  :label="t('actions.zipFile') + ' *'"
                   bg-color="input-bg"
                   class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
                   stack-label
@@ -139,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[
                     (val: any) => {
                       if (!isEditingActionScript) {
-                        return !!val || 'CSV File is required!';
+                        return !!val || 'ZIP File is required!';
                       }
                       return true;
                     },
@@ -197,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
+              v-if="formData.type === 'scheduled'"
               data-test="add-action-script-step-2"
               :name="2"
               title="Schedule"
@@ -210,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-bold text-grey-8 q-mb-sm"
                   data-test="add-action-script-frequency-title"
                 >
-                  Frequency
+                  {{ t("actions.frequency") }} *
                 </div>
                 <div
                   style="
@@ -230,6 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-px-lg visual-selection-btn"
                       style="padding-top: 4px; padding-bottom: 4px"
                       @click="frequency.type = visual.value"
+                      :disable="isEditingActionScript"
+                      :readonly="isEditingActionScript"
                     >
                       {{ visual.label }}</q-btn
                     >
@@ -237,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  v-if="frequency.type === 'Once'"
+                  v-if="frequency.type === 'once'"
                   class="flex justify-start items-center q-mt-md"
                   data-test="add-action-script-frequency-info"
                 >
@@ -247,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <template v-if="frequency.type === 'Repeat'">
+                <template v-if="frequency.type === 'repeat'">
                   <div class="flex items-center justify-start q-mt-md o2-input">
                     <div
                       data-test="add-action-script-cron-input"
@@ -307,6 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         debounce="300"
                         style="width: 100%"
                         @update:model-value="validateFrequency(frequency.cron)"
+                        :disable="isEditingActionScript"
+                        :readonly="isEditingActionScript"
                       />
                     </div>
                     <q-select
@@ -430,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="add-action-script-step3-back-btn"
-                  @click="step = 2"
+                  @click="step = formData.type === 'scheduled' ? 2 : 1"
                   flat
                   color="primary"
                   label="Back"
@@ -611,7 +640,7 @@ const defaultActionScript = {
   start: 0,
   frequency: {
     interval: 1,
-    type: "Repeat",
+    type: "repeat",
     cron: "",
   },
   environment_variables: {},
@@ -626,6 +655,7 @@ const defaultActionScript = {
   fileNameToShow: "",
   id: "",
   service_account: "",
+  type: "scheduled",
 };
 
 const { t } = useI18n();
@@ -642,6 +672,17 @@ const step = ref(1);
 const formData = ref(defaultActionScript);
 
 const q = useQuasar();
+
+const actionTypes = [
+  {
+    label: "Scheduled",
+    value: "scheduled",
+  },
+  {
+    label: "Real Time",
+    value: "service",
+  },
+];
 
 const dialog = ref({
   show: false,
@@ -664,11 +705,11 @@ const timeTabs = [
 const frequencyTabs = [
   {
     label: "Cron Job",
-    value: "Repeat",
+    value: "repeat",
   },
   {
     label: "Once",
-    value: "Once",
+    value: "once",
   },
 ];
 
@@ -698,7 +739,7 @@ const environmentalVariables = ref([{ key: "", value: "", uuid: getUUID() }]);
 const cronError = ref("");
 
 const frequency = ref({
-  type: "Once",
+  type: "once",
   custom: {
     interval: 1,
     period: "days",
@@ -800,7 +841,10 @@ const saveActionScript = async () => {
   const commonFields: Record<string, any> = {
     name: formData.value.name,
     description: formData.value.description,
-    execution_details: frequency.value.type,
+    execution_details:
+      formData.value.type === "scheduled"
+        ? frequency.value.type
+        : formData.value.type,
     service_account: formData.value.service_account,
   };
   // const convertedDateTime = convertDateToTimestamp(
@@ -810,7 +854,10 @@ const saveActionScript = async () => {
   // );
 
   // Add cron expression if needed
-  if (frequency.value.type === "Repeat") {
+  if (
+    formData.value.type === "scheduled" &&
+    frequency.value.type === "repeat"
+  ) {
     commonFields.cron_expr = frequency.value.cron.toString().trim();
     // commonFields.timezoneOffset = convertedDateTime.offset.toString();
     // commonFields.timezone = scheduling.value.timezone;
@@ -930,7 +977,7 @@ const validateActionScriptData = async () => {
     return;
   }
 
-  if (formData.value.execution_details === "Repeat") {
+  if (formData.value.execution_details === "repeat") {
     try {
       cronError.value = "";
       cronParser.parseExpression(frequency.value.cron);
@@ -941,8 +988,13 @@ const validateActionScriptData = async () => {
     }
   }
 
-  if (formData.value.execution_details === "Repeat" && cronError.value) {
+  if (formData.value.execution_details === "repeat" && cronError.value) {
     step.value = 2;
+    return;
+  }
+
+  if (!formData.value.service_account) {
+    step.value = 3;
     return;
   }
 
@@ -993,6 +1045,12 @@ const setupEditingActionScript = async (report: any) => {
   };
   formData.value.fileNameToShow = report.zip_file_name;
 
+  formData.value.type = "scheduled";
+
+  if (formData.value.execution_details === "service") {
+    formData.value.type = "service";
+  }
+
   // set date, time and timezone in scheduling
   // const date = new Date(report.start / 1000);
 
@@ -1017,14 +1075,14 @@ const setupEditingActionScript = async (report: any) => {
   // selectedTimeTab.value = "scheduleLater";
 
   // set frequency
-  if (report.execution_details == "Repeat") {
-    frequency.value.type = "Repeat";
+  if (report.execution_details == "repeat") {
+    frequency.value.type = "repeat";
     frequency.value.cron =
       report.cron_expr.split(" ").length === 7
         ? report.cron_expr.split(" ").slice(0, 6).join(" ")
         : report.cron_expr;
   } else {
-    frequency.value.type = "Once";
+    frequency.value.type = "once";
   }
   if (Object.keys(formData.value.environment_variables).length) {
     environmentalVariables.value = [];

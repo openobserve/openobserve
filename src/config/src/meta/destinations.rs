@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -79,6 +79,10 @@ pub struct Endpoint {
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<HTTPOutputFormat>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -96,6 +100,15 @@ pub enum HTTPType {
     PUT,
     #[serde(rename = "get")]
     GET,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub enum HTTPOutputFormat {
+    #[default]
+    #[serde(rename = "json")]
+    JSON,
+    #[serde(rename = "ndjson")]
+    NDJSON,
 }
 
 impl fmt::Display for HTTPType {

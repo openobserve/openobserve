@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,17 +15,21 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use infra::table::cipher::CipherEntry;
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::cipher::{http_repr::merge_updates, Cipher, CipherData};
-
-#[cfg(feature = "enterprise")]
-use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
-use crate::common::{
-    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-    utils::auth::{remove_ownership, set_ownership},
+use {
+    crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
+    crate::common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    actix_web::http,
+    config::utils::time::now_micros,
+    infra::table::cipher::CipherEntry,
+    o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
 };
+
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Store a key credential in db
 #[utoipa::path(
@@ -50,8 +54,8 @@ use crate::common::{
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
     org_id: web::Path<String>,
-    in_req: HttpRequest,
     body: web::Bytes,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -92,7 +96,7 @@ pub async fn save(
 
         match crate::service::db::keys::add(CipherEntry {
             org: org_id.to_string(),
-            created_at: chrono::Utc::now().timestamp_micros(),
+            created_at: now_micros(),
             created_by: user_id.to_string(),
             name: req.name.clone(),
             data: serde_json::to_string(&cd).unwrap(),
@@ -103,8 +107,8 @@ pub async fn save(
             Ok(_) => {
                 set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    "Key created successfully".to_string(),
+                    http::StatusCode::OK,
+                    "Key created successfully",
                 )))
             }
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -112,6 +116,9 @@ pub async fn save(
     }
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
+        drop(in_req);
+        drop(body);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }
@@ -135,10 +142,7 @@ pub async fn save(
     tag = "Key"
 )]
 #[get("/{org_id}/cipher_keys/{key_name}")]
-pub async fn get(
-    _req: HttpRequest,
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
+pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path.into_inner();
@@ -154,7 +158,7 @@ pub async fn get(
             Ok(None) => {
                 return Ok(MetaHttpResponse::not_found(format!(
                     "Key {key_name} not found"
-                )))
+                )));
             }
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
@@ -169,7 +173,10 @@ pub async fn get(
         Ok(HttpResponse::Ok().json(res))
     }
     #[cfg(not(feature = "enterprise"))]
-    Ok(MetaHttpResponse::forbidden("not supported"))
+    {
+        drop(path);
+        Ok(MetaHttpResponse::forbidden("not supported"))
+    }
 }
 
 /// list all keys for given org
@@ -187,7 +194,7 @@ pub async fn get(
     tag = "Key"
 )]
 #[get("/{org_id}/cipher_keys")]
-pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let org_id = path.into_inner();
@@ -217,7 +224,10 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
         Ok(HttpResponse::Ok().json(res))
     }
     #[cfg(not(feature = "enterprise"))]
-    Ok(MetaHttpResponse::forbidden("not supported"))
+    {
+        drop(path);
+        Ok(MetaHttpResponse::forbidden("not supported"))
+    }
 }
 
 /// delete key credentials for given key name
@@ -238,10 +248,7 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
     tag = "Keys"
 )]
 #[delete("/{org_id}/cipher_keys/{key_name}")]
-pub async fn delete(
-    _req: HttpRequest,
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
+pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path.into_inner();
@@ -255,15 +262,18 @@ pub async fn delete(
             Ok(_) => {
                 remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    "cipher key removed successfully".to_string(),
+                    http::StatusCode::OK,
+                    "cipher key removed successfully",
                 )))
             }
             Err(e) => Ok(MetaHttpResponse::internal_error(e)),
         }
     }
     #[cfg(not(feature = "enterprise"))]
-    Ok(MetaHttpResponse::forbidden("not supported"))
+    {
+        drop(path);
+        Ok(MetaHttpResponse::forbidden("not supported"))
+    }
 }
 
 /// update the credentials for given key
@@ -291,9 +301,9 @@ pub async fn delete(
 )]
 #[put("/{org_id}/cipher_keys/{name}")]
 pub async fn update(
-    in_req: HttpRequest,
-    body: web::Bytes,
     path: web::Path<(String, String)>,
+    body: web::Bytes,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -339,7 +349,7 @@ pub async fn update(
             Ok(None) => {
                 return Ok(MetaHttpResponse::not_found(format!(
                     "Key {key_name} not found"
-                )))
+                )));
             }
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
@@ -361,7 +371,7 @@ pub async fn update(
 
         match crate::service::db::keys::update(CipherEntry {
             org: org_id.to_string(),
-            created_at: chrono::Utc::now().timestamp_micros(),
+            created_at: now_micros(),
             created_by: user_id.to_string(),
             name: req.name,
             data: serde_json::to_string(&cd).unwrap(),
@@ -370,14 +380,17 @@ pub async fn update(
         .await
         {
             Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "key updated successfully".to_string(),
+                http::StatusCode::OK,
+                "key updated successfully",
             ))),
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(in_req);
+        drop(path);
+        drop(body);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }

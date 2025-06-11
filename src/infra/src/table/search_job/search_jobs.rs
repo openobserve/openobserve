@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,10 @@
 
 use config::cluster::LOCAL_NODE;
 use sea_orm::{
-    prelude::Expr,
-    sea_query::{Keyword, LockType, SimpleExpr},
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
     TransactionTrait, UpdateMany, UpdateResult,
+    prelude::Expr,
+    sea_query::{Keyword, LockType, SimpleExpr},
 };
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +34,7 @@ use super::{
     common::{OperatorType, Value},
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors, orm_err,
 };
 

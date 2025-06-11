@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use datafusion::{
-    common::{internal_err, Result},
+    common::{Result, internal_err},
     error::DataFusionError,
     execution::FunctionRegistry,
     logical_expr::ScalarUDF,
@@ -25,7 +25,7 @@ use datafusion::{
 use datafusion_proto::{
     convert_required,
     logical_plan::{
-        from_proto::parse_expr, to_proto::serialize_exprs, DefaultLogicalExtensionCodec,
+        DefaultLogicalExtensionCodec, from_proto::parse_expr, to_proto::serialize_exprs,
     },
     physical_plan::PhysicalExtensionCodec,
     protobuf::proto_error,

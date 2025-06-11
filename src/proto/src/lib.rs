@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 mod generated;
 
-pub use generated::{cluster as cluster_rpc, prometheus as prometheus_rpc};
+pub use generated::{cluster as cluster_rpc, loki as loki_rpc, prometheus as prometheus_rpc};
 
 impl From<Vec<serde_json::Value>> for cluster_rpc::IngestionData {
     fn from(usages: Vec<serde_json::Value>) -> Self {

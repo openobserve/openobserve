@@ -67,6 +67,24 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
   }
 };
 
+const formatValue = (value: any): string | null => {
+  if (value == null) {
+    // if value is null or undefined, return it as is
+    return value;
+  }
+
+  // if value is a string, remove any single quotes and add double quotes
+  let tempValue = value;
+  if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
+    tempValue = value.substring(1, value.length - 1);
+  }
+  // escape any single quotes in the value
+  tempValue = escapeSingleQuotes(tempValue);
+  // add double quotes around the value
+  tempValue = `'${tempValue}'`;
+  return tempValue;
+};
+
 export const addLabelToSQlQuery = async (
   originalQuery: any,
   label: any,
@@ -77,77 +95,108 @@ export const addLabelToSQlQuery = async (
 
   let condition: any;
 
-  switch (operator) {
-    case "Contains":
-      operator = "LIKE";
-      value = "%" + escapeSingleQuotes(value) + "%";
-      break;
-    case "Not Contains":
-      operator = "NOT LIKE";
-      value = "%" + escapeSingleQuotes(value) + "%";
-      break;
-    case "Is Null":
-      operator = "IS NULL";
-      break;
-    case "Is Not Null":
-      operator = "IS NOT NULL";
-      break;
-    case "IN":
-      operator = "IN";
-      // add brackets if not present in "IN" conditions
-      value = splitQuotedString(value).map((it: any) => ({
-        type: "single_quote_string",
-        value: escapeSingleQuotes(it),
-      }));
-      break;
-    case "=":
-    case "<>":
-    case "!=":
-    case "<":
-    case ">":
-    case "<=":
-    case ">=":
-      // If value starts and ends with quote, remove it
-      value =
-        value &&
-        value.length > 1 &&
-        value.startsWith("'") &&
-        value.endsWith("'")
-          ? value.substring(1, value.length - 1)
-          : value;
-      // escape single quotes by doubling them
-      value = escapeSingleQuotes(value);
-      break;
-  }
+  if (operator === "match_all") {
+    condition = `match_all(${formatValue(value)})`;
+  } else if (operator === "str_match") {
+    condition = `str_match(${label}, ${formatValue(value)})`;
+  } else if (operator === "str_match_ignore_case") {
+    condition = `str_match_ignore_case(${label}, ${formatValue(value)})`;
+  } else if (operator === "re_match") {
+    condition = `re_match(${label}, ${formatValue(value)})`;
+  } else if (operator === "re_not_match") {
+    condition = `re_not_match(${label}, ${formatValue(value)})`;
+  } else {
+    switch (operator) {
+      case "Contains":
+        operator = "LIKE";
+        value = "%" + escapeSingleQuotes(value) + "%";
+        break;
+      case "Not Contains":
+        operator = "NOT LIKE";
+        value = "%" + escapeSingleQuotes(value) + "%";
+        break;
+      case "Starts With":
+        operator = "LIKE";
+        value = escapeSingleQuotes(value) + "%";
+        break;
+      case "Ends With":
+        operator = "LIKE";
+        value = "%" + escapeSingleQuotes(value);
+        break;
+      case "Is Null":
+        operator = "IS NULL";
+        break;
+      case "Is Not Null":
+        operator = "IS NOT NULL";
+        break;
+      case "IN":
+        operator = "IN";
+        // add brackets if not present in "IN" conditions
+        value = splitQuotedString(value).map((it: any) => ({
+          type: "single_quote_string",
+          value: escapeSingleQuotes(it),
+        }));
+        break;
+      case "NOT IN":
+        operator = "NOT IN";
+        // add brackets if not present in "NOT IN" conditions
+        value = splitQuotedString(value).map((it: any) => ({
+          type: "single_quote_string",
+          value: escapeSingleQuotes(it),
+        }));
+        break;
+      case "=":
+      case "<>":
+      case "!=":
+      case "<":
+      case ">":
+      case "<=":
+      case ">=":
+        // If value starts and ends with quote, remove it
+        value =
+          value &&
+          value.length > 1 &&
+          value.startsWith("'") &&
+          value.endsWith("'")
+            ? value.substring(1, value.length - 1)
+            : value;
+        // escape single quotes by doubling them
+        value = escapeSingleQuotes(value);
+        break;
+    }
 
-  // Construct condition based on operator
-  condition =
-    operator === "IS NULL" || operator === "IS NOT NULL"
-      ? {
-          type: "binary_expr",
-          operator: operator,
-          left: {
-            type: "column_ref",
-            table: null,
-            column: label,
-          },
-          right: {
-            type: "",
-          },
-        }
-      : {
-          type: "binary_expr",
-          operator: operator,
-          left: {
-            type: "column_ref",
-            table: null,
-            column: label,
-          },
-          right: {
-            type: operator === "IN" ? "expr_list" : "string",
-            value: value,
-          },
-        };
+    // Construct condition based on operator
+    condition =
+      operator === "IS NULL" || operator === "IS NOT NULL"
+        ? {
+            type: "binary_expr",
+            operator: operator,
+            left: {
+              type: "column_ref",
+              table: null,
+              column: label,
+            },
+            right: {
+              type: "",
+            },
+          }
+        : {
+            type: "binary_expr",
+            operator: operator,
+            left: {
+              type: "column_ref",
+              table: null,
+              column: label,
+            },
+            right: {
+              type:
+                operator === "IN" || operator === "NOT IN"
+                  ? "expr_list"
+                  : "string",
+              value: value,
+            },
+          };
+  }
 
   const ast: any = parser.astify(originalQuery);
 
@@ -339,6 +388,22 @@ function parseCondition(condition: any) {
           logicalOperator: "AND",
           filterType: "condition",
         };
+      } else if (condition.operator == "NOT IN") {
+        // create values array based on right side of condition
+        // quote the values
+        const values =
+          condition?.right?.value?.map((value: any) => `'${value?.value}'`) ??
+          [];
+
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column?.expr?.value ?? "",
+          operator: condition?.operator,
+          value: values?.join(","),
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
       } else if (condition.operator == "IN") {
         // create values array based on right side of condition
         const values = condition.right.value.map(
@@ -377,22 +442,69 @@ function parseCondition(condition: any) {
           filterType: "condition",
         };
       } else if (condition?.operator == "LIKE") {
-        return {
-          type: "condition",
-          values: [],
-          column: condition?.left?.column?.expr?.value,
-          operator: "Contains",
-          value: `'${condition?.right?.value}'`,
-          logicalOperator: "AND",
-          filterType: "condition",
-        };
+        // Check the pattern to determine the specific operator
+        const rightValue = condition?.right?.value || "";
+
+        if (rightValue.startsWith("%") && rightValue.endsWith("%")) {
+          // Pattern: %value% - Contains
+          const value = rightValue?.replace(/^%/, "").replace(/%$/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Contains",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else if (rightValue.startsWith("%")) {
+          // Pattern: %value - Ends With
+          const value = rightValue.replace(/^%/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Ends With",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else if (rightValue.endsWith("%")) {
+          // Pattern: value% - Starts With
+          const value = rightValue.replace(/%$/, "");
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Starts With",
+            value: `${value}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        } else {
+          // No % pattern - treat as Contains for fallback
+          return {
+            type: "condition",
+            values: [],
+            column: condition?.left?.column?.expr?.value,
+            operator: "Contains",
+            value: `${rightValue}`,
+            logicalOperator: "AND",
+            filterType: "condition",
+          };
+        }
       } else if (condition?.operator == "NOT LIKE") {
+        // right value may have % at the beginning or end or both
+        // so we need to remove it
+        const value = condition?.right?.value
+          ?.replace(/^%/, "")
+          .replace(/%$/, "");
         return {
           type: "condition",
           values: [],
           column: condition?.left?.column?.expr?.value,
           operator: "Not Contains",
-          value: `'${condition?.right?.value}'`,
+          value: `${value}`,
           logicalOperator: "AND",
           filterType: "condition",
         };
@@ -409,11 +521,7 @@ function parseCondition(condition: any) {
       ];
 
       // function without field name and with value
-      const conditionsWithoutFieldName = [
-        "match_all",
-        "match_all_raw",
-        "match_all_raw_ignore_case",
-      ];
+      const conditionsWithoutFieldName = ["match_all"];
 
       if (conditionsWithFieldName.includes(conditionName)) {
         return {
@@ -576,50 +684,72 @@ export const changeHistogramInterval = async (
   query: any,
   histogramInterval: any,
 ) => {
-  // if histogramInterval is null or query is null or query is empty, return query
-  if (histogramInterval === null || query === null || query === "") {
-    return query;
-  }
+  try {
+    // if histogramInterval is null or query is null or query is empty, return query
+    if (query === null || query === "") {
+      return query;
+    }
 
-  await importSqlParser();
-  const ast: any = parser.astify(query);
+    await importSqlParser();
+    const ast: any = parser.astify(query);
 
-  // Iterate over the columns to check if the column is histogram
-  ast.columns.forEach((column: any) => {
-    // check if the column is histogram
-    if (
-      column.expr.type === "function" &&
-      column?.expr?.name?.name?.[0]?.value === "histogram"
-    ) {
-      const histogramExpr = column.expr;
-      if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
-        // if selected histogramInterval is null then remove interval argument
-        if (!histogramInterval) {
-          histogramExpr.args.value = histogramExpr.args.value.slice(0, 1);
-        }
-        // else update interval argument
-        else {
-          // check if there is existing interval value
-          // if have then do not do anything
-          // else insert new arg with given histogramInterval
-          if (histogramExpr.args.value[1]) {
-            // Update existing interval value
-            // histogramExpr.args.value[1] = {
-            //   type: "single_quote_string",
-            //   value: `${histogramInterval}`,
-            // };
-          } else {
-            // create new arg for interval
-            histogramExpr.args.value.push({
-              type: "single_quote_string",
-              value: `${histogramInterval}`,
-            });
+    // Iterate over the columns to check if the column is histogram
+    ast?.columns?.forEach((column: any) => {
+      // check if the column is histogram
+      if (
+        column.expr.type === "function" &&
+        column?.expr?.name?.name?.[0]?.value === "histogram" &&
+        histogramInterval !== null
+      ) {
+        const histogramExpr = column.expr;
+        if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
+          // if selected histogramInterval is null then remove interval argument
+          if (!histogramInterval) {
+            histogramExpr.args.value = histogramExpr.args.value.slice(0, 1);
+          }
+          // else update interval argument
+          else {
+            // check if there is existing interval value
+            // if have then do not do anything
+            // else insert new arg with given histogramInterval
+            if (histogramExpr.args.value[1]) {
+              // Update existing interval value
+              // histogramExpr.args.value[1] = {
+              //   type: "single_quote_string",
+              //   value: `${histogramInterval}`,
+              // };
+            } else {
+              // create new arg for interval
+              histogramExpr.args.value.push({
+                type: "single_quote_string",
+                value: `${histogramInterval}`,
+              });
+            }
           }
         }
       }
-    }
-  });
+    });
 
-  const sql = parser.sqlify(ast);
-  return sql.replace(/`/g, '"');
+    const sql = parser.sqlify(ast);
+    return sql.replace(/`/g, '"');
+  } catch (error) {
+    return query;
+  }
+};
+
+export const convertQueryIntoSingleLine = async (query: any) => {
+  try {
+    // if query is null or empty, return query as is
+    if (query === null || query === "") {
+      return query;
+    }
+
+    await importSqlParser();
+    const ast: any = parser.astify(query);
+
+    const sql = parser.sqlify(ast);
+    return sql.replace(/`/g, '"');
+  } catch (error) {
+    return query;
+  }
 };

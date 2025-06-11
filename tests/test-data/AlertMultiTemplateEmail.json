@@ -1,0 +1,16 @@
+[
+    {
+        "name": "",
+        "body": "{\"text\":\"{alert_name} is active\"}",
+        "isDefault": true,
+        "type": "email",
+        "title": "{alert_name}"
+    },
+    {
+        "name": "",
+        "body": "{\"text\":\"{alert_name} is active\"}",
+        "isDefault": true,
+        "type": "email",
+        "title": "{alert_name}"
+    }
+]

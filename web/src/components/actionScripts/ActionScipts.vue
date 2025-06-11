@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("actions.header") }}
           </div>
           <q-input
-            data-test="alert-list-search-input"
+            data-test="action-list-search-input"
             v-model="filterQuery"
             borderless
             filled
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-btn
-            data-test="alert-list-add-alert-btn"
+            data-test="action-list-add-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
             color="secondary"
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="row items-center no-wrap q-mx-md q-my-sm">
             <div class="flex items-center">
               <div
-                data-test="add-alert-back-btn"
+                data-test="add-action-back-btn"
                 class="flex justify-center items-center q-mr-md cursor-pointer"
                 style="
                   border: 1.5px solid;
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-card-section>
             <q-form @submit="submitForm">
               <q-input
-                data-test="to-be-clone-alert-name"
+                data-test="to-be-clone-action-name"
                 v-model="toBeCloneAlertName"
                 label="Alert Name"
               />
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="flex justify-center q-mt-lg">
                 <q-btn
-                  data-test="clone-alert-cancel-btn"
+                  data-test="clone-action-cancel-btn"
                   v-close-popup="true"
                   class="q-mb-md text-bold"
                   :label="t('alerts.cancel')"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   no-caps
                 />
                 <q-btn
-                  data-test="clone-alert-submit-btn"
+                  data-test="clone-action-submit-btn"
                   :label="t('alerts.save')"
                   class="q-mb-md text-bold no-border q-ml-md"
                   color="secondary"
@@ -277,6 +277,7 @@ import {
   outlinedPlayArrow,
 } from "@quasar/extras/material-icons-outlined";
 import actions from "@/services/action_scripts";
+import useActions from "@/composables/useActions";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -329,6 +330,7 @@ export default defineComponent({
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const isSubmitting = ref(false);
+    const { getAllActions } = useActions();
 
     const { getStreams } = useStreams();
 
@@ -419,20 +421,29 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading actions...",
       });
-      actions
-        .list(store.state.selectedOrganization.identifier)
-        .then((res) => {
+
+      getAllActions()
+        .then(() => {
           var counter = 1;
-          resultTotal.value = res.data.length;
-          alerts.value = res.data.map((alert: any) => {
-            return {
-              ...alert,
-              uuid: getUUID(),
-            };
-          });
+          resultTotal.value = store.state.organizationData.actions.length;
+          alerts.value = store.state.organizationData.actions.map(
+            (alert: any) => {
+              return {
+                ...alert,
+                uuid: getUUID(),
+              };
+            },
+          );
           actionsScriptRows.value = alerts.value.map((data: any) => {
-            if (data.execution_details_type == "Repeat")
+            if (data.execution_details_type === "repeat")
               data.execution_details_type = "Cron Job";
+
+            if (data.execution_details_type === "service")
+              data.execution_details_type = "Real Time";
+
+            if (data.execution_details_type === "once")
+              data.execution_details_type = "Once";
+
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
@@ -476,6 +487,7 @@ export default defineComponent({
           });
         });
     };
+
     const getAlertByName = (id: string) => {
       return alerts.value.find((alert) => alert.id === id);
     };

@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
+use config::{
+    meta::triggers::{Trigger, TriggerModule},
+    utils::json,
+};
 use infra::{
     errors::{Error, Result},
-    scheduler::{self, Trigger},
+    scheduler,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
+use crate::service::db::alerts::alert;
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::SchedulerPush => {
@@ -47,7 +51,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 async fn push(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
     if let Err(e) = scheduler::push(trigger.clone()).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
@@ -62,8 +67,10 @@ async fn push(msg: Message) -> Result<()> {
 }
 
 async fn update(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
-    if let Err(e) = scheduler::update_trigger(trigger.clone()).await {
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
+    // Update trigger in super cluster with clone = true, so that it copies everything
+    if let Err(e) = scheduler::update_trigger(trigger.clone(), true).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to update scheduler: {}/{:?}/{}, error: {}",
             trigger.org,
@@ -77,13 +84,20 @@ async fn update(msg: Message) -> Result<()> {
 }
 
 async fn update_status(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
     if let Err(e) = scheduler::update_status(
         &trigger.org,
         trigger.module.clone(),
         &trigger.module_key,
         trigger.status,
         trigger.retries,
+        // Only update trigger data if it is not empty
+        if trigger.data.is_empty() {
+            None
+        } else {
+            Some(&trigger.data)
+        },
     )
     .await
     {
@@ -100,7 +114,8 @@ async fn update_status(msg: Message) -> Result<()> {
 }
 
 async fn delete(msg: Message) -> Result<()> {
-    let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    trigger_modify_module_key(&mut trigger).await?;
     if let Err(e) =
         scheduler::delete(&trigger.org, trigger.module.clone(), &trigger.module_key).await
     {
@@ -112,6 +127,32 @@ async fn delete(msg: Message) -> Result<()> {
             e
         );
         return Err(e);
+    }
+    Ok(())
+}
+
+async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
+    // Return if the module_key is in new format (alert_id only)
+    if !trigger.module_key.contains("/") || trigger.module != TriggerModule::Alert {
+        return Ok(());
+    }
+    let parts = trigger.module_key.split("/").collect::<Vec<&str>>();
+
+    if parts.len() != 3 {
+        return Err(Error::Message(format!(
+            "Invalid module_key format: {}",
+            trigger.module_key
+        )));
+    }
+    let stream_type = parts[0];
+    let stream_name = parts[1];
+    let alert_name = parts[2];
+
+    // get alert id from alert name
+    if let Some(alert) =
+        alert::get_by_name(&trigger.org, stream_type.into(), stream_name, alert_name).await?
+    {
+        trigger.module_key = alert.get_unique_key();
     }
     Ok(())
 }

@@ -21,17 +21,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <div class="tw-py-2">
-        Pub/Sub Logs -
-        <a
-          href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
-          class="hover:tw-underline text-primary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          https://openobserve.ai/blog/send-gcp-logs-to-openobserve
-        </a>
-      </div>
+      <ol class="tw-list-decimal q-pl-md">
+        <li class="tw-py-1">
+          <a
+            href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
+            class="tw-underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+          {{ t("ingestion.pubsub") }}
+          </a>
+        </li>
+        <li class="tw-py-1">
+          <a
+            href="https://short.openobserve.ai/security/google-workspace"
+            class="tw-underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+          {{ t("ingestion.gworkspace") }}
+          </a>
+        </li>
+      </ol>
     </div>
   </div>
 </template>
@@ -42,6 +53,7 @@ import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "GCPConfig",
@@ -55,6 +67,7 @@ export default defineComponent({
   },
   components: { CopyContent },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -63,9 +76,17 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    const url = new URL(store.state.API_ENDPOINT);
+
+    let ingestionURL: string = store.state.API_ENDPOINT;
+    if (
+      Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
+      store.state.zoConfig.ingestion_url !== ""
+    ) {
+      ingestionURL = store.state.zoConfig.ingestion_url;
+    }
+    const url = new URL(ingestionURL);
     endpoint.value = {
-      url: store.state.API_ENDPOINT,
+      url: ingestionURL,
       host: url.hostname,
       port: url.port || (url.protocol === "https:" ? "443" : "80"),
       protocol: url.protocol.replace(":", ""),
@@ -74,6 +95,7 @@ export default defineComponent({
 
     const content = `URL: ${endpoint.value.url}/gcp/${store.state.selectedOrganization.identifier}/default/_sub?API-Key=[BASIC_PASSCODE]`;
     return {
+      t,
       store,
       config,
       endpoint,

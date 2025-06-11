@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,8 +25,8 @@ use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
     arrow::{
-        arrow_reader::ArrowReaderMetadata, async_reader::ParquetRecordBatchStream,
-        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata,
+        async_reader::ParquetRecordBatchStream,
     },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
@@ -40,21 +40,26 @@ pub fn new_parquet_writer<'a>(
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
     write_metadata: bool,
+    compression: Option<&str>,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
+    let compression = compression.unwrap_or(&cfg.common.parquet_compression);
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
-        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
+        .set_compression(get_parquet_compression(compression))
         .set_column_dictionary_enabled(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             false,
         )
         .set_column_encoding(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
         );
+    if cfg.common.timestamp_compression_disabled {
+        writer_props = writer_props
+            .set_column_compression(TIMESTAMP_COL_NAME.into(), Compression::UNCOMPRESSED);
+    }
     if write_metadata {
         writer_props = writer_props.set_key_value_metadata(Some(vec![
             KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),
@@ -96,7 +101,8 @@ pub async fn write_recordbatch_to_parquet(
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true);
+    let mut writer =
+        new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true, None);
     for batch in record_batches {
         writer.write(batch).await?;
     }
@@ -214,4 +220,145 @@ pub fn parse_time_range_from_filename(mut name: &str) -> (i64, i64) {
     let min_ts = columns[0].parse::<i64>().unwrap_or(0);
     let max_ts = columns[1].parse::<i64>().unwrap_or(0);
     (min_ts, max_ts)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::{
+        array::{Int32Array, StringArray},
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    };
+
+    use super::*;
+
+    fn create_test_batch() -> (Arc<Schema>, RecordBatch) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let id_array = Int32Array::from(vec![1, 2, 3]);
+        let name_array = StringArray::from(vec!["Alice", "Bob", "Charlie"]);
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(id_array), Arc::new(name_array)],
+        )
+        .unwrap();
+
+        (schema, batch)
+    }
+
+    #[tokio::test]
+    async fn test_write_and_read_recordbatch() {
+        let (schema, batch) = create_test_batch();
+        let metadata = FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 3,
+            original_size: 100,
+            ..Default::default()
+        };
+
+        // Write to parquet
+        let data = write_recordbatch_to_parquet(
+            schema.clone(),
+            &[batch.clone()],
+            &["name".to_string()],
+            &metadata,
+        )
+        .await
+        .unwrap();
+
+        // Read back
+        let (read_schema, read_batches) = read_recordbatch_from_bytes(&bytes::Bytes::from(data))
+            .await
+            .unwrap();
+
+        let read_schema = read_schema
+            .as_ref()
+            .clone()
+            .with_metadata(Default::default());
+        assert_eq!(Arc::new(read_schema), schema);
+        assert_eq!(read_batches.len(), 1);
+        assert_eq!(read_batches[0], batch);
+    }
+
+    #[tokio::test]
+    async fn test_read_metadata() {
+        let (schema, batch) = create_test_batch();
+        let metadata = FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 3,
+            original_size: 100,
+            ..Default::default()
+        };
+
+        // Write to parquet
+        let data = write_recordbatch_to_parquet(schema, &[batch], &["name".to_string()], &metadata)
+            .await
+            .unwrap();
+
+        // Read metadata
+        let read_metadata = read_metadata_from_bytes(&bytes::Bytes::from(data))
+            .await
+            .unwrap();
+
+        assert_eq!(read_metadata.min_ts, metadata.min_ts);
+        assert_eq!(read_metadata.max_ts, metadata.max_ts);
+        assert_eq!(read_metadata.records, metadata.records);
+        assert_eq!(read_metadata.original_size, metadata.original_size);
+    }
+
+    #[test]
+    fn test_parse_file_key_columns() {
+        let key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
+        let (stream_key, date_key, file_name) = parse_file_key_columns(key).unwrap();
+
+        assert_eq!(stream_key, "default/logs/olympics");
+        assert_eq!(date_key, "2022/10/03/10");
+        assert_eq!(file_name, "6982652937134804993_1.parquet");
+    }
+
+    #[test]
+    fn test_parse_file_key_columns_invalid() {
+        let key = "invalid/path";
+        let result = parse_file_key_columns(key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_generate_filename_with_time_range() {
+        let filename = generate_filename_with_time_range(1000, 2000);
+        assert!(filename.ends_with(FILE_EXT_PARQUET));
+        assert!(filename.starts_with("1000.2000."));
+    }
+
+    #[test]
+    fn test_parse_time_range_from_filename() {
+        let filename = "1000.2000.123456789.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(filename);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+    }
+
+    #[test]
+    fn test_parse_time_range_from_filename_with_path() {
+        let filename = "/path/to/1000.2000.123456789.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(filename);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+    }
+
+    #[test]
+    fn test_parse_time_range_from_filename_invalid() {
+        let filename = "invalid.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(filename);
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+    }
 }

@@ -16,17 +16,16 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    get_config,
+    FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
-    utils::{json, schema::infer_json_schema_from_map},
-    FxIndexMap,
+    utils::{json, schema::infer_json_schema_from_map, time::now_micros},
 };
 use infra::{
     errors::{Error, Result},
@@ -36,7 +35,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{RwLock, mpsc},
     time,
 };
 
@@ -152,19 +151,18 @@ impl Metadata for DistinctValues {
         // distinct values will always have _timestamp and
         // count, rest will be dynamically determined
         Arc::new(Schema::new(vec![
-            Field::new(
-                get_config().common.column_timestamp.as_str(),
-                DataType::Int64,
-                false,
-            ),
-            Field::new("count", DataType::Int64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("count", DataType::Int64, true),
         ]))
     }
 
     async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            if let MetadataItem::DistinctValues(item) = item {
+            if let MetadataItem::DistinctValues(mut item) = item {
+                // these two are reserved, so we remove them if present
+                item.value.remove("count");
+                item.value.remove(TIMESTAMP_COL_NAME);
                 let count = group_items.entry(item).or_default();
                 *count += 1;
             }
@@ -186,7 +184,7 @@ impl Metadata for DistinctValues {
         drop(mem_table);
 
         // write to wal
-        let timestamp = chrono::Utc::now().timestamp_micros();
+        let timestamp = now_micros();
         let default_schema = self.generate_schema();
 
         // transpose the table
@@ -264,7 +262,7 @@ impl Metadata for DistinctValues {
                 let data = data.as_object_mut().unwrap();
                 data.insert("count".to_string(), json::Value::Number(count.into()));
                 data.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
                 let hour_key = ingestion::get_write_partition_key(

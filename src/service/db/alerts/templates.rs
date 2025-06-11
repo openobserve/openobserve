@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -79,7 +79,7 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
     infra::cluster_coordinator::destinations::emit_put_event(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
@@ -119,7 +119,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
@@ -128,7 +128,9 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
         )
         .await
         {
-            log::error!("[Template] error triggering super cluster event to remove template from cache: {e}");
+            log::error!(
+                "[Template] error triggering super cluster event to remove template from cache: {e}"
+            );
         }
     }
 

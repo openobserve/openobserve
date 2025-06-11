@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <syntax-guide-metrics class="q-mr-sm" />
+        <MetricLegends class="q-mr-sm" />
       </div>
       <div class="text-right col flex justify-end">
         <DateTimePickerDashboard
@@ -40,7 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-date-picker"
         />
         <AutoRefreshInterval
-          v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+          v-if="
+            !['html', 'markdown', 'custom_chart'].includes(
+              dashboardPanelData.data.type,
+            )
+          "
           v-model="refreshInterval"
           trigger
           :min-refresh-interval="
@@ -95,7 +100,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+        v-if="
+          !['html', 'markdown', 'custom_chart'].includes(
+            dashboardPanelData.data.type,
+          )
+        "
         class="col"
         style="width: 100%; height: 100%"
       >
@@ -360,10 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div
-              class="row"
-              style="height: calc(100%); overflow-y: auto"
-            >
+            <div class="row" style="height: calc(100%); overflow-y: auto">
               <div class="col" style="height: 100%">
                 <q-splitter
                   class="query-editor-splitter"
@@ -385,31 +391,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="layout-panel-container col"
                       style="height: 100%"
                     >
-                    <q-splitter
-                      class="query-editor-splitter"
-                      v-model="splitterModel"    
-                      style="height: 100%"
-                      @update:model-value="layoutSplitterUpdated"
-                    >
-                    <template #before>
-                      <CustomChartEditor
-                        v-model="dashboardPanelData.data.customChartContent"
-                        style="width: 100%; height: 100%"
-                      />
-                    </template>
-                    <template #separator>
-                      <div class="splitter-vertical splitter-enabled"></div>
-                      <q-avatar
-                        color="primary"
-                        text-color="white"
-                        size="20px"
-                        icon="drag_indicator"
-                        style="top: 10px; left: 3.5px"
-                        data-test="dashboard-markdown-editor-drag-indicator"
-                      />
-                    </template>
-                    <template #after>
-                      <PanelSchemaRenderer
+                      <q-splitter
+                        class="query-editor-splitter"
+                        v-model="splitterModel"
+                        style="height: 100%"
+                        @update:model-value="layoutSplitterUpdated"
+                      >
+                        <template #before>
+                          <CustomChartEditor
+                            v-model="dashboardPanelData.data.customChartContent"
+                            style="width: 100%; height: 100%"
+                          />
+                        </template>
+                        <template #separator>
+                          <div class="splitter-vertical splitter-enabled"></div>
+                          <q-avatar
+                            color="primary"
+                            text-color="white"
+                            size="20px"
+                            icon="drag_indicator"
+                            style="top: 10px; left: 3.5px"
+                            data-test="dashboard-markdown-editor-drag-indicator"
+                          />
+                        </template>
+                        <template #after>
+                          <PanelSchemaRenderer
                             v-if="chartData"
                             @metadata-update="metaDataValue"
                             :key="dashboardPanelData.data.type"
@@ -427,12 +433,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             searchType="ui"
                           />
+                        </template>
+                      </q-splitter>
 
-                    </template>
-                     </q-splitter>
-                      
-
-                     
                       <DashboardErrorsComponent
                         :errors="errorData"
                         class="col-auto"
@@ -505,6 +508,7 @@ import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
+import MetricLegends from "./MetricLegends.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
@@ -563,6 +567,7 @@ export default defineComponent({
     CustomHTMLEditor,
     CustomMarkdownEditor,
     SyntaxGuideMetrics,
+    MetricLegends,
     AddToDashboard,
     AutoRefreshInterval,
     CustomChartEditor,
@@ -822,12 +827,16 @@ export default defineComponent({
       }
     };
 
-    const handleChartApiError = (errorMessage: any) => {
-      const errorList = errorData.errors;
-      errorList.splice(0);
-      errorList.push(errorMessage);
+    const handleChartApiError = (errorMessage: {
+      message: string;
+      code: string;
+    }) => {
+      if (errorMessage?.message) {
+        const errorList = errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMessage.message);
+      }
     };
-
     const onDataZoom = (event: any) => {
       // console.time("onDataZoom");
       const selectedDateObj = {

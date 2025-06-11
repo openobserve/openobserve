@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{get, http, put, route, web, HttpRequest, HttpResponse, Result};
+use actix_web::{HttpRequest, HttpResponse, Result, get, http, put, route, web};
 
 #[route("/{org_id}/", method = "GET", method = "HEAD")]
 async fn org_index(_org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {

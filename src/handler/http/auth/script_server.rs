@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{dev::ServiceRequest, Error};
+use actix_web::{Error, dev::ServiceRequest};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::get_config;
 
@@ -22,7 +22,7 @@ pub async fn validator(
     credentials: BasicAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
-    if !credentials.user_id().eq(&cfg.auth.script_server_token) {
+    if !credentials.user_id().eq(&cfg.auth.action_server_token) {
         return Err((actix_web::error::ErrorUnauthorized("auth incorrect"), req));
     }
     Ok(req)

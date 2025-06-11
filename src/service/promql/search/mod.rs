@@ -35,15 +35,15 @@ use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 
 use crate::{
     common::infra::cluster,
     service::{
         grpc::make_grpc_metrics_client,
         promql::{
-            adjust_start_end, micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK,
-            DEFAULT_MAX_POINTS_PER_SERIES,
+            DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
+            micros, value::*,
         },
         search::server_internal_error,
         self_reporting::report_request_usage_stats,
@@ -84,7 +84,7 @@ async fn search_in_cluster(
     user_email: &str,
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
+    let started_at = now_micros();
     let cfg = get_config();
 
     let &cluster_rpc::MetricsQueryStmt {
@@ -105,7 +105,10 @@ async fn search_in_cluster(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
         cache_disabled,
-        start,end,step,query,
+        start,
+        end,
+        step,
+        query,
     );
 
     // get querier nodes from cluster
@@ -137,16 +140,13 @@ async fn search_in_cluster(
     let (start, cached_values) = if cache_disabled {
         (start, vec![])
     } else {
-        config::metrics::QUERY_METRICS_CACHE_REQUESTS
-            .with_label_values(&[])
-            .inc();
         let start_time = std::time::Instant::now();
         match cache::get(query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
-                config::metrics::QUERY_METRICS_CACHE_HITS
-                    .with_label_values(&[])
-                    .inc();
+                config::metrics::QUERY_METRICS_CACHE_RATIO
+                    .with_label_values(&[&req.org_id])
+                    .observe((new_start - start) as f64 / (end - start) as f64);
                 log::info!(
                     "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
                     took
@@ -251,22 +251,20 @@ async fn search_in_cluster(
                             &node.get_grpc_addr(),
                             err
                         );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(server_internal_error("search node error"));
+                        let err = ErrorCodes::from_json(err.message())
+                            .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+                        return Err(Error::ErrorCode(err));
                     }
                 };
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {} bytes, took: {} ms",
                     &node.get_grpc_addr(),
                     req_need_wal,
-                    response.took,
                     scan_stats.files,
                     scan_stats.original_size,
+                    response.took,
                 );
                 Ok(response)
             }
@@ -307,6 +305,12 @@ async fn search_in_cluster(
         series_data.push(series);
     });
 
+    // with cache maybe we only get the last point from original data, then the result_type will
+    // return as vector, but if the query is range query, the result_type should be matrix
+    if result_type == "vector" && original_start != end {
+        result_type = "matrix".to_string();
+    }
+
     // merge result
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data)
@@ -320,10 +324,10 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
-        op_start.elapsed().as_millis(),
+        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} bytes, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
+        op_start.elapsed().as_millis(),
     );
 
     let req_stats = RequestStats {
@@ -352,8 +356,16 @@ async fn search_in_cluster(
     // cache the result
     if !cache_disabled {
         if let Some(matrix) = values.get_ref_matrix_values() {
-            if let Err(err) =
-                cache::set(trace_id, query, original_start, end, step, matrix.to_vec()).await
+            if let Err(err) = cache::set(
+                trace_id,
+                &req.org_id,
+                query,
+                original_start,
+                end,
+                step,
+                matrix.to_vec(),
+            )
+            .await
             {
                 log::error!(
                     "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",

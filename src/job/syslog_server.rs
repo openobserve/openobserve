@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,12 +21,12 @@ use std::{
 use once_cell::sync::Lazy;
 use tokio::{
     net::{TcpListener, UdpSocket},
-    sync::{broadcast, RwLock},
+    sync::{RwLock, broadcast},
 };
 
 use crate::{
     common::infra::config::SYSLOG_ENABLED,
-    handler::tcp_udp::{tcp_server, udp_server, STOP_SRV},
+    handler::tcp_udp::{STOP_SRV, tcp_server, udp_server},
     service::db::syslog::toggle_syslog_setting,
 };
 

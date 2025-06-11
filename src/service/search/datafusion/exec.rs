@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,15 @@
 
 use std::{str::FromStr, sync::Arc};
 
+use arrow::record_batch::RecordBatch;
 use arrow_schema::Field;
 use config::{
-    get_config,
+    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
-    PARQUET_BATCH_SIZE,
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
@@ -39,11 +39,11 @@ use datafusion::{
         cache::cache_manager::{CacheManagerConfig, FileStatisticsCache},
         context::SessionConfig,
         memory_pool::{FairSpillPool, GreedyMemoryPool},
-        runtime_env::{RuntimeConfig, RuntimeEnv},
+        runtime_env::{RuntimeEnv, RuntimeEnvBuilder},
         session_state::SessionStateBuilder,
     },
     logical_expr::AggregateUDF,
-    optimizer::OptimizerRule,
+    optimizer::{AnalyzerRule, OptimizerRule},
     physical_plan::execute_stream,
     prelude::{Expr, SessionContext},
 };
@@ -51,11 +51,11 @@ use futures::TryStreamExt;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
-    arrow::array::{Int64Array, RecordBatch},
+    arrow::array::Int64Array,
     config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
     o2_enterprise::enterprise::{
-        common::downsampling::get_largest_downsampling_rule,
-        common::infra::config::get_config as get_o2_config, search::WorkGroup,
+        common::config::get_config as get_o2_config,
+        common::downsampling::get_largest_downsampling_rule, search::WorkGroup,
     },
     parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue},
 };
@@ -65,7 +65,7 @@ use super::{
     optimizer::join_reorder::JoinReorderRule,
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
-    table_provider::{uniontable::NewUnionTable, NewListingTable},
+    table_provider::{NewListingTable, uniontable::NewUnionTable},
     udf::transform_udf::get_all_transform,
 };
 use crate::service::{
@@ -93,13 +93,13 @@ pub async fn merge_parquet_files(
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-    _is_ingester: bool,
+    is_ingester: bool,
 ) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     #[cfg(feature = "enterprise")]
-    if stream_type == StreamType::Metrics && !_is_ingester {
+    if stream_type == StreamType::Metrics && !is_ingester {
         let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
         if let Some(rule) = rule {
             return merge_parquet_files_with_downsampling(
@@ -117,7 +117,7 @@ pub async fn merge_parquet_files(
     let sql = if stream_type == StreamType::Index {
         format!(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
-            cfg.common.column_timestamp, cfg.common.column_timestamp
+            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -126,23 +126,19 @@ pub async fn merge_parquet_files(
         let fields = schema
             .fields()
             .iter()
-            .filter(|f| f.name() != &cfg.common.column_timestamp && f.name() != "count")
+            .filter(|f| f.name() != TIMESTAMP_COL_NAME && f.name() != "count")
             .map(|x| x.name().to_string())
             .collect::<Vec<_>>();
         let fields_str = fields.join(", ");
         format!(
             "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
-            cfg.common.column_timestamp,
-            cfg.common.column_timestamp,
-            fields_str,
-            fields_str,
-            cfg.common.column_timestamp
+            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, fields_str, fields_str, TIMESTAMP_COL_NAME
         )
+    } else if stream_type == StreamType::Filelist {
+        // for file list we do not have timestamp, so we instead sort by min ts of entries
+        "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
-        format!(
-            "SELECT * FROM tbl ORDER BY {} DESC",
-            cfg.common.column_timestamp
-        )
+        format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
     };
     log::debug!("merge_parquet_files sql: {}", sql);
 
@@ -150,8 +146,14 @@ pub async fn merge_parquet_files(
     let sort_by_timestamp_desc = true;
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
-    let ctx =
-        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
+    let ctx = prepare_datafusion_context(
+        None,
+        vec![],
+        vec![],
+        sort_by_timestamp_desc,
+        target_partitions,
+    )
+    .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
     ctx.register_table("tbl", union_table)?;
@@ -160,27 +162,62 @@ pub async fn merge_parquet_files(
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
 
+    // print the physical plan
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
+            .indent(false)
+            .to_string();
+        println!("+---------------------------+--------------------------+");
+        println!("merge_parquet_files");
+        println!("+---------------------------+--------------------------+");
+        println!("{}", plan);
+    }
+
     // write result to parquet file
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true);
+    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
+        Some("none")
+    } else {
+        None
+    };
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        metadata,
+        true,
+        compression,
+    );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    loop {
-        match batch_stream.try_next().await {
-            Ok(Some(batch)) => {
-                if let Err(e) = writer.write(&batch).await {
-                    log::error!("merge_parquet_files write Error: {}", e);
-                    return Err(e.into());
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+    let task = tokio::task::spawn(async move {
+        loop {
+            match batch_stream.try_next().await {
+                Ok(None) => {
+                    break;
+                }
+                Ok(Some(batch)) => {
+                    if let Err(e) = tx.send(batch).await {
+                        log::error!("merge_parquet_files write to channel error: {}", e);
+                        return Err(DataFusionError::External(Box::new(e)));
+                    }
+                }
+                Err(e) => {
+                    log::error!("merge_parquet_files execute stream error: {}", e);
+                    return Err(e);
                 }
             }
-            Ok(None) => {
-                break;
-            }
-            Err(e) => {
-                log::error!("merge_parquet_files execute stream Error: {}", e);
-                return Err(e);
-            }
+        }
+        Ok(())
+    });
+    while let Some(batch) = rx.recv().await {
+        if let Err(e) = writer.write(&batch).await {
+            log::error!("merge_parquet_files write error: {}", e);
+            return Err(e.into());
         }
     }
+    task.await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
     writer.close().await?;
 
     ctx.deregister_table("tbl")?;
@@ -217,8 +254,14 @@ pub async fn merge_parquet_files_with_downsampling(
     // create datafusion context
     let sort_by_timestamp_desc = true;
     let target_partitions = 2; // force use 2 cpu cores for one merge task
-    let ctx =
-        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
+    let ctx = prepare_datafusion_context(
+        None,
+        vec![],
+        vec![],
+        sort_by_timestamp_desc,
+        target_partitions,
+    )
+    .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
     ctx.register_table("tbl", union_table)?;
@@ -234,50 +277,76 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
     let mut file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata, false);
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        &metadata,
+        false,
+        None,
+    );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    loop {
-        match batch_stream.try_next().await {
-            Ok(Some(batch)) => {
-                if file_meta.max_ts == 0 {
-                    file_meta.max_ts = get_max_timestamp(&batch);
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+    let task = tokio::task::spawn(async move {
+        loop {
+            match batch_stream.try_next().await {
+                Ok(None) => {
+                    break;
                 }
-                file_meta.original_size += batch.get_array_memory_size() as i64;
-                file_meta.records += batch.num_rows() as i64;
-                min_ts = get_min_timestamp(&batch);
-                if file_meta.original_size > cfg.compact.max_file_size as i64 {
-                    file_meta.min_ts = min_ts;
-                    append_metadata(&mut writer, &file_meta)?;
-                    writer.close().await?;
-                    bufs.push(std::mem::take(&mut buf));
-                    file_metas.push(file_meta);
-
-                    // reset for next file
-                    buf.clear();
-                    file_meta = FileMeta::default();
-                    writer = new_parquet_writer(
-                        &mut buf,
-                        &schema,
-                        bloom_filter_fields,
-                        &metadata,
-                        false,
+                Ok(Some(batch)) => {
+                    if let Err(e) = tx.send(batch).await {
+                        log::error!(
+                            "merge_parquet_files_with_downsampling write to channel error: {}",
+                            e
+                        );
+                        return Err(DataFusionError::External(Box::new(e)));
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "merge_parquet_files_with_downsampling execute stream error: {}",
+                        e
                     );
+                    return Err(e);
                 }
-                if let Err(e) = writer.write(&batch).await {
-                    log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
-                    return Err(e.into());
-                }
-            }
-            Ok(None) => break,
-            Err(e) => {
-                log::error!(
-                    "merge_parquet_files_with_downsampling execute stream Error: {}",
-                    e
-                );
-                return Err(e);
             }
         }
+        Ok(())
+    });
+    while let Some(batch) = rx.recv().await {
+        if file_meta.max_ts == 0 {
+            file_meta.max_ts = get_max_timestamp(&batch);
+        }
+        file_meta.original_size += batch.get_array_memory_size() as i64;
+        file_meta.records += batch.num_rows() as i64;
+        min_ts = get_min_timestamp(&batch);
+        if file_meta.original_size > cfg.compact.max_file_size as i64 {
+            file_meta.min_ts = min_ts;
+            append_metadata(&mut writer, &file_meta)?;
+            writer.close().await?;
+            bufs.push(std::mem::take(&mut buf));
+            file_metas.push(file_meta);
+
+            // reset for next file
+            buf.clear();
+            file_meta = FileMeta::default();
+            writer = new_parquet_writer(
+                &mut buf,
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                false,
+                None,
+            );
+        }
+        if let Err(e) = writer.write(&batch).await {
+            log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
+            return Err(e.into());
+        }
     }
+    task.await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
+
     if file_meta.original_size > 0 {
         file_meta.min_ts = min_ts;
         append_metadata(&mut writer, &file_meta)?;
@@ -379,19 +448,15 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let wal_url = url::Url::parse("wal:///").unwrap();
     object_store_registry.register_store(&wal_url, Arc::new(wal));
 
-    let tmpfs = super::storage::tmpfs::Tmpfs::new();
-    let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
-    object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
-
     let cfg = get_config();
-    let mut rn_config =
-        RuntimeConfig::new().with_object_store_registry(Arc::new(object_store_registry));
+    let mut builder =
+        RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
     if cfg.limit.datafusion_file_stat_cache_max_entries > 0 {
         let cache_config = CacheManagerConfig::default();
         let cache_config = cache_config.with_files_statistics_cache(Some(
             super::storage::file_statistics_cache::GLOBAL_CACHE.clone(),
         ));
-        rn_config = rn_config.with_cache_manager(cache_config);
+        builder = builder.with_cache_manager(cache_config);
     }
 
     let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_limit);
@@ -401,18 +466,19 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         })?;
     match mem_pool {
         super::MemoryPoolType::Greedy => {
-            rn_config = rn_config.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
+            builder = builder.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
         }
         super::MemoryPoolType::Fair => {
-            rn_config = rn_config.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
+            builder = builder.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
         }
         super::MemoryPoolType::None => {}
     };
-    RuntimeEnv::try_new(rn_config)
+    builder.build()
 }
 
 pub async fn prepare_datafusion_context(
     _work_group: Option<String>,
+    analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
     target_partitions: usize,
@@ -432,6 +498,9 @@ pub async fn prepare_datafusion_context(
         .with_config(session_config)
         .with_runtime_env(runtime_env)
         .with_default_features();
+    for rule in analyzer_rules {
+        builder = builder.with_analyzer_rule(rule);
+    }
     if !optimizer_rules.is_empty() {
         builder = builder
             .with_optimizer_rules(optimizer_rules)
@@ -464,8 +533,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     #[cfg(feature = "enterprise")]
     ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
@@ -475,7 +542,10 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
     ));
-
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::summary_percentile::SummaryPercentile::new(),
+    ));
+    ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
     let udf_list = get_all_transform(org_id)?;
     for udf in udf_list {
         ctx.register_udf(udf.clone());
@@ -492,14 +562,15 @@ pub async fn register_table(
     files: &[FileKey],
     rules: HashMap<String, DataType>,
     sort_key: &[(String, bool)],
+    need_optimize_partition: bool,
 ) -> Result<SessionContext> {
-    let cfg = get_config();
     // only sort by timestamp desc
     let sorted_by_time =
-        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+        sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
+        vec![],
         vec![],
         sorted_by_time,
         session.target_partitions,
@@ -515,6 +586,7 @@ pub async fn register_table(
         ctx.runtime_env().cache_manager.get_file_statistic_cache(),
         None,
         vec![],
+        need_optimize_partition,
     )
     .await?;
     ctx.register_table(table_name, table)?;
@@ -532,6 +604,7 @@ pub async fn create_parquet_table(
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    need_optimize_partition: bool,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
     let target_partitions = if session.target_partitions == 0 {
@@ -553,6 +626,11 @@ pub async fn create_parquet_table(
         target_partitions
     };
 
+    log::debug!(
+        "create_parquet_table: target_partitions: {}",
+        target_partitions
+    );
+
     // Configure listing options
     let file_format = ParquetFormat::default();
     let mut listing_options = ListingOptions::new(Arc::new(file_format))
@@ -564,7 +642,7 @@ pub async fn create_parquet_table(
         // specify sort columns for parquet file
         listing_options =
             listing_options.with_file_sort_order(vec![vec![datafusion::logical_expr::SortExpr {
-                expr: Expr::Column(Column::new_unqualified(cfg.common.column_timestamp.clone())),
+                expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
                 asc: false,
                 nulls_first: false,
             }]]);
@@ -577,8 +655,6 @@ pub async fn create_parquet_table(
     } else if session.storage_type == StorageType::Wal {
         file_list::set(&session.id, &schema_key, files).await;
         format!("wal:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Tmpfs {
-        format!("tmpfs:///{}/", session.id)
     } else {
         return Err(DataFusionError::Execution(format!(
             "Unsupported storage_type {:?}",
@@ -595,15 +671,15 @@ pub async fn create_parquet_table(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
+    let timestamp_field = schema.field_with_name(TIMESTAMP_COL_NAME);
     let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
         let new_fields = schema
             .fields()
             .iter()
             .map(|x| {
-                if x.name() == &cfg.common.column_timestamp {
+                if x.name() == TIMESTAMP_COL_NAME {
                     Arc::new(Field::new(
-                        cfg.common.column_timestamp.clone(),
+                        TIMESTAMP_COL_NAME.to_string(),
                         DataType::Int64,
                         false,
                     ))
@@ -617,8 +693,14 @@ pub async fn create_parquet_table(
         schema
     };
     config = config.with_schema(schema);
-    let mut table = NewListingTable::try_new(config, rules, index_condition, fst_fields)?;
-    if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
+    let mut table = NewListingTable::try_new(
+        config,
+        rules,
+        index_condition,
+        fst_fields,
+        need_optimize_partition,
+    )?;
+    if file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))
@@ -652,16 +734,12 @@ async fn get_cpu_and_mem_limit(
 
 #[cfg(feature = "enterprise")]
 fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
-    let cfg = get_config();
     let step = rule.step;
     let fields = schema
         .fields()
         .iter()
         .filter_map(|f| {
-            if f.name() != HASH_LABEL
-                && f.name() != VALUE_LABEL
-                && f.name() != &cfg.common.column_timestamp
-            {
+            if f.name() != HASH_LABEL && f.name() != VALUE_LABEL && f.name() != TIMESTAMP_COL_NAME {
                 Some(format!("max({}) as {}", f.name(), f.name()))
             } else {
                 None
@@ -674,7 +752,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
             "{}({} ORDER BY {} ASC) as {}",
             rule.function.fun(),
             VALUE_LABEL,
-            cfg.common.column_timestamp,
+            TIMESTAMP_COL_NAME,
             VALUE_LABEL
         )
     } else {
@@ -690,7 +768,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
         HASH_LABEL,
         step,
-        cfg.common.column_timestamp,
+        TIMESTAMP_COL_NAME,
         TIMESTAMP_ALIAS,
         fields.join(", "),
         fun_str,
@@ -702,10 +780,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         .fields()
         .iter()
         .filter_map(|f| {
-            if f.name() != HASH_LABEL
-                && f.name() != VALUE_LABEL
-                && f.name() != &cfg.common.column_timestamp
-            {
+            if f.name() != HASH_LABEL && f.name() != VALUE_LABEL && f.name() != TIMESTAMP_COL_NAME {
                 Some(f.name().to_string())
             } else {
                 None
@@ -718,7 +793,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         VALUE_LABEL,
         fields.join(", "),
         TIMESTAMP_ALIAS,
-        cfg.common.column_timestamp,
+        TIMESTAMP_COL_NAME,
         sql,
         TIMESTAMP_ALIAS,
     )
@@ -726,9 +801,8 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
 
 #[cfg(feature = "enterprise")]
 fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
-    let cfg = get_config();
     let timestamp = record_batch
-        .column_by_name(&cfg.common.column_timestamp)
+        .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
         .as_any()
         .downcast_ref::<Int64Array>()
@@ -738,9 +812,8 @@ fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
 
 #[cfg(feature = "enterprise")]
 fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
-    let cfg = get_config();
     let timestamp = record_batch
-        .column_by_name(&cfg.common.column_timestamp)
+        .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
         .as_any()
         .downcast_ref::<Int64Array>()

@@ -13,13 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { routeGuard } from "@/utils/zincutils";
+import {
+  routeGuard,
+  useLocalUserInfo,
+  useLocalCurrentUser,
+} from "@/utils/zincutils";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import Tickets from "@/views/TicketsView.vue";
 import About from "@/views/About.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
+import ShortUrl from "@/views/ShortUrl.vue";
 
 const Search = () => import("@/views/Search.vue");
 const AppMetrics = () => import("@/views/AppMetrics.vue");
@@ -63,6 +68,8 @@ const ApiDashboard = () =>
 const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
+const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
+
 const ActionScipts = () =>
   import("@/components/actionScripts/ActionScipts.vue");
 
@@ -70,9 +77,29 @@ import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import config from "@/aws-exports";
 import useManagementRoutes from "./useManagementRoutes";
+import Login from "@/views/Login.vue";
 
 const useRoutes = () => {
-  const parentRoutes: never[] = [];
+  const parentRoutes: any = [
+    {
+      path: "/login",
+      component: Login,
+    },
+    {
+      path: "/logout",
+      beforeEnter(to: any, from: any, next: any) {
+        useLocalCurrentUser("", true);
+        useLocalUserInfo("", true);
+
+        window.location.href = "/login";
+      },
+    },
+    {
+      path: "/cb",
+      name: "callback",
+      component: Login,
+    },
+  ];
 
   const homeChildRoutes = [
     {
@@ -267,6 +294,14 @@ const useRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            {
+              path: "import",
+              name: "importPipeline",
+              component: ImportPipeline,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
       ],
@@ -278,6 +313,15 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    },
+    {
+      path: "short/:id",
+      name: "shortUrl",
+      component: ShortUrl,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      props: true,
     },
     {
       path: "rum",

@@ -24,7 +24,7 @@ use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    get_config,
+    DISTINCT_FIELDS, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -32,19 +32,20 @@ use config::{
     },
     metrics,
     utils::{
-        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
+        json::{Map, Value, estimate_json_bytes, get_string_value, pickup_string_value},
         schema_ext::SchemaExt,
+        time::now_micros,
     },
-    DISTINCT_FIELDS,
 };
-use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 
 use super::{
     db::organization::get_org_setting,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    ingestion::{TriggerAlertData, evaluate_trigger, write_file},
     metadata::{
-        distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
-        write, MetadataItem, MetadataType,
+        MetadataItem, MetadataType,
+        distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
+        write,
     },
     schema::stream_schema_exists,
 };
@@ -57,9 +58,10 @@ use crate::{
 };
 
 pub mod bulk;
+pub mod hec;
 pub mod ingest;
-pub mod otlp_grpc;
-pub mod otlp_http;
+pub mod loki;
+pub mod otlp;
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
@@ -417,25 +419,29 @@ async fn write_logs(
         // start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
-                let end_time = chrono::Utc::now().timestamp_micros();
+                let end_time = now_micros();
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
                         org_id,
                         StreamType::Logs,
                         alert.stream_name,
-                        alert.name
+                        alert.get_unique_key()
                     );
                     // For one alert, only one trigger per request
                     // Trigger for this alert is already added.
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) =
-                        alert.evaluate(Some(&record_val), (None, end_time)).await
+                    match alert
+                        .evaluate(Some(&record_val), (None, end_time), None)
+                        .await
                     {
-                        triggers.push((alert.clone(), v));
-                        evaluated_alerts.insert(key);
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        _ => {}
                     }
                 }
             }

@@ -8,7 +8,10 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText("Login as internal user").click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+ 
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -19,17 +22,6 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-// const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-//   await page.waitForTimeout(4000);
-//   await page
-//     .locator('[data-test="log-search-index-list-select-stream"]')
-//     .click({ force: true });
-//   await page
-//     .locator("div.q-item")
-//     .getByText(`${stream}`)
-//     .first()
-//     .click({ force: true });
-// };
 
 const getHeaders = () => {
   const basicAuthCredentials = Buffer.from(
@@ -142,7 +134,7 @@ async function multistreamselect(page) {
 
   test("should add a function and display it in streams", async ({ page }) => {
 await multistreamselect(page);
-await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
 await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page
@@ -205,10 +197,12 @@ await page.waitForTimeout(1000);
       .click({ force: true });
     await page.getByPlaceholder("Search Stream").click();
     await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page.waitForTimeout(1000);
     await page
       .getByRole("button", { name: "Explore" })
       .first()
       .click({ force: true });
+    await page.waitForTimeout(1000);
     await expect(page.url()).toContain("logs");
   });
 
@@ -228,7 +222,7 @@ await page.waitForTimeout(1000);
       .click({
         force: true,
       });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page
         .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')

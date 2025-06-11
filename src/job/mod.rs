@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,10 @@ use regex::Regex;
 use crate::{
     common::{
         infra::config::SYSLOG_ENABLED,
-        meta::{organization::DEFAULT_ORG, user::UserRequest},
+        meta::{
+            organization::DEFAULT_ORG,
+            user::{UserOrgRole, UserRequest},
+        },
     },
     service::{db, self_reporting, users},
 };
@@ -31,17 +34,20 @@ mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
 mod compactor;
+mod file_downloader;
+mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
-mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
+pub use file_downloader::{download_from_node, queue_download};
+pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -61,38 +67,75 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
-        let _ = users::create_root_user(
+        let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
+        if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
                 email: cfg.auth.root_user_email.clone(),
                 password: cfg.auth.root_user_password.clone(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: UserOrgRole {
+                    base_role: config::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
+                token: if cfg.auth.root_user_token.is_empty() {
+                    None
+                } else {
+                    Some(cfg.auth.root_user_token.clone())
+                },
             },
         )
-        .await;
+        .await
+        {
+            panic!("Failed to create root user: {e}");
+        }
     }
 
     if !cfg.common.mmdb_disable_download {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
-    // cache users
-    tokio::task::spawn(async move { db::user::watch().await });
-    db::user::cache().await.expect("user cache failed");
 
+    db::user::cache().await.expect("user cache failed");
     db::organization::cache()
         .await
-        .expect("organization cache sync failed");
+        .expect("organizations cache failed");
+    db::org_users::cache().await.expect("org user cache failed");
+
+    db::organization::org_settings_cache()
+        .await
+        .expect("organization settings cache sync failed");
+
+    // watch org users
+    tokio::task::spawn(async move { db::user::watch().await });
+    tokio::task::spawn(async move { db::org_users::watch().await });
+    tokio::task::spawn(async move { db::organization::watch().await });
 
     // check version
-    db::version::set().await.expect("db version set failed");
+    db::metas::version::set()
+        .await
+        .expect("db version set failed");
+
+    // check tantivy _timestamp update time
+    _ = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { self_reporting::run_audit_publish().await });
+    #[cfg(feature = "enterprise")]
+    {
+        tokio::task::spawn(async move { db::ofga::watch().await });
+        db::ofga::cache().await.expect("ofga model cache failed");
+        o2_openfga::authorizer::authz::init_open_fga().await;
+        // RBAC model
+        if get_openfga_config().enabled {
+            if let Err(e) = crate::common::infra::ofga::init().await {
+                log::error!("OFGA init failed: {}", e);
+            }
+        }
+    }
 
     tokio::task::spawn(async move { promql_self_consume::run().await });
     // Router doesn't need to initialize job
@@ -122,10 +165,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
     tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
-    tokio::task::spawn(async move { db::organization::watch().await });
+    tokio::task::spawn(async move { db::organization::org_settings_watch().await });
+
     tokio::task::spawn(async move { db::pipeline::watch().await });
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { db::ofga::watch().await });
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
@@ -167,15 +209,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("syslog settings cache failed");
 
-    // cache pipeline
-    db::pipeline::cache().await.expect("Pipeline cache failed");
-
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
-    tokio::task::spawn(async move { db::file_list::cache_stats().await });
-
-    #[cfg(feature = "enterprise")]
-    db::ofga::cache().await.expect("ofga model cache failed");
 
     #[cfg(feature = "enterprise")]
     if !LOCAL_NODE.is_compactor() {
@@ -199,26 +234,37 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(async move { file_downloader::run().await });
+
+    if LOCAL_NODE.is_compactor() {
+        tokio::task::spawn(async move { file_list_dump::run().await });
+    }
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });
     // start pipeline data retention
-    tokio::task::spawn(async move { pipeline::run().await });
-
     #[cfg(feature = "enterprise")]
-    o2_openfga::authorizer::authz::init_open_fga().await;
+    tokio::task::spawn(
+        async move { o2_enterprise::enterprise::pipeline::pipeline_job::run().await },
+    );
 
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { cipher::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::keys::watch().await });
 
-    // RBAC model
-    #[cfg(feature = "enterprise")]
-    if get_openfga_config().enabled {
-        if let Err(e) = crate::common::infra::ofga::init().await {
-            log::error!("OFGA init failed: {}", e);
-        }
+    // additional for cloud
+    #[cfg(feature = "cloud")]
+    {
+        // OpenFGA migration
+        o2_enterprise::enterprise::cloud::ofga_migrate()
+            .await
+            .expect("cloud ofga migrations failed");
+
+        // OrgUsage pipeline init
+        o2_enterprise::enterprise::cloud::billings::org_usage::check_and_create_usage_pipeline()
+            .await
+            .expect("Cloud OrgUsage pipeline init failed");
     }
 
     // Shouldn't serve request until initialization finishes
@@ -234,6 +280,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("syslog server run failed");
     }
+
+    Ok(())
+}
+
+/// Additional jobs that init processes should be deferred until the gRPC service
+/// starts in the main thread
+pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    db::schema::cache_enrichment_tables()
+        .await
+        .expect("EnrichmentTables cache failed");
+    // pipelines can potentially depend on enrichment tables, so cached afterwards
+    db::pipeline::cache().await.expect("Pipeline cache failed");
 
     Ok(())
 }

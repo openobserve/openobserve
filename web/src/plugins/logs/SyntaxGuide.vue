@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     dense
     flat
-    class="q-ml-xs q-pa-xs syntax-guide-button"
-    :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    :title="t('search.syntaxGuideLabel')"
+    class="q-ml-xs q-pa-xs"
+    :class="[sqlmode ? 'sql-mode' : 'normal-mode',
+      !store.state.isAiChatEnabled ? 'syntax-guide-button' : ''
+    ]"
     icon="help"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
@@ -39,16 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   For inverted index search of value 'error' use
                   <span class="bg-highlight">match_all('error')</span>
                   in query editor. Search terms are case-insensitive.
-                </li>
-                <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight">match_all_raw('error')</span>
-                </li>
-                <li>
-                  For case-insensitive full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >match_all_raw_ignore_case('error')</span
-                  >
                 </li>
                 <li>
                   For column search of value 'error' use
@@ -110,20 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all_raw('error')</span
-                  >
-                </li>
-                <li>
-                  For case-insensitive full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all_raw_ignore_case('error')</span
-                  >
-                </li>
-                <li>
                   For column search of value 'error' use
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
@@ -179,6 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
       </q-card>
     </q-menu>
+    <q-tooltip>
+      {{ t('search.syntaxGuideLabel') }}
+    </q-tooltip>
   </q-btn>
 </template>
 

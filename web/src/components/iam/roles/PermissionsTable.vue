@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="!level"
     class="q-mb-md text-bold"
   >
-    {{ selectedPermissionsHash.size }} Permissions
+     {{ visibleResourceCount }} Permissions
   </div>
   <div
     :data-test="`iam-${
@@ -102,21 +102,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :id="`permissions-table-${parent.resourceName}`"
         style="max-height: 725px; overflow-x: hidden; overflow-y: auto"
         :style="{
-          'max-height': level > 0 ? (level > 1 ? '400px' : '100%') : '100%',
+          'max-height': level > 0 ? '400px' : '100%',
         }"
-        :items-size="5"
-        :virtual-scroll-item-size="25"
-        :virtual-scroll-sticky-size-start="0"
-        :virtual-scroll-sticky-size-end="0"
-        :virtual-scroll-slice-size="100"
-        :virtual-scroll-slice-ratio-before="100"
+        :items-size="rows.length"
+        :virtual-scroll-item-size="39"
+        :virtual-scroll-slice-size="20"
+        :virtual-scroll-slice-ratio-before="20"
         type="table"
         :items="rows"
         flat
         bordered
         ref="permissionsTableRef"
         :rows="rows"
-        :columns="(columns as [])"
+        :columns="columns as []"
         :table-colspan="9"
         row-key="name"
         dense
@@ -299,7 +297,7 @@ const columns: any = [
   {
     name: "display_name",
     field: "display_name",
-    label: t("common.name"),
+    label: t("quota.moduleName"),
     align: "left",
     sortable: true,
   },
@@ -338,15 +336,6 @@ const columns: any = [
     style: { width: "80px" },
   },
   {
-    name: "AllowDelete",
-    field: "permission",
-    label: t("iam.delete"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
-  },
-  {
     name: "AllowPost",
     field: "permission",
     label: t("iam.create"),
@@ -364,6 +353,15 @@ const columns: any = [
     slotName: "permission",
     style: { width: "80px" },
   },
+  {
+    name: "AllowDelete",
+    field: "permission",
+    label: t("iam.delete"),
+    align: "center",
+    slot: true,
+    slotName: "permission",
+    style: { width: "80px" },
+  }
 ];
 
 const expandPermission = async (resource: any) => {

@@ -18,7 +18,7 @@ use std::{cmp::max, fmt::Display};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use utoipa::ToSchema;
 
 use super::bitvec::BitVec;
@@ -26,7 +26,7 @@ use crate::{
     get_config,
     meta::self_reporting::usage::Stats,
     utils::{
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
         json::{self, Map, Value},
     },
 };
@@ -87,7 +87,7 @@ impl From<&str> for StreamType {
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
             "index" => StreamType::Index,
-            _ => StreamType::Logs,
+            _ => StreamType::default(),
         }
     }
 }
@@ -168,6 +168,8 @@ pub struct ListStreamParams {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileKey {
+    pub id: i64,
+    pub account: String,
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
@@ -175,8 +177,10 @@ pub struct FileKey {
 }
 
 impl FileKey {
-    pub fn new(key: String, meta: FileMeta, deleted: bool) -> Self {
+    pub fn new(id: i64, account: String, key: String, meta: FileMeta, deleted: bool) -> Self {
         Self {
+            id,
+            account,
             key,
             meta,
             deleted,
@@ -186,6 +190,8 @@ impl FileKey {
 
     pub fn from_file_name(file: &str) -> Self {
         Self {
+            id: 0,
+            account: String::default(),
             key: file.to_string(),
             meta: FileMeta::default(),
             deleted: false,
@@ -236,6 +242,7 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
 
 #[derive(Clone, Debug, Default)]
 pub struct FileListDeleted {
+    pub account: String,
     pub file: String,
     pub index_file: bool,
     pub flattened: bool,
@@ -263,6 +270,7 @@ impl From<&String> for QueryPartitionStrategy {
 pub enum MergeStrategy {
     FileSize,
     FileTime,
+    TimeRange,
 }
 
 impl From<&String> for MergeStrategy {
@@ -270,6 +278,7 @@ impl From<&String> for MergeStrategy {
         match s.to_lowercase().as_str() {
             "file_size" => MergeStrategy::FileSize,
             "file_time" => MergeStrategy::FileTime,
+            "time_range" => MergeStrategy::TimeRange,
             _ => MergeStrategy::FileSize,
         }
     }
@@ -417,6 +426,27 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
     }
 }
 
+impl std::ops::Add<&StreamStats> for &StreamStats {
+    type Output = StreamStats;
+
+    fn add(self, rhs: &StreamStats) -> Self::Output {
+        let mut ret = StreamStats {
+            created_at: self.created_at,
+            file_num: self.file_num + rhs.file_num,
+            doc_num: self.doc_num + rhs.doc_num,
+            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
+            storage_size: self.storage_size + rhs.storage_size,
+            compressed_size: self.compressed_size + rhs.compressed_size,
+            index_size: self.index_size + rhs.index_size,
+        };
+        if ret.doc_time_min == 0 {
+            ret.doc_time_min = rhs.doc_time_min;
+        }
+        ret
+    }
+}
+
 impl From<&FileMeta> for cluster_rpc::FileMeta {
     fn from(req: &FileMeta) -> Self {
         cluster_rpc::FileMeta {
@@ -447,6 +477,8 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
 impl From<&FileKey> for cluster_rpc::FileKey {
     fn from(req: &FileKey) -> Self {
         cluster_rpc::FileKey {
+            id: req.id,
+            account: req.account.clone(),
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
             deleted: req.deleted,
@@ -458,6 +490,8 @@ impl From<&FileKey> for cluster_rpc::FileKey {
 impl From<&cluster_rpc::FileKey> for FileKey {
     fn from(req: &cluster_rpc::FileKey) -> Self {
         FileKey {
+            id: req.id,
+            account: req.account.clone(),
             key: req.key.clone(),
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
@@ -545,6 +579,10 @@ pub struct UpdateStreamSettings {
     pub approx_partition: Option<bool>,
     #[serde(default)]
     pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
+    #[serde(default)]
+    pub index_original_data: Option<bool>,
+    #[serde(default)]
+    pub index_all_values: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -638,7 +676,7 @@ impl TimeRange {
         result
     }
 }
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
@@ -672,6 +710,10 @@ pub struct StreamSettings {
     pub index_updated_at: i64,
     #[serde(default)]
     pub extended_retention_days: Vec<TimeRange>,
+    #[serde(default)]
+    pub index_original_data: bool,
+    #[serde(default)]
+    pub index_all_values: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -699,11 +741,16 @@ impl Serialize for StreamSettings {
         state.serialize_field("approx_partition", &self.approx_partition)?;
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
+        state.serialize_field("index_original_data", &self.index_original_data)?;
+        state.serialize_field("index_all_values", &self.index_all_values)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
                 if !fields.is_empty() {
-                    state.serialize_field("defined_schema_fields", fields)?;
+                    let mut fields = fields.clone();
+                    fields.sort_unstable();
+                    fields.dedup();
+                    state.serialize_field("defined_schema_fields", &fields)?;
                 } else {
                     state.skip_field("defined_schema_fields")?;
                 }
@@ -791,13 +838,15 @@ impl From<&str> for StreamSettings {
 
         let mut defined_schema_fields: Option<Vec<String>> = None;
         if let Some(value) = settings.get("defined_schema_fields") {
-            let fields = value
+            let mut fields = value
                 .as_array()
                 .unwrap()
                 .iter()
                 .map(|item| item.as_str().unwrap().to_string())
                 .collect::<Vec<_>>();
             if !fields.is_empty() {
+                fields.sort_unstable();
+                fields.dedup();
                 defined_schema_fields = Some(fields);
             }
         }
@@ -812,7 +861,11 @@ impl From<&str> for StreamSettings {
         let approx_partition = settings
             .get("approx_partition")
             .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .unwrap_or(
+                get_config()
+                    .common
+                    .use_stream_settings_for_partitions_enabled,
+            );
 
         let mut distinct_value_fields = Vec::new();
         let fields = settings.get("distinct_value_fields");
@@ -843,6 +896,16 @@ impl From<&str> for StreamSettings {
             }
         }
 
+        let index_original_data = settings
+            .get("index_original_data")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let index_all_values = settings
+            .get("index_all_values")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         Self {
             partition_time_level,
             partition_keys,
@@ -858,6 +921,8 @@ impl From<&str> for StreamSettings {
             distinct_value_fields,
             index_updated_at,
             extended_retention_days,
+            index_original_data,
+            index_all_values,
         }
     }
 }
@@ -1068,6 +1133,13 @@ impl std::fmt::Display for Operator {
             Operator::NotContains => write!(f, "not contains"),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EnrichmentTableMetaStreamStats {
+    pub start_time: i64,
+    pub end_time: i64,
+    pub size: i64,
 }
 
 #[cfg(test)]

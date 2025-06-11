@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,17 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::time::now_micros;
 use sea_orm::{
-    entity::prelude::*,
-    sea_query::{Alias, DynIden},
     ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, Order,
     PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*,
+    sea_query::{Alias, DynIden},
 };
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
-    db::{connect_to_orm, mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{
+        IndexStatement, ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl, mysql,
+        postgres, sqlite,
+    },
     errors::{self, DbError, Error},
 };
 
@@ -83,7 +87,7 @@ pub async fn init() -> Result<(), errors::Error> {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -106,7 +110,7 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["created_ts"],
     );
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     match client.get_database_backend() {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
@@ -128,7 +132,7 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     let record = ActiveModel {
         short_id: Set(short_id.to_string()),
         original_url: Set(original_url.to_string()),
-        created_ts: Set(chrono::Utc::now().timestamp_micros()),
+        created_ts: Set(now_micros()),
         ..Default::default()
     };
 

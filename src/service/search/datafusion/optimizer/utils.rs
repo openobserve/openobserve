@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,25 +15,21 @@
 
 use std::sync::Arc;
 
-use config::get_config;
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{
+        DFSchema, Result,
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
         },
-        Column, DFSchema, Result,
     },
     datasource::DefaultTableSource,
-    logical_expr::{
-        col, Extension, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource,
-    },
+    logical_expr::{Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource, col},
     prelude::Expr,
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::{
-    plan::deduplication::DeduplicationLogicalNode, table_provider::empty_table::NewEmptyTable,
-};
+use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {
@@ -53,28 +49,11 @@ pub fn is_complex_query(plan: &LogicalPlan) -> bool {
 pub struct AddSortAndLimit {
     pub limit: usize,
     pub offset: usize,
-    pub deduplication_columns: Vec<Column>,
 }
 
 impl AddSortAndLimit {
     pub fn new(limit: usize, offset: usize) -> Self {
-        Self {
-            limit,
-            offset,
-            deduplication_columns: vec![],
-        }
-    }
-
-    pub fn new_with_deduplication(
-        limit: usize,
-        offset: usize,
-        deduplication_columns: Vec<Column>,
-    ) -> Self {
-        Self {
-            limit,
-            offset,
-            deduplication_columns,
-        }
+        Self { limit, offset }
     }
 }
 
@@ -82,10 +61,6 @@ impl TreeNodeRewriter for AddSortAndLimit {
     type Node = LogicalPlan;
 
     fn f_down(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
-        let cfg = config::get_config();
-        if self.limit == 0 {
-            return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
-        }
         if is_contain_deduplication_plan(&node) {
             return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
         }
@@ -99,6 +74,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
             }
             LogicalPlan::Limit(mut limit) => match limit.input.as_ref() {
                 LogicalPlan::Sort(_) => (Transformed::no(LogicalPlan::Limit(limit)), None),
+                LogicalPlan::Projection(_) => (Transformed::no(LogicalPlan::Limit(limit)), None),
                 _ => {
                     if is_complex {
                         (Transformed::no(LogicalPlan::Limit(limit)), None)
@@ -145,46 +121,6 @@ impl TreeNodeRewriter for AddSortAndLimit {
             transformed.tnr = TreeNodeRecursion::Stop;
         }
 
-        // support deduplication on join key
-        // sort -> deduplication
-        // only add when is_stop == true
-        if !self.deduplication_columns.is_empty() && is_stop {
-            let mut sort_columns = Vec::with_capacity(self.deduplication_columns.len() + 1);
-            let schema = transformed.data.schema().clone();
-
-            for column in self.deduplication_columns.iter() {
-                sort_columns.push(SortExpr {
-                    expr: col(column.name()),
-                    asc: false,
-                    nulls_first: false,
-                });
-            }
-
-            if schema
-                .field_with_name(None, cfg.common.column_timestamp.as_str())
-                .is_ok()
-            {
-                sort_columns.push(SortExpr {
-                    expr: col(cfg.common.column_timestamp.clone()),
-                    asc: false,
-                    nulls_first: false,
-                });
-            }
-
-            let sort = LogicalPlan::Sort(Sort {
-                expr: sort_columns,
-                input: Arc::new(transformed.data),
-                fetch: None,
-            });
-            let dedup = LogicalPlan::Extension(Extension {
-                node: Arc::new(DeduplicationLogicalNode::new(
-                    sort,
-                    self.deduplication_columns.clone(),
-                )),
-            });
-            transformed.data = dedup;
-        }
-
         if let Some(schema) = schema {
             let plan = transformed.data;
             let proj = LogicalPlan::Projection(Projection::new_from_schema(Arc::new(plan), schema));
@@ -210,17 +146,13 @@ fn generate_sort_plan(
     input: Arc<LogicalPlan>,
     limit: usize,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let config = get_config();
     let timestamp = SortExpr {
-        expr: col(config.common.column_timestamp.clone()),
+        expr: col(TIMESTAMP_COL_NAME),
         asc: false,
         nulls_first: false,
     };
     let schema = input.schema().clone();
-    if schema
-        .field_with_name(None, config.common.column_timestamp.as_str())
-        .is_err()
-    {
+    if schema.field_with_name(None, TIMESTAMP_COL_NAME).is_err() {
         let mut input = input.as_ref().clone();
         input = input
             .rewrite(&mut ChangeTableScanSchema::new())
@@ -293,14 +225,15 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
         let mut transformed = match node {
             LogicalPlan::TableScan(scan) => {
                 let schema = scan.source.schema();
-                let timestamp_idx =
-                    schema.index_of(get_config().common.column_timestamp.as_str())?;
-                let mut projection = scan.projection.clone().unwrap();
-                projection.push(timestamp_idx);
+                let timestamp_idx = schema.index_of(TIMESTAMP_COL_NAME)?;
+                let projection = scan.projection.clone().map(|mut p| {
+                    p.push(timestamp_idx);
+                    p
+                });
                 let mut table_scan = TableScan::try_new(
                     scan.table_name,
                     scan.source,
-                    Some(projection),
+                    projection,
                     scan.filters,
                     scan.fetch,
                 )?;
@@ -364,7 +297,7 @@ fn generate_table_source_with_sorted_by_time(
     }
 }
 
-fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
+pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::Extension(_))))
         .unwrap()
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use crate::service::compact;
 
@@ -30,7 +30,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<FileKey>(cfg.limit.file_merge_thread_num * 2);
+    let (tx, rx) = mpsc::channel::<FileKey>(1);
     let rx = Arc::new(Mutex::new(rx));
     // start merge workers
     for _ in 0..cfg.limit.file_merge_thread_num {

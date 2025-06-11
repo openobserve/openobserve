@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,6 +29,7 @@ pub struct Request {
     pub use_inverted_index: bool,
     pub streaming_output: bool,
     pub streaming_id: Option<String>,
+    pub local_mode: Option<bool>,
 }
 
 impl Default for Request {
@@ -45,6 +46,7 @@ impl Default for Request {
             use_inverted_index: false,
             streaming_output: false,
             streaming_id: None,
+            local_mode: None,
         }
     }
 }
@@ -72,6 +74,7 @@ impl Request {
             use_inverted_index: false,
             streaming_output: false,
             streaming_id: None,
+            local_mode: None,
         }
     }
 
@@ -99,6 +102,10 @@ impl Request {
         self.streaming_output = streaming_output;
         self.streaming_id = streaming_id;
     }
+
+    pub fn set_local_mode(&mut self, local_mode: Option<bool>) {
+        self.local_mode = local_mode;
+    }
 }
 
 impl From<FlightSearchRequest> for Request {
@@ -115,6 +122,7 @@ impl From<FlightSearchRequest> for Request {
             use_inverted_index: req.index_info.use_inverted_index,
             streaming_output: false,
             streaming_id: None,
+            local_mode: req.super_cluster_info.local_mode,
         }
     }
 }

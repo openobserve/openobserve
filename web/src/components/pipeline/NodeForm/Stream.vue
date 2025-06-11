@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="add-stream-input-stream-routing-section"
     class=" full-height"
-    style="width: 40vw;"
+    :style="{
+      width: selectedNodeType == 'output' ? '40vw' : '',
+    }"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
@@ -27,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div   class="stream-routing-container full-width q-pa-md">
-
       <q-toggle
-      v-if="selectedNodeType == 'output'"
+      v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
         class="q-mb-sm"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
       />
+
       <q-form   @submit="saveStream">
 
       <div v-if="!createNewStream">
@@ -89,15 +91,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
             @input-value="handleDynamicStreamName"
-           
             />
+
+
+            <q-toggle
+            v-if="stream_type == 'enrichment_tables' && selectedNodeType == 'output'"
+              class="col-12 q-py-md text-grey-8 text-bold"
+              v-model="appendData"
+              :label="t('function.appendData')"
+            />
+
+
 
 
 
 
           </div>
           <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
-          <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
+
+          <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+
             </div>
         </div>
 
@@ -138,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else class="pipeline-add-stream ">
         <AddStream
         ref="addStreamRef"
-        @added:stream-aded="getLogStream"
+        @added:stream-added="getLogStream"
         :is-in-pipeline = "true"
          />
       </div>
@@ -163,6 +178,7 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
+
 import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
@@ -183,7 +199,6 @@ const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
 const { getStreams } = useStreams();
 
 const filteredStreams: Ref<string[]> = ref([]);
-const addStreamRef = ref(null);
 const createNewStream = ref(false);
 const isUpdating = ref(false);
 const isFetchingStreams = ref(false);
@@ -192,10 +207,11 @@ const schemaList = ref([]);
 const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
-//for testing purpose but remove metrics and traces as discuessedf
-const outputStreamTypes = ["logs", "metrics", "traces"];
+const outputStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
+
+const appendData = ref((pipelineObj.currentSelectedNodeData?.meta as { append_data?: string })?.append_data == 'true' || false);
 
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
@@ -207,25 +223,81 @@ onMounted(async () => {
   await getStreamList();
 });
 
-watch(stream_type, (newValue:any) => {
-  if(newValue){
-    stream_name.value = {label: "", value: "", isDisable: false};
-    
+watch(
+  [stream_type, createNewStream],
+  ([newStreamType, newCreateNewStream], [oldStreamType, oldCreateNewStream]) => {
+    if (newStreamType && newCreateNewStream == oldCreateNewStream) {
+      // Only reset if createNewStream has changed
+      stream_name.value = { label: "", value: "", isDisable: false };
+    }
+    getStreamList();
   }
-  getStreamList();
+);
+  function sanitizeStreamName(input: string): string {
+    if(input.length > 100){
+      $q.notify({
+        message: "Stream name should be less than 100 characters",
+        color: "negative",
+        position: "bottom",
+        timeout: 2000,
+      });
+      return;
+    }
+    const regex = /\{[^{}]+\}/g;
+    const parts: string[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(input)) !== null) {
+      // Sanitize and add the static part before the dynamic part
+      if (match.index > lastIndex) {
+        const staticPart = input.slice(lastIndex, match.index);
+        parts.push(...sanitizeStaticPart(staticPart));
+      }
+
+      // Push the dynamic part as-is
+      parts.push(match[0]);
+
+      lastIndex = regex.lastIndex;
+    }
+
+    // Sanitize and add the remaining static part (after the last dynamic part)
+    if (lastIndex < input.length) {
+      const staticPart = input.slice(lastIndex);
+      parts.push(...sanitizeStaticPart(staticPart));
+    }
+
+    return parts.join('');
+  }
+
+  // Only sanitize non-dynamic parts
+  //this will convert all the characters that are not allowed in stream name to _
+  function sanitizeStaticPart(str: string): string[] {
+    return str.split('').map(char => /[a-zA-Z0-9]/.test(char) ? char : '_');
+  }
+
+
+
+
+watch(() => dynamic_stream_name.value, () => {
+  if (
+    dynamic_stream_name.value !== null &&
+    dynamic_stream_name.value !== "" &&
+    selectedNodeType.value === "output"
+  ) {
+    const rawValue =
+      typeof dynamic_stream_name.value === 'object' &&
+      dynamic_stream_name.value.hasOwnProperty('value')
+        ? dynamic_stream_name.value.value
+        : dynamic_stream_name.value;
+
+    const sanitized = sanitizeStreamName(rawValue as string);
+
+    dynamic_stream_name.value = sanitized;
+    saveDynamicStream();
+  }
 });
 
-watch(() => dynamic_stream_name.value,
-()=>{
-  if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
-    const regex = /^[a-zA-Z0-9_]*\{[a-zA-Z0-9_]+\}[a-zA-Z0-9_]*$/;
-    // Check if there is any value between {{ stream_name }}
-      if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
-        saveDynamicStream();
-      }
-   
-  }
-})
 async function getUsedStreamsList() {
     const org_identifier = store.state.selectedOrganization.identifier;
   try {
@@ -298,8 +370,8 @@ const filteredStreamTypes = computed(() => {
       return selectedNodeType.value === 'output' ? outputStreamTypes : streamTypes;
     });
 
-const getLogStream = (data: any) =>{
-
+const getLogStream = async(data: any) =>{
+  
   data.name = data.name.replace(/-/g, '_');
 
   stream_name.value = {label: data.name, value: data.name, isDisable: false};
@@ -308,6 +380,7 @@ const getLogStream = (data: any) =>{
     createNewStream.value = false;
     return;
   }
+
 }
 
 
@@ -341,13 +414,22 @@ const deleteNode = () => {
   emit("cancel:hideform");
 };
 
+
+
 const saveStream = () => {
-  const streamNodeData = {
+  // Validate pipeline configuration
+
+  const streamNodeData: any = {
     stream_type: stream_type,
     stream_name: stream_name,
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
+
+  if(stream_type.value == 'enrichment_tables'){
+    streamNodeData.meta = { append_data: appendData.value.toString() };
+  }
+
   if( typeof stream_name.value === 'object' && stream_name.value !== null && stream_name.value.hasOwnProperty('value') && stream_name.value.value === ""){
     $q.notify({
       message: "Please select Stream from the list",

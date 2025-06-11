@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,28 +18,33 @@ mod tests {
     use core::time;
     use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
 
-    use actix_web::{http::header::ContentType, test, web, App};
+    use actix_web::{App, http::header::ContentType, test, web};
     use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
     use chrono::{Duration, Utc};
     use config::{
         get_config,
         meta::{
-            alerts::{alert::Alert, Operator, QueryCondition, TriggerCondition},
-            dashboards::{v1, Dashboard},
+            alerts::{Operator, QueryCondition, TriggerCondition, alert::Alert},
+            dashboards::{Dashboard, v1},
+            triggers::Trigger,
         },
         utils::json,
     };
-    use infra::scheduler::Trigger;
     use openobserve::{
+        common::meta::ingestion::IngestionResponse,
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::{
-                models::destinations::{Destination, DestinationType},
+                models::{
+                    alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
+                    destinations::{Destination, DestinationType},
+                },
                 router::*,
             },
         },
-        service::{alerts::scheduler::handle_triggers, search::SEARCH_SERVER},
+        migration,
+        service::{alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
@@ -48,7 +53,7 @@ mod tests {
     static START: Once = Once::new();
 
     fn setup() -> (&'static str, &'static str) {
-        START.call_once(|| {
+        START.call_once(|| unsafe {
             env::set_var("ZO_ROOT_USER_EMAIL", "root@example.com");
             env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
             env::set_var("ZO_LOCAL_MODE", "true");
@@ -59,6 +64,7 @@ mod tests {
             env::set_var("ZO_RESULT_CACHE_ENABLED", "false");
             env::set_var("ZO_PRINT_KEY_SQL", "true");
             env::set_var("ZO_SMTP_ENABLED", "true");
+            env::set_var("ZO_CREATE_ORG_THROUGH_INGESTION", "true");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -125,6 +131,7 @@ mod tests {
         // init config
         config::init().await.unwrap();
         // init infra
+        migration::init_db().await.unwrap();
         infra::init().await.unwrap();
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
@@ -143,6 +150,7 @@ mod tests {
         e2e_post_multi().await;
         e2e_post_trace().await;
         e2e_post_metrics().await;
+        e2e_post_hec().await;
         // e2e_post_kinesis_data().await;
 
         // streams
@@ -288,7 +296,7 @@ mod tests {
 
     async fn e2e_post_json() {
         let auth = setup();
-        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
+
         let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
@@ -301,8 +309,150 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        // timestamp in past
+        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 0);
+        assert_eq!(res.status[0].status.failed, 1);
+        assert!(res.status[0].status.error.contains("Too old data"));
+        assert!(
+            res.status[0]
+                .status
+                .error
+                .contains("ZO_INGEST_ALLOWED_UPTO=")
+        );
+
+        // timestamp in future
+        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":9999999999999999}]";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 0);
+        assert_eq!(res.status[0].status.failed, 1);
+        assert!(res.status[0].status.error.contains("Too far data"));
+        assert!(
+            res.status[0]
+                .status
+                .error
+                .contains("ZO_INGEST_ALLOWED_IN_FUTURE=")
+        );
+
+        // timestamp not present
+        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\"}]";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 1);
+        assert_eq!(res.status[0].status.failed, 0);
+
+        // timestamp just right
+        let ts = chrono::Utc::now().timestamp_micros();
+        let body_str = format!(
+            "[{{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":{ts}}}]"
+        );
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 1);
+        assert_eq!(res.status[0].status.failed, 0);
+    }
+
+    async fn e2e_post_hec() {
+        let auth = setup();
+        let thread_id: usize = 0;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .app_data(web::Data::new(thread_id))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+
+        // test case : invalid index
+        let body_str = "{\"event\":\"hello\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_client_error());
+
+        // test case : valid payload
+        let body_str = "{\"event\":\"hello\",\"index\":\"hec_test\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // test case : json event
+        let body_str =
+            "{\"event\":{\"log\":\"hello\",\"severity\":\"info\"},\"index\":\"hec_test\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // test case : ndjson
+        let body_str = r#"
+                { "index": "hec_test", "event": "test log", "time": 1749113798091 }
+                { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "fields": {"cluster":"c1", "namespace":"n1"} }
+                { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "source" : "e2e_test", "fields": {"cluster":"c1", "namespace":"n1"}}
+            "#;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -722,7 +872,7 @@ mod tests {
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
                                 "password": "Abcd12345",
-                                "role": "member"
+                                "role": "admin"
                             }"#;
         let app = test::init_service(
             App::new()
@@ -741,6 +891,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        println!("post user resp: {:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -748,8 +899,8 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
-                                "password": "Abcd12345",
-                                "role": "member"
+                                "new_password": "12345678",
+                                "change_password": true
                             }"#;
         let app = test::init_service(
             App::new()
@@ -1558,9 +1709,11 @@ mod tests {
         // Optionally, deserialize and check the response body
         let body = test::read_body(resp).await;
         let destinations: Vec<Destination> = serde_json::from_slice(&body).unwrap();
-        assert!(destinations
-            .iter()
-            .any(|d| d.destination_type == DestinationType::Sns));
+        assert!(
+            destinations
+                .iter()
+                .any(|d| d.destination_type == DestinationType::Sns)
+        );
     }
 
     async fn e2e_update_sns_alert_destination() {
@@ -1734,10 +1887,29 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
+        // Get the alert with the same stream name
+        let alert = openobserve::service::db::alerts::alert::get_by_name(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            "alert_multi_range",
+        )
+        .await;
+        assert!(alert.is_ok());
+        let alert = alert.unwrap();
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        assert_eq!(alert.stream_type, config::meta::stream::StreamType::Logs);
+        assert_eq!(alert.stream_name, "olympics_schema");
+        assert_eq!(alert.name, "alert_multi_range");
+        let id = alert.id;
+        assert!(id.is_some());
+        let id = id.unwrap();
+        // Check the trigger
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
-            "logs/olympics_schema/alert_multi_range",
+            config::meta::triggers::TriggerModule::Alert,
+            &id.to_string(),
         )
         .await;
         assert!(trigger);
@@ -1755,11 +1927,26 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        // Get the alert with the same stream name
+        let alert = openobserve::service::db::alerts::alert::get_by_name(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            "alert_multi_range",
+        )
+        .await;
+        assert!(alert.is_ok());
+        let alert = alert.unwrap();
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        let id = alert.id;
+        assert!(id.is_some());
+        let id = id.unwrap();
+
+        // Use the v2 api to delete the alert
         let req = test::TestRequest::delete()
-            .uri(&format!(
-                "/api/{}/{}/alerts/{}",
-                "e2e", "olympics_schema", "alert_multi_range"
-            ))
+            .uri(&format!("/api/v2/{}/alerts/{}", "e2e", id))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -1768,8 +1955,8 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
-            "logs/olympics_schema/alert_multi_range",
+            config::meta::triggers::TriggerModule::Alert,
+            &id.to_string(),
         )
         .await;
         assert!(!trigger);
@@ -1813,7 +2000,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
+            .uri(&format!("/api/v2/{}/alerts", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -1823,10 +2010,33 @@ mod tests {
         println!("{:?}", resp.response().body());
         assert!(resp.status().is_success());
 
+        // Get the alert list
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/v2/{}/alerts", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let alert_list_response: ListAlertsResponseBody = serde_json::from_slice(&body).unwrap();
+        assert!(alert_list_response.list.len() > 0);
+        let alert = alert_list_response
+            .list
+            .iter()
+            .find(|a| a.name == "alertChk");
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        assert_eq!(alert.name, "alertChk");
+        assert_eq!(alert.enabled, true);
+        let id = alert.alert_id;
+        let id = id.to_string();
+
+        // Check the trigger
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
-            "logs/olympics_schema/alertChk",
+            config::meta::triggers::TriggerModule::Alert,
+            &id.to_string(),
         )
         .await;
         assert!(trigger);
@@ -1844,20 +2054,64 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        // Get the alert list
         let req = test::TestRequest::get()
-            .uri(&format!(
-                "/api/{}/{}/alerts/{}",
-                "e2e", "olympics_schema", "alertChk"
-            ))
+            .uri(&format!("/api/v2/{}/alerts", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let alert_list_response: ListAlertsResponseBody = serde_json::from_slice(&body).unwrap();
+        assert!(alert_list_response.list.len() > 0);
+        let alert = alert_list_response
+            .list
+            .iter()
+            .find(|a| a.name == "alertChk");
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        assert_eq!(alert.name, "alertChk");
+        assert_eq!(alert.enabled, true);
+        let id = alert.alert_id;
+        let id = id.to_string();
+
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/v2/{}/alerts/{}", "e2e", id))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
         log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let alert_response: GetAlertResponseBody = serde_json::from_slice(&body).unwrap();
+        assert_eq!(alert_response.0.name, "alertChk");
+        assert_eq!(
+            alert_response.0.stream_type,
+            openobserve::handler::http::models::alerts::StreamType::Logs
+        );
+        assert_eq!(alert_response.0.stream_name, "olympics_schema");
+        assert_eq!(alert_response.0.enabled, true);
     }
 
     async fn e2e_handle_alert_after_destination_retries() {
+        let alert = openobserve::service::db::alerts::alert::get_by_name(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            "alertChk",
+        )
+        .await;
+        assert!(alert.is_ok());
+        let alert = alert.unwrap();
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        let id = alert.id;
+        assert!(id.is_some());
+        let id = id.unwrap();
+
         let now = Utc::now().timestamp_micros();
         let mins_3_later = now
             + Duration::try_minutes(3)
@@ -1865,27 +2119,29 @@ mod tests {
                 .num_microseconds()
                 .unwrap();
         let trigger = Trigger {
+            id: 1,
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
-            module_key: "logs/olympics_schema/alertChk".to_string(),
+            module: config::meta::triggers::TriggerModule::Alert,
+            module_key: id.to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 2,
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // This alert has an invalid destination
         assert!(res.is_ok());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
-            "logs/olympics_schema/alertChk",
+            config::meta::triggers::TriggerModule::Alert,
+            &id.to_string(),
         )
         .await;
         assert!(trigger.is_ok());
@@ -1900,28 +2156,44 @@ mod tests {
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
+        let alert = openobserve::service::db::alerts::alert::get_by_name(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            "alertChk",
+        )
+        .await;
+        assert!(alert.is_ok());
+        let alert = alert.unwrap();
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        let id = alert.id;
+        assert!(id.is_some());
+        let id = id.unwrap();
         let trigger = Trigger {
+            id: 1,
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
-            module_key: "logs/olympics_schema/alertChk".to_string(),
+            module: config::meta::triggers::TriggerModule::Alert,
+            module_key: id.to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 3,
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // This alert has an invalid destination
         assert!(res.is_ok());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
-            "logs/olympics_schema/alertChk",
+            config::meta::triggers::TriggerModule::Alert,
+            &id.to_string(),
         )
         .await;
         assert!(trigger.is_ok());
@@ -1930,39 +2202,34 @@ mod tests {
     }
 
     async fn e2e_handle_alert_after_evaluation_retries() {
-        let alert = Alert {
-            name: "test_alert_wrong_sql".to_string(),
-            stream_type: "logs".into(),
-            stream_name: "olympics_schema".to_string(),
-            is_real_time: false,
-            enabled: true,
-            query_condition: QueryCondition {
-                query_type: "sql".into(),
-                conditions: None,
-                sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
-                ..Default::default()
-            },
-            trigger_condition: TriggerCondition {
-                period: 60,
-                threshold: 1,
-                silence: 0,
-                frequency: 3600,
-                operator: Operator::GreaterThanEquals,
-                ..Default::default()
-            },
-            destinations: vec!["slack".to_string()],
+        let mut alert: Alert = Default::default();
+        alert.name = "test_alert_wrong_sql".to_string();
+        alert.stream_type = "logs".into();
+        alert.stream_name = "olympics_schema".to_string();
+        alert.is_real_time = false;
+        alert.enabled = true;
+        alert.query_condition = QueryCondition {
+            query_type: "sql".into(),
+            conditions: None,
+            sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
             ..Default::default()
         };
+        alert.trigger_condition = TriggerCondition {
+            period: 60,
+            threshold: 1,
+            silence: 0,
+            frequency: 3600,
+            operator: Operator::GreaterThanEquals,
+            ..Default::default()
+        };
+        alert.destinations = vec!["slack".to_string()];
 
-        let res = openobserve::service::db::alerts::alert::set(
-            "e2e",
-            config::meta::stream::StreamType::Logs,
-            "olympics_schema",
-            alert,
-            true,
-        )
-        .await;
+        let res = openobserve::service::db::alerts::alert::set("e2e", alert, true).await;
         assert!(res.is_ok());
+        let alert = res.unwrap();
+        let id = alert.id;
+        assert!(id.is_some());
+        let id = id.unwrap();
 
         let now = Utc::now().timestamp_micros();
         let mins_3_later = now
@@ -1971,27 +2238,29 @@ mod tests {
                 .num_microseconds()
                 .unwrap();
         let trigger = Trigger {
+            id: 1,
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
-            module_key: "logs/olympics_schema/test_alert_wrong_sql".to_string(),
+            module: config::meta::triggers::TriggerModule::Alert,
+            module_key: id.to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 2,
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // In case of alert evaluation errors, this error is returned
         assert!(res.is_err());
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
-            "logs/olympics_schema/test_alert_wrong_sql",
+            config::meta::triggers::TriggerModule::Alert,
+            &id.to_string(),
         )
         .await;
         assert!(trigger.is_ok());
@@ -2020,6 +2289,22 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        let alert = openobserve::service::db::alerts::alert::get_by_name(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            "alertChk",
+        )
+        .await;
+        assert!(alert.is_ok());
+        let alert = alert.unwrap();
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        let id = alert.id;
+        assert!(id.is_some());
+        let id = id.unwrap();
+
         let req = test::TestRequest::delete()
             .uri(&format!(
                 "/api/{}/{}/alerts/{}",
@@ -2034,8 +2319,8 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
-            "logs/olympics_schema/alertChk",
+            config::meta::triggers::TriggerModule::Alert,
+            &id.to_string(),
         )
         .await;
         assert!(!trigger);

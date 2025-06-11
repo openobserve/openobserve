@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use proto::cluster_rpc::{
-    query_cache_server::QueryCache, DeleteResultCacheRequest, DeleteResultCacheResponse,
-    MultiQueryCacheResponse, QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryResponse,
+    DeleteResultCacheRequest, DeleteResultCacheResponse, MultiQueryCacheResponse,
+    QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryResponse,
+    query_cache_server::QueryCache,
 };
 use tonic::{Request, Response, Status};
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod check_keep_alive;
+mod compress;
+mod encoding;
 mod slow_log;
 
 pub use check_keep_alive::check_keep_alive;
+pub use compress::Compress;
 pub use slow_log::SlowLog;

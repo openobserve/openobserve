@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::{
-    pipeline::{components::PipelineSource, Pipeline, PipelineList},
+    pipeline::{Pipeline, PipelineList, components::PipelineSource},
     search::SearchEventType,
     stream::ListStreamParams,
 };
@@ -26,14 +26,6 @@ use crate::common::{
 };
 
 pub mod batch_execution;
-mod pipeline_entry;
-mod pipeline_exporter;
-pub mod pipeline_file_server;
-mod pipeline_http_exporter_client;
-pub mod pipeline_offset_manager;
-pub(crate) mod pipeline_receiver;
-pub mod pipeline_wal_writer;
-mod pipeline_watcher;
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
@@ -53,7 +45,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
     }
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
+    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         derived_stream.org_id = pipeline.org.clone();
         // save derived_stream to triggers table
@@ -61,6 +53,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
+            true,
         )
         .await
         {
@@ -68,7 +61,10 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
         }
     }
 
-    pipeline::set(&pipeline).await?;
+    if let Err(e) = pipeline::set(&pipeline).await {
+        log::error!("Failed to save pipeline: {:?}", e);
+        return Err(e);
+    }
     set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
     Ok(())
 }
@@ -127,12 +123,13 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     pipeline.version += 1;
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
+    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if let Err(e) = super::alerts::derived_streams::save(
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
+            true,
         )
         .await
         {
@@ -185,13 +182,14 @@ pub async fn enable_pipeline(
 
     pipeline.enabled = value;
     // add or remove trigger if it's a scheduled pipeline
-    if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
+    if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if pipeline.enabled {
             super::alerts::derived_streams::save(
                 derived_stream.clone(),
                 &pipeline.name,
                 pipeline_id,
+                false,
             )
             .await
             .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;

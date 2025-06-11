@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,11 @@
 
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion},
         Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion},
     },
     logical_expr::LogicalPlan,
-    optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
 };
 
 use super::utils::AddSortAndLimit;
@@ -54,6 +54,9 @@ impl OptimizerRule for AddSortAndLimitRule {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
+        if self.limit == 0 {
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+        }
         let mut plan = plan.rewrite(&mut AddSortAndLimit::new(self.limit, self.offset))?;
         plan.tnr = TreeNodeRecursion::Stop;
         Ok(plan)

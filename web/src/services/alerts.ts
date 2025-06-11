@@ -28,6 +28,25 @@ const alerts = {
       `/api/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
     );
   },
+  listByFolderId: (
+    page_num: number,
+    page_size: number,
+    sort_by: string,
+    desc: boolean,
+    name: string,
+    org_identifier: string,
+    folder_id?: string,
+    query?: string
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
+    if(folder_id){
+      url += `&folder=${folder_id}`;
+    }
+    if(query){
+      url += `&alert_name_substring=${query}`;
+    }
+    return http().get(url);
+  },
   create: (
     org_identifier: string,
     stream_name: string,
@@ -101,6 +120,80 @@ const alerts = {
     )}/preview?type=${stream_type}`;
     return http().get(url);
   },
+  create_by_alert_id: (
+    org_identifier: string,
+    data: any,
+    folder_id?: any
+  ) => {
+      let url = `/api/v2/${org_identifier}/alerts`;
+      if(folder_id){
+        url += `?folder=${folder_id}`;
+      }
+    return http().post(
+      url,
+      data
+    );
+  },
+  update_by_alert_id: (
+    org_identifier: string,
+    data: any,
+    folder_id?: any
+  ) => { 
+    let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().put(
+      url,
+      data
+    );
+  },
+  delete_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().delete(url);
+  },
+  toggle_state_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    enable: boolean,
+    folder_id?: any
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}/enable?value=${enable}`;
+    if(folder_id){
+      url += `&folder=${folder_id}`;
+    }
+    return http().patch(url);
+  },
+  get_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().get(url);
+  },
+  //this endpoint is not used as we are using the common service to move the alerts across folders
+  move_to_another_folder: (
+    org_identifier: string,
+    data: any,
+    folder_id?: any
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts/move`;
+    if(folder_id){
+      url += `?folder=${folder_id}`;
+    }
+    return http().patch(url, data);
+  }
 };
 
 export default alerts;

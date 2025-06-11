@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,8 +21,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     handler::grpc::{
-        cluster_rpc::{metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse},
         MetadataMap,
+        cluster_rpc::{MetricsQueryRequest, MetricsQueryResponse, metrics_server::Metrics},
     },
     service::promql::search as SearchService,
 };
@@ -47,10 +47,10 @@ impl Metrics for MetricsQuerier {
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/metrics/query", "500", org_id, "", stream_type])
+                .with_label_values(&["/metrics/query", "500", org_id, stream_type, "", ""])
                 .observe(time);
             metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/metrics/query", "500", org_id, "", stream_type])
+                .with_label_values(&["/metrics/query", "500", org_id, stream_type, "", ""])
                 .inc();
             let message = if let errors::Error::ErrorCode(code) = err {
                 code.to_json()
@@ -62,10 +62,10 @@ impl Metrics for MetricsQuerier {
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/metrics/query", "200", org_id, "", stream_type])
+            .with_label_values(&["/metrics/query", "200", org_id, stream_type, "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/metrics/query", "200", org_id, "", stream_type])
+            .with_label_values(&["/metrics/query", "200", org_id, stream_type, "", ""])
             .inc();
 
         Ok(Response::new(result))

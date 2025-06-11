@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -57,7 +57,10 @@ impl ScalarUDFImpl for HistogramUdf {
         Ok(Timestamp(Microsecond, None))
     }
 
-    fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue> {
         unreachable!()
     }
 }

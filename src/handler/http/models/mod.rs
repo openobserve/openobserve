@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,11 @@
 //! for HTTP responses and requests.
 
 pub mod action;
+#[cfg(feature = "enterprise")]
+pub mod ai;
 pub mod alerts;
+#[cfg(feature = "cloud")]
+pub mod billings;
 pub mod dashboards;
 pub mod destinations;
 pub mod folders;

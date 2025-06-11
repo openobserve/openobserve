@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,8 +22,8 @@ use std::{
 
 use async_trait::async_trait;
 use tantivy::{
-    directory::{error::OpenReadError, FileHandle, OwnedBytes},
     Directory, HasLen,
+    directory::{FileHandle, OwnedBytes, error::OpenReadError},
 };
 
 use super::footer_cache::FooterCache;
@@ -176,7 +176,7 @@ mod tests {
 
     use std::{path::Path, sync::Arc};
 
-    use tantivy::{directory::RamDirectory, Directory};
+    use tantivy::{Directory, directory::RamDirectory};
 
     use super::CachingDirectory;
 

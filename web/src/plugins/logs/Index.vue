@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-show="!showSearchHistory" id="secondLevel" class="full-height">
+    <div
+      v-show="!showSearchHistory && !showSearchScheduler"
+      id="secondLevel"
+      class="full-height"
+    >
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -286,7 +290,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
       />
-      <div v-else style="height: 200px">
+      <div
+        v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
+        style="height: 200px"
+      >
         <div style="height: 80vh" class="text-center q-pa-md flex flex-center">
           <div>
             <div>
@@ -329,6 +336,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <div v-show="showSearchScheduler">
+      <SearchSchedulersList
+        ref="searchSchedulerRef"
+        @closeSearchHistory="closeSearchSchedulerFn"
+        :isClicked="showSearchScheduler"
+      />
+    </div>
   </q-page>
 </template>
 
@@ -339,6 +353,7 @@ import {
   defineComponent,
   ref,
   onActivated,
+  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -346,6 +361,7 @@ import {
   defineAsyncComponent,
   provide,
   onMounted,
+  onBeforeUnmount,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -370,12 +386,16 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
+import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
+import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import useAiChat from "@/composables/useAiChat";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
+    SearchSchedulersList,
     IndexList: defineAsyncComponent(
       () => import("@/plugins/logs/IndexList.vue"),
     ),
@@ -429,9 +449,12 @@ export default defineComponent({
         // so added this condition to avoid that
         this.searchObj.meta.refreshHistogram = true;
         this.searchObj.data.queryResults.aggs = null;
-
-        await this.getQueryData(false);
-        this.refreshHistogramChart();
+        if (this.searchObj.meta.jobId == "") {
+          await this.getQueryData(false);
+          this.refreshHistogramChart();
+        } else {
+          await this.getJobData(false);
+        }
 
         if (config.isCloud == "true") {
           segment.track("Button Click", {
@@ -454,8 +477,12 @@ export default defineComponent({
         // this.searchObj.data.resultGrid.currentPage =
         //   this.searchObj.data.resultGrid.currentPage + 1;
         this.searchObj.loading = true;
-        await this.getQueryData(true);
-        this.refreshHistogramChart();
+        if (this.searchObj.meta.jobId == "") {
+          await this.getQueryData(true);
+          this.refreshHistogramChart();
+        } else {
+          await this.getJobData(false);
+        }
 
         if (config.isCloud == "true") {
           segment.track("Button Click", {
@@ -516,12 +543,14 @@ export default defineComponent({
     let {
       searchObj,
       getQueryData,
+      getJobData,
       fieldValues,
       updateGridColumns,
       refreshData,
       updateUrlQueryParams,
       loadLogsData,
       updateStreams,
+      loadJobData,
       restoreUrlQueryParams,
       handleRunQuery,
       generateHistogramData,
@@ -537,10 +566,19 @@ export default defineComponent({
       resetHistogramWithError,
       isLimitQuery,
       enableRefreshInterval,
+      buildWebSocketPayload,
+      initializeSearchConnection,
+      addTraceId,
+      sendCancelSearchMessage,
+      isDistinctQuery,
+      isWithQuery,
+      getStream,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
+    const showSearchScheduler = ref(false);
+    const showJobScheduler = ref(false);
     let parser: any;
 
     const isLogsMounted = ref(false);
@@ -561,6 +599,8 @@ export default defineComponent({
     const visualizeErrorData: any = reactive({
       errors: [],
     });
+
+    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 
     // function restoreUrlQueryParams() {
     //   const queryParams = router.currentRoute.value.query;
@@ -610,6 +650,24 @@ export default defineComponent({
       ) {
         showSearchHistory.value = true;
       }
+      if (
+        router.currentRoute.value.query.hasOwnProperty("action") &&
+        router.currentRoute.value.query.action == "search_scheduler"
+      ) {
+        if (config.isEnterprise == "true") {
+          showSearchScheduler.value = true;
+        } else {
+          router.back();
+        }
+      }
+
+      registerAiContextHandler();
+    });
+
+    onBeforeUnmount(() => {
+      // Cancel all the search queries
+      cancelOnGoingSearchQueries();
+      removeAiContextHandler();
     });
 
     onActivated(() => {
@@ -642,12 +700,23 @@ export default defineComponent({
       () => {
         if (!router.currentRoute.value.query.hasOwnProperty("action")) {
           showSearchHistory.value = false;
+          showSearchScheduler.value = false;
         }
         if (
           router.currentRoute.value.query.hasOwnProperty("action") &&
           router.currentRoute.value.query.action == "history"
         ) {
           showSearchHistory.value = true;
+        }
+        if (
+          router.currentRoute.value.query.hasOwnProperty("action") &&
+          router.currentRoute.value.query.action == "search_scheduler"
+        ) {
+          if (config.isEnterprise == "true") {
+            showSearchScheduler.value = true;
+          } else {
+            router.back();
+          }
         }
       },
       // (action) => {
@@ -660,6 +729,8 @@ export default defineComponent({
       () => router.currentRoute.value.query.type,
       async (type) => {
         if (type == "search_history_re_apply") {
+          searchObj.meta.jobId = "";
+
           searchObj.organizationIdetifier =
             router.currentRoute.value.query.org_identifier;
           searchObj.data.stream.selectedStream.value =
@@ -689,6 +760,31 @@ export default defineComponent({
         }
       },
     );
+    watch(
+      () => router.currentRoute.value.query.type,
+      async (type) => {
+        if (type == "search_scheduler") {
+          searchObj.organizationIdetifier =
+            router.currentRoute.value.query.org_identifier;
+          searchObj.data.stream.selectedStream.value =
+            router.currentRoute.value.query.stream;
+          searchObj.data.stream.streamType =
+            router.currentRoute.value.query.stream_type;
+          resetSearchObj();
+
+          // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
+          searchBarRef.value.dateTimeRef.setAbsoluteTime(
+            router.currentRoute.value.query.from,
+            router.currentRoute.value.query.to,
+          );
+          searchObj.data.datetime.type = "absolute";
+          searchObj.meta.searchApplied = false;
+          resetStreamData();
+          await restoreUrlQueryParams();
+          await loadLogsData();
+        }
+      },
+    );
 
     const importSqlParser = async () => {
       const useSqlParser: any = await import("@/composables/useParser");
@@ -702,6 +798,7 @@ export default defineComponent({
       try {
         await getQueryData();
         refreshHistogramChart();
+        showJobScheduler.value = true;
       } catch (e) {
         console.log(e);
       }
@@ -750,6 +847,7 @@ export default defineComponent({
         }
 
         searchObj.meta.quickMode = isQuickModeEnabled();
+        searchObj.meta.showHistogram = isHistogramEnabled();
 
         isLogsMounted.value = true;
       } catch (error) {
@@ -779,6 +877,11 @@ export default defineComponent({
     // Helper function to check if quick mode is enabled
     function isQuickModeEnabled() {
       return store.state.zoConfig.quick_mode_enabled;
+    }
+
+    // Helper function to check if histogram is enabled
+    function isHistogramEnabled() {
+      return store.state.zoConfig.histogram_enabled;
     }
 
     const handleActivation = async () => {
@@ -1149,7 +1252,7 @@ export default defineComponent({
           // check is required for union query where both streams interesting fields goes into single array
           // but it should be added if field exist in the strem schema
           searchObj.data.streamResults.list.forEach((stream) => {
-            if (stream.name === parsedSQL.from[0].table) {
+            if (stream.name === parsedSQL?.from?.[0]?.table) {
               stream.schema.forEach((stream_field) => {
                 if (field.name === stream_field.name) {
                   parsedSQL.columns.push({
@@ -1244,7 +1347,7 @@ export default defineComponent({
       () => {
         if (
           searchObj.meta.logsVisualizeToggle == "visualize" &&
-          searchObj.meta.toggleFunction &&
+          searchObj.data.transformType === "function" &&
           searchObj.data.tempFunctionContent
         ) {
           dashboardPanelData.data.queries[
@@ -1338,6 +1441,10 @@ export default defineComponent({
       router.back();
       showSearchHistory.value = false;
       refreshHistogramChart();
+    };
+    const closeSearchSchedulerFn = () => {
+      router.back();
+      showSearchScheduler.value = false;
     };
 
     // watch for changes in the visualize toggle
@@ -1442,6 +1549,84 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    const cancelOnGoingSearchQueries = () => {
+      sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
+    };
+
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const isLogsPage = router.currentRoute.value.name === "logs";
+
+          const isStreamSelectedInLogsPage =
+            searchObj.meta.logsVisualizeToggle === "logs" &&
+            searchObj.data.stream.selectedStream.length;
+
+          const isStreamSelectedInDashboardPage =
+            searchObj.meta.logsVisualizeToggle === "visualize" &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          if (
+            !isLogsPage ||
+            !(isStreamSelectedInLogsPage || isStreamSelectedInDashboardPage)
+          ) {
+            resolve("");
+            return;
+          }
+
+          const payload = {};
+
+          const streams =
+            searchObj.meta.logsVisualizeToggle === "logs"
+              ? searchObj.data.stream.selectedStream
+              : [
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.stream,
+                ];
+
+          const streamType =
+            searchObj.meta.logsVisualizeToggle === "logs"
+              ? searchObj.data.stream.streamType
+              : dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream_type;
+
+          if (!streamType || !streams?.length) {
+            resolve("");
+            return;
+          }
+
+          for (let i = 0; i < streams.length; i++) {
+            const schema = await getStream(streams[i], streamType, true);
+
+            payload["stream_name_" + (i + 1)] = streams[i];
+            payload["schema_" + (i + 1)] =
+              schema.uds_schema || schema.schema || [];
+          }
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for logs page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
     return {
       t,
       store,
@@ -1452,6 +1637,7 @@ export default defineComponent({
       splitterModel,
       // loadPageData,
       getQueryData,
+      getJobData,
       searchResultRef,
       runQueryFn,
       refreshData,
@@ -1488,6 +1674,16 @@ export default defineComponent({
       resetHistogramWithError,
       fnParsedSQL,
       isLimitQuery,
+      buildWebSocketPayload,
+      initializeSearchConnection,
+      addTraceId,
+      isWebSocketEnabled,
+      showJobScheduler,
+      showSearchScheduler,
+      closeSearchSchedulerFn,
+      isDistinctQuery,
+      isWithQuery,
+      isStreamingEnabled,
     };
   },
   computed: {
@@ -1553,7 +1749,16 @@ export default defineComponent({
         ? this.searchObj.config.lastSplitterPosition
         : 0;
     },
-    async showHistogram() {
+    async showHistogram(newVal, oldVal) {
+      if (
+        newVal == true &&
+        oldVal == false &&
+        this.searchObj.meta.histogramDirtyFlag == true &&
+        this.searchObj.data.queryResults.hits.length > 0
+      ) {
+        this.searchObj.meta.resetPlotChart = true;
+        this.searchObj.data.queryResults.aggs = [];
+      }
       let parsedSQL = null;
 
       if (this.searchObj.meta.sqlMode) parsedSQL = this.fnParsedSQL();
@@ -1566,18 +1771,55 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram is not available for limit queries.",
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
           );
+          this.searchObj.meta.histogramDirtyFlag = false;
+        } else if (
+          this.searchObj.meta.sqlMode &&
+          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
+        ) {
+          this.resetHistogramWithError(
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
+          );
+          this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );
-        } else if (this.searchObj.meta.histogramDirtyFlag == true) {
+        } else if (
+          this.searchObj.meta.histogramDirtyFlag == true &&
+          this.searchObj.meta.jobId == ""
+        ) {
           this.searchObj.meta.histogramDirtyFlag = false;
+
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
+          const shouldUseWebSocket = this.isWebSocketEnabled(this.store.state);
+          const shouldUseStreaming = this.isStreamingEnabled(this.store.state);
+          // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
+
+          if (shouldUseWebSocket || shouldUseStreaming) {
+            // Use WebSocket for histogram data
+            const payload = this.buildWebSocketPayload(
+              this.searchObj.data.histogramQuery,
+              false,
+              "histogram",
+              {
+                isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
+              },
+            );
+            const requestId = this.initializeSearchConnection(payload);
+
+            if (requestId) {
+              this.addTraceId(payload.traceId);
+            }
+
+            return;
+          }
 
           this.getHistogramQueryData(this.searchObj.data.histogramQuery)
             .then((res: any) => {
@@ -1638,8 +1880,12 @@ export default defineComponent({
     async fullSQLMode(newVal) {
       if (newVal) {
         await nextTick();
-        this.setQuery(newVal);
-        this.updateUrlQueryParams();
+        if (this.searchObj.meta.sqlModeManualTrigger) {
+          this.searchObj.meta.sqlModeManualTrigger = false;
+        } else {
+          this.setQuery(newVal);
+          this.updateUrlQueryParams();
+        }
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
@@ -1669,7 +1915,7 @@ export default defineComponent({
       this.refreshHistogramChart();
     },
   },
-});
+}) as any;
 </script>
 
 <style lang="scss">

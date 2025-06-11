@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,8 +43,8 @@
 
 use itertools::Itertools;
 use sea_orm::{
+    DeriveIden, EntityTrait, IntoActiveModel, PaginatorTrait, QueryOrder, Set, TransactionTrait,
     sea_query::{Table, TableCreateStatement},
-    DeriveIden, EntityTrait, IntoActiveModel, PaginatorTrait, Set, TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
 
@@ -336,6 +336,7 @@ mod legacy_alerts {
 }
 
 mod new_folders {
+
     use super::*;
 
     const FOLDERS_ORG_IDX: &str = "folders_org_idx_2";
@@ -405,8 +406,9 @@ mod new_folders {
     /// Select each record from the `legacy_folders` table and use it to
     /// create a new record in the new `folders` table.
     pub async fn populate<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
-        let mut legacy_folder_pages =
-            legacy_entities::legacy_folders::Entity::find().paginate(conn, 100);
+        let mut legacy_folder_pages = legacy_entities::legacy_folders::Entity::find()
+            .order_by_asc(legacy_entities::legacy_folders::Column::Id)
+            .paginate(conn, 100);
         while let Some(legacy_folders) = legacy_folder_pages.fetch_and_next().await? {
             let conversions_rslt: Result<Vec<_>, _> = legacy_folders
                 .into_iter()
@@ -425,6 +427,8 @@ mod new_folders {
 }
 
 mod new_dashboards {
+    use sea_orm::QueryOrder;
+
     use super::*;
 
     const DASHBOARDS_FOLDERS_FK: &str = "dashboards_folders_fk_2";
@@ -502,6 +506,7 @@ mod new_dashboards {
     pub async fn populate<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
         let mut legacy_dashboard_pages = legacy_entities::legacy_dashboards::Entity::find()
             .find_also_related(legacy_entities::legacy_folders::Entity)
+            .order_by_asc(legacy_entities::legacy_dashboards::Column::Id)
             .paginate(conn, 100);
         while let Some(legacy_dashboards) = legacy_dashboard_pages.fetch_and_next().await? {
             let conversions_rslt: Result<Vec<_>, _> = legacy_dashboards
@@ -520,14 +525,14 @@ mod new_dashboards {
     }
 }
 
+pub const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
+    "alerts_org_stream_type_stream_name_name_idx_2";
 mod new_alerts {
     use sea_orm::QueryOrder;
 
     use super::*;
     use crate::table::migration::get_text_type;
     const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
-    const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
-        "alerts_org_stream_type_stream_name_name_idx_2";
     const ALERTS_FOLDER_ID_IDX: &str = "alerts_folder_id_idx_2";
 
     /// Identifiers used in queries on the alerts table.

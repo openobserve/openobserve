@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,16 +19,21 @@ use std::{
     task::{Context, Poll},
 };
 
-use arrow::array::{BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array};
-use arrow_schema::{DataType, SortOptions};
+use arrow::array::{
+    BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, TimestampMicrosecondArray,
+    UInt64Array,
+};
+use arrow_schema::{DataType, SortOptions, TimeUnit};
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{internal_err, Result, Statistics},
+    common::{Result, Statistics, internal_err},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexRequirement, Partitioning, PhysicalSortRequirement},
     physical_plan::{
-        expressions::Column, DisplayAs, DisplayFormatType, Distribution, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        expressions::Column,
     },
 };
 use futures::{Stream, StreamExt};
@@ -65,7 +70,8 @@ impl DeduplicationExec {
             // Output Partitioning
             Partitioning::UnknownPartitioning(1),
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 }
@@ -135,7 +141,6 @@ impl ExecutionPlan for DeduplicationExec {
     // if don't have this, the optimizer will not merge the SortExec
     // and get wrong result
     fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        let cfg = config::get_config();
         let mut sort_requirment = self
             .deduplication_columns
             .iter()
@@ -146,9 +151,9 @@ impl ExecutionPlan for DeduplicationExec {
                 )
             })
             .collect_vec();
-        if let Some((index, _)) = self.schema().column_with_name(&cfg.common.column_timestamp) {
+        if let Some((index, _)) = self.schema().column_with_name(TIMESTAMP_COL_NAME) {
             sort_requirment.push(PhysicalSortRequirement::new(
-                Arc::new(Column::new(&cfg.common.column_timestamp, index)) as _,
+                Arc::new(Column::new(TIMESTAMP_COL_NAME, index)) as _,
                 Some(SortOptions::new(true, false)),
             ));
         }
@@ -253,6 +258,7 @@ enum Array {
     UInt64(UInt64Array),
     Boolean(BooleanArray),
     Float64(Float64Array),
+    TimestampMicrosecond(TimestampMicrosecondArray),
 }
 
 impl Array {
@@ -263,6 +269,7 @@ impl Array {
             Array::UInt64(array) => Value::UInt64(array.value(i)),
             Array::Boolean(array) => Value::Boolean(array.value(i)),
             Array::Float64(array) => Value::Float64(array.value(i)),
+            Array::TimestampMicrosecond(array) => Value::Int64(array.value(i)),
         }
     }
 }
@@ -316,7 +323,16 @@ fn generate_deduplication_arrays(
                         .unwrap()
                         .clone(),
                 ),
-                _ => panic!("Unsupported data type"),
+                DataType::Timestamp(TimeUnit::Microsecond, None) => Array::TimestampMicrosecond(
+                    array
+                        .as_any()
+                        .downcast_ref::<TimestampMicrosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                _ => {
+                    panic!("Unsupported data type: {}", array.data_type());
+                }
             }
         })
         .collect_vec();

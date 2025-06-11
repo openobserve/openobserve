@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use anyhow::Error;
 use config::meta::cluster::get_internal_grpc_token;
 use proto::cluster_rpc;
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
+use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
 use crate::service::grpc::get_ingester_channel;
 
@@ -47,11 +47,8 @@ pub async fn ingest(
                 "[InternalIngestion] export partial_success node: {addr}, response: {:?}",
                 err
             );
-            if err.code() == tonic::Code::Internal {
-                return Err(err.into());
-            }
             return Err(Error::msg(format!(
-                "Ingest node {addr}, response error: {}",
+                "Ingest node {addr}, response error: {:?}",
                 err
             )));
         }

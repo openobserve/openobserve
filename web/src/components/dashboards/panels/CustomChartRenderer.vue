@@ -93,13 +93,16 @@ export default defineComponent({
 
     const hoveredSeriesState = inject("hoveredSeriesState", null);
     const convertStringToFunction = (obj) => {
-        if (typeof obj === 'string' && obj.startsWith('function')) {
-          try {
-            return new Function(`return ${obj}`)(); // Convert string to function
-          } catch (error) {
-           emit("error",`Error while executing the code: ${error.message}`);
-          }
+      if (typeof obj === "string" && obj.startsWith("function")) {
+        try {
+          return new Function(`return ${obj}`)(); // Convert string to function
+        } catch (error) {
+          emit({
+            message: `Error while executing the code: ${error.message}`,
+            code: "",
+          });
         }
+      }
 
         if (Array.isArray(obj)) {
           return obj.map(item => convertStringToFunction(item)); // Recursively handle arrays
@@ -136,12 +139,6 @@ export default defineComponent({
 
       const echartsGL = await import('echarts-gl');
 
-
-      // Destroy the existing chart instance if any
-      if (chart) {
-        chart.dispose();
-      }
-
       // Initialize chart
       chart = echarts.init(chartRef.value, undefined, {
         renderer: "canvas",
@@ -151,31 +148,22 @@ export default defineComponent({
       const convertedData = convertStringToFunction(props.data);
       const safeChartOptions = deepSanitize(convertedData);
       chart.setOption(safeChartOptions);
-            // Now, set the option with the executed functions
-            chart.on("click", (params) => emit("click", params));
-      chart.on("mousemove", (params) => emit("mousemove", params));
-      chart.on("mouseout", () => emit("mouseout"));
-      chart.on("legendselectchanged", (params) =>
-        emit("legendChanged", params),
-      );
 
-      if (convertedData.o2_events) {
-        
-        // Add event listeners for custom interactions
-        for (const event in convertedData.o2_events) {
-          chart.off(event);
-          chart.on(event, (params) => convertedData.o2_events[event](params,chart));
+        if (convertedData.o2_events) {
+          // Add event listeners for custom interactions
+          for (const event in convertedData.o2_events) {
+            chart.off(event);
+            chart.on(event, (params) =>
+              convertedData.o2_events[event](params, chart),
+            );
+          }
         }
+      } catch (e) {
+        emit({
+          message: "Error while executing the code",
+          code: "",
+        });
       }
-
-      }
-      catch(e){
-        emit("error","Error while executing the code");
-      }
-
-
-
-
     };
 
     const handleResize = async () => {

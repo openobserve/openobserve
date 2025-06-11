@@ -18,8 +18,8 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
-    get_config,
-    meta::promql::{HashLabelValue, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    TIMESTAMP_COL_NAME,
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, HashLabelValue, NAME_LABEL, VALUE_LABEL},
     utils::json,
 };
 use datafusion::{
@@ -29,26 +29,26 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
-    prelude::{col, lit, DataFrame, SessionContext},
+    prelude::{DataFrame, SessionContext, col, lit},
 };
-use futures::{future::try_join_all, TryStreamExt};
+use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
     parser::{
-        token, AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function,
-        FunctionArgs, LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr,
-        StringLiteral, UnaryExpr, VectorMatchCardinality, VectorSelector,
+        AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
+        LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
+        VectorMatchCardinality, VectorSelector, token,
     },
 };
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
-    utils::{apply_label_selector, apply_matchers},
     PromqlContext,
+    utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
+    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
 };
 
 pub struct Engine {
@@ -354,14 +354,20 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let metrics_name = selector.name.as_ref().expect("Missing selector name");
+        let data_cache_key = &selector.to_string();
 
-        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        let cache_exists = {
+            self.ctx
+                .data_cache
+                .read()
+                .await
+                .contains_key(data_cache_key)
+        };
         if !cache_exists {
             self.selector_load_data(&selector, None).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(metrics_name) {
+        let metrics_cache = match metrics_cache.get(data_cache_key) {
             Some(v) => match v.get_ref_matrix_values() {
                 Some(v) => v,
                 None => return Ok(vec![]),
@@ -371,7 +377,7 @@ impl Engine {
 
         // Evaluation timestamp.
         let eval_ts = self.time;
-        // let start = eval_ts - self.ctx.lookback_delta;
+        let start = eval_ts - self.ctx.lookback_delta;
 
         let mut offset_modifier: i64 = 0;
         if let Some(offset) = selector.offset {
@@ -390,16 +396,26 @@ impl Engine {
             let end_index = metric
                 .samples
                 .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            if end_index > 0 && metric.samples[end_index - 1].timestamp + offset_modifier <= eval_ts
-            {
-                let last_value = metric.samples[end_index - 1].value;
-                values.push(
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    InstantValue {
-                        labels: metric.labels.clone(),
-                        sample: Sample::new(eval_ts, last_value),
-                    },
-                );
+            let match_sample = if end_index > 0 {
+                metric.samples.get(end_index - 1)
+            } else if !metric.samples.is_empty() {
+                metric.samples.first()
+            } else {
+                None
+            };
+            if let Some(sample) = match_sample {
+                if sample.timestamp + offset_modifier <= eval_ts
+                    && sample.timestamp + offset_modifier > start
+                {
+                    let last_value = sample.value;
+                    values.push(
+                        // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                        InstantValue {
+                            labels: metric.labels.clone(),
+                            sample: Sample::new(eval_ts, last_value),
+                        },
+                    );
+                }
             }
         }
         Ok(values)
@@ -434,13 +450,19 @@ impl Engine {
             selector.name = Some(name);
         }
 
-        let metrics_name = selector.name.as_ref().expect("Missing selector name");
-        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        let data_cache_key = &selector.to_string();
+        let cache_exists = {
+            self.ctx
+                .data_cache
+                .read()
+                .await
+                .contains_key(data_cache_key)
+        };
         if !cache_exists {
             self.selector_load_data(&selector, Some(range)).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
-        let metrics_cache = match metrics_cache.get(metrics_name) {
+        let metrics_cache = match metrics_cache.get(data_cache_key) {
             Some(v) => match v.get_ref_matrix_values() {
                 Some(v) => v,
                 None => return Ok(vec![]),
@@ -481,15 +503,7 @@ impl Engine {
                 })
                 .collect::<Vec<_>>();
             let exemplars = if self.ctx.query_exemplars {
-                metric.exemplars.as_ref().map(|v| {
-                    v.iter()
-                        .filter(|e| {
-                            let modified_ts = e.timestamp + offset_modifier;
-                            modified_ts >= start && modified_ts <= eval_ts
-                        })
-                        .cloned()
-                        .collect::<Vec<_>>()
-                })
+                metric.exemplars.clone()
             } else {
                 None
             };
@@ -510,17 +524,20 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<()> {
-        let table_name = selector.name.as_ref().unwrap();
+        let data_cache_key = selector.to_string();
         let mut data_loaded = self.ctx.data_loading.lock().await;
-        if data_loaded.contains(table_name) {
+        if data_loaded.contains(&data_cache_key) {
             return Ok(()); // data is already loading
         }
 
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
-                log::error!("[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}", self.trace_id);
-                data_loaded.insert(table_name.to_string());
+                log::error!(
+                    "[trace_id: {}] [PromQL] Failed to load data for stream: {data_cache_key}, error: {e:?}",
+                    self.trace_id
+                );
+                data_loaded.insert(data_cache_key);
                 return Err(e);
             }
         };
@@ -531,8 +548,8 @@ impl Engine {
                 .data_cache
                 .write()
                 .await
-                .insert(table_name.to_string(), Value::None);
-            data_loaded.insert(table_name.to_string());
+                .insert(data_cache_key.clone(), Value::None);
+            data_loaded.insert(data_cache_key);
             return Ok(());
         }
 
@@ -557,8 +574,8 @@ impl Engine {
             .data_cache
             .write()
             .await
-            .insert(table_name.to_string(), values);
-        data_loaded.insert(table_name.to_string());
+            .insert(data_cache_key.clone(), values);
+        data_loaded.insert(data_cache_key);
         Ok(())
     }
 
@@ -668,7 +685,7 @@ impl Engine {
         }
 
         log::info!(
-            "[trace_id: {}] load data done for stream: {}, took: {}ms",
+            "[trace_id: {}] load data done for stream: {}, took: {} ms",
             self.trace_id,
             table_name,
             start_time.elapsed().as_millis()
@@ -1110,9 +1127,9 @@ async fn selector_load_data_from_datafusion(
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
-            col(&cfg.common.column_timestamp)
+            col(TIMESTAMP_COL_NAME)
                 .gt(lit(start))
-                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
             return Ok(HashMap::default());
@@ -1126,13 +1143,21 @@ async fn selector_load_data_from_datafusion(
         None => return Ok(HashMap::default()),
     }
 
+    // check if exemplars field is exists
+    if query_exemplars {
+        let schema: Schema = df_group.schema().into();
+        if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
+            return Ok(HashMap::default());
+        }
+    }
+
     let label_cols = df_group
         .schema()
         .fields()
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == &cfg.common.column_timestamp
+            if name == TIMESTAMP_COL_NAME
                 || name == VALUE_LABEL
                 || name == EXEMPLARS_LABEL
                 || name == NAME_LABEL
@@ -1156,7 +1181,7 @@ async fn selector_load_data_from_datafusion(
         .clone()
         .aggregate(
             vec![col(HASH_LABEL)],
-            vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
+            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
         .sort(vec![col(HASH_LABEL).sort(true, true)])?
         .limit(0, Some(max_series))?
@@ -1170,7 +1195,7 @@ async fn selector_load_data_from_datafusion(
                 .iter()
                 .flat_map(|batch| {
                     let ts = batch
-                        .column_by_name(&cfg.common.column_timestamp)
+                        .column_by_name(TIMESTAMP_COL_NAME)
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Int64Array>()
@@ -1191,7 +1216,7 @@ async fn selector_load_data_from_datafusion(
                 .iter()
                 .flat_map(|batch| {
                     let ts = batch
-                        .column_by_name(&cfg.common.column_timestamp)
+                        .column_by_name(TIMESTAMP_COL_NAME)
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Int64Array>()
@@ -1220,7 +1245,7 @@ async fn selector_load_data_from_datafusion(
     // get series
     let series = df_group
         .clone()
-        .filter(col(&cfg.common.column_timestamp).in_list(timestamp_values, false))?
+        .filter(col(TIMESTAMP_COL_NAME).in_list(timestamp_values, false))?
         .select(label_cols)?
         .collect()
         .await?;
@@ -1316,7 +1341,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load samples took: {:?}",
+        "[trace_id: {trace_id}] load data took: {:?}",
         start_time.elapsed()
     );
 
@@ -1330,9 +1355,8 @@ async fn load_samples_from_datafusion(
     df: DataFrame,
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
-    let cfg = get_config();
     let streams = df
-        .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
+        .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
         .execute_stream_partitioned()
         .await?;
 
@@ -1347,12 +1371,11 @@ async fn load_samples_from_datafusion(
         let mut series = metrics.clone();
         let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
             tokio::task::spawn(async move {
-                let cfg = get_config();
                 loop {
                     match stream.try_next().await {
                         Ok(Some(batch)) => {
                             let time_values = batch
-                                .column_by_name(&cfg.common.column_timestamp)
+                                .column_by_name(TIMESTAMP_COL_NAME)
                                 .unwrap()
                                 .as_any()
                                 .downcast_ref::<Int64Array>()
@@ -1430,16 +1453,22 @@ async fn load_samples_from_datafusion(
 }
 
 async fn load_exemplars_from_datafusion(
-    _trace_id: &str,
+    trace_id: &str,
     hash_field_type: &DataType,
     metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
+    let start_time = std::time::Instant::now();
     let streams = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
         .execute_stream_partitioned()
         .await?;
+
+    log::info!(
+        "[trace_id: {trace_id}] load exemplars from datafusion took: {:?}",
+        start_time.elapsed()
+    );
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1548,6 +1577,11 @@ async fn load_exemplars_from_datafusion(
             }
         }
     }
+
+    log::info!(
+        "[trace_id: {trace_id}] group batches took: {:?}",
+        start_time.elapsed()
+    );
 
     Ok(())
 }

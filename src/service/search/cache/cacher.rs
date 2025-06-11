@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,9 +16,9 @@
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{search::Response, sql::OrderBy, stream::StreamType},
-    utils::{file::scan_files, json},
+    utils::{file::scan_files, json, time::now_micros},
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -30,10 +30,10 @@ use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta},
     service::search::{
         cache::{
-            result_utils::{get_ts_value, round_down_to_nearest_minute},
             MultiCachedQueryResponse,
+            result_utils::{get_ts_value, round_down_to_nearest_minute},
         },
-        sql::{generate_histogram_interval, Sql, RE_HISTOGRAM, RE_SELECT_FROM},
+        sql::{RE_HISTOGRAM, RE_SELECT_FROM, Sql, generate_histogram_interval},
     },
 };
 
@@ -94,10 +94,9 @@ pub async fn check_cache(
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
-    let cfg = get_config();
 
     let query: SearchQuery = req.query.clone().into();
-    let sql = match Sql::new(&query, org_id, stream_type).await {
+    let sql = match Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
@@ -106,7 +105,7 @@ pub async fn check_cache(
     };
 
     // skip the queries with no timestamp column
-    let ts_result = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let ts_result = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
     if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
         return MultiCachedQueryResponse::default();
@@ -116,7 +115,7 @@ pub async fn check_cache(
     let order_by = sql.order_by;
     if req.query.track_total_hits
         || (!order_by.is_empty()
-            && order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
+            && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
             && (result_ts_col.is_none()
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
@@ -129,18 +128,15 @@ pub async fn check_cache(
     {
         let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
         let cap_str = caps.get(1).unwrap().as_str();
-        if !cap_str.contains(&cfg.common.column_timestamp) {
-            *origin_sql = origin_sql.replacen(
-                cap_str,
-                &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-                1,
-            );
+        if !cap_str.contains(TIMESTAMP_COL_NAME) {
+            *origin_sql =
+                origin_sql.replacen(cap_str, &format!("{}, {}", TIMESTAMP_COL_NAME, cap_str), 1);
         }
         req.query.sql = origin_sql.clone();
-        result_ts_col = Some(cfg.common.column_timestamp.clone());
+        result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
     }
     if !is_aggregate && origin_sql.contains('*') {
-        result_ts_col = Some(cfg.common.column_timestamp.clone());
+        result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
     }
 
     let result_ts_col = result_ts_col.unwrap();
@@ -150,7 +146,7 @@ pub async fn check_cache(
 
         let mut req_time_range = (req.query.start_time, req.query.end_time);
         if req_time_range.1 == 0 {
-            req_time_range.1 = chrono::Utc::now().timestamp_micros();
+            req_time_range.1 = now_micros();
         }
 
         let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
@@ -571,13 +567,12 @@ pub fn calculate_deltas_v1(
 }
 
 pub async fn cache_results_to_disk(
-    trace_id: &str,
     file_path: &str,
     file_name: &str,
     data: String,
 ) -> std::io::Result<()> {
     let file = format!("results/{}/{}", file_path, file_name);
-    match disk::set(trace_id, &file, Bytes::from(data)).await {
+    match disk::set(&file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
             log::error!("Error caching results to disk: {:?}", e);
@@ -648,7 +643,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
     for file in files {
-        match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
+        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
                 log::error!("Error deleting cache: {:?}", e);
@@ -746,9 +741,9 @@ fn calculate_deltas_multi(
 
     // Check if there is a gap at the end
     if current_end_time < end_time
-        && results.last().map_or(false, |last_meta| {
-            !last_meta.cached_response.hits.is_empty()
-        })
+        && results
+            .last()
+            .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
     {
         deltas.push(QueryDelta {
             // Adding histogram interval to the current end time to ensure the next query

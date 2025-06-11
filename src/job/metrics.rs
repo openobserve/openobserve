@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,18 +25,22 @@ use config::{
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
 use once_cell::sync::Lazy;
-use opentelemetry::{global, metrics::Histogram, KeyValue};
+use opentelemetry::{KeyValue, global, metrics::Histogram};
 use opentelemetry_sdk::{
+    Resource,
     metrics::{
-        new_view, reader::DefaultTemporalitySelector, Aggregation, Instrument, PeriodicReader,
-        SdkMeterProvider, Stream,
+        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream, new_view,
+        reader::DefaultTemporalitySelector,
     },
-    runtime, Resource,
+    runtime,
 };
-use tokio::{sync::RwLock, time};
+use tokio::{sync::Mutex, time};
 
 use crate::{
-    common::infra::{cluster::get_cached_online_nodes, config::USERS},
+    common::infra::{
+        cluster::get_cached_online_nodes,
+        config::{ORG_USERS, USERS},
+    },
     service::{
         db,
         exporter::otlp_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
@@ -57,13 +61,13 @@ pub struct TraceMetricsItem {
 
 pub type TraceMetricsChan = (
     tokio::sync::mpsc::Sender<TraceMetricsItem>,
-    RwLock<tokio::sync::mpsc::Receiver<TraceMetricsItem>>,
+    Mutex<tokio::sync::mpsc::Receiver<TraceMetricsItem>>,
 );
 
 pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
     let (tx, rx) =
         tokio::sync::mpsc::channel(get_config().common.traces_span_metrics_channel_buffer);
-    (tx, RwLock::new(rx))
+    (tx, Mutex::new(rx))
 });
 
 pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
@@ -96,9 +100,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         if let Err(e) = update_storage_metrics().await {
             log::error!("Error update storage metrics: {}", e);
-        }
-        if let Err(e) = update_memory_usage().await {
-            log::error!("Error update memory_usage metrics: {}", e);
         }
         interval.tick().await;
     }
@@ -154,6 +155,10 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
 }
 
 async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
+    if !config::cluster::LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
+
     let db = get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
@@ -223,7 +228,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         .set(users as i64);
     for org_id in &orgs {
         let mut count: i64 = 0;
-        for user in USERS.clone().iter() {
+        for user in ORG_USERS.iter() {
             if user.key().starts_with(&format!("{org_id}/")) {
                 count += 1;
             }
@@ -241,12 +246,12 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         if columns.len() <= 2 {
             // query functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], "", "", "query"])
+                .with_label_values(&[columns[0], "", "query"])
                 .inc();
         } else {
             // ingest functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], columns[2], columns[1], "ingest"])
+                .with_label_values(&[columns[0], columns[1], "ingest"])
                 .inc();
         }
     }
@@ -258,30 +263,44 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
 }
 
 async fn update_storage_metrics() -> Result<(), anyhow::Error> {
+    if !config::cluster::LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
+
+    // reset metrics
+    metrics::STORAGE_ORIGINAL_BYTES.reset();
+    metrics::STORAGE_COMPRESSED_BYTES.reset();
+    metrics::STORAGE_FILES.reset();
+    metrics::STORAGE_RECORDS.reset();
+
+    // update metrics
     let stats = cache::stats::get_stats();
     for (key, stat) in stats {
         let columns = key.split('/').collect::<Vec<&str>>();
+        let cur_val = metrics::STORAGE_ORIGINAL_BYTES
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_ORIGINAL_BYTES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
-            .set(stat.storage_size as i64);
+            .with_label_values(&[columns[0], columns[1]])
+            .set(cur_val + stat.storage_size as i64);
+        let cur_val = metrics::STORAGE_COMPRESSED_BYTES
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
-            .set(stat.compressed_size as i64);
+            .with_label_values(&[columns[0], columns[1]])
+            .set(cur_val + stat.compressed_size as i64);
+        let cur_val = metrics::STORAGE_FILES
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_FILES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
-            .set(stat.file_num);
+            .with_label_values(&[columns[0], columns[1]])
+            .set(cur_val + stat.file_num);
+        let cur_val = metrics::STORAGE_RECORDS
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_RECORDS
-            .with_label_values(&[columns[0], columns[2], columns[1]])
-            .set(stat.doc_num);
-    }
-    Ok(())
-}
-
-async fn update_memory_usage() -> Result<(), anyhow::Error> {
-    if let Some(cur_memory) = memory_stats::memory_stats() {
-        metrics::MEMORY_USAGE
-            .with_label_values(&[])
-            .set(cur_memory.physical_mem as i64);
+            .with_label_values(&[columns[0], columns[1]])
+            .set(cur_val + stat.doc_num);
     }
     Ok(())
 }
@@ -315,7 +334,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
 }
 
 async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
-    let mut receiver = TRACE_METRICS_CHAN.1.write().await;
+    let mut receiver = TRACE_METRICS_CHAN.1.lock().await;
 
     while let Some(item) = receiver.recv().await {
         // Record measurements using the histogram instrument.

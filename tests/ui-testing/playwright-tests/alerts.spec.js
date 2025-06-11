@@ -206,22 +206,19 @@ test.describe("Alerts testcases", () => {
 
 
   });
-
+  // at least one template is required before adding destination
   test.skip("should click on add destination button and display error if user clicks directly on save", async ({ page }) => {
     await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="alert-destinations-tab"]');
-    await page.locator(
-      '[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(
-        100);
+    await page.locator('[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(100);
     await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
-    await page.locator(
-      '[data-test="alert-destination-list-add-alert-btn"]').click({
-        force: true
-      }); await page.locator(
-
-        '[data-test="add-destination-submit-btn"]').click({ force: true }); await expect(page.locator(
-          ".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
+    await page.locator('[data-test="alert-destination-list-add-alert-btn"]').click({force: true}); 
+    await page.locator('[data-test="add-destination-submit-btn"]').click({ force: true }); 
+    await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
   })
+
+
+  
 
 });

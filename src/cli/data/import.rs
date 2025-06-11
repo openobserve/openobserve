@@ -17,13 +17,8 @@ use std::fs;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-use bytes::Bytes;
 
-use crate::{
-    cli::data::{cli::Cli, Context},
-    common::meta::ingestion::IngestionRequest,
-    service::logs,
-};
+use crate::cli::data::{Context, cli::Cli};
 
 pub struct Import {}
 
@@ -42,18 +37,21 @@ async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow:
         let path = entry.path();
         if path.is_file() {
             let content = fs::read(&path)?;
-            if let Err(e) = logs::ingest::ingest(
-                0,
-                &c.org,
-                &c.stream_name,
-                IngestionRequest::JSON(&Bytes::from(content)),
-                "root",
-                None,
-            )
-            .await
-            {
+            let req = proto::cluster_rpc::IngestionRequest {
+                org_id: c.org.clone(),
+                stream_name: c.stream_name.clone(),
+                stream_type: c.stream_type.clone(),
+                data: Some(proto::cluster_rpc::IngestionData {
+                    data: content.to_vec(),
+                }),
+                ingestion_type: Some(proto::cluster_rpc::IngestionType::Json.into()),
+                metadata: None,
+            };
+            if let Err(e) = crate::service::ingestion::ingestion_service::ingest(req).await {
                 eprintln!("insert data fail {:?}: {:?}", path, e);
                 return Ok(false);
+            } else {
+                println!("insert data success: {:?}", path);
             }
         } else if path.is_dir()
             && !read_files_in_directory(c.clone(), &path.to_string_lossy()).await?

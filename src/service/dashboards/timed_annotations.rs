@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,7 +115,7 @@ pub async fn delete_timed_annotation_panels(
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
     use super::TimedAnnotation;
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,21 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use config::meta::{alerts::alert::Alert as MetaAlert, folder::DEFAULT_FOLDER};
-use infra::db::{connect_to_orm, ORM_CLIENT};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, patch, post, put, web};
+use config::meta::{
+    alerts::alert::Alert as MetaAlert,
+    triggers::{Trigger, TriggerModule},
+};
+use hashbrown::HashMap;
+use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::alerts::{
-        requests::{
-            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
-            UpdateAlertRequestBody,
+    handler::http::{
+        models::alerts::{
+            requests::{
+                CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
+                UpdateAlertRequestBody,
+            },
+            responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
         },
-        responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
+        request::dashboards::get_folder,
     },
-    service::alerts::alert::{self, AlertError},
+    service::{
+        alerts::alert::{self, AlertError},
+        db::scheduler,
+    },
 };
 
 #[allow(deprecated)]
@@ -65,11 +75,16 @@ impl From<AlertError> for HttpResponse {
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
+            AlertError::PermissionDenied => MetaHttpResponse::forbidden("Unauthorized access"),
+            AlertError::UserNotFound => MetaHttpResponse::forbidden("Unauthorized access"),
+            AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
         }
     }
 }
 
 /// CreateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -91,26 +106,32 @@ pub async fn create_alert(
     path: web::Path<String>,
     req_body: web::Json<CreateAlertRequestBody>,
     user_email: UserEmail,
+    req: HttpRequest,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let req_body = req_body.into_inner();
 
-    let folder_id = req_body
-        .folder_id
-        .clone()
-        .unwrap_or(DEFAULT_FOLDER.to_string());
+    let folder_id = get_folder(req);
     let mut alert: MetaAlert = req_body.into();
-    alert.owner = Some(user_email.user_id.clone());
+    if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
+        alert.owner = Some(user_email.user_id.clone());
+    }
     alert.last_edited_by = Some(user_email.user_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::create(client, &org_id, &folder_id, alert).await {
-        Ok(_) => MetaHttpResponse::ok("Alert saved"),
+        Ok(v) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
+                .with_name(v.name),
+        ),
         Err(e) => e.into(),
     }
 }
 
 /// GetAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -134,7 +155,11 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok(alert) => {
-            let resp_body: GetAlertResponseBody = alert.into();
+            let key = alert.get_unique_key();
+            let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
+                .await
+                .ok();
+            let resp_body: GetAlertResponseBody = (alert, scheduled_job).into();
             MetaHttpResponse::json(resp_body)
         }
         Err(e) => e.into(),
@@ -142,6 +167,8 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// UpdateAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -165,11 +192,12 @@ pub async fn update_alert(
     req_body: web::Json<UpdateAlertRequestBody>,
     user_email: UserEmail,
 ) -> HttpResponse {
-    let (org_id, _alert_id) = path.into_inner();
+    let (org_id, alert_id) = path.into_inner();
     let req_body = req_body.into_inner();
 
     let mut alert: MetaAlert = req_body.into();
     alert.last_edited_by = Some(user_email.user_id);
+    alert.id = Some(alert_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::update(client, &org_id, None, alert).await {
@@ -179,6 +207,8 @@ pub async fn update_alert(
 }
 
 /// DeleteAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -207,6 +237,8 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// ListAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -238,17 +270,36 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     };
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let folders_and_alerts = match alert::list_v2(client, user_id, query.into(&org_id)).await {
-        Ok(f_a) => f_a,
-        Err(e) => return e.into(),
-    };
-    let Ok(resp_body) = ListAlertsResponseBody::try_from(folders_and_alerts) else {
+    let scheduled_jobs = scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
+        .await
+        .unwrap_or_default();
+    let mut scheduled_jobs: HashMap<String, Trigger> = scheduled_jobs
+        .into_iter()
+        .map(|t| (t.module_key.clone(), t))
+        .collect();
+    let folders_and_alerts_scheduled_job =
+        match alert::list_v2(client, user_id, query.into(&org_id)).await {
+            Ok(f_a) => {
+                let f_a: Vec<_> = f_a
+                    .into_iter()
+                    .map(|(folder, alert)| {
+                        let key = alert.get_unique_key();
+                        (folder, alert, scheduled_jobs.remove(&key))
+                    })
+                    .collect();
+                f_a
+            }
+            Err(e) => return e.into(),
+        };
+    let Ok(resp_body) = ListAlertsResponseBody::try_from(folders_and_alerts_scheduled_job) else {
         return MetaHttpResponse::internal_error("");
     };
     MetaHttpResponse::json(resp_body)
 }
 
 /// EnableAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -267,7 +318,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}/enable")]
+#[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
 async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
     let Ok(query) = web::Query::<EnableAlertQuery>::from_query(req.query_string()) else {
@@ -288,6 +339,8 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
 }
 
 /// TriggerAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -305,7 +358,7 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}/trigger")]
+#[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
 async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
 
@@ -317,6 +370,8 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// MoveAlerts
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -334,10 +389,11 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/move")]
+#[patch("/v2/{org_id}/alerts/move")]
 async fn move_alerts(
     path: web::Path<String>,
     req_body: web::Json<MoveAlertsRequestBody>,
+    user_email: UserEmail,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -346,6 +402,7 @@ async fn move_alerts(
         &org_id,
         &req_body.alert_ids,
         &req_body.dst_folder_id,
+        &user_email.user_id,
     )
     .await
     {

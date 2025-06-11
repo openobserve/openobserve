@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,12 @@ use std::sync::Arc;
 
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
         Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
     error::DataFusionError,
-    logical_expr::{expr::ScalarFunction, BinaryExpr, Expr, LogicalPlan, Operator},
-    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
+    logical_expr::{BinaryExpr, Expr, LogicalPlan, Operator, expr::ScalarFunction},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder, utils::NamePreserver},
     scalar::ScalarValue,
 };
 
@@ -345,54 +345,54 @@ mod tests {
             // equal to operator gets re-written
             (
                 "SELECT _timestamp FROM t where decrypt(name, 'test_key') = 'test_val'",
-                "Projection: t._timestamp\n  Filter: t.name = encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: t.name = encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             // not equal operator gets rewritten
             (
                 "SELECT _timestamp FROM t where decrypt(name, 'test_key') != 'test_val'",
-                "Projection: t._timestamp\n  Filter: t.name != encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: t.name != encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             // like operator does not get rewritten
             (
                 "SELECT _timestamp FROM t where decrypt(name, 'test_key') LIKE '%test%'",
-                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test_key\")) LIKE Utf8(\"%test%\")\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test_key\")) LIKE Utf8(\"%test%\")\n    TableScan: t",
             ),
             // match all does not get re-written
             (
                 "SELECT _timestamp FROM t where match_all(decrypt(name, 'test_key'), 'test')",
-                "Projection: t._timestamp\n  Filter: match_all(decrypt(t.name, Utf8(\"test_key\")), Utf8(\"test\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: match_all(decrypt(t.name, Utf8(\"test_key\")), Utf8(\"test\"))\n    TableScan: t",
             ),
             // if comparison is to non-literal, it does not get re-written
             (
                 "SELECT _timestamp FROM t where decrypt(name, 'test_key') = other_col",
-                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t",
             ),
             // similar checks for encrypt
             (
                 "SELECT _timestamp FROM t where encrypt(name, 'test_key') = 'test_val'",
-                "Projection: t._timestamp\n  Filter: t.name = decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: t.name = decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where encrypt(name, 'test_key') != 'test_val'",
-                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where encrypt(name, 'test_key') = other_col",
-                "Projection: t._timestamp\n  Filter: encrypt(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: encrypt(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t",
             ),
             // checks for revered order in query
             (
                 "SELECT _timestamp FROM t where 'test_val' = decrypt(name, 'test_key')",
-                "Projection: t._timestamp\n  Filter: t.name = encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: t.name = encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where 'test_val' != encrypt(name, 'test_key')",
-                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             // no op sanity check
             (
                 "SELECT _timestamp FROM t where match_all(name, 'test')",
-                "Projection: t._timestamp\n  Filter: match_all(t.name, Utf8(\"test\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: match_all(t.name, Utf8(\"test\"))\n    TableScan: t",
             ),
         ];
 
@@ -453,11 +453,11 @@ mod tests {
             // check key is re-written
             (
                 "SELECT _timestamp FROM t where decrypt(name, 'test_key') = 'test_val'",
-                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"org1:test_key\")) = Utf8(\"test_val\")\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"org1:test_key\")) = Utf8(\"test_val\")\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where 'test_val' = encrypt(name, 'test_key')",
-                "Projection: t._timestamp\n  Filter: Utf8(\"test_val\") = encrypt(t.name, Utf8(\"org1:test_key\"))\n    TableScan: t"
+                "Projection: t._timestamp\n  Filter: Utf8(\"test_val\") = encrypt(t.name, Utf8(\"org1:test_key\"))\n    TableScan: t",
             ),
         ];
 

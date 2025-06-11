@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{datetime_now, OrdF64};
+use super::{OrdF64, datetime_now};
 use crate::meta::stream::StreamType;
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -43,6 +43,8 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_datetime_duration: Option<DateTimeOptions>,
+    #[serde(default, skip_serializing)]
+    pub updated_at: i64,
 }
 
 impl From<Dashboard> for super::Dashboard {
@@ -53,6 +55,7 @@ impl From<Dashboard> for super::Dashboard {
         hasher.write_i32(version);
         value.hash(&mut hasher);
         let hash = hasher.finish().to_string();
+        let updated_at = value.updated_at;
 
         Self {
             v1: None,
@@ -62,6 +65,7 @@ impl From<Dashboard> for super::Dashboard {
             v5: Some(value),
             version,
             hash,
+            updated_at,
         }
     }
 }
@@ -159,6 +163,14 @@ pub struct AxisItem {
     pub args: Option<Vec<AxisArg>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_derived: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub having_conditions: Option<Vec<HavingConditions>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct HavingConditions {
+    value: Option<OrdF64>,
+    operator: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -202,6 +214,19 @@ pub struct GroupType {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct Background {
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub value: Option<BackgroundValue>, // "", single
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct BackgroundValue {
+    pub color: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
     #[serde(rename = "type")]
     pub typ: String,
@@ -226,7 +251,13 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     line_thickness: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    step_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     top_results: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y_axis_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y_axis_max: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -267,6 +298,8 @@ pub struct PanelConfig {
     mappings: Option<Vec<Mapping>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<ColorCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    background: Option<Background>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trellis: Option<Trellis>,
 }
@@ -508,6 +541,8 @@ pub struct MapView {
 pub struct Trellis {
     pub layout: Option<String>,
     pub num_of_columns: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_by_y_axis: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]

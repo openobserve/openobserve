@@ -16,6 +16,8 @@
 use std::sync::Arc;
 
 use config::utils::json;
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::cloud::is_ofga_migrations_done;
 use o2_openfga::{
     config::OFGA_STORE_ID,
     meta::mapping::OFGAModel,
@@ -31,7 +33,12 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
             log::info!("OFGA model already exists & no changes required");
             Ok(existing_model.store_id)
         } else {
-            let store_id = if existing_model.store_id.is_empty() {
+            #[cfg(not(feature = "cloud"))]
+            let force_create_new_store = false;
+            #[cfg(feature = "cloud")]
+            let force_create_new_store = !is_ofga_migrations_done().await.unwrap();
+
+            let store_id = if existing_model.store_id.is_empty() || force_create_new_store {
                 create_open_fga_store().await.unwrap()
             } else {
                 existing_model.store_id
@@ -79,9 +86,9 @@ pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow:
 pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
     let key = "/ofga/model";
     let ret = db::get(key).await?;
-    let loc_value = json::from_slice(&ret).unwrap();
-    let value = Some(loc_value);
-    Ok(value)
+    let mut loc_value: OFGAModel = json::from_slice(&ret).unwrap();
+    loc_value.version = loc_value.version.trim_matches('"').to_string();
+    Ok(Some(loc_value))
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

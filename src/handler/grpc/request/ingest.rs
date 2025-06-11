@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ use config::{
     utils::json,
 };
 use proto::cluster_rpc::{
-    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType,
+    IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
 };
 use tonic::{Request, Response, Status};
 
@@ -110,11 +110,19 @@ impl Ingest for Ingester {
                             })
                             .collect()
                     });
+                let append_data = match req.metadata {
+                    Some(metadata) => metadata
+                        .data
+                        .get("append_data")
+                        .and_then(|v| v.parse::<bool>().ok())
+                        .unwrap_or(true),
+                    None => true,
+                };
                 match crate::service::enrichment_table::save_enrichment_data(
                     &org_id,
                     &stream_name,
                     json_records,
-                    true,
+                    append_data,
                 )
                 .await
                 {
@@ -159,10 +167,10 @@ impl Ingest for Ingester {
         // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .with_label_values(&["/ingest/inner", "200", "", "", "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/ingest/inner", "200", "", "", ""])
+            .with_label_values(&["/ingest/inner", "200", "", "", "", ""])
             .inc();
 
         Ok(Response::new(reply))

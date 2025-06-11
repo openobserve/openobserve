@@ -18,11 +18,11 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
-    get_config,
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
@@ -34,17 +34,17 @@ use config::{
     },
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
-    SIZE_IN_MB,
 };
 use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
 use vrl::{
-    compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
+    compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
     prelude::state,
 };
 
 use super::{
-    db::pipeline, pipeline::batch_execution::ExecutablePipeline,
+    db::{alerts::alert, pipeline},
+    pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
 };
 use crate::{
@@ -53,7 +53,11 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::{alerts::alert::AlertExt, db, logs::bulk::TRANSFORM_FAILED},
+    service::{
+        alerts::alert::AlertExt,
+        db::{self, alerts::alert::scheduler_key},
+        logs::bulk::TRANSFORM_FAILED,
+    },
 };
 
 pub mod grpc;
@@ -101,11 +105,21 @@ pub fn apply_vrl_fn(
     stream_name: &[String],
 ) -> (Value, Option<String>) {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
+    metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
+    metadata.insert(
+        "stream_name",
+        vrl::value::Value::from(stream_name[0].clone()),
+    );
     let mut target = TargetValueRef {
         value: &mut vrl::value::Value::from(&row),
         metadata: &mut metadata,
         secrets: &mut vrl::value::Secrets::new(),
     };
+
+    target
+        .secrets
+        .insert(stream_name[0].clone(), stream_name[0].clone());
+
     let timezone = vrl::compiler::TimeZone::Local;
     let result = match vrl::compiler::VrlRuntime::default() {
         vrl::compiler::VrlRuntime::Ast => {
@@ -179,32 +193,34 @@ pub async fn get_stream_alerts(
     stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
 ) {
     for stream in streams {
-        let key = format!(
-            "{}/{}/{}",
-            stream.org_id, stream.stream_type, stream.stream_name
-        );
+        let key = alert::cache_stream_key(&stream.org_id, stream.stream_type, &stream.stream_name);
         if stream_alerts_map.contains_key(&key) {
-            return;
+            continue;
         }
 
-        let alerts_cacher = STREAM_ALERTS.read().await;
-        let alerts_list = alerts_cacher.get(&key);
-        if alerts_list.is_none() {
-            return;
+        let stream_alerts_cacher = STREAM_ALERTS.read().await;
+        let alerts_id_list = stream_alerts_cacher.get(&key);
+        if alerts_id_list.is_none() {
+            continue;
         }
+        let mut alerts_list = vec![];
+        for alert_id in alerts_id_list.unwrap().iter() {
+            if let Some((_, alert)) = alert::get_alert_from_cache(&stream.org_id, alert_id).await {
+                alerts_list.push(alert);
+            }
+        }
+
         let triggers_cache = REALTIME_ALERT_TRIGGERS.read().await;
         let alerts = alerts_list
-            .unwrap()
-            .iter()
+            .into_iter()
             .filter(|alert| alert.enabled && alert.is_real_time)
             .filter(|alert| {
-                let key = format!("{}/{}", key, alert.name);
+                let key = format!("{}/{}", stream.org_id, alert.id.as_ref().unwrap());
                 match triggers_cache.get(&key) {
                     Some(v) => !v.is_silenced,
                     None => true,
                 }
             })
-            .cloned()
             .collect::<Vec<_>>();
         if alerts.is_empty() {
             return;
@@ -220,16 +236,13 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     log::debug!("Evaluating triggers: {:?}", triggers);
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
-        let module_key = format!(
-            "{}/{}/{}",
-            &alert.stream_type, &alert.stream_name, &alert.name
-        );
+        let module_key = scheduler_key(alert.id);
         let now = Utc::now().timestamp_micros();
         let mut trigger_data_stream = TriggerData {
             _timestamp: now,
             org: alert.org_id.to_string(),
             module: TriggerDataType::Alert,
-            key: module_key.clone(),
+            key: format!("{}/{module_key}", alert.name),
             next_run_at: now,
             is_realtime: true,
             is_silenced: false,
@@ -242,6 +255,10 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             is_partial: None,
             delay_in_secs: None,
             evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
+            scheduler_trace_id: None,
+            time_in_queue_ms: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -493,12 +510,13 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
         Value::Null => Value::Null,
     }
 }
+
 pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
-    user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
-    streams_need_original: &mut HashSet<String>,
+    user_defined_schema_map: &mut HashMap<String, Option<HashSet<String>>>,
+    streams_need_original: &mut HashMap<String, bool>,
+    streams_need_all_values: &mut HashMap<String, bool>,
 ) {
-    let cfg = get_config();
     for stream in streams {
         if user_defined_schema_map.contains_key(stream.stream_name.as_str()) {
             continue;
@@ -507,16 +525,23 @@ pub async fn get_uds_and_original_data_streams(
             infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
                 .await
                 .unwrap_or_default();
-        if stream_settings.store_original_data {
-            streams_need_original.insert(stream.stream_name.to_string());
-        }
+        streams_need_original.insert(
+            stream.stream_name.to_string(),
+            stream_settings.store_original_data || stream_settings.index_original_data,
+        );
+        streams_need_all_values.insert(
+            stream.stream_name.to_string(),
+            stream_settings.index_all_values,
+        );
         if let Some(fields) = &stream_settings.defined_schema_fields {
             if !fields.is_empty() {
                 let mut fields: HashSet<_> = fields.iter().cloned().collect();
-                if !fields.contains(&cfg.common.column_timestamp) {
-                    fields.insert(cfg.common.column_timestamp.to_string());
+                if !fields.contains(TIMESTAMP_COL_NAME) {
+                    fields.insert(TIMESTAMP_COL_NAME.to_string());
                 }
-                user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+                user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
+            } else {
+                user_defined_schema_map.insert(stream.stream_name.to_string(), None);
             }
         }
     }
@@ -546,7 +571,7 @@ pub fn create_log_ingestion_req(
 
 #[cfg(test)]
 mod tests {
-    use infra::schema::{unwrap_stream_settings, STREAM_SETTINGS};
+    use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
 
     use super::*;
 
@@ -614,6 +639,7 @@ mod tests {
         let settings = unwrap_stream_settings(&schema).unwrap();
         let mut w = STREAM_SETTINGS.write().await;
         w.insert("default/logs/olympics".to_string(), settings);
+        infra::schema::set_stream_settings_atomic(w.clone());
         drop(w);
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(

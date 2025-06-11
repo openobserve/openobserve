@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::TimeZone;
 use config::utils::file::set_permission;
 use infra::{
     db::{connect_to_orm, ORM_CLIENT},
@@ -21,16 +22,18 @@ use infra::{
 
 use crate::{
     cli::data::{
-        cli::{args as dataArgs, Cli as dataCli},
-        export, import, Context,
+        Context,
+        cli::{Cli as dataCli, args as dataArgs},
+        export, import,
     },
-    common::{infra::config::USERS, meta, migration},
+    common::{infra::config::USERS, meta},
+    migration,
     service::{compact, db, file_list, users},
 };
 
 pub async fn cli() -> Result<bool, anyhow::Error> {
     let app = clap::Command::new("openobserve")
-        .version(env!("GIT_VERSION"))
+        .version(config::VERSION)
         .about(clap::crate_description!())
         .subcommands(&[
             clap::Command::new("reset")
@@ -112,13 +115,19 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
-                .arg(
+                .args([
+                    clap::Arg::new("account")
+                        .short('a')
+                        .long("account")
+                        .required(false)
+                        .value_name("account")
+                        .help("the account name"),
                     clap::Arg::new("file")
                         .short('f')
                         .long("file")
                         .value_name("file")
                         .help("the parquet file name"),
-                ),
+                ]),
             clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
             clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
                 .subcommand(
@@ -130,28 +139,118 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .about("rollback last N SeaORM migration steps")
                     .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
                 ),
-            clap::Command::new("recover-file-list").about("recover file list from s3").args([
-                clap::Arg::new("prefix")
-                    .short('p')
-                    .long("prefix")
-                    .value_name("prefix")
-                    .required(true)
-                    .help("only migrate specified prefix"),
-                clap::Arg::new("insert")
-                    .short('i')
-                    .long("insert")
-                    .value_name("insert")
-                    .required(false)
-                    .action(clap::ArgAction::SetTrue)
-                    .help("insert file list into db"),
+            clap::Command::new("recover-file-list").about("recover file list from s3")
+                .args([
+                    clap::Arg::new("account")
+                        .short('a')
+                        .long("account")
+                        .value_name("account")
+                        .required(true)
+                        .help("the account name"),
+                    clap::Arg::new("prefix")
+                        .short('p')
+                        .long("prefix")
+                        .value_name("prefix")
+                        .required(true)
+                        .help("only migrate specified prefix"),
+                    clap::Arg::new("insert")
+                        .short('i')
+                        .long("insert")
+                        .value_name("insert")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue)
+                        .help("insert file list into db"),
+                ]),
+            clap::Command::new("node").about("node command").subcommands([
+                clap::Command::new("offline").about("offline node"),
+                clap::Command::new("online").about("online node"),
+                clap::Command::new("flush").about("flush memtable to disk"),
+                clap::Command::new("list").about("list cached nodes").args([
+                    clap::Arg::new("metrics")
+                        .short('m')
+                        .long("metrics")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue)
+                        .help("show node metrics"),
+                ]),
+                clap::Command::new("metrics").about("show local node metrics"),
             ]),
+            clap::Command::new("sql").about("query data").args([
+                clap::Arg::new("org") 
+                    .long("org")
+                    .required(false)
+                    .default_value("default")
+                    .help("org name"),
+                clap::Arg::new("execute")
+                    .short('e')
+                    .long("execute")
+                    .required(true)
+                    .help("execute sql"),
+                clap::Arg::new("time")
+                    .short('t')
+                    .long("time")
+                    .required(false)
+                    .default_value("15m")
+                    .help("time range, e.g. 15m, 1h, 1d, 1w, 1y"),
+                clap::Arg::new("limit")
+                    .short('l')
+                    .long("limit")
+                    .required(false)
+                    .default_value("10")
+                    .help("limit the number of results"),
+            ]),
+            clap::Command::new("test").about("test command").subcommands([
+                clap::Command::new("file_list").about("test generate file list groups").args([
+                    clap::Arg::new("mode")
+                        .short('m')
+                        .long("mode")
+                        .required(true)
+                        .default_value("file_size")
+                        .help("mode: file_size, file_time, time_range"),
+                    clap::Arg::new("stream")
+                        .short('s')
+                        .long("stream")
+                        .required(true)
+                        .default_value("")
+                        .help("stream name, the format is org/logs/default"),
+                    clap::Arg::new("hour")
+                        .short('d')
+                        .long("date")
+                        .required(true)
+                        .default_value("")
+                        .help("date for testing, the format is 2025/01/01/00"),
+                    clap::Arg::new("group_size")
+                        .short('g')
+                        .long("group_size")
+                        .required(false)
+                        .default_value("5")
+                        .help("group size by gb, default is 5gb"),
+                ]),
+            ]),
+            clap::Command::new("parse-id").about("parse snowflake id to timestamp").args([
+                clap::Arg::new("id")
+                    .short('i')
+                    .long("id")
+                    .required(true)
+                    .help("snowflake id"),
+            ]),
+            clap::Command::new("consistent-hash").about("consistent hash").args([
+                clap::Arg::new("file")
+                    .short('f')
+                    .long("file")
+                    .required(true)
+                    .num_args(1..)
+                    .help("file"),
+            ]),
+            clap::Command::new("upgrade-db")
+                .about("upgrade db table schemas").args(dataArgs()),
         ])
         .get_matches();
 
     if app.subcommand().is_none() {
         return Ok(false);
     }
-    let cfg = config::get_config();
+
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
@@ -170,6 +269,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     }
 
     // init infra, create data dir & tables
+    let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
     match name {
         "reset" => {
@@ -185,10 +285,17 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             change_password: true,
                             old_password: None,
                             new_password: Some(cfg.auth.root_user_password.clone()),
-                            role: Some(meta::user::UserRole::Root),
+                            role: Some(crate::common::meta::user::UserRoleRequest {
+                                role: config::meta::user::UserRole::Root.to_string(),
+                                custom: None,
+                            }),
                             first_name: Some("root".to_owned()),
                             last_name: Some("".to_owned()),
-                            token: None,
+                            token: if cfg.auth.root_user_token.is_empty() {
+                                None
+                            } else {
+                                Some(cfg.auth.root_user_token.clone())
+                            },
                         },
                     )
                     .await?;
@@ -210,6 +317,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
+                    // init nats client
+                    let (tx, _rx) = tokio::sync::mpsc::channel::<infra::db::nats::NatsEvent>(1);
+                    if !cfg.common.local_mode
+                        && cfg.common.cluster_coordinator.to_lowercase() == "nats"
+                    {
+                        infra::db::nats::init_nats_client(tx).await?;
+                    }
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
@@ -233,10 +347,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "version" => {
-                    println!("version: {}", db::version::get().await?);
+                    println!("version: {}", db::metas::version::get().await?);
                 }
                 "user" => {
                     db::user::cache().await?;
+                    db::org_users::cache().await?;
                     let mut id = 0;
                     for user in USERS.iter() {
                         id += 1;
@@ -282,8 +397,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::pipeline_func::run(drop_table).await?;
         }
         "delete-parquet" => {
+            let account = command
+                .get_one::<String>("account")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
             let file = command.get_one::<String>("file").unwrap();
-            match file_list::delete_parquet_file(file, true).await {
+            match file_list::delete_parquet_file(&account, file, true).await {
                 Ok(_) => {
                     println!("delete parquet file {} successfully", file);
                 }
@@ -293,9 +412,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
+            crate::common::infra::init().await?;
+            crate::common::infra::cluster::register_and_keep_alive().await?;
             import::Import::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "export" => {
+            crate::common::infra::init().await?;
+            crate::common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "migrate-schemas" => {
@@ -324,9 +447,88 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         },
         "recover-file-list" => {
+            let account = command
+                .get_one::<String>("account")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
             let prefix = command.get_one::<String>("prefix").unwrap();
             let insert = command.get_flag("insert");
-            super::load::load_file_list_from_s3(prefix, insert).await?;
+            super::load::load_file_list_from_s3(&account, prefix, insert).await?;
+        }
+        "node" => {
+            let command = command.subcommand();
+            match command {
+                Some(("offline", _)) => {
+                    super::http::node_offline().await?;
+                }
+                Some(("online", _)) => {
+                    super::http::node_online().await?;
+                }
+                Some(("flush", _)) => {
+                    super::http::node_flush().await?;
+                }
+                Some(("list", args)) => {
+                    let metrics = args.get_flag("metrics");
+                    if metrics {
+                        super::http::node_list_with_metrics().await?;
+                    } else {
+                        super::http::node_list().await?;
+                    }
+                }
+                Some(("metrics", _)) => {
+                    super::http::local_node_metrics().await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupported sub command: {name}"));
+                }
+            }
+        }
+        "sql" => {
+            let org = command.get_one::<String>("org").unwrap();
+            let sql = command.get_one::<String>("execute").unwrap();
+            let time = command.get_one::<String>("time").unwrap();
+            let limit = command.get_one::<String>("limit").unwrap();
+            let mut limit = limit.parse::<i64>().unwrap_or(10);
+            if !(1..=1000).contains(&limit) {
+                limit = 10;
+            }
+            super::http::query(org, sql, time, limit).await?;
+        }
+        "test" => {
+            let command = command.subcommand();
+            match command {
+                Some(("file_list", args)) => {
+                    let mode = args.get_one::<String>("mode").unwrap();
+                    let stream = args.get_one::<String>("stream").unwrap();
+                    let hour = args.get_one::<String>("hour").unwrap();
+                    let group_size = args.get_one::<String>("group_size").unwrap();
+                    super::test::file_list(mode, stream, hour, group_size).await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupported sub command: {name}"));
+                }
+            }
+        }
+        "parse-id" => {
+            let id = command.get_one::<String>("id").unwrap();
+            println!("id: {}", id);
+            let id = id.parse::<i64>().unwrap();
+            let ts = config::ider::to_timestamp_millis(id);
+            println!("timestamp: {}", ts);
+            let t = chrono::Utc.timestamp_nanos(ts * 1_000_000);
+            let td = t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            println!("datetimes: {}", td);
+        }
+        "consistent-hash" => {
+            let files = command
+                .get_many::<String>("file")
+                .unwrap()
+                .collect::<Vec<_>>();
+            let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
+            super::http::consistent_hash(files).await?;
+        }
+        "upgrade-db" => {
+            crate::migration::init_db().await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

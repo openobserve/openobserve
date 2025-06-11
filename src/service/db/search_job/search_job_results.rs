@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use infra::{errors, table::entity::search_job_results::Model as JobResult};
 #[cfg(feature = "enterprise")]
 use {
     infra::table::search_job::search_job_results::JobResultOperator,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::super_cluster,
 };
 

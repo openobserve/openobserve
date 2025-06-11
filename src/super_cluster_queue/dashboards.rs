@@ -27,9 +27,19 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
         DashboardMessage::Put {
             org_id,
             folder_id,
+            new_folder_id,
             dashboard,
+            ..
         } => {
-            table::dashboards::put(&org_id, &folder_id, dashboard).await?;
+            // `clone` is always true for super cluster
+            table::dashboards::put(
+                &org_id,
+                &folder_id,
+                new_folder_id.as_deref(),
+                dashboard,
+                true,
+            )
+            .await?;
         }
         DashboardMessage::Delete {
             org_id,
@@ -74,6 +84,11 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
         } => {
             table::timed_annotation_panels::delete_many_panels(&timed_annotation_id, panels)
                 .await?;
+        }
+        _ => {
+            // Temporarily do catch-all message handling so that we can add new message types to
+            // o2_enterprise without breaking the build.
+            log::warn!("Unsupported dashboard super cluster message: {:?}", msg);
         }
     };
     Ok(())

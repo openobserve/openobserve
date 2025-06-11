@@ -21,6 +21,7 @@ use arrow_schema::{DataType, Field};
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
+    FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
@@ -37,26 +38,26 @@ use config::{
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
     },
-    FILE_EXT_PARQUET,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
     dist_lock, file_list as infra_file_list,
     schema::{
-        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-        SchemaCache,
+        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_created_at,
+        unwrap_stream_settings,
     },
     storage,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use tokio::{
-    sync::{mpsc, Semaphore},
+    sync::{Semaphore, mpsc},
     task::JoinHandle,
 };
 
+use super::worker::{MergeBatch, MergeSender};
 use crate::{
     common::infra::cluster::get_node_by_uuid,
     job::files::parquet::{create_tantivy_index, generate_index_on_compactor},
@@ -64,29 +65,11 @@ use crate::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
         search::{
-            datafusion::exec::{self, MergeParquetResult},
             DATAFUSION_RUNTIME,
+            datafusion::exec::{self, MergeParquetResult},
         },
-        stream,
     },
 };
-
-#[derive(Clone)]
-pub struct MergeBatch {
-    pub batch_id: usize,
-    pub org_id: String,
-    pub stream_type: StreamType,
-    pub stream_name: String,
-    pub prefix: String,
-    pub files: Vec<FileKey>,
-}
-
-pub struct MergeResult {
-    pub batch_id: usize,
-    pub new_file: FileKey,
-}
-
-pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>), anyhow::Error>>;
 
 /// Generate merging job by stream
 /// 1. get offset from db
@@ -129,11 +112,10 @@ pub async fn generate_job_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = stream::stream_created(&schema).unwrap_or_default();
-    if offset == 0 {
+    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
+    if offset == 0 && stream_created > 0 {
         offset = stream_created
-    }
-    if offset == 0 {
+    } else if offset == 0 {
         return Ok(()); // no data
     }
 
@@ -181,7 +163,7 @@ pub async fn generate_job_by_stream(
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMPACT] add file_list_jobs failed: {}",
+            "[COMPACTOR] add file_list_jobs failed: {}",
             e
         ));
     }
@@ -298,7 +280,7 @@ pub async fn generate_old_data_job_by_stream(
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
-                "[COMPACT] add file_list_jobs for old data failed: {}",
+                "[COMPACTOR] add file_list_jobs for old data failed: {}",
                 e
             ));
         }
@@ -356,7 +338,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    let stream_created = unwrap_stream_created_at(&schema).unwrap_or_default();
     if offset == 0 {
         offset = stream_created
     }
@@ -450,7 +432,7 @@ pub async fn merge_by_stream(
     if schema == Schema::empty() {
         // the stream was deleted, mark the job as done
         if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-            log::error!("[COMPACT] set_job_done failed: {e}");
+            log::error!("[COMPACTOR] set_job_done failed: {e}");
         }
         return Ok(());
     }
@@ -480,9 +462,10 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files = file_list::query_by_date(org_id, stream_name, stream_type, &date_start, &date_end)
-        .await
-        .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+    let files =
+        file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
+            .await
+            .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
@@ -497,7 +480,7 @@ pub async fn merge_by_stream(
     if files.is_empty() {
         // update job status
         if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-            log::error!("[COMPACT] set_job_done failed: {e}");
+            log::error!("[COMPACTOR] set_job_done failed: {e}");
         }
         return Ok(());
     }
@@ -505,6 +488,10 @@ pub async fn merge_by_stream(
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
+        // skip the files which already reach the max_file_size * 95%
+        if file.meta.original_size > cfg.compact.max_file_size as i64 * 95 / 100 {
+            continue;
+        }
         let file_name = file.key.clone();
         let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
@@ -514,7 +501,7 @@ pub async fn merge_by_stream(
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
-    for (prefix, files_with_size) in partition_files_with_size.into_iter() {
+    for (prefix, mut files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -522,7 +509,6 @@ pub async fn merge_by_stream(
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
-            let mut files_with_size = files_with_size.to_owned();
             let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
             match job_strategy {
                 MergeStrategy::FileSize => {
@@ -530,6 +516,9 @@ pub async fn merge_by_stream(
                 }
                 MergeStrategy::FileTime => {
                     files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+                }
+                MergeStrategy::TimeRange => {
+                    files_with_size = sort_by_time_range(files_with_size);
                 }
             }
 
@@ -563,7 +552,10 @@ pub async fn merge_by_stream(
                 let mut new_file_list = Vec::new();
                 let mut new_file_size = 0;
                 for file in files_with_size.iter() {
-                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
+                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
+                        || (cfg.compact.max_group_files > 0
+                            && new_file_list.len() >= cfg.compact.max_group_files)
+                    {
                         if new_file_list.len() <= 1 {
                             if job_strategy == MergeStrategy::FileSize {
                                 break;
@@ -607,7 +599,7 @@ pub async fn merge_by_stream(
             let (inner_tx, mut inner_rx) = mpsc::channel(batch_group_len);
             for batch in batch_groups.iter() {
                 if let Err(e) = worker_tx.send((inner_tx.clone(), batch.clone())).await {
-                    log::error!("[COMPACT] send batch to worker failed: {}", e);
+                    log::error!("[COMPACTOR] send batch to worker failed: {}", e);
                     return Err(anyhow::Error::msg("send batch to worker failed"));
                 }
             }
@@ -623,7 +615,7 @@ pub async fn merge_by_stream(
                 let (batch_id, new_files) = match ret {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!("[COMPACT] merge files failed: {}", e);
+                        log::error!("[COMPACTOR] merge files failed: {}", e);
                         last_error = Some(e);
                         continue;
                     }
@@ -631,7 +623,7 @@ pub async fn merge_by_stream(
 
                 if check_guard.contains(&batch_id) {
                     log::warn!(
-                        "[COMPACT] merge files for stream: [{}/{}/{}] found error files, batch_id: {} duplicate",
+                        "[COMPACTOR] merge files for stream: [{}/{}/{}] found error files, batch_id: {} duplicate",
                         org_id,
                         stream_type,
                         stream_name,
@@ -645,30 +637,23 @@ pub async fn merge_by_stream(
                 let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
                 let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
                 for new_file in new_files {
-                    if new_file.key.is_empty() {
-                        continue;
+                    if !new_file.key.is_empty() {
+                        events.push(new_file);
                     }
-                    events.push(FileKey {
-                        key: new_file.key,
-                        meta: new_file.meta,
-                        deleted: false,
-                        segment_ids: None,
-                    });
                 }
 
                 for file in delete_file_list {
                     events.push(FileKey {
-                        key: file.key.clone(),
-                        meta: file.meta.clone(),
                         deleted: true,
                         segment_ids: None,
+                        ..file.clone()
                     });
                 }
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
                 if let Err(e) = write_file_list(&org_id, &events).await {
-                    log::error!("[COMPACT] write file list failed: {}", e);
+                    log::error!("[COMPACTOR] write file list failed: {}", e);
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
@@ -688,7 +673,7 @@ pub async fn merge_by_stream(
 
     // update job status
     if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
-        log::error!("[COMPACT] set_job_done failed: {e}");
+        log::error!("[COMPACTOR] set_job_done failed: {e}");
     }
 
     // metrics
@@ -700,7 +685,17 @@ pub async fn merge_by_stream(
     Ok(())
 }
 
-/// merge small files into big file, upload to storage, returns the big file key and merged files
+// merge small files into big file, upload to storage, returns the big file key and merged files
+// params:
+// - thread_id: the id of the thread
+// - org_id: the id of the organization
+// - stream_type: the type of the stream
+// - stream_name: the name of the stream
+// - prefix: the prefix of the files
+// - files_with_size: the files to merge
+// returns:
+// - new_files: the files that are merged
+// - retain_file_list: the files that are not merged
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
@@ -708,7 +703,8 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
-) -> Result<(Vec<String>, Vec<FileMeta>, Vec<FileKey>), anyhow::Error> {
+) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
+    let start = std::time::Instant::now();
     #[cfg(feature = "enterprise")]
     let is_match_downsampling_rule = get_largest_downsampling_rule(
         stream_name,
@@ -720,7 +716,7 @@ pub async fn merge_files(
     let is_match_downsampling_rule = false;
 
     if files_with_size.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new()));
     }
 
     let mut new_file_size = 0;
@@ -748,25 +744,39 @@ pub async fn merge_files(
     }
     // no files need to merge
     if new_file_list.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), Vec::new()));
+        return Ok((Vec::new(), Vec::new()));
     }
 
     let retain_file_list = new_file_list.clone();
 
     // cache parquet files
     let deleted_files = cache_remote_files(&new_file_list).await?;
+    log::info!(
+        "[COMPACTOR:WORKER:{thread_id}] download {} parquet files, took: {} ms",
+        new_file_list.len(),
+        start.elapsed().as_millis()
+    );
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
     if new_file_list.len() <= 1 && !is_match_downsampling_rule {
-        return Ok((Vec::new(), Vec::new(), retain_file_list));
+        return Ok((Vec::new(), retain_file_list));
     }
 
-    // get time range for these files
-    let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
-    let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
-    let total_records = new_file_list.iter().map(|f| f.meta.records).sum();
-    let new_file_size = new_file_list.iter().map(|f| f.meta.original_size).sum();
+    // get time range and stats for these files in a single iteration
+    let (min_ts, max_ts, total_records, new_file_size) = new_file_list.iter().fold(
+        (i64::MAX, i64::MIN, 0, 0),
+        |(min_ts, max_ts, records, size), file| {
+            (
+                min_ts.min(file.meta.min_ts),
+                max_ts.max(file.meta.max_ts),
+                records + file.meta.records,
+                size + file.meta.original_size,
+            )
+        },
+    );
+    let min_ts = if min_ts == i64::MAX { 0 } else { min_ts };
+    let max_ts = if max_ts == i64::MIN { 0 } else { max_ts };
     let mut new_file_meta = FileMeta {
         min_ts,
         max_ts,
@@ -786,19 +796,24 @@ pub async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let (defined_schema_fields, need_original) = match stream_settings {
-        Some(s) => (
-            s.defined_schema_fields.unwrap_or_default(),
-            s.store_original_data,
-        ),
-        None => (Vec::new(), false),
-    };
+    let (defined_schema_fields, need_original, index_original_data, index_all_values) =
+        match stream_settings {
+            Some(s) => (
+                s.defined_schema_fields.unwrap_or_default(),
+                s.store_original_data,
+                s.index_original_data,
+                s.index_all_values,
+            ),
+            None => (Vec::new(), false, false, false),
+        };
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema);
         let latest_schema = generate_schema_for_defined_schema_fields(
             &latest_schema,
             &defined_schema_fields,
             need_original,
+            index_original_data,
+            index_all_values,
         );
         latest_schema.schema().as_ref().clone()
     } else {
@@ -811,8 +826,11 @@ pub async fn merge_files(
     let mut fi = 0;
     for file in new_file_list.iter() {
         fi += 1;
-        log::info!("[COMPACT:{thread_id}:{fi}] merge small file: {}", &file.key);
-        let buf = file_data::get(&file.key, None).await?;
+        log::info!(
+            "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
+            &file.key
+        );
+        let buf = file_data::get(&file.account, &file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
@@ -860,6 +878,7 @@ pub async fn merge_files(
             None,
             None,
             vec![],
+            is_match_downsampling_rule,
         )
         .await
         {
@@ -877,7 +896,6 @@ pub async fn merge_files(
         tables.push(table);
     }
 
-    let start = std::time::Instant::now();
     let merge_result = {
         let stream_name = stream_name.to_string();
         let latest_schema = latest_schema.clone();
@@ -911,7 +929,7 @@ pub async fn merge_files(
                 files,
                 latest_schema
             );
-            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}",)).into());
+            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
         }
     };
 
@@ -933,8 +951,7 @@ pub async fn merge_files(
         );
     }
 
-    let mut new_file_keys = Vec::new();
-    let mut new_file_metas = Vec::new();
+    let mut new_files = Vec::new();
     match buf {
         MergeParquetResult::Single(buf) => {
             new_file_meta.compressed_size = buf.len() as i64;
@@ -947,7 +964,7 @@ pub async fn merge_files(
             let id = ider::generate();
             let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
             log::info!(
-                "[COMPACT:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
                 new_file_key,
                 new_file_meta.original_size,
@@ -957,7 +974,13 @@ pub async fn merge_files(
 
             // upload file to storage
             let buf = Bytes::from(buf);
-            storage::put(&new_file_key, buf.clone()).await?;
+            if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+                infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+                log::debug!("merge_files {new_file_key} file_data::disk::set success");
+            }
+
+            let account = storage::get_account(&new_file_key).unwrap_or_default();
+            storage::put(&account, &new_file_key, buf.clone()).await?;
 
             if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                 // generate inverted index
@@ -974,8 +997,7 @@ pub async fn merge_files(
                 )
                 .await?;
             }
-            new_file_keys.push(new_file_key);
-            new_file_metas.push(new_file_meta);
+            new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
         }
         MergeParquetResult::Multiple { bufs, file_metas } => {
             for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
@@ -992,7 +1014,14 @@ pub async fn merge_files(
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
-                storage::put(&new_file_key, buf.clone()).await?;
+                if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node
+                {
+                    infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
+                    log::debug!("merge_files {new_file_key} file_data::disk::set success");
+                }
+
+                let account = storage::get_account(&new_file_key).unwrap_or_default();
+                storage::put(&account, &new_file_key, buf.clone()).await?;
 
                 if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                     // generate inverted index
@@ -1010,21 +1039,23 @@ pub async fn merge_files(
                     .await?;
                 }
 
-                new_file_keys.push(new_file_key);
-                new_file_metas.push(new_file_meta);
+                new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
             }
             log::info!(
-                "[COMPACT:{thread_id}] merge file successfully, {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
-                new_file_keys,
-                new_file_metas.iter().map(|m| m.original_size).sum::<i64>(),
-                new_file_metas.iter().map(|m| m.compressed_size).sum::<i64>(),
+                new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
+                new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
+                new_files
+                    .iter()
+                    .map(|f| f.meta.compressed_size)
+                    .sum::<i64>(),
                 start.elapsed().as_millis(),
             );
         }
     };
 
-    Ok((new_file_keys, new_file_metas, retain_file_list))
+    Ok((new_files, retain_file_list))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1042,6 +1073,7 @@ async fn generate_inverted_index(
     let cfg = get_config();
 
     // generate parquet format inverted index
+    #[allow(deprecated)]
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
         index_format,
@@ -1068,7 +1100,7 @@ async fn generate_inverted_index(
                 retain_file_list
             )
         })?;
-        for (file_name, filemeta) in files {
+        for (account, file_name, filemeta) in files {
             if file_name.is_empty() {
                 continue;
             }
@@ -1080,6 +1112,8 @@ async fn generate_inverted_index(
             if let Err(e) = write_file_list(
                 org_id,
                 &[FileKey {
+                    id: 0,
+                    account,
                     key: file_name.clone(),
                     meta: filemeta,
                     deleted: false,
@@ -1102,14 +1136,14 @@ async fn generate_inverted_index(
         index_format,
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
-        let (schema, mut reader) = get_recordbatch_reader_from_bytes(buf).await?;
+        let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
         let index_size =  create_tantivy_index(
                 "COMPACTOR",
                 new_file_key,
                 full_text_search_fields,
                 index_fields,
                 schema,
-                &mut reader,
+                reader,
             )
             .await.map_err(|e| {
                 anyhow::anyhow!(
@@ -1129,15 +1163,11 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         return Ok(());
     }
 
-    let put_items = events
-        .iter()
-        .filter(|v| !v.deleted)
-        .map(|v| v.to_owned())
-        .collect::<Vec<_>>();
     let del_items = events
         .iter()
         .filter(|v| v.deleted)
         .map(|v| FileListDeleted {
+            account: v.account.clone(),
             file: v.key.clone(),
             index_file: v.meta.index_size > 0,
             flattened: v.meta.flattened,
@@ -1149,42 +1179,46 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     let mut success = false;
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
-        if !del_items.is_empty() {
-            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
-            {
-                log::error!("[COMPACT] batch_add_deleted to db failed, retrying: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-        }
-        if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACT] batch_add to db failed, retrying: {}", e);
+        if let Err(e) = infra_file_list::batch_process(events).await {
+            log::error!("[COMPACTOR] batch_process to db failed, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
         if !del_items.is_empty() {
-            let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-            if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
+            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
+            {
+                log::error!(
+                    "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
+                    e
+                );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
-        };
-        // send broadcast to other nodes
-        if get_config().memory_cache.cache_latest_files {
-            if let Err(e) = db::file_list::broadcast::send(events, None).await {
-                log::error!("[COMPACT] send broadcast for file_list failed: {}", e);
-            }
         }
-        // broadcast success
         success = true;
         break;
     }
-    if !success {
-        Err(anyhow::anyhow!("batch_write to db failed"))
+
+    if success {
+        // send broadcast to other nodes
+        if get_config().cache_latest_files.enabled {
+            // get id for all the new files
+            let file_ids = infra_file_list::query_ids_by_files(events).await?;
+            let mut events = events.to_vec();
+            for event in events.iter_mut() {
+                if let Some(id) = file_ids.get(&event.key) {
+                    event.id = *id;
+                }
+            }
+            if let Err(e) = db::file_list::broadcast::send(&events).await {
+                log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
+            }
+        }
     } else {
-        Ok(())
+        return Err(anyhow::anyhow!("batch_write to db failed"));
     }
+
+    Ok(())
 }
 
 pub fn generate_inverted_idx_recordbatch(
@@ -1205,7 +1239,7 @@ pub fn generate_inverted_idx_recordbatch(
         .map(|f| f.name())
         .collect::<HashSet<_>>();
 
-    let mut inverted_idx_columns = if !full_text_search_fields.is_empty() {
+    let mut inverted_idx_columns: Vec<String> = if !full_text_search_fields.is_empty() {
         full_text_search_fields.to_vec()
     } else {
         config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
@@ -1218,8 +1252,8 @@ pub fn generate_inverted_idx_recordbatch(
         return Ok(None);
     }
     // add _timestamp column to columns_to_index
-    if !inverted_idx_columns.contains(&cfg.common.column_timestamp) {
-        inverted_idx_columns.push(cfg.common.column_timestamp.to_string());
+    if !inverted_idx_columns.contains(&TIMESTAMP_COL_NAME.to_string()) {
+        inverted_idx_columns.push(TIMESTAMP_COL_NAME.to_string());
     }
 
     let mut inverted_idx_batches = Vec::with_capacity(batches.len());
@@ -1258,7 +1292,7 @@ pub fn generate_inverted_idx_recordbatch(
 
         if matches!(
             new_batch.schema().fields().len(),
-            0 | 1 if new_batch.schema().field(0).name() == &cfg.common.column_timestamp
+            0 | 1 if new_batch.schema().field(0).name() == TIMESTAMP_COL_NAME
         ) {
             Ok(None)
         } else {
@@ -1280,39 +1314,66 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
+        let file_account = file.account.to_string();
         let file_name = file.key.to_string();
+        let file_size = file.meta.compressed_size as usize;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download("", &file_name).await.err()
+                file_data::disk::download(&file_account, &file_name, Some(file_size)).await
             } else {
-                None
+                Ok(0)
             };
             // In case where the parquet file is not found or has no data, we assume that it
             // must have been deleted by some external entity, and hence we
             // should remove the entry from file_list table.
-            let file_name = if let Some(e) = ret {
-                if e.to_string().to_lowercase().contains("not found")
-                    || e.to_string().to_lowercase().contains("data size is zero")
-                {
-                    // delete file from file list
-                    log::error!("found invalid file: {}", file_name);
-                    if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("[COMPACT] delete from file_list err: {}", e);
+            let file_name = match ret {
+                Ok(data_len) => {
+                    if data_len > 0 && data_len != file_size {
+                        log::warn!(
+                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will skip it",
+                            file_name,
+                            file_size,
+                            data_len,
+                        );
+                        // update database
+                        // if let Err(e) =
+                        //     file_list::update_compressed_size(&file_name, data_len as i64).await
+                        // {
+                        //     log::error!(
+                        //         "[COMPACT] update file size for file {} err: {}",
+                        //         file_name,
+                        //         e
+                        //     );
+                        // }
+                        // skip this file for compact
+                        Some(file_name)
+                    } else {
+                        None
                     }
-                    Some(file_name)
-                } else {
-                    log::warn!(
-                        "[COMPACT] download file to cache err: {}, file: {}",
-                        e,
-                        file_name
-                    );
-                    // remove downloaded file
-                    let _ = file_data::disk::remove("", &file_name).await;
-                    None
                 }
-            } else {
-                None
+                Err(e) => {
+                    if e.to_string().to_lowercase().contains("not found")
+                        || e.to_string().to_lowercase().contains("data size is zero")
+                    {
+                        // delete file from file list
+                        log::error!(
+                            "[COMPACT] found invalid file: {}, will delete it",
+                            file_name
+                        );
+                        if let Err(e) =
+                            file_list::delete_parquet_file(&file_account, &file_name, true).await
+                        {
+                            log::error!("[COMPACT] delete from file_list err: {}", e);
+                        }
+                        Some(file_name)
+                    } else {
+                        log::error!("[COMPACT] download file to cache err: {}", e);
+                        // remove downloaded file
+                        let _ = file_data::disk::remove(&file_name).await;
+                        None
+                    }
+                }
             };
             drop(permit);
             file_name
@@ -1329,7 +1390,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                 }
             }
             Err(e) => {
-                log::error!("[COMPACT] load file task err: {}", e);
+                log::error!("[COMPACTOR] load file task err: {}", e);
             }
         }
     }
@@ -1354,4 +1415,543 @@ fn generate_schema_diff(
     }
 
     Ok(diff_fields)
+}
+
+/// sort by time range without overlapping
+fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
+    let files_num = file_list.len();
+    file_list.sort_by_key(|f| f.meta.min_ts);
+    let mut groups: Vec<Vec<FileKey>> = Vec::new();
+    for file in file_list {
+        let mut inserted = None;
+        for (i, group) in groups.iter().enumerate() {
+            if group
+                .last()
+                .map(|f| file.meta.min_ts >= f.meta.max_ts)
+                .unwrap_or(false)
+            {
+                inserted = Some(i);
+                break;
+            }
+        }
+        if let Some(i) = inserted {
+            groups[i].push(file);
+        } else {
+            groups.push(vec![file]);
+        }
+    }
+    let mut files = Vec::with_capacity(files_num);
+    for group in groups {
+        files.extend(group);
+    }
+    files
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::stream::{FileKey, FileMeta};
+    use hashbrown::HashMap;
+
+    use super::*;
+
+    // Helper function to create test FileKey
+    fn create_file_key(key: &str, min_ts: i64, max_ts: i64, original_size: i64) -> FileKey {
+        FileKey {
+            id: 0,
+            account: "test_account".to_string(),
+            key: key.to_string(),
+            meta: FileMeta {
+                min_ts,
+                max_ts,
+                records: 100,
+                original_size,
+                compressed_size: original_size / 2, // assume 50% compression
+                index_size: 0,
+                flattened: false,
+            },
+            deleted: false,
+            segment_ids: None,
+        }
+    }
+
+    #[test]
+    fn test_sort_by_time_range_edge_case_adjacent_files() {
+        let files = vec![
+            create_file_key("file1.parquet", 1000, 2000, 1024),
+            create_file_key("file2.parquet", 2000, 3000, 1024), // exactly adjacent
+            create_file_key("file3.parquet", 3000, 4000, 1024), // exactly adjacent
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+
+        // Adjacent files should be able to be in the same group
+        assert_eq!(result[0].key, "file1.parquet");
+        assert_eq!(result[1].key, "file2.parquet");
+        assert_eq!(result[2].key, "file3.parquet");
+    }
+
+    // Test helper function creation
+    #[test]
+    fn test_create_file_key_helper() {
+        let file_key = create_file_key("test.parquet", 1000, 2000, 1024);
+        assert_eq!(file_key.key, "test.parquet");
+        assert_eq!(file_key.meta.min_ts, 1000);
+        assert_eq!(file_key.meta.max_ts, 2000);
+        assert_eq!(file_key.meta.original_size, 1024);
+        assert_eq!(file_key.meta.compressed_size, 512); // 50% compression
+        assert_eq!(file_key.meta.records, 100);
+        assert!(!file_key.meta.flattened);
+        assert_eq!(file_key.id, 0);
+        assert_eq!(file_key.account, "test_account");
+        assert!(!file_key.deleted);
+        assert!(file_key.segment_ids.is_none());
+    }
+
+    // Boundary tests for sort_by_time_range
+    #[test]
+    fn test_sort_by_time_range_negative_timestamps() {
+        let files = vec![
+            create_file_key("file1.parquet", -2000, -1000, 1024),
+            create_file_key("file2.parquet", -1000, 0, 1024),
+            create_file_key("file3.parquet", 0, 1000, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].key, "file1.parquet");
+        assert_eq!(result[1].key, "file2.parquet");
+        assert_eq!(result[2].key, "file3.parquet");
+    }
+
+    #[test]
+    fn test_sort_by_time_range_large_timestamps() {
+        let files = vec![
+            create_file_key("file1.parquet", i64::MAX - 2000, i64::MAX - 1000, 1024),
+            create_file_key("file2.parquet", i64::MAX - 1000, i64::MAX, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].key, "file1.parquet");
+        assert_eq!(result[1].key, "file2.parquet");
+    }
+
+    // Edge case where min_ts equals max_ts (point in time)
+    #[test]
+    fn test_sort_by_time_range_point_in_time() {
+        let files = vec![
+            create_file_key("file1.parquet", 1000, 1000, 1024), // Point in time
+            create_file_key("file2.parquet", 1000, 2000, 1024), // Overlaps with file1
+            create_file_key("file3.parquet", 2000, 2000, 1024), // Point in time, adjacent
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+
+        // Verify all files are present
+        let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
+        assert!(keys.contains(&&"file1.parquet".to_string()));
+        assert!(keys.contains(&&"file2.parquet".to_string()));
+        assert!(keys.contains(&&"file3.parquet".to_string()));
+    }
+
+    #[test]
+    fn test_sort_by_time_range_many_files_random_order() {
+        let files = vec![
+            create_file_key("file_f.parquet", 6000, 7000, 1024),
+            create_file_key("file_b.parquet", 2000, 3000, 1024),
+            create_file_key("file_d.parquet", 4000, 5000, 1024),
+            create_file_key("file_a.parquet", 1000, 2000, 1024),
+            create_file_key("file_c.parquet", 3000, 4000, 1024),
+            create_file_key("file_e.parquet", 5000, 6000, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 6);
+
+        // Should be sorted by min_ts (all adjacent files)
+        assert_eq!(result[0].key, "file_a.parquet");
+        assert_eq!(result[1].key, "file_b.parquet");
+        assert_eq!(result[2].key, "file_c.parquet");
+        assert_eq!(result[3].key, "file_d.parquet");
+        assert_eq!(result[4].key, "file_e.parquet");
+        assert_eq!(result[5].key, "file_f.parquet");
+    }
+
+    #[test]
+    fn test_sort_by_time_range_gaps_between_files() {
+        let files = vec![
+            create_file_key("file1.parquet", 1000, 2000, 1024),
+            create_file_key("file2.parquet", 5000, 6000, 1024), // gap after file1
+            create_file_key("file3.parquet", 3000, 4000, 1024), // fits in gap
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+
+        // Should be sorted by min_ts
+        assert_eq!(result[0].key, "file1.parquet");
+        assert_eq!(result[1].key, "file3.parquet");
+        assert_eq!(result[2].key, "file2.parquet");
+    }
+
+    #[test]
+    fn test_sort_by_time_range_empty_list() {
+        let files = vec![];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_sort_by_time_range_single_file() {
+        let files = vec![create_file_key("file1.parquet", 1000, 2000, 1024)];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].key, "file1.parquet");
+        assert_eq!(result[0].meta.min_ts, 1000);
+        assert_eq!(result[0].meta.max_ts, 2000);
+    }
+
+    #[test]
+    fn test_sort_by_time_range_already_sorted_non_overlapping() {
+        let files = vec![
+            create_file_key("file1.parquet", 1000, 2000, 1024),
+            create_file_key("file2.parquet", 2000, 3000, 1024),
+            create_file_key("file3.parquet", 3000, 4000, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].key, "file1.parquet");
+        assert_eq!(result[1].key, "file2.parquet");
+        assert_eq!(result[2].key, "file3.parquet");
+    }
+
+    #[test]
+    fn test_sort_by_time_range_unsorted_non_overlapping() {
+        let files = vec![
+            create_file_key("file3.parquet", 3000, 4000, 1024),
+            create_file_key("file1.parquet", 1000, 2000, 1024),
+            create_file_key("file2.parquet", 2000, 3000, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+        // Should be sorted by min_ts
+        assert_eq!(result[0].key, "file1.parquet");
+        assert_eq!(result[1].key, "file2.parquet");
+        assert_eq!(result[2].key, "file3.parquet");
+    }
+
+    #[test]
+    fn test_sort_by_time_range_overlapping_files() {
+        let files = vec![
+            create_file_key("file1.parquet", 1000, 2500, 1024), // overlaps with file2
+            create_file_key("file2.parquet", 2000, 3000, 1024), // overlaps with file1
+            create_file_key("file3.parquet", 3500, 4000, 1024), // non-overlapping
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+
+        // First file should be file1 (min_ts = 1000)
+        assert_eq!(result[0].key, "file1.parquet");
+
+        // Due to overlapping, file3 should come next (can fit in same group as file1)
+        // file2 would be in a separate group since it overlaps with file1
+        let mut found_file2 = false;
+        let mut found_file3 = false;
+        for file in &result {
+            if file.key == "file2.parquet" {
+                found_file2 = true;
+            }
+            if file.key == "file3.parquet" {
+                found_file3 = true;
+            }
+        }
+        assert!(found_file2);
+        assert!(found_file3);
+    }
+
+    #[test]
+    fn test_sort_by_time_range_complex_overlapping() {
+        let files = vec![
+            create_file_key("file1.parquet", 1000, 1500, 1024),
+            create_file_key("file2.parquet", 1200, 1800, 1024), // overlaps with file1
+            create_file_key("file3.parquet", 1600, 2000, 1024), // overlaps with file2
+            create_file_key("file4.parquet", 2000, 2500, 1024), // adjacent to file3
+            create_file_key("file5.parquet", 3000, 3500, 1024), // separate group
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 5);
+
+        // Verify all files are present
+        let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
+        assert!(keys.contains(&&"file1.parquet".to_string()));
+        assert!(keys.contains(&&"file2.parquet".to_string()));
+        assert!(keys.contains(&&"file3.parquet".to_string()));
+        assert!(keys.contains(&&"file4.parquet".to_string()));
+        assert!(keys.contains(&&"file5.parquet".to_string()));
+    }
+
+    #[test]
+    fn test_sort_by_time_range_identical_timestamps() {
+        let files = vec![
+            create_file_key("file1.parquet", 1000, 2000, 1024),
+            create_file_key("file2.parquet", 1000, 2000, 512),
+            create_file_key("file3.parquet", 1000, 2000, 2048),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 3);
+
+        // All files have same timestamp, so they should all be in separate groups
+        // due to overlap, but ordering should be maintained based on original order after sorting
+        let keys: Vec<&String> = result.iter().map(|f| &f.key).collect();
+        assert_eq!(keys.len(), 3);
+        assert!(keys.contains(&&"file1.parquet".to_string()));
+        assert!(keys.contains(&&"file2.parquet".to_string()));
+        assert!(keys.contains(&&"file3.parquet".to_string()));
+    }
+
+    // Test cases for generate_schema_diff function
+    #[test]
+    fn test_generate_schema_diff_no_differences() {
+        // Create a schema with fields
+        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
+        let field2 = Arc::new(Field::new("field2", DataType::Int64, false));
+        let schema = Schema::new(vec![field1.clone(), field2.clone()]);
+
+        // Create latest schema map with same types
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(field1.name(), &field1);
+        latest_schema_map.insert(field2.name(), &field2);
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_generate_schema_diff_with_type_differences() {
+        // Create original schema
+        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
+        let field2 = Arc::new(Field::new("field2", DataType::Int32, false));
+        let schema = Schema::new(vec![field1.clone(), field2.clone()]);
+
+        // Create latest schema with different types
+        let latest_field1 = Arc::new(Field::new("field1", DataType::Utf8, true)); // Same type
+        let latest_field2 = Arc::new(Field::new("field2", DataType::Int64, false)); // Different type
+
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(latest_field1.name(), &latest_field1);
+        latest_schema_map.insert(latest_field2.name(), &latest_field2);
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+
+        assert_eq!(diff.len(), 1);
+        assert!(diff.contains_key("field2"));
+        assert_eq!(diff.get("field2").unwrap(), &DataType::Int64);
+    }
+
+    #[test]
+    fn test_generate_schema_diff_multiple_type_differences() {
+        // Create original schema
+        let field1 = Arc::new(Field::new("field1", DataType::Int32, true));
+        let field2 = Arc::new(Field::new("field2", DataType::Float32, false));
+        let field3 = Arc::new(Field::new("field3", DataType::Boolean, true));
+        let schema = Schema::new(vec![field1.clone(), field2.clone(), field3.clone()]);
+
+        // Create latest schema with different types
+        let latest_field1 = Arc::new(Field::new("field1", DataType::Int64, true)); // Different
+        let latest_field2 = Arc::new(Field::new("field2", DataType::Float64, false)); // Different
+        let latest_field3 = Arc::new(Field::new("field3", DataType::Boolean, true)); // Same
+
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(latest_field1.name(), &latest_field1);
+        latest_schema_map.insert(latest_field2.name(), &latest_field2);
+        latest_schema_map.insert(latest_field3.name(), &latest_field3);
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+
+        assert_eq!(diff.len(), 2);
+        assert!(diff.contains_key("field1"));
+        assert!(diff.contains_key("field2"));
+        assert!(!diff.contains_key("field3")); // Same type, should not be in diff
+        assert_eq!(diff.get("field1").unwrap(), &DataType::Int64);
+        assert_eq!(diff.get("field2").unwrap(), &DataType::Float64);
+    }
+
+    #[test]
+    fn test_generate_schema_diff_field_missing_in_latest() {
+        // Create original schema
+        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
+        let field2 = Arc::new(Field::new("field2", DataType::Int64, false));
+        let schema = Schema::new(vec![field1.clone(), field2.clone()]);
+
+        // Create latest schema map missing field2
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(field1.name(), &field1);
+        // field2 is missing from latest_schema_map
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+
+        // Should be empty since field2 is not found in latest_schema_map
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_generate_schema_diff_empty_schema() {
+        let schema = Schema::empty();
+        let latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_generate_schema_diff_empty_latest_schema_map() {
+        let field1 = Arc::new(Field::new("field1", DataType::Utf8, true));
+        let schema = Schema::new(vec![field1]);
+        let latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+        assert!(diff.is_empty()); // No fields in latest_schema_map to compare against
+    }
+
+    #[test]
+    fn test_generate_schema_diff_complex_data_types() {
+        // Test with complex data types like List, Struct, etc.
+        let list_field = Arc::new(Field::new(
+            "list_field",
+            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
+            true,
+        ));
+        let timestamp_field = Arc::new(Field::new(
+            "timestamp_field",
+            DataType::Timestamp(arrow_schema::TimeUnit::Microsecond, None),
+            false,
+        ));
+        let schema = Schema::new(vec![list_field.clone(), timestamp_field.clone()]);
+
+        // Create latest schema with different complex types
+        let latest_list_field = Arc::new(Field::new(
+            "list_field",
+            DataType::List(Arc::new(Field::new("item", DataType::Int64, true))), /* Different inner type */
+            true,
+        ));
+        let latest_timestamp_field = Arc::new(Field::new(
+            "timestamp_field",
+            DataType::Timestamp(arrow_schema::TimeUnit::Nanosecond, None), // Different time unit
+            false,
+        ));
+
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(latest_list_field.name(), &latest_list_field);
+        latest_schema_map.insert(latest_timestamp_field.name(), &latest_timestamp_field);
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+
+        assert_eq!(diff.len(), 2);
+        assert!(diff.contains_key("list_field"));
+        assert!(diff.contains_key("timestamp_field"));
+    }
+
+    #[test]
+    fn test_generate_schema_diff_nullable_differences() {
+        // Test that nullable differences are detected when data types are same
+        let field1 = Arc::new(Field::new("field1", DataType::Utf8, false)); // Not nullable
+        let schema = Schema::new(vec![field1.clone()]);
+
+        let latest_field1 = Arc::new(Field::new("field1", DataType::Utf8, true)); // Nullable
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(latest_field1.name(), &latest_field1);
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+
+        // Note: This test verifies current behavior - the function only compares data_type(),
+        // not the nullable property. If nullable differences should be detected,
+        // the function would need to be modified.
+        assert!(diff.is_empty()); // Current implementation doesn't detect nullable differences
+    }
+
+    #[test]
+    fn test_generate_schema_diff_mixed_scenario() {
+        // Create a realistic mixed scenario
+        let original_fields = vec![
+            Arc::new(Field::new("id", DataType::Int32, false)),
+            Arc::new(Field::new("name", DataType::Utf8, true)),
+            Arc::new(Field::new("score", DataType::Float32, true)),
+            Arc::new(Field::new("active", DataType::Boolean, false)),
+            Arc::new(Field::new("metadata", DataType::Utf8, true)),
+        ];
+        let schema = Schema::new(original_fields);
+
+        // Latest schema with some changes
+        let latest_id = Arc::new(Field::new("id", DataType::Int64, false)); // Changed type
+        let latest_name = Arc::new(Field::new("name", DataType::Utf8, true)); // Same
+        let latest_score = Arc::new(Field::new("score", DataType::Float64, true)); // Changed type
+        let latest_active = Arc::new(Field::new("active", DataType::Boolean, false)); // Same
+        // metadata field missing from latest schema
+
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(latest_id.name(), &latest_id);
+        latest_schema_map.insert(latest_name.name(), &latest_name);
+        latest_schema_map.insert(latest_score.name(), &latest_score);
+        latest_schema_map.insert(latest_active.name(), &latest_active);
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+
+        assert_eq!(diff.len(), 2);
+        assert!(diff.contains_key("id"));
+        assert!(diff.contains_key("score"));
+        assert!(!diff.contains_key("name")); // Same type
+        assert!(!diff.contains_key("active")); // Same type
+        assert!(!diff.contains_key("metadata")); // Missing from latest
+
+        assert_eq!(diff.get("id").unwrap(), &DataType::Int64);
+        assert_eq!(diff.get("score").unwrap(), &DataType::Float64);
+    }
+
+    #[test]
+    fn test_generate_schema_diff_decimal_types() {
+        // Test with decimal types that have precision and scale
+        let decimal_field = Arc::new(Field::new(
+            "decimal_field",
+            DataType::Decimal128(10, 2), // precision=10, scale=2
+            true,
+        ));
+        let schema = Schema::new(vec![decimal_field.clone()]);
+
+        let latest_decimal_field = Arc::new(Field::new(
+            "decimal_field",
+            DataType::Decimal128(12, 4), // Different precision and scale
+            true,
+        ));
+
+        let mut latest_schema_map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        latest_schema_map.insert(latest_decimal_field.name(), &latest_decimal_field);
+
+        let result = generate_schema_diff(&schema, &latest_schema_map);
+        assert!(result.is_ok());
+        let diff = result.unwrap();
+
+        assert_eq!(diff.len(), 1);
+        assert!(diff.contains_key("decimal_field"));
+        assert_eq!(
+            diff.get("decimal_field").unwrap(),
+            &DataType::Decimal128(12, 4)
+        );
+    }
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     catalog::Session,
-    common::{project_schema, Result},
+    common::{Result, project_schema},
     datasource::{TableProvider, TableType},
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,22 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::{cluster::CompactionJobType, stream::FileKey},
+    meta::{cluster::CompactionJobType, stream::ALL_STREAM_TYPES},
     metrics,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-use tokio::sync::{mpsc, Mutex};
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use tokio::sync::mpsc;
 
-use crate::service::compact::{
-    self,
-    merge::{MergeBatch, MergeSender},
-};
+use crate::service::compact;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
@@ -40,69 +35,22 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(cfg.limit.file_merge_thread_num * 2);
-    let rx = Arc::new(Mutex::new(rx));
-    // start merge workers
-    for thread_id in 0..cfg.limit.file_merge_thread_num {
-        let rx = rx.clone();
-        tokio::spawn(async move {
-            loop {
-                let ret = rx.lock().await.recv().await;
-                match ret {
-                    None => {
-                        log::debug!("[COMPACTOR:JOB] Receiving files channel is closed");
-                        break;
-                    }
-                    Some((tx, msg)) => {
-                        match compact::merge::merge_files(
-                            thread_id,
-                            &msg.org_id,
-                            msg.stream_type,
-                            &msg.stream_name,
-                            &msg.prefix,
-                            &msg.files,
-                        )
-                        .await
-                        {
-                            Ok((file, meta, _)) => {
-                                let mut new_file_keys = Vec::with_capacity(file.len());
-                                for (file, meta) in file.into_iter().zip(meta.into_iter()) {
-                                    new_file_keys.push(FileKey::new(file, meta, false));
-                                }
-                                if let Err(e) = tx.send(Ok((msg.batch_id, new_file_keys))).await {
-                                    log::error!(
-                                        "[COMPACTOR:JOB] Error sending file to merge_job: {}",
-                                        e
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "[COMPACTOR:JOB] Error merging files: stream: {}/{}/{}, err: {}",
-                                    msg.org_id,
-                                    msg.stream_type,
-                                    msg.stream_name,
-                                    e
-                                );
-                                if let Err(e) = tx.send(Err(e)).await {
-                                    log::error!(
-                                        "[COMPACTOR:JOB] Error sending error to merge_job: {}",
-                                        e
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
+    let mut worker = compact::worker::MergeWorker::new(cfg.limit.file_merge_thread_num);
+    if let Err(e) = worker.run() {
+        log::error!("[COMPACTOR::JOB] start merge worker error: {e}");
+    }
+
+    let mut scheduler =
+        compact::worker::JobScheduler::new(cfg.limit.file_merge_thread_num, worker.tx());
+    if let Err(e) = scheduler.run() {
+        log::error!("[COMPACTOR::JOB] start merge job scheduler error: {e}");
     }
 
     tokio::task::spawn(async move { run_generate_job().await });
     tokio::task::spawn(async move { run_generate_old_data_job().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { run_generate_downsampling_job().await });
-    tokio::task::spawn(async move { run_merge(tx).await });
+    tokio::task::spawn(async move { run_merge(scheduler.tx()).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });
     tokio::task::spawn(async move { run_sync_to_db().await });
@@ -119,20 +67,37 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
     let interval = get_config().compact.pending_jobs_metric_interval;
 
-    log::info!("[COMPACTOR] start run_compactor_pending_jobs_metric job");
+    log::info!("[COMPACTOR::JOB] start run_compactor_pending_jobs_metric job");
 
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
 
-        log::debug!("[COMPACTOR] Running compactor pending jobs to report metric");
+        log::debug!("[COMPACTOR::JOB] Running compactor pending jobs to report metric");
         let job_status = match infra::file_list::get_pending_jobs_count().await {
             Ok(status) => status,
             Err(e) => {
-                log::error!("[COMPACTOR] run compactor pending jobs metric error: {e}");
+                log::error!("[COMPACTOR::JOB] run compactor pending jobs metric error: {e}");
                 continue;
             }
         };
 
+        // reset all metrics
+        let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+        for org in orgs {
+            for stream_type in ALL_STREAM_TYPES {
+                if metrics::COMPACT_PENDING_JOBS
+                    .with_label_values(&[org.as_str(), stream_type.as_str()])
+                    .get()
+                    > 0
+                {
+                    metrics::COMPACT_PENDING_JOBS
+                        .with_label_values(&[org.as_str(), stream_type.as_str()])
+                        .set(0);
+                }
+            }
+        }
+
+        // set new metrics
         for (org, inner_map) in job_status {
             for (stream_type, counter) in inner_map {
                 metrics::COMPACT_PENDING_JOBS
@@ -150,9 +115,9 @@ async fn run_generate_job() -> Result<(), anyhow::Error> {
             get_config().compact.interval,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running generate merge job");
+        log::debug!("[COMPACTOR::JOB] Running generate merge job");
         if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
-            log::error!("[COMPACTOR] run generate merge job error: {e}");
+            log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");
         }
     }
 }
@@ -165,9 +130,9 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
             get_config().compact.old_data_interval + 1,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running generate merge job for old data");
+        log::debug!("[COMPACTOR::JOB] Running generate merge job for old data");
         if let Err(e) = compact::run_generate_job(CompactionJobType::Historical).await {
-            log::error!("[COMPACTOR] run generate merge job for old data error: {e}");
+            log::error!("[COMPACTOR::JOB] run generate merge job for old data error: {e}");
         }
     }
 }
@@ -187,23 +152,23 @@ async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
             get_o2_config().downsampling.downsampling_interval,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running generate downsampling job");
+        log::debug!("[COMPACTOR::JOB] Running generate downsampling job");
         if let Err(e) = compact::run_generate_downsampling_job().await {
-            log::error!("[COMPACTOR] run generate downsampling job error: {e}");
+            log::error!("[COMPACTOR::JOB] run generate downsampling job error: {e}");
         }
     }
 }
 
 /// Merge small files
-async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
+async fn run_merge(tx: mpsc::Sender<compact::worker::MergeJob>) -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().compact.interval + 2,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running data merge");
+        log::debug!("[COMPACTOR::JOB] Running data merge");
         if let Err(e) = compact::run_merge(tx.clone()).await {
-            log::error!("[COMPACTOR] run data merge error: {e}");
+            log::error!("[COMPACTOR::JOB] run data merge error: {e}");
         }
     }
 }
@@ -215,9 +180,9 @@ async fn run_retention() -> Result<(), anyhow::Error> {
             get_config().compact.interval + 3,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running data retention");
+        log::debug!("[COMPACTOR::JOB] Running data retention");
         if let Err(e) = compact::run_retention().await {
-            log::error!("[COMPACTOR] run data retention error: {e}");
+            log::error!("[COMPACTOR::JOB] run data retention error: {e}");
         }
     }
 }
@@ -229,9 +194,9 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
             get_config().compact.interval + 4,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running data delay deletion");
+        log::debug!("[COMPACTOR::JOB] Running data delay deletion");
         if let Err(e) = compact::run_delay_deletion().await {
-            log::error!("[COMPACTOR] run data delay deletion error: {e}");
+            log::error!("[COMPACTOR::JOB] run data delay deletion error: {e}");
         }
     }
 }
@@ -242,9 +207,9 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
             get_config().compact.sync_to_db_interval,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running sync cached compact offset to db");
+        log::debug!("[COMPACTOR::JOB] Running sync cached compact offset to db");
         if let Err(e) = crate::service::db::compact::files::sync_cache_to_db().await {
-            log::error!("[COMPACTOR] run sync cached compact offset to db error: {e}");
+            log::error!("[COMPACTOR::JOB] run sync cached compact offset to db error: {e}");
         }
     }
 }
@@ -263,9 +228,9 @@ async fn run_downsampling_sync_to_db() -> Result<(), anyhow::Error> {
             get_config().compact.sync_to_db_interval,
         ))
         .await;
-        log::debug!("[COMPACTOR] Running sync cached downsampling offset to db");
+        log::debug!("[COMPACTOR::JOB] Running sync cached downsampling offset to db");
         if let Err(e) = crate::service::db::compact::downsampling::sync_cache_to_db().await {
-            log::error!("[COMPACTOR] run sync cached downsampling offset to db error: {e}");
+            log::error!("[COMPACTOR::JOB] run sync cached downsampling offset to db error: {e}");
         }
     }
 }
@@ -273,10 +238,10 @@ async fn run_downsampling_sync_to_db() -> Result<(), anyhow::Error> {
 async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
     loop {
         let time = get_config().compact.job_run_timeout;
-        log::debug!("[COMPACTOR] Running check running jobs");
+        log::debug!("[COMPACTOR::JOB] Running check running jobs");
         let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
         if let Err(e) = infra::file_list::check_running_jobs(updated_at).await {
-            log::error!("[COMPACTOR] run check running jobs error: {e}");
+            log::error!("[COMPACTOR::JOB] run check running jobs error: {e}");
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
     }
@@ -285,10 +250,10 @@ async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
 async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
     loop {
         let time = get_config().compact.job_clean_wait_time;
-        log::debug!("[COMPACTOR] Running clean done jobs");
+        log::debug!("[COMPACTOR::JOB] Running clean done jobs");
         let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
         if let Err(e) = infra::file_list::clean_done_jobs(updated_at).await {
-            log::error!("[COMPACTOR] run clean done jobs error: {e}");
+            log::error!("[COMPACTOR::JOB] run clean done jobs error: {e}");
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
     }

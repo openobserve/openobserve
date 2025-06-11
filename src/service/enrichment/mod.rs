@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -88,48 +88,57 @@ fn get_data(
         .iter()
         .filter(|v| {
             if let vrl::value::Value::Object(map) = v {
-                for cond in condition {
-                    match cond {
-                        vector_enrichment::Condition::Equals { field, value } => match case {
-                            Case::Insensitive => {
-                                if let Some(Value::Bytes(bytes1)) = map.get(field.to_owned()) {
-                                    if let Value::Bytes(bytes2) = value {
-                                        match (
-                                            std::str::from_utf8(bytes1),
-                                            std::str::from_utf8(bytes2),
-                                        ) {
-                                            (Ok(s1), Ok(s2)) => {
-                                                return s1.eq_ignore_ascii_case(s2);
-                                            }
-                                            (Err(_), Err(_)) => return bytes1 == bytes2,
-                                            _ => return false,
-                                        }
+                // Default to false for empty conditions array
+                if condition.is_empty() {
+                    return false;
+                }
+
+                // Check that ALL conditions match (AND logic)
+                condition.iter().all(|cond| match cond {
+                    vector_enrichment::Condition::Equals { field, value } => match case {
+                        Case::Insensitive => {
+                            if let Some(Value::Bytes(bytes1)) = map.get(field.to_owned()) {
+                                if let Value::Bytes(bytes2) = value {
+                                    match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2))
+                                    {
+                                        (Ok(s1), Ok(s2)) => s1.eq_ignore_ascii_case(s2),
+                                        (Err(_), Err(_)) => bytes1 == bytes2,
+                                        _ => false,
                                     }
+                                } else {
+                                    false
                                 }
-                            }
-                            Case::Sensitive => {
-                                if let Some(v) = map.get(field.to_owned()) {
-                                    if v.clone() == value.clone() {
-                                        return true;
-                                    }
-                                }
-                            }
-                        },
-                        vector_enrichment::Condition::BetweenDates { field, from, to } => {
-                            if let Some(v) = map.get(field.to_owned()) {
-                                if let Some(v) = v.as_str() {
-                                    if let Ok(v) = parse_str_to_time(&v) {
-                                        if v >= *from && v <= *to {
-                                            return true;
-                                        }
-                                    }
-                                }
+                            } else {
+                                false
                             }
                         }
+                        Case::Sensitive => {
+                            if let Some(v) = map.get(field.to_owned()) {
+                                v.clone() == value.clone()
+                            } else {
+                                false
+                            }
+                        }
+                    },
+                    vector_enrichment::Condition::BetweenDates { field, from, to } => {
+                        if let Some(v) = map.get(field.to_owned()) {
+                            if let Some(v) = v.as_str() {
+                                if let Ok(v) = parse_str_to_time(&v) {
+                                    v >= *from && v <= *to
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
                     }
-                }
+                })
+            } else {
+                false
             }
-            false
         })
         .collect();
 

@@ -25,11 +25,7 @@ pub fn max(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result
             data,
             "max",
             |prev, val| {
-                if prev >= val {
-                    prev
-                } else {
-                    val
-                }
+                if prev >= val { prev } else { val }
             },
         )?;
     if score_values.is_none() {

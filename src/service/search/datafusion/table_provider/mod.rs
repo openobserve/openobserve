@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -37,29 +37,32 @@ use async_trait::async_trait;
 use config::get_config;
 use datafusion::{
     catalog::Session,
-    common::{plan_err, project_schema, Result, Statistics, ToDFSchema},
+    common::{Result, Statistics, ToDFSchema, plan_err, project_schema},
     datasource::{
+        TableProvider,
+        file_format::parquet::ParquetFormat,
         get_statistics_with_limit,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl, PartitionedFile},
-        physical_plan::FileScanConfig,
-        TableProvider,
+        physical_plan::{FileScanConfig, ParquetSource},
     },
     error::DataFusionError,
     execution::{
         cache::{cache_manager::FileStatisticsCache, cache_unit::DefaultFileStatisticsCache},
         context::SessionState,
     },
-    logical_expr::{utils::conjunction, Expr, SortExpr, TableProviderFilterPushDown, TableType},
-    physical_expr::{create_physical_expr, expressions, LexOrdering, PhysicalSortExpr},
-    physical_plan::{empty::EmptyExec, ExecutionPlan},
+    logical_expr::{Expr, SortExpr, TableProviderFilterPushDown, TableType, utils::conjunction},
+    physical_expr::{LexOrdering, PhysicalSortExpr, create_physical_expr, expressions},
+    physical_plan::{ExecutionPlan, PhysicalExpr, empty::EmptyExec},
 };
 use futures::{
+    StreamExt,
     future::{self, try_join_all},
-    stream, StreamExt,
+    stream,
 };
 use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
+use parquet_reader::NewParquetFileReaderFactory;
 use tokio::sync::Semaphore;
 
 use crate::service::search::index::IndexCondition;
@@ -68,6 +71,7 @@ pub mod catalog;
 pub mod empty_table;
 mod helpers;
 pub mod memtable;
+mod parquet_reader;
 pub mod uniontable;
 
 #[derive(Debug)]
@@ -82,6 +86,7 @@ pub(crate) struct NewListingTable {
     collected_statistics: FileStatisticsCache,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    need_optimize_partition: bool,
 }
 
 impl NewListingTable {
@@ -99,6 +104,7 @@ impl NewListingTable {
         rules: HashMap<String, DataType>,
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
+        need_optimize_partition: bool,
     ) -> Result<Self> {
         let file_schema = config
             .file_schema
@@ -123,6 +129,7 @@ impl NewListingTable {
             collected_statistics: Arc::new(DefaultFileStatisticsCache::default()),
             index_condition,
             fst_fields,
+            need_optimize_partition,
         };
 
         Ok(table)
@@ -218,8 +225,8 @@ impl NewListingTable {
     /// This method first checks if the statistics for the given file are already cached.
     /// If they are, it returns the cached statistics.
     /// If they are not, it infers the statistics from the file and stores them in the cache.
-    async fn do_collect_statistics<'a>(
-        &'a self,
+    async fn do_collect_statistics(
+        &self,
         ctx: &SessionState,
         store: &Arc<dyn ObjectStore>,
         part_file: &PartitionedFile,
@@ -234,7 +241,15 @@ impl NewListingTable {
                     .options
                     .format
                     .infer_stats(ctx, store, self.file_schema.clone(), &part_file.object_meta)
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "Failed to infer stats for file: {}, error: {}",
+                            part_file.object_meta.location,
+                            e
+                        );
+                        e
+                    })?;
                 statistics_cache.put_with_extra(
                     &part_file.object_meta.location,
                     statistics.clone().into(),
@@ -243,6 +258,46 @@ impl NewListingTable {
                 Ok(statistics)
             }
         }
+    }
+
+    async fn create_physical_plan(
+        &self,
+        state: &SessionState,
+        conf: FileScanConfig,
+        filters: Option<&Arc<dyn PhysicalExpr>>,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        let Some(parquet) = self.options.format.as_any().downcast_ref::<ParquetFormat>() else {
+            return plan_err!("ParquetFormat not found");
+        };
+
+        let mut predicate = None;
+        let mut metadata_size_hint = None;
+
+        // If enable pruning then combine the filters to build the predicate.
+        // If disable pruning then set the predicate to None, thus readers
+        // will not prune data based on the statistics.
+        if parquet.enable_pruning() {
+            if let Some(pred) = filters.cloned() {
+                predicate = Some(pred);
+            }
+        }
+        if let Some(metadata) = parquet.metadata_size_hint() {
+            metadata_size_hint = Some(metadata);
+        }
+
+        let mut source = ParquetSource::new(parquet.options().clone());
+
+        let store = state.runtime_env().object_store(&conf.object_store_url)?;
+        source = source
+            .with_parquet_file_reader_factory(Arc::new(NewParquetFileReaderFactory::new(store)));
+        if let Some(predicate) = predicate {
+            source = source.with_predicate(Arc::clone(&conf.file_schema), predicate);
+        }
+        if let Some(metadata_size_hint) = metadata_size_hint {
+            source = source.with_metadata_size_hint(metadata_size_hint)
+        }
+
+        Ok(conf.with_source(Arc::new(source)).build())
     }
 }
 
@@ -301,8 +356,12 @@ impl TableProvider for NewListingTable {
                     partitioned_file_lists = new_groups;
                 }
                 Ordering::Greater => {
-                    partitioned_file_lists =
-                        repartition_sorted_groups(new_groups, self.options.target_partitions);
+                    if self.need_optimize_partition {
+                        partitioned_file_lists =
+                            repartition_sorted_groups(new_groups, self.options.target_partitions);
+                    } else {
+                        partitioned_file_lists = new_groups;
+                    }
                 }
                 Ordering::Less => {
                     log::debug!(
@@ -316,6 +375,12 @@ impl TableProvider for NewListingTable {
                 log::debug!("did't set split_file_groups_by_statistics");
             } // no ordering required
         };
+
+        log::debug!(
+            "after partition, target_partitions: {}, file groups: {}",
+            self.options.target_partitions,
+            partitioned_file_lists.len()
+        );
 
         // extract types of partition columns
         let table_partition_cols = self
@@ -366,17 +431,19 @@ impl TableProvider for NewListingTable {
 
         // create the execution plan
         let parquet_exec = self
-            .options
-            .format
             .create_physical_plan(
                 session_state,
-                FileScanConfig::new(object_store_url, Arc::clone(&self.file_schema))
-                    .with_file_groups(partitioned_file_lists)
-                    .with_statistics(statistics)
-                    .with_projection(parquet_projection.cloned())
-                    .with_limit(limit)
-                    .with_output_ordering(output_ordering)
-                    .with_table_partition_cols(table_partition_cols),
+                FileScanConfig::new(
+                    object_store_url,
+                    Arc::clone(&self.file_schema),
+                    self.options.format.file_source(),
+                )
+                .with_file_groups(partitioned_file_lists)
+                .with_statistics(statistics)
+                .with_projection(parquet_projection.cloned())
+                .with_limit(limit)
+                .with_output_ordering(output_ordering)
+                .with_table_partition_cols(table_partition_cols),
                 filters.as_ref(),
             )
             .await?;
@@ -449,7 +516,7 @@ fn repartition_sorted_groups(
         }
 
         // split max_group into odd and even groups
-        let group_cap = (max_group.len() + 1) / 2;
+        let group_cap = max_group.len().div_ceil(2);
         let mut odd_group = Vec::with_capacity(group_cap);
         let mut even_group = Vec::with_capacity(group_cap);
 

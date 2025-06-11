@@ -21,7 +21,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
 use crate::service::promql::value::{
-    signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Value,
+    InstantValue, Labels, LabelsExt, Sample, Value, signature_without_labels,
 };
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33

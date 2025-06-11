@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{dev::ServiceRequest, Error};
+use actix_web::{Error, dev::ServiceRequest};
 #[cfg(feature = "enterprise")]
 use actix_web::{
     error::ErrorUnauthorized,
-    http::{header, Method},
+    http::{Method, header},
 };
 #[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
@@ -36,6 +36,7 @@ pub async fn token_validator(
     use actix_web::error::ErrorForbidden;
 
     use super::validator::check_permissions;
+    use crate::common::utils::auth::V2_API_PREFIX;
 
     let user;
     let keys = get_dex_jwks().await;
@@ -73,12 +74,20 @@ pub async fn token_validator(
                                 all_users.first().cloned()
                             }
                         }
-                        Err(_) => None,
+                        Err(e) => {
+                            log::error!("Error getting user in token validator: {}", e);
+                            None
+                        }
                     }
                 } else {
                     user = match path.find('/') {
                         Some(index) => {
-                            let org_id = &path[0..index];
+                            let org_id =
+                                if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
+                                    path_columns[1]
+                                } else {
+                                    &path[0..index]
+                                };
                             users::get_user(Some(org_id), user_id).await
                         }
                         None => users::get_user(None, user_id).await,

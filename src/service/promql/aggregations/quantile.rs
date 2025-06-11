@@ -18,7 +18,7 @@ use promql_parser::parser::Expr as PromExpr;
 use rayon::prelude::*;
 
 use crate::service::promql::{
-    aggregations::prepare_vector, common::quantile as calculate_quantile, value::Value, Engine,
+    Engine, aggregations::prepare_vector, common::quantile as calculate_quantile, value::Value,
 };
 
 pub async fn quantile(

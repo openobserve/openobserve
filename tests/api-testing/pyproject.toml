@@ -1,18 +1,28 @@
 [project]
 name = "pytest-openobserve"
 version = "0.1.0"
-description = "Add your description here"
+authors = [
+  { name="OpenObserve", email="info@openobserve.ai" },
+]
+description = "A pytest plugin for OpenObserve"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "pytest>=7.4.2",
+    "pytest>=7.0",
+    "pytest-order>=1.1.1",
     "pytest-sugar>=0.9.7",
     "pytest-pretty>=1.2.0",
     "requests>=2.31.0",
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
+    "websocket-client>=1.8.0",
 ]
-readme = "README.md"
-requires-python = ">= 3.11"
 
 [build-system]
 requires = ["hatchling"]
@@ -29,3 +39,12 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/main"]
+
+[project.urls]
+"Homepage" = "https://github.com/openobserve/openobserve"
+"Bug Tracker" = "https://github.com/openobserve/openobserve/issues"
+
+[tool.pytest.ini_options]
+markers = [
+    "order: mark test to run in a specific order"
+]

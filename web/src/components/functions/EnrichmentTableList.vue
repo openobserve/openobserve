@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
+        dense
       >
         <template #no-data>
           <NoData />
@@ -35,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
+              :data-test="`${props.row.name}-explore-btn`"
               icon="search"
               :title="t('logStream.explore')"
               class="q-ml-xs"
@@ -44,6 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               @click="exploreEnrichmentTable(props)"
+            />
+            <q-btn
+              icon="list_alt"
+              :title="t('logStream.schemaHeader')"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click="listSchema(props)"
             />
             <q-btn
               icon="edit"
@@ -143,6 +156,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <q-dialog
+      v-model="showEnrichmentSchema"
+      position="right"
+      full-height
+      maximized
+    >
+      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
+    </q-dialog>
   </q-page>
 </template>
 
@@ -158,14 +179,15 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import EnrichmentSchema from "./EnrichmentSchema.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
-  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog },
+  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog, EnrichmentSchema },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -183,6 +205,7 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const showEnrichmentSchema = ref<boolean>(false);
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -196,6 +219,35 @@ export default defineComponent({
         label: t("function.name"),
         align: "left",
         sortable: true,
+      },
+      {
+        name: "doc_num",
+        field: (row: any) => row.doc_num.toLocaleString(),
+        label: t("logStream.docNum"),
+        align: "left",
+        sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return parseInt(rowA.doc_num) - parseInt(rowB.doc_num);
+        },
+      },
+      {
+        name: "storage_size",
+        label: t("logStream.storageSize"),
+        field: (row: any) => formatSizeFromMB(row.storage_size),
+        align: "left",
+        sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return rowA.original_storage_size- rowB.original_storage_size
+        },
+      },
+      {
+        name: "compressed_size",
+        field: (row: any) => formatSizeFromMB(row.compressed_size),
+        label: t("logStream.compressedSize"),
+        align: "left",
+        sortable: false,
+        sort: (a, b, rowA, rowB) =>
+          rowA.original_compressed_size- rowB.original_compressed_size,
       },
       {
         name: "actions",
@@ -219,13 +271,32 @@ export default defineComponent({
 
       getStreams("enrichment_tables", false)
         .then((res: any) => {
+
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {
+            let doc_num = "";
+            let storage_size = "";
+            let compressed_size = "";
+            let original_storage_size = "";
+            let original_compressed_size = "";
+
+            if (data.stats) {
+              doc_num = data.stats.doc_num;
+              storage_size = data.stats.storage_size + " MB";
+              compressed_size = data.stats.compressed_size + " MB";
+              original_storage_size = data.stats.storage_size;
+              original_compressed_size = data.stats.compressed_size;
+            }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.name + counter,
               name: data.name,
+              doc_num: doc_num,
+              storage_size: storage_size,
+              compressed_size: compressed_size,
+              original_storage_size: original_storage_size,
+              original_compressed_size: original_compressed_size,
               actions: "action buttons",
               stream_type: data.stream_type,
             };
@@ -259,6 +330,7 @@ export default defineComponent({
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
+    const selectedEnrichmentTable = ref<any>(null);
     const pagination: any = ref({
       rowsPerPage: 20,
     });
@@ -391,7 +463,10 @@ export default defineComponent({
               streamResponse.stats.doc_time_min &&
               streamResponse.stats.doc_time_max
             ) {
-              dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
+              //reducing the doc_time_min by 1000000 to get the exact time range
+              //previously we were subtracting 60000000 which might confuse some users so we are using 1000000 (1sec)
+              dateTime["from"] = streamResponse.stats.doc_time_min - 1000000;
+              //adding 60000000(1min)
               dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
             } else if (streamResponse.stats.created_at) {
               // When enrichment table is uploaded, stats will not have doc_time_min and doc_time_max.
@@ -433,7 +508,10 @@ export default defineComponent({
         },
       });
     };
-
+    const listSchema = async (props: any) => {
+      selectedEnrichmentTable.value = props.row.name;
+      showEnrichmentSchema.value = true;
+    };
     return {
       t,
       qTable,
@@ -474,6 +552,9 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       exploreEnrichmentTable,
+      showEnrichmentSchema,
+      listSchema,
+      selectedEnrichmentTable,
     };
   },
   computed: {

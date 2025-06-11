@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,30 +15,31 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::Utc;
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
-        pipeline::{components::NodeData, Pipeline},
+        pipeline::{Pipeline, components::NodeData},
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
     utils::{
         flatten,
-        json::{get_string_value, Value},
+        json::{self, Value, get_string_value},
     },
 };
 use futures::future::try_join_all;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
         ingestion::{apply_vrl_fn, compile_vrl_function},
-        pipeline::pipeline_wal_writer::get_pipeline_wal_writer,
         self_reporting::publish_error,
     },
 };
@@ -50,12 +51,12 @@ static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
 pub trait PipelineExt: Sync + Send + 'static {
     /// Registers the function of all the FunctionNode of this pipeline once for execution.
     /// Returns a map of node_id -> VRLResultResolver for quick lookup
-    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>>;
+    async fn register_functions(&self) -> Result<HashMap<String, (VRLResultResolver, bool)>>;
 }
 
 #[async_trait]
 impl PipelineExt for Pipeline {
-    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>> {
+    async fn register_functions(&self) -> Result<HashMap<String, (VRLResultResolver, bool)>> {
         let mut vrl_map = HashMap::new();
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
@@ -68,10 +69,13 @@ impl PipelineExt for Pipeline {
                 registry.finish_load();
                 vrl_map.insert(
                     node.get_node_id(),
-                    VRLResultResolver {
-                        program: vrl_runtime_config.program,
-                        fields: vrl_runtime_config.fields,
-                    },
+                    (
+                        VRLResultResolver {
+                            program: vrl_runtime_config.program,
+                            fields: vrl_runtime_config.fields,
+                        },
+                        transform.is_result_array_vrl(),
+                    ),
                 );
             }
         }
@@ -85,7 +89,7 @@ pub struct ExecutablePipeline {
     name: String,
     source_node_id: String,
     sorted_nodes: Vec<String>,
-    vrl_map: HashMap<String, VRLResultResolver>,
+    vrl_map: HashMap<String, (VRLResultResolver, bool)>,
     node_map: HashMap<String, ExecutableNode>,
 }
 
@@ -189,9 +193,18 @@ impl ExecutablePipeline {
         &self,
         org_id: &str,
         records: Vec<Value>,
+        stream_name: Option<String>,
     ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
         let batch_size = records.len();
-        log::debug!("[Pipeline]: process batch of size {}", batch_size);
+        let pipeline_name = self.name.clone();
+        log::debug!(
+            "[Pipeline] {} : process batch of size {}",
+            pipeline_name,
+            batch_size
+        );
+        if batch_size == 0 {
+            return Ok(HashMap::default());
+        }
 
         // result_channel
         let (result_sender, mut result_receiver) =
@@ -224,6 +237,8 @@ impl ExecutablePipeline {
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
             let vrl_runtime = self.vrl_map.get(node_id).cloned();
+            let pipeline_name = pipeline_name.clone();
+            let stream_name = stream_name.clone();
 
             let task = tokio::spawn(async move {
                 process_node(
@@ -236,6 +251,8 @@ impl ExecutablePipeline {
                     vrl_runtime,
                     result_sender_cp,
                     error_sender_cp,
+                    pipeline_name,
+                    stream_name,
                 )
                 .await
             });
@@ -329,7 +346,7 @@ impl ExecutablePipeline {
             .filter_map(|exec_node| {
                 if exec_node.children.is_empty() {
                     if let NodeData::Stream(stream_params) = &exec_node.node_data {
-                        Some(stream_params.clone())
+                        (!stream_params.stream_name.contains("{")).then_some(stream_params.clone())
                     } else {
                         None
                     }
@@ -481,16 +498,21 @@ async fn process_node(
     node: ExecutableNode,
     mut receiver: Receiver<(usize, Value, bool)>,
     mut child_senders: Vec<Sender<(usize, Value, bool)>>,
-    vrl_runtime: Option<VRLResultResolver>,
+    vrl_runtime: Option<(VRLResultResolver, bool)>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
     error_sender: Sender<(String, String, String)>,
+    pipeline_name: String,
+    stream_name: Option<String>,
 ) -> Result<()> {
     let cfg = config::get_config();
     let mut count: usize = 0;
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::debug!("[Pipeline]: Leaf node {node_idx} starts processing");
+                log::debug!(
+                    "[Pipeline] {} : Leaf node {node_idx} starts processing",
+                    pipeline_name
+                );
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
@@ -508,7 +530,8 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                                        "[Pipeline] {} : LeafNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
                                     );
                                     break;
                                 }
@@ -521,11 +544,18 @@ async fn process_node(
                     if destination_stream.stream_name.contains("{") {
                         match resolve_stream_name(&destination_stream.stream_name, &record) {
                             Ok(stream_name) if !stream_name.is_empty() => {
-                                destination_stream.stream_name = stream_name.into();
+                                destination_stream.stream_name =
+                                    if cfg.common.skip_formatting_stream_name {
+                                        stream_name.into()
+                                    } else {
+                                        stream_name.to_lowercase().into()
+                                    }
                             }
                             resolve_res => {
                                 let err_msg = if let Err(e) = resolve_res {
-                                    format!("Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped")
+                                    format!(
+                                        "Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped"
+                                    )
                                 } else {
                                     "Dynamic Stream Name resolved to empty. Record dropped"
                                         .to_string()
@@ -536,7 +566,8 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                                        "[Pipeline] {} : LeafNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
                                     );
                                     break;
                                 }
@@ -549,7 +580,8 @@ async fn process_node(
                         result_sender.send((idx, destination_stream, record)).await
                     {
                         log::error!(
-                            "[Pipeline]: LeafNode errors sending result for collection caused by: {send_err}"
+                            "[Pipeline] {} : LeafNode errors sending result for collection caused by: {send_err}",
+                            pipeline_name
                         );
                         break;
                     }
@@ -563,7 +595,10 @@ async fn process_node(
                     send_to_children(&mut child_senders, item, "StreamNode").await;
                     count += 1;
                 }
-                log::debug!("[Pipeline]: source node {node_idx} done processing {count} records");
+                log::debug!(
+                    "[Pipeline] {} : source node {node_idx} done processing {count} records",
+                    pipeline_name
+                );
             }
         }
         NodeData::Condition(condition_params) => {
@@ -583,7 +618,8 @@ async fn process_node(
                                 .await
                             {
                                 log::error!(
-                                    "[Pipeline]: ConditionNode failed sending errors for collection caused by: {send_err}"
+                                    "[Pipeline] {} : ConditionNode failed sending errors for collection caused by: {send_err}",
+                                    pipeline_name
                                 );
                                 break;
                             }
@@ -612,8 +648,10 @@ async fn process_node(
         NodeData::Function(func_params) => {
             log::debug!("[Pipeline]: func node {node_idx} starts processing");
             let mut runtime = crate::service::ingestion::init_functions_runtime();
+            let stream_name = stream_name.unwrap_or("pipeline".to_string());
+            let mut result_array_records = Vec::new();
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
-                if let Some(vrl_runtime) = &vrl_runtime {
+                if let Some((vrl_runtime, is_result_array_vrl)) = &vrl_runtime {
                     if func_params.after_flatten && !flattened {
                         record = match flatten::flatten_with_level(
                             record,
@@ -627,7 +665,8 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                                        "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
                                     );
                                     break;
                                 }
@@ -635,12 +674,51 @@ async fn process_node(
                             }
                         };
                     }
-                    record = match apply_vrl_fn(
+                    if !is_result_array_vrl {
+                        record = match apply_vrl_fn(
+                            &mut runtime,
+                            vrl_runtime,
+                            record,
+                            &org_id,
+                            &[stream_name.clone()],
+                        ) {
+                            (res, None) => res,
+                            (res, Some(error)) => {
+                                let err_msg = format!("FunctionNode error: {}", error);
+                                if let Err(send_err) = error_sender
+                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
+                                    );
+                                    break;
+                                }
+                                res
+                            }
+                        };
+                        flattened = false; // since apply_vrl_fn can produce unflattened data
+                        send_to_children(
+                            &mut child_senders,
+                            (idx, record, flattened),
+                            "FunctionNode",
+                        )
+                        .await;
+                    } else {
+                        result_array_records.push(record);
+                    }
+                }
+                count += 1;
+            }
+            if !result_array_records.is_empty() {
+                if let Some((vrl_runtime, true)) = &vrl_runtime {
+                    let result = match apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,
-                        record,
+                        json::Value::Array(result_array_records),
                         &org_id,
-                        &["pipeline".to_string()],
+                        &[stream_name.clone()],
                     ) {
                         (res, None) => res,
                         (res, Some(error)) => {
@@ -650,18 +728,25 @@ async fn process_node(
                                 .await
                             {
                                 log::error!(
-                                    "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                                    "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
+                                    pipeline_name
                                 );
-                                break;
+                                return Ok(());
                             }
                             res
                         }
                     };
-                    flattened = false; // since apply_vrl_fn can produce unflattened data
+                    // since apply_vrl_fn can produce unflattened data
+                    for record in result.as_array().unwrap().iter() {
+                        // use usize::MAX as a flag to disregard original_value
+                        send_to_children(
+                            &mut child_senders,
+                            (usize::MAX, record.clone(), false),
+                            "FunctionNode",
+                        )
+                        .await;
+                    }
                 }
-                send_to_children(&mut child_senders, (idx, record, flattened), "FunctionNode")
-                    .await;
-                count += 1;
             }
             log::debug!("[Pipeline]: func node {node_idx} done processing {count} records");
         }
@@ -674,38 +759,97 @@ async fn process_node(
             }
             log::debug!("[Pipeline]: query node {node_idx} done processing {count} records");
         }
+        #[cfg(feature = "enterprise")]
         NodeData::RemoteStream(remote_stream) => {
             let mut records = vec![];
             log::debug!(
                 "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {:?}",
                 remote_stream
             );
-            while let Some((_, record, _)) = receiver.recv().await {
-                // External destinations will automatically flatten the payload, hence
-                // no need to flatten the records here
+            let min_ts = (Utc::now()
+                - chrono::Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+            .timestamp_micros();
+            let max_ts = (Utc::now()
+                + chrono::Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
+            .timestamp_micros();
+            while let Some((_, mut record, flattened)) = receiver.recv().await {
+                // handle timestamp before sending to remote_write service
+                if !flattened {
+                    record = match flatten::flatten_with_level(
+                        record,
+                        cfg.limit.ingest_flatten_level,
+                    ) {
+                        Ok(flattened) => flattened,
+                        Err(e) => {
+                            let err_msg = format!("DestinationNode error with flattening: {}", e);
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
+                                    pipeline_name
+                                );
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                }
+                if let Err(e) =
+                    crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
+                {
+                    let err_msg = format!("DestinationNode error handling timestamp: {}", e);
+                    if let Err(send_err) = error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
+                            pipeline_name
+                        );
+                        break;
+                    }
+                    continue;
+                }
                 records.push(record);
                 count += 1;
             }
 
-            let mut remote_stream = remote_stream.clone();
-            remote_stream.org_id = org_id.into();
-            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream.clone()).await?;
-            if let Err(e) = writer.write_wal(records).await {
-                let err_msg = format!(
-                    "DestinationNode error persisting data to be ingested externally: {}",
-                    e
-                );
-                if let Err(send_err) = error_sender
-                    .send((node.id.to_string(), node.node_type(), err_msg))
-                    .await
-                {
-                    log::error!(
-                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+            if !records.is_empty() {
+                let mut remote_stream = remote_stream.clone();
+                remote_stream.org_id = org_id.into();
+                let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
+                if let Err(e) = writer.write_wal(records).await {
+                    let err_msg = format!(
+                        "DestinationNode error persisting data to be ingested externally: {}",
+                        e
                     );
+                    if let Err(send_err) = error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                        );
+                    }
                 }
             }
 
             log::debug!("[Pipeline]: DestinationNode {node_idx} done processing {count} records");
+        }
+        #[cfg(not(feature = "enterprise"))]
+        NodeData::RemoteStream(_) => {
+            let err_msg = "[Pipeline]: remote destination is not supported in open source version. Records dropped".to_string();
+            log::error!("{err_msg}");
+            if let Err(send_err) = error_sender
+                .send((node.id.to_string(), node.node_type(), err_msg))
+                .await
+            {
+                log::error!(
+                    "[Pipeline({pipeline_id})]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                );
+            }
         }
     }
 

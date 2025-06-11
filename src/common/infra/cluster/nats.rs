@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,14 +23,25 @@ use config::{
     utils::json,
 };
 use infra::{
-    db::{get_coordinator, NEED_WATCH},
+    db::{NEED_WATCH, get_coordinator, nats},
     dist_lock,
     errors::{Error, Result},
 };
-use tokio::task;
+use tokio::{sync::mpsc, task};
+
+use crate::common::infra::config::update_cache;
 
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
+    // first, init NATs client with channel communicating NATs events
+    let (nats_event_tx, nats_event_rx) = mpsc::channel::<nats::NatsEvent>(10);
+    if let Err(e) = nats::init_nats_client(nats_event_tx).await {
+        log::error!("[CLUSTER] NATs client init failed: {}", e);
+        return Err(e);
+    }
+    // a child task to handle NATs event
+    task::spawn(async move { update_cache(nats_event_rx).await });
+
     if let Err(e) = register().await {
         log::error!("[CLUSTER] register failed: {}", e);
         return Err(e);
@@ -46,7 +57,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let ttl_keep_alive = min(10, (get_config().limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = min(5, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
@@ -74,7 +85,12 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
 async fn register() -> Result<()> {
     let cfg = get_config();
     // 1. create a cluster lock for node register
-    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
+    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64)
+        .await
+        .map_err(|e| {
+            log::error!("[CLUSTER] nats register failed: {}", e);
+            e
+        })?;
 
     // 2. watch node list
     task::spawn(async move { super::watch_node_list().await });
@@ -83,7 +99,10 @@ async fn register() -> Result<()> {
     let node_list = match super::list_nodes().await {
         Ok(v) => v,
         Err(e) => {
-            dist_lock::unlock(&locker).await?;
+            dist_lock::unlock(&locker).await.map_err(|e| {
+                log::error!("[CLUSTER] nats unlock failed: {}", e);
+                e
+            })?;
             return Err(e);
         }
     };
@@ -153,6 +172,8 @@ async fn register() -> Result<()> {
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
+        metrics: Default::default(),
+        version: config::VERSION.to_string(),
     };
     let val = json::to_vec(&node).unwrap();
 
@@ -184,7 +205,10 @@ async fn register() -> Result<()> {
     }
 
     // 7. register ok, release lock
-    dist_lock::unlock(&locker).await?;
+    dist_lock::unlock(&locker).await.map_err(|e| {
+        log::error!("[CLUSTER] nats unlock failed: {}", e);
+        e
+    })?;
 
     log::info!("[CLUSTER] Register to cluster ok");
     Ok(())
@@ -202,7 +226,7 @@ pub(crate) async fn set_offline() -> Result<()> {
 pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let cfg = get_config();
     // set node status to online
-    let node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
+    let mut node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
         Some(node) => {
             let mut val = node.clone();
             val.status = status.clone();
@@ -230,8 +254,14 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
+            metrics: Default::default(),
+            version: config::VERSION.to_string(),
         },
     };
+
+    // update node status metrics
+    node.metrics = super::update_node_status_metrics().await;
+
     let val = json::to_string(&node).unwrap();
 
     LOCAL_NODE_STATUS.store(status as _, Ordering::Release);
@@ -264,4 +294,42 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
         return Err(Error::Message(format!("update node error: {}", e)));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_nats_update_local_node() {
+        let node = Node::default();
+        let _ = update_local_node(&node).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_set_status() {
+        let _ = set_status(NodeStatus::Online).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_set_offline() {
+        let _ = set_offline().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_leave() {
+        let _ = leave().await.is_err();
+    }
+
+    // #[tokio::test]
+    // async fn test_nats_register_and_keep_alive() {
+    //     config::cache_instance_id("instance");
+    //     let _ = register_and_keep_alive().await.is_err();
+    // }
+
+    #[tokio::test]
+    async fn test_nats_register() {
+        config::cache_instance_id("instance");
+        let _ = register().await.is_err();
+    }
 }

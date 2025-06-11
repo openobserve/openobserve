@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,14 +16,14 @@
 use async_trait::async_trait;
 use config::{
     meta::{
-        pipeline::{components::PipelineSource, Pipeline},
+        pipeline::{Pipeline, components::PipelineSource},
         stream::StreamParams,
     },
     utils::json,
 };
 
 use crate::{
-    db::mysql::CLIENT,
+    db::mysql::{CLIENT, CLIENT_DDL, CLIENT_RO},
     errors::{DbError, Error, Result},
 };
 
@@ -44,7 +44,7 @@ impl Default for MySqlPipelineTable {
 #[async_trait]
 impl super::PipelineTable for MySqlPipelineTable {
     async fn create_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         sqlx::query(
             r#"
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         let queries = vec![
             "CREATE INDEX pipeline_org_idx ON pipeline (org);",
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn drop_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         sqlx::query("DROP TABLE IF EXISTS pipeline;")
             .execute(&pool)
@@ -253,7 +253,7 @@ UPDATE pipeline
     }
 
     async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"
 SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND stream_name = ? AND stream_type = ?;
         "#;
@@ -269,24 +269,17 @@ SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND 
     }
 
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"SELECT * FROM pipeline WHERE id = ?;"#;
-        let pipeline = match sqlx::query_as::<_, Pipeline>(query)
+        sqlx::query_as::<_, Pipeline>(query)
             .bind(pipeline_id)
             .fetch_one(&pool)
             .await
-        {
-            Ok(pipeline) => pipeline,
-            Err(e) => {
-                log::debug!("[MYSQL] get pipeline by id error: {}", e);
-                return Err(Error::from(DbError::KeyNotExists(pipeline_id.to_string())));
-            }
-        };
-        Ok(pipeline)
+            .map_err(|_| Error::from(DbError::KeyNotExists(pipeline_id.to_string())))
     }
 
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let similar_pipeline = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
                 sqlx::query_as::<_, Pipeline>(
@@ -312,7 +305,7 @@ SELECT * FROM pipeline
     }
 
     async fn list(&self) -> Result<Vec<Pipeline>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"SELECT * FROM pipeline ORDER BY id;"#;
         match sqlx::query_as::<_, Pipeline>(query).fetch_all(&pool).await {
             Ok(pipelines) => Ok(pipelines),
@@ -324,7 +317,7 @@ SELECT * FROM pipeline
     }
 
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"SELECT * FROM pipeline WHERE org = ? ORDER BY id;"#;
         match sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
@@ -340,7 +333,7 @@ SELECT * FROM pipeline
     }
 
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let query = r#"
 SELECT * FROM pipeline WHERE org = ? AND source_type = ? ORDER BY id;
         "#;

@@ -94,12 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div v-if="createNewFunction" class="pipeline-add-function tw-w-[95vw]">
+        <div  v-if="createNewFunction" class="pipeline-add-function tw-w-[95vw]">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"
             @update:list="onFunctionCreation"
             @cancel:hideform="cancelFunctionCreation"
+            :heightOffset="75"
           />
         </div>
 
@@ -242,8 +243,9 @@ const loading = ref(false);
 
 const afterFlattening = ref(
   (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })
-    ?.after_flatten || false,
+    ?.after_flatten ?? true
 );
+
 
 const filteredFunctions: Ref<any[]> = ref([]);
 
@@ -261,7 +263,7 @@ const nodeLink = ref({
 
 const computedStyleForFunction = computed(() => {
   return createNewFunction.value
-    ? { width: "100%" }
+    ? { width: "100%", }
     : { width: "100%", height: "100%" };
 });
 

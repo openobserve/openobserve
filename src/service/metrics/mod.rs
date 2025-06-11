@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::{Metadata, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
-    utils::hash::{gxhash, Sum64},
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, VALUE_LABEL},
+    utils::hash::{Sum64, gxhash},
 };
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
@@ -68,12 +68,15 @@ pub fn signature_without_labels(
 fn get_exclude_labels() -> Vec<&'static str> {
     let vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
     // TODO: fixed _timestamp
-    // let column_timestamp = config::get_config().common.column_timestamp.as_str();
+    // let column_timestamp = config::TIMESTAMP_COL_NAME.as_str();
     // vec.push(column_timestamp);
     vec
 }
 
 // format stream name
 pub fn format_label_name(label: &str) -> String {
-    RE_CORRECT_LABEL_NAME.replace_all(label, "_").to_string()
+    RE_CORRECT_LABEL_NAME
+        .replace_all(label, "_")
+        .to_string()
+        .to_lowercase()
 }

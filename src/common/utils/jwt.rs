@@ -1,9 +1,23 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 #[cfg(feature = "enterprise")]
 use {
     jsonwebtoken::{
-        decode, decode_header,
+        Algorithm, DecodingKey, TokenData, Validation, decode, decode_header,
         jwk::{self, AlgorithmParameters},
-        Algorithm, DecodingKey, TokenData, Validation,
     },
     serde_json::Value,
     std::{collections::HashMap, str::FromStr},
@@ -26,9 +40,8 @@ pub(crate) async fn verify_decode_token(
     ),
     anyhow::Error,
 > {
+    use config::meta::user::UserRole;
     use infra::errors::JwtError;
-
-    use crate::common::meta::user::UserRole;
 
     let jwks: jwk::JwkSet = serde_json::from_str(jwks).unwrap();
     let header = decode_header(token)?;
@@ -73,11 +86,11 @@ pub(crate) async fn verify_decode_token(
                 final_claims.extend(claims);
 
                 let user_email = if let Some(email) = final_claims.get("email") {
-                    email.as_str().unwrap()
+                    email.as_str().unwrap().to_lowercase()
                 } else if let Some(user_id) = final_claims.get("user_id") {
-                    user_id.as_str().unwrap()
+                    user_id.as_str().unwrap().to_lowercase()
                 } else {
-                    ""
+                    "".to_string()
                 };
 
                 let user_name = if let Some(name) = final_claims.get("name") {
@@ -106,7 +119,7 @@ pub(crate) async fn verify_decode_token(
                 Ok((
                     TokenValidationResponse {
                         is_valid: true,
-                        user_email: user_email.to_owned(),
+                        user_email,
                         user_name: user_name.to_owned(),
                         family_name: family_name.to_owned(),
                         given_name: given_name.to_owned(),

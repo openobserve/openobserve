@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,15 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    cmp::Ordering,
     io::{Error, ErrorKind},
 };
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
+};
 use config::{
     meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
+use hashbrown::HashMap;
 
 use crate::{
     common::{
@@ -37,6 +40,8 @@ use crate::{
 };
 
 /// GetSchema
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -48,6 +53,9 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
+        ("keyword" = String, Query, description = "Keyword"),
+        ("offset" = u32, Query, description = "Offset"),
+        ("limit" = u32, Query, description = "Limit"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Stream),
@@ -59,24 +67,65 @@ async fn schema(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
+    let Some(mut schema) = schema else {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND,
+            "stream not found",
+        )));
     };
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    stream::get_stream(&org_id, &stream_name, stream_type).await
+    if let Some(uds_fields) = schema.settings.defined_schema_fields.as_ref() {
+        let mut schema_fields = schema
+            .schema
+            .iter()
+            .map(|f| (&f.name, f))
+            .collect::<HashMap<_, _>>();
+        schema.uds_schema = Some(
+            uds_fields
+                .iter()
+                .filter_map(|f| schema_fields.remove(f).map(|f| f.to_owned()))
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    // filter by keyword
+    if let Some(keyword) = query.get("keyword") {
+        if !keyword.is_empty() {
+            schema.schema.retain(|f| f.name.contains(keyword));
+        }
+    }
+
+    // set total fields
+    schema.total_fields = schema.schema.len();
+
+    // Pagination
+    let offset = query
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    if offset >= schema.schema.len() {
+        schema.schema = vec![];
+    } else if limit > 0 {
+        let end = std::cmp::min(offset + limit, schema.schema.len());
+        schema.schema = schema.schema[offset..end].to_vec();
+    }
+
+    Ok(HttpResponse::Ok().json(schema))
 }
 
 /// CreateStreamSettings
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -106,37 +155,21 @@ async fn settings(
         stream_name = format_stream_name(&stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => {
-            if let Some(s_type) = v {
-                if s_type == StreamType::EnrichmentTables || s_type == StreamType::Index {
-                    return Ok(
-                        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                            http::StatusCode::BAD_REQUEST.into(),
-                            format!("Stream type '{}' not allowed", s_type),
-                        )),
-                    );
-                }
-                Some(s_type)
-            } else {
-                v
-            }
-        }
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
-
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Index {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                format!("Stream type '{}' not allowed", stream_type),
+            )),
+        );
+    }
     stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
 }
 
 /// UpdateStreamSettings
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -167,33 +200,15 @@ async fn update_settings(
         stream_name = format_stream_name(&stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => {
-            if let Some(s_type) = v {
-                if s_type == StreamType::EnrichmentTables || s_type == StreamType::Index {
-                    return Ok(
-                        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                            http::StatusCode::BAD_REQUEST.into(),
-                            format!("Stream type '{}' not allowed", s_type),
-                        )),
-                    );
-                }
-                Some(s_type)
-            } else {
-                v
-            }
-        }
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
-
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Index {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                format!("Stream type '{}' not allowed", stream_type),
+            )),
+        );
+    }
     let stream_settings: UpdateStreamSettings = stream_settings.into_inner();
     let main_stream_res =
         stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
@@ -201,6 +216,7 @@ async fn update_settings(
 
     // sync the data retention to index stream
     if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
+        #[allow(deprecated)]
         let index_stream_name =
             if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
                 stream_name.to_string()
@@ -245,6 +261,8 @@ async fn update_settings(
 }
 
 /// DeleteStreamFields
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -269,19 +287,12 @@ async fn delete_fields(
     fields: web::Json<StreamDeleteFields>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query);
     match stream::delete_fields(
         &org_id,
         &stream_name,
@@ -291,17 +302,17 @@ async fn delete_fields(
     .await
     {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "fields deleted".to_string(),
+            http::StatusCode::OK,
+            "fields deleted",
         ))),
-        Err(e) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            e.to_string(),
-        ))),
+        Err(e) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))),
     }
 }
 
 /// DeleteStream
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -324,24 +335,18 @@ async fn delete(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     stream::delete_stream(&org_id, &stream_name, stream_type).await
 }
 
 /// ListStreams
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -352,6 +357,10 @@ async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("type" = String, Query, description = "Stream type"),
+        ("keyword" = String, Query, description = "Keyword"),
+        ("offset" = u32, Query, description = "Offset"),
+        ("limit" = u32, Query, description = "Limit"),
+        ("sort" = String, Query, description = "Sort"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListStream),
@@ -361,17 +370,7 @@ async fn delete(
 #[get("/{org_id}/streams")]
 async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query);
 
     let fetch_schema = match query.get("fetchSchema") {
         Some(s) => match s.to_lowercase().as_str() {
@@ -425,10 +424,92 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         _stream_list_from_rbac,
     )
     .await;
-    indices.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(HttpResponse::Ok().json(ListStream { list: indices }))
+
+    // filter by keyword
+    if let Some(keyword) = query.get("keyword") {
+        if !keyword.is_empty() {
+            indices.retain(|s| s.name.contains(keyword));
+        }
+    }
+
+    // sort by
+    let mut sort = "name".to_string();
+    if let Some(s) = query.get("sort") {
+        let s = s.to_lowercase();
+        if !s.is_empty() {
+            sort = s;
+        }
+    }
+    let asc = if let Some(asc) = query.get("asc") {
+        asc.to_lowercase() == "true" || asc.to_lowercase() == "1"
+    } else {
+        true
+    };
+    indices.sort_by(|a, b| match (sort.as_str(), asc) {
+        ("name", true) => a.name.cmp(&b.name),
+        ("name", false) => b.name.cmp(&a.name),
+        ("doc_num", true) => a.stats.doc_num.cmp(&b.stats.doc_num),
+        ("doc_num", false) => b.stats.doc_num.cmp(&a.stats.doc_num),
+        ("storage_size", true) => a
+            .stats
+            .storage_size
+            .partial_cmp(&b.stats.storage_size)
+            .unwrap_or(Ordering::Equal),
+        ("storage_size", false) => b
+            .stats
+            .storage_size
+            .partial_cmp(&a.stats.storage_size)
+            .unwrap_or(Ordering::Equal),
+        ("compressed_size", true) => a
+            .stats
+            .compressed_size
+            .partial_cmp(&b.stats.compressed_size)
+            .unwrap_or(Ordering::Equal),
+        ("compressed_size", false) => b
+            .stats
+            .compressed_size
+            .partial_cmp(&a.stats.compressed_size)
+            .unwrap_or(Ordering::Equal),
+        ("index_size", true) => a
+            .stats
+            .index_size
+            .partial_cmp(&b.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        ("index_size", false) => b
+            .stats
+            .index_size
+            .partial_cmp(&a.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        _ => a.name.cmp(&b.name),
+    });
+
+    // set total streams
+    let total = indices.len();
+
+    // Pagination
+    let offset = query
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    if offset >= indices.len() {
+        indices = vec![];
+    } else if limit > 0 {
+        let end = std::cmp::min(offset + limit, indices.len());
+        indices = indices[offset..end].to_vec();
+    }
+    Ok(HttpResponse::Ok().json(ListStream {
+        list: indices,
+        total,
+    }))
 }
 
+/// StreamDeleteCache
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -453,24 +534,16 @@ async fn delete_stream_cache(
 ) -> Result<HttpResponse, Error> {
     if !config::get_config().common.result_cache_enabled {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Result Cache is disabled".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Result Cache is disabled",
         )));
     }
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    };
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let path = if stream_name.eq("_all") {
         org_id
     } else {
@@ -479,12 +552,12 @@ async fn delete_stream_cache(
 
     match crate::service::search::cluster::cacher::delete_cached_results(path).await {
         true => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "cache deleted".to_string(),
+            http::StatusCode::OK,
+            "cache deleted",
         ))),
         false => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Error deleting cache, please retry".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Error deleting cache, please retry",
         ))),
     }
 }

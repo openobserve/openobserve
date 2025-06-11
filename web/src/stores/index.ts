@@ -36,14 +36,18 @@ const organizationObj = {
   organizationPasscode: "",
   allDashboardList: {},
   allDashboardData: {},
+  allAlertsListByFolderId: {},
+  allAlertsListByNames: {},
   allDashboardListHash: {},
   rumToken: {
     rum_token: "",
   },
   quotaThresholdMsg: "",
   functions: [],
+  actions: [],
   streams: {},
   folders: [],
+  foldersByType: [],
   organizationSettings: {
     scrape_interval: 15,
     trace_id_field_name: "trace_id",
@@ -78,6 +82,12 @@ export default createStore({
     hiddenMenus: [],
     sessionId: "",
     webSocketUrl: "",
+    allApiLimitsByOrgId: {},
+    allRoleLimitsByOrgIdByRole: {},
+    modulesToDisplay: {},
+    isAiChatEnabled: false,
+    currentChatTimestamp: null,
+    chatUpdated: false,
   },
   mutations: {
     login(state, payload) {
@@ -129,6 +139,12 @@ export default createStore({
     setAllDashboardList(state, payload) {
       state.organizationData.allDashboardList = payload;
     },
+    setAllAlertsListByFolderId(state, payload) {
+      state.organizationData.allAlertsListByFolderId = payload;
+    },
+    setAllAlertsListByNames(state, payload) {
+      state.organizationData.allAlertsListByNames = payload;
+    },
     setDashboardData(state, payload) {
       state.organizationData.allDashboardData = payload;
     },
@@ -140,6 +156,9 @@ export default createStore({
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
+    },
+    setActions(state, payload) {
+      state.organizationData.actions = payload;
     },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
@@ -164,6 +183,9 @@ export default createStore({
     },
     setFolders(state, payload) {
       state.organizationData.folders = payload;
+    },
+    setFoldersByType(state, payload) {
+      state.organizationData.foldersByType = payload;
     },
     appTheme(state, payload) {
       state.theme = payload;
@@ -194,6 +216,24 @@ export default createStore({
     },
     setHiddenMenus(state, payload) {
       state.hiddenMenus = payload;
+    },
+    setApiLimitsByOrgId(state, payload) {
+      state.allApiLimitsByOrgId = payload;
+    },
+    setRoleLimitsByOrgIdByRole(state, payload) {
+      state.allRoleLimitsByOrgIdByRole = payload;
+    },
+    setModulesToDisplay(state, payload) {
+      state.modulesToDisplay = payload;
+    },
+    setIsAiChatEnabled(state, payload) {
+      state.isAiChatEnabled = payload;
+    },
+    setCurrentChatTimestamp(state, payload) {
+      state.currentChatTimestamp = payload;
+    },
+    setChatUpdated(state, payload) {
+      state.chatUpdated = payload;
     },
   },
   actions: {
@@ -242,6 +282,12 @@ export default createStore({
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
     },
+    setAllAlertsListByFolderId(context, payload) {
+      context.commit("setAllAlertsListByFolderId", payload);
+    },
+    setAllAlertsListByNames(context, payload) {
+      context.commit("setAllAlertsListByNames", payload);
+    },
     setDashboardData(context, payload) {
       context.commit("setDashboardData", payload);
     },
@@ -254,8 +300,14 @@ export default createStore({
     setFolders(context, payload) {
       context.commit("setFolders", payload);
     },
+    setFoldersByType(context, payload) {
+      context.commit("setFoldersByType", payload);
+    },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
+    },
+    setActions(context, payload) {
+      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);
@@ -307,6 +359,24 @@ export default createStore({
     },
     setHiddenMenus(context, payload) {
       context.commit("setHiddenMenus", payload);
+    },
+    setApiLimitsByOrgId(context, payload) {
+      context.commit("setApiLimitsByOrgId", payload);
+    },
+    setRoleLimitsByOrgIdByRole(context, payload) {
+      context.commit("setRoleLimitsByOrgIdByRole", payload);
+    },
+    setModulesToDisplay(context, payload) {
+      context.commit("setModulesToDisplay", payload);
+    },
+    setIsAiChatEnabled(context, payload) {
+      context.commit("setIsAiChatEnabled", payload);
+    },
+    setCurrentChatTimestamp(context, payload) {
+      context.commit("setCurrentChatTimestamp", payload);
+    },
+    setChatUpdated(context, payload) {
+      context.commit("setChatUpdated", payload);
     },
   },
   modules: {},

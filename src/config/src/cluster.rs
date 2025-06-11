@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,9 +51,11 @@ pub fn load_local_node() -> Node {
             cfg.grpc.port
         ),
         cpu_num: cfg.limit.cpu_num as u64,
-        status: NodeStatus::Online,
         scheduled: true,
         broadcasted: false,
+        status: NodeStatus::Online,
+        metrics: Default::default(),
+        version: crate::VERSION.to_string(),
     }
 }
 
@@ -71,7 +73,7 @@ fn load_local_node_role() -> Vec<Role> {
         .collect()
 }
 
-fn load_role_group() -> RoleGroup {
+pub fn load_role_group() -> RoleGroup {
     RoleGroup::from(get_config().common.node_role_group.as_str())
 }
 

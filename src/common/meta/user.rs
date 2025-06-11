@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt, str::FromStr};
-
+use config::meta::user::{DBUser, User, UserOrg, UserRole};
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::cloud::OrgInviteStatus;
 use serde::{Deserialize, Serialize};
-use strum::EnumIter;
+#[cfg(feature = "enterprise")]
+use strum::IntoEnumIterator;
 use utoipa::ToSchema;
+
+use super::organization::OrgRoleMapping;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserRequest {
@@ -28,10 +32,12 @@ pub struct UserRequest {
     pub last_name: String,
     pub password: String,
     #[serde(skip_serializing)]
-    pub role: UserRole,
+    pub role: UserOrgRole,
     /// Is the user created via ldap flow.
     #[serde(default)]
     pub is_external: bool,
+    #[serde(skip_serializing)]
+    pub token: Option<String>,
 }
 
 impl UserRequest {
@@ -56,7 +62,7 @@ impl UserRequest {
                 name: org,
                 token,
                 rum_token: Some(rum_token),
-                role: self.role.clone(),
+                role: self.role.base_role.clone(),
             }],
             is_external,
             password_ext: Some(password_ext),
@@ -65,114 +71,42 @@ impl UserRequest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct DBUser {
+pub struct PostUserRequest {
     pub email: String,
     #[serde(default)]
     pub first_name: String,
     #[serde(default)]
     pub last_name: String,
     pub password: String,
-    #[serde(default)]
-    pub salt: String,
-    pub organizations: Vec<UserOrg>,
+    #[serde(skip_serializing, flatten)]
+    pub role: UserRoleRequest,
+    /// Is the user created via ldap flow.
     #[serde(default)]
     pub is_external: bool,
-    pub password_ext: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
 }
 
-impl DBUser {
-    pub fn get_user(&self, org_id: String) -> Option<User> {
-        if self.organizations.is_empty() {
-            return None;
+impl From<&PostUserRequest> for UserRequest {
+    fn from(user: &PostUserRequest) -> Self {
+        UserRequest {
+            email: user.email.clone(),
+            first_name: user.first_name.clone(),
+            last_name: user.last_name.clone(),
+            password: user.password.clone(),
+            role: UserOrgRole::from(&user.role),
+            is_external: user.is_external,
+            token: user.token.clone(),
         }
-
-        let mut local = self.clone();
-        local.organizations.retain(|org| org.name.eq(&org_id));
-        if local.organizations.is_empty() {
-            return None;
-        }
-
-        let org = local.organizations.first().unwrap();
-        Some(User {
-            email: local.email,
-            first_name: local.first_name,
-            last_name: local.last_name,
-            password: local.password,
-            role: org.role.clone(),
-            org: org.name.clone(),
-            token: org.token.clone(),
-            rum_token: org.rum_token.clone(),
-            salt: local.salt,
-            is_external: self.is_external,
-            password_ext: self.password_ext.clone(),
-        })
-    }
-
-    pub fn get_all_users(&self) -> Vec<User> {
-        let mut ret_val = vec![];
-        if self.organizations.is_empty() {
-            ret_val
-        } else {
-            for org in self.organizations.clone() {
-                ret_val.push(User {
-                    email: self.email.clone(),
-                    first_name: self.first_name.clone(),
-                    last_name: self.last_name.clone(),
-                    password: self.password.clone(),
-                    role: org.role,
-                    org: org.name,
-                    token: org.token,
-                    rum_token: org.rum_token,
-                    salt: self.salt.clone(),
-                    is_external: self.is_external,
-                    password_ext: self.password_ext.clone(),
-                })
-            }
-            ret_val
-        }
-    }
-}
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct User {
-    pub email: String,
-    #[serde(default)]
-    pub first_name: String,
-    #[serde(default)]
-    pub last_name: String,
-    pub password: String,
-    #[serde(default)]
-    pub salt: String,
-    #[serde(default)]
-    pub token: String,
-    #[serde(default)]
-    pub rum_token: Option<String>,
-    pub role: UserRole,
-    pub org: String,
-    /// Is the user authenticated and created via LDAP
-    pub is_external: bool,
-    pub password_ext: Option<String>,
-}
-
-#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]
-pub struct UserOrg {
-    pub name: String,
-    #[serde(default)]
-    pub token: String,
-    #[serde(default)]
-    pub rum_token: Option<String>,
-    #[serde(default)]
-    pub role: UserRole,
-}
-
-impl PartialEq for UserOrg {
-    fn eq(&self, other: &Self) -> bool {
-        !self.name.eq(&other.name)
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserOrgRole {
-    pub role: UserRole,
+    #[serde(rename = "role")]
+    pub base_role: UserRole,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub custom_role: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]
@@ -187,99 +121,43 @@ pub struct UpdateUser {
     pub old_password: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_password: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<UserRole>,
+    #[serde(skip_serializing_if = "Option::is_none", flatten)]
+    pub role: Option<UserRoleRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
-pub enum UserRole {
-    #[serde(rename = "admin")]
-    Admin,
-    #[serde(rename = "member")] // admin in OpenSource
-    Member,
-    #[serde(rename = "root")]
-    Root,
-    #[cfg(feature = "enterprise")]
-    #[serde(rename = "viewer")] // read only user
-    Viewer,
-    #[cfg(feature = "enterprise")]
-    #[serde(rename = "user")] // No access only login user
-    User,
-    #[cfg(feature = "enterprise")]
-    #[serde(rename = "editor")]
-    Editor,
-    #[serde(rename = "service_account")]
-    ServiceAccount,
-}
-
-impl Default for UserRole {
-    fn default() -> Self {
-        #[cfg(not(feature = "enterprise"))]
-        return UserRole::Admin;
-        #[cfg(feature = "enterprise")]
-        return UserRole::User;
+pub fn get_default_user_org() -> UserOrg {
+    UserOrg {
+        name: "".to_string(),
+        token: "".to_string(),
+        rum_token: None,
+        role: get_default_user_role(),
     }
 }
 
-impl fmt::Display for UserRole {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            UserRole::Admin => write!(f, "admin"),
-            UserRole::Member => write!(f, "member"),
-            UserRole::Root => write!(f, "root"),
-            #[cfg(feature = "enterprise")]
-            UserRole::Viewer => write!(f, "viewer"),
-            #[cfg(feature = "enterprise")]
-            UserRole::Editor => write!(f, "editor"),
-            #[cfg(feature = "enterprise")]
-            UserRole::User => write!(f, "user"),
-            UserRole::ServiceAccount => write!(f, "service_account"),
-        }
+#[cfg(feature = "enterprise")]
+pub fn get_default_user_role() -> UserRole {
+    let mut role = UserRole::Admin;
+    if o2_openfga::config::get_config().enabled {
+        role = o2_dex::config::get_config().default_role.parse().unwrap();
     }
+    role
 }
 
-impl UserRole {
-    pub fn get_label(&self) -> String {
-        match self {
-            UserRole::Admin => "Admin".to_string(),
-            UserRole::Member => "Member".to_string(),
-            UserRole::Root => "Root".to_string(),
-            #[cfg(feature = "enterprise")]
-            UserRole::Viewer => "Viewer".to_string(),
-            #[cfg(feature = "enterprise")]
-            UserRole::Editor => "Editor".to_string(),
-            #[cfg(feature = "enterprise")]
-            UserRole::User => "User".to_string(),
-            UserRole::ServiceAccount => "Service Account".to_string(),
-        }
-    }
+#[cfg(not(feature = "enterprise"))]
+pub fn get_default_user_role() -> UserRole {
+    UserRole::Admin
 }
 
-// Implementing FromStr for UserRole
-impl FromStr for UserRole {
-    type Err = ();
+#[cfg(feature = "enterprise")]
+pub fn get_roles() -> Vec<UserRole> {
+    UserRole::iter().collect()
+}
 
-    fn from_str(input: &str) -> Result<UserRole, Self::Err> {
-        match input {
-            "admin" => Ok(UserRole::Admin),
-            "member" => Ok(UserRole::Member),
-            "root" => Ok(UserRole::Root),
-            #[cfg(feature = "enterprise")]
-            "viewer" => Ok(UserRole::Viewer),
-            #[cfg(feature = "enterprise")]
-            "editor" => Ok(UserRole::Editor),
-            #[cfg(feature = "enterprise")]
-            "user" => Ok(UserRole::User),
-            #[cfg(feature = "enterprise")]
-            "service_account" => Ok(UserRole::ServiceAccount),
-            #[cfg(feature = "enterprise")]
-            _ => Ok(UserRole::User),
-            #[cfg(not(feature = "enterprise"))]
-            _ => Ok(UserRole::Admin),
-        }
-    }
+#[cfg(not(feature = "enterprise"))]
+pub fn get_roles() -> Vec<UserRole> {
+    vec![UserRole::Admin, UserRole::Root, UserRole::ServiceAccount]
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -289,14 +167,58 @@ pub struct UserResponse {
     pub first_name: String,
     #[serde(default)]
     pub last_name: String,
-    pub role: UserRole,
+    pub role: String,
     #[serde(default)]
     pub is_external: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orgs: Option<Vec<OrgRoleMapping>>,
+    pub created_at: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserList {
     pub data: Vec<UserResponse>,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum InviteStatus {
+    #[serde(rename = "pending")]
+    Pending,
+    #[serde(rename = "accepted")]
+    Accepted,
+    #[serde(rename = "rejected")]
+    Rejected,
+    #[serde(rename = "expired")]
+    Expired,
+}
+
+#[cfg(feature = "cloud")]
+impl From<&OrgInviteStatus> for InviteStatus {
+    fn from(status: &OrgInviteStatus) -> Self {
+        match status {
+            OrgInviteStatus::Pending => InviteStatus::Pending,
+            OrgInviteStatus::Accepted => InviteStatus::Accepted,
+            OrgInviteStatus::Rejected => InviteStatus::Rejected,
+            OrgInviteStatus::Expired => InviteStatus::Expired,
+        }
+    }
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserInvite {
+    pub org_id: String,
+    pub token: String,
+    pub role: String,
+    pub status: InviteStatus,
+    pub expires_at: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserInviteList {
+    pub data: Vec<UserInvite>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -423,10 +345,11 @@ impl TokenValidationResponseBuilder {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RoleOrg {
     pub role: UserRole,
     pub org: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_role: Option<String>,
 }
 
@@ -445,9 +368,47 @@ pub struct UserGroupRequest {
     pub remove_roles: Option<std::collections::HashSet<String>>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 pub struct UserRoleRequest {
-    pub name: String,
+    pub role: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "custom_role"
+    )]
+    pub custom: Option<Vec<String>>,
+}
+
+impl From<&UserRoleRequest> for UserOrgRole {
+    fn from(role: &UserRoleRequest) -> Self {
+        let mut standard_role = get_default_user_role();
+        let mut custom_role = role.custom.clone();
+        let mut is_role_name_standard = false;
+        for user_role in get_roles() {
+            if user_role.to_string().eq(&role.role) {
+                standard_role = user_role;
+                is_role_name_standard = true;
+                break;
+            }
+        }
+        if !is_role_name_standard && custom_role.is_none() {
+            custom_role = Some(vec![role.role.clone()]);
+        }
+        UserOrgRole {
+            base_role: standard_role,
+            custom_role,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub fn is_standard_role(role: &str) -> bool {
+    for user_role in UserRole::iter() {
+        if user_role.to_string().eq_ignore_ascii_case(role) {
+            return true;
+        }
+    }
+    false
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -468,4 +429,350 @@ pub struct AuthTokensExt {
     pub refresh_token: String,
     pub request_time: i64,
     pub expires_in: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn test_user_request() {
+        let request = UserRequest {
+            email: "test@example.com".to_string(),
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            password: "password123".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::Admin,
+                custom_role: None,
+            },
+            is_external: false,
+            token: None,
+        };
+
+        assert_eq!(request.email, "test@example.com");
+        assert_eq!(request.first_name, "John");
+        assert_eq!(request.last_name, "Doe");
+        assert_eq!(request.password, "password123");
+        assert_eq!(request.role.base_role, UserRole::Admin);
+        assert!(request.role.custom_role.is_none());
+        assert!(!request.is_external);
+        assert!(request.token.is_none());
+    }
+
+    #[test]
+    fn test_user_request_to_new_dbuser() {
+        let request = UserRequest {
+            email: "test@example.com".to_string(),
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            password: "hashed_password".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::Admin,
+                custom_role: None,
+            },
+            is_external: false,
+            token: None,
+        };
+
+        let db_user = request.to_new_dbuser(
+            "hashed_password".to_string(),
+            "salt".to_string(),
+            "org1".to_string(),
+            "token123".to_string(),
+            "rum_token123".to_string(),
+            false,
+            "password_ext".to_string(),
+        );
+
+        assert_eq!(db_user.email, "test@example.com");
+        assert_eq!(db_user.first_name, "John");
+        assert_eq!(db_user.last_name, "Doe");
+        assert_eq!(db_user.password, "hashed_password");
+        assert_eq!(db_user.salt, "salt");
+        assert_eq!(db_user.organizations.len(), 1);
+        assert_eq!(db_user.organizations[0].name, "org1");
+        assert_eq!(db_user.organizations[0].token, "token123");
+        assert_eq!(
+            db_user.organizations[0].rum_token,
+            Some("rum_token123".to_string())
+        );
+        assert_eq!(db_user.organizations[0].role, UserRole::Admin);
+        assert!(!db_user.is_external);
+        assert_eq!(db_user.password_ext, Some("password_ext".to_string()));
+    }
+
+    #[test]
+    fn test_post_user_request() {
+        let request = PostUserRequest {
+            email: "test@example.com".to_string(),
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            password: "password123".to_string(),
+            role: UserRoleRequest {
+                role: "Admin".to_string(),
+                custom: None,
+            },
+            is_external: false,
+            token: None,
+        };
+
+        assert_eq!(request.email, "test@example.com");
+        assert_eq!(request.first_name, "John");
+        assert_eq!(request.last_name, "Doe");
+        assert_eq!(request.password, "password123");
+        assert_eq!(request.role.role, "Admin");
+        assert!(request.role.custom.is_none());
+        assert!(!request.is_external);
+        assert!(request.token.is_none());
+    }
+
+    #[test]
+    fn test_post_user_request_to_user_request() {
+        let post_request = PostUserRequest {
+            email: "test@example.com".to_string(),
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            password: "password123".to_string(),
+            role: UserRoleRequest {
+                role: "Admin".to_string(),
+                custom: None,
+            },
+            is_external: false,
+            token: None,
+        };
+
+        let user_request = UserRequest::from(&post_request);
+
+        assert_eq!(user_request.email, "test@example.com");
+        assert_eq!(user_request.first_name, "John");
+        assert_eq!(user_request.last_name, "Doe");
+        assert_eq!(user_request.password, "password123");
+        assert_eq!(user_request.role.base_role, UserRole::Admin);
+        assert_eq!(
+            user_request.role.custom_role.unwrap().first().unwrap(),
+            "Admin"
+        );
+        assert!(!user_request.is_external);
+        assert!(user_request.token.is_none());
+    }
+
+    #[test]
+    fn test_update_user() {
+        let update = UpdateUser {
+            change_password: true,
+            first_name: Some("John".to_string()),
+            last_name: Some("Doe".to_string()),
+            old_password: Some("old123".to_string()),
+            new_password: Some("new123".to_string()),
+            role: Some(UserRoleRequest {
+                role: "Admin".to_string(),
+                custom: None,
+            }),
+            token: Some("token123".to_string()),
+        };
+
+        assert!(update.change_password);
+        assert_eq!(update.first_name, Some("John".to_string()));
+        assert_eq!(update.last_name, Some("Doe".to_string()));
+        assert_eq!(update.old_password, Some("old123".to_string()));
+        assert_eq!(update.new_password, Some("new123".to_string()));
+        assert!(update.role.is_some());
+        assert_eq!(update.token, Some("token123".to_string()));
+    }
+
+    #[test]
+    fn test_update_user_default() {
+        let update = UpdateUser::default();
+
+        assert!(!update.change_password);
+        assert!(update.first_name.is_none());
+        assert!(update.last_name.is_none());
+        assert!(update.old_password.is_none());
+        assert!(update.new_password.is_none());
+        assert!(update.role.is_none());
+        assert!(update.token.is_none());
+    }
+
+    #[test]
+    fn test_user_response() {
+        let response = UserResponse {
+            email: "test@example.com".to_string(),
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            role: "Admin".to_string(),
+            is_external: false,
+            orgs: Some(vec![OrgRoleMapping {
+                org_id: "org1".to_string(),
+                org_name: "org1".to_string(),
+                role: UserRole::Admin,
+            }]),
+            created_at: 1234567890,
+        };
+
+        assert_eq!(response.email, "test@example.com");
+        assert_eq!(response.first_name, "John");
+        assert_eq!(response.last_name, "Doe");
+        assert_eq!(response.role, "Admin");
+        assert!(!response.is_external);
+        assert!(response.orgs.is_some());
+        assert_eq!(response.created_at, 1234567890);
+    }
+
+    #[test]
+    fn test_user_list() {
+        let list = UserList {
+            data: vec![UserResponse {
+                email: "test@example.com".to_string(),
+                first_name: "John".to_string(),
+                last_name: "Doe".to_string(),
+                role: "Admin".to_string(),
+                is_external: false,
+                orgs: None,
+                created_at: 1234567890,
+            }],
+        };
+
+        assert_eq!(list.data.len(), 1);
+        assert_eq!(list.data[0].email, "test@example.com");
+    }
+
+    #[test]
+    fn test_user_group() {
+        let mut users = HashSet::new();
+        users.insert("user1".to_string());
+        users.insert("user2".to_string());
+
+        let mut roles = HashSet::new();
+        roles.insert("role1".to_string());
+        roles.insert("role2".to_string());
+
+        let group = UserGroup {
+            name: "test_group".to_string(),
+            users: Some(users.clone()),
+            roles: Some(roles.clone()),
+        };
+
+        assert_eq!(group.name, "test_group");
+        assert_eq!(group.users, Some(users));
+        assert_eq!(group.roles, Some(roles));
+    }
+
+    #[test]
+    fn test_user_group_request() {
+        let mut add_users = HashSet::new();
+        add_users.insert("user1".to_string());
+
+        let mut remove_users = HashSet::new();
+        remove_users.insert("user2".to_string());
+
+        let mut add_roles = HashSet::new();
+        add_roles.insert("role1".to_string());
+
+        let mut remove_roles = HashSet::new();
+        remove_roles.insert("role2".to_string());
+
+        let request = UserGroupRequest {
+            add_users: Some(add_users.clone()),
+            remove_users: Some(remove_users.clone()),
+            add_roles: Some(add_roles.clone()),
+            remove_roles: Some(remove_roles.clone()),
+        };
+
+        assert_eq!(request.add_users, Some(add_users));
+        assert_eq!(request.remove_users, Some(remove_users));
+        assert_eq!(request.add_roles, Some(add_roles));
+        assert_eq!(request.remove_roles, Some(remove_roles));
+    }
+
+    #[test]
+    fn test_user_role_request() {
+        let request = UserRoleRequest {
+            role: "Admin".to_string(),
+            custom: Some(vec!["custom1".to_string(), "custom2".to_string()]),
+        };
+
+        assert_eq!(request.role, "Admin");
+        assert_eq!(
+            request.custom,
+            Some(vec!["custom1".to_string(), "custom2".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_user_role_request_to_user_org_role() {
+        let request = UserRoleRequest {
+            role: "Admin".to_string(),
+            custom: Some(vec!["custom1".to_string(), "custom2".to_string()]),
+        };
+
+        let org_role = UserOrgRole::from(&request);
+
+        assert_eq!(org_role.base_role, UserRole::Admin);
+        assert_eq!(
+            org_role.custom_role,
+            Some(vec!["custom1".to_string(), "custom2".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_roles_response() {
+        let response = RolesResponse {
+            label: "Admin".to_string(),
+            value: "admin".to_string(),
+        };
+
+        assert_eq!(response.label, "Admin");
+        assert_eq!(response.value, "admin");
+    }
+
+    #[test]
+    fn test_auth_tokens() {
+        let tokens = AuthTokens {
+            access_token: "access123".to_string(),
+            refresh_token: "refresh123".to_string(),
+        };
+
+        assert_eq!(tokens.access_token, "access123");
+        assert_eq!(tokens.refresh_token, "refresh123");
+    }
+
+    #[test]
+    fn test_auth_tokens_ext() {
+        let tokens = AuthTokensExt {
+            auth_ext: "auth123".to_string(),
+            refresh_token: "refresh123".to_string(),
+            request_time: 1234567890,
+            expires_in: 3600,
+        };
+
+        assert_eq!(tokens.auth_ext, "auth123");
+        assert_eq!(tokens.refresh_token, "refresh123");
+        assert_eq!(tokens.request_time, 1234567890);
+        assert_eq!(tokens.expires_in, 3600);
+    }
+
+    #[test]
+    fn test_token_validation_response_builder() {
+        let builder = TokenValidationResponseBuilder::new()
+            .is_valid(true)
+            .user_email("test@example.com".to_string())
+            .user_name("John Doe".to_string())
+            .family_name("Doe".to_string())
+            .given_name("John".to_string())
+            .is_internal_user(true)
+            .user_role(Some(UserRole::Admin));
+
+        let response = builder.build();
+
+        assert!(response.is_valid);
+        assert_eq!(response.user_email, "test@example.com");
+        assert_eq!(response.user_name, "John Doe");
+        assert_eq!(response.family_name, "Doe");
+        assert_eq!(response.given_name, "John");
+        assert!(response.is_internal_user);
+        assert_eq!(response.user_role, Some(UserRole::Admin));
+    }
 }

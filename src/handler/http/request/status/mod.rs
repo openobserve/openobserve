@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,25 +16,28 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    cookie,
+    HttpRequest, HttpResponse, cookie,
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
-    put, web, HttpRequest, HttpResponse,
+    post, put, web,
 };
 use arrow_schema::Schema;
 use config::{
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
-    meta::{cluster::NodeStatus, function::ZoFunction},
-    utils::{json, schema_ext::SchemaExt},
-    Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    meta::{
+        cluster::{NodeStatus, Role, RoleGroup},
+        function::ZoFunction,
+        search::{HashFileRequest, HashFileResponse},
+    },
+    utils::{base64, json, schema_ext::SchemaExt},
 };
 use hashbrown::HashMap;
 use infra::{
-    cache::{self, file_data::disk::FileType},
-    file_list,
-    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST},
+    cache, file_list,
+    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -43,17 +46,17 @@ use {
     crate::common::utils::{auth::extract_auth_str, jwt::verify_decode_token},
     crate::handler::http::auth::{
         jwt::process_token,
-        validator::{get_user_email_from_auth_str, ID_TOKEN_HEADER, PKCE_STATE_ORG},
+        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
-    config::{ider, utils::base64},
+    config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, HttpMeta, Protocol},
-        infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_text},
     },
     o2_openfga::config::{
@@ -121,9 +124,16 @@ struct ConfigResponse<'a> {
     all_fields_name: String,
     usage_enabled: bool,
     usage_publish_interval: i64,
+    ingestion_url: String,
     websocket_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
+    max_dashboard_series: usize,
+    actions_enabled: bool,
+    streaming_enabled: bool,
+    histogram_enabled: bool,
+    max_query_range: i64,
+    ai_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -213,6 +223,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let rbac_enabled = false;
 
     #[cfg(feature = "enterprise")]
+    let actions_enabled = o2cfg.actions.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let actions_enabled = false;
+
+    #[cfg(feature = "enterprise")]
     let super_cluster_enabled = o2cfg.super_cluster.enabled;
     #[cfg(not(feature = "enterprise"))]
     let super_cluster_enabled = false;
@@ -250,15 +265,20 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = false;
 
     #[cfg(feature = "enterprise")]
+    let ai_enabled = o2cfg.ai.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let ai_enabled = false;
+
+    #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
-        version: VERSION.to_string(),
+        version: config::VERSION.to_string(),
         instance: get_instance_id(),
-        commit_hash: COMMIT_HASH.to_string(),
-        build_date: BUILD_DATE.to_string(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        build_date: config::BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
@@ -268,7 +288,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
-        timestamp_column: cfg.common.column_timestamp.clone(),
+        timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: cfg.compact.data_retention_days,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
@@ -297,16 +317,23 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
         },
-        meta_org: cfg.common.usage_org.to_string(),
+        meta_org: META_ORG_ID.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
-        websocket_enabled: cfg.common.websocket_enabled,
+        ingestion_url: cfg.common.ingestion_url.to_string(),
+        websocket_enabled: cfg.websocket.enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
+        max_dashboard_series: cfg.limit.max_dashboard_series,
+        actions_enabled,
+        streaming_enabled: cfg.websocket.streaming_enabled,
+        histogram_enabled: cfg.limit.histogram_enabled,
+        max_query_range: cfg.limit.default_max_query_range_days * 24,
+        ai_enabled,
     }))
 }
 
@@ -332,11 +359,13 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let mem_file_num = cache::file_data::memory::len().await;
     let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len(FileType::DATA).await;
-    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats(FileType::DATA).await;
-    let disk_result_file_num = cache::file_data::disk::len(FileType::RESULT).await;
+    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::DATA).await;
+    let (disk_max_size, disk_cur_size) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::DATA).await;
+    let disk_result_file_num =
+        cache::file_data::disk::len(cache::file_data::disk::FileType::RESULT).await;
     let (disk_result_max_size, disk_result_cur_size) =
-        cache::file_data::disk::stats(FileType::RESULT).await;
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::RESULT).await;
     stats.insert(
         "FILE_DATA",
         json::json!({
@@ -352,9 +381,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         "FILE_LIST",
         json::json!({"num":file_list_num,"max_id": file_list_max_id}),
     );
-
-    let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
-    stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
 
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
     stats.insert(
@@ -399,14 +425,17 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         // Since this is not a protected route, there is no way to get the user email
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: chrono::Utc::now().timestamp_micros(),
-        protocol: Protocol::Http(HttpMeta {
-            method: "GET".to_string(),
-            path: "/config/reload".to_string(),
-            query_params: "".to_string(),
-            body: "".to_string(),
-            response_code: 200,
-        }),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/reload".to_string(),
+            http_query_params: "".to_string(),
+            http_body: "".to_string(),
+            http_response_code: 200,
+            error_msg: None,
+            trace_id: None,
+        },
     })
     .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
@@ -427,13 +456,6 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         }
     }
     drop(r);
-    let r = STREAM_SCHEMAS_COMPRESSED.read().await;
-    for (key, val) in r.iter() {
-        stream_num += 1;
-        mem_size += key.len();
-        mem_size += val.len();
-    }
-    drop(r);
     let r = STREAM_SCHEMAS_LATEST.read().await;
     for (key, schema) in r.iter() {
         stream_num += 1;
@@ -448,7 +470,9 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::{AuthTokens, UserRole};
+    use config::meta::user::UserRole;
+
+    use crate::common::meta::user::AuthTokens;
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -460,14 +484,17 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: chrono::Utc::now().timestamp_micros(),
-        protocol: Protocol::Http(HttpMeta {
-            method: "GET".to_string(),
-            path: "/config/redirect".to_string(),
-            body: "".to_string(),
-            query_params: req.query_string().to_string(),
-            response_code: 302,
-        }),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/redirect".to_string(),
+            http_body: "".to_string(),
+            http_query_params: req.query_string().to_string(),
+            http_response_code: 302,
+            error_msg: None,
+            trace_id: None,
+        },
     };
 
     match query.get("state") {
@@ -477,9 +504,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             Err(_) => {
                 // Bad Request
-                if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                    http_meta.response_code = 400;
-                }
+                audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
             }
@@ -487,9 +512,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
         None => {
             // Bad Request
-            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                http_meta.response_code = 400;
-            }
+            audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
@@ -543,10 +566,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     process_token(res).await
                 }
                 Err(e) => {
-                    if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                        http_meta.response_code = 400;
-                    }
-                    audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+                    audit_message.response_meta.http_response_code = 400;
+                    audit_message._timestamp = now_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
                 }
@@ -566,6 +587,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             })
             .unwrap();
             let cfg = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -581,7 +603,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             log::info!("Redirecting user after processing token");
 
-            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_url))
@@ -589,10 +611,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 .finish())
         }
         Err(e) => {
-            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
-                http_meta.response_code = 400;
-            }
-            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit_message.response_meta.http_response_code = 400;
+            audit_message._timestamp = now_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
         }
@@ -615,7 +635,8 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 #[get("/dex_refresh")]
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     let token = if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
 
         // remove old session id from cluster co-ordinator
 
@@ -647,6 +668,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             })
             .unwrap();
             let conf = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -666,6 +688,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
         Err(_) => {
             let conf = get_config();
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -694,6 +717,7 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     conf: &Arc<Config>,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
+    let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(
         cookie::time::OffsetDateTime::now_utc()
@@ -722,7 +746,9 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let user_email = get_user_email_from_auth_str(&auth_str).await;
 
     if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
 
         if access_token.starts_with("session") {
@@ -738,14 +764,17 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         audit(AuditMessage {
             user_email,
             org_id: "".to_string(),
-            _timestamp: chrono::Utc::now().timestamp_micros(),
-            protocol: Protocol::Http(HttpMeta {
-                method: "GET".to_string(),
-                path: "/config/logout".to_string(),
-                query_params: req.query_string().to_string(),
-                body: "".to_string(),
-                response_code: 200,
-            }),
+            _timestamp: now_micros(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: "GET".to_string(),
+                http_path: "/config/logout".to_string(),
+                http_query_params: req.query_string().to_string(),
+                http_body: "".to_string(),
+                http_response_code: 200,
+                error_msg: None,
+                trace_id: None,
+            },
         })
         .await;
     }
@@ -793,4 +822,46 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[get("/list")]
+async fn list_node() -> Result<HttpResponse, Error> {
+    let nodes = cluster::get_cached_nodes(|_| true).await;
+    Ok(MetaHttpResponse::json(nodes))
+}
+
+#[get("/metrics")]
+async fn node_metrics() -> Result<HttpResponse, Error> {
+    let metrics = config::utils::sysinfo::get_node_metrics();
+    Ok(MetaHttpResponse::json(metrics))
+}
+
+#[post("/consistent_hash")]
+async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpResponse, Error> {
+    let mut ret = HashFileResponse::default();
+    for file in body.files.iter() {
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "querier_interactive".to_string(),
+            cluster::get_node_from_consistent_hash(
+                file,
+                &Role::Querier,
+                Some(RoleGroup::Interactive),
+            )
+            .await
+            .unwrap_or_default(),
+        );
+        nodes.insert(
+            "querier_background".to_string(),
+            cluster::get_node_from_consistent_hash(
+                file,
+                &Role::Querier,
+                Some(RoleGroup::Background),
+            )
+            .await
+            .unwrap_or_default(),
+        );
+        ret.files.insert(file.clone(), nodes);
+    }
+    Ok(MetaHttpResponse::json(ret))
 }

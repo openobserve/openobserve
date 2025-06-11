@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_multipart::Multipart;
-use actix_web::{post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, post, web};
 use config::SIZE_IN_MB;
 use hashbrown::HashMap;
 
@@ -26,6 +26,8 @@ use crate::{
 };
 
 /// CreateEnrichmentTable
+///
+/// #{"ratelimit_module":"Enrichment Table", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -62,10 +64,16 @@ pub async fn save_enrichment_table(
         }
     };
     let cfg = config::get_config();
-    if content_length > cfg.limit.enrichment_table_limit as f64 {
+    log::debug!(
+        "Enrichment table {} content length in mb: {}, max size in mb: {}",
+        table_name,
+        content_length,
+        cfg.limit.enrichment_table_max_size
+    );
+    if content_length > cfg.limit.enrichment_table_max_size as f64 {
         return Ok(MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
-            cfg.limit.enrichment_table_limit
+            cfg.limit.enrichment_table_max_size
         )));
     }
     match content_type {
@@ -81,7 +89,7 @@ pub async fn save_enrichment_table(
                     Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
                     None => false,
                 };
-                let json_record = extract_multipart(payload).await?;
+                let json_record = extract_multipart(payload, append_data).await?;
                 save_enrichment_data(&org_id, &table_name, json_record, append_data).await
             } else {
                 Ok(MetaHttpResponse::bad_request(

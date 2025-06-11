@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::function::VRLCompilerConfig, GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE,
+    GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE, meta::function::VRLCompilerConfig,
 };
 use vector_enrichment::{Table, TableRegistry};
 
@@ -72,16 +72,17 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
         );
     }
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .common
         .enable_enterprise_mmdb
     {
         let geoip_ent = crate::common::infra::config::GEOIP_ENT_TABLE.read();
         if let Some(table) = geoip_ent.as_ref() {
             tables.insert(
-                    o2_enterprise::enterprise::common::infra::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
-                        .to_owned(),Box::new(table.clone())
-                );
+                o2_enterprise::enterprise::common::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
+                    .to_owned(),
+                Box::new(table.clone()),
+            );
         }
     };
 
@@ -89,4 +90,85 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
     let mut config = vrl::compiler::CompileConfig::default();
     config.set_custom(registry);
     VRLCompilerConfig { config, functions }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_init_vrl_runtime() {
+        let runtime = init_vrl_runtime();
+        assert!(runtime.is_empty());
+    }
+
+    #[test]
+    fn test_get_vrl_compiler_config() {
+        let config = get_vrl_compiler_config("default");
+        assert!(!config.functions.is_empty());
+        assert!(config.config.get_custom::<TableRegistry>().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_all_transform_keys() {
+        // Setup test data
+        let test_org = "test_org";
+        let test_key = format!("{}/test_transform", test_org);
+        crate::common::infra::config::QUERY_FUNCTIONS.insert(
+            test_key.clone(),
+            config::meta::function::Transform {
+                name: test_key.clone(),
+                function: ".".to_string(),
+                params: "row".to_string(),
+                num_args: 1,
+                trans_type: Some(0),
+                streams: Some(vec![config::meta::function::StreamOrder {
+                    stream: "test".to_string(),
+                    order: 1,
+                    stream_type: config::meta::stream::StreamType::Logs,
+                    is_removed: false,
+                    apply_before_flattening: false,
+                }]),
+            },
+        );
+
+        // Test the function
+        let keys = get_all_transform_keys(test_org).await;
+        assert!(keys.contains(&"test_transform".to_string()));
+    }
+
+    #[test]
+    fn test_get_vrl_compiler_config_with_enrichment_tables() {
+        // Setup test data
+        let test_org = "test_org";
+        let test_stream = "test_stream";
+        let table_name = "test_table";
+        let en_table = crate::service::enrichment::StreamTable {
+            org_id: test_org.to_string(),
+            stream_name: test_stream.to_string(),
+            data: vec![],
+        };
+        ENRICHMENT_TABLES.insert(table_name.to_string(), en_table);
+
+        // Test the function
+        let config = get_vrl_compiler_config(test_org);
+        let registry = config.config.get_custom::<TableRegistry>().unwrap();
+
+        // Verify enrichment table is loaded
+        assert!(registry.table_ids().contains(&test_stream.to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_all_transform_keys_empty() {
+        let keys = get_all_transform_keys("nonexistent_org").await;
+        assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_get_vrl_compiler_config_empty() {
+        let config = get_vrl_compiler_config("nonexistent_org");
+        let registry = config.config.get_custom::<TableRegistry>().unwrap();
+        assert!(registry.table_ids().is_empty());
+    }
 }

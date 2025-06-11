@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-py-2">
         <a
           href="https://github.com/openobserve/azure-function-openobserve"
-          class="hover:tw-underline text-primary"
+          class="hover:tw-underline"
           target="_blank"
           rel="noopener noreferrer"
         >

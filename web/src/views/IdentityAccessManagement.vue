@@ -1,7 +1,7 @@
 <template>
   <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
     <div class="flex no-wrap" style="height: calc(100vh - 50px) !important">
-      <div style="width: 160px" class="iam-tabs">
+      <div style="width: 180px" class="iam-tabs">
         <route-tabs
           ref="iamRouteTabsRef"
           dataTest="iam-tabs"
@@ -26,6 +26,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter } from "vue-router";
 import { nextTick } from "vue";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 const store = useStore();
 const { t } = useI18n();
@@ -35,6 +36,8 @@ const router = useRouter();
 const activeTab = ref("users");
 
 const iamRouteTabsRef: any = ref(null);
+
+const { isMetaOrg } = useIsMetaOrg();
 
 const tabs = ref([
   {
@@ -46,7 +49,7 @@ const tabs = ref([
         org_identifier: store.state.selectedOrganization.identifier,
       },
     },
-    label: t("iam.users"),
+    label: t("iam.basicUsers"),
     class: "tab_content",
   },
   {
@@ -86,6 +89,18 @@ const tabs = ref([
     class: "tab_content",
   },
   {
+    dataTest: "iam-quota-tab",
+    name: "quota",
+    to: {
+      name: "quota",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.quota"),
+    class: "tab_content",
+  },
+  {
     dataTest: "iam-organizations-tab",
     name: "organizations",
     to: {
@@ -112,12 +127,21 @@ watch(
         },
       });
     }
+    //this condition is added to avoid the unnecessarily showing the quota tab when the user is not in the meta org and trying to access the quota tab
+    //this is fallback to users tab when the user is not in the meta org and trying to access the quota tab
+    if(value == "quota" && !isMetaOrg.value){
+      router.push({
+        name: "users",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
   },
   {
     immediate: true,
   }
 );
-
 watch(
   () => store.state.zoConfig,
   () => {
@@ -129,7 +153,7 @@ watch(
 );
 
 function setTabs() {
-  const cloud = ["users", "organizations", "serviceAccounts"];
+  const cloud = ["users", "organizations"];
 
   const rbac = ["groups", "roles"];
 
@@ -140,13 +164,22 @@ function setTabs() {
     config.isEnterprise == "true" || config.isCloud == "true";
 
   if (isEnterprise) {
+  //for cloud version we dont want service accounts and for enterprise version we need service accounts 
+  //so it will be available for entrerprise version
+    if(config.isCloud == "false"){
+      cloud.push("serviceAccounts")
+    }
     let filteredTabs = tabs.value.filter((tab) => cloud.includes(tab.name));
 
     if (store.state.zoConfig.rbac_enabled) {
+      if(isMetaOrg.value){
+        rbac.push("quota")
+      }
       filteredTabs = [
         ...filteredTabs,
         ...tabs.value.filter((tab) => rbac.includes(tab.name)),
       ];
+
     }
 
     tabs.value = filteredTabs;

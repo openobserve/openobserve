@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :removed-users="removedUsers"
         />
         <GroupServiceAccounts
+          v-if="config.isCloud == 'false'"
           data-test="edit-role-users-section"
           v-show="activeTab === 'serviceAccounts'"
           :groupUsers="roleUsers"
@@ -135,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   dense
                   class="q-mb-xs no-border q-mr-md"
-                  :placeholder="t('common.search')"
+                  :placeholder="`Search Permissions`"
                   style="width: 300px"
                   @update:model-value="onResourceChange"
                 >
@@ -352,6 +353,8 @@ import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
+import config from "@/aws-exports";
+import commonService from "@/services/common";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -422,11 +425,14 @@ const tabs = [
     value: "users",
     label: "Users",
   },
-  {
+];
+
+if (config.isCloud == "false") {
+  tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
-  },
-];
+  });
+}
 
 const permissionDisplayOptions = [
   {
@@ -534,42 +540,94 @@ const getResourceByName = (
   if (!level) return null;
 };
 
-const setDefaultPermissions = () => {
-  //TODO: Need to make it recursive to support multi level nested resources
-  permissionsState.resources.forEach((resource: any) => {
-    const resourcePermission = getDefaultResource();
-    resourcePermission.name = resource.key;
-    resourcePermission.resourceName = resource.key;
-    resourcePermission.display_name = resource.display_name;
-    resourcePermission.top_level = resource.top_level;
+const setPermission = (resource: any, visited: Set<string>) => {
+  if (!resource || !resource.key) {
+    return;
+  }
 
-    if (resource.has_entities) resourcePermission.has_entities = true;
+  // Prevent infinite recursion by tracking visited resources
+  if (visited.has(resource.key)) {
+    return;
+  }
+  visited.add(resource.key);
 
-    resourcePermission.parent = resource.parent;
+  const resourcePermission = getDefaultResource();
+  resourcePermission.name = resource.key;
+  resourcePermission.resourceName = resource.key;
+  resourcePermission.display_name = resource.display_name;
+  resourcePermission.top_level = resource.top_level;
 
-    resourceMapper.value[resourcePermission.name] = resourcePermission;
+  if (resource.has_entities) resourcePermission.has_entities = true;
 
-    if (resource.parent) {
-      const parentResource = getResourceByName(
-        permissionsState.permissions,
-        resource.parent,
+  resourcePermission.parent = resource.parent;
+
+  resourceMapper.value[resourcePermission.name] = resourcePermission;
+
+  if (resource.parent) {
+    const parentResource = getResourceByName(
+      permissionsState.permissions,
+      resource.parent,
+    );
+
+    if (parentResource) {
+      parentResource.childs.push(resourcePermission as Resource);
+      return;
+    } else {
+      // Find parent in resources array
+      const _parentResource = permissionsState.resources.find(
+        (r) => r.key === resource.parent,
       );
-      if (parentResource) {
-        parentResource.childs.push(resourcePermission as Resource);
-        return;
+
+      if (_parentResource && !visited.has(_parentResource.key)) {
+        // Process parent first
+        setPermission(_parentResource, visited);
+
+        // Get the processed parent resource
+        const processedParentResource = getResourceByName(
+          permissionsState.permissions,
+          resource.parent,
+        );
+
+        if (processedParentResource) {
+          processedParentResource.childs.push(resourcePermission as Resource);
+        }
       }
     }
+  }
 
-    modifyResourcePermissions(resourcePermission);
-
+  modifyResourcePermissions(resourcePermission);
+    if (resourcePermission.name === 'org' && store.state.selectedOrganization.identifier !== store.state.zoConfig.meta_org) {
+      return; // Skip adding 'org' resource if the organization is not _meta
+    }
     permissionsState.permissions.push(resourcePermission as Resource);
-  });
+};
 
+const setDefaultPermissions = () => {
+  // Create a single visited set to be shared across all recursive calls
+  const visited = new Set<string>();
+
+  // Process resources in order of their parent relationships
+  const processResource = (resource: any) => {
+    if (!visited.has(resource.key)) {
+      setPermission(resource, visited);
+    }
+  };
+
+  // First process resources without parents
+  permissionsState.resources
+    .filter((resource: any) => !resource.parent)
+    .forEach(processResource);
+
+  // Then process resources with parents
+  permissionsState.resources
+    .filter((resource: any) => resource.parent)
+    .forEach(processResource);
+
+  // Filter out child resources from the top level
   permissionsState.permissions = permissionsState.permissions.filter(
     (resource) => !resource.parent,
   );
 };
-
 const modifyResourcePermissions = (resource: Resource) => {
   if (resource.resourceName === "settings") {
     resource.permission.AllowList.show = false;
@@ -679,16 +737,34 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           resource,
         ) as Resource;
       }
-
       // Added it intentionally, as to get parent resource for dashboard, before getting dashboard permissions
       if (!resourceMapper[resource] && resource === "dashboard") {
-        if (!resourceMapper["dfolder"])
+        if (!resourceMapper["dfolder"]) {
           resourceMapper["dfolder"] = getResourceByName(
             permissionsState.permissions,
             "dfolder",
           ) as Resource;
+        }
 
         await getResourceEntities(resourceMapper["dfolder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
+      if (!resourceMapper[resource] && resource === "alert") {
+        if (!resourceMapper["afolder"]) {
+          resourceMapper["afolder"] = getResourceByName(
+            permissionsState.permissions,
+            "afolder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["afolder"]);
 
         if (!resourceMapper[resource]) {
           resourceMapper[resource] = getResourceByName(
@@ -730,6 +806,13 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(dashResource as Entity);
+      } else if (resource === "alert") {
+        const [folderId, alertId] = entity.split("/");
+
+        const alertResource = resourceMapper["afolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        );
+        await getResourceEntities(alertResource as Entity);
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
@@ -903,6 +986,12 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
+      } else if (resource === "alert") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["afolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -947,6 +1036,12 @@ const updateJsonInTable = () => {
         const [folderId, dashboardId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
+      } else if (resource === "alert") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
@@ -1282,6 +1377,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     service_accounts: getServiceAccounts,
     action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
+    afolder: getAlertFolders,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1393,7 +1489,33 @@ const getFolders = async () => {
     resolve(true);
   });
 };
+const getAlertFolders = async () => {
+  //this is exaclty same as getFolders, but we are using different endpoint
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "alerts",
+  );
 
+  let isDefaultPresent = folders.data.list.find(
+    (folder: any) => folder.folderId === "default",
+  );
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "afolder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "alert",
+  );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
 const _getGroups = async () => {
   const groups = await getGroups(store.state.selectedOrganization.identifier);
   updateResourceEntities("group", [], [...groups.data]);
@@ -1459,24 +1581,32 @@ const getPipelines = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("pipeline", ["name"], [...pipelines.data.list]);
+  updateResourceEntities("pipeline", ["pipeline_id"], [...pipelines.data.list],false,"name");
 
   return new Promise((resolve) => {
     resolve(true);
   });
 };
 
-const getAlerts = async () => {
-  const alerts = await alertService.list(
-    1,
+const getAlerts = async (resource: Entity | Resource) => {
+  let alerts: any = await alertService.listByFolderId(
+    0,
     10000,
     "name",
     false,
     "",
     store.state.selectedOrganization.identifier,
+    resource.name,
+    "",
   );
 
-  updateResourceEntities("alert", ["name"], [...alerts.data.list]);
+  updateEntityEntities(
+    resource,
+    ["alertId"],
+    [...alerts.data.list],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1538,7 +1668,8 @@ const getActionScripts = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("action_scripts", ["name"], [...actionScripts.data]);
+
+  updateResourceEntities("action_scripts", ["id"], [...actionScripts.data],false,"name");
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1625,6 +1756,9 @@ const updateEntityEntities = (
 
       if (entity.childName === "dashboard") {
         entityName = entity["name"] + "/" + _entity["dashboardId"];
+      }
+      if (entity.childName === "alert") {
+        entityName = entity["name"] + "/" + _entity["alert_id"];
       }
     }
 

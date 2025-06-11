@@ -16,31 +16,30 @@
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicI64, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, metrics,
-    utils::hash::{gxhash, Sum64},
-    MEM_TABLE_INDIVIDUAL_STREAMS,
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
+    utils::hash::{Sum64, gxhash},
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{mpsc, RwLock};
-use wal::Writer as WalWriter;
+use tokio::sync::{RwLock, mpsc};
+use wal::{Writer as WalWriter, build_file_path};
 
 use crate::{
+    ReadRecordBatchEntry, WriterSignal,
     entry::Entry,
     errors::*,
-    immutable::{Immutable, IMMUTABLES},
+    immutable::{IMMUTABLES, Immutable},
     memtable::MemTable,
     rwmap::RwMap,
-    ReadRecordBatchEntry, WriterSignal,
 };
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
@@ -214,12 +213,10 @@ impl Writer {
             key: key.clone(),
             wal: Arc::new(RwLock::new(
                 WalWriter::new(
-                    wal_dir,
-                    &key.org_id,
-                    &key.stream_type,
-                    wal_id.to_string(),
+                    build_file_path(wal_dir, &key.org_id, &key.stream_type, wal_id.to_string()),
                     cfg.limit.max_file_size_on_disk as u64,
                     cfg.limit.wal_write_buffer_size,
+                    None,
                 )
                 .expect("wal file create error"),
             )),
@@ -356,6 +353,7 @@ impl Writer {
                 continue;
             }
             wal.write(&entry).context(WalSnafu)?;
+            tokio::task::coop::consume_budget().await;
         }
         drop(wal);
 
@@ -371,6 +369,7 @@ impl Writer {
                 continue;
             }
             mem.write(entry.schema.clone().unwrap(), entry, batch)?;
+            tokio::task::coop::consume_budget().await;
         }
         drop(mem);
 
@@ -415,12 +414,15 @@ impl Writer {
             wal_id
         );
         let new_wal = WalWriter::new(
-            wal_dir,
-            &self.key.org_id,
-            &self.key.stream_type,
-            wal_id.to_string(),
+            build_file_path(
+                wal_dir,
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id.to_string(),
+            ),
             cfg.limit.max_file_size_on_disk as u64,
             cfg.limit.wal_write_buffer_size,
+            None,
         )
         .context(WalSnafu)?;
         wal.sync().context(WalSnafu)?; // sync wal before rotation
@@ -445,7 +447,7 @@ impl Writer {
         let path = old_wal.path().clone();
         let path_str = path.display().to_string();
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str,);
+        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str);
         IMMUTABLES.write().await.insert(path, table);
         log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
 
@@ -493,9 +495,10 @@ impl Writer {
     /// Check if the wal file size is over the threshold or the file is too old
     fn check_wal_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
         let cfg = get_config();
-        let (compressed_size, _uncompressed_size) = written_size;
+        let (compressed_size, uncompressed_size) = written_size;
         compressed_size > wal::FILE_TYPE_IDENTIFIER_LEN
             && (compressed_size + data_size > cfg.limit.max_file_size_on_disk
+                || uncompressed_size + data_size > cfg.limit.max_file_size_on_disk
                 || self.created_at.load(Ordering::Relaxed)
                     + Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                         .unwrap()

@@ -16,7 +16,7 @@
 use config::meta::stream::StreamType;
 use futures_util::future::try_join_all;
 use proto::cluster_rpc::{
-    streams_server::Streams, StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse,
+    StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse, streams_server::Streams,
 };
 use tonic::{Request, Response, Status};
 
@@ -101,11 +101,10 @@ impl Streams for StreamServiceImpl {
 
         let entries = Self::process_orgs_batch(&orgs, stream_type, stream_name).await;
         log::debug!(
-            "orgs:{:?}, stream_type:{:?}, stream_name:{:?}, stream stats: {:?}",
+            "[grpc:stream_stats] orgs: {:?}, stream_type: {:?}, stream_name: {:?}",
             orgs,
             stream_type,
             stream_name,
-            entries
         );
         Ok(Response::new(StreamStatsResponse { entries }))
     }

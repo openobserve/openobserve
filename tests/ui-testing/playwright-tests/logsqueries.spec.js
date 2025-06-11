@@ -138,6 +138,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Explore' }).first().click({ force: true });
     await page.waitForTimeout(5000);
     await page.waitForSelector('[data-test="logs-search-saved-views-btn"]');
@@ -216,6 +217,7 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForTimeout(3000);
     await page.click('[data-test="streams-search-stream-input"]')
     await page.keyboard.type("e2e_automate");
+    await page.waitForTimeout(2000);
     await page.locator("[title=\"Stream Detail\"]").first().click({ force: true });
     await page.locator(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     const scope = page.locator(".q-virtual-scroll__content");
@@ -256,7 +258,7 @@ test.describe("Logs Queries testcases", () => {
     await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
     await page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
     await page.waitForTimeout(4000);
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await expect(page.locator(
       '[data-cy="search-bar-refresh-button"] > .q-btn__content')).toBeVisible(); await page.waitForTimeout(
         3000); await page.locator(
@@ -298,4 +300,62 @@ test.describe("Logs Queries testcases", () => {
 
   });
 
+  test("should display results if stringmatch ignorecase lowercase added in log query search", async ({ page }) => {
+    // Type the value of a variable into an input field
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+    // Ensure the query editor is visible and clickable before typing
+    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    await expect(queryEditor).toBeVisible();
+    await queryEditor.click();
+    await page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'ziox')");
+    await page.waitForTimeout(4000);
+
+    // Ensure the refresh button is visible and clickable before clicking
+    const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
+    await expect(refreshButton).toBeVisible();
+    await refreshButton.click({ force: true });
+
+    // Verify that the expected log table column is visible
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+  });
+
+
+  test("should display results if stringmatch ignorecase uppercase added in log query search", async ({ page }) => {
+    // Type the value of a variable into an input field
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+    // Ensure the query editor is visible and clickable before typing
+    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    await expect(queryEditor).toBeVisible();
+    await queryEditor.click();
+    await page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'Ziox')");
+    await page.waitForTimeout(4000);
+
+    // Ensure the refresh button is visible and clickable before clicking
+    const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
+    await expect(refreshButton).toBeVisible();
+    await refreshButton.click({ force: true });
+
+    // Verify that the expected log table column is visible
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+  });
+
+  test("should trigger search results when pressing Cmd+Enter or Ctrl+Enter", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutTest();
+  });
+
+  test("should execute query with keyboard shortcut (Cmd+Enter or Ctrl+Enter) after clicking elsewhere ", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutAfterClickingElsewhere();
+  });
+
+  test("should execute different query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutWithDifferentQuery();
+  });
+
+  test("should execute SQL query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", async ({ page }) => {
+    await logsPage.executeQueryWithKeyboardShortcutWithSQLMode();
+  });
 })

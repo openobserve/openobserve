@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,16 @@
 
 use config::meta::{
     dashboards::{
-        v1::Dashboard as DashboardV1, v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3,
-        v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
-        ListDashboardsParams,
+        Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
+        v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4,
+        v5::Dashboard as DashboardV5,
     },
     folder::{Folder, FolderType},
 };
 use sea_orm::{
-    prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, ConnectionTrait,
-    DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set, TransactionTrait, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use serde_json::Value as JsonValue;
 use svix_ksuid::KsuidLike;
@@ -35,7 +35,7 @@ use super::{
     folders::folder_type_into_i16,
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors::{self, GetDashboardError},
 };
 
@@ -57,6 +57,7 @@ impl TryFrom<dashboards::Model> for Dashboard {
                 "description".to_owned(),
                 value.description.unwrap_or_default().into(),
             );
+            obj.insert("updatedAt".to_owned(), value.updated_at.into());
         }
 
         match value.version {
@@ -159,10 +160,16 @@ pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
 
 /// Creates a new dashboard or updates an existing dashboard in the database.
 /// Returns the new or updated dashboard.
+///
+/// `clone` is a boolean that determines whether the dashboard should be cloned.
+/// if `clone` is true, the given dashboard will be used as it is when saving to db.
+/// `clone` should be always true for super cluster.
 pub async fn put(
     org_id: &str,
     folder_id: &str,
-    dashboard: Dashboard,
+    new_folder_id: Option<&str>,
+    mut dashboard: Dashboard,
+    clone: bool,
 ) -> Result<Dashboard, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
@@ -192,56 +199,86 @@ pub async fn put(
         .map(|d| d.to_owned());
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
-
+    if clone {
+        dashboard.set_updated_at();
+    }
+    let updated_at = dashboard.updated_at;
     let data = inner_data_as_json(dashboard)?;
 
-    let model = match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
-        None => {
-            // Destination folder does not exist so the dashboard can neither be
-            // created nor updated.
-            Err(errors::PutDashboardError::FolderDoesNotExist)
-        }
-        Some((folder_m, Some(dash_m))) => {
-            // Destination folder exists and dashboard already exists, so
-            // update the dashboard.
-            let mut dash_am = dash_m.into_active_model();
-            dash_am.folder_id = Set(folder_m.id);
-            dash_am.owner = Set(owner);
-            dash_am.role = Set(role);
-            dash_am.title = Set(title);
-            dash_am.description = Set(description);
-            dash_am.data = Set(data);
-            dash_am.version = Set(version);
-            let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
-            Ok(model)
-        }
-        Some((folder_m, None)) => {
-            // Destination folder exists but dashboard does not exist, so create
-            // a new dashboard.
-            let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
-                created_at_tz.timestamp()
-            } else {
-                chrono::Utc::now().timestamp()
-            };
+    // Try to get the new folder if the dashboard is being moved to a new folder.
+    let maybe_new_folder_model = if let Some(new_folder_id) = new_folder_id {
+        let new_folder_model = folders::Entity::find()
+            .filter(folders::Column::Org.eq(org_id))
+            .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)))
+            .filter(folders::Column::FolderId.eq(new_folder_id))
+            .one(client)
+            .await?
+            .ok_or(errors::PutDashboardError::FolderDoesNotExist)?;
+        Some(new_folder_model)
+    } else {
+        None
+    };
 
-            let dash_am = dashboards::ActiveModel {
-                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
-                dashboard_id: Set(dashboard_id.to_owned()),
-                folder_id: Set(folder_m.id),
-                owner: Set(owner),
-                role: Set(role),
-                title: Set(title),
-                description: Set(description),
-                data: Set(data),
-                version: Set(version),
-                created_at: Set(created_at_unix),
-            };
-            let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
-            Ok(model)
-        }
-    }?;
+    let dashboard_model =
+        match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
+            None => {
+                // Destination folder does not exist so the dashboard can neither be
+                // created nor updated.
+                Err(errors::PutDashboardError::FolderDoesNotExist)
+            }
+            Some((folder_m, Some(dash_m))) => {
+                // Destination folder exists and dashboard already exists, so
+                // update the dashboard.
 
-    let dash = model.try_into()?;
+                // If the dashboard is being to a new folder, then update the folder ID foreign key.
+                // Otherwise keep using the older folder ID foreign key.
+                let folder_id = if let Some(new_folder_model) = maybe_new_folder_model {
+                    new_folder_model.id
+                } else {
+                    folder_m.id
+                };
+
+                let mut dash_am = dash_m.into_active_model();
+                dash_am.folder_id = Set(folder_id);
+                dash_am.owner = Set(owner);
+                dash_am.role = Set(role);
+                dash_am.title = Set(title);
+                dash_am.description = Set(description);
+                dash_am.data = Set(data);
+                dash_am.version = Set(version);
+                dash_am.updated_at = Set(updated_at);
+                let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
+                Ok(model)
+            }
+            Some((folder_m, None)) => {
+                // Destination folder exists but dashboard does not exist, so create
+                // a new dashboard.
+                // TODO: Use timestamp in microseconds like all other resources
+                let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
+                    created_at_tz.timestamp()
+                } else {
+                    chrono::Utc::now().timestamp()
+                };
+
+                let dash_am = dashboards::ActiveModel {
+                    id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+                    dashboard_id: Set(dashboard_id.to_owned()),
+                    folder_id: Set(folder_m.id),
+                    owner: Set(owner),
+                    role: Set(role),
+                    title: Set(title),
+                    description: Set(description),
+                    data: Set(data),
+                    version: Set(version),
+                    created_at: Set(created_at_unix),
+                    updated_at: Set(updated_at),
+                };
+                let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
+                Ok(model)
+            }
+        }?;
+
+    let dash = dashboard_model.try_into()?;
     Ok(dash)
 }
 
@@ -463,7 +500,7 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{entity::prelude::*, DatabaseBackend, MockDatabase, Transaction};
+    use sea_orm::{DatabaseBackend, MockDatabase, Transaction, entity::prelude::*};
 
     use super::*;
 
@@ -483,7 +520,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Postgres,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -513,7 +550,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::MySql,
-                r#"SELECT `dashboards`.`id` AS `A_id`, `dashboards`.`dashboard_id` AS `A_dashboard_id`, `dashboards`.`folder_id` AS `A_folder_id`, `dashboards`.`owner` AS `A_owner`, `dashboards`.`role` AS `A_role`, `dashboards`.`title` AS `A_title`, `dashboards`.`description` AS `A_description`, `dashboards`.`data` AS `A_data`, `dashboards`.`version` AS `A_version`, `dashboards`.`created_at` AS `A_created_at`, `folders`.`id` AS `B_id`, `folders`.`org` AS `B_org`, `folders`.`folder_id` AS `B_folder_id`, `folders`.`name` AS `B_name`, `folders`.`description` AS `B_description`, `folders`.`type` AS `B_type` FROM `dashboards` LEFT JOIN `folders` ON `dashboards`.`folder_id` = `folders`.`id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`name` ASC LIMIT ? OFFSET ?"#,
+                r#"SELECT `dashboards`.`id` AS `A_id`, `dashboards`.`dashboard_id` AS `A_dashboard_id`, `dashboards`.`folder_id` AS `A_folder_id`, `dashboards`.`owner` AS `A_owner`, `dashboards`.`role` AS `A_role`, `dashboards`.`title` AS `A_title`, `dashboards`.`description` AS `A_description`, `dashboards`.`data` AS `A_data`, `dashboards`.`version` AS `A_version`, `dashboards`.`created_at` AS `A_created_at`, `dashboards`.`updated_at` AS `A_updated_at`, `folders`.`id` AS `B_id`, `folders`.`org` AS `B_org`, `folders`.`folder_id` AS `B_folder_id`, `folders`.`name` AS `B_name`, `folders`.`description` AS `B_description`, `folders`.`type` AS `B_type` FROM `dashboards` LEFT JOIN `folders` ON `dashboards`.`folder_id` = `folders`.`id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`name` ASC LIMIT ? OFFSET ?"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -543,7 +580,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Sqlite,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
                 [
                     "orgId".into(),
                     0i16.into(),

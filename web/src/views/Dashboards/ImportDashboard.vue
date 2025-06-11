@@ -406,10 +406,15 @@ export default defineComponent({
           reader.onload = (e) => {
             try {
               const jsonObject = JSON.parse(e.target.result);
-              fileContents.push(jsonObject);
+              // If the parsed object is an array, flatten it
+              if (Array.isArray(jsonObject)) {
+                fileContents.push(...jsonObject); // spread into fileContents
+              } else {
+                fileContents.push(jsonObject);
+              }
 
               // Check if all files have been processed
-              if (fileContents.length === newVal.length) {
+              if (fileContents.length >= newVal.length) {
                 jsonStr.value = JSON.stringify(fileContents, null, 2);
               }
             } catch (error) {
@@ -513,27 +518,60 @@ export default defineComponent({
         isLoading.value = false;
         return;
       }
+
       isLoading.value = ImportType.FILES;
 
-      jsonStr.value = JSON.parse(jsonStr.value);
+      try {
+        jsonStr.value = JSON.parse(jsonStr.value);
+      } catch (e) {
+        showErrorNotification("Invalid JSON content");
+        isLoading.value = false;
+        return;
+      }
 
-      const data = jsonStr.value.map((parsedObject, index) => {
-        return new Promise((resolve, reject) => {
+
+      const data = jsonStr.value.map((parsedContent, fileIndex) => {
+        return new Promise(async (resolve, reject) => {
+          const fileName = jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
+
           try {
-            const convertedSchema = convertDashboardSchemaVersion(parsedObject);
+            //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
+            //to support both the cases, we are using this condition\
+            //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
+            const dashboards = Array.isArray(parsedContent)
+              ? parsedContent
+              : [parsedContent];
 
-            importDashboardFromJSON(convertedSchema, selectedFolder.value)
-              .then((res) => {
-                resolve({ file: jsonFiles.value[index].name, result: res });
-              })
-              .catch((e) => {
-                reject({ file: jsonFiles.value[index].name, error: e });
-              });
+            const results = [];
+
+            for (let i = 0; i < dashboards.length; i++) {
+              const dashboard = dashboards[i];
+              //this is the core logic to convert the dashboard schema version
+              //it will convert the dashboard schema version to the latest version
+
+              try {
+                const convertedSchema = convertDashboardSchemaVersion(dashboard);
+                const res = await importDashboardFromJSON(convertedSchema, selectedFolder.value);
+                results.push({ index: i + 1, result: res });
+              } catch (e) {
+                results.push({ index: i + 1, error: e });
+              }
+            }
+
+            const failedMessages = results
+                .filter(r => r.error)
+                .map(r => `${r.error?.message || r.error}`);
+
+              if (failedMessages.length) {
+                reject({
+                  file: `JSON ${fileIndex + 1}`,         
+                  error: failedMessages.join("; "),
+                });
+              } else {
+                resolve({ file: fileName, results });
+              }
           } catch (e) {
-            reject({
-              file: jsonFiles.value[index].name,
-              error: "Error processing file",
-            });
+            reject({ file: fileName, error: "Error processing file" });
           }
         });
       });
@@ -541,29 +579,25 @@ export default defineComponent({
       Promise.allSettled(data).then(async (results) => {
         filesImportResults.value = results;
 
-        const allFulfilledValues = results.filter(
-          (r) => r.status === "fulfilled",
-        ).length;
+        const successfulImports = results.filter(r => r.status === "fulfilled").length;
 
-        if (results.length === allFulfilledValues) {
+        if (results.length === successfulImports) {
           await resetAndRefresh(ImportType.FILES, selectedFolder.value);
         }
 
-        if (allFulfilledValues) {
-          showPositiveNotification(
-            `${allFulfilledValues} Dashboard(s) Imported`,
-          );
+        if (successfulImports) {
+          showPositiveNotification(`${successfulImports} File(s) Imported Successfully`);
         }
 
-        if (results.length - allFulfilledValues) {
-          showErrorNotification(
-            `${results.length - allFulfilledValues} Dashboard(s) Failed to Import`,
-          );
+        const failedImports = results.length - successfulImports;
+        if (failedImports) {
+          showErrorNotification(`${failedImports} File(s) Failed to Import`);
         }
 
         isLoading.value = false;
       });
     };
+
 
     // reset and refresh the value based on selected type
     const resetAndRefresh = async (type, selectedFolder) => {
@@ -598,34 +632,54 @@ export default defineComponent({
     const importFromUrl = async () => {
       isLoading.value = ImportType.URL;
       try {
-        // get the dashboard
-        const urlData = url.value.trim() ? url.value.trim() : "";
+        const urlData = url.value.trim();
 
         if (!urlData && !jsonStr.value) {
           showErrorNotification("Please Enter a URL for import");
           return;
         }
 
-        const oldImportedSchema = JSON.parse(jsonStr.value);
-        const convertedSchema =
-          convertDashboardSchemaVersion(oldImportedSchema);
+        //this is used to convert the json string to an array of objects
+        //so that we can use the same logic to import the dashboard
+        //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
+        const rawJson = JSON.parse(jsonStr.value);
+        const dashboards = Array.isArray(rawJson) ? rawJson : [rawJson];
+        
 
-        await importDashboardFromJSON(
-          convertedSchema,
-          selectedFolder.value,
-        ).then((res) => {
-          resetAndRefresh(ImportType.URL, selectedFolder.value);
-          filesImportResults.value = [];
-          jsonStr.value = "";
-
-          showPositiveNotification(`Dashboard Imported Successfully`);
+        const importPromises = dashboards.map((dashboard, index) => {
+          try {
+            const converted = convertDashboardSchemaVersion(dashboard);
+            return importDashboardFromJSON(converted, selectedFolder.value);
+          } catch (e) {
+            return Promise.reject({ index, error: e });
+          }
         });
+
+        const results = await Promise.allSettled(importPromises);
+
+        const successCount = results.filter(r => r.status === 'fulfilled').length;
+        const failedCount = results.length - successCount;
+
+        if (successCount > 0) {
+          await resetAndRefresh(ImportType.URL, selectedFolder.value);
+          showPositiveNotification(`${successCount} Dashboard(s) Imported Successfully`);
+        }
+
+        if (failedCount > 0) {
+          showErrorNotification(`${failedCount} Dashboard(s) Failed to Import`);
+        }
+
+        filesImportResults.value = results;
       } catch (error) {
         showErrorNotification("Failed to Import Dashboard");
       } finally {
+        if (jsonStr.value && typeof jsonStr.value !== "string") {
+            jsonStr.value = "";
+          }
         isLoading.value = false;
       }
     };
+
 
     // import dashboard from json string
     const importFromJsonStr = async () => {

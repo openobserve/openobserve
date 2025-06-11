@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,6 +73,9 @@ fn flatten_value(
         }
         Value::Array(arr) => {
             flatten_array(arr, &parent_key, max_level, depth, flattened)?;
+        }
+        Value::Null => {
+            // we don't need to store null values
         }
         _ => {
             flattened.insert(parent_key, current);

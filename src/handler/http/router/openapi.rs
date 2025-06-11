@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{get_config, meta::stream::StreamType};
-use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi};
+#[cfg(feature = "enterprise")]
+use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
+use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme};
 
 use crate::{common::meta, handler::http::request};
 
@@ -28,6 +30,8 @@ use crate::{common::meta, handler::http::request};
         request::users::delete,
         request::users::add_user_to_org,
         request::organization::org::organizations,
+        request::organization::org::create_org,
+        request::organization::org::rename_org,
         request::organization::org::org_summary,
         request::organization::org::get_user_passcode,
         request::organization::org::update_user_passcode,
@@ -45,6 +49,7 @@ use crate::{common::meta, handler::http::request};
         request::logs::ingest::bulk,
         request::logs::ingest::multi,
         request::logs::ingest::json,
+        request::logs::loki::loki_push,
         request::traces::traces_write,
         request::traces::get_latest_traces,
         request::metrics::ingest::json,
@@ -62,7 +67,8 @@ use crate::{common::meta, handler::http::request};
         request::rum::ingest::sessionreplay,
         request::search::search,
         request::search::search_partition,
-        request::search::around,
+        request::search::around_v1,
+        request::search::around_v2,
         request::search::values,
         request::search::search_history,
         request::search::saved_view::create_view,
@@ -94,6 +100,7 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::get_dashboard,
         request::dashboards::delete_dashboard,
         request::dashboards::move_dashboard,
+        request::dashboards::move_dashboards,
         request::dashboards::timed_annotations::create_annotations,
         request::dashboards::timed_annotations::get_annotations,
         request::dashboards::timed_annotations::delete_annotations,
@@ -136,6 +143,58 @@ use crate::{common::meta, handler::http::request};
         request::clusters::list_clusters,
         request::short_url::shorten,
         request::short_url::retrieve,
+        request::ratelimit::list_module_ratelimit,
+        request::ratelimit::list_role_ratelimit,
+        request::ratelimit::update_ratelimit,
+        request::service_accounts::list,
+        request::service_accounts::save,
+        request::service_accounts::update,
+        request::service_accounts::delete,
+        request::service_accounts::get_api_token,
+        request::pipeline::save_pipeline,
+        request::pipeline::list_pipelines,
+        request::pipeline::list_streams_with_pipeline,
+        request::pipeline::delete_pipeline,
+        request::pipeline::update_pipeline,
+        request::pipeline::enable_pipeline,
+        request::dashboards::reports::create_report,
+        request::dashboards::reports::update_report,
+        request::dashboards::reports::list_reports,
+        request::dashboards::reports::get_report,
+        request::dashboards::reports::delete_report,
+        request::dashboards::reports::enable_report,
+        request::dashboards::reports::trigger_report,
+        request::actions::action::upload_zipped_action,
+        request::actions::action::delete_action,
+        request::actions::action::serve_action_zip,
+        request::actions::action::update_action_details,
+        request::actions::action::list_actions,
+        request::actions::action::get_action_from_id,
+        request::authz::fga::create_role,
+        request::authz::fga::delete_role,
+        request::authz::fga::get_roles,
+        request::authz::fga::update_role,
+        request::authz::fga::get_role_permissions,
+        request::authz::fga::get_users_with_role,
+        request::authz::fga::create_group,
+        request::authz::fga::update_group,
+        request::authz::fga::get_groups,
+        request::authz::fga::get_group_details,
+        request::authz::fga::delete_group,
+        request::keys::save,
+        request::keys::get,
+        request::keys::list,
+        request::keys::delete,
+        request::keys::update,
+        request::search::search_job::submit_job,
+        request::search::search_job::list_status,
+        request::search::search_job::get_status,
+        request::search::search_job::cancel_job,
+        request::search::search_job::get_job_result,
+        request::search::search_job::delete_job,
+        request::search::search_job::retry_job,
+        request::search::search_stream::search_http2_stream,
+        request::search::search_stream::values_http2_stream,
     ),
     components(
         schemas(
@@ -188,6 +247,7 @@ use crate::{common::meta, handler::http::request};
             crate::handler::http::models::dashboards::ListDashboardsResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBodyItem,
             crate::handler::http::models::dashboards::MoveDashboardRequestBody,
+            crate::handler::http::models::dashboards::MoveDashboardsRequestBody,
             // Destinations
             crate::handler::http::models::destinations::Destination,
             crate::handler::http::models::destinations::DestinationType,
@@ -227,7 +287,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::search::RequestEncoding,
             config::meta::search::Response,
             config::meta::search::ResponseTook,
-            config::meta::search::ResponseNodeTook,
             config::meta::search::SearchEventType,
             config::meta::search::SearchEventContext,
             config::meta::search::SearchPartitionRequest,
@@ -240,9 +299,14 @@ use crate::{common::meta, handler::http::request};
             config::meta::search::ScanStats,
             config::meta::short_url::ShortenUrlRequest,
             config::meta::short_url::ShortenUrlResponse,
+            config::meta::user::UserRole,
             meta::ingestion::RecordStatus,
             meta::ingestion::StreamStatus,
             meta::ingestion::IngestionResponse,
+            meta::loki::LokiPushResponse,
+            meta::loki::LokiPushRequest,
+            meta::loki::LokiStream,
+            meta::loki::LokiEntry,
             meta::saved_view::View,
             meta::saved_view::ViewWithoutData,
             meta::saved_view::ViewsWithoutData,
@@ -251,8 +315,8 @@ use crate::{common::meta, handler::http::request};
             meta::saved_view::CreateViewResponse,
             meta::saved_view::UpdateViewRequest,
             meta::user::UpdateUser,
-            meta::user::UserRequest,
-            meta::user::UserRole,
+            meta::user::UserRoleRequest,
+            meta::user::PostUserRequest,
             meta::user::UserOrgRole,
             meta::user::UserList,
             meta::user::UserResponse,
@@ -266,6 +330,8 @@ use crate::{common::meta, handler::http::request};
             meta::organization::OrgUser,
             meta::organization::IngestionPasscode,
             meta::organization::PasscodeResponse,
+            meta::organization::Organization,
+            meta::organization::OrgRenameBody,
             meta::organization::OrganizationSetting,
             meta::organization::OrganizationSettingResponse,
             meta::organization::RumIngestionResponse,
@@ -280,7 +346,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
             // Functions
-
          ),
     ),
     modifiers(&SecurityAddon),
@@ -302,6 +367,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
+        (name = "Ratelimit", description = "Ratelimit operations"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -326,4 +392,49 @@ impl Modify for SecurityAddon {
             )),
         );
     }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn openapi_info() -> OpenapiInfo {
+    let api = ApiDoc::openapi();
+
+    // Group endpoints by tags with full operation details
+    let mut tag_operations: OpenapiInfo = std::collections::HashMap::new();
+
+    for (path, path_item) in &api.paths.paths {
+        for (method, operation) in path_item.operations.clone() {
+            let tags = operation
+                .tags
+                .clone()
+                .unwrap_or_else(|| vec!["untagged".to_string()]);
+
+            let method = match method {
+                utoipa::openapi::PathItemType::Get => "GET",
+                utoipa::openapi::PathItemType::Post => "POST",
+                utoipa::openapi::PathItemType::Put => "PUT",
+                utoipa::openapi::PathItemType::Delete => "DELETE",
+                utoipa::openapi::PathItemType::Patch => "PATCH",
+                utoipa::openapi::PathItemType::Head => "HEAD",
+                utoipa::openapi::PathItemType::Options => "OPTIONS",
+                utoipa::openapi::PathItemType::Trace => "TRACE",
+                utoipa::openapi::PathItemType::Connect => "CONNECT",
+            };
+
+            let operation_info = (
+                method.to_string(),
+                path.clone(),
+                operation.clone().description,
+                tags.clone(),
+            );
+
+            for tag in tags {
+                tag_operations
+                    .entry(tag)
+                    .or_default()
+                    .push(operation_info.clone());
+            }
+        }
+    }
+
+    tag_operations
 }

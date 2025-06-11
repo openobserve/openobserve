@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
@@ -36,6 +36,8 @@ impl From<PipelineError> for HttpResponse {
 }
 
 /// CreatePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipeline",
@@ -60,19 +62,21 @@ pub async fn save_pipeline(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut pipeline = pipeline.into_inner();
-    pipeline.name = pipeline.name.trim().to_string();
+    pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
     pipeline.id = ider::generate();
     match pipeline::save_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Pipeline created successfully".to_string(),
+            http::StatusCode::OK,
+            "Pipeline created successfully",
         ))),
         Err(e) => Ok(e.into()),
     }
 }
 
 /// ListPipelines
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -128,6 +132,8 @@ async fn list_pipelines(
 }
 
 /// GetStreamsWithPipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -155,6 +161,8 @@ async fn list_streams_with_pipeline(
 }
 
 /// DeletePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -179,14 +187,16 @@ async fn delete_pipeline(
     let (_org_id, pipeline_id) = path.into_inner();
     match pipeline::delete_pipeline(&pipeline_id).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Pipeline deleted successfully".to_string(),
+            http::StatusCode::OK,
+            "Pipeline deleted successfully",
         ))),
         Err(e) => Ok(e.into()),
     }
 }
 
 /// UpdatePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -211,14 +221,16 @@ pub async fn update_pipeline(
     let pipeline = pipeline.into_inner();
     match pipeline::update_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Pipeline updated successfully".to_string(),
+            http::StatusCode::OK,
+            "Pipeline updated successfully",
         ))),
         Err(e) => Ok(e.into()),
     }
 }
 
 /// EnablePipeline
+///
+/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -251,10 +263,9 @@ pub async fn enable_pipeline(
     let resp_msg =
         "Pipeline successfully ".to_string() + if enable { "enabled" } else { "disabled" };
     match pipeline::enable_pipeline(&org_id, &pipeline_id, enable).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            resp_msg,
-        ))),
+        Ok(()) => {
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
+        }
         Err(e) => Ok(e.into()),
     }
 }

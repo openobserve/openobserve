@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use config::meta::destinations::{Destination, DestinationType, Module, Template}
 
 use crate::{
     common::{
-        infra::config::STREAM_ALERTS,
+        infra::config::ALERTS,
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
@@ -28,7 +28,7 @@ pub async fn save(
     name: &str,
     mut destination: Destination,
     create: bool,
-) -> Result<(), DestinationError> {
+) -> Result<Destination, DestinationError> {
     // First validate the `destination` according to its `destination_type`
     match &mut destination.module {
         Module::Alert {
@@ -99,7 +99,7 @@ pub async fn save(
     if name.is_empty() {
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
     }
-    Ok(())
+    Ok(saved)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -144,12 +144,12 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    let cacher = STREAM_ALERTS.read().await;
-    for (stream_key, alerts) in cacher.iter() {
-        for alert in alerts.iter() {
-            if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
-                return Err(DestinationError::UsedByAlert(alert.name.to_string()));
-            }
+    let cacher = ALERTS.read().await;
+    for (stream_key, (_, alert)) in cacher.iter() {
+        if stream_key.starts_with(&format!("{}/", org_id))
+            && alert.destinations.contains(&name.to_string())
+        {
+            return Err(DestinationError::UsedByAlert(alert.name.to_string()));
         }
     }
     drop(cacher);

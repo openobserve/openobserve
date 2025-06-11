@@ -30,8 +30,12 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
         Some(val) => Ok(val.to_string()),
         None => {
             let val = db::get(&format!("{USER_SESSION_KEY}{session_id}")).await?;
-
-            Ok(json::to_string(&val).unwrap())
+            // base64 format: convert bytes to string and trim any quotes
+            let val = String::from_utf8(val.to_vec())
+                .unwrap()
+                .trim_matches('"')
+                .to_string();
+            Ok(val)
         }
     }
 }

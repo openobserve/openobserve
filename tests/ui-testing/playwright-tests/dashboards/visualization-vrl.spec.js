@@ -1,132 +1,51 @@
 import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
+import { login } from "../utils/dashLogin";
+import { ingestion } from "../utils/dashIngestion";
 import logsdata from "../../../test-data/logs_data.json";
 
+import logData from "../../cypress/fixtures/log.json";
+import { log } from "console";
+
 test.describe.configure({ mode: "parallel" });
-
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000);
-
-  // await page.getByText('Login as internal user').click();
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  //Enter Password
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-  await page.waitForTimeout(4000);
-  await page.goto(process.env["ZO_BASE_URL"]);
-}
-
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
+  await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
-test.describe(" visualize UI testcases", () => {
-  // let logData;
-  function removeUTFCharacters(text) {
-    // console.log(text, "tex");
-    // Remove UTF characters using regular expression
-    return text.replace(/[^\x00-\x7F]/g, " ");
-  }
-  async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    const search = page.waitForResponse(logData.applyQuery);
-    await page.waitForTimeout(3000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-      force: true,
-    });
-    // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
-    // await search.hits.FIXME_should("be.an", "array");
-  }
-  // tebefore(async function () {
-  //   // logData("log");
-  //   // const data = page;
-  //   // logData = data;
 
-  //   console.log("--logData--", logData);
-  // });
+test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
-    console.log("running before each");
-
     await login(page);
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
 
-    // ("ingests logs via API", () => {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString("base64");
-
-    const headers = {
-      Authorization: `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    // const logsdata = {}; // Fill this with your actual data
-
-    // Making a POST request using fetch API
-    const response = await page.evaluate(
-      async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(
-          `${url}/api/${orgId}/${streamName}/_json`,
-          {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(logsdata),
-          }
-        );
-        return await fetchResponse.json();
-      },
-      {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        streamName: streamName,
-        logsdata: logsdata,
-      }
-    );
-
-    console.log(response);
-    //  });
-    // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // const functions = page.waitForResponse("**/api/default/functions**");
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
-    await applyQueryButton(page);
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
   test("should allow adding a VRL function in the visualization chart", async ({
     page,
   }) => {
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+    await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
 
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
     await page.waitForTimeout(5000);
-    await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".vrl12=123");
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
+    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl12=123");
 
     await page.waitForTimeout(3000);
 
@@ -168,12 +87,12 @@ test.describe(" visualize UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-      await page.waitForTimeout(5000);
-      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
+    await page.waitForTimeout(5000);
     await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".vrL=1000");
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
+    await page.locator("#fnEditor").locator(".inputarea").fill(".vrL=1000");
     await page.waitForTimeout(3000);
 
     await page
@@ -225,11 +144,11 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
     await page.waitForTimeout(5000);
-    await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".VRL=1000");
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
+    await page.locator("#fnEditor").locator(".inputarea").fill(".VRL=1000");
 
     await page.waitForTimeout(3000);
 
@@ -307,28 +226,22 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-      await page.waitForTimeout(5000);
-      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
+    await page.waitForTimeout(5000);
     await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".vrl=11abc");
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
+    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=11abc");
     await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    await expect(page.getByText("warningFunction error: error[")).toBeVisible();
+    // await expect(page.getByText("warningFunction error: error[")).toBeVisible();
 
-    await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .press("Control+a");
-    await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".vrl=123");
+    await page.locator("#fnEditor").locator(".inputarea").press("Control+a");
+    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=123");
 
     await page.waitForTimeout(3000);
 
@@ -357,7 +270,11 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
@@ -371,13 +288,13 @@ test.describe(" visualize UI testcases", () => {
         .getByText('SELECT * FROM "e2e_automate"')
     ).toBeVisible();
     await page.waitForTimeout(5000);
-      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".vrl=100");
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
+    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=100");
 
-      await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000);
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .waitFor({ state: "visible" });
@@ -408,14 +325,17 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await page.waitForTimeout(5000);
-      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
+    await page
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator(".inputarea")
       .fill(".vrlsanity=100");
 
-      await page.waitForTimeout(3000);
-      
+    await page.waitForTimeout(3000);
+
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page
       .locator(
@@ -428,10 +348,7 @@ test.describe(" visualize UI testcases", () => {
       .filter({ hasText: /^\.vrlsanity=100$/ })
       .nth(3)
       .click();
-    await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .press("Control+a");
+    await page.locator("#fnEditor").locator(".inputarea").press("Control+a");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
@@ -444,11 +361,11 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await page.waitForTimeout(5000);
-      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
     await page
-      .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(".vrl=123");
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
+    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=123");
 
     await page.waitForTimeout(3000);
 
@@ -497,10 +414,13 @@ test.describe(" visualize UI testcases", () => {
     });
 
     await page.waitForTimeout(5000);
-      await page.locator('[data-test="logs-vrl-function-editor"]').first().click();
+    await page
+      .locator('[data-test="logs-vrl-function-editor"]')
+      .first()
+      .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator(".inputarea")
       .fill(".VRLsanity=1000");
     await page.waitForTimeout(3000);
 

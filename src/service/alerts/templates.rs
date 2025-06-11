@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,11 @@ use crate::{
     service::db::{self, alerts::templates::TemplateError},
 };
 
-pub async fn save(name: &str, mut template: Template, create: bool) -> Result<(), TemplateError> {
+pub async fn save(
+    name: &str,
+    mut template: Template,
+    create: bool,
+) -> Result<Template, TemplateError> {
     if template.body.is_empty() {
         return Err(TemplateError::EmptyBody);
     }
@@ -64,7 +68,7 @@ pub async fn save(name: &str, mut template: Template, create: bool) -> Result<()
     if name.is_empty() {
         set_ownership(&saved.name, "templates", Authz::new(&saved.name)).await;
     }
-    Ok(())
+    Ok(saved)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {

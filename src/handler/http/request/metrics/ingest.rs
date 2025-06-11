@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, http, post, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -47,10 +47,8 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/metrics/_json: {:?}", e);
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
+            HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
         }
     })
 }
@@ -81,8 +79,8 @@ pub async fn otlp_metrics_write(
         metrics::otlp::otlp_json(&org_id, body).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Bad Request".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Bad Request",
         )))
     }
 }

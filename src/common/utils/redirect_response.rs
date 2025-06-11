@@ -16,8 +16,8 @@
 use std::{collections::HashMap, fmt};
 
 use actix_web::{
-    http::header::{ContentType, LOCATION},
     HttpResponse, ResponseError,
+    http::header::{ContentType, LOCATION},
 };
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
@@ -52,12 +52,14 @@ impl RedirectResponse {
     }
 
     fn build_redirect_response(&self) -> HttpResponse {
-        let redirect_uri = self.build_full_redirect_uri();
+        let mut redirect_uri = self.build_full_redirect_uri();
+        redirect_uri = redirect_uri.trim_matches('"').to_string();
         if redirect_uri.len() < 1024 {
             HttpResponse::Found()
                 .append_header((LOCATION, redirect_uri))
                 .finish()
         } else {
+            // if the URL is too long, we send the original URL and let FE handle the redirect.
             let html = format!(
                 r#"
                 <!DOCTYPE html>
@@ -133,7 +135,7 @@ impl Default for RedirectResponseBuilder {
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{http::header::LOCATION, HttpResponse};
+    use actix_web::{HttpResponse, http::header::LOCATION};
 
     use super::*;
 

@@ -100,8 +100,8 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner v-if="loading" size="lg" color="primary" />
-
+      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <div v-if="!loading">
       <query-editor
         v-model:query="unflattendData"
         ref="queryEditorRef"
@@ -110,6 +110,7 @@
         :class="mode"
         language="json"
       />
+      </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
       {
@@ -198,7 +199,7 @@
                     round
                     class="q-mr-sm pointer"
                   ></q-btn
-                  >{{ t("common.addFieldToTable") }}</q-item-label
+                  >{{addOrRemoveLabel(key)}}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -258,6 +259,11 @@ export default {
     mode: {
       type: String,
       default: "sidebar",
+    },
+    streamName: {
+      type: String,
+      default: "",
+      required: false,
     },
   },
   components: {
@@ -377,9 +383,7 @@ export default {
 
     onMounted(async () => {});
 
-    watch(
-      () => props.value,
-      async () => {
+    const getOriginalData = async () => {
         setViewTraceBtn();
 
         if (
@@ -387,6 +391,12 @@ export default {
           searchAggData.hasAggregation ||
           searchObj.data.stream.selectedStream.length > 1
         ) {
+          return;
+        }
+        // Check if data exists in searchObj cache
+        const cacheKey = `${props.value._o2_id}_${props.value._timestamp}`;
+        if (searchObj.data.originalDataCache?.has(cacheKey)) {
+          unflattendData.value = searchObj.data.originalDataCache.get(cacheKey);
           return;
         }
 
@@ -401,7 +411,7 @@ export default {
               query: {
                 query: {
                   start_time: props.value._timestamp - 10 * 60 * 1000,
-                  sql: `SELECT _original FROM "${searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                  sql: `SELECT _original FROM "${props.streamName ?  props.streamName : searchObj.data.stream.selectedStream }" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
                   end_time: props.value._timestamp + 10 * 60 * 1000,
                   sql_mode: "full",
                   size: 1,
@@ -412,9 +422,12 @@ export default {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           );
-          unflattendData.value = res.data.hits[0]._original;
+          const formattedData = JSON.stringify(JSON.parse(res.data.hits[0]._original), null, 2);
+          unflattendData.value = formattedData;
+          //store the data in cache of searchObj
+          searchObj.data.originalDataCache.set(cacheKey, formattedData);
         } catch (err: any) {
           loading.value = false;
           $q.notify({
@@ -427,9 +440,14 @@ export default {
         } finally {
           loading.value = false;
         }
-      },
-      { immediate: true, deep: true },
-    );
+      };
+
+      watch(activeTab, async () => {
+        if (activeTab.value === "unflattened") {
+          unflattendData.value = "";
+          await getOriginalData();
+        }
+      });
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -446,7 +464,9 @@ export default {
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
         await nextTick();
-        queryEditorRef.value.formatDocument();
+        if(!loading.value) {
+          queryEditorRef.value.formatDocument();
+        }
       }
     };
 
@@ -462,6 +482,12 @@ export default {
         return true;
       });
     });
+    const addOrRemoveLabel = (key: string) => {
+      if(searchObj.data.stream.selectedFields.includes(key)) {
+        return t("common.removeFieldFromTable");
+      }
+      return t("common.addFieldToTable");
+    };
 
     return {
       t,
@@ -489,6 +515,8 @@ export default {
       isTracesStreamsLoading,
       tracesStreams,
       setViewTraceBtn,
+      getOriginalData,
+      addOrRemoveLabel,
     };
   },
 };

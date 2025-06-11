@@ -31,8 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round
-flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -54,8 +53,7 @@ flat icon="close" />
         >
           No data available.
         </div>
-        <div v-else
-class="indexDetailsContainer" style="height: 100vh">
+        <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
             class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
           >
@@ -65,7 +63,7 @@ class="indexDetailsContainer" style="height: 100vh">
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title q-pl-xs" > {{ indexData.name }}</span>
+                <span class="title q-pl-xs"> {{ indexData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -109,18 +107,15 @@ class="indexDetailsContainer" style="height: 100vh">
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
-              
+                <span class="q-px-xs">
+                  Start Time:
+                  <span class="title">{{ indexData.stats.doc_time_min }}</span>
+                </span>
 
                 <span class="q-px-xs">
-                      Start Time:
-                 <span class="title">{{ indexData.stats.doc_time_min }}</span>
-                </span>
-                
-                <span class=" q-px-xs">
                   End Time:
                   <span class="title">{{ indexData.stats.doc_time_max }}</span>
                 </span>
-
               </div>
             </div>
           </div>
@@ -197,7 +192,9 @@ class="indexDetailsContainer" style="height: 100vh">
               <q-tabs v-model="activeMainTab" inline-label dense>
                 <!-- Schema Settings Tab with conditional class -->
                 <q-tab
-                  :class="{ 'text-primary': activeMainTab === 'schemaSettings' }"
+                  :class="{
+                    'text-primary': activeMainTab === 'schemaSettings',
+                  }"
                   name="schemaSettings"
                   icon="settings"
                   label="Schema Settings"
@@ -205,13 +202,12 @@ class="indexDetailsContainer" style="height: 100vh">
 
                 <!-- Red Button Tab -->
                 <q-tab
-                :class="{ 'text-primary': activeMainTab === 'redButton' }"
+                  :class="{ 'text-primary': activeMainTab === 'redButton' }"
                   name="redButton"
                   icon="backup"
                   label="Extended Retention"
                 />
               </q-tabs>
-
             </div>
           </div>
           <!-- schema settings tab -->
@@ -239,10 +235,11 @@ class="indexDetailsContainer" style="height: 100vh">
                 dense
               />
             </div>
-            <div class="flex justify-between items-center full-width q-mb-md">
-              <div>
+            <div class="q-mb-md">
+              <div class="flex justify-between items-center full-width">
+              <div class="flex items-center">
                 <app-tabs
-                  v-if="isSchemaEvolutionEnabled"
+                  v-if="isSchemaUDSEnabled"
                   class="schema-fields-tabs"
                   style="
                     border: 1px solid #8a8a8a;
@@ -254,6 +251,15 @@ class="indexDetailsContainer" style="height: 100vh">
                   :active-tab="activeTab"
                   @update:active-tab="updateActiveTab"
                 />
+                <div v-if="hasUserDefinedSchema" class="q-ml-sm">
+                  <q-icon name="info" class="q-mr-xs " size="16px" style="color: #F5A623; cursor: pointer;">
+                    <q-tooltip 
+                    style="font-size: 14px; width: 250px;"
+                    >
+                    Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.
+                    </q-tooltip>
+                  </q-icon>
+                </div>
               </div>
 
               <div class="flex items-center tw-gap-4">
@@ -272,6 +278,7 @@ class="indexDetailsContainer" style="height: 100vh">
                   </template>
                 </q-input>
                 <q-btn
+                  v-if="isSchemaUDSEnabled"
                   color="primary"
                   data-test="schema-add-fields-title"
                   @click="openDialog"
@@ -285,17 +292,22 @@ class="indexDetailsContainer" style="height: 100vh">
                 </q-btn>
               </div>
             </div>
+            </div>
+
             <div class="q-mb-md" v-if="isDialogOpen">
               <q-card class="add-fields-card">
                 <!-- Header Section -->
-                <q-card-section class="q-pa-none" style="padding: 8px 16px 6px 16px">
+                <q-card-section
+                  class="q-pa-none"
+                  style="padding: 8px 16px 6px 16px"
+                >
                   <div class="tw-flex tw-justify-between tw-items-center">
                     <div class="text-h6">Add Field(s)</div>
                     <div>
                       <q-btn
                         data-test="add-stream-cancel-btn"
                         icon="close"
-                        class=" text-bold q-mr-md"
+                        class="text-bold q-mr-md"
                         text-color="light-text"
                         no-caps
                         dense
@@ -477,27 +489,24 @@ class="indexDetailsContainer" style="height: 100vh">
                 <q-icon name="info" class="q-mr-xs" size="16px" />
 
                 Additional
-                {{ store.state.zoConfig.extended_data_retention_days }} days of extension
-                will be applied to the selected date ranges</span
+                {{ store.state.zoConfig.extended_data_retention_days }} days of
+                extension will be applied to the selected date ranges</span
               >
             </div>
             <div class="q-mt-sm">
-              <div class="text-center q-mt-sm tw-flex items-center ">
+              <div class="text-center q-mt-sm tw-flex items-center">
                 <div class="flex items-center">
                   <span class="text-bold"> Select Date</span>
-                <date-time
-                  class="q-mx-sm"
-                  @on:date-change="dateChangeValue"
-                  disable-relative
-                  hide-relative-time
-                  hide-relative-timezone
-                  :minDate="minDate"
-                />
+                  <date-time
+                    class="q-mx-sm"
+                    @on:date-change="dateChangeValue"
+                    disable-relative
+                    hide-relative-time
+                    hide-relative-timezone
+                    :minDate="minDate"
+                  />
                 </div>
-                <span class="text-bold">
-                  (UTC Timezone)
-                </span>
-
+                <span class="text-bold"> (UTC Timezone) </span>
               </div>
 
               <div class="q-mt-sm" style="margin-bottom: 30px">
@@ -536,7 +545,6 @@ class="indexDetailsContainer" style="height: 100vh">
                     </q-td>
                   </template>
 
-
                   <template #bottom="scope">
                     <QTablePagination
                       :scope="scope"
@@ -568,10 +576,7 @@ class="indexDetailsContainer" style="height: 100vh">
                   selected</span
                 >
                 <q-btn
-                  v-if="
-                    isSchemaEvolutionEnabled &&
-                    activeMainTab == 'schemaSettings'
-                  "
+                  v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                   data-test="schema-add-field-button"
                   class="q-my-sm no-border text-bold q-mr-md"
                   padding="sm md"
@@ -590,10 +595,9 @@ class="indexDetailsContainer" style="height: 100vh">
                       : t("logStream.addSchemaField")
                   }}
                 </q-btn>
-                {{   }}
                 <q-btn
                   v-bind:disable="
-                  !selectedFields.length &&  (!selectedDateFields.length) 
+                    !selectedFields.length && !selectedDateFields.length
                   "
                   data-test="schema-delete-button"
                   class="q-my-sm text-bold btn-delete"
@@ -603,7 +607,11 @@ class="indexDetailsContainer" style="height: 100vh">
                   dense
                   flat
                   style="border: 1px red solid"
-                  @click="activeMainTab == 'schemaSettings' ? confirmQueryModeChangeDialog = true : confirmDeleteDatesDialog = true"
+                  @click="
+                    activeMainTab == 'schemaSettings'
+                      ? (confirmQueryModeChangeDialog = true)
+                      : (confirmDeleteDatesDialog = true)
+                  "
                 >
                   <span class="flex items-center tw-gap-1">
                     <q-icon size="14px" :name="outlinedDelete" />
@@ -750,14 +758,13 @@ export default defineComponent({
     const redBtnRows = ref([]);
 
     const newSchemaFields = ref([]);
-    const activeTab = ref("allFields");
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
     const isDialogOpen = ref(false);
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
-    const perPageOptions : any = [
+    const perPageOptions: any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
       { label: "20", value: 20 },
@@ -786,18 +793,26 @@ export default defineComponent({
     const allFieldsName = computed(() => {
       return store.state.zoConfig.all_fields_name;
     });
+    //here we are setting the active tab based on the user defined schema
+    //1. if there is UDS then it should be schemaFields
+    //2. if there is no UDS then it should be allFields
+    const activeTab = ref(hasUserDefinedSchema.value ? "schemaFields" : "allFields");
+
 
     const tabs = computed(() => [
-      {
-        value: "allFields",
-        label: `All Fields (${indexData.value.schema.length})`,
-        disabled: false,
-      },
-      {
+    {
         value: "schemaFields",
         label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
         disabled: !hasUserDefinedSchema.value,
+        hide: !hasUserDefinedSchema.value,
       },
+      {
+        value: "allFields",
+        label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
+        disabled: false,
+        hide: false,
+      }
+
     ]);
     const mainTabs = computed(() => [
       {
@@ -811,6 +826,15 @@ export default defineComponent({
         disabled: false,
       },
     ]);
+    //here we are making the schema field name dynamic based on the user defined schema 
+    //1. if there is UDS the it should be other fields 
+    //2. if there is no UDS then it should be all fields
+    const computedSchemaFieldsName = computed(()=>{
+      if(!hasUserDefinedSchema.value){
+        return 'All Fields'
+      }
+      return 'Other Fields'
+    })
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -833,8 +857,18 @@ export default defineComponent({
       storeOriginalData.value = false;
       approxPartition.value = false;
     });
+    //here we added a watcher to 
+    //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
+    //2. if user defined schema is disabled then we need to show the all fields tab and also need to make sure that it would be the active tab
+    watch(hasUserDefinedSchema, (newVal) => {
+      if(newVal){
+        activeTab.value = "schemaFields";
+      }else{
+        activeTab.value = "allFields";
+      }
+    });
 
-    const isSchemaEvolutionEnabled = computed(() => {
+    const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
@@ -958,16 +992,19 @@ export default defineComponent({
       }
       if (Array.isArray(streamResponse.settings.extended_retention_days)) {
         redBtnRows.value = [];
-        indexData.value.extended_retention_days = streamResponse.settings.extended_retention_days;
-        streamResponse.settings.extended_retention_days.forEach((field, index) => {
-          redBtnRows.value.push({
-            index: index,
-            original_start: field.start,
-            original_end: field.end,
-            start: convertUnixToQuasarFormat(field.start),
-            end: convertUnixToQuasarFormat(field.end),
-          });
-        });
+        indexData.value.extended_retention_days =
+          streamResponse.settings.extended_retention_days;
+        streamResponse.settings.extended_retention_days.forEach(
+          (field, index) => {
+            redBtnRows.value.push({
+              index: index,
+              original_start: field.start,
+              original_end: field.end,
+              start: convertUnixToQuasarFormat(field.start),
+              end: convertUnixToQuasarFormat(field.end),
+            });
+          },
+        );
       }
 
       if (
@@ -1114,12 +1151,12 @@ export default defineComponent({
       if (selectedDateFields.value.length > 0) {
         selectedDateFields.value.forEach((field) => {
           // Filter out the items only if both start and end match
-          settings.extended_retention_days = settings.extended_retention_days.filter((item) => {
-            return !(item.start === field.start && item.end === field.end);
+          settings.extended_retention_days =
+            settings.extended_retention_days.filter((item) => {
+              return !(item.start === field.start && item.end === field.end);
             });
         });
-      };
-
+      }
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -1506,44 +1543,46 @@ export default defineComponent({
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
       return date.formatDate(formattedDate, "DD-MM-YYYY");
-
     }
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object
-      const day = String(date.getDate()).padStart(2, '0'); // Get day with leading zero
-      const month = String(date.getMonth() + 1).padStart(2, '0'); // Get month with leading zero
+      const day = String(date.getDate()).padStart(2, "0"); // Get day with leading zero
+      const month = String(date.getMonth() + 1).padStart(2, "0"); // Get month with leading zero
       const year = date.getFullYear(); // Get the full year
-      
+
       return `${day}-${month}-${year}`; // Return formatted date
     }
 
-
-
-
-
-
-
-
-
     const dateChangeValue = (value) => {
-
-      const selectedFromDate = value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.from)
-      const selectedToDate =value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.to)
+      const selectedFromDate =
+        value.hasOwnProperty("selectedDate") &&
+        formatDate(value.selectedDate.from);
+      const selectedToDate =
+        value.hasOwnProperty("selectedDate") &&
+        formatDate(value.selectedDate.to);
       if (value.relativeTimePeriod == null) {
         try {
-            const startTimestamp = convertDateToTimestamp(selectedFromDate, "00:00", 'UTC').timestamp;
-            const endTimestamp = convertDateToTimestamp(selectedToDate, "00:00", 'UTC').timestamp;
-            
-            if (startTimestamp && endTimestamp) {
-              redDaysList.value.push({
-                start: startTimestamp,
-                end: endTimestamp,
-              });
-              onSubmit();
-            }
-          } catch (error) {
-            console.error('Error processing date selection:', error);
+          const startTimestamp = convertDateToTimestamp(
+            selectedFromDate,
+            "00:00",
+            "UTC",
+          ).timestamp;
+          const endTimestamp = convertDateToTimestamp(
+            selectedToDate,
+            "00:00",
+            "UTC",
+          ).timestamp;
+
+          if (startTimestamp && endTimestamp) {
+            redDaysList.value.push({
+              start: startTimestamp,
+              end: endTimestamp,
+            });
+            onSubmit();
           }
+        } catch (error) {
+          console.error("Error processing date selection:", error);
+        }
       }
     };
     const calculateDateRange = () => {
@@ -1564,7 +1603,6 @@ export default defineComponent({
       );
     };
 
-
     const deleteDates = () => {
       selectedDateFields.value = selectedDateFields.value.map((field) => {
         return {
@@ -1574,7 +1612,7 @@ export default defineComponent({
       });
       formDirtyFlag.value = true;
       onSubmit();
-      };
+    };
 
     return {
       t,
@@ -1616,7 +1654,7 @@ export default defineComponent({
       activeTab,
       updateActiveTab,
       hasUserDefinedSchema,
-      isSchemaEvolutionEnabled,
+      isSchemaUDSEnabled,
       updateDefinedSchemaFields,
       selectedFields,
       allFieldsName,

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,17 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::HttpResponse;
-use config::meta::stream::StreamType;
-use o2_openfga::meta::mapping::OFGA_MODELS;
-
-use crate::common::{
-    infra::config::USERS,
-    meta::{self, http::HttpResponse as MetaHttpResponse},
-    utils::auth::{is_root_user, AuthExtractor},
+#[cfg(feature = "enterprise")]
+use {
+    crate::{
+        common::{
+            meta::http::HttpResponse as MetaHttpResponse,
+            utils::auth::{AuthExtractor, is_root_user},
+        },
+        service::users::get_user,
+    },
+    actix_web::HttpResponse,
+    config::meta::{stream::StreamType, user::User},
+    o2_openfga::meta::mapping::OFGA_MODELS,
 };
 
 // Check permissions on stream
+#[cfg(feature = "enterprise")]
 pub async fn check_stream_permissions(
     stream_name: &str,
     org_id: &str,
@@ -31,7 +36,7 @@ pub async fn check_stream_permissions(
     stream_type: &StreamType,
 ) -> Option<HttpResponse> {
     if !is_root_user(user_id) {
-        let user: meta::user::User = USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+        let user: User = get_user(Some(org_id), user_id).await.unwrap();
         let stream_type_str = stream_type.as_str();
 
         if !crate::handler::http::auth::validator::check_permissions(

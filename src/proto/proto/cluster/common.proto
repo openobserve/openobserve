@@ -36,20 +36,28 @@ message ScanStats {
     int64 querier_disk_cached_files   = 7;
     int64 idx_scan_size               = 8; // unit: MB
     int64 idx_took                    = 9; // unit: ms
+    int64 file_list_took             = 10; // unit: ms
 }
 
 message FileList {
     repeated FileKey items = 1;
+    string node_addr = 2;
 }
 
 message FileKey {
-    string         key         = 1;
-    FileMeta       meta        = 2;
-    bool           deleted     = 3;
-    optional bytes segment_ids = 4;
+    int64          id          = 1;
+    string         account     = 2;
+    string         key         = 3;
+    FileMeta       meta        = 4;
+    bool           deleted     = 5;
+    optional bytes segment_ids = 6;
 }
 
 message IdxFileName {
     string         key         = 1;
     optional bytes segment_ids = 2;
+}
+
+message SimpleFileList {
+    repeated string files = 1;
 }

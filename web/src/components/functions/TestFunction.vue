@@ -95,7 +95,7 @@
             </div>
             <q-select
               v-model="selectedStream.name"
-              :options="streams"
+              :options="filteredStreams"
               :popup-content-style="{ textTransform: 'lowercase' }"
               color="input-border"
               bg-color="input-bg"
@@ -104,6 +104,9 @@
               outlined
               filled
               dense
+              use-input
+              hide-selected
+              fill-input
               :loading="isFetchingStreams"
               style="min-width: 120px"
               @filter="filterStreams"
@@ -122,7 +125,20 @@
             >
               {{ t("common.duration") + " *" }}
             </div>
-            <DateTime label="Start Time" class="q-py-xs tw-w-full" />
+
+            <DateTime
+              label="Start Time"
+              class="q-py-xs tw-w-full"
+              auto-apply
+              :default-type="dateTime.type"
+              :default-absolute-time="{
+                startTime: dateTime.startTime,
+                endTime: dateTime.endTime,
+              }"
+              :default-relative-time="dateTime.relativeTimePeriod"
+              data-test="logs-search-bar-date-time-dropdown"
+              @on:date-change="updateDateTime"
+            />
           </div>
 
           <div
@@ -203,6 +219,7 @@
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
           class="monaco-editor test-function-input-editor"
+          :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
         />
@@ -274,6 +291,7 @@
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
           class="monaco-editor test-function-output-editor"
+          :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
           read-only
@@ -312,6 +330,10 @@ const props = defineProps({
   vrlFunction: {
     type: Object,
     required: true,
+  },
+  heightOffset: {
+    type: Number,
+    default: 0,
   },
 });
 
@@ -490,6 +512,10 @@ const updateStreams = async (resetStream = true) => {
     .finally(() => (isFetchingStreams.value = false));
 };
 
+const updateDateTime = (value: any) => {
+  dateTime.value = value;
+};
+
 const getResults = async () => {
   loading.value.events = true;
 
@@ -505,9 +531,6 @@ const getResults = async () => {
   });
 
   delete query.aggs;
-
-  // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
-  query.query.start_time = query.query.start_time + 780000000;
 
   // TODO: Handle the edge case when user enters limit in the query
   query.query.sql = inputQuery.value;
@@ -716,10 +739,10 @@ defineExpose({
   border-radius: 5px;
 }
 
-.test-function-input-editor,
-.test-function-output-editor {
-  height: calc((100vh - 260px) / 2) !important;
-}
+// .test-function-input-editor,
+// .test-function-output-editor {
+//   height: calc((100vh - (260px + 75px)) / 2) !important;
+// }
 
 .test-function-option-tabs {
   :deep(.rum-tab) {

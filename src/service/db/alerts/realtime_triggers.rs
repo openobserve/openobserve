@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,50 @@ use config::utils::json;
 
 use crate::{common::infra::config::REALTIME_ALERT_TRIGGERS, service::db};
 
+// Parses the item key from the event key and extracts org_id and module_key
+fn parse_item_key(key_prefix: &str, event_key: &str) -> (String, String, String) {
+    let item_key = event_key
+        .strip_prefix(key_prefix)
+        .map_or_else(String::new, |s| s.to_string());
+    let (org_id, module_key) = item_key.split_once('/').map_or_else(
+        || ("".to_string(), "".to_string()),
+        |(org, module)| (org.to_string(), module.to_string()),
+    );
+    (item_key, org_id, module_key)
+}
+
+// Handles old format to new format conversion if needed
+async fn handle_format_conversion(
+    mut item_key: String,
+    org_id: &str,
+    module_key: &str,
+) -> Result<(String, String), anyhow::Error> {
+    if module_key.contains('/') {
+        // Old format: extract stream_type, stream_name, alert_name
+        let parts = module_key.split('/').collect::<Vec<&str>>();
+        if parts.len() >= 3 {
+            let stream_type = parts[0];
+            let stream_name = parts[1];
+            let alert_name = parts[2];
+
+            let alert =
+                db::alerts::alert::get_by_name(org_id, stream_type.into(), stream_name, alert_name)
+                    .await?;
+            if let Some(alert) = alert {
+                if let Some(id) = alert.id {
+                    let alert_id = id.to_string();
+                    item_key = format!("{}/{}", org_id, &alert_id);
+                    return Ok((item_key, alert_id));
+                }
+            }
+            return Err(anyhow::anyhow!("Failed to get alert ID for old format"));
+        }
+        return Err(anyhow::anyhow!("Invalid module key format"));
+    }
+    // New format: item key does not need to be changed
+    Ok((item_key, module_key.to_string()))
+}
+
 // Watches only for realtime alert triggers
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = format!(
@@ -28,7 +72,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     );
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(&key).await?;
-    let events = Arc::get_mut(&mut events).unwrap();
+    let events = Arc::get_mut(&mut events)
+        .ok_or_else(|| anyhow::anyhow!("Failed to get mutable reference to events"))?;
     log::info!("Start watching alert realtime triggers");
     loop {
         let ev = match events.recv().await {
@@ -41,17 +86,27 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             // Cluster coordinator sends put events only for realtime alerts
             db::Event::Put(ev) => {
-                // Currently, cluster coordinator sends only the alert triggers
-                // ev.key format -> /triggers/<alert|report>/{item_key}
-                // item_key format -> {org_id}/{module_key}
-                let item_key = ev.key.strip_prefix(&key).unwrap();
-                let columns = item_key.split_once('/').unwrap();
+                // Parse the item key and extract components
+                let (mut item_key, org_id, module_key) = parse_item_key(&key, &ev.key);
+
+                // Handle format conversion
+                let (updated_item_key, alert_id) =
+                    match handle_format_conversion(item_key, &org_id, &module_key).await {
+                        Ok(result) => result,
+                        Err(e) => {
+                            log::error!("Error handling format conversion: {}", e);
+                            continue;
+                        }
+                    };
+                item_key = updated_item_key;
+
+                // Get or parse the trigger value
                 let item_value: db::scheduler::Trigger =
                     if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
                         match db::scheduler::get(
-                            columns.0,
-                            infra::scheduler::TriggerModule::Alert,
-                            columns.1,
+                            &org_id,
+                            config::meta::triggers::TriggerModule::Alert,
+                            &alert_id,
                         )
                         .await
                         {
@@ -62,16 +117,38 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             }
                         }
                     } else {
-                        json::from_slice(&ev.value.unwrap()).unwrap()
+                        match json::from_slice(&ev.value.unwrap()) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error parsing trigger value: {}", e);
+                                continue;
+                            }
+                        }
                     };
+
                 REALTIME_ALERT_TRIGGERS
                     .write()
                     .await
-                    .insert(item_key.to_owned(), item_value);
+                    .insert(item_key, item_value);
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(&key).unwrap();
-                REALTIME_ALERT_TRIGGERS.write().await.remove(item_key);
+                // Parse the item key and extract components
+                let (item_key, org_id, module_key) = parse_item_key(&key, &ev.key);
+
+                // Handle format conversion
+                let (updated_item_key, _) =
+                    match handle_format_conversion(item_key, &org_id, &module_key).await {
+                        Ok(result) => result,
+                        Err(e) => {
+                            log::error!("Error handling format conversion: {}", e);
+                            continue;
+                        }
+                    };
+
+                REALTIME_ALERT_TRIGGERS
+                    .write()
+                    .await
+                    .remove(&updated_item_key);
             }
             db::Event::Empty => {}
         }

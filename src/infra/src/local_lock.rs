@@ -70,7 +70,7 @@ mod tests {
 
     use tokio::{
         sync::RwLock,
-        time::{sleep, Duration},
+        time::{Duration, sleep},
     };
 
     use super::*;

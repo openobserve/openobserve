@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,9 +27,8 @@ use serde_json::{Map, Value};
 
 use super::str::find;
 use crate::{
-    get_config,
+    FxIndexMap, TIMESTAMP_COL_NAME,
     meta::{promql::HASH_LABEL, stream::StreamType},
-    FxIndexMap,
 };
 
 const MAX_PARTITION_KEY_LENGTH: usize = 100;
@@ -232,13 +231,12 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
             })
             .collect::<Vec<_>>()
     };
-    let cfg = get_config();
     fields = fields
         .into_iter()
         .map(|x| {
-            if x.name() == &cfg.common.column_timestamp {
+            if x.name() == TIMESTAMP_COL_NAME {
                 Arc::new(Field::new(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     DataType::Int64,
                     false,
                 ))
@@ -272,10 +270,16 @@ pub fn format_partition_key(input: &str) -> String {
 
 // format stream name
 pub fn format_stream_name(stream_name: &str) -> String {
-    RE_CORRECT_STREAM_NAME
-        .replace_all(stream_name, "_")
-        .to_string()
-        .to_lowercase()
+    if crate::get_config().common.format_stream_name_to_lower {
+        RE_CORRECT_STREAM_NAME
+            .replace_all(stream_name, "_")
+            .to_string()
+            .to_lowercase()
+    } else {
+        RE_CORRECT_STREAM_NAME
+            .replace_all(stream_name, "_")
+            .to_string()
+    }
 }
 
 /// match a source is a needed file or not, return true if needed

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@ use std::sync::Arc;
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
+    metrics::QUERY_PARQUET_CACHE_RATIO,
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -26,6 +27,11 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::{
+    action_manager::trigger_action,
+    meta::{ActionTriggerResult, TriggerSource},
+};
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
@@ -48,11 +54,24 @@ pub async fn search(
     let meta = Sql::new_from_req(&req, &query).await?;
     let sql = Arc::new(meta);
 
+    for s in sql.stream_names.iter() {
+        let schema =
+            infra::schema::get_cache(&sql.org_id, &s.stream_name(), sql.stream_type).await?;
+        if schema.schema().fields().is_empty() {
+            let mut result = search::Response::new(sql.offset, sql.limit);
+            result.function_error = vec![format!("Stream not found {}", &s.stream_name())];
+            result.is_partial = true;
+            return Ok(result);
+        }
+    }
+
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
     let use_query_fn = query.uses_zo_fn;
     let mut query_fn = query.query_fn.clone();
+    #[cfg(feature = "enterprise")]
+    let action_id = query.action_id.clone();
 
     #[cfg(feature = "enterprise")]
     let local_cluster_search = _req_regions == vec!["local"]
@@ -62,7 +81,7 @@ pub async fn search(
     // handle query function
     #[cfg(feature = "enterprise")]
     let ret = if _need_super_cluster
-        && o2_enterprise::enterprise::common::infra::config::get_config()
+        && o2_enterprise::enterprise::common::config::get_config()
             .super_cluster
             .enabled
         && !local_cluster_search
@@ -82,7 +101,7 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let ret = flight::search(&trace_id, sql.clone(), req, query).await;
 
-    let (merge_batches, scan_stats, took_wait, is_partial, idx_took, partial_err) = match ret {
+    let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
         Ok(v) => v,
         Err(e) => {
             log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
@@ -123,7 +142,7 @@ pub async fn search(
                     }
                     Err(err) => {
                         log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
-                        result.function_error = err.to_string();
+                        result.function_error = vec![err.to_string()];
                         None
                     }
                 };
@@ -186,6 +205,33 @@ pub async fn search(
                     .collect(),
             }
         };
+
+        #[cfg(feature = "enterprise")]
+        if !action_id.is_empty() {
+            let resp = trigger_action(
+                &trace_id,
+                &sql.org_id,
+                &action_id,
+                sources,
+                TriggerSource::Search,
+            )
+            .await
+            .map_err(|err| Error::Message(err.to_string()))?;
+            match resp.result {
+                ActionTriggerResult::Success(new_sources) => {
+                    sources = new_sources;
+                }
+                ActionTriggerResult::Failure(err_msg) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search->action: action_id: {}, err: {}",
+                        action_id,
+                        err_msg
+                    );
+                    return Err(Error::Message(err_msg));
+                }
+            }
+        }
+
         // handle query type: json, metrics, table
         if query_type == "table" {
             (result.columns, sources) = super::handle_table_response(schema, sources);
@@ -219,25 +265,32 @@ pub async fn search(
             .unwrap_or_default()
     };
 
+    let took_time = start.elapsed().as_millis() as usize;
+
     result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
     result.set_partial(is_partial, partial_err);
-    result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
+    result.set_took(took_time);
+    result.set_wait_in_queue(took_wait);
+    result.set_search_took(
+        took_time - took_wait,
+        scan_stats.file_list_took as usize,
+        scan_stats.idx_took as usize,
+    );
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
-    result.set_cached_ratio(
-        (((scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files) * 100)
-            as f64
-            / scan_stats.querier_files as f64) as usize,
-    );
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
 
-    result.set_idx_took(if idx_took > 0 {
-        idx_took
-    } else {
-        scan_stats.idx_took as usize
-    });
+    if scan_stats.querier_files > 0 {
+        let cached_ratio = (scan_stats.querier_memory_cached_files
+            + scan_stats.querier_disk_cached_files) as f64
+            / scan_stats.querier_files as f64;
+        result.set_cached_ratio((cached_ratio * 100.0) as usize);
+        QUERY_PARQUET_CACHE_RATIO
+            .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
+            .observe(cached_ratio);
+    }
 
     if query_type == "table" {
         result.response_type = "table".to_string();
@@ -251,10 +304,10 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
+        "[trace_id {trace_id}] search->result: total: {}, scan_size: {} mb, took: {} ms",
         result.total,
-        result.took,
         result.scan_size,
+        result.took,
     );
 
     Ok(result)

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,11 +17,25 @@ use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{get_config, get_instance_id, meta::search::SearchEventType};
-
+use crate::{
+    get_config, get_instance_id, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
+};
 pub trait NodeInfo: Debug + Send + Sync {
+    fn is_querier(&self) -> bool {
+        true
+    }
+    fn is_ingester(&self) -> bool {
+        false
+    }
     fn get_grpc_addr(&self) -> String;
     fn get_auth_token(&self) -> String;
+    fn get_name(&self) -> String;
+    fn get_region(&self) -> String {
+        "openobserve".to_string()
+    }
+    fn get_cluster(&self) -> String {
+        crate::config::get_cluster_name()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -35,11 +49,15 @@ pub struct Node {
     #[serde(default)]
     pub role_group: RoleGroup,
     pub cpu_num: u64,
-    pub status: NodeStatus,
     #[serde(default)]
     pub scheduled: bool,
     #[serde(default)]
     pub broadcasted: bool,
+    pub status: NodeStatus,
+    #[serde(default)]
+    pub metrics: NodeMetrics,
+    #[serde(default)]
+    pub version: String,
 }
 
 impl Node {
@@ -53,11 +71,26 @@ impl Node {
             role: vec![],
             role_group: RoleGroup::None,
             cpu_num: 0,
-            status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
+            status: NodeStatus::Prepare,
+            metrics: Default::default(),
+            version: crate::VERSION.to_string(),
         }
     }
+
+    pub fn is_same(&self, other: &Node) -> bool {
+        self.uuid == other.uuid
+            && self.name == other.name
+            && self.http_addr == other.http_addr
+            && self.grpc_addr == other.grpc_addr
+            && self.role == other.role
+            && self.role_group == other.role_group
+            && self.scheduled == other.scheduled
+            && self.broadcasted == other.broadcasted
+            && self.status == other.status
+    }
+
     pub fn is_single_node(&self) -> bool {
         self.role.len() == 1 && self.role.contains(&Role::All)
     }
@@ -108,12 +141,24 @@ impl Default for Node {
 }
 
 impl NodeInfo for Node {
+    fn is_querier(&self) -> bool {
+        self.is_querier()
+    }
+
+    fn is_ingester(&self) -> bool {
+        self.is_ingester()
+    }
+
     fn get_auth_token(&self) -> String {
         get_internal_grpc_token()
     }
 
     fn get_grpc_addr(&self) -> String {
         self.grpc_addr.clone()
+    }
+
+    fn get_name(&self) -> String {
+        self.name.clone()
     }
 }
 
@@ -237,11 +282,16 @@ impl std::fmt::Display for RoleGroup {
 #[inline]
 pub fn get_internal_grpc_token() -> String {
     let cfg = get_config();
-    if cfg.grpc.internal_grpc_token.is_empty() {
+    let token = if cfg.grpc.internal_grpc_token.is_empty() {
         get_instance_id()
     } else {
         cfg.grpc.internal_grpc_token.clone()
+    };
+
+    if token.is_empty() {
+        panic!("grpc token is empty");
     }
+    token
 }
 
 // CompactionJobType is used to distinguish between current and historical compaction jobs.

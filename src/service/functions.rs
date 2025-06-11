@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,24 +16,29 @@
 use std::io::Error;
 
 use actix_web::{
-    http::{self, StatusCode},
     HttpResponse,
+    http::{self, StatusCode},
 };
 use config::{
     meta::{
-        function::{FunctionList, TestVRLResponse, Transform, VRLResult, VRLResultResolver},
+        function::{
+            FunctionList, RESULT_ARRAY, TestVRLResponse, Transform, VRLResult, VRLResultResolver,
+        },
         pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
     },
-    utils::json,
+    utils::json::Value,
 };
 
 use crate::{
-    common,
     common::{
+        self,
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::{db, ingestion::compile_vrl_function, search::RESULT_ARRAY},
+    handler::http::{
+        request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
+    },
+    service::{db, ingestion::compile_vrl_function},
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";
@@ -46,8 +51,8 @@ const FN_IN_USE: &str =
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST.into(),
-            FN_ALREADY_EXIST.to_string(),
+            StatusCode::BAD_REQUEST,
+            FN_ALREADY_EXIST,
         )))
     } else {
         if !func.function.ends_with('.') {
@@ -55,27 +60,20 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         }
         if func.trans_type.unwrap() == 0 {
             if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )));
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    error.to_string(),
-                )),
-            )
+            Ok(map_error_to_http_response(&error.into(), None))
         } else {
             set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
 
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                FN_SUCCESS.to_string(),
-            )))
+            Ok(
+                HttpResponse::Ok()
+                    .json(MetaHttpResponse::message(http::StatusCode::OK, FN_SUCCESS)),
+            )
         }
     }
 }
@@ -84,7 +82,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
 pub async fn test_run_function(
     org_id: &str,
     mut function: String,
-    events: Vec<json::Value>,
+    events: Vec<Value>,
 ) -> Result<HttpResponse, anyhow::Error> {
     // Append a dot at the end of the function if it doesn't exist
     if !function.ends_with('.') {
@@ -106,10 +104,8 @@ pub async fn test_run_function(
             program
         }
         Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )))
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
         }
     };
 
@@ -125,14 +121,14 @@ pub async fn test_run_function(
                 program: program.clone(),
                 fields: fields.clone(),
             },
-            json::Value::Array(events),
+            Value::Array(events),
             org_id,
             &[String::new()],
         );
 
         if err.is_some() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
+                StatusCode::BAD_REQUEST,
                 err.unwrap(),
             )));
         }
@@ -141,20 +137,20 @@ pub async fn test_run_function(
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|v| {
-                let flattened_array = v
-                    .as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                    .map(|item| config::utils::flatten::flatten(item.clone()).unwrap())
-                    .collect::<Vec<_>>();
-                if flattened_array.is_empty() {
-                    return None;
-                }
-                Some(serde_json::Value::Array(flattened_array))
-            })
-            .for_each(|transform| {
-                transformed_events.push(VRLResult::new("", transform));
+            .for_each(|record| match record {
+                Value::Object(hit) => transformed_events.push(VRLResult::new(
+                    "",
+                    config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+                )),
+                Value::Array(hits) => hits.iter().for_each(|hit| {
+                    if let Value::Object(hit) = hit {
+                        transformed_events.push(VRLResult::new(
+                            "",
+                            config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
+                        ))
+                    }
+                }),
+                _ => {}
             });
     } else {
         events.into_iter().for_each(|event| {
@@ -174,7 +170,7 @@ pub async fn test_run_function(
             }
 
             let transform = if !ret_val.is_null() {
-                config::utils::flatten::flatten(ret_val).unwrap()
+                config::utils::flatten::flatten(ret_val).unwrap_or("".into())
             } else {
                 "".into()
             };
@@ -198,10 +194,8 @@ pub async fn update_function(
     let existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
-                FN_NOT_FOUND.to_string(),
-            )));
+            return Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(StatusCode::NOT_FOUND, FN_NOT_FOUND)));
         }
     };
     if func == existing_fn {
@@ -213,21 +207,14 @@ pub async fn update_function(
     }
     if func.trans_type.unwrap() == 0 {
         if let Err(e) = compile_vrl_function(&func.function, org_id) {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )));
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
         }
     }
     extract_num_args(&mut func);
 
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        );
+        return Ok(map_error_to_http_response(&(error.into()), None));
     }
 
     // update associated pipelines
@@ -235,24 +222,21 @@ pub async fn update_function(
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name) {
                 if let Err(e) = db::pipeline::update(&pipeline, None).await {
-                    return Ok(HttpResponse::InternalServerError().json(
-                        MetaHttpResponse::message(
-                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    return Ok(HttpResponse::InternalServerError()
+                        .append_header((ERROR_HEADER, e.to_string()))
+                        .json(MetaHttpResponse::message(
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
                             format!(
                                 "Failed to update associated pipeline({}/{}): {}",
                                 pipeline.id, pipeline.name, e
                             ),
-                        ),
-                    ));
+                        )));
                 }
             }
         }
     }
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        FN_SUCCESS.to_string(),
-    )))
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, FN_SUCCESS)))
 }
 
 pub async fn list_functions(
@@ -286,10 +270,8 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
         None => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
-                FN_NOT_FOUND.to_string(),
-            )));
+            return Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(StatusCode::NOT_FOUND, FN_NOT_FOUND)));
         }
     };
     // TODO(taiming): Function Stream Association to be deprecated starting v0.13.1.
@@ -309,7 +291,7 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
                 .join(", ");
             if !names.is_empty() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.into(),
+                    StatusCode::BAD_REQUEST,
                     format!("{} {}", FN_IN_USE, names),
                 )));
             }
@@ -319,7 +301,7 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     if !pipeline_dep.is_empty() {
         let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
         return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
-            http::StatusCode::CONFLICT.into(),
+            http::StatusCode::CONFLICT,
             format!(
                 "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
                 fn_name,
@@ -333,15 +315,13 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
         Ok(_) => {
             remove_ownership(&org_id, "functions", Authz::new(&fn_name)).await;
 
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                FN_DELETED.to_string(),
-            )))
+            Ok(
+                HttpResponse::Ok()
+                    .json(MetaHttpResponse::message(http::StatusCode::OK, FN_DELETED)),
+            )
         }
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            FN_NOT_FOUND.to_string(),
-        ))),
+        Err(_) => Ok(HttpResponse::NotFound()
+            .json(MetaHttpResponse::error(StatusCode::NOT_FOUND, FN_NOT_FOUND))),
     }
 }
 
@@ -386,10 +366,7 @@ fn extract_num_args(func: &mut Transform) {
 }
 
 async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
-    match db::functions::get(org_id, fn_name).await {
-        Ok(function) => Some(function),
-        Err(_) => None,
-    }
+    (db::functions::get(org_id, fn_name).await).ok()
 }
 
 #[cfg(test)]
@@ -439,9 +416,11 @@ mod tests {
         let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
-            .await
-            .is_ok());
+        assert!(
+            delete_function("nexus".to_string(), "dummyfn".to_owned())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]

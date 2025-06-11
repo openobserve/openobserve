@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,21 +16,18 @@
 use datafusion::{
     self,
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
         Column, Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
     error::DataFusionError,
-    logical_expr::{expr::ScalarFunction, utils::disjunction, Expr, Like, LogicalPlan},
-    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
+    logical_expr::{Expr, Like, LogicalPlan, expr::ScalarFunction, utils::disjunction},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder, utils::NamePreserver},
     scalar::ScalarValue,
 };
 
 use crate::service::search::datafusion::udf::{
     fuzzy_match_udf,
-    match_all_udf::{
-        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
-        MATCH_ALL_UDF_NAME,
-    },
+    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
 };
 
 /// Optimization rule that rewrite match_all() to str_match()
@@ -69,8 +66,7 @@ impl OptimizerRule for RewriteMatch {
                 if plan
                     .expressions()
                     .iter()
-                    .map(|expr| expr.exists(|expr| Ok(is_match_all(expr))).unwrap())
-                    .any(|x| x)
+                    .any(|expr| expr.exists(|expr| Ok(is_match_all(expr))).unwrap())
                 {
                     let mut expr_rewriter = MatchToFullTextMatch::new(self.fields.clone());
                     let name_preserver = NamePreserver::new(&plan);
@@ -93,8 +89,6 @@ fn is_match_all(expr: &Expr) -> bool {
     match expr {
         Expr::ScalarFunction(ScalarFunction { func, .. }) => {
             func.name().to_lowercase() == MATCH_ALL_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_UDF_NAME
                 || func.name() == FUZZY_MATCH_ALL_UDF_NAME
         }
         _ => false,
@@ -120,10 +114,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
         match &expr {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
                 let name = func.name();
-                if name == MATCH_ALL_UDF_NAME
-                    || name == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                    || name == MATCH_ALL_RAW_UDF_NAME
-                {
+                if name == MATCH_ALL_UDF_NAME {
                     let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for match_all() keyword: {:?}",
@@ -138,7 +129,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                             expr: Box::new(Expr::Column(Column::new_unqualified(field))),
                             pattern: Box::new(item.clone()),
                             escape_char: None,
-                            case_insensitive: name != MATCH_ALL_RAW_UDF_NAME,
+                            case_insensitive: true,
                         });
                         expr_list.push(new_expr);
                     }
@@ -203,10 +194,7 @@ mod tests {
         },
         assert_batches_eq,
         datasource::MemTable,
-        execution::{
-            runtime_env::{RuntimeConfig, RuntimeEnv},
-            session_state::SessionStateBuilder,
-        },
+        execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         prelude::{SessionConfig, SessionContext},
     };
 
@@ -217,41 +205,25 @@ mod tests {
     #[tokio::test]
     async fn test_rewrite_match() {
         let sqls = [
-            ("select * from t where match_all('open')", vec![
-                "+------------+-------------+-------------+",
-                "| _timestamp | name        | log         |",
-                "+------------+-------------+-------------+",
-                "| 1          | open        | o2          |",
-                "| 3          | openobserve | openobserve |",
-                "+------------+-------------+-------------+",
-            ]),
-            ("select _timestamp from t where match_all('open')", vec![
-                "+------------+",
-                "| _timestamp |",
-                "+------------+",
-                "| 1          |",
-                "| 3          |",
-                "+------------+",
-            ]),
             (
-                "select _timestamp from t where match_all_raw_ignore_case('observe')",
+                "select * from t where match_all('open')",
                 vec![
-                    "+------------+",
-                    "| _timestamp |",
-                    "+------------+",
-                    "| 2          |",
-                    "| 3          |",
-                    "| 4          |",
-                    "+------------+",
+                    "+------------+-------------+-------------+",
+                    "| _timestamp | name        | log         |",
+                    "+------------+-------------+-------------+",
+                    "| 1          | open        | o2          |",
+                    "| 3          | openobserve | openobserve |",
+                    "+------------+-------------+-------------+",
                 ],
             ),
             (
-                "select _timestamp from t where match_all_raw_ignore_case('observe') and _timestamp = 2",
+                "select _timestamp from t where match_all('open')",
                 vec![
                     "+------------+",
                     "| _timestamp |",
                     "+------------+",
-                    "| 2          |",
+                    "| 1          |",
+                    "| 3          |",
                     "+------------+",
                 ],
             ),
@@ -291,18 +263,14 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
-            .with_runtime_env(Arc::new(
-                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
-            ))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_optimizer_rules(vec![Arc::new(RewriteMatch::new(fields.clone()))])
             .build();
         let ctx = SessionContext::new_with_state(state);
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_UDF.clone());
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
         ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
 
         for item in sqls {

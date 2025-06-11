@@ -13,14 +13,19 @@ import { ReportsPage } from "../pages/reportsPage.js";
 import { AlertsPage } from "../pages/alertsPage.js";
 import { DataPage } from "../pages/dataPage.js";
 import { IamPage } from "../pages/iamPage.js";
-import { ManagementPage } from "../pages/managementPage .js";
+import { ManagementPage } from "../pages/managementPage.js";
 import { AboutPage } from "../pages/aboutPage.js";
+import { CreateOrgPage } from "../pages/createOrgPage.js";
 
 
 test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
-        tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage, 
-        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, defaulttestmulti;
+        tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage,
+        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage,
+        multiOrgIdentifier;
+        const timestamp = Date.now(); 
+        const randomSuffix = Math.floor(Math.random() * 1000); 
+        const newOrgName = `org${timestamp}${randomSuffix}`;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -39,50 +44,54 @@ test.describe("Change Organisation", () => {
         iamPage = new IamPage(page);
         managementPage = new ManagementPage(page);
         aboutPage = new AboutPage(page);
+        createOrgPage = new CreateOrgPage(page);
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
-        await ingestionPage.ingestionMultiOrg();
+        
     });
 
     test("Home Page default validation", async ({ page }) => {
-
+        await page.waitForTimeout(1000);
+        await page.reload();
+        await page.waitForTimeout(5000);
         await homePage.homePageValidation();
         await homePage.gotoHomePage();
         await homePage.homePageValidation();
-
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
 
     });
 
     test("Home Page change organisation validation", async ({ page }) => {
-
-        await homePage.homePageDefaultMultiOrg();
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await homePage.homePageValidation();
-        await homePage.homePageURLValidation();
+        await homePage.homePageURLValidation(newOrgName);
         await homePage.gotoHomePage();
         await homePage.homePageValidation();
-        await homePage.homePageURLValidation();
-
+        await homePage.homePageURLValidation(newOrgName);
+        await homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Logs Page default validation", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.validateLogsPage();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
+
     });
 
     test("Logs Page change organisation validation", async ({ page }) => {
-
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await logsPage.navigateToLogs();
-        await logsPage.logsPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await logsPage.validateLogsPage();
-
-        await logsPage.logsPageURLValidation();
-        await logsPage.navigateToLogs();
-        await logsPage.validateLogsPage();
-        await logsPage.logsPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
+     
 
     });
 
@@ -90,45 +99,40 @@ test.describe("Change Organisation", () => {
 
 
         await metricsPage.gotoMetricsPage();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await metricsPage.metricsPageValidation();
         await metricsPage.metricsURLValidation();
     });
 
     test("Metrics Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await metricsPage.gotoMetricsPage();
-        await page.waitForTimeout(5000);
-        await metricsPage.metricsPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await metricsPage.metricsPageValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
-        await metricsPage.metricsPageURLValidation();
-        await metricsPage.gotoMetricsPage();
-        await metricsPage.metricsPageValidation();
-        await metricsPage.metricsPageURLValidation();
-
+        
     });
 
     test("Traces Page default validation", async ({ page }) => {
 
 
         await tracesPage.navigateToTraces();
+        await tracesPage.tracesPageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await tracesPage.validateTracesPage();
         await tracesPage.tracesURLValidation();
     });
 
     test("Traces Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await tracesPage.navigateToTraces();
-        await page.waitForTimeout(5000);
-        await tracesPage.tracesPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await tracesPage.validateTracesPage();
-
-        await tracesPage.tracesPageURLValidation();
-        await tracesPage.navigateToTraces();
-        await tracesPage.validateTracesPage();
-        await tracesPage.tracesPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -136,18 +140,19 @@ test.describe("Change Organisation", () => {
 
 
         await rumPage.gotoRumPage();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
+        await rumPage.rumURLValidation();
         await rumPage.rumURLValidation();
     });
 
     test("RUM Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await rumPage.gotoRumPage();
-        await page.waitForTimeout(5000);
-        await rumPage.rumPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await rumPage.rumPageURLValidation();
-        await rumPage.gotoRumPage();
-        await rumPage.rumPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -156,18 +161,19 @@ test.describe("Change Organisation", () => {
 
 
         await pipelinesPage.gotoPipelinesPage();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
+        await pipelinesPage.pipelinesURLValidation();
         await pipelinesPage.pipelinesURLValidation();
     });
 
     test("Pipelines Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await pipelinesPage.gotoPipelinesPage();
-        await page.waitForTimeout(5000);
-        await pipelinesPage.pipelinesPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await pipelinesPage.pipelinesPageURLValidation();
-        await pipelinesPage.gotoPipelinesPage();
-        await pipelinesPage.pipelinesPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -175,18 +181,19 @@ test.describe("Change Organisation", () => {
 
 
         await dashboardPage.navigateToDashboards();
+        await homePage.clickDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await dashboardPage.dashboardURLValidation();
+        
     });
 
     test("Dashboard Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await dashboardPage.navigateToDashboards();
-        await page.waitForTimeout(5000);
-        await dashboardPage.dashboardPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await dashboardPage.dashboardPageURLValidation();
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.dashboardPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -194,18 +201,19 @@ test.describe("Change Organisation", () => {
 
 
         await streamsPage.gotoStreamsPage();
+        await streamsPage.streamsPageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await streamsPage.streamsURLValidation();
+        
     });
 
     test("Streams Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await streamsPage.gotoStreamsPage();
-        await page.waitForTimeout(5000);
-        await streamsPage.streamsPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await streamsPage.streamsPageURLValidation();
-        await streamsPage.gotoStreamsPage();
-        await streamsPage.streamsPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -213,18 +221,19 @@ test.describe("Change Organisation", () => {
 
 
         await reportsPage.goToReports();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await reportsPage.reportsURLValidation();
+        
     });
 
     test("Reports Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await reportsPage.goToReports();
-        await page.waitForTimeout(5000);
-        await reportsPage.reportsPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await reportsPage.reportsPageURLValidation();
-        await reportsPage.goToReports();
-        await reportsPage.reportsPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -232,18 +241,19 @@ test.describe("Change Organisation", () => {
 
 
         await alertsPage.navigateToAlerts();
+        await homePage.clickDefaultOrg();
+        await page.waitForTimeout(5000);
+        await homePage.homePageURLValidationDefaultOrg();
         await alertsPage.alertsURLValidation();
     });
 
     test("Alerts Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await alertsPage.navigateToAlerts();
-        await page.waitForTimeout(5000);
-        await alertsPage.alertsPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await alertsPage.alertsPageURLValidation();
-        await alertsPage.navigateToAlerts();
-        await alertsPage.alertsPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -251,18 +261,19 @@ test.describe("Change Organisation", () => {
 
 
         await dataPage.gotoDataPage();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await dataPage.dataURLValidation();
     });
 
     test("Data sources Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await dataPage.gotoDataPage();
-        await page.waitForTimeout(5000);
-        await dataPage.dataPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await dataPage.dataPageURLValidation();
-        await dataPage.gotoDataPage();
-        await dataPage.dataPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
+
 
     });
 
@@ -270,18 +281,18 @@ test.describe("Change Organisation", () => {
 
 
         await iamPage.gotoIamPage();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await iamPage.iamURLValidation();
     });
 
     test("IAM Page change organisation validation", async ({ page }) => {
 
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await iamPage.gotoIamPage();
-        await page.waitForTimeout(5000);
-        await iamPage.iamPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await iamPage.iamPageURLValidation();
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageURLValidation();
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
@@ -289,18 +300,19 @@ test.describe("Change Organisation", () => {
 
 
         await managementPage.goToManagement();
+        await homePage.homePageDefaultOrg();
+        await homePage.homePageURLValidationDefaultOrg();
         await managementPage.managementURLValidation();
     });
 
     test("Management Page change organisation validation", async ({ page }) => {
-
+        
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await homePage.homePageOrg(newOrgName);
         await managementPage.goToManagement();
-        await page.waitForTimeout(5000);
-        await managementPage.managementPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await managementPage.managementPageURLValidation();
-        await managementPage.goToManagement();
-        await managementPage.managementPageURLValidation();
+        await managementPage.managementURLValidation();
+      
 
     });
 
@@ -308,22 +320,21 @@ test.describe("Change Organisation", () => {
 
         await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
+        await homePage.homePageDefaultOrg();
         await aboutPage.aboutURLValidation();
     });
 
     test("About Page change organisation validation", async ({ page }) => {
+
+        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
+        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
         await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
-        await page.waitForTimeout(5000);
-       await aboutPage.aboutPageDefaultMultiOrg();
-        await page.waitForTimeout(5000);
-        await aboutPage.aboutPageURLValidation();
-        await aboutPage.clickHelpMenu();
-        await aboutPage.gotoAboutPage();
-        await aboutPage.aboutURLValidation();
+        await homePage.homePageOrg(newOrgName);
+        await homePage.homeURLContains(multiOrgIdentifier);
 
     });
 
-   
+
 
 });

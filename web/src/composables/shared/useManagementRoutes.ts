@@ -88,6 +88,17 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "nodes",
+          name: "nodes",
+          component: () => import("@/components/settings/Nodes.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     );
   }

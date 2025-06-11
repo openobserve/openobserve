@@ -21,20 +21,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <div
-        v-for="awsService in awsServiceLinks"
-        :key="awsService.name"
-        class="tw-py-2"
-      >
-        {{ awsService.name }} -
-        <a
-          :href="awsService.link"
-          class="hover:tw-underline text-primary"
-          target="_blank"
-          rel="noopener noreferrer"
-          >{{ awsService.link }}</a
+      <ol class="tw-list-decimal tw-pl-[27px]">
+        <li
+          v-for="awsService in awsServiceLinks"
+          :key="awsService.name"
+          class="tw-py-1"
         >
-      </div>
+          <a
+            :href="awsService.link"
+            class="tw-underline"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ awsService.name }}</a
+          >
+        </li>
+      </ol>
     </div>
   </div>
 </template>
@@ -69,9 +70,16 @@ export default defineComponent({
     });
 
     try {
-      const url = new URL(store.state.API_ENDPOINT);
+      let ingestionURL: string = store.state.API_ENDPOINT;
+      if (
+        Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
+        store.state.zoConfig.ingestion_url !== ""
+      ) {
+        ingestionURL = store.state.zoConfig.ingestion_url;
+      }
+      const url = new URL(ingestionURL);
       endpoint.value = {
-        url: store.state.API_ENDPOINT,
+        url: ingestionURL,
         host: url.hostname,
         port: url.port || (url.protocol === "https:" ? "443" : "80"),
         protocol: url.protocol.replace(":", ""),
@@ -86,28 +94,64 @@ Access Key: [BASIC_PASSCODE]`;
 
     const awsServiceLinks = [
       {
-        name: "Cloudwatch Logs",
-        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html",
+        name: "Application Load Balancer (ALB)",
+        link: "https://short.openobserve.ai/aws/alb",
       },
       {
-        name: "Cloudwatch Events",
-        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-events.html",
+        name: "Cloudwatch Logs",
+        link: "https://short.openobserve.ai/aws/cloudwatch-logs",
+      },
+      {
+        name: "Cost and Usage Reports (CUR)",
+        link: "https://short.openobserve.ai/aws-cur",
+      },
+      {
+        name: "Eventbridge/Cloudwatch Events",
+        link: "https://short.openobserve.ai/aws/eventbridge",
       },
       {
         name: "Cloudwatch Metrics",
-        link: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Metric-Streams.html",
+        link: "https://short.openobserve.ai/aws/cloudwatch-metrics",
       },
       {
         name: "VPC Flow Logs",
-        link: "https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-firehose.html",
+        link: "https://short.openobserve.ai/aws/vpc-flow-logs",
+      },
+      {
+        name: "EC2 Instance Logs",
+        link: "https://short.openobserve.ai/aws/ec2",
+      },
+      {
+        name: "Cognito",
+        link: "https://short.openobserve.ai/aws/cognito",
       },
       {
         name: "AWS Network Firewall Logs",
-        link: "https://docs.aws.amazon.com/network-firewall/latest/developerguide/logging-kinesis.html",
+        link: "https://short.openobserve.ai/aws/network-firewall-logs",
       },
       {
         name: "AWS WAF Logs",
-        link: "https://docs.aws.amazon.com/waf/latest/developerguide/logging-kinesis.html",
+        link: "https://short.openobserve.ai/aws/waf",
+      },
+      {
+        name: "RDS Logs",
+        link: "https://short.openobserve.ai/aws/rds",
+      },
+      {
+        name: "DynamoDB Logs",
+        link: "https://short.openobserve.ai/aws/dynamodb",
+      },
+      {
+        name: "Route53 Logs",
+        link: "https://short.openobserve.ai/aws/route53",
+      },
+      {
+        name: "API Gateway Logs",
+        link: "https://short.openobserve.ai/aws/api-gateway",
+      },
+      {
+        name: "Cloudfront Logs",
+        link: "https://short.openobserve.ai/aws/cloudfront",
       },
       {
         name: "AWS IoT",

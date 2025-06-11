@@ -19,12 +19,12 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
-    get_config,
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
@@ -33,10 +33,10 @@ use config::{
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt},
+    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
 use hashbrown::HashSet;
-use infra::schema::{unwrap_partition_time_level, update_setting, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -48,13 +48,14 @@ use prost::Message;
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            evaluate_trigger,
+            TriggerAlertData, evaluate_trigger,
             grpc::{get_exemplar_val, get_metric_val, get_val},
-            write_file, TriggerAlertData,
+            write_file,
         },
         metrics::{format_label_name, get_exclude_labels},
         pipeline::batch_execution::ExecutablePipeline,
@@ -73,7 +74,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
                 e
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Invalid proto: {}", e),
             )));
         }
@@ -97,7 +98,7 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("Invalid json: {}", e),
             )));
         }
@@ -120,19 +121,19 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, "not an ingester".to_string()))
+            .json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                "not an ingester",
+            )));
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty()
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
+            http::StatusCode::FORBIDDEN,
             format!("Quota exceeded for this organization [{}]", org_id),
         )));
     }
@@ -141,8 +142,8 @@ pub async fn handle_otlp_request(
     if let Err(e) = ingester::check_memtable_size() {
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                e,
             )),
         );
     }
@@ -164,7 +165,6 @@ pub async fn handle_otlp_request(
     let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
-    let cfg = get_config();
     let mut partial_success = ExportMetricsPartialSuccess::default();
 
     // records buffer
@@ -269,8 +269,13 @@ pub async fn handle_otlp_request(
 
                 // update schema metadata
                 if !schema_exists.has_metadata {
-                    if let Err(e) =
-                        update_setting(org_id, metric_name, StreamType::Metrics, prom_meta).await
+                    if let Err(e) = db::schema::update_setting(
+                        org_id,
+                        metric_name,
+                        StreamType::Metrics,
+                        prom_meta,
+                    )
+                    .await
                     {
                         log::error!(
                             "Failed to set metadata for metric: {} with error: {}",
@@ -369,7 +374,10 @@ pub async fn handle_otlp_request(
                 continue;
             };
             let count = pipeline_inputs.len();
-            match exec_pl.process_batch(org_id, pipeline_inputs).await {
+            match exec_pl
+                .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     let err_msg = format!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",
@@ -427,7 +435,7 @@ pub async fn handle_otlp_request(
                 rec.as_object_mut().unwrap();
 
             let timestamp = val_map
-                .get(&cfg.common.column_timestamp)
+                .get(TIMESTAMP_COL_NAME)
                 .and_then(|ts| ts.as_i64())
                 .unwrap_or(Utc::now().timestamp_micros());
 
@@ -508,12 +516,16 @@ pub async fn handle_otlp_request(
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = chrono::Utc::now().timestamp_micros();
+                    let alert_end_time = now_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
+                        match alert
+                            .evaluate(Some(val_map), (None, alert_end_time), None)
+                            .await
                         {
-                            trigger_alerts.push((alert.clone(), v));
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));
@@ -577,10 +589,10 @@ pub async fn handle_otlp_request(
 
     let time_took = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .inc();
 
     // only one trigger per request, as it updates etcd
@@ -729,7 +741,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
     rec[VALUE_LABEL] = get_metric_val(&data_point.value);
-    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
+    rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -749,7 +761,7 @@ fn process_hist_data_point(
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
+    rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -811,7 +823,7 @@ fn process_exp_hist_data_point(
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
+    rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -868,7 +880,7 @@ fn process_summary_data_point(
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
+    rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -906,8 +918,7 @@ fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
             exemplar_rec[attr.key.as_str()] = get_val(&attr.value.as_ref());
         }
         exemplar_rec[VALUE_LABEL] = get_exemplar_val(&exemplar.value);
-        exemplar_rec[&get_config().common.column_timestamp] =
-            (exemplar.time_unix_nano / 1000).into();
+        exemplar_rec[TIMESTAMP_COL_NAME] = (exemplar.time_unix_nano / 1000).into();
 
         match TraceId::from_bytes(exemplar.trace_id.as_slice().try_into().unwrap_or_default()) {
             TraceId::INVALID => {}

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,15 +54,23 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
 
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_put(entry.clone()).await
                 {
                     Ok(_) => {
-                        log::info!("successfully sent key add notification to super cluster queue for {}/{}", entry.org,entry.name);
+                        log::info!(
+                            "successfully sent key add notification to super cluster queue for {}/{}",
+                            entry.org,
+                            entry.name
+                        );
                     }
                     Err(e) => {
-                        log::error!("error in sending cipher key add notification to super cluster queue for {}/{} : {e}", entry.org,entry.name);
+                        log::error!(
+                            "error in sending cipher key add notification to super cluster queue for {}/{} : {e}",
+                            entry.org,
+                            entry.name
+                        );
                     }
                 }
             }
@@ -89,18 +97,24 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
             .await?;
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_update(entry.clone())
                     .await
                 {
                     Ok(_) => {
                         log::info!(
-                            "successfully sent cipher key update notification to super cluster queue for {}/{}",entry.org,entry.name
+                            "successfully sent cipher key update notification to super cluster queue for {}/{}",
+                            entry.org,
+                            entry.name
                         );
                     }
                     Err(e) => {
-                        log::error!("error in sending cipher key update notification to super cluster queue for {}/{} : {e}",entry.org,entry.name);
+                        log::error!(
+                            "error in sending cipher key update notification to super cluster queue for {}/{} : {e}",
+                            entry.org,
+                            entry.name
+                        );
                     }
                 }
             }
@@ -127,7 +141,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
 
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await
                 {
@@ -137,7 +151,9 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
                         );
                     }
                     Err(e) => {
-                        log::error!("error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}");
+                        log::error!(
+                            "error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}"
+                        );
                     }
                 }
             }

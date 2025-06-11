@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -65,6 +65,17 @@ pub fn second_micros(n: i64) -> i64 {
 }
 
 #[inline(always)]
+pub fn get_ymdh_from_micros(n: i64) -> String {
+    let n = if n > 0 {
+        n
+    } else {
+        Utc::now().timestamp_micros()
+    };
+    let t = Utc.timestamp_nanos(n * 1000);
+    t.format("%Y/%m/%d/%H").to_string()
+}
+
+#[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> i64 {
     if v == 0 {
         return Utc::now().timestamp_micros();
@@ -111,7 +122,23 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
         if s.len() == 19 {
             let fmt = "%Y-%m-%dT%H:%M:%S";
             NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+        } else if s.contains('.') {
+            // Handle formats with decimal seconds: "2025-05-14T01:15:25.047"
+            // First check if it has milliseconds (3 decimal places)
+            if s.split('.').next_back().unwrap_or("").len() == 3 {
+                let fmt = "%Y-%m-%dT%H:%M:%S%.3f";
+                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+            } else if s.split('.').next_back().unwrap_or("").len() == 6 {
+                // Handle microseconds (6 decimal places)
+                let fmt = "%Y-%m-%dT%H:%M:%S%.6f";
+                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+            } else {
+                // Fall back to RFC3339 parsing for other decimal formats
+                let t = DateTime::parse_from_rfc3339(s)?;
+                t.into()
+            }
         } else {
+            // Other formats with 'T' but no spaces or decimal points
             let t = DateTime::parse_from_rfc3339(s)?;
             t.into()
         }
@@ -243,6 +270,33 @@ pub fn end_of_the_day(timestamp: i64) -> i64 {
     t_next_day_zero - 1
 }
 
+pub fn format_duration(ms: u64) -> String {
+    if ms == 0 {
+        return "0s".to_string();
+    }
+    let seconds = ms / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    let days = hours / 24;
+    let remaining_seconds = seconds % 60;
+    let remaining_minutes = minutes % 60;
+    let remaining_hours = hours % 24;
+    let mut parts = Vec::new();
+    if days > 0 {
+        parts.push(format!("{}d", days));
+    }
+    if remaining_hours > 0 {
+        parts.push(format!("{}h", remaining_hours));
+    }
+    if remaining_minutes > 0 {
+        parts.push(format!("{}m", remaining_minutes));
+    }
+    if remaining_seconds > 0 {
+        parts.push(format!("{}s", remaining_seconds));
+    }
+    parts.join("")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,6 +357,36 @@ mod tests {
         let s = "Wed, 8 Mar 2023 16:46:51 CST";
         let t = parse_str_to_time(s).unwrap();
         assert_eq!(t.timestamp_micros(), 1678315611000000);
+
+        // Test milliseconds format (3 decimal places)
+        let s = "2021-01-01T00:00:00.123";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123000);
+
+        // Test microseconds format (6 decimal places)
+        let s = "2021-01-01T00:00:00.123456";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123456);
+
+        // Test other decimal places (fallback to RFC3339)
+        let s = "2021-01-01T00:00:00.123456789";
+        let t = parse_str_to_time(s);
+        assert!(t.is_err());
+
+        // Test with timezone and milliseconds
+        let s = "2021-01-01T00:00:00.123Z";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123000);
+
+        // Test with timezone and microseconds
+        let s = "2021-01-01T00:00:00.123456+08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609430400123456);
+
+        // Test with timezone and other decimal places
+        let s = "2021-01-01T00:00:00.123456789-08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609488000123456);
     }
 
     #[test]
@@ -413,5 +497,48 @@ mod tests {
         for i in 0..t.len() {
             assert_eq!(end_of_the_day(t[i]), d[i]);
         }
+    }
+
+    #[test]
+    fn test_get_ymdhms_from_micros() {
+        let n = 1609459200000000;
+        let s = get_ymdh_from_micros(n);
+        assert_eq!(s, "2021/01/01/00");
+
+        let n = 1744077663427000;
+        let s = get_ymdh_from_micros(n);
+        assert_eq!(s, "2025/04/08/02");
+    }
+
+    #[test]
+    fn test_format_duration() {
+        // Test zero milliseconds
+        assert_eq!(format_duration(0), "0s");
+
+        // Test seconds only
+        assert_eq!(format_duration(1000), "1s");
+        assert_eq!(format_duration(5000), "5s");
+        assert_eq!(format_duration(59000), "59s");
+
+        // Test minutes only
+        assert_eq!(format_duration(60000), "1m");
+        assert_eq!(format_duration(300000), "5m");
+        assert_eq!(format_duration(3540000), "59m");
+
+        // Test hours only
+        assert_eq!(format_duration(3600000), "1h");
+        assert_eq!(format_duration(7200000), "2h");
+        assert_eq!(format_duration(82800000), "23h");
+
+        // Test days only
+        assert_eq!(format_duration(86400000), "1d");
+        assert_eq!(format_duration(172800000), "2d");
+        assert_eq!(format_duration(2592000000), "30d");
+
+        // Test combinations
+        assert_eq!(format_duration(90061000), "1d1h1m1s");
+        assert_eq!(format_duration(93784000), "1d2h3m4s");
+        assert_eq!(format_duration(3661000), "1h1m1s");
+        assert_eq!(format_duration(61000), "1m1s");
     }
 }

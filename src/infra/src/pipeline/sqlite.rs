@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use config::{
     meta::{
-        pipeline::{components::PipelineSource, Pipeline},
+        pipeline::{Pipeline, components::PipelineSource},
         stream::StreamParams,
     },
     utils::json,
@@ -270,18 +270,11 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE id = $1;";
-        let pipeline = match sqlx::query_as::<_, Pipeline>(query)
+        sqlx::query_as::<_, Pipeline>(query)
             .bind(pipeline_id)
             .fetch_one(&pool)
             .await
-        {
-            Ok(pipeline) => pipeline,
-            Err(e) => {
-                log::error!("[SQLITE] get pipeline by id error: {}", e);
-                return Err(Error::from(DbError::KeyNotExists(pipeline_id.to_string())));
-            }
-        };
-        Ok(pipeline)
+            .map_err(|_| Error::from(DbError::KeyNotExists(pipeline_id.to_string())))
     }
 
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline> {

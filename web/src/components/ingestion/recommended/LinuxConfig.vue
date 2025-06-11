@@ -6,10 +6,10 @@
     <div>
       <div class="text-subtitle1 q-pl-xs q-mt-md">
         Once you have installed the OpenObserve collector, it will:
-        <ul class="tw-list-disc tw-ml-5">
+        <ol class="tw-list-decimal tw-ml-5">
           <li>Collect system logs</li>
           <li>Collect host metrics</li>
-        </ul>
+        </ol>
       </div>
     </div>
   </div>
@@ -41,10 +41,17 @@ const endpoint: any = ref({
   tls: "",
 });
 
-const url = new URL(store.state.API_ENDPOINT);
+let ingestionURL: string = store.state.API_ENDPOINT;
+if (
+  Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
+  store.state.zoConfig.ingestion_url !== ""
+) {
+  ingestionURL = store.state.zoConfig.ingestion_url;
+}
+const url = new URL(ingestionURL);
 
 endpoint.value = {
-  url: store.state.API_ENDPOINT,
+  url: ingestionURL,
   host: url.hostname,
   port: url.port || (url.protocol === "https:" ? "443" : "80"),
   protocol: url.protocol.replace(":", ""),

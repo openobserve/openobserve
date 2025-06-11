@@ -278,6 +278,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :rules="[(val: string) => !!val?.trim() || 'Required']"
                   />
+                  <div style="width: 100%" class="tw-mb-2">
+                    <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
+
+                    <q-btn
+                      dense
+                      outline
+                      color="primary"
+                      icon="add"
+                      label="Add"
+                      @click="toggleHavingFilter"
+                      v-if="!isHavingFilterVisible()"
+                    />
+
+                    <div
+                      class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+                      v-if="isHavingFilterVisible()"
+                    >
+                      <q-select
+                        dense
+                        filled
+                        v-model="getHavingCondition().operator"
+                        :options="operators"
+                        style="width: 30%"
+                      >
+                      </q-select>
+
+                      <q-input
+                        dense
+                        filled
+                        v-model.number="getHavingCondition().value"
+                        style="width: 50%"
+                        type="number"
+                        placeholder="Value"
+                      />
+
+                      <q-btn
+                        dense
+                        flat
+                        icon="close"
+                        @click="cancelHavingFilter"
+                      />
+                    </div>
+                  </div>
                   <div
                     v-if="
                       !dashboardPanelData.data.queries[
@@ -332,7 +375,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
+import {
+  defineComponent,
+  ref,
+  reactive,
+  watch,
+  computed,
+  inject,
+  nextTick,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -364,7 +415,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    
+
     const {
       dashboardPanelData,
       addMapName,
@@ -559,6 +610,57 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
+    const operators = ["=", "<>", ">=", "<=", ">", "<"];
+
+    const isHavingFilterVisible = () => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields
+          .value_for_maps;
+
+      const isVisible = !!currentField?.havingConditions?.length;
+      return isVisible;
+    };
+
+    const toggleHavingFilter = async () => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields
+          .value_for_maps;
+
+      if (!currentField.havingConditions) {
+        currentField.havingConditions = [];
+      }
+
+      if (!currentField.havingConditions.length) {
+        currentField.havingConditions.push({ operator: null, value: null });
+      }
+
+      await nextTick();
+    };
+
+    const cancelHavingFilter = async () => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields
+          .value_for_maps;
+
+      currentField.havingConditions = [];
+
+      await nextTick();
+    };
+
+    const getHavingCondition = () => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields
+          .value_for_maps;
+
+      return (
+        currentField.havingConditions?.[0] || { operator: null, value: null }
+      );
+    };
+
     return {
       t,
       dashboardPanelData,
@@ -581,6 +683,11 @@ export default defineComponent({
       Hint,
       promqlMode,
       onFieldDragStart,
+      operators,
+      isHavingFilterVisible,
+      toggleHavingFilter,
+      cancelHavingFilter,
+      getHavingCondition,
       options: [
         "=",
         "<>",

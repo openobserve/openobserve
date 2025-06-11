@@ -83,24 +83,28 @@ export interface Headers {
 }
 export interface Destination {
   name: string;
-  url: string;
-  method: string;
-  skip_tls_verify: boolean;
-  headers: Headers;
-  template: string | Template;
-  emails: string;
-  type: "http" | "email" | "sns";
+  url?: string;
+  method?: string;
+  skip_tls_verify?: boolean;
+  headers?: Headers;
+  template?: string | Template;
+  emails?: string;
+  type: "http" | "email" | "sns" | "action";
+  action_id?: string;
+  output_format?: "json" | "ndjson";
 }
 
 export interface DestinationPayload {
   name: string;
-  url: string;
-  method: string;
-  skip_tls_verify: boolean;
-  headers: Headers;
-  template: string | Template;
-  emails: string[];
-  type: "http" | "email" | "sns";
+  url?: string;
+  method?: string;
+  skip_tls_verify?: boolean;
+  headers?: Headers;
+  template?: string | Template;
+  emails?: string[];
+  type: "http" | "email" | "sns" | "action";
+  action_id?: string;
+  output_format?: "json" | "ndjson";
 }
 
 // Destination object which is modified in frontend to display in table and form

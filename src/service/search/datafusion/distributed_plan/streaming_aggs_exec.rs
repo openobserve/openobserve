@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,8 +28,10 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::EquivalenceProperties,
     physical_plan::{
-        memory::MemoryStream, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-        ExecutionPlanProperties, Partitioning, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        memory::MemoryStream,
     },
 };
 use futures::{Stream, StreamExt};
@@ -111,7 +113,8 @@ impl StreamingAggsExec {
             // Output Partitioning
             output_partitioning,
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 }
@@ -282,6 +285,12 @@ impl StreamingAggsCache {
     pub fn insert(&self, k: String, v: RecordBatch) {
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
+            log::info!(
+                "[StreamingAggs] [streaming_id: {}] remove the oldest entry: max_entries={}, current_entries={}",
+                k,
+                self.max_entries,
+                w.len()
+            );
             if let Some(k) = w.pop_front() {
                 self.data.remove(&k);
                 GLOBAL_ID_CACHE.remove(&k);
@@ -303,7 +312,7 @@ impl Default for StreamingAggsCache {
         Self::new(
             config::get_config()
                 .limit
-                .datafusion_file_stat_cache_max_entries,
+                .datafusion_streaming_aggs_cache_max_entries,
         )
     }
 }
@@ -322,6 +331,10 @@ impl StreamingIdCache {
     pub fn insert(&self, k: String, start_time: i64, end_time: i64) {
         self.data
             .insert(k, StreamingIdItem::new(start_time, end_time));
+    }
+
+    pub fn exists(&self, k: &str) -> bool {
+        self.data.contains_key(k)
     }
 
     pub fn check_time(&self, k: &str, start_time: i64, end_time: i64) -> bool {
@@ -367,5 +380,96 @@ impl StreamingIdItem {
             self.end_ok = true;
         }
         self.start_ok && self.end_ok
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::{
+        array::{Int32Array, RecordBatch},
+        datatypes::{DataType, Field, Schema},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_streaming_aggs_cache_insert_max_entries() {
+        // Create a cache with max_entries = 2
+        let cache = StreamingAggsCache::new(2);
+
+        // Create test schema and record batches
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+
+        let batch1 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
+
+        let batch2 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![4, 5, 6]))],
+        )
+        .unwrap();
+
+        let batch3 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![7, 8, 9]))],
+        )
+        .unwrap();
+
+        // Insert first entry
+        cache.insert("key1".to_string(), batch1);
+        assert!(cache.get("key1").is_some());
+        assert_eq!(cache.data.len(), 1);
+
+        // Insert second entry
+        cache.insert("key2".to_string(), batch2);
+        assert!(cache.get("key1").is_some());
+        assert!(cache.get("key2").is_some());
+        assert_eq!(cache.data.len(), 2);
+
+        // Insert third entry - should evict the first (oldest) entry
+        cache.insert("key3".to_string(), batch3);
+        assert!(cache.get("key1").is_none()); // Should be evicted
+        assert!(cache.get("key2").is_some());
+        assert!(cache.get("key3").is_some());
+        assert_eq!(cache.data.len(), 2); // Should still be 2 (max_entries)
+
+        // Verify that the cacher queue length matches max_entries
+        let cacher_len = cache.cacher.lock().len();
+        assert_eq!(cacher_len, 2);
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_insert_within_limit() {
+        // Create a cache with max_entries = 5
+        let cache = StreamingAggsCache::new(5);
+
+        // Create test schema and record batch
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
+
+        // Insert 3 entries (within limit)
+        cache.insert("key1".to_string(), batch.clone());
+        cache.insert("key2".to_string(), batch.clone());
+        cache.insert("key3".to_string(), batch.clone());
+
+        // All entries should be present
+        assert!(cache.get("key1").is_some());
+        assert!(cache.get("key2").is_some());
+        assert!(cache.get("key3").is_some());
+        assert_eq!(cache.data.len(), 3);
+
+        // Verify that the cacher queue length matches number of entries
+        let cacher_len = cache.cacher.lock().len();
+        assert_eq!(cacher_len, 3);
     }
 }

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="chartPanelClass"
     >
       <div
-        v-if="!errorDetail"
+        v-if="!errorDetail?.message"
         :style="{ height: chartPanelHeight, width: '100%' }"
       >
         <MapsRenderer
@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
             class="col"
+            :variablesData="variablesData"
           />
         </div>
         <div
@@ -73,27 +74,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
             class="col"
+            :variablesData="variablesData"
           />
         </div>
 
-          <CustomChartRenderer
+        <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
-            :data="panelData"
-            style="width: 100%; height: 100%"
-            class="col"
-            @error="errorDetail = $event"
-          />
+          :data="panelData"
+          style="width: 100%; height: 100%"
+          class="col"
+          @error="errorDetail = $event"
+        />
         <ChartRenderer
           v-else
           :data="
             panelSchema.queryType === 'promql' ||
-            (data.length &&
-              data[0]?.length &&
-              panelData.chartType != 'geomap' &&
+            (panelData.chartType != 'geomap' &&
               panelData.chartType != 'table' &&
-              panelData.chartType != 'maps')
+              panelData.chartType != 'maps' &&
+              loading)
               ? panelData
-              : { options: { backgroundColor: 'transparent' } }
+              : noData == 'No Data'
+                ? {
+                    options: {
+                      backgroundColor: 'transparent',
+                    },
+                  }
+                : panelData
           "
           :height="chartPanelHeight"
           @updated:data-zoom="onDataZoom"
@@ -103,9 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="
-          !errorDetail &&
+          !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
-          panelSchema.type != 'maps'
+          panelSchema.type != 'maps' &&
+          !loading
         "
         class="noData"
         data-test="no-data"
@@ -113,15 +121,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ noData }}
       </div>
       <div
-        v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
+        v-if="
+          errorDetail?.message &&
+          !panelSchema?.error_config?.custom_error_handeling
+        "
         class="errorMessage"
       >
         <q-icon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
+        <div style="height: 80%; width: 100%">
+          {{
+            errorDetail?.code?.toString().startsWith("4")
+              ? errorDetail.message
+              : "Error Loading Data"
+          }}
+        </div>
       </div>
       <div
         v-if="
-          errorDetail &&
+          errorDetail?.message &&
           panelSchema?.error_config?.custom_error_handeling &&
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
@@ -131,15 +148,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        v-if="loading"
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <q-spinner-dots
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; z-index: 999"
-        />
+        <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
       </div>
       <div
         v-if="allowAnnotationsAdd && isCursorOverPanel"
@@ -284,6 +296,8 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
+import { exportFile } from "quasar";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -327,6 +341,7 @@ export default defineComponent({
     MarkdownRenderer,
     AddAnnotation,
     CustomChartRenderer,
+    LoadingProgress,
   },
   props: {
     selectedTimeObj: {
@@ -380,6 +395,8 @@ export default defineComponent({
     "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
+    "loading-state-change",
+    "limit-number-of-series-warning-message-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -393,6 +410,8 @@ export default defineComponent({
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
     const annotationPopupRef: any = ref(null);
+
+    const limitNumberOfSeriesWarningMessage: any = ref("");
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -427,6 +446,7 @@ export default defineComponent({
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
+      loadingProgressPercentage,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -457,7 +477,7 @@ export default defineComponent({
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
-    const tableRendererRef = ref(null);
+    const tableRendererRef: any = ref(null);
 
     // hovered series state
     // used to show tooltip axis for all charts
@@ -505,6 +525,11 @@ export default defineComponent({
       "variablesAndPanelsDataLoadingState",
       { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
+
+    // Watch loading state changes and emit them to parent
+    watch(loading, (newLoadingState) => {
+      emit("loading-state-change", newLoadingState);
+    });
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
     watch(loading, (updatedLoadingValue) => {
@@ -573,10 +598,17 @@ export default defineComponent({
 
           emit("updated:vrlFunctionFieldList", responseFields);
         }
-        if(panelData.value.chartType == 'custom_chart') errorDetail.value = '';
+        if (panelData.value.chartType == "custom_chart")
+          errorDetail.value = {
+            message: "",
+            code: "",
+          };
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (!errorDetail.value && validatePanelData?.value?.length === 0) {
+        if (
+          !errorDetail?.value?.message &&
+          validatePanelData?.value?.length === 0
+        ) {
           try {
             // passing chartpanelref to get width and height of DOM element
             panelData.value = await convertPanelData(
@@ -589,14 +621,23 @@ export default defineComponent({
               metadata.value,
               chartPanelStyle.value,
               annotations,
-              loading.value
+              loading.value,
             );
 
-            errorDetail.value = "";
+            limitNumberOfSeriesWarningMessage.value =
+              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+
+            errorDetail.value = {
+              message: "",
+              code: "",
+            };
           } catch (error: any) {
             console.error("error", error);
 
-            errorDetail.value = error.message;
+            errorDetail.value = {
+              message: error?.message,
+              code: error?.code || "",
+            };
           }
         } else {
           // if no data is available, then show the default data
@@ -609,7 +650,10 @@ export default defineComponent({
             data.value = JSON.parse(
               panelSchema.value?.error_config?.default_data_on_error,
             );
-            errorDetail.value = "";
+            errorDetail.value = {
+              message: "",
+              code: "",
+            };
           }
         }
       },
@@ -625,6 +669,18 @@ export default defineComponent({
       metadata,
       () => {
         emit("metadata-update", metadata.value);
+      },
+      { deep: true },
+    );
+
+    // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
+    watch(
+      limitNumberOfSeriesWarningMessage,
+      () => {
+        emit(
+          "limit-number-of-series-warning-message-update",
+          limitNumberOfSeriesWarningMessage.value,
+        );
       },
       { deep: true },
     );
@@ -756,8 +812,8 @@ export default defineComponent({
     // when the error changes, emit the error
     watch(errorDetail, () => {
       //check if there is an error message or not
-      if (!errorDetail.value) return;
-      emit("error", errorDetail);
+      // if (!errorDetail.value) return; // emmit is required to reset the error on parent component
+      emit("error", errorDetail.value);
     });
 
     const hidePopupsAndOverlays = () => {
@@ -796,6 +852,34 @@ export default defineComponent({
       });
     };
 
+    const replaceDrilldownToLogs = (str: any, obj: any) => {
+      // If str is exactly equal to a key, return its value directly
+      for (const key in obj) {
+        if (`\$\{${key}\}` === str) {
+          let value = obj[key];
+
+          // Ensure string values are wrapped in quotes
+          return typeof value === "string" ? `'${value}'` : value;
+        }
+      }
+
+      return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
+        // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
+        let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
+
+        let value = obj;
+        for (let part of parts) {
+          if (value && part in value) {
+            value = value[part];
+          } else {
+            return "${" + key + "}"; // Keep the placeholder if the key is not found
+          }
+        }
+
+        // Ensure string values are wrapped in quotes
+        return typeof value === "string" ? `'${value}'` : value;
+      });
+    };
     // get offset from parent
     function getOffsetFromParent(parent: any, child: any) {
       const parentRect = parent.getBoundingClientRect();
@@ -921,7 +1005,8 @@ export default defineComponent({
       return offSetValues;
     };
 
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
 
     let parser: any;
     onBeforeMount(async () => {
@@ -1133,7 +1218,6 @@ export default defineComponent({
 
           const { originalQuery, streamName } =
             getOriginalQueryAndStream(queryDetails, metadata) || {};
-
           if (!originalQuery || !streamName) return;
 
           const hoveredTime = drilldownParams[0]?.value?.[0];
@@ -1146,6 +1230,7 @@ export default defineComponent({
             hoveredTimestamp,
             intervalMicro.value,
           );
+
           let modifiedQuery = originalQuery;
 
           if (drilldownData.data.logsMode === "auto") {
@@ -1167,17 +1252,15 @@ export default defineComponent({
             const breakdownColumn = breakdown[0]?.column;
 
             const seriesIndex = drilldownParams[0]?.seriesIndex;
-
             const breakdownSeriesName =
               seriesIndex !== undefined
                 ? panelData.value.options.series[seriesIndex]
                 : undefined;
-
             const uniqueSeriesName = breakdownSeriesName
               ? breakdownSeriesName.originalSeriesName
               : drilldownParams[0]?.seriesName;
-
             const breakdownValue = uniqueSeriesName;
+
             const whereClause = buildWhereClause(
               ast,
               breakdownColumn,
@@ -1186,12 +1269,102 @@ export default defineComponent({
 
             modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
           } else {
-            modifiedQuery = replaceVariablesValue(
+            // Create drilldown variables object exactly as you do for other drilldown types
+            const drilldownVariables: any = {};
+
+            // Add time range
+            if (
+              selectedTimeObj?.value?.start_time &&
+              selectedTimeObj?.value?.start_time != "Invalid Date"
+            ) {
+              drilldownVariables.start_time = new Date(
+                selectedTimeObj?.value?.start_time?.toISOString(),
+              ).getTime();
+            }
+            if (
+              selectedTimeObj?.value?.end_time &&
+              selectedTimeObj?.value?.end_time != "Invalid Date"
+            ) {
+              drilldownVariables.end_time = new Date(
+                selectedTimeObj?.value?.end_time?.toISOString(),
+              ).getTime();
+            }
+
+            // Add query and encoded query
+            drilldownVariables.query =
+              metadata?.value?.queries[0]?.query ??
+              panelSchema?.value?.queries[0]?.query ??
+              "";
+            drilldownVariables.query_encoded = b64EncodeUnicode(
+              drilldownVariables.query,
+            );
+
+            // Handle different chart types
+            if (panelSchema.value.type == "table") {
+              const fields: any = {};
+              panelSchema.value.queries.forEach((query: any) => {
+                const panelFields: any = [
+                  ...(query.fields.x || []),
+                  ...(query.fields.y || []),
+                  ...(query.fields.z || []),
+                ];
+                panelFields.forEach((field: any) => {
+                  fields[field.label] = drilldownParams[1][0][field.alias];
+                  fields[field.alias] = drilldownParams[1][0][field.alias];
+                });
+              });
+              drilldownVariables.row = {
+                field: fields,
+                index: drilldownParams[1][1],
+              };
+            } else if (panelSchema.value.type == "sankey") {
+              if (drilldownParams[0].dataType == "node") {
+                drilldownVariables.node = {
+                  __name: drilldownParams[0]?.name ?? "",
+                  __value: drilldownParams[0]?.value ?? "",
+                };
+              } else {
+                drilldownVariables.edge = {
+                  __source: drilldownParams[0]?.data?.source ?? "",
+                  __target: drilldownParams[0]?.data?.target ?? "",
+                  __value: drilldownParams[0]?.data?.value ?? "",
+                };
+              }
+            } else {
+              drilldownVariables.series = {
+                __name: ["pie", "donut", "heatmap"].includes(
+                  panelSchema.value.type,
+                )
+                  ? drilldownParams[0].name
+                  : drilldownParams[0].seriesName,
+                __value: Array.isArray(drilldownParams[0].value)
+                  ? drilldownParams[0].value[
+                      drilldownParams[0].value.length - 1
+                    ]
+                  : drilldownParams[0].value,
+              };
+            }
+
+            variablesData?.value?.values?.forEach((variable: any) => {
+              if (variable.type != "dynamic_filters") {
+                drilldownVariables[variable.name] = variable.value;
+              }
+            });
+
+            let queryWithReplacedPlaceholders = replaceVariablesValue(
               drilldownData?.data?.logsQuery,
               variablesData?.value?.values,
               panelSchema,
             );
+
+            queryWithReplacedPlaceholders = replaceDrilldownToLogs(
+              queryWithReplacedPlaceholders,
+              drilldownVariables,
+            );
+
+            modifiedQuery = queryWithReplacedPlaceholders;
           }
+
           modifiedQuery = modifiedQuery.replace(/`/g, '"');
 
           const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
@@ -1308,6 +1481,8 @@ export default defineComponent({
             __value: Array.isArray(drilldownParams[0].value)
               ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
               : drilldownParams[0].value,
+            __axisValue:
+              drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
           };
         }
 
@@ -1494,6 +1669,192 @@ export default defineComponent({
       return "";
     });
 
+    const downloadDataAsCSV = (title: string) => {
+      // if panel type is table then download data as csv
+      if (panelSchema.value.type == "table") {
+        tableRendererRef?.value?.downloadTableAsCSV(title);
+      } else {
+        // For non-table charts
+        try {
+          // Check if data exists
+          if (!data?.value || data?.value?.length === 0) {
+            showErrorNotification("No data available to download");
+            return;
+          }
+
+          let csvContent;
+
+          // Check if this is a PromQL query type panel
+          if (panelSchema.value.queryType === "promql") {
+            // Handle PromQL data format
+            const flattenedData: any[] = [];
+
+            // Iterate through each response item (multiple queries can produce multiple responses)
+            data?.value?.forEach((promData: any, queryIndex: number) => {
+              if (!promData?.result || !Array.isArray(promData.result)) return;
+
+              // Iterate through each result (time series)
+              promData.result.forEach((series: any, seriesIndex: number) => {
+                const metricLabels = series.metric || {};
+
+                // Iterate through values array (timestamp, value pairs)
+                series.values.forEach((point: any) => {
+                  const timestamp = point[0];
+                  const value = point[1];
+
+                  // Create a row with timestamp, value, and all metric labels
+                  const row = {
+                    timestamp: timestamp,
+                    value: value,
+                    ...metricLabels,
+                  };
+
+                  flattenedData.push(row);
+                });
+              });
+            });
+
+            // Get all unique keys across all data points
+            const allKeys = new Set();
+            flattenedData.forEach((row: any) => {
+              Object.keys(row).forEach((key: any) => allKeys.add(key));
+            });
+
+            // Convert Set to Array and ensure timestamp and value come first
+            const keys = Array.from(allKeys);
+            keys.sort((a: any, b: any) => {
+              if (a === "timestamp") return -1;
+              if (b === "timestamp") return 1;
+              if (a === "value") return -1;
+              if (b === "value") return 1;
+              return a.localeCompare(b);
+            });
+
+            // Create CSV content
+            csvContent = [
+              keys.join(","), // Headers row
+              ...flattenedData.map((row: any) =>
+                keys.map((key: any) => wrapCsvValue(row[key] ?? "")).join(","),
+              ),
+            ].join("\r\n");
+          } else {
+            // Handle standard SQL format - now supporting multiple arrays
+            const flattenedData: any[] = [];
+
+            // Iterate through all datasets/arrays in the response
+            data?.value?.forEach((dataset: any, datasetIndex: number) => {
+              // Skip if dataset is empty or not an array
+              if (!dataset || !Array.isArray(dataset) || dataset.length === 0)
+                return;
+
+              dataset.forEach((row: any) => {
+                flattenedData.push({
+                  ...row,
+                });
+              });
+            });
+
+            // If after flattening we have no data, show notification and return
+            if (flattenedData.length === 0) {
+              showErrorNotification("No data available to download");
+              return;
+            }
+
+            // Collect all possible keys from all objects
+            const allKeys = new Set();
+            flattenedData.forEach((row: any) => {
+              Object.keys(row).forEach((key: any) => allKeys.add(key));
+            });
+
+            // Convert Set to Array and sort for consistent order
+            const headers = Array.from(allKeys).sort();
+
+            // Create CSV content with headers and data rows
+            csvContent = [
+              headers?.join(","), // Headers row
+              ...flattenedData?.map((row: any) =>
+                headers
+                  ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
+                  .join(","),
+              ),
+            ].join("\r\n");
+          }
+
+          const status = exportFile(
+            (title ?? "chart-export") + ".csv",
+            csvContent,
+            "text/csv",
+          );
+
+          if (status === true) {
+            showPositiveNotification("Chart data downloaded as a CSV file", {
+              timeout: 2000,
+            });
+          } else {
+            showErrorNotification("Browser denied file download...");
+          }
+        } catch (error) {
+          console.error("Error downloading CSV:", error);
+          showErrorNotification("Failed to download data as CSV");
+        }
+      }
+    };
+
+    // Helper function to properly wrap CSV values
+    const wrapCsvValue = (val: any): string => {
+      if (val === null || val === undefined) {
+        return "";
+      }
+
+      // Convert to string and escape any quotes
+      const str = String(val).replace(/"/g, '""');
+
+      // Wrap in quotes if the value contains comma, quotes, or newlines
+      const needsQuotes =
+        str.includes(",") ||
+        str.includes('"') ||
+        str.includes("\n") ||
+        str.includes("\r");
+      return needsQuotes ? `"${str}"` : str;
+    };
+
+    const downloadDataAsJSON = (title: string) => {
+      try {
+        // Handle table type charts
+        if (panelSchema?.value?.type === "table") {
+          tableRendererRef?.value?.downloadTableAsJSON(title);
+        } else {
+          // Handle non-table charts
+          const chartData = data.value;
+
+          if (!chartData || !chartData.length) {
+            showErrorNotification("No data available to download");
+            return;
+          }
+
+          // Export the data as JSON
+          const content = JSON.stringify(chartData, null, 2);
+
+          const status = exportFile(
+            (title ?? "data-export") + ".json",
+            content,
+            "application/json",
+          );
+
+          if (status === true) {
+            showPositiveNotification("Chart data downloaded as a JSON file", {
+              timeout: 2000,
+            });
+          } else {
+            showErrorNotification("Browser denied file download...");
+          }
+        }
+      } catch (error) {
+        console.error("Error downloading JSON:", error);
+        showErrorNotification("Failed to download data as JSON");
+      }
+    };
+
     return {
       store,
       chartPanelRef,
@@ -1525,6 +1886,9 @@ export default defineComponent({
       panelsList,
       isCursorOverPanel,
       showPopupsAndOverlays,
+      downloadDataAsCSV,
+      downloadDataAsJSON,
+      loadingProgressPercentage,
     };
   },
 });
@@ -1542,7 +1906,7 @@ export default defineComponent({
   height: 80%;
   overflow: hidden;
   text-align: center;
-  color: rgba(255, 0, 0, 0.8);
+  // color: rgba(255, 0, 0, 0.8);
   text-overflow: ellipsis;
 }
 

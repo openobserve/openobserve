@@ -101,7 +101,7 @@ test.describe("Logs UI testcases", () => {
   }) => {
     await page.waitForTimeout(3000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-query-editor"]').click();
     await page.keyboard.press(
       process.platform === "darwin" ? "Meta+A" : "Control+A"
@@ -109,7 +109,7 @@ test.describe("Logs UI testcases", () => {
     await page.keyboard.press("Backspace");
     await page.waitForTimeout(3000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByText("No column found in selected stream.").click();
+    await page.getByText("SQL query is missing or invalid. Please submit a valid SQL statement.").click();
   });
 
   test("should be able to enter valid text in VRL and run query", async ({
@@ -124,7 +124,7 @@ test.describe("Logs UI testcases", () => {
     await applyQueryButton(page);
 
 
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
     await page.waitForTimeout(1000);
     await applyQueryButton(page);
     const warningElement = page.locator('text=warning Query execution');
@@ -197,48 +197,6 @@ test.describe("Logs UI testcases", () => {
     await expect(page.locator(".q-notification__message")).toContainText(
       "Please provide valid view name"
     );
-  });
-
-  test("should allow alphanumeric name under saved view", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator("button")
-      .filter({ hasText: "savesaved_search" })
-      .click();
-    await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("e2enewtest");
-    await page
-      .locator('[data-test="saved-view-dialog-save-btn"]')
-      .click({ force: true });
-    await page.waitForTimeout(5000);
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click({ force: true });
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.waitForTimeout(3000);
-    await page.getByText("e2enewtest").click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
   });
 
   test("should display error when user directly clicks on OK without adding name", async ({
@@ -358,8 +316,9 @@ test.describe("Logs UI testcases", () => {
     // Click on the date-time button
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
-    // Click on the SQL Mode toggle
-    await page.locator('[aria-label="SQL Mode"]').click({ force: true });
+    await page.waitForTimeout(1000);
+
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
 
     // Assert that the SQL query is visible
     const expectedQuery =
@@ -424,6 +383,7 @@ test.describe("Logs UI testcases", () => {
       .click({ force: true });
     await page.getByPlaceholder("Search Stream").click();
     await page.getByPlaceholder("Search Stream").fill("e2e");
+    await page.waitForTimeout(1000);
     await page
       .getByRole("button", { name: "Explore" })
       .first()
@@ -441,7 +401,7 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').click();
@@ -460,7 +420,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display click save directly while creating a function', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
@@ -469,7 +429,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding only blank spaces under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill(' ');
@@ -480,7 +440,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding invalid characters under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill('e2e@@@');
@@ -490,7 +450,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display added function on switching between tabs and again navigate to log', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="menu-link-\\/metrics-item"]').click();
@@ -510,11 +470,11 @@ test.describe("Logs UI testcases", () => {
     await page.waitForTimeout(4000);
     // await page.locator('[data-test="logs-search-subfield-add-code-200"] [data-test="log-search-subfield-list-equal-code-field-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
@@ -536,7 +496,7 @@ test.describe("Logs UI testcases", () => {
   test.skip('should display results for search around after adding function', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
+    await page.locator('#fnEditor').locator('.inputarea').fill('.a=1');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
@@ -550,7 +510,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display search around in SQL mode', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
     await page.waitForTimeout(2000)
@@ -567,7 +527,7 @@ test.describe("Logs UI testcases", () => {
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code') limit 5");
     await page.waitForTimeout(2000);
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();

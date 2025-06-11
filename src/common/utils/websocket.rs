@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,13 +15,17 @@
 
 use std::ops::ControlFlow;
 
-use config::meta::{
-    search::{SearchEventContext, SearchEventType},
-    websocket::SearchResultType,
+use config::{
+    get_config,
+    meta::{
+        search::{SearchEventContext, SearchEventType},
+        websocket::SearchResultType,
+    },
 };
 use infra::errors::Error;
+use rand::Rng;
 use sqlparser::{
-    ast::{visit_statements_mut, Expr, FunctionArguments, Statement},
+    ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -67,7 +71,8 @@ pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ra
 }
 
 /// Updates the `HISTOGRAM` function in a SQL query to include or modify the interval.
-pub(crate) fn update_histogram_interval_in_query(
+// TODO: should be a utils function in sql crate
+pub fn update_histogram_interval_in_query(
     sql: &str,
     histogram_interval: i64,
 ) -> Result<String, Error> {
@@ -76,8 +81,8 @@ pub(crate) fn update_histogram_interval_in_query(
         .pop()
         .unwrap();
 
-    visit_statements_mut(&mut statement, |stmt| {
-        if let Statement::Query(ref mut query) = stmt {
+    let _ = visit_statements_mut(&mut statement, |stmt| {
+        if let Statement::Query(query) = stmt {
             if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
                 for projection in &mut select.projection {
                     match projection {
@@ -138,6 +143,12 @@ pub fn _calc_result_cache_ratio(accumulated_results: &[SearchResultType]) -> usi
         return 0; // avoid division by zero
     }
     ((cache_hits as f64 / total_hits as f64) * 100.0).round() as usize
+}
+
+pub fn get_ping_interval_secs_with_jitter() -> i64 {
+    let base_interval = get_config().websocket.ping_interval_secs;
+    let jitter = rand::thread_rng().gen_range(0..10) as i64;
+    base_interval + jitter
 }
 
 #[cfg(test)]

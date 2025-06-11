@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,30 +15,39 @@
 
 use std::fmt::Debug;
 
-use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
-use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
 use base64::Engine;
-use config::utils::json;
-use futures::future::{ready, Ready};
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
-#[cfg(feature = "enterprise")]
-use o2_openfga::meta::mapping::OFGA_MODELS;
+use config::{
+    meta::user::UserRole,
+    utils::{hash::get_passcode_hash, json},
+};
+use futures::future::{Ready, ready};
 use once_cell::sync::Lazy;
 use regex::Regex;
-
 #[cfg(feature = "enterprise")]
-use crate::common::infra::config::USER_SESSIONS;
+use {
+    crate::{
+        common::{infra::config::USER_SESSIONS, meta::ingestion::INGESTION_EP},
+        service::users::get_user,
+    },
+    jsonwebtoken::TokenData,
+    o2_dex::service::auth::get_dex_jwks,
+    o2_openfga::config::get_config as get_openfga_config,
+    o2_openfga::meta::mapping::OFGA_MODELS,
+    serde_json::Value,
+    std::{collections::HashMap, str::FromStr},
+};
+
 use crate::common::{
-    infra::config::{PASSWORD_HASH, USERS},
+    infra::config::{ORG_USERS, PASSWORD_HASH},
     meta::{
         authz::Authz,
         organization::DEFAULT_ORG,
-        user::{AuthTokens, UserRole},
+        user::{AuthTokens, UserOrgRole},
     },
 };
-#[cfg(feature = "enterprise")]
-use crate::common::{meta, meta::ingestion::INGESTION_EP};
+
+pub const V2_API_PREFIX: &str = "v2";
 
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
@@ -47,6 +56,17 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
     let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
     Regex::new(&pattern).unwrap()
 });
+
+pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+.-]*[a-zA-Z0-9_+])?)@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
+    )
+    .unwrap()
+});
+
+pub fn is_valid_email(email: &str) -> bool {
+    EMAIL_REGEX.is_match(email)
+}
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
@@ -72,40 +92,59 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     match hash {
         Some(ret_hash) => ret_hash.value().to_string(),
         None => {
-            let t_cost = 4;
-            let m_cost = 2048;
-            let p_cost = 2;
-            let params = Params::new(m_cost, t_cost, p_cost, None).unwrap();
-            let ctx = Argon2::new(Algorithm::Argon2d, Version::V0x10, params);
-            let password = pass.as_bytes();
-            let salt_string = SaltString::encode_b64(salt.as_bytes()).unwrap();
-            let password_hash = ctx
-                .hash_password(password, &salt_string)
-                .unwrap()
-                .to_string();
+            let password_hash = get_passcode_hash(pass, salt);
             PASSWORD_HASH.insert(key, password_hash.clone());
             password_hash
         }
     }
 }
 
+// TODO
+pub fn generate_invite_token() -> String {
+    "".to_string()
+}
+
 pub(crate) fn is_root_user(user_id: &str) -> bool {
-    match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
+    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
 }
 
 #[cfg(feature = "enterprise")]
-pub fn get_role(role: UserRole) -> UserRole {
+pub async fn save_org_tuples(org_id: &str) {
+    use o2_openfga::config::get_config as get_openfga_config;
+
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::save_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn save_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
+pub async fn delete_org_tuples(org_id: &str) {
+    use o2_openfga::config::get_config as get_openfga_config;
+
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn delete_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
+pub fn get_role(role: &UserOrgRole) -> UserRole {
     use std::str::FromStr;
 
-    let role = o2_openfga::authorizer::roles::get_role(format!("{role}"));
+    let role = o2_openfga::authorizer::roles::get_role(format!("{}", role.base_role));
     UserRole::from_str(&role).unwrap()
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub fn get_role(_role: UserRole) -> UserRole {
+pub fn get_role(_role: &UserOrgRole) -> UserRole {
     UserRole::Admin
 }
 
@@ -175,7 +214,7 @@ impl FromRequest for UserEmail {
         if let Some(auth_header) = req.headers().get("user_id") {
             if let Ok(user_str) = auth_header.to_str() {
                 return ready(Ok(UserEmail {
-                    user_id: user_str.to_owned(),
+                    user_id: user_str.to_lowercase(),
                 }));
             }
         }
@@ -199,21 +238,17 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(feature = "enterprise")]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let start = std::time::Instant::now();
-
-        use std::collections::HashMap;
-
         use actix_web::web;
-        use config::meta::stream::StreamType;
+        use config::{get_config, meta::stream::StreamType};
+        use hashbrown::HashMap;
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
+        let start = std::time::Instant::now();
+
         let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-        let stream_type = match get_stream_type_from_request(&query) {
-            Ok(v) => v,
-            Err(_) => Some(StreamType::Logs),
-        };
+        let stream_type = get_stream_type_from_request(&query);
 
         let folder = get_folder(&query);
 
@@ -228,7 +263,11 @@ impl FromRequest for AuthExtractor {
 
         let path_columns = path.split('/').collect::<Vec<&str>>();
         let url_len = path_columns.len();
-        let org_id = path_columns[0].to_string();
+        let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
+            path_columns[1].to_string()
+        } else {
+            path_columns[0].to_string()
+        };
 
         // This is case for ingestion endpoints where we need to check
         // permissions on the stream
@@ -255,7 +294,7 @@ impl FromRequest for AuthExtractor {
         let object_type = if url_len == 1 {
             // for organization entity itself, get requires the list
             // permissions, and the object is a special format string
-            if method.eq("GET") && path_columns[0].eq("organizations") {
+            if path_columns[0].eq("organizations") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 };
@@ -264,12 +303,12 @@ impl FromRequest for AuthExtractor {
             } else {
                 path_columns[0].to_string()
             }
-        } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
+        } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
             // for settings, the post/delete require PUT permissions, GET needs LIST permissions
             // also the special settings exception is for 3-part urls for logo /text
             // which are of path /org/settings/logo , which need permission of operating
             // on permission in general
-            if path_columns[1].starts_with("settings") {
+            if path_columns[1].eq("settings") {
                 if method.eq("POST") || method.eq("DELETE") {
                     method = "PUT".to_string();
                 }
@@ -277,14 +316,27 @@ impl FromRequest for AuthExtractor {
                 method = "LIST".to_string();
             }
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
+            let key = if path_columns[1].eq("invites") {
+                "users"
+            } else if path_columns[1].eq("rename") && method.eq("PUT") {
+                "organizations"
+            } else {
+                path_columns[1]
+            };
+
+            // for organization api changes we need perms on _all_{org}
+            let entity = if key == "organizations" {
+                format!("_all_{}", path_columns[0])
+            } else {
+                path_columns[0].to_string()
+            };
+
             format!(
                 "{}:{}",
-                OFGA_MODELS
-                    .get(path_columns[1])
-                    .map_or(path_columns[1], |model| model.key),
-                path_columns[0]
+                OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                entity
             )
-        } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {
+        } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
             // to check permission on role:org/id for permissions on that specific role
             format!(
@@ -295,13 +347,24 @@ impl FromRequest for AuthExtractor {
                 path_columns[2]
             )
         } else if url_len == 3 {
+            // Handle /v2 alert apis
+            if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("alert_folders").unwrap().key,
+                    folder
+                )
+            }
             // these are cases where the entity is "sub-entity" of some other entity,
             // for example, alerts are on route /org/stream/alerts
             // or templates are on route /org/alerts/templates and so on
             // users/roles is one of the special exception here
-            if path_columns[2].starts_with("alerts")
-                || path_columns[2].starts_with("templates")
-                || path_columns[2].starts_with("destinations")
+            else if path_columns[2].eq("alerts")
+                || path_columns[2].eq("templates")
+                || path_columns[2].eq("destinations")
                 || path.ends_with("users/roles")
             {
                 if method.eq("GET") {
@@ -333,6 +396,10 @@ impl FromRequest for AuthExtractor {
             } else if path_columns[2].starts_with("_values")
                 || path_columns[2].starts_with("_around")
             {
+                if method.eq("POST") {
+                    // For _around search, the rbac check will be "GET"
+                    method = "GET".to_string();
+                }
                 // special case of _values/_around , where we need permission on that stream,
                 // as it is part of search, but still 3-part route
                 format!(
@@ -340,13 +407,20 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS.get("streams").unwrap().key,
                     path_columns[1]
                 )
-            } else if method.eq("PUT")
+            } else if path_columns[1].starts_with("rename") {
+                // Org rename
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("organizations").unwrap().key,
+                    org_id
+                )
+            } else if (method.eq("PUT") && !path_columns[1].starts_with("ratelimit"))
                 || method.eq("DELETE")
-                || path_columns[1].starts_with("reports")
-                || path_columns[1].starts_with("savedviews")
-                || path_columns[1].starts_with("functions")
-                || path_columns[1].starts_with("service_accounts")
-                || path_columns[1].starts_with("cipher_keys")
+                || path_columns[1].eq("reports")
+                || path_columns[1].eq("savedviews")
+                || path_columns[1].eq("functions")
+                || path_columns[1].eq("service_accounts")
+                || path_columns[1].eq("cipher_keys")
             {
                 // Similar to the alerts/templates etc, but for other entities such as specific
                 // pipeline, specific stream, specific alert/destination etc.
@@ -364,9 +438,9 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             } else if method.eq("GET")
-                && (path_columns[1].starts_with("dashboards")
-                    || path_columns[1].starts_with("folders")
-                    || path_columns[1].starts_with("actions"))
+                && (path_columns[1].eq("dashboards")
+                    || path_columns[1].eq("folders")
+                    || path_columns[1].eq("actions"))
             {
                 format!(
                     "{}:{}",
@@ -378,6 +452,12 @@ impl FromRequest for AuthExtractor {
             } else {
                 // for things like dashboards and folders etc,
                 // this will take form org:dashboard or org:folders
+
+                // handle ratelimit:org
+                if method.eq("GET") && path_columns[1].starts_with("ratelimit") {
+                    method = "LIST".to_string();
+                }
+
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -387,9 +467,37 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else if url_len == 4 {
+            // Handle /v2 alert apis
+            if path_columns[0].eq(V2_API_PREFIX) {
+                if path_columns[2].eq("alerts") {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[2])
+                            .map_or(path_columns[2], |model| model.key),
+                        path_columns[3]
+                    )
+                } else {
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    }
+                    let ofga_type = if path_columns[3].eq("alerts") {
+                        "alert_folders"
+                    } else {
+                        "folders"
+                    };
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(ofga_type)
+                            .map_or(ofga_type, |model| model.key),
+                        path_columns[1]
+                    )
+                }
+            }
             // this is for specific sub-items like specific alert, destination etc.
             // and sub-items such as schema, stream settings, or enabling/triggering reports
-            if method.eq("PUT") && path_columns[1].eq("reports") {
+            else if method.eq("PUT") && path_columns[1].eq("reports") {
                 // for report enable/trigger, we need permissions on that specific
                 // report, so this will be name:reports
                 format!(
@@ -464,15 +572,42 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             }
-        } else if method.eq("PUT") || method.eq("DELETE") {
+        } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
             // this block is for all other urls
             // specifically checking PUT /org_id/streams/stream_name/delete_fields
             // even though method is put, we actually need to check delete permissions
             if path_columns[url_len - 1].eq("delete_fields") {
                 method = "DELETE".to_string();
             }
+
+            if method.eq("PATCH") {
+                method = "PUT".to_string();
+            }
+
+            // Handle /v2 folders apis
+            if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("folders") {
+                let ofga_type = if path_columns[3].eq("alerts") {
+                    "alert_folders"
+                } else {
+                    "folders"
+                };
+                if url_len == 6 {
+                    // Should check for all_org permissions
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get(ofga_type).unwrap().key,
+                        path_columns[1]
+                    )
+                } else {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get(ofga_type).unwrap().key,
+                        path_columns[4]
+                    )
+                }
+            }
             //  this is specifically for enabling alerts
-            if path_columns[url_len - 1].eq("enable") {
+            else if path_columns[url_len - 1].eq("enable") {
                 // this will take form name:alert
                 format!(
                     "{}:{}",
@@ -505,6 +640,26 @@ impl FromRequest for AuthExtractor {
             )
         };
 
+        // Check if the ws request is using internal grpc token
+        if method.eq("GET") && path.contains("/ws") {
+            if let Some(auth_header) = req.headers().get("Authorization") {
+                if auth_header
+                    .to_str()
+                    .unwrap()
+                    .eq(&get_config().grpc.internal_grpc_token)
+                {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_header.to_str().unwrap().to_string(),
+                        method,
+                        o2_type: format!("stream:{org_id}"),
+                        org_id,
+                        bypass_check: true,
+                        parent_id: folder,
+                    }));
+                }
+            }
+        }
+
         let auth_str = extract_auth_str(req);
 
         // if let Some(auth_header) = req.headers().get("Authorization") {
@@ -520,6 +675,8 @@ impl FromRequest for AuthExtractor {
                 || path.contains("query_manager")
                 || path.contains("/short")
                 || path.contains("/ws")
+                || path.contains("/_values_stream")
+                || (url_len > 1 && path_columns[1].eq("ai"))
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
@@ -574,6 +731,19 @@ impl FromRequest for AuthExtractor {
                 } else {
                     object_type
                 };
+                // Currently, we have a patch api for dashboard move,
+                // which can not be handled by the middleware layer,
+                // so we need to bypass the check here
+                if method.eq("PATCH") {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method: "".to_string(),
+                        o2_type: "".to_string(),
+                        org_id: "".to_string(),
+                        bypass_check: true, // bypass check permissions
+                        parent_id: folder,
+                    }));
+                }
 
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
@@ -581,6 +751,17 @@ impl FromRequest for AuthExtractor {
                     o2_type: object_type,
                     org_id,
                     bypass_check: false,
+                    parent_id: folder,
+                }));
+            }
+
+            if method.eq("PATCH") && object_type.eq("alert:move") {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
                     parent_id: folder,
                 }));
             }
@@ -607,7 +788,9 @@ impl FromRequest for AuthExtractor {
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
-            let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+            let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+            let auth_tokens: AuthTokens =
+                json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
@@ -646,12 +829,17 @@ impl FromRequest for AuthExtractor {
 pub fn extract_auth_str(req: &HttpRequest) -> String {
     let auth_ext_cookie = |req: &HttpRequest| -> String {
         req.cookie("auth_ext")
-            .map(|cookie| cookie.value().to_string())
+            .map(|cookie| {
+                let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+                std::str::from_utf8(&val).unwrap_or_default().to_string()
+            })
             .unwrap_or_default()
     };
 
     if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
         if access_token.is_empty() {
             // If cookie was set but access token is still empty
@@ -671,7 +859,8 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
             format!("Bearer {}", access_token)
         }
     } else if let Some(cookie) = req.cookie("auth_ext") {
-        cookie.value().to_string()
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        std::str::from_utf8(&val).unwrap_or_default().to_string()
     } else if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             auth_str.to_owned()
@@ -736,9 +925,10 @@ pub async fn check_permissions(
     user_id: &str,
     object_type: &str,
     method: &str,
+    parent_id: &str,
 ) -> bool {
     if !is_root_user(user_id) {
-        let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+        let user: config::meta::user::User = match get_user(Some(org_id), user_id).await {
             Some(user) => user.clone(),
             None => return false,
         }
@@ -763,7 +953,7 @@ pub async fn check_permissions(
                 ),
                 org_id: org_id.to_string(),
                 bypass_check: false,
-                parent_id: "".to_string(),
+                parent_id: parent_id.to_string(),
             },
             user.role,
             user.is_external,
@@ -773,12 +963,102 @@ pub async fn check_permissions(
     true
 }
 
+#[cfg(feature = "enterprise")]
+pub async fn extract_auth_expiry_and_user_id(
+    req: &HttpRequest,
+) -> (Option<chrono::DateTime<chrono::Utc>>, Option<String>) {
+    use crate::handler::http::auth::validator::get_user_email_from_auth_str;
+
+    let decode = async |token: &str| match decode_expiry(token).await {
+        Ok(token_data) => token_data
+            .claims
+            .get("exp")
+            .and_then(|exp| exp.as_i64())
+            .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0)),
+        Err(e) => {
+            log::error!("Error verifying token: {}", e);
+            None
+        }
+    };
+
+    let auth_str = extract_auth_str(req);
+    if auth_str.is_empty() {
+        return (None, None);
+    } else if auth_str.starts_with("Basic") {
+        let user_id = get_user_email_from_auth_str(&auth_str).await;
+        return (None, user_id);
+    } else if auth_str.starts_with("Bearer") {
+        let user_id = get_user_email_from_auth_str(&auth_str).await;
+        let stripped_bearer_token = auth_str.strip_prefix("Bearer ").unwrap();
+        let exp = decode(stripped_bearer_token).await;
+        return (exp, user_id);
+    } else if auth_str.starts_with("session ") {
+        let session_key = auth_str.strip_prefix("session ").unwrap();
+        let stripped_bearer_token = match crate::service::db::session::get(session_key).await {
+            Ok(bearer_token) => bearer_token,
+            Err(e) => {
+                log::error!("Error getting session: {}", e);
+                return (None, None);
+            }
+        };
+        let exp = decode(&stripped_bearer_token).await;
+        let bearer_full_token = format!("Bearer {}", stripped_bearer_token);
+        let user_id = get_user_email_from_auth_str(&bearer_full_token).await;
+        return (exp, user_id);
+    }
+    (None, None)
+}
+
+#[cfg(feature = "enterprise")]
+async fn decode_expiry(token: &str) -> Result<TokenData<HashMap<String, Value>>, anyhow::Error> {
+    use infra::errors::JwtError;
+    use jsonwebtoken::{
+        Algorithm, DecodingKey, Validation, decode, decode_header,
+        jwk::{self, AlgorithmParameters},
+    };
+
+    let header = decode_header(token)?;
+    let kid = match header.kid {
+        Some(k) => k,
+        None => return Err(JwtError::MissingAttribute("`kid` header".to_owned()).into()),
+    };
+    let dex_jwks = get_dex_jwks().await;
+    let jwks: jwk::JwkSet = serde_json::from_str(&dex_jwks).unwrap();
+
+    if let Some(j) = jwks.find(&kid) {
+        match &j.algorithm {
+            AlgorithmParameters::RSA(rsa) => {
+                let decoding_key = DecodingKey::from_rsa_components(&rsa.n, &rsa.e).unwrap();
+
+                let mut validation = Validation::new(
+                    Algorithm::from_str(j.common.key_algorithm.unwrap().to_string().as_str())
+                        .unwrap(),
+                );
+                validation.validate_exp = true;
+                let aud = &o2_dex::config::get_config().client_id;
+                validation.set_audience(&[aud]);
+                Ok(decode::<HashMap<String, serde_json::Value>>(
+                    token,
+                    &decoding_key,
+                    &validation,
+                )?)
+            }
+            _ => Err(JwtError::ValidationFailed().into()),
+        }
+    } else {
+        Err(JwtError::KeyNotExists().into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use infra::db as infra_db;
+    use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{
+        common::meta::user::UserRequest,
+        service::{self, organization, users},
+    };
 
     #[test]
     fn test_generate_presigned_url() {
@@ -809,20 +1089,32 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
-        let _ = users::create_root_user(
+        infra_table::create_user_tables().await.unwrap();
+        organization::check_and_create_org_without_ofga(DEFAULT_ORG)
+            .await
+            .unwrap();
+        let _ = users::create_root_user_if_not_exists(
             DEFAULT_ORG,
             UserRequest {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: UserOrgRole {
+                    base_role: config::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
+                token: None,
             },
         )
         .await;
+        service::db::user::cache().await.unwrap();
+        service::db::organization::cache().await.unwrap();
+        service::db::org_users::cache().await.unwrap();
         assert!(is_root_user("root@example.com"));
         assert!(!is_root_user("root2@example.com"));
     }

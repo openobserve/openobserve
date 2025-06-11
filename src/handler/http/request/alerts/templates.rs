@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -39,6 +39,8 @@ impl From<TemplateError> for HttpResponse {
 }
 
 /// CreateTemplate
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -63,12 +65,18 @@ pub async fn save_template(
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner().into(&org_id);
     match templates::save("", tmpl, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Template saved")),
+        Ok(v) => Ok(MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Template saved")
+                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
+                .with_name(v.name),
+        )),
         Err(e) => Ok(e.into()),
     }
 }
 
 /// UpdateTemplate
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -100,6 +108,8 @@ pub async fn update_template(
 }
 
 /// GetTemplateByName
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -126,6 +136,8 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
 }
 
 /// ListTemplates
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -179,6 +191,8 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
 }
 
 /// DeleteTemplate
+///
+/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",

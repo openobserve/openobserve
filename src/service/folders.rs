@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,14 +17,16 @@ use config::{
     ider,
     meta::{
         alerts::alert::ListAlertsParams,
-        dashboards::{reports::ListReportsParams, ListDashboardsParams},
-        folder::{Folder, FolderType, DEFAULT_FOLDER},
+        dashboards::{ListDashboardsParams, reports::ListReportsParams},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
 };
 use infra::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     table,
 };
+#[cfg(feature = "enterprise")]
+use o2_openfga::meta::mapping::OFGA_MODELS;
 
 use crate::common::{
     meta::authz::Authz,
@@ -113,10 +115,14 @@ pub async fn save_folder(
     }
 
     let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
-    set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+    let folder_type_ofga = match folder_type {
+        FolderType::Dashboards => "folders",
+        FolderType::Alerts => "alert_folders",
+    };
+    set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
@@ -154,7 +160,7 @@ pub async fn update_folder(
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
@@ -177,18 +183,26 @@ pub async fn list_folders(
     user_id: Option<&str>,
     folder_type: FolderType,
 ) -> Result<Vec<Folder>, FolderError> {
-    let permitted_folders = permitted_folders(org_id, user_id).await?;
+    let permitted_folders = permitted_folders(org_id, user_id, folder_type).await?;
     let folders = table::folders::list_folders(org_id, folder_type).await?;
+    #[cfg(feature = "enterprise")]
+    let folder_ofga_model = match folder_type {
+        FolderType::Dashboards => OFGA_MODELS.get("folders").unwrap().key,
+        FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let folder_ofga_model = "";
+
     let filtered = match permitted_folders {
         Some(permitted_folders) => {
-            if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
+            if permitted_folders.contains(&format!("{}:_all_{}", folder_ofga_model, org_id)) {
                 folders
             } else {
                 folders
                     .into_iter()
                     .filter(|folder_loc| {
                         permitted_folders
-                            .contains(&format!("{}:{}", "dfolder", folder_loc.folder_id))
+                            .contains(&format!("{}:{}", folder_ofga_model, folder_loc.folder_id))
                     })
                     .collect::<Vec<_>>()
             }
@@ -256,10 +270,14 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+    let folder_type_ofga = match folder_type {
+        FolderType::Dashboards => "folders",
+        FolderType::Alerts => "alert_folders",
+    };
+    remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
@@ -278,6 +296,7 @@ pub async fn delete_folder(
 async fn permitted_folders(
     _org_id: &str,
     _user_id: Option<&str>,
+    _folder_type: FolderType,
 ) -> Result<Option<Vec<String>>, FolderError> {
     Ok(None)
 }
@@ -286,14 +305,69 @@ async fn permitted_folders(
 async fn permitted_folders(
     org_id: &str,
     user_id: Option<&str>,
+    folder_type: FolderType,
 ) -> Result<Option<Vec<String>>, FolderError> {
+    let (folder_ofga_model, child_ofga_model) = match folder_type {
+        FolderType::Dashboards => (
+            OFGA_MODELS.get("folders").unwrap().key,
+            OFGA_MODELS.get("dashboards").unwrap().key,
+        ),
+        FolderType::Alerts => (
+            OFGA_MODELS.get("alert_folders").unwrap().key,
+            OFGA_MODELS.get("alerts").unwrap().key,
+        ),
+    };
+
     let Some(user_id) = user_id else {
         return Err(FolderError::PermittedFoldersMissingUser);
     };
-    let stream_list = crate::handler::http::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "dfolder",
+
+    // Get the list of folders that the user has `GET` permission on.
+    let mut folder_list = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET",
+        folder_ofga_model,
     )
     .await
     .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
-    Ok(stream_list)
+
+    // In some cases, there might not be direct `GET` permission on the folder.
+    // So, we need to check if the user has `GET` permission on any of the dashboards
+    // inside the folder.
+
+    let permitted_dashboards = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET_INDIVIDUAL_FROM_ROLE",
+        child_ofga_model,
+    )
+    .await
+    .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+
+    log::debug!("permitted_dashboards: {:?}", permitted_dashboards);
+    if permitted_dashboards.is_some() {
+        let mut folder_list_with_roles = vec![];
+        for dashboard in permitted_dashboards.unwrap() {
+            let Some((_, folder_id)) = dashboard.split_once(":") else {
+                continue;
+            };
+            // The folder_id is of the format `{folder_id}/{dashboard_id}`.
+            // So, we need to extract the folder_id from the dashboard string.
+            let Some((folder_id, _)) = folder_id.split_once("/") else {
+                continue;
+            };
+            log::info!("folder_id: {:?}", folder_id);
+            folder_list_with_roles.push(format!("{}:{}", folder_ofga_model, folder_id));
+        }
+        if folder_list.is_some() {
+            let folder_list = folder_list.as_mut().unwrap();
+            folder_list.extend(folder_list_with_roles);
+        } else {
+            folder_list = Some(folder_list_with_roles);
+        }
+    }
+    log::info!("folder_list: {:?}", folder_list);
+
+    Ok(folder_list)
 }

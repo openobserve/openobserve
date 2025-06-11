@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,17 @@
 
 use std::io::Error;
 
-use actix_web::{get, HttpResponse};
+use actix_web::{HttpResponse, get};
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
-    std::io::ErrorKind,
+    config::meta::cluster::RoleGroup,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config, std::io::ErrorKind,
 };
 
 /// ListClusters
+///
+/// #{"ratelimit_module":"Clusters", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Clusters",
@@ -39,9 +41,11 @@ use {
 pub async fn list_clusters() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     let clusters = if get_o2_config().super_cluster.enabled {
-        let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list()
-            .await
-            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+        let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list_by_role_group(
+            Some(RoleGroup::Interactive),
+        )
+        .await
+        .map_err(|e| Error::new(ErrorKind::Other, e))?;
         let mut regions = HashMap::with_capacity(clusters.len());
         for c in clusters {
             let region: &mut Vec<_> = regions.entry(c.region).or_insert_with(Vec::new);
