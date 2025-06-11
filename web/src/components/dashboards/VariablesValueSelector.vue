@@ -795,16 +795,16 @@ export default defineComponent({
     );
 
     // you may need to query the data if the variable configs or the data/time changes
-    watch(
-      () => props.selectedTimeDate,
-      () => {
-        // reject all promises
-        rejectAllPromises();
+    // watch(
+    //   () => props.selectedTimeDate,
+    //   () => {
+    //     // reject all promises
+    //     rejectAllPromises();
 
-        loadAllVariablesData(false);
-        skipAPILoad.value = true;
-      },
-    );
+    //     // loadAllVariablesData(false);
+    //     skipAPILoad.value = true;
+    //   },
+    // );
     watch(
       () =>
         JSON.stringify({
