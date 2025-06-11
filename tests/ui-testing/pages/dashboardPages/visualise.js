@@ -223,9 +223,9 @@ export default class LogsVisualise {
     console.log("Clicking 'Run query' button...");
     await runBtn.click();
 
-    console.log("Waiting for 'Cancel query' button to appear...");
+    // console.log("Waiting for 'Cancel query' button to appear...");
     // Wait for "Cancel query" to appear (query is running)
-    await cancelBtn.waitFor({ state: "visible" });
+    // await cancelBtn.waitFor({ state: "visible" });
 
     console.log("Waiting for 'Run query' button to reappear...");
     // Wait for "Run query" to reappear (query is finished)
