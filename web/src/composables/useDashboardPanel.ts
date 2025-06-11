@@ -1265,7 +1265,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         type: currentQuery.fields.stream_type,
         no_count: true,
       };
-    
+
       const res = await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,

@@ -839,6 +839,7 @@ export const usePanelDataLoader = (
       ...(getDependentVariablesData() || []),
       ...(getDynamicVariablesData() || []),
     ];
+
     // Identify variables with empty values
     const variablesToSkip = allVars
       .filter(
@@ -853,6 +854,7 @@ export const usePanelDataLoader = (
     // Log variables for which the API will be skipped
     variablesToSkip.forEach((variableName) => {
       state.loading = false;
+      console.log(`Skipping API for variable: ${variableName}`);
     });
 
     // Return true if there are any variables to skip, indicating loading should be continued

@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </span>
     <VariablesValueSelector
+      v-if="currentTimeObj['__global']"
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj['__global']"
