@@ -126,7 +126,7 @@ pub async fn process_search_stream_request(
     req.query.from = 0;
     req.query.size = original_size + hits_to_skip;
 
-    let use_cached_flow = if req.query.from == 0 && !req.query.track_total_hits  {
+    let use_cached_flow = if req.query.from == 0 && !req.query.track_total_hits {
         if use_cache && hits_to_skip > 0 {
             // do not use cached flow as its a paginated query
             // use partitioned search instead
