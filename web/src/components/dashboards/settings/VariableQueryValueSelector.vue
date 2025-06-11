@@ -144,7 +144,9 @@ export default defineComponent({
         }
       }
       selectedValue.value = val;
-      emit("update:modelValue", val);
+      if(!props.variableItem.multiSelect) {
+        emit("update:modelValue", val);
+      }
     };
 
     const onPopupShow = () => {
