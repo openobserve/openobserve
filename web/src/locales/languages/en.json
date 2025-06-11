@@ -689,6 +689,7 @@
     "DefaultSize": "Default max record size (optional)",
     "multiSelect": "Allow multiple selection",
     "hideOnDashboard": "Hide On Dashboard",
+    "escapeSingleQuotes": "Escape Single Quotes",
     "maxRecordSize": "Default max record size is 10. You can update this value as required",
     "newFolderBtnLabel": "New Folder",
     "folderLabel": "Folders",

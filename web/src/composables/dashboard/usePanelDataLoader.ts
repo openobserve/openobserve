@@ -41,6 +41,7 @@ import {
   generateTraceContext,
   isWebSocketEnabled,
   isStreamingEnabled,
+  escapeSingleQuotes,
 } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
@@ -1592,7 +1593,13 @@ export const usePanelDataLoader = (
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value =
-            variable.value.map((value: any) => `'${value}'`).join(",") || "''";
+            variable.value
+              .map((value: any) =>
+                variable.escapeSingleQuotes
+                  ? `'${escapeSingleQuotes(value)}'`
+                  : `'${value}'`,
+              )
+              .join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
             {
               placeHolder: `\${${variable.name}:csv}`,
@@ -1636,7 +1643,12 @@ export const usePanelDataLoader = (
             );
           });
         } else {
-          variableValue = variable.value === null ? "" : variable.value;
+          variableValue =
+            variable.value === null
+              ? ""
+              : variable.escapeSingleQuotes
+                ? `${escapeSingleQuotes(variable.value)}`
+                : `${variable.value}`;
           if (query.includes(variableName)) {
             metadata.push({
               type: "variable",
