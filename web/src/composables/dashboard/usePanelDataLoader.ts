@@ -1647,8 +1647,8 @@ export const usePanelDataLoader = (
             variable.value === null
               ? ""
               : variable.escapeSingleQuotes
-                ? `'${escapeSingleQuotes(variable.value)}'`
-                : `'${variable.value}'`;
+                ? `${escapeSingleQuotes(variable.value)}`
+                : `${variable.value}`;
           if (query.includes(variableName)) {
             metadata.push({
               type: "variable",

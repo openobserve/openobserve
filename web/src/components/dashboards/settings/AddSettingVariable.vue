@@ -404,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   flat
                   round
+                  :disable="variableData.options.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
                   icon="cancel"
@@ -707,7 +708,13 @@ export default defineComponent({
         filter: [],
       },
       value: "",
-      options: [],
+      options: [
+        {
+          label: "",
+          value: "",
+          selected: true,
+        },
+      ],
       multiSelect: false,
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
@@ -907,6 +914,9 @@ export default defineComponent({
     };
 
     const removeField = (index: any) => {
+      if (variableData.options.length === 1) {
+        return;
+      }
       variableData.options.splice(index, 1);
 
       // if all values are selected, then check customSelectAllModel = true
@@ -1050,6 +1060,15 @@ export default defineComponent({
         // check if filter has cycle
         if (await isFilterHasCycle()) {
           // filter has cycle, so show error and return
+          return false;
+        }
+
+        // for custom, check at least one option is selected as default value
+        if (
+          variableData.type === "custom" &&
+          variableData.options.every((option: any) => !option.selected)
+        ) {
+          showErrorNotification("Select at least one default option");
           return false;
         }
 
