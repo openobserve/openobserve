@@ -151,6 +151,7 @@ export default defineComponent({
           const propertiesToWatch = [
             'value',
             'isLoading',
+            'isVariablePartialLoaded',
             'isVariableLoadingPending',
             'options'
           ];
@@ -411,7 +412,8 @@ export default defineComponent({
               variableObject.options = [];
             }
 
-            const isFirstResponse = variableObject.options.length === 0 && fieldHit.values.length > 0;
+            const isFirstResponse = fieldHit.values.length > 0 
+                    && variableObject.isVariablePartialLoaded === false;
             
             variableLog(
               variableObject.name,
@@ -451,23 +453,51 @@ export default defineComponent({
               JSON.stringify(variableObject.value),
             );
 
-            // Update options and handle first response
-            if (oldVariablesData[variableObject.name] !== undefined) {
-              const oldValues = Array.isArray(
-                oldVariablesData[variableObject.name],
-              )
-                ? oldVariablesData[variableObject.name]
-                : [oldVariablesData[variableObject.name]];
+            if (isFirstResponse) {
 
-              handleQueryValuesLogic(variableObject, oldValues);
-            } else {
-              variableObject.value = variableObject.options.length
-                ? variableObject.options[0].value
-                : null;
-            }
+              // Update options and handle first response
+              if (oldVariablesData[variableObject.name] !== undefined) {
 
-            if(isFirstResponse) {
-              finalizePartialVariableLoading(variableObject, true);
+                variableLog(
+                  variableObject.name,
+                  `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
+                );
+
+                const oldValues = Array.isArray(
+                  oldVariablesData[variableObject.name],
+                )
+                  ? oldVariablesData[variableObject.name]
+                  : [oldVariablesData[variableObject.name]];
+
+                handleQueryValuesLogic(variableObject, oldValues);
+                
+              } else {
+
+                variableLog(
+                  variableObject.name,
+                  `Old values not found, setting default value`,
+                );
+
+                variableObject.value = variableObject.options.length
+                  ? variableObject.options[0].value
+                  : null;
+              }
+
+              const hasValueChanged =
+                Array.isArray(originalValue) &&
+                  Array.isArray(variableObject.value)
+                  ? JSON.stringify(originalValue) !==
+                  JSON.stringify(variableObject.value)
+                  : originalValue !== variableObject.value;
+
+
+              if (hasValueChanged) {
+                finalizePartialVariableLoading(variableObject, true);
+              } else {
+                // just set the partially loaded state
+                variableObject.isVariablePartialLoaded = true;
+              }
+
             }
 
             // Check if value actually changed before loading child variables
@@ -497,6 +527,7 @@ export default defineComponent({
       } catch (error) {
         resetVariableState(variableObject);
         variableObject.isLoading = false;
+        variableObject.isVariablePartialLoaded = true
         variableObject.isVariableLoadingPending = false;
       }
 
@@ -634,6 +665,7 @@ export default defineComponent({
           // isVariableLoadingPending is used to check that variable loading is pending
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: true,
+          isVariablePartialLoaded: false,
         };
 
         variableLog(
@@ -681,6 +713,11 @@ export default defineComponent({
 
         // set old variables data
         oldVariablesData[item.name] = initialValue;
+
+        variableLog(
+          variableData.name,
+          `Old Values after initialization: ${JSON.stringify(oldVariablesData)}`,
+        );
       });
 
       // if showDynamicFilters is true, add the Dynamic filters variable
@@ -1120,6 +1157,12 @@ export default defineComponent({
               const parentVariable = variablesData.values.find(
                 (v: any) => v.name === parentName,
               );
+
+              variableLog(
+                variableObject.name,
+                `Parent variable readiness with parent ${JSON.stringify(parentVariable)}`
+              )
+
               const isReady =
                 parentVariable &&
                 parentVariable.isVariablePartialLoaded &&
@@ -1132,7 +1175,7 @@ export default defineComponent({
                 // Reset this variable since parent is not ready
                 resetVariableState(variableObject);
                 variableObject.isVariableLoadingPending = true;
-                variableObject.isVariablePartialLoaded = false;
+                variableObject.isVariablePartialLoaded = true;
                 variableObject.isLoading = false;
               }
               return isReady;
@@ -1446,9 +1489,9 @@ export default defineComponent({
 
       if (success) {
 
-
         // Update loading states
         variableObject.isLoading = false;
+        variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
 
         // Update global loading state
@@ -1774,6 +1817,7 @@ export default defineComponent({
       // Reset all affected variables
       variablesToUpdate.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
+        variable.isVariablePartialLoaded = false;
         variable.isLoading = true;
         // Reset value based on multiSelect property
         variable.value = variable.multiSelect ? [] : null;
