@@ -540,7 +540,7 @@ export default defineComponent({
       payload: any,
       variableObject: any,
     ): any => {
-      if (isStreamingEnabled(store.state)) {
+      if (isStreamingEnabled()) {
         fetchQueryDataWithHttpStream(payload, {
           data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
           error: (p: any, r: any) => handleSearchError(p, r, variableObject),
@@ -550,7 +550,7 @@ export default defineComponent({
         return;
       }
 
-      if (isWebSocketEnabled(store.state)) {
+      if (isWebSocketEnabled()) {
         fetchQueryDataWithWebSocket(payload, {
           open: sendSearchMessage,
           close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
@@ -1270,8 +1270,8 @@ export default defineComponent({
             const queryContext: any = await buildQueryContext(variableObject);
 
             if (
-              isWebSocketEnabled(store.state) ||
-              isStreamingEnabled(store.state)
+              isWebSocketEnabled() ||
+              isStreamingEnabled()
             ) {
               // For WebSocket, we don't need to wait for the response here
               // as it will be handled by the WebSocket handlers
