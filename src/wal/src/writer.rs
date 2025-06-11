@@ -41,7 +41,7 @@ impl Writer {
         init_size: u64,
         buffer_size: usize,
         header: Option<FileHeader>,
-    ) -> Result<Self> {
+    ) -> Result<(Self, usize)> {
         create_dir_all(path.parent().ok_or_else(|| Error::NoParentDir {
             path: path.clone().into(),
         })?)
@@ -67,10 +67,11 @@ impl Writer {
 
         let bytes_written = super::FILE_TYPE_IDENTIFIER.len();
 
+        let header_len;
         if let Some(header) = header {
             let header_bytes = Self::serialize_header(&header);
             // write header len, 4 bytes
-            let header_len = header_bytes.len() as u32;
+            header_len = header_bytes.len() as u32;
             f.write_all(&header_len.to_be_bytes())
                 .context(FileWriteSnafu { path: path.clone() })?;
             // write header value
@@ -78,7 +79,7 @@ impl Writer {
                 .context(FileWriteSnafu { path: path.clone() })?;
         } else {
             // write header len, 4 bytes
-            let header_len = 0u32;
+            header_len = 0u32;
             f.write_all(&header_len.to_be_bytes())
                 .context(FileWriteSnafu { path: path.clone() })?;
         }
@@ -88,14 +89,17 @@ impl Writer {
             return Err(Error::WriteFileType { source: e });
         }
 
-        Ok(Self {
-            path: path.into(),
-            f: BufWriter::with_capacity(buffer_size, f),
-            bytes_written,
-            uncompressed_bytes_written: bytes_written,
-            buffer: Vec::with_capacity(buffer_size),
-            synced: true,
-        })
+        Ok((
+            Self {
+                path: path.to_path_buf(),
+                f: BufWriter::with_capacity(buffer_size, f),
+                bytes_written,
+                uncompressed_bytes_written: bytes_written,
+                buffer: Vec::with_capacity(buffer_size),
+                synced: true,
+            },
+            header_len as usize,
+        ))
     }
 
     pub fn path(&self) -> &PathBuf {
