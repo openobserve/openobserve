@@ -371,7 +371,7 @@ pub async fn logs_json_handler(
                     timestamps.push(timestamp);
                 } else {
                     let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *_size += estimate_json_bytes(&rec);
+                    *_size += estimate_json_bytes(&value);
                     // JSON Flattening
                     value =
                         flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
