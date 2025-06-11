@@ -196,6 +196,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
     org_id: &str,
