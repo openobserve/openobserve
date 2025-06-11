@@ -52,7 +52,7 @@ fn test_wal_build() {
     header.insert("key1".into(), "value1".into());
     header.insert("key2".into(), "value2".into());
 
-    let mut writer = Writer::build(
+    let (mut writer, _) = Writer::build(
         dir,
         "org",
         "stream",
@@ -139,7 +139,7 @@ fn test_realtime_write_and_read() {
     header.insert("key1".into(), "value1".into());
     header.insert("key2".into(), "value2".into());
 
-    let mut writer = Writer::build(
+    let (mut writer, _) = Writer::build(
         dir,
         "org",
         "stream",
