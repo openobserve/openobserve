@@ -918,7 +918,6 @@ export const usePanelDataLoader = (
       ...(getDependentVariablesData() || []),
       ...(getDynamicVariablesData() || []),
     ];
-    console.log("shouldSkipSearchDueToEmptyVariables: all variables", allVars);
 
     // Identify variables with empty values
     const variablesToSkip = allVars
@@ -930,11 +929,6 @@ export const usePanelDataLoader = (
           (Array.isArray(v.value) && v.value.length === 0),
       )
       .map((v) => v.name);
-
-    console.log(
-      "shouldSkipSearchDueToEmptyVariables: variables to skip",
-      variablesToSkip,
-    );
 
     // Log variables for which the API will be skipped
     variablesToSkip.forEach((variableName) => {
@@ -991,9 +985,6 @@ export const usePanelDataLoader = (
 
       // Add guard here
       if (shouldSkipSearchDueToEmptyVariables()) {
-        console.log(
-          "shouldSkipSearchDueToEmptyVariables [PanelDataLoader] Skipping search API call: some variable values are null/empty",
-        );
         return;
       }
       fetchQueryDataWithWebSocket(payload, {
