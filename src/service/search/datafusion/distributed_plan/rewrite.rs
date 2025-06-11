@@ -201,7 +201,7 @@ pub struct StreamingAggsRewriter {
 impl StreamingAggsRewriter {
     pub async fn new(id: String, start_time: i64, end_time: i64) -> Self {
         let mut is_complete_cache_hit = false;
-        let streaming_item = streaming_aggs_exec::GLOBAL_ID_CACHE.get(&id);
+        let streaming_item = streaming_aggs_exec::GLOBAL_CACHE.id_cache.get(&id);
         if let Some(item) = streaming_item {
             // Check record batch cache for partition start time and end time
             let cached_result = match streaming_aggs_exec::check_record_batches_cache(
@@ -253,7 +253,7 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             && node.children().first().unwrap().name() == "AggregateExec"
             && config::get_config().common.feature_query_streaming_aggs
         {
-            if !streaming_aggs_exec::GLOBAL_ID_CACHE.exists(&self.id) {
+            if !streaming_aggs_exec::GLOBAL_CACHE.exists(&self.id) {
                 return Err(DataFusionError::Plan(format!(
                     "streaming aggregation cache not found with id: {}",
                     self.id

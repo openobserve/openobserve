@@ -107,8 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   data-test="add-alert-delay-error"
-                  v-if="triggerData.silence < 0"
-                  class="text-red-8 q-pt-xs"
+                  v-if="triggerData.silence < 0 || triggerData.silence === undefined || triggerData.silence === null"
+                  class="text-red-8 q-pt-xs q-field--error"
                   style="font-size: 11px; line-height: 12px"
                 >
                   Field is required!
@@ -138,7 +138,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   multiple
                   use-input
                   fill-input
-                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :rules="[(val: any) =>{
+                    return val.length > 0 || 'Field is required!'
+                  }]"
+                  :required="true"
                   style="width: 200px"
                   @update:model-value="updateDestinations"
                 >
