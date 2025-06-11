@@ -833,6 +833,34 @@ export const usePanelDataLoader = (
     processApiError(response?.content, "sql");
   };
 
+  const shouldSkipSearchDueToEmptyVariables = () => {
+    // Retrieve all variables data
+    const allVars = [
+      ...(getDependentVariablesData() || []),
+      ...(getDynamicVariablesData() || []),
+    ];
+
+    // Identify variables with empty values
+    const variablesToSkip = allVars
+      .filter(
+        (v) =>
+          v.value === null ||
+          v.value === undefined ||
+          v.value === "" ||
+          (Array.isArray(v.value) && v.value.length === 0),
+      )
+      .map((v) => v.name);
+
+    // Log variables for which the API will be skipped
+    variablesToSkip.forEach((variableName) => {
+      state.loading = false;
+      console.log(`Skipping API for variable: ${variableName}`);
+    });
+
+    // Return true if there are any variables to skip, indicating loading should be continued
+    return variablesToSkip.length > 0;
+  };
+
   const getDataThroughWebSocket = async (
     query: string,
     it: any,
@@ -871,6 +899,10 @@ export const usePanelDataLoader = (
         },
       };
 
+      // Add guard here
+      if (shouldSkipSearchDueToEmptyVariables()) {
+        return;
+      }
       fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
@@ -904,7 +936,7 @@ export const usePanelDataLoader = (
 
       const payload: {
         queryReq: any;
-        type: "search" | "histogram" | "pageCount";
+        type: "search" | "histogram" | "pageCount" | "values";
         isPagination: boolean;
         traceId: string;
         org_id: string;
@@ -958,6 +990,11 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        return;
+      }
+
+      // Add guard here
+      if (shouldSkipSearchDueToEmptyVariables()) {
         return;
       }
 
@@ -1801,7 +1838,7 @@ export const usePanelDataLoader = (
     newDependentVariablesData: any,
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => it.isLoading || it.isVariableLoadingPending,
+      (it: any) => (it.value == null || (Array.isArray(it.value) && it.value.length === 0)) && (it.isLoading || it.isVariableLoadingPending),
     );
 
   const getDependentVariablesData = () =>
@@ -1857,8 +1894,8 @@ export const usePanelDataLoader = (
     }
 
     // Sort both arrays
-    const sortedArray1 = array1?.slice().sort();
-    const sortedArray2 = array2?.slice().sort();
+    const sortedArray1 = array1?.slice()?.sort();
+    const sortedArray2 = array2?.slice()?.sort();
 
     // Compare sorted arrays element by element
     for (let i = 0; i < sortedArray1?.length; i++) {
