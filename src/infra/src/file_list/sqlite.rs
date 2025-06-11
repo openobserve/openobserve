@@ -617,7 +617,7 @@ SELECT date
         }
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
+            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#,
         )
         .bind(org_id)
         .bind(time_max)
