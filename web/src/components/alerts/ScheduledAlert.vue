@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scheduled-alerts q-pa-none q-ma-none">
+  <div ref="scheduledAlertRef" class="scheduled-alerts q-pa-none q-ma-none">
 
     <!-- first section -->
 
@@ -416,12 +416,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="scheduled-alert-period-input"
               style="width: 87px; margin-left: 0 !important"
-              class=""
+              class="period-input-container"
             >
               <q-input
                 v-model="triggerData.period"
-                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                 type="number"
+                class="scheduled-alert-period-input"
                 dense
                 filled
                 min="1"
@@ -449,6 +450,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="scheduled-alert-period-error-text"
             v-if="!Number(triggerData.period)"
             class="text-red-8 q-pt-xs"
+            :class="{
+              'q-field--error': triggerData.frequency_type == 'cron' && (triggerData.cron == '' || !triggerData.timezone)
+            }"
             style="font-size: 11px; line-height: 12px"
           >
             Field is required!
@@ -751,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   data-test="add-alert-delay-error"
-                  v-if="triggerData.silence < 0"
+                 v-if="triggerData.silence < 0 || triggerData.silence == undefined || triggerData.silence == ''"
                   class="text-red-8 q-pt-xs"
                   style="font-size: 11px; line-height: 12px"
                 >
@@ -782,7 +786,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   multiple
                   use-input
                   fill-input
-                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :rules="[(val: any) =>{
+                    return val.length > 0 || 'Field is required!'
+                  }]"
+                  :required="true"
                   style="width: 200px"
                   @update:model-value="updateDestinations"
                 >
@@ -868,14 +875,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-flex lg:tw-flex-col  tw-items-start tw-gap-2">
             <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
               Cycle
-              <span><q-icon name="info" size="16px" /></span>
+              <span class="tw-cursor-pointer"><q-icon name="info" size="16px" />
+                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                  Compare results with the same time in the previous cycle.
+                </q-tooltip>
+              </span>
             </div>
             <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
               <div class="tw-w-full lg:tw-w-[300px] running-text">
-                Runnig for 1 hour in the interval of every 30mins
+                Running for {{ convertMinutesToDisplayValue(triggerData.period) }} in the interval of every {{
+                triggerData.frequency_type == 'minutes' ? convertMinutesToDisplayValue(triggerData.frequency) : triggerData.cron 
+                   }}
               </div>
               <div>
-                <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" />
+                <q-btn class="tw-rounded-full" flat dense icon="edit_outline" size="16px" @click="editCurrentWindow">
+                  <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                    Edit Period and Frequency.
+                  </q-tooltip>
+                </q-btn>
               </div>
             </div>
           </div>
@@ -898,7 +915,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw-flex tw-items-center">
                 <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
                 Time Frame 
-                <span class="tw-ml-2"><q-icon name="info" size="16px" /></span>
+                <span class="tw-ml-2 tw-cursor-pointer"><q-icon name="info" size="16px" />
+                  <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                    Time range for your query.
+                  </q-tooltip>
+                </span>
               </div>
               <CustomDateTimePicker
                     v-model="picker.offSet"
@@ -911,7 +932,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
               <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
                   Cycle
-                  <span><q-icon name="info" size="16px" /></span>
+                  <span class="tw-cursor-pointer"><q-icon name="info" size="16px" />
+                  <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px;">
+                    Compare results with the same time in the previous cycle.
+                  </q-tooltip>
+                  </span>
                 </div>
               <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
                 <div class="tw-w-full lg:tw-w-[300px] reference-text">
@@ -994,7 +1019,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="scheduled-alert-custom-tab"
           name="custom"
           :label="t('alerts.quick')"
-        />
+          >
+          <q-tooltip max-width="200px" style="font-size: 12px;" v-if="dateTimePicker.length > 0">
+            Quick mode is disabled when comparision window is added.
+          </q-tooltip>
+        </q-tab>
         <q-tab
           data-test="scheduled-alert-sql-tab"
           name="sql"
@@ -1062,20 +1091,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <q-card  class="tw-h-full editor-dialog-card "
+  <div class="tw-flex tw-h-full">
+
+
+    <q-card  class="tw-h-full  editor-dialog-card tw-flex "
     :style="{
-      width: isFullScreen ? '100vw' : '90vw'
+      width: isFullScreen  ? '100vw' : store.state.isAiChatEnabled ? '65vw' : '90vw'
     }"
     >
-      <div class="tw-h-full  tw-px-6 tw-py-2">
+      <div class="tw-h-full tw-w-full tw-px-6 tw-py-2 "
+      >
       <div class="tw-h-16 tw-flex tw-items-center tw-justify-between" style="font-size: 20px ;">
         <div class="tw-flex tw-items-center tw-gap-2">
           <q-icon name="close" size="20px" class="tw-cursor-pointer" @click="viewSqlEditor = false" />
           <span>Add Conditions</span>
         </div>
+        <div class="tw-flex tw-items-center">
 
-        <q-btn icon="fullscreen" size="16px"  dense class="tw-cursor-pointer" @click="() => isFullScreen = !isFullScreen" ></q-btn>
+          <q-btn
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            dense
+            class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%;"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
 
+          >
+            <div class="row items-center no-wrap tw-gap-2  ">
+              <img  :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
+          <q-btn 
+            icon="fullscreen" 
+            size="16px" 
+            dense 
+            class="tw-cursor-pointer" 
+            :class="store.state.theme === 'dark' ? 'tw-text-white' : ''"
+            :color="isFullScreen ? 'primary' : undefined"
+            @click="() => isFullScreen = !isFullScreen" 
+          />
+
+        </div>
       </div>
       <div class="tw-h-[calc(100vh-100px)]">
         <div class="row tw-gap-4 tw-h-[100%] ">
@@ -1146,7 +1209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         query === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
-                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-90px)]' : 'tw-h-[calc(100%-70px)]'
+                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-100px)]' : 'tw-h-[calc(100%-70px)]'
                       ]"
                       @update:query="updateQueryValue"
                       @focus="queryEditorPlaceholderFlag = false"
@@ -1154,7 +1217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="min-height: 10rem;"
                     />
 
-                    <div v-show="!!sqlQueryErrorMsg && tab === 'sql'" class="text-negative q-py-sm invalid-sql-error">
+                    <div style="height: 50px; overflow: auto;" v-show="!!sqlQueryErrorMsg && tab === 'sql'" class="text-negative q-py-sm invalid-sql-error">
                     <span v-show="!!sqlQueryErrorMsg">
                       Error: {{ sqlQueryErrorMsg }}</span
                     >
@@ -1206,6 +1269,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="filterFunctionOptions"
                       @update:modelValue="onFunctionSelect"
                       class="mini-select"
+                      clearable
+                      @clear="onFunctionClear"
                       input-style="height: 8px; min-height: 8px; margin: 0px; width: 200px;  "
                                             >
                       <template #no-option>
@@ -1266,7 +1331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- this is for multi time range to select -->
                 <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
                     <div class="tw-text-sm tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
-                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
+                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff] tw-cursor-pointer' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
                     >
                   {{triggerData.period  }} minute(s) ago
                 </div>
@@ -1344,8 +1409,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- this is for multi time range to select -->
                 <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
-                    <div class="tw-text-sm tw-bg-white tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
-                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff]' : ''"
+                    <div class="tw-text-sm tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
+                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff] tw-cursor-pointer' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
                     >
                   {{triggerData.period  }} minute(s) ago
                 </div>
@@ -1417,30 +1482,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         </div>
-        <div v-if="false" class="flex justify-end items-center q-px-lg tw-w-full tw-h-16 " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky;  bottom: 0 !important; top: 0; ">
-              <q-btn
-                data-test="add-alert-cancel-btn"
-                v-close-popup="true"
-                class=" text-bold"
-                :label="t('alerts.cancel')"
-                text-color="light-text"
-                padding="sm md"
-                no-caps
-              />
-              <q-btn
-                data-test="add-alert-submit-btn"
-                :label="t('alerts.save')"
-                class=" text-bold no-border q-ml-md"
-                padding="sm xl"
-                type="submit"
-                no-caps
-                :disable="true"
-                style="background-color: #4A4E4c; color: #ffffff;"
-
-              />
-            </div>
       </div>
+
     </q-card>
+    <div  class="q-ml-sm " v-if="store.state.isAiChatEnabled " style="width: 24.5vw; max-width: 100%; min-width: 75px;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+              <O2AIChat :header-height="60" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 0px) !important;" />
+
+            </div>
+
+  </div>
+
   </q-dialog>
 
 
@@ -1477,6 +1528,8 @@ import searchService from "@/services/search";
 import AlertsContainer from "./AlertsContainer.vue";
 import useQuery from "@/composables/useQuery";
 import { pick } from "lodash-es";
+import config from "@/aws-exports";
+import O2AIChat from "../O2AIChat.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -1606,9 +1659,16 @@ const tempRunQuery = ref(false);
 
 const runQueryLoading = ref(false);
 
+const isHovered = ref(false);
+
 const runPromqlError = ref("");
 
-const selectedColumn = ref("");
+const scheduledAlertRef = ref<any>(null);
+
+const selectedColumn = ref<any>({
+  label: "",
+  value: ""
+});
 
 const filteredTimezone: any = ref([]);
 
@@ -1775,6 +1835,9 @@ const testFields  = ref(
 
 
 const onFunctionSelect = (_function: any) => {
+  if(!_function){
+    return;
+  }
   selectedFunction.value = _function.name;
   vrlFunctionContent.value = _function.function;
 };
@@ -2118,6 +2181,10 @@ const routeToCreateDestination = () => {
   };
 
   const onColumnSelect = () => {
+    if(selectedColumn.value.value){
+      query.value += ` ${selectedColumn.value.value} `
+    }
+    selectedColumn.value = ""
   };
   const buildMulitWindowQuery = (sql: any, fn: boolean = false) => {
   const queryToSend: any = [
@@ -2262,7 +2329,7 @@ const routeToCreateDestination = () => {
   const removeConditionGroup = (targetGroupId: string, currentGroup: any = inputData.value) => {
     emits('remove:group', targetGroupId)
 
-    // No emit here — you’re handling data directly in parent
+    // No emit here — you're handling data directly in parent
   };
   const multiWindowImage = computed(() => {
   if(store.state.theme === 'dark'){
@@ -2332,6 +2399,90 @@ const routeToCreateDestination = () => {
   }
 
 
+    const toggleAIChat = () => {
+      const isEnabled = !store.state.isAiChatEnabled;
+      store.dispatch("setIsAiChatEnabled", isEnabled);
+    }
+
+
+    const getBtnLogo = computed(() => {
+          if (isHovered.value || store.state.isAiChatEnabled) {
+            return getImageURL('images/common/ai_icon_dark.svg')
+          }
+
+          return store.state.theme === 'dark'
+            ? getImageURL('images/common/ai_icon_dark.svg')
+            : getImageURL('images/common/ai_icon.svg')
+        })
+
+    const convertMinutesToDisplayValue = (value: number) => {
+      if (!value || value < 0) return '0 minutes';
+      
+      // Constants for time unit conversions
+      const MINUTES_IN_HOUR = 60;
+      const MINUTES_IN_DAY = 24 * MINUTES_IN_HOUR;
+      const MINUTES_IN_WEEK = 7 * MINUTES_IN_DAY;
+      const MINUTES_IN_MONTH = 30 * MINUTES_IN_DAY; // Approximate
+
+      // Convert to the most appropriate unit
+      if (value < 60) {
+        return `${value} minute${value !== 1 ? 's' : ''}`;
+      } else if (value < MINUTES_IN_DAY) {
+        const hours = Math.floor(value / MINUTES_IN_HOUR);
+        const remainingMinutes = value % MINUTES_IN_HOUR;
+        return remainingMinutes > 0 
+          ? `${hours} hour${hours !== 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`
+          : `${hours} hour${hours !== 1 ? 's' : ''}`;
+      } else if (value < MINUTES_IN_WEEK) {
+        const days = Math.floor(value / MINUTES_IN_DAY);
+        const remainingHours = Math.floor((value % MINUTES_IN_DAY) / MINUTES_IN_HOUR);
+        return remainingHours > 0 
+          ? `${days} day${days !== 1 ? 's' : ''} ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`
+          : `${days} day${days !== 1 ? 's' : ''}`;
+      } else if (value < MINUTES_IN_MONTH) {
+        const weeks = Math.floor(value / MINUTES_IN_WEEK);
+        const remainingDays = Math.floor((value % MINUTES_IN_WEEK) / MINUTES_IN_DAY);
+        return remainingDays > 0 
+          ? `${weeks} week${weeks !== 1 ? 's' : ''} ${remainingDays} day${remainingDays !== 1 ? 's' : ''}`
+          : `${weeks} week${weeks !== 1 ? 's' : ''}`;
+      } else {
+        const months = Math.floor(value / MINUTES_IN_MONTH);
+        const remainingWeeks = Math.floor((value % MINUTES_IN_MONTH) / MINUTES_IN_WEEK);
+        return remainingWeeks > 0 
+          ? `${months} month${months !== 1 ? 's' : ''} ${remainingWeeks} week${remainingWeeks !== 1 ? 's' : ''}`
+          : `${months} month${months !== 1 ? 's' : ''}`;
+      }
+    }
+
+    const editCurrentWindow = () => {
+      // Find the period input container
+      //usign the class name to find the element
+      const periodInputContainer = scheduledAlertRef.value.querySelector('.period-input-container');
+      
+      if (periodInputContainer) {
+        // Scroll the element into view with smooth behavior
+        periodInputContainer.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center'
+        });
+        
+        // Adding focus to the input for better UX
+        //user might be editing the period input so we need to focus on it
+        const input = periodInputContainer.querySelector('input');
+        if (input) {
+          input.focus();
+        }
+      }
+    }
+
+
+    const onFunctionClear = () => {
+      selectedFunction.value = null;
+      vrlFunctionContent.value = "";
+    };
+
+
+
 
 
 
@@ -2361,7 +2512,12 @@ defineExpose({
   inputData,
   updateGroup,
   removeConditionGroup,
-  runPromqlError
+  runPromqlError,
+  toggleAIChat,
+  isHovered,
+  getBtnLogo,
+  convertMinutesToDisplayValue,
+  scheduledAlertRef
 });
 </script>
 

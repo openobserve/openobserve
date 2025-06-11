@@ -503,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <ConfirmDialog
       title="Delete Alert"
-      message="Are you sure you want to delete alert?"
+      message="Are you sure you want to delete this alert?"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -1235,11 +1235,7 @@ export default defineComponent({
       toBeClonedAlert.value = await getAlertById(row.alert_id);
     };
     const submitForm = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
+
 
       if (!toBeClonedAlert.value) {
         $q.notify({
@@ -1266,6 +1262,11 @@ export default defineComponent({
         return;
       }
       isSubmitting.value = true;
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
 
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;

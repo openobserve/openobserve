@@ -776,6 +776,7 @@ export default defineComponent({
           return await createAlert(jsonObj, index , selectedFolderId.value);
         }
       } catch (e: any) {
+        console.log(e,'e')
         q.notify({
           message: "Error importing Alert(s) please check the JSON",
           color: "negative",
@@ -788,6 +789,7 @@ export default defineComponent({
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
+      console.log(input,'input')
       let alertErrors: (string | { message: string; field: string })[] = [];
 
       // 1. Validate 'name' field
@@ -865,29 +867,111 @@ export default defineComponent({
 
       // 6. Validate 'query_condition' field
       if (input.query_condition && input.query_condition.conditions) {
-        if (!Array.isArray(input.query_condition.conditions)) {
+        const validateCondition = (condition: any) => {
+          // Check if it's a simple condition
+          if (condition.column && condition.operator && condition.value !== undefined) {
+            if (
+              input.query_condition.type === "custom" &&
+              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
+                condition.operator,
+              )
+            ) {
+              alertErrors.push(
+                `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
+              );
+            }
+            return;
+          }
+
+          // Check if it's a nested condition with 'and' or 'or'
+          if (condition.and || condition.or) {
+            const conditions = condition.and || condition.or;
+            if (!Array.isArray(conditions)) {
+              alertErrors.push(
+                `Alert - ${index}: 'and'/'or' conditions must be an array.`,
+              );
+              return;
+            }
+            conditions.forEach(validateCondition);
+            return;
+          }
+
+          // If neither a simple condition nor a nested condition
           alertErrors.push(
-            `Alert - ${index}: Query conditions should be an array.`,
+            `Alert - ${index}: Invalid condition format. Must have either column/operator/value or and/or operators.`,
           );
-        }
+        };
 
-        for (let condition of input.query_condition.conditions) {
-          if (!condition.column || !condition.operator || !condition.value) {
-            alertErrors.push(
-              `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
-            );
-          }
-
-          if (
-            input.query_condition.type === "custom" &&
-            !["=", ">", "<", ">=", "<=", "Contains", "NotContains"].includes(
-              condition.operator,
-            )
-          ) {
-            alertErrors.push(
-              `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
-            );
-          }
+        // Handle both array format and nested format
+        //because old alerts are having direct array which is and by default 
+        //new alerts are having nested conditions with and/or and can have multiple conditions
+        if (Array.isArray(input.query_condition.conditions)) {
+          // Old format - array of conditions
+          input.query_condition.conditions.forEach((condition) => {
+            if (!condition.column || !condition.operator || !condition.value) {
+              alertErrors.push(
+                `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
+              );
+            }
+          });
+        } else {
+          // New format - nested conditions with and/or
+          //the new format looks like this
+            //             {
+            //     "or": [
+            //         {
+            //             "column": "_timestamp",
+            //             "operator": "<=",
+            //             "value": "100",
+            //             "ignore_case": false
+            //         },
+            //         {
+            //             "column": "job",
+            //             "operator": "not_contains",
+            //             "value": "12",
+            //             "ignore_case": true
+            //         },
+            //         {
+            //             "or": [
+            //                 {
+            //                     "column": "job",
+            //                     "operator": "contains",
+            //                     "value": "1222",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "column": "level",
+            //                     "operator": "not_contains",
+            //                     "value": "dsff",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "or": [
+            //                         {
+            //                             "column": "job",
+            //                             "operator": "=",
+            //                             "value": "111",
+            //                             "ignore_case": true
+            //                         },
+            //                         {
+            //                             "column": "level",
+            //                             "operator": "contains",
+            //                             "value": "1222",
+            //                             "ignore_case": true
+            //                         }
+            //                     ]
+            //                 },
+            //                 {
+            //                     "column": "log",
+            //                     "operator": "!=",
+            //                     "value": "33",
+            //                     "ignore_case": true
+            //                 }
+            //             ]
+            //         }
+            //     ]
+            // }  
+          validateCondition(input.query_condition.conditions);
         }
       }
       // 7. Validate 'sql' and 'promql'
@@ -988,11 +1072,11 @@ export default defineComponent({
 
       if (
         isNaN(Number(triggerCondition.silence)) ||
-        triggerCondition.silence < 1 ||
+        triggerCondition.silence < 0 ||
         typeof triggerCondition.silence !== "number"
       ) {
         alertErrors.push(
-          `Alert - ${index}: Silence should be a positive number greater than 0 and should be a number.`,
+          `Alert - ${index}: Silence should be a positive number greater than or equal to 0 and should be a number.`,
         );
       }
 
