@@ -18,35 +18,6 @@ declare global {
   }
 }
 
-// Variable to track if tab close handler is set up
-let isTabCloseHandlerSetup = false;
-let tabCloseHandler: ((event: BeforeUnloadEvent) => void) | null = null;
-
-// Function to clear cache on tab close
-const clearCacheOnTabClose = async (event: BeforeUnloadEvent) => {
-  try {
-    // Clear the cache synchronously to ensure it completes before tab closes
-    await performTransaction("readwrite", (store) => store.clear());
-  } catch (error) {
-    console.error("Error clearing cache on tab close:", error);
-  }
-};
-
-// Setup automatic cache clearing on tab close
-const setupCacheClearOnTabClose = () => {
-  if (isTabCloseHandlerSetup) {
-    return;
-  }
-
-  tabCloseHandler = clearCacheOnTabClose;
-  window.addEventListener("beforeunload", tabCloseHandler);
-  isTabCloseHandlerSetup = true;
-};
-
-
-// Automatically setup cache clearing on tab close when module loads
-setupCacheClearOnTabClose();
-
 // Initialize IndexedDB
 const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
