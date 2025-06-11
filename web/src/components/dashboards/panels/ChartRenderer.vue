@@ -69,6 +69,7 @@ function findNearestIndex(sortedArray: any, target: any) {
   return nearestIndex; // Return the index of the nearest value
 }
 
+import { debounce } from 'lodash-es';
 import {
   defineComponent,
   ref,
@@ -228,9 +229,20 @@ export default defineComponent({
     // currently hovered series state
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
+    const DEBOUNCE_TIMEOUT = 350;
+
+    // Create a stable debounced function that persists between renders
+    const debouncedSetHoveredSeriesName = debounce((name: string) => {
+      hoveredSeriesState?.value?.setHoveredSeriesName(name);
+    }, DEBOUNCE_TIMEOUT);
+
+    // Create a stable debounced function that persists between renders
+    const debouncedSetHoveredSeriesIndex = debounce((arg1, arg2,  arg3, arg4) => {
+      hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
+    }, DEBOUNCE_TIMEOUT);
+
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
-      // seriesName and seriesIndex will used in the same function
       if (params?.componentSubType === "pie") {
         params.seriesName = params?.data?.name;
         params.seriesIndex = params?.dataIndex;
@@ -242,29 +254,13 @@ export default defineComponent({
         params.seriesIndex = -1;
       }
 
-      // set current hovered series name in state
-      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName ?? "");
-
-      // Below logic is to scroll legend upto current series index
-      // which creates wrong legend highlight issue in tooltip
-      // so commented out
-
-      // scroll legend upto current series index
-      // const legendOption = chart?.getOption()?.legend[0];
-      // if (legendOption) {
-      // legendOption.scrollDataIndex = params?.seriesIndex || 0;
-      // chart?.setOption({ legend: [legendOption] });
-      // chart?.dispatchAction({
-      //   type: "legendScroll",
-      //   scrollDataIndex: params?.seriesIndex || 0,
-      //   legendId: params?.seriesId,
-      // });
-      // }
+      // Use the debounced function to update the state
+      debouncedSetHoveredSeriesName(params?.seriesName ?? "");
     };
 
     const mouseOutEffectFn = () => {
       // reset current hovered series name in state
-      hoveredSeriesState?.value?.setHoveredSeriesName("");
+      debouncedSetHoveredSeriesName("");
     };
 
     const legendSelectChangedFn = (params: any) => {
@@ -321,8 +317,8 @@ export default defineComponent({
       });
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
-        hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
-        hoveredSeriesState?.value?.setHoveredSeriesName("");
+        debouncedSetHoveredSeriesIndex(-1, -1, -1, null);
+        debouncedSetHoveredSeriesName("");
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
@@ -341,7 +337,7 @@ export default defineComponent({
 
           // set current hovered series name in state
           if (chart?.getOption()?.series[seriesIndex]?.data[dataIndex]) {
-            hoveredSeriesState?.value?.setIndex(
+            debouncedSetHoveredSeriesIndex(
               dataIndex,
               seriesIndex,
               props?.data?.extras?.panelId || -1,
