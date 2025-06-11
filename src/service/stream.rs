@@ -599,6 +599,7 @@ pub async fn delete_stream(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    del_related_feature_resources: bool,
 ) -> Result<HttpResponse, Error> {
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
@@ -620,26 +621,43 @@ pub async fn delete_stream(
             )));
     }
 
-    // delete associated pipelines
-    if let Some(pipeline) =
-        db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
-    {
-        if let Err(e) = db::pipeline::delete(&pipeline.id).await {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((
-                    ERROR_HEADER,
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                ))
-                .json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                )));
+    // delete associated feature resources, i.e. pipelines, alerts
+    if del_related_feature_resources {
+        if let Some(pipeline) =
+            db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
+        {
+            if let Err(e) = db::pipeline::delete(&pipeline.id).await {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!(
+                            "Error: failed to delete the associated pipeline \"{}\": {e}",
+                            pipeline.name
+                        ),
+                    )),
+                );
+            }
+        }
+
+        if let Ok(alerts) =
+            db::alerts::alert::list(org_id, Some(stream_type), Some(stream_name)).await
+        {
+            for alert in alerts {
+                if let Err(e) =
+                    db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, &alert.name)
+                        .await
+                {
+                    return Ok(
+                        HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!(
+                                "Error: failed to delete the associated alert \"{}\": {e}",
+                                alert.name
+                            ),
+                        )),
+                    );
+                }
+            }
         }
     }
 
