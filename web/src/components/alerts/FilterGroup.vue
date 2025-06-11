@@ -1,6 +1,7 @@
 <template>
-    <div :class="[`tw-ml-[${depth * 20}px] tw-w-fit  tw-px-2 tw-mb-2 tw-border group-border tw-mt-6  `, 
-        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'
+    <div :class="[`  tw-px-2 tw-mb-2 tw-border group-border tw-mt-6  `, 
+        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
+        store.state.isAiChatEnabled ? `tw-w-full tw-ml-[${depth * 10}px]` : `xl:tw-w-fit tw-ml-[${depth * 20}px]`
     ]"
     :style="{
         opacity: computedOpacity,
@@ -52,7 +53,8 @@
           />
           <div
             v-else
-            class="tw-flex tw-items-center tw-gap-2 tw-pl-4 "
+            class="tw-flex tw-items-center tw-gap-2  "
+            :class="store.state.isAiChatEnabled ? 'tw-pl-0' : 'tw-pl-4'"
             >
             <FilterCondition
                 :condition="item"
@@ -334,6 +336,7 @@ const computedOpacity = computed(() => {
     }
     .dark-mode-group-tabs  .q-tab--inactive{
         background-color: #494A4A !important;
+        
         color: $white
     }
 
@@ -350,6 +353,7 @@ const computedOpacity = computed(() => {
       border: 1px solid #464646;
         .q-tab--inactive{
         background-color: #494A4A !important;
+        opacity: 1;
         color: $white;
       }      
     }

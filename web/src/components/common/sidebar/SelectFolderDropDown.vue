@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filled
         borderless
         dense
-        class="q-mb-xs showLabelOnTop "
+        class="q-mb-xs showLabelOnTop no-case "
         :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
         style="width: calc(100% - 40px)"
         :disable="disableDropdown"
