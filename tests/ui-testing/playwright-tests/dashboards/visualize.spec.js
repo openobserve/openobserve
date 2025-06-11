@@ -552,7 +552,9 @@ test.describe("logs testcases", () => {
     await logsVisualise.backToLogs();
   });
 
-  test("should create dashboard from the visualization chart sucessfully", async ({ page }) => {
+  test("should create dashboard from the visualization chart sucessfully", async ({
+    page,
+  }) => {
     const randomDashboardName =
       "Dashboard_" + Math.random().toString(36).substr(2, 9);
     const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
@@ -590,7 +592,6 @@ test.describe("logs testcases", () => {
 
     //add to dashboard and submit it
     await page.getByRole("button", { name: "Add To Dashboard" }).click();
-    await page.waitForTimeout(3000);
     await page
       .locator('[data-test="dashboard-dashboard-new-add"]')
       .waitFor({ state: "visible" });
@@ -613,23 +614,20 @@ test.describe("logs testcases", () => {
     await page
       .locator('[data-test="metrics-new-dashboard-panel-title"]')
       .fill(panelName);
-    await page.waitForTimeout(3000);
     await page
       .locator('[data-test="metrics-schema-update-settings-button"]')
       .click();
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="dashboard-back-btn"]').click();
 
     //redirecting to the dashboard and edit panel and save it
+
     await dashboardPanel.editPanel(panelName);
     await page
       .locator('[data-test="dashboard-panel-name"]')
       .waitFor({ state: "visible" });
-    await page.waitForTimeout(3000);
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
-    await page.waitForTimeout(3000);
+
     await expect(
       page.getByText(
         'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1", kubernetes_annotations_kubernetes_io_psp AS "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1',
