@@ -35,7 +35,6 @@ use datafusion::{
     physical_plan::PhysicalExpr,
     scalar::ScalarValue,
 };
-use datafusion_functions_aggregate_common::tdigest::TryIntoF64;
 
 use super::NUMERICS;
 
@@ -222,82 +221,72 @@ impl SummaryPercentileAccumulator {
             DataType::Float64 => {
                 let array = downcast_value!(values, Float64Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default())
+                    .collect::<Vec<f64>>())
             }
             DataType::Float32 => {
                 let array = downcast_value!(values, Float32Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::Int64 => {
                 let array = downcast_value!(values, Int64Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::Int32 => {
                 let array = downcast_value!(values, Int32Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::Int16 => {
                 let array = downcast_value!(values, Int16Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::Int8 => {
                 let array = downcast_value!(values, Int8Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::UInt64 => {
                 let array = downcast_value!(values, UInt64Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::UInt32 => {
                 let array = downcast_value!(values, UInt32Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::UInt16 => {
                 let array = downcast_value!(values, UInt16Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             DataType::UInt8 => {
                 let array = downcast_value!(values, UInt8Array);
                 Ok(array
-                    .values()
                     .iter()
-                    .filter_map(|v| v.try_as_f64().transpose())
-                    .collect::<Result<Vec<_>>>()?)
+                    .map(|v| v.unwrap_or_default() as f64)
+                    .collect::<Vec<f64>>())
             }
             e => internal_err!("SUMMART_PERCENTILE is not expected to receive the type {e:?}"),
         }
@@ -305,7 +294,10 @@ impl SummaryPercentileAccumulator {
 
     fn convert_to_int64(values: &ArrayRef) -> Result<Vec<i64>> {
         let array = downcast_value!(values, Int64Array);
-        Ok(array.values().to_vec())
+        Ok(array
+            .iter()
+            .map(|v| v.unwrap_or_default())
+            .collect::<Vec<i64>>())
     }
 }
 
@@ -360,19 +352,13 @@ impl Accumulator for SummaryPercentileAccumulator {
             }
         }
 
-        // 3. calculate the rank of the percentile
+        // 3. calculate the result
         let percentile_count = self.percentile * (prefix_sum[prefix_sum.len() - 1] as f64);
-        let lower_index = prefix_sum
+        let index = prefix_sum
             .iter()
             .position(|&v| v as f64 >= percentile_count)
             .unwrap();
-        let upper_index = lower_index + 1;
-
-        // 4. calculate the fractioned value
-        let fraction = percentile_count - prefix_sum[lower_index] as f64;
-        let lower_value = value_count[lower_index].0;
-        let upper_value = value_count[upper_index].0;
-        let percentile_value = lower_value + (upper_value - lower_value) * fraction;
+        let percentile_value = *value_count[index].0;
 
         Ok(match &self.return_type {
             DataType::Int8 => ScalarValue::Int8(Some(percentile_value as i8)),
@@ -408,9 +394,10 @@ impl Accumulator for SummaryPercentileAccumulator {
             return Ok(());
         }
 
-        let array = states[0].as_list::<i32>();
-        for v in array.iter().flatten() {
-            self.update_batch(&[v])?
+        let value = states[0].as_list::<i32>();
+        let count = states[1].as_list::<i32>();
+        for (v, c) in value.iter().flatten().zip(count.iter().flatten()) {
+            self.update_batch(&[v, c])?;
         }
         Ok(())
     }

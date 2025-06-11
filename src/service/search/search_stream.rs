@@ -120,7 +120,31 @@ pub async fn process_search_stream_request(
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
-    if req.query.from == 0 && !req.query.track_total_hits {
+    // HACK: always search from the first partition
+    let mut hits_to_skip = req.query.from;
+    let original_size = req.query.size;
+    req.query.from = 0;
+    req.query.size = original_size + hits_to_skip;
+
+    let use_cached_flow = if req.query.from == 0 && !req.query.track_total_hits  {
+        if use_cache && hits_to_skip > 0 {
+            // do not use cached flow as its a paginated query
+            // use partitioned search instead
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {}, Skipping cached flow as paginated query, hits_to_skip: {}",
+                trace_id,
+                hits_to_skip
+            );
+            false
+        } else {
+            // check cache for the first page
+            true
+        }
+    } else {
+        false
+    };
+
+    if use_cached_flow {
         let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
             .instrument(search_span.clone())
             .await
@@ -296,6 +320,7 @@ pub async fn process_search_stream_request(
                 sender.clone(),
                 values_ctx,
                 fallback_order_by_col,
+                &mut hits_to_skip,
             )
             .instrument(search_span.clone())
             .await
@@ -409,6 +434,7 @@ pub async fn process_search_stream_request(
             sender.clone(),
             values_ctx,
             fallback_order_by_col,
+            &mut hits_to_skip,
         )
         .instrument(search_span.clone())
         .await
@@ -511,6 +537,7 @@ pub async fn do_partitioned_search(
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
+    hits_to_skip: &mut i64,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -579,7 +606,23 @@ pub async fn do_partitioned_search(
         // do not use cache for partitioned search without cache
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
 
-        let total_hits = search_res.total as i64;
+        let mut total_hits = search_res.total as i64;
+
+        let skip_hits = std::cmp::min(*hits_to_skip, total_hits);
+        if skip_hits > 0 {
+            search_res.hits = search_res.hits[skip_hits as usize..].to_vec();
+            search_res.total = search_res.hits.len();
+            total_hits = search_res.total as i64;
+            *hits_to_skip -= skip_hits;
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {}, Skipped {} hits, remaining hits to skip: {}, total hits for partition {}: {}",
+                trace_id,
+                skip_hits,
+                *hits_to_skip,
+                idx,
+                total_hits
+            );
+        }
 
         if req.query.size > 0 && total_hits > req.query.size {
             log::info!(
@@ -1031,7 +1074,7 @@ async fn process_delta(
 
         let total_hits = search_res.total as i64;
 
-        if total_hits > req.query.size {
+        if req.query.size > 0 && total_hits > req.query.size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,

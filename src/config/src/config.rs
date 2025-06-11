@@ -90,6 +90,9 @@ pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
+pub const MESSAGE_COL_NAME: &str = "message";
+pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
+pub const DEFAULT_STREAM_NAME: &str = "default";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
@@ -461,7 +464,7 @@ pub struct WebSocket {
     pub streaming_response_chunk_size: usize,
     #[env_config(
         name = "ZO_STREAMING_ENABLED",
-        default = false,
+        default = true,
         help = "Enable streaming"
     )]
     pub streaming_enabled: bool,
@@ -659,6 +662,14 @@ pub struct TCP {
     pub tcp_port: u16,
     #[env_config(name = "ZO_UDP_PORT", default = 5514)]
     pub udp_port: u16,
+    #[env_config(name = "ZO_TCP_TLS_ENABLED", default = false)]
+    pub tcp_tls_enabled: bool,
+    #[env_config(name = "ZO_TCP_TLS_CERT_PATH", default = "")]
+    pub tcp_tls_cert_path: String,
+    #[env_config(name = "ZO_TCP_TLS_KEY_PATH", default = "")]
+    pub tcp_tls_key_path: String,
+    #[env_config(name = "ZO_TCP_TLS_CA_CERT_PATH", default = "")]
+    pub tcp_tls_ca_cert_path: String,
 }
 
 #[derive(EnvConfig)]
@@ -801,7 +812,7 @@ pub struct Common {
         help = "Comma separated list of fields to use for search around"
     )]
     pub search_around_default_fields: String,
-    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
+    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = true)]
     pub wal_fsync_disabled: bool,
     #[env_config(
         name = "ZO_WAL_WRITE_QUEUE_ENABLED",
@@ -1147,10 +1158,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1183,7 +1194,7 @@ pub struct Limit {
         help = "MemTable bucket num, default is 1"
     )] // default is 1
     pub mem_table_bucket_num: usize,
-    #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
+    #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
@@ -1483,7 +1494,7 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
@@ -1924,6 +1935,10 @@ pub fn init() -> Config {
     // check http config
     if let Err(e) = check_http_config(&mut cfg) {
         panic!("common config error: {e}")
+    }
+
+    if let Err(e) = check_tcp_tls_config(&mut cfg) {
+        panic!("syslog config error: {e}")
     }
 
     // check data path config
@@ -2757,6 +2772,19 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 return Err(anyhow::anyhow!("invalid master encryption key: {e}"));
             }
         }
+    }
+    Ok(())
+}
+
+fn check_tcp_tls_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.tcp.tcp_tls_enabled
+        && (cfg.tcp.tcp_tls_cert_path.is_empty()
+            || cfg.tcp.tcp_tls_key_path.is_empty()
+            || cfg.tcp.tcp_tls_ca_cert_path.is_empty())
+    {
+        return Err(anyhow::anyhow!(
+            "ZO_TCP_TLS_CERT_PATH, ZO_TCP_TLS_KEY_PATH and ZO_TCP_TLS_CA_CERT_PATH must be set when ZO_TCP_TLS_ENABLED is true"
+        ));
     }
     Ok(())
 }
