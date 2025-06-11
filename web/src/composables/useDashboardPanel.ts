@@ -207,7 +207,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
   const valuesWebSocket = useValuesWebSocket();
-  console.log("Fetching field values: Values WebSocket:", valuesWebSocket);
 
   // Initialize the state for this page key if it doesn't already exist
   if (!dashboardPanelDataObj[pageKey]) {
@@ -1266,17 +1265,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         type: currentQuery.fields.stream_type,
         no_count: true,
       };
-      console.log("Fetching field values: queryReq", queryReq);
 
       const res = await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
         name,
-      );
-      console.log("Fetching field values: res", res);
-      console.log(
-        "Fetching field values: dashboardPanelData",
-        dashboardPanelData.meta.filterValue,
       );
     } catch (error: any) {
       const errorDetailValue =
@@ -1318,12 +1311,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         queryReq,
         dashboardPanelData,
         name,
-      );
-      console.log("Fetching field values: response-----------", response);
-
-      console.log(
-        "Fetching field values: dashboardPanelData loadFilterItem",
-        dashboardPanelData,
       );
     } catch (error: any) {
       const errorDetailValue =

@@ -121,15 +121,10 @@ const useValuesWebSocket = () => {
         (response.type === "search_response" ||
           response.type === "search_response_hits")
       ) {
-        console.log("Fetching field values: response", response);
-        console.log("Fetching field values: variableObject", variableObject);
-
         const hits = response.content.results.hits;
         const fieldHit = hits.find(
           (field: any) => field.field === variableObject.name,
         );
-
-        console.log("Fetching field values: fieldHit", fieldHit);
 
         if (!fieldHit) {
           return;
@@ -140,8 +135,6 @@ const useValuesWebSocket = () => {
           .map((it: any) => it.zo_sql_key)
           .filter((it: any) => it)
           .map((it: any) => String(it));
-
-        console.log("Fetching field values: newOptions", newOptions);
 
         // IMPORTANT: Access the correct dashboardPanelData object
         const dashboardPanelData = variableObject.dashboardPanelData;
@@ -167,7 +160,6 @@ const useValuesWebSocket = () => {
         const mergedValues = Array.from(
           new Set([...existingValues, ...newOptions]),
         );
-        console.log("Fetching field values: mergedValues", mergedValues);
 
         // Update or add the entry
         if (existingIndex >= 0) {
@@ -181,18 +173,8 @@ const useValuesWebSocket = () => {
             value: mergedValues,
           });
         }
-
-        console.log(
-          "Fetching field values: Updated filterValue:",
-          dashboardPanelData.meta.filterValue,
-        );
       }
-    } catch (error) {
-      console.error(
-        `[WebSocket] Error processing response for ${variableObject.name}:`,
-        error,
-      );
-    }
+    } catch (error) {}
   };
 
   const initializeWebSocketConnection = (
@@ -211,16 +193,6 @@ const useValuesWebSocket = () => {
     }
 
     if (isStreamingEnabled(store.state)) {
-      console.log(
-        `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
-        {
-          isLoading: variableObject.isLoading,
-          isVariableLoadingPending: variableObject.isVariableLoadingPending,
-          currentValue: variableObject.value,
-          options: variableObject.options,
-        },
-      );
-
       fetchQueryDataWithHttpStream(payload, {
         data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
         error: (p: any, r: any) => handleSearchError(p, r, variableObject),
@@ -248,8 +220,6 @@ const useValuesWebSocket = () => {
     dashboardPanelData: any,
     name: any,
   ) => {
-    console.log("Fetching field values:", queryReq);
-
     if (isWebSocketEnabled(store.state)) {
       // Use WebSocket
       const wsPayload = {
@@ -274,7 +244,6 @@ const useValuesWebSocket = () => {
         name: name,
         dashboardPanelData: dashboardPanelData,
       });
-      console.log("Fetching field values: res websocket", res);
 
       return res;
     } else if (isStreamingEnabled(store.state)) {
@@ -301,7 +270,6 @@ const useValuesWebSocket = () => {
         name: name,
         dashboardPanelData: dashboardPanelData,
       });
-      console.log("Fetching field values: res websocket", res);
 
       return res;
     } else {
@@ -332,7 +300,6 @@ const useValuesWebSocket = () => {
             .map((it: any) => String(it)),
         });
       } catch (error) {
-        console.error("Error fetching field values:", error);
         throw error;
       }
     }
