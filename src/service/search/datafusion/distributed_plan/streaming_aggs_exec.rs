@@ -16,14 +16,12 @@
 use std::{
     any::Any,
     collections::VecDeque,
-    fs::File,
-    path::Path,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 
-use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader as ArrowFileReader};
+use arrow::{array::RecordBatch, datatypes::SchemaRef};
 use dashmap::DashMap;
 use datafusion::{
     common::{Result, Statistics},
@@ -85,6 +83,7 @@ pub struct StreamingAggsExec {
 }
 
 impl StreamingAggsExec {
+    #[allow(dead_code)]
     /// Create a new StreamingAggsExec
     pub fn new(
         id: String,

@@ -635,7 +635,7 @@ pub async fn search_partition(
     };
 
     let origin_sql = req.sql.clone();
-    let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
+    let (stream_name, _all_streams) = match resolve_stream_names(&origin_sql) {
         // TODO: cache don't not support multiple stream names
         Ok(v) => (v[0].clone(), v.join(",")),
         Err(e) => {

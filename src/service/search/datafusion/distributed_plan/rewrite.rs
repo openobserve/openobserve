@@ -264,9 +264,6 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
                 .get(&self.id)
                 .unwrap_or_default();
 
-            // Check if this is a complete cache hit
-            let streaming_item = streaming_aggs_exec::GLOBAL_ID_CACHE.get(&self.id);
-
             log::info!(
                 "[streaming_id {}] StreamingAggsRewriter: cache_strategy={}, cached_batches={}",
                 self.id,

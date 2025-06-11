@@ -1,5 +1,4 @@
 use std::{
-    fs::File,
     io::{Cursor, ErrorKind},
     path::Path,
     sync::Arc,
