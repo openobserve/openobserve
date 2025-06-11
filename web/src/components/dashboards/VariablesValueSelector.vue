@@ -242,7 +242,6 @@ export default defineComponent({
     };
 
     const handleSearchReset = (data: any) => {
-      console.log("[WebSocket] Received reset:", data);
 
       const variableObject = variablesData.values.find(
         (v: any) => v.query_data?.field === data.queryReq?.fields[0],
@@ -264,25 +263,10 @@ export default defineComponent({
       response: any,
       variableObject: any,
     ) => {
-      console.log(`[Http Streaming] Received response:`, {
-        payload,
-        response,
-      });
 
       if (!variableObject) {
-        console.error("Variable object is undefined");
         return;
       }
-
-      variableObject.isLoading = true;
-
-      console.log(`[WebSocket] Received response for ${variableObject.name}:`, {
-        responseType: response.type,
-        hasResults: !!response.content?.results?.hits?.length,
-        currentValue: variableObject.value,
-        isLoading: variableObject.isLoading,
-        isVariableLoadingPending: variableObject.isVariableLoadingPending,
-      });
 
       if (response.type === "cancel_response") {
         removeTraceId(variableObject.name, response.content.trace_id);
@@ -306,11 +290,9 @@ export default defineComponent({
           (response.type === "search_response" ||
             response.type === "search_response_hits")
         ) {
+          variableObject.isLoading = false;
+
           const hits = response.content.results.hits;
-          console.log(
-            `[Http Streaming] Hits for ${variableObject.name}:`,
-            hits,
-          );
 
           const fieldHit = hits.find(
             (field: any) => field.field === variableObject.query_data.field,
@@ -376,24 +358,12 @@ export default defineComponent({
                     JSON.stringify(variableObject.value)
                   : originalValue !== variableObject.value;
 
-              console.log(
-                `[WebSocket] First response value change check for ${variableObject.name}:`,
-                {
-                  originalValue,
-                  newValue: variableObject.value,
-                  hasValueChanged,
-                },
-              );
-
               // Only load child variables if value actually changed
               if (hasValueChanged) {
                 const childVariables =
                   variablesDependencyGraph[variableObject.name]
                     ?.childVariables || [];
                 if (childVariables.length > 0) {
-                  console.log(
-                    `[WebSocket] Loading child variables for ${variableObject.name} due to value change`,
-                  );
                   const childVariableObjects = variablesData.values.filter(
                     (variable: any) => childVariables.includes(variable.name),
                   );
@@ -402,9 +372,7 @@ export default defineComponent({
                   });
                 }
               } else {
-                console.log(
-                  `[WebSocket] Skipping child variable load for ${variableObject.name} - value unchanged`,
-                );
+                
               }
             } else {
               // For subsequent responses, we'll accumulate values but not trigger UI updates
@@ -438,24 +406,12 @@ export default defineComponent({
                     JSON.stringify(variableObject.value)
                   : originalValue !== variableObject.value;
 
-              console.log(
-                `[WebSocket] Subsequent response value change check for ${variableObject.name}:`,
-                {
-                  originalValue,
-                  newValue: variableObject.value,
-                  hasValueChanged,
-                },
-              );
-
               // Only load child variables if value actually changed
               if (hasValueChanged) {
                 const childVariables =
                   variablesDependencyGraph[variableObject.name]
                     ?.childVariables || [];
                 if (childVariables.length > 0) {
-                  console.log(
-                    `[WebSocket] Loading child variables for ${variableObject.name} due to value change`,
-                  );
                   const childVariableObjects = variablesData.values.filter(
                     (variable: any) => childVariables.includes(variable.name),
                   );
@@ -464,18 +420,11 @@ export default defineComponent({
                   });
                 }
               } else {
-                console.log(
-                  `[WebSocket] Skipping child variable load for ${variableObject.name} - value unchanged`,
-                );
               }
             }
           }
         }
       } catch (error) {
-        console.error(
-          `[WebSocket] Error processing response for ${variableObject.name}:`,
-          error,
-        );
         resetVariableState(variableObject);
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
@@ -490,16 +439,6 @@ export default defineComponent({
       variableObject: any,
     ): any => {
       if (isStreamingEnabled(store.state)) {
-        console.log(
-          `[HTTP Streaming] Starting fetch for ${variableObject.name}:`,
-          {
-            isLoading: variableObject.isLoading,
-            isVariableLoadingPending: variableObject.isVariableLoadingPending,
-            currentValue: variableObject.value,
-            options: variableObject.options,
-          },
-        );
-
         fetchQueryDataWithHttpStream(payload, {
           data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
           error: (p: any, r: any) => handleSearchError(p, r, variableObject),
@@ -526,7 +465,6 @@ export default defineComponent({
       queryContext: string,
     ) => {
       if (!variableObject?.query_data?.field) {
-        console.error("Invalid variable object or missing field");
         return;
       }
 
@@ -540,12 +478,6 @@ export default defineComponent({
       // Set loading state before initiating WebSocket
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
-      console.log(`[WebSocket] Starting fetch for ${variableObject.name}:`, {
-        isLoading: variableObject.isLoading,
-        isVariableLoadingPending: variableObject.isVariableLoadingPending,
-        currentValue: variableObject.value,
-        options: variableObject.options,
-      });
 
       // Reset first response flag when starting a new fetch
       variableFirstResponseProcessed.value[variableObject.name] = false;
@@ -570,7 +502,6 @@ export default defineComponent({
         org_id: store.state.selectedOrganization.identifier,
         meta: payload,
       };
-      console.log("wsPayload", wsPayload);
       try {
         // Start new connection
         initializeWebSocketConnection(wsPayload, variableObject);
@@ -579,13 +510,6 @@ export default defineComponent({
         console.error("WebSocket connection failed:", error);
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
-        console.log(
-          `[WebSocket] Failed to connect for ${variableObject.name}:`,
-          {
-            isLoading: variableObject.isLoading,
-            isVariableLoadingPending: variableObject.isVariableLoadingPending,
-          },
-        );
       }
     };
 
@@ -648,13 +572,6 @@ export default defineComponent({
           ((Array.isArray(initialValue) && initialValue.length === 0) ||
             !initialValue) // Only set custom value if no URL value exists
         ) {
-          console.log(
-            `Setting custom multi-select value for--------------- ${item.name}:`,
-            {
-              customValue: item.customMultiSelectValue,
-            },
-          );
-
           variableData.value = item.multiSelect
             ? item.customMultiSelectValue
             : item.customMultiSelectValue[0];
@@ -710,11 +627,6 @@ export default defineComponent({
         // set old variables data
         oldVariablesData["Dynamic filters"] = initialValue;
       }
-
-      console.log(
-        "[WebSocket] variablesData.values:",
-        JSON.stringify(variablesData.values, null, 2),
-      );
 
       // need to build variables dependency graph on variables config list change
       variablesDependencyGraph = buildVariablesDependencyGraph(
@@ -831,9 +743,6 @@ export default defineComponent({
       currentVariable: any,
       oldVariableSelectedValues: any[],
     ) => {
-      console.log("oldVariableSelectedValues", oldVariableSelectedValues);
-      console.log("currentVariable", currentVariable);
-
       // For multiSelect, preserve existing values even if they're not in current options
       if (currentVariable.multiSelect) {
         // If we have existing values and they're not empty, keep them
@@ -870,10 +779,6 @@ export default defineComponent({
           currentVariable.value !== null &&
           currentVariable.value !== undefined
         ) {
-          console.log(
-            "[Debug] SingleSelect variable already has a valid value, skipping recalculation",
-            currentVariable.value,
-          );
           return;
         }
       }
@@ -907,11 +812,6 @@ export default defineComponent({
         currentVariable?.selectAllValueForMultiSelect === "custom" &&
         currentVariable?.customMultiSelectValue?.length > 0
       ) {
-        console.log(
-          "[Debug] Using custom values for variable--------------",
-          currentVariable,
-        );
-
         currentVariable.value = currentVariable.multiSelect
           ? currentVariable.customMultiSelectValue
           : currentVariable.customMultiSelectValue[0];
@@ -936,11 +836,6 @@ export default defineComponent({
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
           if (currentVariable.selectAllValueForMultiSelect === "custom") {
-            console.log(
-              "[Debug] Using custom value for single select variable--------------",
-              currentVariable,
-            );
-
             const customValue = currentVariable.options.find(
               (variableOption: any) =>
                 variableOption.value ===
@@ -1098,15 +993,6 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was loaded successfully, false if it was not
      */
     const loadSingleVariableDataByName = async (variableObject: any) => {
-      console.log(
-        `[WebSocket] Loading variable data for ${variableObject.name}:`,
-        variableObject,
-      );
-      console.log(
-        `[WebSocket] Currently executing promises:`,
-        currentlyExecutingPromises,
-      );
-
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
 
@@ -1130,7 +1016,6 @@ export default defineComponent({
             isInvalidDate(props.selectedTimeDate?.start_time) ||
             isInvalidDate(props.selectedTimeDate?.end_time)
           ) {
-            console.error("Invalid date range");
             variableObject.isLoading = false;
             variableObject.isVariableLoadingPending = false;
             resolve(false);
@@ -1167,7 +1052,6 @@ export default defineComponent({
           );
 
           if (!areParentsReady) {
-            console.log(`Parents not ready for ${name}, marking as pending`);
             // Just update loading states but don't reset value if already set
             variableObject.isLoading = false;
             variableObject.isVariableLoadingPending = true;
@@ -1198,34 +1082,15 @@ export default defineComponent({
      * @returns {Promise<boolean>} - true if the variable was handled successfully, false if it was not
      */
     const handleVariableType = async (variableObject: any) => {
-      console.log(
-        `[WebSocket] handleVariableType: starting handle for ${variableObject.name}`,
-        variableObject,
-      );
       switch (variableObject.type) {
         case "query_values": {
-          console.log(
-            `[WebSocket] handleVariableType: building query context for ${variableObject.name}`,
-          );
-
           // Check if this is a child variable
           const isChildVariable =
             variablesDependencyGraph[variableObject.name]?.parentVariables
               ?.length > 0;
 
-          console.log(
-            `[WebSocket] handleVariableType: IF `,
-            JSON.stringify(variableObject, null, 2),
-            JSON.stringify(props.initialVariableValues?.value, null, 2),
-            JSON.stringify(oldVariablesData, null, 2),
-          );
-
           try {
             const queryContext: any = await buildQueryContext(variableObject);
-            console.log(
-              `[WebSocket] handleVariableType: built query context for ${variableObject.name}`,
-              queryContext,
-            );
 
             if (
               isWebSocketEnabled(store.state) ||
@@ -1241,50 +1106,27 @@ export default defineComponent({
                 variableObject,
                 queryContext,
               );
-              console.log(
-                `[WebSocket] handleVariableType: fetched field values for ${variableObject.name}`,
-                response,
-              );
               if (response?.data?.hits) {
                 updateVariableOptions(variableObject, response.data.hits);
-                console.log(
-                  `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
-                );
                 return true;
               }
             }
             return false;
           } catch (error) {
-            console.log(
-              `[WebSocket] handleVariableType: error fetching field values for ${variableObject.name}`,
-              error,
-            );
             resetVariableState(variableObject);
             return false;
           }
         }
         case "custom": {
-          console.log(
-            `[WebSocket] handleVariableType: handling custom variable ${variableObject.name}`,
-          );
           handleCustomVariable(variableObject);
-          console.log(
-            `[WebSocket] handleVariableType: finished handling custom variable ${variableObject.name}`,
-          );
           return true;
         }
         case "constant":
         case "textbox":
         case "dynamic_filters": {
-          console.log(
-            `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
-          );
           return true;
         }
         default: {
-          console.log(
-            `[WebSocket] handleVariableType: finished handling ${variableObject.name}`,
-          );
           return false;
         }
       }
@@ -1377,8 +1219,6 @@ export default defineComponent({
      * @param hits - The result from the stream service containing field values.
      */
     const updateVariableOptions = (variableObject: any, hits: any[]) => {
-      console.log("hits", hits);
-
       const fieldHit = hits.find(
         (field: any) => field.field === variableObject.query_data.field,
       );
@@ -1452,10 +1292,6 @@ export default defineComponent({
         // Reset variable state if no field values are available
         resetVariableState(variableObject);
       }
-      console.log(
-        `[WebSocket] isLoading=false (updateVariableOptions) for`,
-        variableObject.name,
-      );
     };
 
     /**
@@ -1519,10 +1355,6 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
-      console.log(
-        `[WebSocket] Loading options for ${variableObject.name} on dropdown open`,
-      );
-
       // When a dropdown is opened, only load the variable data
       await loadSingleVariableDataByName(variableObject);
     };
@@ -1681,10 +1513,6 @@ export default defineComponent({
         !currentVariable.isLoading &&
         !currentVariable.isVariableLoadingPending
       ) {
-        console.log(
-          `[Debug] Filtering multiSelect values for ${currentVariable.name}`,
-        );
-
         // If custom values are set and current value matches custom values, don't filter
         if (
           currentVariable?.selectAllValueForMultiSelect === "custom" &&
@@ -1692,10 +1520,6 @@ export default defineComponent({
           JSON.stringify(currentVariable.value) ===
             JSON.stringify(currentVariable.customMultiSelectValue)
         ) {
-          console.log(
-            `[Debug] Keeping custom values for-------- ${currentVariable.name}`,
-            currentVariable.value,
-          );
           return;
         }
 
@@ -1704,21 +1528,10 @@ export default defineComponent({
             (opt: any) => opt.value === val || val == SELECT_ALL_VALUE,
           ),
         );
-        console.log(
-          `[Debug] Filtered multiSelect values for ${currentVariable.name}:`,
-          filtered,
-        );
 
         if (filtered.length !== currentVariable.value.length) {
-          console.log(
-            `[Debug] Updating multiSelect value for ${currentVariable.name} to filtered values`,
-          );
 
           currentVariable.value = filtered;
-          console.log(
-            `[Debug] Updated multiSelect value for ${currentVariable.name}:`,
-            currentVariable.value,
-          );
         }
       }
 
