@@ -68,7 +68,7 @@ test.describe("Alerts Module testcases", () => {
     tag: ['@createFolder', '@all', '@alerts']
   }, async ({ page }) => {
     // Generate random folder name once for this test
-    const folderName = alertsPage.generateRandomFolderName();
+    const folderName = 'automationFolder_' + alertsPage.generateRandomFolderName();
     console.log('Created folder:', folderName);
     
     // Create first folder
@@ -85,8 +85,8 @@ test.describe("Alerts Module testcases", () => {
     await alertsPage.cancelFolderCreation();
   });
 
-  test('Create, update, clone and delete alert in folder', {
-    tag: ['@createAlert', '@editAlert', '@cloneAlert', '@deleteAlert', '@all', '@alerts']
+  test('Create, update and clone alert in folder', {
+    tag: ['@createUpdateCloneAlert', '@all', '@alerts']
   }, async ({ page }) => {
     const streamName = 'alertstestqa';
     const column = 'job';
@@ -112,4 +112,6 @@ test.describe("Alerts Module testcases", () => {
     // Clone alert
     await alertsPage.cloneAlert(alertName, 'logs', streamName);
   });
+
+
 });

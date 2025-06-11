@@ -12,7 +12,7 @@ export class AlertsNewPage {
         this.folderSaveButton = '[data-test="dashboard-folder-add-save"]';
         this.folderCancelButton = '[data-test="dashboard-folder-add-cancel"]';
         this.noDataAvailableText = 'No data available';
-        this.folderExistsError = 'Folder with this name already';
+        this.folderExistsError = 'Folder with this name already exists in this organization';
 
         // Alert creation locators
         this.addAlertButton = '[data-test="alert-list-add-alert-btn"]';
@@ -96,11 +96,11 @@ export class AlertsNewPage {
     }
 
     async verifyNoDataAvailable() {
-        await expect(this.page.locator(this.noDataAvailableText)).toBeVisible();
+        await expect(this.page.getByText('No data available')).toBeVisible();
     }
 
     async verifyFolderExistsError() {
-        await expect(this.page.locator(this.folderExistsError)).toBeVisible();
+        await expect(this.page.getByText(this.folderExistsError)).toBeVisible();
     }
 
     async cancelFolderCreation() {
