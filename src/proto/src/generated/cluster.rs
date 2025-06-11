@@ -70,6 +70,9 @@ pub struct ScanStats {
     /// unit: ms
     #[prost(int64, tag = "10")]
     pub file_list_took: i64,
+    /// unit: %
+    #[prost(int64, tag = "11")]
+    pub aggs_cache_ratio: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]

@@ -1011,6 +1011,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
                 file_list_took: scan_stats.file_list_took,
+                aggs_cache_ratio: scan_stats.aggs_cache_ratio,
             });
         let query_status = if result.is_queue {
             "waiting"

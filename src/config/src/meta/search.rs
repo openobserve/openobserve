@@ -223,6 +223,8 @@ pub struct Response {
     pub new_end_time: Option<i64>,
     #[serde(default)]
     pub result_cache_ratio: usize,
+    #[serde(default)]
+    pub aggs_cache_ratio: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -386,6 +388,7 @@ impl Response {
             new_start_time: None,
             new_end_time: None,
             result_cache_ratio: 0,
+            aggs_cache_ratio: 0,
             work_group: None,
             order_by: None,
         }
@@ -483,6 +486,10 @@ impl Response {
 
     pub fn set_order_by(&mut self, val: Option<OrderBy>) {
         self.order_by = val;
+    }
+
+    pub fn set_aggs_cache_ratio(&mut self, val: usize) {
+        self.aggs_cache_ratio = val;
     }
 }
 
@@ -770,6 +777,7 @@ pub struct ScanStats {
     pub idx_scan_size: i64,
     pub idx_took: i64,
     pub file_list_took: i64,
+    pub aggs_cache_ratio: i64,
 }
 
 impl ScanStats {
@@ -788,6 +796,7 @@ impl ScanStats {
         self.idx_scan_size += other.idx_scan_size;
         self.idx_took = std::cmp::max(self.idx_took, other.idx_took);
         self.file_list_took = std::cmp::max(self.file_list_took, other.file_list_took);
+        self.aggs_cache_ratio = std::cmp::max(self.aggs_cache_ratio, other.aggs_cache_ratio);
     }
 
     pub fn format_to_mb(&mut self) {
@@ -829,6 +838,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
             file_list_took: req.file_list_took,
+            aggs_cache_ratio: req.aggs_cache_ratio,
         }
     }
 }
@@ -846,6 +856,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
             file_list_took: req.file_list_took,
+            aggs_cache_ratio: req.aggs_cache_ratio,
         }
     }
 }

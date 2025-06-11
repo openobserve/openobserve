@@ -488,6 +488,7 @@ pub async fn run_datafusion(
     }
 
     // check for streaming aggregation query
+    let mut aggs_cache_ratio = 0;
     if streaming_output {
         let Some(streaming_id) = streaming_id else {
             return Err(Error::Message(
@@ -495,6 +496,11 @@ pub async fn run_datafusion(
             ));
         };
         let mut rewriter = StreamingAggsRewriter::new(streaming_id, start_time, end_time).await;
+        // Check for aggs cache hit
+        if rewriter.is_complete_cache_hit {
+            aggs_cache_ratio = 100;
+        }
+
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 
@@ -536,7 +542,10 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
+        let mut scan_stats = visit.scan_stats;
+        // Update scan stats to include aggregation cache ratio
+        scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+        ret.map(|data| (data, scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
 }

@@ -195,7 +195,7 @@ pub struct StreamingAggsRewriter {
     id: String,
     start_time: i64,
     end_time: i64,
-    is_complete_cache_hit: bool,
+    pub is_complete_cache_hit: bool,
 }
 
 impl StreamingAggsRewriter {
