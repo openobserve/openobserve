@@ -28,7 +28,10 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+    },
 };
 use syslog_loose::{Message, ProcId, Protocol, Variant};
 
@@ -126,6 +129,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
 
     // parse msg to json::Value
     let parsed_msg = syslog_loose::parse_message(msg, Variant::Either);
@@ -155,6 +159,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         pipeline_inputs.push(value);
         original_options.push(original_data);
     } else {
+        let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+        *_size += estimate_json_bytes(&value);
         // JSON Flattening
         value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
@@ -311,6 +317,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             ))); // just return
                         };
 
+                        // we calculate original size BEFORE applying uds
+                        let original_size = estimate_json_bytes(&res);
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,
@@ -392,6 +401,11 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             continue;
                         };
 
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
+
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
                             .or_insert_with(|| (Vec::new(), None));
@@ -427,6 +441,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             UsageType::Syslog,
             &mut status,
             json_data_by_stream,
+            size_by_stream,
         )
         .await;
         stream_status.status = match status {
