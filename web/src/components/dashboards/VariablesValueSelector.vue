@@ -1274,8 +1274,28 @@ export default defineComponent({
                 queryContext,
               );
               if (response?.data?.hits) {
+
+                const originalValue = JSON.parse(
+                  JSON.stringify(variableObject.value),
+                );
+
                 updateVariableOptions(variableObject, response.data.hits);
-                finalizePartialVariableLoading(variableObject, true);
+
+                const hasValueChanged =
+                  Array.isArray(originalValue) &&
+                    Array.isArray(variableObject.value)
+                    ? JSON.stringify(originalValue) !==
+                    JSON.stringify(variableObject.value)
+                    : originalValue !== variableObject.value;
+
+
+                if (hasValueChanged) {
+                  finalizePartialVariableLoading(variableObject, true);
+                } else {
+                  // just set the partially loaded state
+                  variableObject.isVariablePartialLoaded = true;
+                }
+
                 finalizeVariableLoading(variableObject, true);
                 return true;
               }
