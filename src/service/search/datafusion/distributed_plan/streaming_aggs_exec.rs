@@ -152,11 +152,9 @@ impl DisplayAs for StreamingAggsExec {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
                 let strategy = if self.is_complete_cache_hit {
-                    "complete_cache_hit"
-                } else if !self.cached_data.is_empty() {
-                    "partial_cache_hit"
+                    "complete_hit"
                 } else {
-                    "cache_miss"
+                    "miss"
                 };
                 write!(
                     f,

@@ -270,7 +270,7 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
                 if self.is_complete_cache_hit {
                     "complete_hit"
                 } else {
-                    "partial_or_miss"
+                    "miss"
                 },
                 cached_data.len()
             );
