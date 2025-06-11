@@ -438,7 +438,7 @@ impl StreamingAggsCache {
         w.push_back(k.clone());
         drop(w);
         let mut entry = self.data.entry(k).or_default();
-        entry.extend(v.into_iter().map(|v| Arc::new(v)));
+        entry.extend(v.into_iter().map(Arc::new));
     }
 
     pub fn remove(&self, k: &str) {

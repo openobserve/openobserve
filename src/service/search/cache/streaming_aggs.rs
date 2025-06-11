@@ -230,7 +230,7 @@ pub async fn get_streaming_aggs_records_from_disk(
                 start_time,
                 end_time
             );
-            match get_record_batches(&file_path, &file_name_str).await {
+            match get_record_batches(file_path, file_name_str).await {
                 Ok(cached_record_batches) => {
                     for batch in cached_record_batches {
                         let record_batch_cache_result = StreamingAggsCacheResultRecordBatch {
