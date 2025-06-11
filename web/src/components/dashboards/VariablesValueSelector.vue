@@ -361,6 +361,11 @@ export default defineComponent({
       variableObject: any,
     ) => {
 
+      variableLog(
+        variableObject.name,
+        `Received response: ${JSON.stringify(response)}`,
+      );
+
       if (!variableObject) {
         return;
       }
@@ -377,6 +382,7 @@ export default defineComponent({
         response.type === "end"
       ) {
         variableObject.isLoading = false;
+        variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
         emitVariablesData();
         return;
@@ -387,7 +393,7 @@ export default defineComponent({
           (response.type === "search_response" ||
             response.type === "search_response_hits")
         ) {
-          variableObject.isLoading = false;
+          // variableObject.isVariablePartialLoaded = true;
 
           const hits = response.content.results.hits;
 
@@ -396,127 +402,74 @@ export default defineComponent({
           );
 
           if (fieldHit) {
+
+            variableObject.isVariablePartialLoaded = true;
+
+            // Initialize options array if it doesn't exist
+            if (!Array.isArray(variableObject.options)) {
+              variableObject.options = [];
+            }
+
+            // Process the first response
+            const newOptions = fieldHit.values
+              .filter((value: any) => value.zo_sql_key !== undefined)
+              .map((value: any) => ({
+                label:
+                  value.zo_sql_key !== ""
+                    ? value.zo_sql_key.toString()
+                    : "<blank>",
+                value: value.zo_sql_key.toString(),
+              }));
+
+            variableObject.options = Array.from(new Set(...newOptions, ...variableObject.options));
+            variableObject.options.sort((a: any, b: any) =>
+              a.label.localeCompare(b.label),
+            );
+
+            variableLog(
+              variableObject.name,
+              `Received options being set: ${JSON.stringify(variableObject.options)}`,
+            );
+
             const originalValue = JSON.parse(
               JSON.stringify(variableObject.value),
             );
-            // Check if this is the first response for this variable
-            const isFirstResponse =
-              !variableFirstResponseProcessed.value[variableObject.name];
 
-            if (isFirstResponse) {
-              // Initialize options array if it doesn't exist
-              if (!Array.isArray(variableObject.options)) {
-                variableObject.options = [];
-              }
+            // Update options and handle first response
+            if (oldVariablesData[variableObject.name] !== undefined) {
+              const oldValues = Array.isArray(
+                oldVariablesData[variableObject.name],
+              )
+                ? oldVariablesData[variableObject.name]
+                : [oldVariablesData[variableObject.name]];
 
-              // Process the first response
-              const newOptions = fieldHit.values
-                .filter((value: any) => value.zo_sql_key !== undefined)
-                .map((value: any) => ({
-                  label:
-                    value.zo_sql_key !== ""
-                      ? value.zo_sql_key.toString()
-                      : "<blank>",
-                  value: value.zo_sql_key.toString(),
-                }));
-
-              variableObject.options = newOptions;
-              variableObject.options.sort((a: any, b: any) =>
-                a.label.localeCompare(b.label),
-              );
-
-              // Update options and handle first response
-              if (oldVariablesData[variableObject.name] !== undefined) {
-                const oldValues = Array.isArray(
-                  oldVariablesData[variableObject.name],
-                )
-                  ? oldVariablesData[variableObject.name]
-                  : [oldVariablesData[variableObject.name]];
-
-                if (variableObject.type === "custom") {
-                  handleCustomVariablesLogic(variableObject, oldValues);
-                } else {
-                  handleQueryValuesLogic(variableObject, oldValues);
-                }
-              } else {
-                variableObject.value = variableObject.options.length
-                  ? variableObject.options[0].value
-                  : null;
-              }
-
-              variableFirstResponseProcessed.value[variableObject.name] = true;
-              variableObject.isVariableLoadingPending = false;
-
-              // Check if value actually changed before loading child variables
-              const hasValueChanged =
-                Array.isArray(originalValue) &&
-                Array.isArray(variableObject.value)
-                  ? JSON.stringify(originalValue) !==
-                    JSON.stringify(variableObject.value)
-                  : originalValue !== variableObject.value;
-
-              // Only load child variables if value actually changed
-              if (hasValueChanged) {
-                const childVariables =
-                  variablesDependencyGraph[variableObject.name]
-                    ?.childVariables || [];
-                if (childVariables.length > 0) {
-                  const childVariableObjects = variablesData.values.filter(
-                    (variable: any) => childVariables.includes(variable.name),
-                  );
-                  childVariableObjects.forEach((childVariable: any) => {
-                    loadSingleVariableDataByName(childVariable);
-                  });
-                }
-              } else {
-                
-              }
+              handleQueryValuesLogic(variableObject, oldValues);
             } else {
-              // For subsequent responses, we'll accumulate values but not trigger UI updates
-              const existingValuesSet = new Set(
-                variableObject.options.map((opt: any) => opt.value),
-              );
+              variableObject.value = variableObject.options.length
+                ? variableObject.options[0].value
+                : null;
+            }
 
-              // Accumulate new values that don't exist yet
-              const newOptions = fieldHit.values
-                .filter((value: any) => value.zo_sql_key !== undefined)
-                .map((value: any) => ({
-                  label:
-                    value.zo_sql_key !== ""
-                      ? value.zo_sql_key.toString()
-                      : "<blank>",
-                  value: value.zo_sql_key.toString(),
-                }))
-                .filter((opt: any) => !existingValuesSet.has(opt.value));
+            // Check if value actually changed before loading child variables
+            const hasValueChanged =
+              Array.isArray(originalValue) &&
+              Array.isArray(variableObject.value)
+                ? JSON.stringify(originalValue) !==
+                  JSON.stringify(variableObject.value)
+                : originalValue !== variableObject.value;
 
-              // Add new options to the existing array
-              variableObject.options.push(...newOptions);
-              variableObject.options.sort((a: any, b: any) =>
-                a.label.localeCompare(b.label),
-              );
-
-              // Check if the variable's selected value has changed significantly
-              const hasValueChanged =
-                Array.isArray(originalValue) &&
-                Array.isArray(variableObject.value)
-                  ? JSON.stringify(originalValue) !==
-                    JSON.stringify(variableObject.value)
-                  : originalValue !== variableObject.value;
-
-              // Only load child variables if value actually changed
-              if (hasValueChanged) {
-                const childVariables =
-                  variablesDependencyGraph[variableObject.name]
-                    ?.childVariables || [];
-                if (childVariables.length > 0) {
-                  const childVariableObjects = variablesData.values.filter(
-                    (variable: any) => childVariables.includes(variable.name),
-                  );
-                  childVariableObjects.forEach((childVariable: any) => {
-                    loadSingleVariableDataByName(childVariable);
-                  });
-                }
-              } else {
+            // Only load child variables if value actually changed
+            if (hasValueChanged) {
+              const childVariables =
+                variablesDependencyGraph[variableObject.name]
+                  ?.childVariables || [];
+              if (childVariables.length > 0) {
+                const childVariableObjects = variablesData.values.filter(
+                  (variable: any) => childVariables.includes(variable.name),
+                );
+                childVariableObjects.forEach((childVariable: any) => {
+                  loadSingleVariableDataByName(childVariable);
+                });
               }
             }
           }
@@ -1216,6 +1169,7 @@ export default defineComponent({
                 variableObject.value.length > 0)
             ) {
               variableObject.isLoading = false;
+              variableObject.isVariablePartialLoaded = true;
               variableObject.isVariableLoadingPending = false;
               emitVariablesData();
               return true;
@@ -1560,46 +1514,46 @@ export default defineComponent({
         );
       }
 
-      const loadDependentVariables = async () => {
-        for (const variable of dependentVariables) {
-          // Find all parent variables of the current variable
-          const parentVariables =
-            variablesDependencyGraph[variable.name].parentVariables;
-          // Check if all parent variables are loaded
-          const areParentsLoaded = parentVariables.every(
-            (parentName: string) => {
-              const parentVariable = variablesData.values.find(
-                (v: any) => v.name === parentName,
-              );
-              return (
-                parentVariable &&
-                !parentVariable.isLoading &&
-                !parentVariable.isVariableLoadingPending &&
-                parentVariable.value !== null
-              );
-            },
-          );
+      // const loadDependentVariables = async () => {
+      //   for (const variable of dependentVariables) {
+      //     // Find all parent variables of the current variable
+      //     const parentVariables =
+      //       variablesDependencyGraph[variable.name].parentVariables;
+      //     // Check if all parent variables are loaded
+      //     const areParentsLoaded = parentVariables.every(
+      //       (parentName: string) => {
+      //         const parentVariable = variablesData.values.find(
+      //           (v: any) => v.name === parentName,
+      //         );
+      //         return (
+      //           parentVariable &&
+      //           !parentVariable.isLoading &&
+      //           !parentVariable.isVariableLoadingPending &&
+      //           parentVariable.value !== null
+      //         );
+      //       },
+      //     );
 
-          // If all parent variables are loaded, load the current variable
-          if (areParentsLoaded) {
-            await loadSingleVariableDataByName(variable);
-          }
-        }
-      };
+      //     // If all parent variables are loaded, load the current variable
+      //     if (areParentsLoaded) {
+      //       await loadSingleVariableDataByName(variable);
+      //     }
+      //   }
+      // };
 
-      // Attempt to load dependent variables up to 3 times
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await loadDependentVariables();
+      // // Attempt to load dependent variables up to 3 times
+      // for (let attempt = 0; attempt < 3; attempt++) {
+      //   await loadDependentVariables();
 
-        // Check if all variables are loaded
-        const allLoaded = variablesData.values.every(
-          (variable: any) =>
-            !variable.isLoading && !variable.isVariableLoadingPending,
-        );
+      //   // Check if all variables are loaded
+      //   const allLoaded = variablesData.values.every(
+      //     (variable: any) =>
+      //       !variable.isLoading && !variable.isVariableLoadingPending,
+      //   );
 
-        // If all variables are loaded, break the loop
-        if (allLoaded) break;
-      }
+      //   // If all variables are loaded, break the loop
+      //   if (allLoaded) break;
+      // }
 
       isLoading = false;
     };
