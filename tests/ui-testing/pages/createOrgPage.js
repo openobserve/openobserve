@@ -42,4 +42,75 @@ export class CreateOrgPage {
             return "";
         }
     }
+
+    async navigateToOrg() {
+
+        await this.page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await this.page.locator('[data-test="iam-organizations-tab"]').click();        
+    }
+
+
+    async clickAddOrg() {
+        await this.page.locator('[data-test="Add Organization"]').click();
+    }
+
+    async fillOrgName(orgName) {
+        await this.page.locator('[data-test="org-name"]').fill(orgName);
+    }
+
+    async clickSaveOrg() {
+        await this.page.locator('[data-test="add-org"]').click();
+    }
+
+    async checkSaveEnabled() {
+        const saveButton = this.page.locator('[data-test="add-org"]');
+        
+        // Check if the button is enabled
+        const isEnabled = await saveButton.isEnabled();
+        
+        if (!isEnabled) {
+            console.error('The "Add Organization" button is not enabled.');
+            return false; // Return false to indicate the button is not enabled
+        }
+        
+        return true; // Return true if the button is enabled
+    }
+    
+    async clickCancelButton() {
+        const cancelButton = this.page.locator('[data-test="cancel-organizations-modal"]');
+        
+        // Check if the button is visible and enabled before clicking
+        const isVisible = await cancelButton.isVisible();
+        const isEnabled = await cancelButton.isEnabled();
+        
+        if (isVisible && isEnabled) {
+            await cancelButton.click();
+        } else {
+            console.error('The "Cancel" button is not visible or enabled.');
+            throw new Error('Attempted to click "Cancel" button, but it is not visible or enabled.');
+        }
+    }
+    
+
+    async searchOrg(orgName) {
+        await this.page.getByPlaceholder('Search Organization').click();
+        await this.page.getByPlaceholder('Search Organization').fill(orgName);
+        await this.page.waitForTimeout(5000);
+    }
+    
+    async verifyOrgNotExists(expect) {
+        const mainSection = this.page.locator('[data-test="iam-page"]').getByRole('main');
+        const textContent = await mainSection.textContent();
+        console.log('Main section text:', textContent); // Debugging line
+        await expect(mainSection).toContainText('No data available');
+    }
+    
+    async verifyOrgExists(orgName) {
+
+        await expect(this.page.locator('tbody')).toContainText(orgName);
+
+    }
+    
+
+
 }
