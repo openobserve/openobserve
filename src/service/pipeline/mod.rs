@@ -13,13 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use config::meta::{
-    pipeline::{Pipeline, PipelineList, components::PipelineSource},
+    function::Transform,
+    pipeline::{Pipeline, components::PipelineSource},
     search::SearchEventType,
     stream::ListStreamParams,
 };
 
-use super::db::pipeline::{self, PipelineError};
+use super::db::{
+    functions,
+    pipeline::{self, PipelineError},
+};
 use crate::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
@@ -145,7 +151,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
 pub async fn list_pipelines(
     org_id: String,
     permitted: Option<Vec<String>>,
-) -> Result<PipelineList, PipelineError> {
+) -> Result<(Vec<Pipeline>, HashMap<String, Transform>), PipelineError> {
     let list = pipeline::list_by_org(&org_id)
         .await?
         .into_iter()
@@ -161,7 +167,29 @@ pub async fn list_pipelines(
                     .contains(&format!("pipeline:_all_{}", org_id))
         })
         .collect();
-    Ok(PipelineList { list })
+    let meta_functions = functions::list(&org_id)
+        .await
+        .map_err(|_| PipelineError::ListFunctionError)?
+        .into_iter()
+        .map(|func| (func.name.clone(), func))
+        .collect::<HashMap<_, _>>();
+    Ok((list, meta_functions))
+}
+
+#[tracing::instrument]
+pub async fn get_pipeline(
+    org_id: String,
+    pipeline_id: String,
+    permitted: Option<Vec<String>>,
+) -> Result<Option<Pipeline>, PipelineError> {
+    pipeline::get_by_id(&pipeline_id).await.map(|pipeline| {
+        permitted
+            .is_none_or(|permitted| {
+                permitted.contains(&format!("pipeline:{}", pipeline.id))
+                    || permitted.contains(&format!("pipeline:_all_{}", org_id))
+            })
+            .then_some(pipeline)
+    })
 }
 
 #[tracing::instrument]

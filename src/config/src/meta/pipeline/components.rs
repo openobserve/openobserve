@@ -75,10 +75,10 @@ pub struct Node {
     pub data: NodeData,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, String>>,
-    position: Position,
-    io_type: String,
+    pub position: Position,
+    pub io_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    style: Option<NodeStyle>,
+    pub style: Option<NodeStyle>,
 }
 
 impl PartialEq for Node {
@@ -158,14 +158,14 @@ pub struct ConditionParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct Position {
+pub struct Position {
     x: f32,
     y: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NodeStyle {
+pub struct NodeStyle {
     background_color: Option<String>,
 }
 

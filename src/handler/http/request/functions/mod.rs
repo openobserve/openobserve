@@ -112,7 +112,6 @@ async fn list_functions(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name" = String, Path, description = "Function name"),
-        ("force" = bool, Query, description = "Force delete function regardless pipeline dependencies"),
     ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
