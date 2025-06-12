@@ -604,20 +604,6 @@ export default defineComponent({
       cleanupChart();
     });
 
-    const cleanupChart = () => {
-      if (chart) {
-        chart.dispose();
-        chart?.off("mousemove");
-        chart?.off("mouseout");
-        chart?.off("globalout");
-        chart?.off("legendselectchanged");
-        chart?.off("highlight");
-        chart?.off("dataZoom");
-        chart?.off("click");
-        chart?.off("mouseover");
-      }
-    };
-
     //need to resize chart on activated
     onActivated(() => {
       windowResizeEventCallback();
