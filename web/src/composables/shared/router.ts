@@ -106,17 +106,11 @@ const useRoutes = () => {
       path: "",
       name: "home",
       component: Home,
-      meta: {
-        keepAlive: true,
-      },
     },
     {
       path: "logs",
       name: "logs",
       component: Search,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -125,9 +119,6 @@ const useRoutes = () => {
       path: "metrics",
       name: "metrics",
       component: AppMetrics,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -136,9 +127,6 @@ const useRoutes = () => {
       path: "traces",
       name: "traces",
       component: AppTraces,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -172,9 +160,6 @@ const useRoutes = () => {
       path: "tickets",
       name: "tickets",
       component: Tickets,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -183,17 +168,11 @@ const useRoutes = () => {
       path: "about",
       name: "about",
       component: About,
-      meta: {
-        keepAlive: true,
-      },
     },
     {
       path: "dashboards",
       name: "dashboards",
       component: Dashboards,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -203,9 +182,6 @@ const useRoutes = () => {
       name: "viewDashboard",
       component: ViewDashboard,
       props: true,
-      // meta: {
-      // keepAlive: true,
-      // },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -215,9 +191,6 @@ const useRoutes = () => {
       name: "importDashboard",
       component: ImportDashboard,
       props: true,
-      meta: {
-        // keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -227,9 +200,6 @@ const useRoutes = () => {
       name: "addPanel",
       component: AddPanel,
       props: true,
-      meta: {
-        // keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -238,9 +208,6 @@ const useRoutes = () => {
       path: "member_subscription",
       name: "member_subscription",
       component: MemberSubscription,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -335,9 +302,6 @@ const useRoutes = () => {
           path: "sessions",
           name: "Sessions",
           component: AppSessions,
-          meta: {
-            keepAlive: true,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -347,9 +311,6 @@ const useRoutes = () => {
           name: "SessionViewer",
           component: SessionViewer,
           props: true,
-          meta: {
-            keepAlive: false,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -358,9 +319,6 @@ const useRoutes = () => {
           path: "errors",
           name: "ErrorTracking",
           component: AppErrors,
-          meta: {
-            keepAlive: true,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -370,9 +328,6 @@ const useRoutes = () => {
           name: "ErrorViewer",
           component: ErrorViewer,
           props: true,
-          meta: {
-            keepAlive: true,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -382,9 +337,6 @@ const useRoutes = () => {
           name: "RumPerformance",
           component: AppPerformance,
           props: true,
-          meta: {
-            keepAlive: true,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -430,9 +382,6 @@ const useRoutes = () => {
     {
       path: "/:catchAll(.*)*",
       component: Error404,
-      meta: {
-        keepAlive: true,
-      },
     },
   ];
 
