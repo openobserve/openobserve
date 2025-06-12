@@ -1,39 +1,105 @@
 /**
- * This is the cache object which is used to store the panel level cache data
- * Ex:
- * {
- *    "folder1": {
- *        "dashboard1": {
- *            "panel1": {
- *              "key": {},    // Data against which the cache is stored
- *              "value": {}   // The cache to restore
- *            }
- *          }
- *      }
- * }
+ * This is the IndexedDB-based cache implementation for panel level cache data
+ * Database structure:
+ * - Database: 'PanelCache'
+ * - Object Store: 'panels'
+ * - Key format: 'folder_id:dashboard_id:panel_id'
+ * - Value: { key, value, cacheTimeRange, timestamp }
  */
-const cache: any = {};
+
+const DB_NAME = "PanelCache";
+const DB_VERSION = 1;
+const STORE_NAME = "panels";
 
 declare global {
   interface Window {
-    _o2_removeDashboardCache: () => void;
-    _o2_getDashboardCache: () => any;
+    _o2_removeDashboardCache: () => Promise<void>;
+    _o2_getDashboardCache: () => Promise<any>;
   }
 }
 
-window._o2_removeDashboardCache = () => {
-  // empty the cache object by removing all keys
-  // as we can not reassign const
-  Object.keys(cache).forEach((key) => {
-    delete cache[key];
+// Initialize IndexedDB
+const initDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
+        store.createIndex("folderId", "folderId", { unique: false });
+        store.createIndex("dashboardId", "dashboardId", { unique: false });
+        store.createIndex("timestamp", "timestamp", { unique: false });
+      }
+    };
   });
 };
 
-window._o2_getDashboardCache = () => {
-  // empty the cache object by removing all keys
-  // as we can not reassign const
-  return JSON.parse(JSON.stringify(cache));
+// Helper function to generate cache key
+const generateCacheKey = (
+  folderId: string,
+  dashboardId: string,
+  panelId: string,
+): string => {
+  return `${folderId}:${dashboardId}:${panelId}`;
 };
+
+// Helper function to perform IndexedDB transactions
+const performTransaction = async <T>(
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> => {
+  const db = await initDB();
+  const transaction = db.transaction([STORE_NAME], mode);
+  const store = transaction.objectStore(STORE_NAME);
+
+  return new Promise((resolve, reject) => {
+    const request = callback(store);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+// Global cache management functions
+window._o2_removeDashboardCache = async (): Promise<void> => {
+  try {
+    await performTransaction("readwrite", (store) => store.clear());
+  } catch (error) {
+    console.error("Error clearing dashboard cache:", error);
+  }
+};
+
+window._o2_getDashboardCache = async (): Promise<any> => {
+  try {
+    const allRecords = await performTransaction("readonly", (store) =>
+      store.getAll(),
+    );
+    const cache: any = {};
+
+    allRecords.forEach((record: any) => {
+      const [folderId, dashboardId, panelId] = record.id.split(":");
+
+      if (!cache[folderId]) cache[folderId] = {};
+      if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
+
+      cache[folderId][dashboardId][panelId] = {
+        key: record.key,
+        value: record.value,
+        cacheTimeRange: record.cacheTimeRange,
+        timestamp: record.timestamp,
+      };
+    });
+
+    return cache;
+  } catch (error) {
+    console.error("Error getting dashboard cache:", error);
+    return {};
+  }
+};
+
 /**
  * Use Panel Cache Data on a per dashboard basis in combination with folderid, dashboard id and panel id
  */
@@ -43,11 +109,15 @@ export const usePanelCache = (
   panelId: string,
 ) => {
   if (!(folderId && dashboardId && panelId)) {
-    const savePanelCache = (data: any) => {
+    const savePanelCache = async (
+      key: any,
+      data: any,
+      cacheTimeRange: any,
+    ): Promise<void> => {
       // do nothing
     };
 
-    const getPanelCache = () => {
+    const getPanelCache = async (): Promise<null> => {
       return null;
     };
 
@@ -57,39 +127,51 @@ export const usePanelCache = (
     };
   }
 
-  // create nested paths as required
-  const createNestedPathsIfRequired = () => {
-    // check if cache is there or not
-    if (cache?.[folderId]?.[dashboardId]?.[panelId]) {
-      return;
-    }
+  const cacheKey = generateCacheKey(folderId, dashboardId, panelId);
 
-    // create nested paths as required
-    if (!cache[folderId]) {
-      cache[folderId] = {};
-    }
+  const savePanelCache = async (
+    key: any,
+    data: any,
+    cacheTimeRange: any,
+  ): Promise<void> => {
+    try {
+      const cacheData = {
+        id: cacheKey,
+        folderId,
+        dashboardId,
+        panelId,
+        key: JSON.parse(JSON.stringify(key)), // deep copy key
+        value: JSON.parse(JSON.stringify(data)), // deep copy data
+        cacheTimeRange: JSON.parse(JSON.stringify(cacheTimeRange)),
+        timestamp: new Date().getTime(),
+      };
 
-    if (!cache[folderId][dashboardId]) {
-      cache[folderId][dashboardId] = {};
-    }
-
-    if (!cache[folderId][dashboardId][panelId]) {
-      cache[folderId][dashboardId][panelId] = {};
+      await performTransaction("readwrite", (store) => store.put(cacheData));
+    } catch (error) {
+      console.error("Error saving panel cache:", error);
     }
   };
 
-  const savePanelCache = (key: any, data: any, cacheTimeRange: any) => {
-    createNestedPathsIfRequired();
+  const getPanelCache = async (): Promise<any> => {
+    try {
+      const result = await performTransaction("readonly", (store) =>
+        store.get(cacheKey),
+      );
 
-    cache[folderId][dashboardId][panelId] = {
-      key: JSON.parse(JSON.stringify(key)), // deep copy key,
-      value: JSON.parse(JSON.stringify(data)), // deep copy data
-      cacheTimeRange: JSON.parse(JSON.stringify(cacheTimeRange)),
-    };
-  };
+      if (result) {
+        return {
+          key: result.key,
+          value: result.value,
+          cacheTimeRange: result.cacheTimeRange,
+          timestamp: result.timestamp,
+        };
+      }
 
-  const getPanelCache = () => {
-    return cache?.[folderId]?.[dashboardId]?.[panelId];
+      return null;
+    } catch (error) {
+      console.error("Error getting panel cache:", error);
+      return null;
+    }
   };
 
   return {

@@ -151,7 +151,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
+        <LoadingProgress
+          :loading="loading"
+          :loadingProgressPercentage="loadingProgressPercentage"
+        />
       </div>
       <div
         v-if="allowAnnotationsAdd && isCursorOverPanel"
@@ -288,7 +291,7 @@ import {
 } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -397,6 +400,7 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "is-partial-data-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -447,6 +451,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
       loadingProgressPercentage,
+      isPartialData,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -1102,11 +1107,15 @@ export default defineComponent({
       const queryType = panelSchema?.value?.queryType;
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
+        const variableNameWithBrackets = `\${${variable.name}}`;
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value = variable.value
-            .map((value: any) => `'${value}'`)
+            .map(
+              (value: any) =>
+                `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
+            )
             .join(",");
           const possibleVariablesPlaceHolderTypes = [
             {
@@ -1149,7 +1158,10 @@ export default defineComponent({
             );
           });
         } else {
-          variableValue = variable.value === null ? "" : variable.value;
+          variableValue =
+            variable.value === null
+              ? ""
+              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
@@ -1157,6 +1169,7 @@ export default defineComponent({
           //     value: variable.value,
           //   });
           // }
+          query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }
       });
@@ -1855,6 +1868,11 @@ export default defineComponent({
       }
     };
 
+    // Watch isPartialData changes and emit them
+    watch(isPartialData, (newValue) => {
+      emit("is-partial-data-update", newValue);
+    });
+
     return {
       store,
       chartPanelRef,
@@ -1889,6 +1907,7 @@ export default defineComponent({
       downloadDataAsCSV,
       downloadDataAsJSON,
       loadingProgressPercentage,
+      isPartialData,
     };
   },
 });

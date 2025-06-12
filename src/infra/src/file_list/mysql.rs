@@ -186,6 +186,7 @@ impl super::FileList for MysqlFileList {
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
+            // we don't care the id here, because the id is from file_list table not for this table
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
                 "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
@@ -219,7 +220,7 @@ impl super::FileList for MysqlFileList {
         Ok(())
     }
 
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -229,8 +230,12 @@ impl super::FileList for MysqlFileList {
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
+                if file.id > 0 {
+                    ids.push(file.id.to_string());
+                    continue;
+                }
                 let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+                    parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
                 DB_QUERY_NUMS
                     .with_label_values(&["select", "file_list_deleted", ""])
                     .inc();
@@ -680,27 +685,173 @@ SELECT date
         if time_max == 0 {
             return Ok(Vec::new());
         }
-        let pool = CLIENT_RO.clone();
+
+        let lock_pool = CLIENT.clone();
+        let lock_key = "file_list_deleted:query_deleted";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_sql = format!(
+            "SELECT GET_LOCK('{}', {})",
+            lock_id,
+            config::get_config().limit.meta_transaction_lock_timeout
+        );
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let mut lock_tx = lock_pool.begin().await?;
+        DB_QUERY_NUMS.with_label_values(&["get_lock", "", ""]).inc();
+        match sqlx::query_scalar::<_, i64>(&lock_sql)
+            .fetch_one(&mut *lock_tx)
+            .await
+        {
+            Ok(v) => {
+                if v != 1 {
+                    if let Err(e) = lock_tx.rollback().await {
+                        log::error!("[MYSQL] rollback lock for query_deleted error: {}", e);
+                    }
+                    return Err(Error::from(DbError::DBOperError(
+                        "LockTimeout".to_string(),
+                        lock_key.to_string(),
+                    )));
+                }
+            }
+            Err(e) => {
+                if let Err(e) = lock_tx.rollback().await {
+                    log::error!("[MYSQL] rollback lock for query_deleted error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
+        let pool = CLIENT.clone();
+        let mut tx = match pool.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
-        let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
+        let items: Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? ORDER BY created_at ASC LIMIT ?;"#,
         )
         .bind(org_id)
         .bind(time_max)
         .bind(limit)
-        .fetch_all(&pool)
-        .await?;
-        Ok(ret
+        .fetch_all(&mut *tx)
+        .await{
+            Ok(v) => v
             .iter()
             .map(|r| FileListDeleted {
+                id: r.id,
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
                 flattened: r.flattened,
             })
-            .collect())
+            .collect(),
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!(
+                        "[MYSQL] rollback select query_deleted for update error: {e}"
+                    );
+                }
+                DB_QUERY_NUMS
+                    .with_label_values(&["release_lock", "", ""])
+                    .inc();
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
+        // update file created_at to NOW to avoid these files being deleted again
+        let ids = items.iter().map(|r| r.id.to_string()).collect::<Vec<_>>();
+        if ids.is_empty() {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback select query_deleted error: {e}");
+            }
+            DB_QUERY_NUMS
+                .with_label_values(&["release_lock", "", ""])
+                .inc();
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[MYSQL] unlock query_deleted error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+            }
+            return Ok(Vec::new());
+        }
+        let sql = format!(
+            "UPDATE file_list_deleted SET created_at = ? WHERE id IN ({});",
+            ids.join(",")
+        );
+        let now = config::utils::time::now_micros();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "file_list_deleted", ""])
+            .inc();
+        let ret = match sqlx::query(&sql).bind(now).execute(&mut *tx).await {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback update query_deleted status error: {e}");
+                }
+                DB_QUERY_NUMS
+                    .with_label_values(&["release_lock", "", ""])
+                    .inc();
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+        if ret.rows_affected() != ids.len() as u64 {
+            log::warn!(
+                "[MYSQL] update query_deleted error: query_deleted rows affected: {}, expected: {}, try again later",
+                ret.rows_affected(),
+                ids.len()
+            );
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback update query_deleted status error: {e}");
+            }
+            DB_QUERY_NUMS
+                .with_label_values(&["release_lock", "", ""])
+                .inc();
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[MYSQL] unlock query_deleted error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+            }
+            return Ok(Vec::new());
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit select query_deleted error: {e}");
+            return Err(e.into());
+        }
+        DB_QUERY_NUMS
+            .with_label_values(&["release_lock", "", ""])
+            .inc();
+        if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+            log::error!("[MYSQL] unlock query_deleted error: {}", e);
+        }
+        if let Err(e) = lock_tx.commit().await {
+            log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+        }
+        Ok(items)
     }
 
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
@@ -709,13 +860,14 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
         Ok(ret
             .iter()
             .map(|r| FileListDeleted {
+                id: r.id,
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,

@@ -579,7 +579,6 @@ test.describe("dashboard variables setting", () => {
     await page
       .locator('[data-test="dashboard-variable-label"]')
       .fill("custom-variable");
-    await page.getByRole("button", { name: "Add Option" }).click();
     await page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
       .click();
@@ -642,7 +641,6 @@ test.describe("dashboard variables setting", () => {
     await page
       .locator('[data-test="dashboard-variable-label"]')
       .fill("custom-variable");
-    await page.getByRole("button", { name: "Add Option" }).click();
     await page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
       .click();
@@ -712,7 +710,6 @@ test.describe("dashboard variables setting", () => {
     await page
       .locator('[data-test="dashboard-variable-label"]')
       .fill("custom-variable");
-    await page.getByRole("button", { name: "Add Option" }).click();
     await page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
       .click();

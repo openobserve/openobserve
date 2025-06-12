@@ -49,7 +49,7 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
     let udp_addr: SocketAddr = format!("{bind_addr}:{}", cfg.tcp.udp_port).parse()?;
     let tcp_tls_enabled = cfg.tcp.tcp_tls_enabled;
     if (!server_running || is_init) && start_srv {
-        log::info!("Starting TCP UDP server");
+        log::info!("Starting TCP UDP server on {tcp_addr}");
         let tcp_listener: TcpListener = TcpListener::bind(tcp_addr).await?;
         let udp_socket = UdpSocket::bind(udp_addr).await?;
         let tls_server_config = if tcp_tls_enabled {
