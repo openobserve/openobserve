@@ -1058,12 +1058,29 @@ export default defineComponent({
         });
     };
 
+    // Cleanup references
+    const cleanupRefs = () => {
+      // Clear all component refs to prevent memory leaks
+      if (dateTimePicker.value) {
+        dateTimePicker.value = null;
+      }
+      if (renderDashboardChartsRef.value) {
+        renderDashboardChartsRef.value = null;
+      }
+      if (fullscreenDiv.value) {
+        fullscreenDiv.value = null;
+      }
+    };
+
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
     });
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+
+      // Clear all refs
+      cleanupRefs();
     });
 
     onMounted(() => {

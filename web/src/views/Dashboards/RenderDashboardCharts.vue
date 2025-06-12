@@ -179,6 +179,7 @@ import {
   defineAsyncComponent,
   defineComponent,
   onActivated,
+  onUnmounted,
   provide,
   ref,
   watch,
@@ -590,6 +591,46 @@ export default defineComponent({
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
     };
+
+
+    // Cleanup function
+    const cleanup = () => {
+
+      // Clear refs
+      if (gridLayoutRef.value) {
+        gridLayoutRef.value = null;
+      }
+      
+      if (variablesValueSelectorRef.value) {
+        variablesValueSelectorRef.value = null;
+      }
+
+      // Clear reactive objects
+      // Object.keys(variablesAndPanelsDataLoadingState).forEach(key => {
+      //   if (typeof variablesAndPanelsDataLoadingState[key] === 'object') {
+      //     Object.keys(variablesAndPanelsDataLoadingState[key]).forEach(subKey => {
+      //       delete variablesAndPanelsDataLoadingState[key][subKey];
+      //     });
+      //   }
+      // });
+
+      // // Clear variables data
+      // if (variablesData.value && typeof variablesData.value === 'object') {
+      //   Object.keys(variablesData.value).forEach(key => {
+      //     delete variablesData.value[key];
+      //   });
+      // }
+
+      // if (currentVariablesDataRef.value && typeof currentVariablesDataRef.value === 'object') {
+      //   Object.keys(currentVariablesDataRef.value).forEach(key => {
+      //     delete currentVariablesDataRef.value[key];
+      //   });
+      // }
+    };
+
+    onUnmounted(() => {
+      cleanup();
+    });
 
     return {
       store,
