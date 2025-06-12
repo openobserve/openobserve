@@ -292,10 +292,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id) {
                             if stream_exec_pl.remove(&removed).is_some() {
                                 log::info!(
-                                    "[Pipeline]: pipeline {} disabled and removed from cache.",
+                                    "[Pipeline::watch]: pipeline {} disabled and removed from cache.",
+                                    pipeline_id
+                                );
+                            } else {
+                                log::warn!(
+                                    "[Pipeline::watch]: pipeline {} not found in stream_executable_pipelines cache",
                                     pipeline_id
                                 );
                             }
+                        } else {
+                            log::warn!(
+                                "[Pipeline::watch]: pipeline {} not found in pipeline_stream_mapping_cache",
+                                pipeline_id
+                            );
                         }
                     }
                 }
@@ -313,7 +323,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             "[Pipeline]: pipeline {} deleted and removed from cache.",
                             pipeline_id
                         );
-                    };
+                    } else {
+                        log::warn!(
+                            "[Pipeline::watch]: pipeline {} not found in stream_executable_pipelines cache",
+                            pipeline_id
+                        );
+                    }
+                } else {
+                    log::warn!(
+                        "[Pipeline::watch]: pipeline {} not found in pipeline_stream_mapping_cache",
+                        pipeline_id
+                    );
                 }
             }
             db::Event::Empty => {}

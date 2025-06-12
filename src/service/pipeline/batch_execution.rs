@@ -28,6 +28,7 @@ use config::{
     utils::{
         flatten,
         json::{self, Value, get_string_value},
+        schema::format_stream_name,
     },
 };
 use futures::future::try_join_all;
@@ -202,6 +203,9 @@ impl ExecutablePipeline {
             pipeline_name,
             batch_size
         );
+        if batch_size == 0 {
+            return Ok(HashMap::default());
+        }
 
         // result_channel
         let (result_sender, mut result_receiver) =
@@ -547,7 +551,7 @@ async fn process_node(
                                     if cfg.common.skip_formatting_stream_name {
                                         stream_name.into()
                                     } else {
-                                        stream_name.to_lowercase().into()
+                                        format_stream_name(&stream_name).into()
                                     }
                             }
                             resolve_res => {
