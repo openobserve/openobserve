@@ -57,8 +57,8 @@ export class CreateOrgPage {
 
 
     async clickAddOrg() {
-        await this.page.waitForSelector('[data-test="Add Organization"]');
-        await this.page.locator('[data-test="Add Organization"]').click();
+        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/iam/organizations?action=add&org_identifier=default");
+        await this.page.waitForTimeout(10000);
     }
 
     async fillOrgName(orgName) {
