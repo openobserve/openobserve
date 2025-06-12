@@ -20,9 +20,7 @@ use prometheus::{
     CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
     TextEncoder,
 };
-
-pub const NAMESPACE: &str = "zo";
-const HELP_SUFFIX: &str =
+pub const NAMESPACE: &str = "zo"; const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
 pub const SPAN_METRICS_BUCKET: [f64; 15] = [
     0.1, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
@@ -906,6 +904,33 @@ pub static PIPELINE_WAL_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static PIPELINE_WAL_INGESTION_MB: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_wal_ingestion_mb",
+            "Bytes ingested across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_EXPORTED_MB: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_http_exported_mb",
+            "Bytes exported across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1145,6 +1170,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(PIPELINE_WAL_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_INGESTION_MB.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_EXPORTED_MB.clone()))
         .expect("Metric registered");
 }
 
