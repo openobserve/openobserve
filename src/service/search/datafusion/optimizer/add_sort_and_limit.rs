@@ -23,6 +23,7 @@ use datafusion::{
 };
 
 use super::utils::AddSortAndLimit;
+use crate::service::search::datafusion::optimizer::utils::is_empty_relation;
 
 #[derive(Debug)]
 pub struct AddSortAndLimitRule {
@@ -54,7 +55,7 @@ impl OptimizerRule for AddSortAndLimitRule {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        if self.limit == 0 {
+        if self.limit == 0 || is_empty_relation(&plan) {
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
         }
         let mut plan = plan.rewrite(&mut AddSortAndLimit::new(self.limit, self.offset))?;
