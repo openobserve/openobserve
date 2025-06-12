@@ -228,6 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </div>
+  </div>
+
+    <router-view v-else />
     
     <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
       <stream-selection @save="savePipeline" />
@@ -240,7 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="resetConfirmDialog"
       v-model="confirmDialogMeta.show"
     />
-  </div>
 </template>
 <script setup lang="ts">
 import { ref, onBeforeMount, computed, watch, reactive, onActivated, onMounted } from "vue";
