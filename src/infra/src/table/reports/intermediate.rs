@@ -18,11 +18,14 @@
 
 use std::num::TryFromIntError;
 
-use config::meta::dashboards::reports::{
-    ReportDashboardVariable as MetaReportDashboardVariable,
-    ReportDestination as MetaReportDestination, ReportFrequency as MetaReportFrequency,
-    ReportFrequencyType as MetaReportFrequencyType, ReportTimerange as MetaReportTimeRange,
-    ReportTimerangeType as MetaReportTimeRangeType,
+use config::meta::{
+    alerts::default_align_time,
+    dashboards::reports::{
+        ReportDashboardVariable as MetaReportDashboardVariable,
+        ReportDestination as MetaReportDestination, ReportFrequency as MetaReportFrequency,
+        ReportFrequencyType as MetaReportFrequencyType, ReportTimerange as MetaReportTimeRange,
+        ReportTimerangeType as MetaReportTimeRangeType,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -63,65 +66,98 @@ impl From<MetaReportDestination> for ReportDestination {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ReportFrequencyType {
+    Once,
+    Hours,
+    Days,
+    #[default]
+    Weeks,
+    Months,
+    Cron,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ReportFrequency {
-    Once,
-    HourlyInterval(u32),
-    DailyInterval(u32),
-    WeeklyInterval(u32),
-    MonthlyInterval(u32),
-    Cron(String),
+pub struct ReportFrequency {
+    /// Frequency interval in the `frequency_type` unit
+    #[serde(default)]
+    pub interval: u32,
+    /// Cron expression
+    #[serde(default)]
+    pub cron: String,
+    #[serde(default)]
+    pub frequency_type: ReportFrequencyType,
+    #[serde(default = "default_align_time")]
+    pub align_time: bool,
 }
 
 impl TryFrom<MetaReportFrequency> for ReportFrequency {
     type Error = TryFromIntError;
 
     fn try_from(value: MetaReportFrequency) -> Result<Self, Self::Error> {
-        let freq = match value.frequency_type {
-            MetaReportFrequencyType::Once => Self::Once,
-            MetaReportFrequencyType::Hours => Self::HourlyInterval(value.interval.try_into()?),
-            MetaReportFrequencyType::Days => Self::DailyInterval(value.interval.try_into()?),
-            MetaReportFrequencyType::Weeks => Self::WeeklyInterval(value.interval.try_into()?),
-            MetaReportFrequencyType::Months => Self::MonthlyInterval(value.interval.try_into()?),
-            MetaReportFrequencyType::Cron => Self::Cron(value.cron),
+        let freq = Self {
+            interval: value.interval.try_into()?,
+            cron: value.cron,
+            frequency_type: value.frequency_type.into(),
+            align_time: value.align_time,
         };
         Ok(freq)
     }
 }
 
+impl From<MetaReportFrequencyType> for ReportFrequencyType {
+    fn from(value: MetaReportFrequencyType) -> Self {
+        match value {
+            MetaReportFrequencyType::Once => Self::Once,
+            MetaReportFrequencyType::Hours => Self::Hours,
+            MetaReportFrequencyType::Days => Self::Days,
+            MetaReportFrequencyType::Weeks => Self::Weeks,
+            MetaReportFrequencyType::Months => Self::Months,
+            MetaReportFrequencyType::Cron => Self::Cron,
+        }
+    }
+}
+
 impl From<ReportFrequency> for MetaReportFrequency {
     fn from(value: ReportFrequency) -> Self {
-        match value {
-            ReportFrequency::Once => Self {
+        match value.frequency_type {
+            ReportFrequencyType::Once => Self {
                 frequency_type: MetaReportFrequencyType::Once,
                 interval: 0,
                 cron: "".to_string(),
+                align_time: value.align_time,
             },
-            ReportFrequency::HourlyInterval(interval) => Self {
+            ReportFrequencyType::Hours => Self {
                 frequency_type: MetaReportFrequencyType::Hours,
-                interval: interval.into(),
+                interval: value.interval.into(),
                 cron: "".to_string(),
+                align_time: value.align_time,
             },
-            ReportFrequency::DailyInterval(interval) => Self {
+            ReportFrequencyType::Days => Self {
                 frequency_type: MetaReportFrequencyType::Days,
-                interval: interval.into(),
+                interval: value.interval.into(),
                 cron: "".to_string(),
+                align_time: value.align_time,
             },
-            ReportFrequency::WeeklyInterval(interval) => Self {
+            ReportFrequencyType::Weeks => Self {
                 frequency_type: MetaReportFrequencyType::Weeks,
-                interval: interval.into(),
+                interval: value.interval.into(),
                 cron: "".to_string(),
+                align_time: value.align_time,
             },
-            ReportFrequency::MonthlyInterval(interval) => Self {
+            ReportFrequencyType::Months => Self {
                 frequency_type: MetaReportFrequencyType::Months,
-                interval: interval.into(),
+                interval: value.interval.into(),
                 cron: "".to_string(),
+                align_time: value.align_time,
             },
-            ReportFrequency::Cron(expr) => Self {
+            ReportFrequencyType::Cron => Self {
                 frequency_type: MetaReportFrequencyType::Cron,
                 interval: 0,
-                cron: expr,
+                cron: value.cron,
+                align_time: value.align_time,
             },
         }
     }

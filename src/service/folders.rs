@@ -118,6 +118,7 @@ pub async fn save_folder(
     let folder_type_ofga = match folder_type {
         FolderType::Dashboards => "folders",
         FolderType::Alerts => "alert_folders",
+        FolderType::Reports => "report_folders",
     };
     set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
@@ -273,6 +274,7 @@ pub async fn delete_folder(
     let folder_type_ofga = match folder_type {
         FolderType::Dashboards => "folders",
         FolderType::Alerts => "alert_folders",
+        FolderType::Reports => "report_folders",
     };
     remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
