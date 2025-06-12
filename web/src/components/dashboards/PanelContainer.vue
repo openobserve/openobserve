@@ -382,6 +382,7 @@ import {
   defineAsyncComponent,
   watch,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
@@ -807,6 +808,19 @@ export default defineComponent({
     const handleIsPartialDataUpdate = (isPartial: boolean) => {
       isPartialData.value = isPartial;
     };
+
+    // Add cleanup on component unmount
+    onBeforeUnmount(() => {
+      // Clear any pending timeouts or intervals
+      // Reset refs to help with garbage collection
+      metaData.value = null;
+      errorData.value = "";
+      
+      // Clear the PanelSchemaRenderer reference
+      if (PanleSchemaRendererRef.value) {
+        PanleSchemaRendererRef.value = null;
+      }
+    });
 
     return {
       props,
