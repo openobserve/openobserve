@@ -13,7 +13,7 @@ export class AlertDestinationsPage {
         this.destinationNameInput = '[data-test="add-destination-name-input"]';
         this.templateSelect = '[data-test="add-destination-template-select"]';
         this.urlInput = '[data-test="add-destination-url-input"]';
-        this.methodSelect = '[data-test="add-destination-method-select"]';
+        // this.methodSelect = '[data-test="add-destination-method-select"]';
         this.submitButton = '[data-test="add-destination-submit-btn"]';
         this.successMessage = 'Destination saved';
     }
