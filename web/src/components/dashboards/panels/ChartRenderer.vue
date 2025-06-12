@@ -233,6 +233,7 @@ export default defineComponent({
     const windowResizeEventCallback = async () => {
       try {
         await nextTick();
+        await nextTick();
         chart?.resize();
       } catch (e) {
         console.error("Error during resizing", e);
@@ -256,6 +257,7 @@ export default defineComponent({
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
+      // seriesName and seriesIndex will used in the same function
       if (params?.componentSubType === "pie") {
         params.seriesName = params?.data?.name;
         params.seriesIndex = params?.dataIndex;
@@ -269,6 +271,21 @@ export default defineComponent({
 
       // Use the throttled function to update the state
       throttledSetHoveredSeriesName(params?.seriesName ?? "");
+
+      // Below logic is to scroll legend upto current series index
+      // which creates wrong legend highlight issue in tooltip
+      // so commented out
+      // scroll legend upto current series index
+      // const legendOption = chart?.getOption()?.legend[0];
+      // if (legendOption) {
+      // legendOption.scrollDataIndex = params?.seriesIndex || 0;
+      // chart?.setOption({ legend: [legendOption] });
+      // chart?.dispatchAction({
+      //   type: "legendScroll",
+      //   scrollDataIndex: params?.seriesIndex || 0,
+      //   legendId: params?.seriesId,
+      // });
+      // }
     };
 
     const mouseOutEffectFn = () => {
