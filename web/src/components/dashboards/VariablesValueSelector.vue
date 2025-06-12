@@ -788,6 +788,14 @@ export default defineComponent({
       // isInitialLoad.value = false;
     });
 
+    onUnmounted(() => {
+      // Clean up any in-flight promises to prevent memory leaks
+      rejectAllPromises();
+      Object.keys(currentlyExecutingPromises).forEach(key => {
+        currentlyExecutingPromises[key] = null;
+      });
+    });
+
     watch(
       () => props.variablesConfig,
       async () => {
