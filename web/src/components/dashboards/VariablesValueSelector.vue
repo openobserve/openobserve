@@ -272,10 +272,8 @@ export default defineComponent({
 
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
-      console.log(`Attempting to cancel trace IDs for field: ${field}`);
       if (isStreamingEnabled(store.state) && traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
-          console.log(`Canceling trace ID: ${traceId}`);
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
@@ -284,12 +282,10 @@ export default defineComponent({
 
         // Clear the trace IDs after cancellation
         traceIdMapper.value[field] = [];
-        console.log(`Cleared trace IDs for field: ${field}`);
       }
 
       if (isWebSocketEnabled(store.state) && traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
-          console.log(`Canceling trace ID: ${traceId}`);
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
@@ -298,18 +294,11 @@ export default defineComponent({
 
         // Clear the trace IDs after cancellation
         traceIdMapper.value[field] = [];
-        console.log(`Cleared trace IDs for field: ${field}`);
-      } else {
-        console.log(`No trace IDs found for field: ${field}`);
       }
     };
 
     // onUnmounted want to cancel the values api call for all http2, websocket and streaming
     onUnmounted(() => {
-      console.log(
-        "Unmounting VariablesValueSelector, canceling all active trace IDs...",
-      );
-
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);

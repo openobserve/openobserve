@@ -933,7 +933,6 @@ export const usePanelDataLoader = (
     // Log variables for which the API will be skipped
     variablesToSkip.forEach((variableName) => {
       state.loading = false;
-      console.log(`Skipping API for variable: ${variableName}`);
     });
 
     // Return true if there are any variables to skip, indicating loading should be continued
@@ -1944,7 +1943,10 @@ export const usePanelDataLoader = (
     newDependentVariablesData: any,
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => (it.value == null || (Array.isArray(it.value) && it.value.length === 0)) && (it.isLoading || it.isVariableLoadingPending),
+      (it: any) =>
+        (it.value == null ||
+          (Array.isArray(it.value) && it.value.length === 0)) &&
+        (it.isLoading || it.isVariableLoadingPending),
     );
 
   const getDependentVariablesData = () =>
