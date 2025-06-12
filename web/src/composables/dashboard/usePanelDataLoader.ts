@@ -1575,30 +1575,37 @@ export const usePanelDataLoader = (
 
     // replace fixed variables with its values
     fixedVariables?.forEach((variable: any) => {
+      // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
       const variableName = `$${variable.name}`;
+      const variableNameWithBrackets = `\${${variable.name}}`;
       const variableValue = variable.value;
-      if (query.includes(variableName)) {
+      if (
+        query.includes(variableName) ||
+        query.includes(variableNameWithBrackets)
+      ) {
         metadata.push({
           type: "fixed",
           name: variable.name,
           value: variable.value,
         });
       }
+      query = query.replaceAll(variableNameWithBrackets, variableValue);
       query = query.replaceAll(variableName, variableValue);
     });
 
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
+        // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
         const variableName = `$${variable.name}`;
+        const variableNameWithBrackets = `\${${variable.name}}`;
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value =
             variable.value
-              .map((value: any) =>
-                variable.escapeSingleQuotes
-                  ? `'${escapeSingleQuotes(value)}'`
-                  : `'${value}'`,
+              .map(
+                (value: any) =>
+                  `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
               )
               .join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
@@ -1647,16 +1654,18 @@ export const usePanelDataLoader = (
           variableValue =
             variable.value === null
               ? ""
-              : variable.escapeSingleQuotes
-                ? `${escapeSingleQuotes(variable.value)}`
-                : `${variable.value}`;
-          if (query.includes(variableName)) {
+              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+          if (
+            query.includes(variableName) ||
+            query.includes(variableNameWithBrackets)
+          ) {
             metadata.push({
               type: "variable",
               name: variable.name,
               value: variable.value,
             });
           }
+          query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }
       });
