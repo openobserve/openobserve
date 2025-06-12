@@ -1407,6 +1407,13 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
+    watch(
+      () => searchObj.data.transforms,
+      (newVal) => {
+        functionOptions.value = newVal;
+      }
+    );
+
     const { closeSocketWithError } = useSearchWebSocket();
 
     const transformsExpandState = ref({
