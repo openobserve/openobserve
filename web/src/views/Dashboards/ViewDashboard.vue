@@ -369,7 +369,10 @@ import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
-import DashboardJsonEditor from "./DashboardJsonEditor.vue";
+
+const DashboardJsonEditor = defineAsyncComponent(() => {
+  return import("./DashboardJsonEditor.vue");
+});
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
