@@ -93,7 +93,7 @@ test.describe.serial("Alerts Module testcases", () => {
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
 
     // Create destination with test URL
-    const testUrl = 'https://hooks.slack.com/services/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';
+    const testUrl = 'DEMO';
     await destinationsPage.createDestination(createdDestinationName, testUrl, createdTemplateName);
     console.log('Successfully created destination:', createdDestinationName);
   });
