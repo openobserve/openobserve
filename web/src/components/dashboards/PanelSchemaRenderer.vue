@@ -288,7 +288,7 @@ import {
 } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
