@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, watch, nextTick, onMounted } from "vue";
+import { ref, computed, defineEmits, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   FlexRender,
@@ -568,10 +568,12 @@ watch(
   },
 );
 
+const intervalId = ref(null);
+
 const updateTableWidth = async () => {
   tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
 
-  setTimeout(() => {
+  intervalId.value = setTimeout(() => {
     let max = 0;
     let width = max;
     for (let i = 0; i < tableRows.value.length; i++) {

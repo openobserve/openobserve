@@ -1596,6 +1596,7 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
+      intervalId,
     };
   },
   computed: {
@@ -1648,7 +1649,7 @@ export default defineComponent({
         this.searchObj.meta.showHistogram == true &&
         this.searchObj.meta.sqlMode == false
       ) {
-        setTimeout(() => {
+        this.intervalId = setTimeout(() => {
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
@@ -1740,7 +1741,7 @@ export default defineComponent({
               this.searchObj.loadingHistogram = false;
             });
 
-          setTimeout(() => {
+          this.intervalId = setTimeout(() => {
             if (this.searchResultRef) this.searchResultRef.reDrawChart();
           }, 100);
         }
@@ -1774,7 +1775,7 @@ export default defineComponent({
     // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
-      setTimeout(() => {
+      this.intervalId = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },
