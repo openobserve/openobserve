@@ -349,6 +349,11 @@ pub async fn set(
     index.entries.push(Arc::new(cache_item));
     drop(w);
 
+    // update the metrics
+    config::metrics::QUERY_METRICS_CACHE_ITEMS
+        .with_label_values(&[org])
+        .inc();
+
     Ok(())
 }
 
@@ -358,7 +363,7 @@ pub async fn load(cache_key: &str) -> Result<()> {
     if !cfg.common.metrics_cache_enabled {
         return Ok(());
     }
-    let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
+    let Some((org, key, start, end)) = parse_cache_item_key(cache_key) else {
         return Ok(());
     };
     let bucket_id = get_bucket_id(&key);
@@ -369,6 +374,11 @@ pub async fn load(cache_key: &str) -> Result<()> {
     index.entries.push(Arc::new(cache_item));
     drop(w);
 
+    // update the metrics
+    config::metrics::QUERY_METRICS_CACHE_ITEMS
+        .with_label_values(&[&org])
+        .inc();
+
     Ok(())
 }
 
@@ -378,6 +388,12 @@ async fn gc(bucket_id: usize) -> Result<()> {
     for _ in 0..(w.max_entries / METRICS_INDEX_CACHE_GC_PERCENT) {
         if let Some(key) = w.cacher.pop_front() {
             w.data.remove(&key);
+            // update the metrics
+            if let Some((org, ..)) = parse_cache_item_key(&key) {
+                config::metrics::QUERY_METRICS_CACHE_ITEMS
+                    .with_label_values(&[&org])
+                    .dec();
+            }
         } else {
             break;
         }
@@ -406,11 +422,15 @@ fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {
 /// parse the cache item key
 ///
 /// the key format is: metrics_results/{date}/{prefix}_{start}_{end}_{suffix}.json
-fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
+/// return (org, prefix, start, end)
+fn parse_cache_item_key(key: &str) -> Option<(String, String, i64, i64)> {
     if !key.starts_with("metrics_results/") || !key.ends_with(".pb") {
         return None;
     }
-    let item_key = key.split('/').next_back().unwrap_or("");
+    let parts = key.split('/').collect::<Vec<_>>();
+    // first part is metrics_results, second part is org_id
+    let org_id = parts.get(1).unwrap_or(&"");
+    let item_key = parts.last().unwrap_or(&"");
     let parts = item_key.split('_').collect::<Vec<_>>();
     if parts.len() != 4 {
         return None;
@@ -423,7 +443,7 @@ fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
     let Ok(end) = parts[2].parse::<i64>() else {
         return None;
     };
-    Some((prefix.to_string(), start, end))
+    Some((org_id.to_string(), prefix.to_string(), start, end))
 }
 
 fn get_bucket_id(key: &str) -> usize {
@@ -601,10 +621,11 @@ mod tests {
     #[test]
     fn test_parse_cache_item_key() {
         // Test valid key
-        let key = "metrics_results/2024/01/01/00/prefix_1234_5678_suffix.pb";
+        let key = "metrics_results/default/2025/01/01/00/prefix_1234_5678_suffix.pb";
         let result = parse_cache_item_key(key);
         assert!(result.is_some());
-        let (prefix, start, end) = result.unwrap();
+        let (org_id, prefix, start, end) = result.unwrap();
+        assert_eq!(org_id, "default");
         assert_eq!(prefix, "prefix");
         assert_eq!(start, 1234);
         assert_eq!(end, 5678);

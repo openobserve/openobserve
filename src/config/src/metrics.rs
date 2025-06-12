@@ -343,6 +343,19 @@ pub static QUERY_DISK_METRICS_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(||
     .expect("Metric created")
 });
 
+pub static QUERY_METRICS_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_metrics_cache_items",
+            "Querier metrics result cached items.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 // query cache ratio for parquet files
 pub static QUERY_PARQUET_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
@@ -983,6 +996,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_DISK_METRICS_CACHE_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_METRICS_CACHE_ITEMS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_PARQUET_CACHE_RATIO.clone()))
