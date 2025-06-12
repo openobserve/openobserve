@@ -250,9 +250,6 @@ const useRoutes = () => {
           path: "pipelines",
           name: "pipelines",
           component: PipelinesList,
-          meta: {
-            keepAlive: true,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
