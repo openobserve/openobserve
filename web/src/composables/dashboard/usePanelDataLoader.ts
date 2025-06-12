@@ -175,8 +175,8 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
-  const saveCurrentStateToCache = () => {
-    savePanelCache(
+  const saveCurrentStateToCache = async () => {
+    await savePanelCache(
       getCacheKey(),
       { ...toRaw(state) },
       {
@@ -580,6 +580,7 @@ export const usePanelDataLoader = (
               endISOTimestamp;
 
             // need to break the loop, save the cache
+            // this is async task, which will be executed in background(await is not required)
             saveCurrentStateToCache();
 
             break;
@@ -621,6 +622,7 @@ export const usePanelDataLoader = (
                   partition[0];
 
                 // need to break the loop, save the cache
+                // this is async task, which will be executed in background(await is not required)
                 saveCurrentStateToCache();
 
                 break;
@@ -633,6 +635,7 @@ export const usePanelDataLoader = (
 
         if (i == 0) {
           // if it is last partition, cache the result
+          // this is async task, which will be executed in background(await is not required)
           saveCurrentStateToCache();
         }
       }
@@ -850,6 +853,7 @@ export const usePanelDataLoader = (
     state.isOperationCancelled = false;
 
     // save current state to cache
+    // this is async task, which will be executed in background(await is not required)
     saveCurrentStateToCache();
   };
 
@@ -1087,7 +1091,7 @@ export const usePanelDataLoader = (
       if (runCount == 0) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
-        const isRestoredFromCache = restoreFromCache();
+        const isRestoredFromCache = await restoreFromCache();
         log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
           state.loading = false;
@@ -1180,6 +1184,7 @@ export const usePanelDataLoader = (
         };
         state.annotations = annotationList || [];
 
+        // this is async task, which will be executed in background(await is not required)
         saveCurrentStateToCache();
       } else {
         // copy of current abortController
@@ -1392,6 +1397,7 @@ export const usePanelDataLoader = (
                   state.annotations = annotationList;
 
                   // need to break the loop, save the cache
+                  // this is async task, which will be executed in background(await is not required)
                   saveCurrentStateToCache();
                 } finally {
                   removeTraceId(traceId);
@@ -1474,6 +1480,7 @@ export const usePanelDataLoader = (
                 );
               }
 
+              // this is async task, which will be executed in background(await is not required)
               saveCurrentStateToCache();
             }
           }
@@ -1574,30 +1581,37 @@ export const usePanelDataLoader = (
 
     // replace fixed variables with its values
     fixedVariables?.forEach((variable: any) => {
+      // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
       const variableName = `$${variable.name}`;
+      const variableNameWithBrackets = `\${${variable.name}}`;
       const variableValue = variable.value;
-      if (query.includes(variableName)) {
+      if (
+        query.includes(variableName) ||
+        query.includes(variableNameWithBrackets)
+      ) {
         metadata.push({
           type: "fixed",
           name: variable.name,
           value: variable.value,
         });
       }
+      query = query.replaceAll(variableNameWithBrackets, variableValue);
       query = query.replaceAll(variableName, variableValue);
     });
 
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
+        // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
         const variableName = `$${variable.name}`;
+        const variableNameWithBrackets = `\${${variable.name}}`;
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value =
             variable.value
-              .map((value: any) =>
-                variable.escapeSingleQuotes
-                  ? `'${escapeSingleQuotes(value)}'`
-                  : `'${value}'`,
+              .map(
+                (value: any) =>
+                  `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
               )
               .join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
@@ -1646,16 +1660,18 @@ export const usePanelDataLoader = (
           variableValue =
             variable.value === null
               ? ""
-              : variable.escapeSingleQuotes
-                ? `${escapeSingleQuotes(variable.value)}`
-                : `${variable.value}`;
-          if (query.includes(variableName)) {
+              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+          if (
+            query.includes(variableName) ||
+            query.includes(variableNameWithBrackets)
+          ) {
             metadata.push({
               type: "variable",
               name: variable.name,
               value: variable.value,
             });
           }
+          query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }
       });
@@ -2207,8 +2223,8 @@ export const usePanelDataLoader = (
     loadData(); // Loading the data
   });
 
-  const restoreFromCache: () => boolean = () => {
-    const cache = getPanelCache();
+  const restoreFromCache: () => Promise<boolean> = async () => {
+    const cache = await getPanelCache();
 
     if (!cache) {
       log("usePanelDataLoader: panelcache: cache is not there");
