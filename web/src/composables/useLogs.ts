@@ -1894,7 +1894,7 @@ const useLogs = () => {
                 if (partitions.length > 1) {
                   setTimeout(async () => {
                     await generateHistogramData();
-                    refreshPartitionPagination(true);
+                    if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
                   }, 100);
                 }
               }
@@ -1902,7 +1902,7 @@ const useLogs = () => {
             }
           }
           await generateHistogramData();
-          refreshPartitionPagination(true);
+          if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
@@ -2511,14 +2511,43 @@ const useLogs = () => {
           }
           // if total records in partition is greater than recordsPerPage then we need to update pagination
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-          if (searchObj.meta.jobId == "") {
+          if (searchObj.meta.jobId == "" && !queryReq.query?.streaming_output) {
             refreshPartitionPagination(regeratePaginationFlag);
           }
           // Scan-size and took time in histogram title
           // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
           // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+          if(queryReq.query?.streaming_output) {
+            searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
+            searchObj.data.queryResults.from = res.data.from;
+            searchObj.data.queryResults.scan_size += res.data.scan_size;
+            searchObj.data.queryResults.took += res.data.took;
+            searchObj.data.queryResults.hits = res.data.hits;
 
-          if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
+            if (
+              searchObj.data.queryResults.partitionDetail.partitions[
+                searchObj.data.queryResults.subpage
+              ]?.length
+            ) {
+              queryReq.query.start_time =
+                searchObj.data.queryResults.partitionDetail.partitions[
+                  searchObj.data.queryResults.subpage
+                ][0];
+              queryReq.query.end_time =
+                searchObj.data.queryResults.partitionDetail.partitions[
+                  searchObj.data.queryResults.subpage
+                ][1];
+              queryReq.query.from = 0;
+              queryReq.query.size = -1;
+  
+              searchObj.data.queryResults.subpage++;
+  
+              setTimeout(async () => {
+                processPostPaginationData();
+              }, 0);
+              await getPaginatedData(queryReq, true);
+            }
+          } else if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult && !queryReq.query?.streaming_output) {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
