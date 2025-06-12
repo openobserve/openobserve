@@ -2394,7 +2394,7 @@ const useLogs = () => {
       //   searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
       // }
       const parsedSQL: any = fnParsedSQL();
-      searchObj.meta.resultGrid.showPagination = true;
+
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
@@ -2494,13 +2494,18 @@ const useLogs = () => {
 
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
+          searchObj.meta.resultGrid.showPagination = true;
+
           if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
             if (
               hasAggregation(parsedSQL?.columns) ||
               parsedSQL.groupby != null
             ) {
-              searchAggData.total = res.data.total;
-              searchAggData.hasAggregation = true;
+              if(queryReq.query?.streaming_output) {
+                searchAggData.total = res.data.total;
+                searchAggData.hasAggregation = true;
+              }
+
               searchObj.meta.resultGrid.showPagination = false;
             }
           }
@@ -2566,8 +2571,6 @@ const useLogs = () => {
                 searchObj.data.queryResults.took = res.data.took;
                 searchObj.data.queryResults.hits = res.data.hits;
               }
-              
-              
             }
           } else {
             resetFieldValues();
