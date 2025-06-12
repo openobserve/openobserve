@@ -662,6 +662,7 @@ import {
   watch,
   computed,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -742,6 +743,8 @@ export default defineComponent({
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
+    const intervalId = ref(null);
+
     const userDefinedSchemaBtnGroupOption = [
       {
         label: "",
@@ -793,6 +796,12 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importSqlParser();
+    });
+
+    onBeforeUnmount(() => {
+      if (intervalId.value) {
+        clearInterval(intervalId.value);
+      }
     });
 
     const importSqlParser = async () => {
@@ -1294,7 +1303,7 @@ export default defineComponent({
     const toggleSchema = async () => {
       searchObj.loadingStream = true;
       selectedFieldsName = [];
-      setTimeout(async () => {
+      intervalId.value = setTimeout(async () => {
         await extractFields();
         searchObj.loadingStream = false;
       }, 0);
