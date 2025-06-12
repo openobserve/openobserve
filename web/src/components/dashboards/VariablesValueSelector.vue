@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, ref, watch } from "vue";
+import { getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -241,7 +241,8 @@ export default defineComponent({
     // Flag to track initial load
     // const isInitialLoad = ref(true);
 
-    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+    const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+      useHttpStreaming();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
@@ -271,17 +272,49 @@ export default defineComponent({
 
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
-      if (traceIds && traceIds.length > 0) {
+      console.log(`Attempting to cancel trace IDs for field: ${field}`);
+      if (isStreamingEnabled(store.state) && traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
-          cancelSearchQueryBasedOnRequestId({
+          console.log(`Canceling trace ID: ${traceId}`);
+          cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+
         // Clear the trace IDs after cancellation
         traceIdMapper.value[field] = [];
+        console.log(`Cleared trace IDs for field: ${field}`);
+      }
+
+      if (isWebSocketEnabled(store.state) && traceIds && traceIds.length > 0) {
+        traceIds.forEach((traceId) => {
+          console.log(`Canceling trace ID: ${traceId}`);
+          cancelStreamQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+
+        // Clear the trace IDs after cancellation
+        traceIdMapper.value[field] = [];
+        console.log(`Cleared trace IDs for field: ${field}`);
+      } else {
+        console.log(`No trace IDs found for field: ${field}`);
       }
     };
+
+    // onUnmounted want to cancel the values api call for all http2, websocket and streaming
+    onUnmounted(() => {
+      console.log(
+        "Unmounting VariablesValueSelector, canceling all active trace IDs...",
+      );
+
+      // Cancel all active trace IDs for all variables
+      Object.keys(traceIdMapper.value).forEach((field) => {
+        cancelTraceId(field);
+      });
+    });
 
     const sendSearchMessage = (queryReq: any) => {
       const payload = {
