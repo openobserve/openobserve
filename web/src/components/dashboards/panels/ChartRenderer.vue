@@ -219,6 +219,10 @@ export default defineComponent({
     const store = useStore();
 
     const cleanupChart = () => {
+      //dispose
+      if (chart) {
+        chart.dispose();
+      }
       // Remove all event listeners from chart
       chart?.off('mousemove');
       chart?.off('mouseout');
@@ -228,6 +232,9 @@ export default defineComponent({
       chart?.off('dataZoom');
       chart?.off('click');
       chart?.off('mouseover');
+
+      chart = null;
+      chartRef.value = null;
     };
 
     const windowResizeEventCallback = async () => {

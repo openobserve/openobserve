@@ -465,18 +465,6 @@ export default defineComponent({
 
     const limitNumberOfSeriesWarningMessage = ref("");
 
-    // Add cleanup on component unmount
-    onBeforeUnmount(() => {
-      // Clear any pending timeouts or intervals
-      // Reset refs to help with garbage collection
-      metaData.value = null;
-      errorData.value = "";
-      
-      // Clear the PanelSchemaRenderer reference
-      if (PanleSchemaRendererRef.value) {
-        PanleSchemaRendererRef.value = null;
-      }
-    });
 
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];

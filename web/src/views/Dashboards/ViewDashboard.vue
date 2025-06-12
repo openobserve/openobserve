@@ -369,14 +369,6 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 
-// Import memory leak detector for development
-let memoryLeakDetector = null;
-if (process.env.NODE_ENV === 'development') {
-  import('@/utils/memoryLeakDetector.js').then(module => {
-    memoryLeakDetector = module.memoryLeakDetector;
-  });
-}
-
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
 });
@@ -604,10 +596,6 @@ export default defineComponent({
         await getFoldersList(store);
       }
       
-      // Log memory usage on mount
-      if (memoryLeakDetector) {
-        memoryLeakDetector.logMemoryUsage('ViewDashboard - onMounted');
-      }
     });
 
     const setTimeString = () => {
@@ -1092,32 +1080,8 @@ export default defineComponent({
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       
-      // Log memory usage before cleanup
-      if (memoryLeakDetector) {
-        memoryLeakDetector.logMemoryUsage('ViewDashboard - Before Cleanup');
-      }
-      
       // Clear all refs
       cleanupRefs();
-      
-      // // Clear reactive objects
-      // Object.keys(currentDashboardData.data).forEach(key => {
-      //   delete currentDashboardData.data[key];
-      // });
-      // Object.keys(variablesData).forEach(key => {
-      //   delete variablesData[key];
-      // });
-      // Object.keys(refreshedVariablesData).forEach(key => {
-      //   delete refreshedVariablesData[key];
-      // });
-      
-      // Log memory usage after cleanup
-      if (memoryLeakDetector) {
-        setTimeout(() => {
-          memoryLeakDetector.logMemoryUsage('ViewDashboard - After Cleanup');
-          memoryLeakDetector.checkDashboardNodes();
-        }, 100);
-      }
     });
 
     onMounted(() => {
