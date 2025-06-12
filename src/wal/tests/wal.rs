@@ -27,7 +27,7 @@ fn test_wal_new() {
     let dir = tempdir().unwrap();
     let dir = dir.path();
     let path = build_file_path(dir, "org", "stream", "1".to_string());
-    let mut writer = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
@@ -51,7 +51,7 @@ fn test_wal_build() {
     header.insert("key1".into(), "value1".into());
     header.insert("key2".into(), "value2".into());
     let path = build_file_path(dir, "org", "stream", "1".to_string());
-    let mut writer = Writer::new(path.clone(), 1024_1024, 8 * 1024, Some(header)).unwrap();
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, Some(header)).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
@@ -77,7 +77,7 @@ fn test_position() {
     let dir = tempdir().unwrap();
     let dir = dir.path();
     let path = build_file_path(dir, "org", "stream", "1".to_string());
-    let mut writer = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
@@ -100,7 +100,7 @@ fn test_metadata() {
     let dir = tempdir().unwrap();
     let dir = dir.path();
     let path = build_file_path(dir, "org", "stream", "1".to_string());
-    let mut writer = Writer::new(path, 1024_1024, 8 * 1024, None).unwrap();
+    let (mut writer, _) = Writer::new(path, 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
@@ -127,7 +127,7 @@ fn test_realtime_write_and_read() {
     header.insert("key1".into(), "value1".into());
     header.insert("key2".into(), "value2".into());
     let path = build_file_path(dir, "org", "stream", "1".to_string());
-    let mut writer = Writer::new(path, 0, 8 * 1024, Some(header)).unwrap();
+    let (mut writer, _) = Writer::new(path, 0, 8 * 1024, Some(header)).unwrap();
 
     std::thread::spawn(move || {
         for i in 0..entry_num {
@@ -183,7 +183,7 @@ fn test_reader_from_path_position_and_metadata() {
     let dir = tempdir().unwrap();
     let dir = dir.path();
     let path = build_file_path(dir, "org", "stream", "1".to_string());
-    let mut writer = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
 
     for i in 0..entry_num {
         let data = format!("hello {}", i);
