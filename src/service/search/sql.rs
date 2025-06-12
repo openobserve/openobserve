@@ -236,9 +236,11 @@ impl Sql {
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
 
+        let is_complex = is_complex_query(&mut statement);
+
         // NOTE: only this place modify the sql
         // 10. add _timestamp and _o2_id if need
-        if !is_complex_query(&mut statement) {
+        if !is_complex {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
             if o2_id_is_needed(&used_schemas, &search_event_type) {
@@ -279,7 +281,7 @@ impl Sql {
 
         // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
-        if !is_complex_query(&mut statement)
+        if !is_complex
             && order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
@@ -314,7 +316,6 @@ impl Sql {
             }
         }
 
-        let is_complex = is_complex_query(&mut statement);
         Ok(Sql {
             sql: statement.to_string(),
             is_complex,

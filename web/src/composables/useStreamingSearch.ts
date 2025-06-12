@@ -195,7 +195,6 @@ const useHttpStreaming = () => {
         if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
         if (meta?.fallback_order_by_col) url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       } else if(type === "values") {
-        const fieldsString = meta?.fields.join(",");
         url = `/_values_stream`
       }
 
