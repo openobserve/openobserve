@@ -262,6 +262,18 @@ export default defineComponent({
     const gridLayoutRef = ref(null);
     const variablesValueSelectorRef = ref(null);
 
+    onBeforeUnmount(() => {
+      // Clean up grid layout reference
+      if (gridLayoutRef.value) {
+        gridLayoutRef.value = null;
+      }
+
+      // Clean up any other references that might cause memory leaks
+      if (variablesValueSelectorRef.value) {
+        variablesValueSelectorRef.value = null;
+      }
+    });
+
     const showViewPanel = ref(false);
     // holds the view panel id
     const viewPanelId = ref("");
