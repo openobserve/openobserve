@@ -31,14 +31,17 @@ module.exports = defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
-    },
+    
+    /* Slow down Playwright operations by 100ms */
+    slowMo: 300,
+  },
    timeout: 5 * 60 * 1000,
    
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, },
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 720 }, },
      
       
     }

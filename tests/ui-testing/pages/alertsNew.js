@@ -52,7 +52,7 @@ export class AlertsNewPage {
         this.currentAlertName = '';
     }
 
-    generateRandomFolderName() {
+    generateRandomString() {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         let result = '';
         for (let i = 0; i < 5; i++) {
@@ -107,9 +107,9 @@ export class AlertsNewPage {
         await this.page.locator(this.folderCancelButton).click();
     }
 
-    /** @param {string} streamType @param {string} streamName @param {string} column @param {string} value */
-    async createAlert(streamName, column, value) {
-        const randomAlertName = 'Automation_Alert_' + this.generateRandomFolderName();
+    /** @param {string} streamName @param {string} column @param {string} value @param {string} destinationName @param {string} randomValue */
+    async createAlert(streamName, column, value, destinationName, randomValue) {
+        const randomAlertName = 'Automation_Alert_' + randomValue;
         this.currentAlertName = randomAlertName;  // Store the alert name
         console.log('Created alert:', randomAlertName);
 
@@ -139,7 +139,7 @@ export class AlertsNewPage {
 
         await this.page.locator('[data-test="add-alert-destination-select"]').getByLabel('arrow_drop_down').click();
         await this.page.waitForTimeout(2000); // Wait for destination options to load
-        await this.page.getByText('mySecondDest').click();
+        await this.page.getByText(destinationName, { exact: true }).click();
         await this.page.waitForTimeout(1000); // Wait after selecting destination
 
         await this.page.locator(this.columnInput).click();
