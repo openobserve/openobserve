@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="metaData && metaData.queries?.length > 0"
               v-close-popup="true"
               @click="
-                PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
+                PanelSchemaRendererRef?.downloadDataAsCSV(props.data.title)
               "
             >
               <q-item-section>
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="metaData && metaData.queries?.length > 0"
               v-close-popup="true"
               @click="
-                PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
+                PanelSchemaRendererRef?.downloadDataAsJSON(props.data.title)
               "
             >
               <q-item-section>
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       @error="onError"
       @is-partial-data-update="handleIsPartialDataUpdate"
-      ref="PanleSchemaRendererRef"
+      ref="PanelSchemaRendererRef"
       :allowAnnotationsAdd="true"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
@@ -510,8 +510,8 @@ export default defineComponent({
 
     const showText = ref(false);
 
-    // need PanleSchemaRendererRef for table download as a csv
-    const PanleSchemaRendererRef: any = ref(null);
+    // need PanelSchemaRendererRef for table download as a csv
+    const PanelSchemaRendererRef: any = ref(null);
 
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {
@@ -817,8 +817,8 @@ export default defineComponent({
       errorData.value = "";
       
       // Clear the PanelSchemaRenderer reference
-      if (PanleSchemaRendererRef.value) {
-        PanleSchemaRendererRef.value = null;
+      if (PanelSchemaRendererRef.value) {
+        PanelSchemaRendererRef.value = null;
       }
     });
 
@@ -846,7 +846,7 @@ export default defineComponent({
       dependentAdHocVariable,
       confirmDeletePanelDialog,
       showText,
-      PanleSchemaRendererRef,
+      PanelSchemaRendererRef,
       confirmMovePanelDialog,
       movePanelDialog,
       onRefreshPanel,

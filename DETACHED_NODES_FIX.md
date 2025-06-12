@@ -25,8 +25,8 @@ onBeforeUnmount(() => {
   errorData.value = "";
   
   // Clear the PanelSchemaRenderer reference
-  if (PanleSchemaRendererRef.value) {
-    PanleSchemaRendererRef.value = null;
+  if (PanelSchemaRendererRef.value) {
+    PanelSchemaRendererRef.value = null;
   }
 });
 ```
