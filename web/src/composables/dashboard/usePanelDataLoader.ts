@@ -162,8 +162,8 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
-  const saveCurrentStateToCache = () => {
-    savePanelCache(
+  const saveCurrentStateToCache = async () => {
+    await savePanelCache(
       getCacheKey(),
       { ...toRaw(state) },
       {
@@ -547,6 +547,7 @@ export const usePanelDataLoader = (
               endISOTimestamp;
 
             // need to break the loop, save the cache
+            // this is async task, which will be executed in background(await is not required)
             saveCurrentStateToCache();
 
             break;
@@ -588,6 +589,7 @@ export const usePanelDataLoader = (
                   partition[0];
 
                 // need to break the loop, save the cache
+                // this is async task, which will be executed in background(await is not required)
                 saveCurrentStateToCache();
 
                 break;
@@ -600,6 +602,7 @@ export const usePanelDataLoader = (
 
         if (i == 0) {
           // if it is last partition, cache the result
+          // this is async task, which will be executed in background(await is not required)
           saveCurrentStateToCache();
         }
       }
@@ -813,6 +816,7 @@ export const usePanelDataLoader = (
     state.isOperationCancelled = false;
 
     // save current state to cache
+    // this is async task, which will be executed in background(await is not required)
     saveCurrentStateToCache();
   };
 
@@ -1082,7 +1086,7 @@ export const usePanelDataLoader = (
       if (runCount == 0) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
-        const isRestoredFromCache = restoreFromCache();
+        const isRestoredFromCache = await restoreFromCache();
         log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
           state.loading = false;
@@ -1177,6 +1181,7 @@ export const usePanelDataLoader = (
         };
         state.annotations = annotationList || [];
 
+        // this is async task, which will be executed in background(await is not required)
         saveCurrentStateToCache();
       } else {
         // copy of current abortController
@@ -1387,6 +1392,7 @@ export const usePanelDataLoader = (
                   state.annotations = annotationList;
 
                   // need to break the loop, save the cache
+                  // this is async task, which will be executed in background(await is not required)
                   saveCurrentStateToCache();
                 } finally {
                   removeTraceId(traceId);
@@ -1468,6 +1474,7 @@ export const usePanelDataLoader = (
                 );
               }
 
+              // this is async task, which will be executed in background(await is not required)
               saveCurrentStateToCache();
             }
           }
@@ -2201,8 +2208,8 @@ export const usePanelDataLoader = (
     loadData(); // Loading the data
   });
 
-  const restoreFromCache: () => boolean = () => {
-    const cache = getPanelCache();
+  const restoreFromCache: () => Promise<boolean> = async () => {
+    const cache = await getPanelCache();
 
     if (!cache) {
       log("usePanelDataLoader: panelcache: cache is not there");
