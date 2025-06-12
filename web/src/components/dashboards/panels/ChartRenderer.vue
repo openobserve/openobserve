@@ -69,6 +69,7 @@ function findNearestIndex(sortedArray: any, target: any) {
   return nearestIndex; // Return the index of the nearest value
 }
 
+import { throttle } from 'lodash-es';
 import {
   defineComponent,
   ref,
@@ -77,6 +78,7 @@ import {
   onUnmounted,
   nextTick,
   onActivated,
+  onDeactivated,
   inject,
 } from "vue";
 import { useStore } from "vuex";
@@ -215,6 +217,19 @@ export default defineComponent({
     const chartRef: any = ref(null);
     let chart: any;
     const store = useStore();
+
+    const cleanupChart = () => {
+      // Remove all event listeners from chart
+      chart?.off('mousemove');
+      chart?.off('mouseout');
+      chart?.off('globalout');
+      chart?.off('legendselectchanged');
+      chart?.off('highlight');
+      chart?.off('dataZoom');
+      chart?.off('click');
+      chart?.off('mouseover');
+    };
+
     const windowResizeEventCallback = async () => {
       try {
         await nextTick();
@@ -227,6 +242,18 @@ export default defineComponent({
 
     // currently hovered series state
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
+
+    const DEBOUNCE_TIMEOUT = 350;
+
+    // Create a stable throttled function that persists between renders
+    const throttledSetHoveredSeriesName = throttle((name: string) => {
+      hoveredSeriesState?.value?.setHoveredSeriesName(name);
+    }, DEBOUNCE_TIMEOUT);
+
+    // Create a stable throttled function that persists between renders
+    const throttledSetHoveredSeriesIndex = throttle((arg1, arg2, arg3, arg4) => {
+      hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
+    }, DEBOUNCE_TIMEOUT);
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -242,13 +269,12 @@ export default defineComponent({
         params.seriesIndex = -1;
       }
 
-      // set current hovered series name in state
-      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName ?? "");
+      // Use the throttled function to update the state
+      throttledSetHoveredSeriesName(params?.seriesName ?? "");
 
       // Below logic is to scroll legend upto current series index
       // which creates wrong legend highlight issue in tooltip
       // so commented out
-
       // scroll legend upto current series index
       // const legendOption = chart?.getOption()?.legend[0];
       // if (legendOption) {
@@ -264,7 +290,7 @@ export default defineComponent({
 
     const mouseOutEffectFn = () => {
       // reset current hovered series name in state
-      hoveredSeriesState?.value?.setHoveredSeriesName("");
+      throttledSetHoveredSeriesName("");
     };
 
     const legendSelectChangedFn = (params: any) => {
@@ -318,11 +344,12 @@ export default defineComponent({
       chart?.on("mouseout", (params: any) => {
         emit("mouseout", params);
         mouseOutEffectFn();
-      });
+      });      
+      
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
-        hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
-        hoveredSeriesState?.value?.setHoveredSeriesName("");
+        throttledSetHoveredSeriesIndex(-1, -1, -1, null);
+        throttledSetHoveredSeriesName("");
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
@@ -339,9 +366,9 @@ export default defineComponent({
           const seriesIndex = params?.batch?.[0]?.seriesIndex;
           const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
 
-          // set current hovered series name in state
+          // set current hovered series name in state          
           if (chart?.getOption()?.series[seriesIndex]?.data[dataIndex]) {
-            hoveredSeriesState?.value?.setIndex(
+            throttledSetHoveredSeriesIndex(
               dataIndex,
               seriesIndex,
               props?.data?.extras?.panelId || -1,
@@ -521,7 +548,23 @@ export default defineComponent({
       }
     });
     onUnmounted(() => {
+      // Clean up event listeners
       window.removeEventListener("resize", windowResizeEventCallback);
+      
+      // Cancel throttled functions
+      throttledSetHoveredSeriesName.cancel();
+      throttledSetHoveredSeriesIndex.cancel();
+      
+      // Clean up chart instance
+      chart?.dispose();
+      chart = null;
+
+      // Clean up intersection observer
+      if (chartRef.value) {
+        isChartVisibleObserver?.unobserve(chartRef.value);
+        isChartVisibleObserver?.disconnect();
+      }
+      isChartVisibleObserver = null;
     });
 
     // observer for chart visibility
@@ -567,6 +610,11 @@ export default defineComponent({
         key: "dataZoomSelect",
         dataZoomSelectActive: true,
       });
+    });
+
+    // Clean up on deactivate
+    onDeactivated(() => {
+      cleanupChart();
     });
 
     watch(
