@@ -500,6 +500,7 @@ async fn write_file_list(
                 let del_items = events
                     .iter()
                     .map(|v| FileListDeleted {
+                        id: 0,
                         account: v.account.clone(),
                         file: v.key.clone(),
                         index_file: v.meta.index_size > 0,

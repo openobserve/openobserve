@@ -322,6 +322,7 @@ async fn move_and_delete(
         .iter()
         .chain(dump_files.iter())
         .map(|f| FileListDeleted {
+            id: 0,
             account: f.account.to_string(),
             file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             index_file: false,
