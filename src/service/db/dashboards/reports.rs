@@ -16,6 +16,7 @@
 use config::meta::dashboards::reports::{ListReportsParams, Report};
 use infra::table;
 use sea_orm::{ConnectionTrait, TransactionTrait};
+use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::service::db;
 
@@ -94,8 +95,18 @@ pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTra
     folder_snowflake_id: &str,
     report: Report,
 ) -> Result<(), anyhow::Error> {
-    table::reports::create_report(conn, folder_snowflake_id, report, None).await?;
-    // todo: emit supercluster event
+    let report_id = Ksuid::new(None, None);
+    let _report_id_str = report_id.to_string();
+    table::reports::create_report(conn, folder_snowflake_id, report.clone(), Some(report_id))
+        .await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_create_event(
+        &report.org_id.clone(),
+        folder_snowflake_id,
+        &_report_id_str,
+        report,
+    )
+    .await?;
     Ok(())
 }
 
@@ -105,9 +116,22 @@ pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTra
     new_folder_snowflake_id: Option<&str>,
     report: Report,
 ) -> Result<(), anyhow::Error> {
-    table::reports::update_report(conn, folder_snowflake_id, new_folder_snowflake_id, report)
-        .await?;
-    // todo: emit supercluster event
+    table::reports::update_report(
+        conn,
+        folder_snowflake_id,
+        new_folder_snowflake_id,
+        report.clone(),
+    )
+    .await?;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_update_event(
+        &report.org_id.clone(),
+        folder_snowflake_id,
+        new_folder_snowflake_id,
+        report,
+    )
+    .await?;
     Ok(())
 }
 
@@ -123,7 +147,8 @@ pub async fn delete<C: ConnectionTrait + TransactionTrait>(
     let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, name)
         .await
         .inspect_err(|e| log::error!("Failed to delete trigger: {}", e));
-    // todo: emit supercluster event
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_delete_event(org_id, folder_snowflake_id, name).await?;
     Ok(())
 }
 
@@ -137,6 +162,83 @@ pub async fn list<C: ConnectionTrait>(
 
 pub async fn reset<C: ConnectionTrait>(conn: &C) -> Result<(), anyhow::Error> {
     table::reports::delete_all(conn).await?;
-    // todo: emit supercluster event
+    #[cfg(feature = "enterprise")]
+    super_cluster::reset().await?;
     Ok(())
+}
+
+/// Helper functions for sending events to the super cluster queue.
+#[cfg(feature = "enterprise")]
+mod super_cluster {
+    use config::meta::dashboards::reports::Report;
+    use infra::errors::Error;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+    /// Sends event to the super cluster queue indicating that an report has been
+    /// created in the database.
+    pub async fn emit_create_event(
+        org_id: &str,
+        folder_id: &str,
+        report_id: &str,
+        report: Report,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            log::debug!("Sending super cluster report creation event: {:?}", report);
+            o2_enterprise::enterprise::super_cluster::queue::reports_create(
+                org_id, folder_id, report_id, report,
+            )
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to the super cluster queue indicating that an report has been
+    /// updated in the database.
+    pub async fn emit_update_event(
+        org: &str,
+        folder_snowflake_id: &str,
+        new_folder_snowflake_id: Option<&str>,
+        report: Report,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            log::debug!("Sending super cluster report update event: {:?}", report);
+            o2_enterprise::enterprise::super_cluster::queue::reports_update(
+                org,
+                folder_snowflake_id,
+                new_folder_snowflake_id,
+                report,
+            )
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to the super cluster queue indicating that an report has been
+    /// deleted from the database.
+    pub async fn emit_delete_event(
+        org: &str,
+        folder_id: &str,
+        name: &str,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            log::debug!("Sending super cluster report delete event: {:?}", name);
+            o2_enterprise::enterprise::super_cluster::queue::reports_delete(org, folder_id, name)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to the super cluster queue indicating that all reports have
+    /// been deleted from the database.
+    pub async fn reset() -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::reports_reset()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
 }

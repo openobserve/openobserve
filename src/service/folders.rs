@@ -190,6 +190,7 @@ pub async fn list_folders(
     let folder_ofga_model = match folder_type {
         FolderType::Dashboards => OFGA_MODELS.get("folders").unwrap().key,
         FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
+        FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -317,6 +318,10 @@ async fn permitted_folders(
         FolderType::Alerts => (
             OFGA_MODELS.get("alert_folders").unwrap().key,
             OFGA_MODELS.get("alerts").unwrap().key,
+        ),
+        FolderType::Reports => (
+            OFGA_MODELS.get("report_folders").unwrap().key,
+            OFGA_MODELS.get("reports").unwrap().key,
         ),
     };
 

@@ -25,6 +25,7 @@ mod org_user;
 mod organization;
 mod pipelines;
 mod ratelimit;
+mod reports;
 mod scheduler;
 mod schemas;
 mod search_job;
@@ -35,7 +36,7 @@ mod user;
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
-    OrgUsersQueue, OrganizationsQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
+    OrgUsersQueue, OrganizationsQueue, PipelinesQueue, ReportsQueue, SchedulerQueue, SchemasQueue,
     SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue, UsersQueue,
 };
 
@@ -96,6 +97,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let org_users_queue = OrgUsersQueue {
         on_org_users_msg: org_user::process,
     };
+    let reports_queue = ReportsQueue {
+        on_report_msg: reports::process,
+    };
 
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
@@ -112,6 +116,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(orgs_queue),
         Box::new(users_queue),
         Box::new(org_users_queue),
+        Box::new(reports_queue),
     ];
 
     for queue in queues {
