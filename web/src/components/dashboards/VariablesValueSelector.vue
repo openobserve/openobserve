@@ -290,7 +290,7 @@ export default defineComponent({
       if (isWebSocketEnabled(store.state) && traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
           console.log(`Canceling trace ID: ${traceId}`);
-          cancelStreamQueryBasedOnRequestId({
+          cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
