@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'q-link-function': title == 'Functions',
     }"
     :target="target"
+    :key="title"
     @click="external ? openWebPage(link) : ''"
   >
     <q-item-section v-if="icon" avatar>
