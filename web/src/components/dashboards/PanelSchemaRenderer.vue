@@ -1102,11 +1102,15 @@ export default defineComponent({
       const queryType = panelSchema?.value?.queryType;
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
+        const variableNameWithBrackets = `\${${variable.name}}`;
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value = variable.value
-            .map((value: any) => `'${value}'`)
+            .map(
+              (value: any) =>
+                `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
+            )
             .join(",");
           const possibleVariablesPlaceHolderTypes = [
             {
@@ -1149,7 +1153,10 @@ export default defineComponent({
             );
           });
         } else {
-          variableValue = variable.value === null ? "" : variable.value;
+          variableValue =
+            variable.value === null
+              ? ""
+              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
@@ -1157,6 +1164,7 @@ export default defineComponent({
           //     value: variable.value,
           //   });
           // }
+          query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }
       });
