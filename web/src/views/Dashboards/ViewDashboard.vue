@@ -357,7 +357,6 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
-import ScheduledDashboards from "./ScheduledDashboards.vue";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
 import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
@@ -376,6 +375,10 @@ const DashboardJsonEditor = defineAsyncComponent(() => {
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
+});
+
+const ScheduledDashboards = defineAsyncComponent(() => {
+  return import("./ScheduledDashboards.vue");
 });
 
 export default defineComponent({
