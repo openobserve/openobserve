@@ -239,6 +239,7 @@ impl UsageType {
             self,
             UsageType::Bulk
                 | UsageType::Json
+                | UsageType::Hec
                 | UsageType::Multi
                 | UsageType::KinesisFirehose
                 | UsageType::GCPSubscription
