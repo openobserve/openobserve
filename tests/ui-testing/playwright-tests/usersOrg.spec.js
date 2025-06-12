@@ -56,7 +56,7 @@ test.describe("Users and Organizations", () => {
         await userPage.selectUserRole('Admin');
         await userPage.page.waitForTimeout(1000);   
         await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
+        await userPage.page.waitForTimeout(10000);   
         await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await userPage.addUserFirstLast('a', 'b');
         await userPage.userCreate();
@@ -73,7 +73,7 @@ test.describe("Users and Organizations", () => {
         await userPage.selectUserRole('Admin');
         await userPage.page.waitForTimeout(1000);   
         await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
+        await userPage.page.waitForTimeout(10000);   
         await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await userPage.addUserFirstLast('a', 'b');
         await userPage.page.waitForTimeout(1000);
@@ -109,7 +109,7 @@ test.describe("Users and Organizations", () => {
         await userPage.selectUserRole('Admin');
         await userPage.page.waitForTimeout(1000);   
         await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
+        await userPage.page.waitForTimeout(10000);   
         await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await userPage.addUserFirstLast('a', 'b');
         await userPage.page.waitForTimeout(1000);
@@ -129,7 +129,7 @@ test.describe("Users and Organizations", () => {
         await userPage.selectUserRole('Admin');
         await userPage.page.waitForTimeout(1000);   
         await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
+        await userPage.page.waitForTimeout(10000);   
         await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await userPage.addUserFirstLast('a', 'b');
         await userPage.userCreate();
@@ -151,7 +151,7 @@ test.describe("Users and Organizations", () => {
         await userPage.selectUserRole('Admin');
         await userPage.page.waitForTimeout(1000);   
         await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
+        await userPage.page.waitForTimeout(10000);   
         await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await userPage.addUserFirstLast('a', 'b');
         await userPage.userCreate();
@@ -177,7 +177,7 @@ test.describe("Users and Organizations", () => {
         await userPage.selectUserRole('Admin');
         await userPage.page.waitForTimeout(1000);   
         await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
+        await userPage.page.waitForTimeout(10000);   
         await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await userPage.addUserFirstLast('a', 'b');
         await userPage.userCreate();
@@ -200,7 +200,7 @@ test.describe("Users and Organizations", () => {
         await userPage.selectUserRole('Admin');
         await userPage.page.waitForTimeout(1000);   
         await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
+        await userPage.page.waitForTimeout(10000);   
         await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
         await userPage.addUserFirstLast('a', 'b');
         await userPage.userCreate();

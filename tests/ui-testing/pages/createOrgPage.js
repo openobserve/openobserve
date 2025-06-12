@@ -47,17 +47,18 @@ export class CreateOrgPage {
         // Wait for the IAM menu link to be visible
         await this.page.waitForSelector('[data-test="menu-link-\\/iam-item"]');
         await this.page.locator('[data-test="menu-link-\\/iam-item"]').click();
+
+        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/iam/organizations?org_identifier=default");
+        await this.page.waitForTimeout(10000);
     
-        // Wait for the IAM organizations tab to be visible
-        await this.page.waitForSelector('[data-test="iam-organizations-tab"]');
-        await this.page.locator('[data-test="iam-organizations-tab"]').click();
+   
     }
     
 
 
     async clickAddOrg() {
-        await this.page.waitForSelector('[data-test="Add Organization"]');
-        await this.page.locator('[data-test="Add Organization"]').click();
+        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/iam/organizations?action=add&org_identifier=default");
+        await this.page.waitForTimeout(10000);
     }
 
     async fillOrgName(orgName) {

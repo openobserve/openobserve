@@ -242,6 +242,7 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
 
 #[derive(Clone, Debug, Default)]
 pub struct FileListDeleted {
+    pub id: i64,
     pub account: String,
     pub file: String,
     pub index_file: bool,
