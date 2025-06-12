@@ -1100,16 +1100,16 @@ export default defineComponent({
       // Clear all refs
       cleanupRefs();
       
-      // Clear reactive objects
-      Object.keys(currentDashboardData.data).forEach(key => {
-        delete currentDashboardData.data[key];
-      });
-      Object.keys(variablesData).forEach(key => {
-        delete variablesData[key];
-      });
-      Object.keys(refreshedVariablesData).forEach(key => {
-        delete refreshedVariablesData[key];
-      });
+      // // Clear reactive objects
+      // Object.keys(currentDashboardData.data).forEach(key => {
+      //   delete currentDashboardData.data[key];
+      // });
+      // Object.keys(variablesData).forEach(key => {
+      //   delete variablesData[key];
+      // });
+      // Object.keys(refreshedVariablesData).forEach(key => {
+      //   delete refreshedVariablesData[key];
+      // });
       
       // Log memory usage after cleanup
       if (memoryLeakDetector) {
