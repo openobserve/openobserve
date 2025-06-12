@@ -139,6 +139,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-tooltip>
         </q-btn>
+        <q-btn
+          v-if="isPartialData && !isPanelLoading"
+          :icon="symOutlinedClockLoader20"
+          flat
+          size="xs"
+          padding="2px"
+          data-test="dashboard-panel-partial-data-warning"
+          class="warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right">
+            <div style="white-space: pre-wrap">
+              The data shown is incomplete because the loading was interrupted.
+              Refresh to load complete data.
+            </div>
+          </q-tooltip>
+        </q-btn>
         <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
           <span class="lastRefreshedAtIcon"
             >🕑
@@ -330,6 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (...args) => $emit('update:initial-variable-values', ...args)
       "
       @error="onError"
+      @is-partial-data-update="handleIsPartialDataUpdate"
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
     ></PanelSchemaRenderer>
@@ -376,7 +393,10 @@ import {
   outlinedWarning,
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
-import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import {
+  symOutlinedClockLoader20,
+  symOutlinedDataInfoAlert,
+} from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
@@ -782,6 +802,12 @@ export default defineComponent({
       }
     };
 
+    const isPartialData = ref(false);
+
+    const handleIsPartialDataUpdate = (isPartial: boolean) => {
+      isPartialData.value = isPartial;
+    };
+
     return {
       props,
       onEditPanel,
@@ -790,6 +816,7 @@ export default defineComponent({
       deletePanelDialog,
       isCurrentlyHoveredPanel,
       outlinedWarning,
+      symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
       store,
@@ -816,6 +843,8 @@ export default defineComponent({
       handleLoadingStateChange,
       limitNumberOfSeriesWarningMessage,
       handleLimitNumberOfSeriesWarningMessageUpdate,
+      isPartialData,
+      handleIsPartialDataUpdate,
     };
   },
   methods: {

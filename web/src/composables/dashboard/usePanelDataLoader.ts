@@ -154,6 +154,7 @@ export const usePanelDataLoader = (
     loadingTotal: 0,
     loadingCompleted: 0,
     loadingProgressPercentage: 0,
+    isPartialData: false,
   });
 
   // observer for checking if panel is visible on the screen
@@ -324,12 +325,19 @@ export const usePanelDataLoader = (
 
   const cancelQueryAbort = () => {
     state.loading = false;
-
     state.isOperationCancelled = true;
 
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    if (isStreamingEnabled() && state.searchRequestTraceIds?.length > 0) {
+      state.searchRequestTraceIds.forEach((traceId) => {
+        cancelStreamQueryBasedOnRequestId({
+          trace_id: traceId,
+          org_id: store?.state?.selectedOrganization?.identifier,
+        });
+      });
+    }
+
+    if (isWebSocketEnabled() && state.searchRequestTraceIds.length > 0) {
       try {
-        // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
@@ -345,6 +353,7 @@ export const usePanelDataLoader = (
     if (abortController) {
       abortController?.abort();
     }
+    saveCurrentStateToCache();
   };
 
   const getHistogramSearchRequest = async (
@@ -409,6 +418,10 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        // Set partial data when partition API call is interrupted
+        state.isPartialData = true;
+        // Save current state to cache with partial data flag
+        saveCurrentStateToCache();
         return;
       }
 
@@ -650,6 +663,14 @@ export const usePanelDataLoader = (
     // update result metadata
     state.resultMetaData[payload?.meta?.currentQueryIndex] =
       searchRes?.content?.results ?? {};
+
+    // If we have data and loading is complete, set isPartialData to false
+    if (
+      state.data[payload?.meta?.currentQueryIndex]?.length > 0 &&
+      !state.loading
+    ) {
+      state.isPartialData = false;
+    }
   };
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
@@ -704,45 +725,51 @@ export const usePanelDataLoader = (
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
-      // console.log("panel data loader response", payload.traceId, response);
-
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response_hits") {
         handleStreamingHistogramHits(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "error") {
-        // set loading to false
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
         state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
-
         processApiError(response?.content, "sql");
       }
 
       if (response.type === "end") {
-        // set loading to false
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
-        state.loadingProgressPercentage = 0;
+        state.loadingProgressPercentage = 100; // Set to 100% when complete
         state.isOperationCancelled = false;
+        state.isPartialData = false; // Explicitly set to false when complete
+        saveCurrentStateToCache();
       }
+
       if (response.type === "event_progress") {
-        // The loadingProgressPercentage value is now in 0-100 format, no need to multiply
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
+        // Only set isPartialData to true if we're still loading and progress is not 100%
+        if (state.loading && state.loadingProgressPercentage < 100) {
+          state.isPartialData = true;
+        } else if (state.loadingProgressPercentage === 100) {
+          state.isPartialData = false;
+        }
+        saveCurrentStateToCache();
       }
     } catch (error: any) {
-      // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
       state.loadingTotal = 0;
@@ -814,6 +841,10 @@ export const usePanelDataLoader = (
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
+    // Only set isPartialData to true if we haven't received complete data
+    if (state.loadingProgressPercentage < 100) {
+      state.isPartialData = true;
+    }
 
     // save current state to cache
     // this is async task, which will be executed in background(await is not required)
@@ -821,6 +852,8 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchReset = (payload: any, traceId?: string) => {
+    // Save current state to cache
+    saveCurrentStateToCache();
     loadData();
   };
 
@@ -994,6 +1027,10 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        // Set partial data flag on abort
+        state.isPartialData = true;
+        // Save current state to cache
+        saveCurrentStateToCache();
         return;
       }
 
@@ -1021,6 +1058,11 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
+    // Only reset isPartialData if we're starting a fresh load and not restoring from cache
+    if (runCount > 0 && !state.isOperationCancelled) {
+      state.isPartialData = false;
+    }
+
     try {
       log("loadData: entering...");
       state.loadingTotal = 0;
@@ -1854,7 +1896,10 @@ export const usePanelDataLoader = (
     newDependentVariablesData: any,
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => (it.value == null || (Array.isArray(it.value) && it.value.length === 0)) && (it.isLoading || it.isVariableLoadingPending),
+      (it: any) =>
+        (it.value == null ||
+          (Array.isArray(it.value) && it.value.length === 0)) &&
+        (it.isLoading || it.isVariableLoadingPending),
     );
 
   const getDependentVariablesData = () =>
@@ -2183,17 +2228,54 @@ export const usePanelDataLoader = (
   onUnmounted(() => {
     // abort on unmount
     if (abortController) {
-      // this will stop partition api call
+      // Only set isPartialData if we're still loading or haven't received complete response
+      // AND we haven't already marked it as complete
+      if (
+        (state.loading || state.loadingProgressPercentage < 100) &&
+        !state.isOperationCancelled
+      ) {
+        state.isPartialData = true;
+      }
       abortController.abort();
     }
     if (observer) {
       observer.disconnect();
     }
-
-    // for websocket
-    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+    // cancel http2 queries using http streaming api
+    if (isStreamingEnabled() && state.searchRequestTraceIds?.length > 0) {
       try {
-        // loop on state.searchRequestTraceIds
+        // Only set isPartialData if we're still loading or haven't received complete response
+        // AND we haven't already marked it as complete
+        if (
+          (state.loading || state.loadingProgressPercentage < 100) &&
+          !state.isOperationCancelled
+        ) {
+          state.isPartialData = true;
+        }
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelStreamQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      } catch (error) {
+        console.error("Error during HTTP2 cleanup:", error);
+      } finally {
+        state.searchRequestTraceIds = [];
+      }
+    }
+
+    // Cancel WebSocket queries
+    if (isWebSocketEnabled() && state.searchRequestTraceIds?.length > 0) {
+      try {
+        // Only set isPartialData if we're still loading or haven't received complete response
+        // AND we haven't already marked it as complete
+        if (
+          (state.loading || state.loadingProgressPercentage < 100) &&
+          !state.isOperationCancelled
+        ) {
+          state.isPartialData = true;
+        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
@@ -2265,6 +2347,9 @@ export const usePanelDataLoader = (
       state.resultMetaData = tempPanelCacheValue.resultMetaData;
       state.annotations = tempPanelCacheValue.annotations;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
+      // Restore isPartialData and isOperationCancelled from cache
+      state.isPartialData = tempPanelCacheValue.isPartialData;
+      state.isOperationCancelled = tempPanelCacheValue.isOperationCancelled;
 
       // set that the cache is restored
       isRestoredFromCache = true;
