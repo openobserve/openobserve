@@ -5386,14 +5386,6 @@ const useLogs = () => {
       }
     }
 
-    if(searchObj.meta.refreshInterval === 0) {
-      if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
-        searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
-      } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total != payload.queryReq.query.size)){
-        searchObj.data.queryResults.pageCountTotal = (payload.queryReq.query.size * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + response.content.results.total;
-      }
-    }
-
           // We are storing time_offset for the context of pagecount, to get the partial pagecount
     if (searchObj.data.queryResults) {
       searchObj.data.queryResults.time_offset = response.content?.time_offset;
