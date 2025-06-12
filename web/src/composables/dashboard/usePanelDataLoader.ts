@@ -337,25 +337,14 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
-    console.log("cancelQueryAbort: entering...");
-
     state.loading = false;
     state.isOperationCancelled = true;
     state.isPartialData = true; // Set to true when cancelled
-
-    // For WebSocket and HTTP streaming, we need to check if we're still receiving data
-    if (isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)) {
-      console.log(
-        "cancelQueryAbort: cleaning up WebSocket or HTTP streaming listeners...",
-      );
-    }
 
     if (
       isStreamingEnabled(store.state) &&
       state.searchRequestTraceIds?.length > 0
     ) {
-      console.log("cancelQueryAbort: cancelling http2 queries...");
-
       state.searchRequestTraceIds.forEach((traceId) => {
         cancelStreamQueryBasedOnRequestId({
           trace_id: traceId,
@@ -667,10 +656,6 @@ export const usePanelDataLoader = (
     } catch (error) {
       // Process API error for "sql"
       processApiError(error, "sql");
-      // Set partial data when partition API call fails
-      state.isPartialData = true;
-      // Save current state to cache with partial data flag
-      saveCurrentStateToCache();
       return { result: null, metadata: metadata };
     } finally {
       // set loading to false
@@ -769,14 +754,6 @@ export const usePanelDataLoader = (
     // update result metadata
     state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
       searchRes?.content?.results?.hits ?? {};
-
-    // If we have data and loading is complete, set isPartialData to false
-    // if (
-    //   state.data[payload?.meta?.currentQueryIndex]?.length > 0 &&
-    //   !state.loading
-    // ) {
-    //   state.isPartialData = false;
-    // }
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
@@ -803,8 +780,6 @@ export const usePanelDataLoader = (
         state.loadingCompleted = 0;
         state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
-        state.isPartialData = true;
-        saveCurrentStateToCache();
         processApiError(response?.content, "sql");
       }
 
@@ -834,12 +809,10 @@ export const usePanelDataLoader = (
       state.loadingTotal = 0;
       state.loadingCompleted = 0;
       state.loadingProgressPercentage = 0;
-      state.isPartialData = true;
       state.errorDetail = {
         message: error?.message || "Unknown error in search response",
         code: error?.code ?? "",
       };
-      saveCurrentStateToCache();
     }
   };
 
@@ -884,7 +857,6 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchClose = (payload: any, response: any) => {
-    console.log("Search closed", response);
     removeTraceId(payload?.traceId);
 
     if (response.type === "error") {
@@ -919,8 +891,6 @@ export const usePanelDataLoader = (
   };
 
   const handleSearchReset = (payload: any, traceId?: string) => {
-    // Set partial data flag when resetting
-    // state.isPartialData = true;
     // Save current state to cache
     saveCurrentStateToCache();
     loadData();
@@ -935,13 +905,8 @@ export const usePanelDataLoader = (
     state.loadingCompleted = 0;
     state.loadingProgressPercentage = 0;
     state.isOperationCancelled = false;
-    // Set partial data flag for errors
-    state.isPartialData = true;
 
     processApiError(response?.content, "sql");
-
-    // Save current state to cache with partial data flag
-    saveCurrentStateToCache();
   };
 
   const getDataThroughWebSocket = async (
@@ -955,9 +920,6 @@ export const usePanelDataLoader = (
     try {
       const { traceId } = generateTraceContext();
       addTraceId(traceId);
-
-      // Set partial data flag at start of WebSocket connection
-      // state.isPartialData = true;
 
       const payload: {
         queryReq: any;
@@ -1006,10 +968,6 @@ export const usePanelDataLoader = (
       };
       state.loading = false;
       state.isOperationCancelled = false;
-      // Set partial data flag on error
-      // state.isPartialData = true;
-      // Save current state to cache
-      saveCurrentStateToCache();
     }
   };
 
@@ -1024,9 +982,6 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
-
-      // Set partial data flag at start of streaming
-      // state.isPartialData = true;
 
       const payload: {
         queryReq: any;
@@ -1106,10 +1061,6 @@ export const usePanelDataLoader = (
       };
       state.loading = false;
       state.isOperationCancelled = false;
-      // Set partial data flag on error
-      // state.isPartialData = true;
-      // Save current state to cache
-      saveCurrentStateToCache();
     }
   };
 
@@ -2280,11 +2231,8 @@ export const usePanelDataLoader = (
 
   // remove intersection observer
   onUnmounted(() => {
-    console.log("-----------------onUnmounted-----------------");
-
     // abort on unmount
     if (abortController) {
-      console.log("PanelSchema/Time: aborting the controller on unmount");
       // Only set isPartialData if we're still loading or haven't received complete response
       // AND we haven't already marked it as complete
       if (
@@ -2304,10 +2252,6 @@ export const usePanelDataLoader = (
       state.searchRequestTraceIds?.length > 0
     ) {
       try {
-        console.log(
-          "PanelSchema/Time: cleaning up HTTP2 requests",
-          state.searchRequestTraceIds,
-        );
         // Only set isPartialData if we're still loading or haven't received complete response
         // AND we haven't already marked it as complete
         if (
@@ -2325,10 +2269,6 @@ export const usePanelDataLoader = (
       } catch (error) {
         console.error("Error during HTTP2 cleanup:", error);
       } finally {
-        console.log(
-          "PanelSchema/Time: HTTP2 cleanup done",
-          state.searchRequestTraceIds,
-        );
         state.searchRequestTraceIds = [];
       }
     }
@@ -2339,10 +2279,6 @@ export const usePanelDataLoader = (
       state.searchRequestTraceIds?.length > 0
     ) {
       try {
-        console.log(
-          "PanelSchema/Time: cleaning up WebSocket requests",
-          state.searchRequestTraceIds,
-        );
         // Only set isPartialData if we're still loading or haven't received complete response
         // AND we haven't already marked it as complete
         if (

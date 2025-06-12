@@ -139,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-tooltip>
         </q-btn>
-        {{ isPartialData }}
         <q-btn
           v-if="isPartialData && !isPanelLoading"
           :icon="symOutlinedClockLoader20"
@@ -806,10 +805,7 @@ export default defineComponent({
     const isPartialData = ref(false);
 
     const handleIsPartialDataUpdate = (isPartial: boolean) => {
-      console.log("Partial data update:", isPartial);
-
       isPartialData.value = isPartial;
-      console.log("Updated isPartialData:", isPartialData.value);
     };
 
     return {
