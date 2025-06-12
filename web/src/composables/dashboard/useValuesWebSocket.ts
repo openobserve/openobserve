@@ -181,17 +181,6 @@ const useValuesWebSocket = () => {
     payload: any,
     variableObject: any,
   ): any => {
-    if (isWebSocketEnabled(store.state)) {
-      fetchQueryDataWithWebSocket(payload, {
-        open: sendSearchMessage,
-        close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-        error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-        message: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
-        reset: handleSearchReset,
-      }) as string;
-      return;
-    }
-
     if (isStreamingEnabled(store.state)) {
       fetchQueryDataWithHttpStream(payload, {
         data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
