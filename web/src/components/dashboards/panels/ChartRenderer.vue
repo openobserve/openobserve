@@ -609,8 +609,8 @@ export default defineComponent({
     onUnmounted(() => {
       if (chartRef.value) {
         // unobserve chart
-        isChartVisibleObserver.unobserve(chartRef.value);
-        isChartVisibleObserver.disconnect();
+        isChartVisibleObserver?.unobserve(chartRef.value);
+        isChartVisibleObserver?.disconnect();
       }
 
       cleanupChart();
