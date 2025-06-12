@@ -370,7 +370,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_lru_cache_set_file() {
+    async fn test_cache_memory_lru_cache_set_file() {
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
@@ -384,7 +384,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_lru_cache_get_file() {
+    async fn test_cache_memory_lru_cache_get_file() {
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().memory_cache.max_size, "lru");
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_2_1.parquet";
@@ -400,7 +400,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_lru_cache_miss() {
+    async fn test_cache_memory_lru_cache_miss() {
         let mut file_data = FileData::with_capacity_and_cache_strategy(100, "lru");
         let file_key1 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_3_2.parquet";
@@ -416,7 +416,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_set_file() {
+    async fn test_cache_memory_fifo_cache_set_file() {
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
@@ -430,7 +430,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_get_file() {
+    async fn test_cache_memory_fifo_cache_get_file() {
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().memory_cache.max_size, "fifo");
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_5_1.parquet";
@@ -446,7 +446,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_miss() {
+    async fn test_cache_memory_fifo_cache_miss() {
         let mut file_data = FileData::with_capacity_and_cache_strategy(100, "fifo");
         let file_key1 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_6_2.parquet";

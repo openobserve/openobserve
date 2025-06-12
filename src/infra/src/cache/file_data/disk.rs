@@ -78,6 +78,7 @@ static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     files
 });
 
+// result cache in memory index
 pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
 
@@ -88,6 +89,8 @@ pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::n
 
 pub struct FileData {
     max_size: usize,
+    release_size: usize,
+    gc_size: usize,
     cur_size: usize,
     root_dir: String,
     multi_dir: Vec<String>,
@@ -107,20 +110,40 @@ impl Default for FileData {
 }
 
 impl FileData {
-    fn new(file_type: FileType) -> FileData {
+    fn new(file_type: FileType) -> Self {
         let cfg = get_config();
-        let size = match file_type {
-            FileType::DATA => cfg.disk_cache.max_size,
-            FileType::RESULT => cfg.disk_cache.result_max_size,
+        let (max_size, release_size, gc_size) = match file_type {
+            FileType::DATA => (
+                cfg.disk_cache.max_size,
+                cfg.disk_cache.release_size,
+                cfg.disk_cache.gc_size,
+            ),
+            FileType::RESULT => (
+                cfg.disk_cache.result_max_size,
+                cfg.disk_cache.result_max_size / 10,
+                cfg.disk_cache.result_max_size / 100,
+            ),
         };
-        FileData::with_capacity_and_cache_strategy(size, &cfg.disk_cache.cache_strategy)
+        Self::with_capacity_and_cache_strategy(
+            max_size,
+            release_size,
+            gc_size,
+            &cfg.disk_cache.cache_strategy,
+        )
     }
 
-    fn with_capacity_and_cache_strategy(max_size: usize, strategy: &str) -> FileData {
+    fn with_capacity_and_cache_strategy(
+        max_size: usize,
+        release_size: usize,
+        gc_size: usize,
+        strategy: &str,
+    ) -> Self {
         let cfg = get_config();
 
-        FileData {
+        Self {
             max_size,
+            release_size,
+            gc_size,
             cur_size: 0,
             root_dir: format!(
                 "{}{}",
@@ -144,13 +167,10 @@ impl FileData {
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
-            Ok(data) => Some(Bytes::from(data)),
-            Err(_) => None,
-        })
-        .await
-        .ok()
-        .flatten()
+        config::utils::async_file::get_file_contents(&file_path, range)
+            .await
+            .ok()
+            .map(Bytes::from)
     }
 
     async fn get_size(&self, file: &str) -> Option<usize> {
@@ -169,10 +189,7 @@ impl FileData {
                 data_size
             );
             // cache is full, need release some space
-            let need_release_size = min(
-                self.max_size,
-                max(get_config().disk_cache.release_size, data_size * 100),
-            );
+            let need_release_size = min(self.max_size, max(self.release_size, data_size * 100));
             self.gc(need_release_size).await?;
         }
 
@@ -253,7 +270,7 @@ impl FileData {
             if key.starts_with("results/") {
                 let columns = key.split('/').collect::<Vec<&str>>();
                 let query_key = format!(
-                    "{}_{}_{}_{}",
+                    "{}_{}_{}_{}", // org_id, stream_type, stream_name, hashed_query
                     columns[1], columns[2], columns[3], columns[4]
                 );
                 remove_result_files.push(query_key);
@@ -628,23 +645,25 @@ async fn gc() -> Result<(), anyhow::Error> {
 
     for file in FILES.iter() {
         let r = file.read().await;
-        if r.cur_size + cfg.disk_cache.release_size < r.max_size {
+        if r.cur_size + r.release_size < r.max_size {
             continue;
         }
+        let gc_size = r.gc_size;
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(gc_size).await?;
         drop(w);
     }
     for file in RESULT_FILES.iter() {
         let r = file.read().await;
-        if r.cur_size + cfg.disk_cache.release_size < r.max_size {
+        if r.cur_size + r.release_size < r.max_size {
             drop(r);
             continue;
         }
+        let gc_size = r.gc_size;
         drop(r);
         let mut w = file.write().await;
-        w.gc(cfg.disk_cache.gc_size).await?;
+        w.gc(gc_size).await?;
         drop(w);
     }
     Ok(())
@@ -762,8 +781,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_lru_cache_set_file() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
+    async fn test_cache_disk_lru_cache_set_file() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, 100, 1, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
@@ -776,9 +795,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_lru_cache_get_file() {
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
+    async fn test_cache_disk_lru_cache_get_file() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, 100, 1, "lru");
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -791,8 +809,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_lru_cache_miss() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
+    async fn test_cache_disk_lru_cache_miss() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(10, 1, 1, "lru");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
@@ -807,8 +825,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_set_file() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
+    async fn test_cache_disk_fifo_cache_set_file() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, 100, 1, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
@@ -824,9 +842,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_get_file() {
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
+    async fn test_cache_disk_fifo_cache_get_file() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, 100, 1, "fifo");
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -839,8 +856,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_miss() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
+    async fn test_cache_disk_fifo_cache_miss() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(10, 1, 1, "fifo");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
@@ -855,15 +872,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_multi_dir() {
+    async fn test_cache_disk_multi_dir() {
         let multi_dir: Vec<String> = "dir1 , dir2 , dir3"
             .split(',')
             .filter(|s| !s.trim().is_empty())
             .map(|s| s.to_string())
             .collect();
 
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, 100, 1, "lru");
         file_data.multi_dir = multi_dir;
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
@@ -879,7 +895,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_parse_result_cache_key() {
+    async fn test_cache_disk_parse_result_cache_key() {
         let file_key = "results/default/logs/default/16042959487540176184_30_zo_sql_key/1744081170000000_1744081170000000_1_0.json";
         let Some((org_id, stream_type, query_key, meta)) = parse_result_cache_key(file_key) else {
             panic!("parse result cache key error");
