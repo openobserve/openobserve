@@ -560,11 +560,16 @@ export default defineComponent({
       chart = null;
 
       // Clean up intersection observer
-      if (chartRef.value) {
-        isChartVisibleObserver?.unobserve(chartRef.value);
-        isChartVisibleObserver?.disconnect();
+      if (chartRef.value && isChartVisibleObserver) {
+        isChartVisibleObserver.unobserve(chartRef.value);
+        isChartVisibleObserver.disconnect();
+        isChartVisibleObserver = null;
       }
-      isChartVisibleObserver = null;
+      
+      // Clear chart reference
+      if (chartRef.value) {
+        chartRef.value = null;
+      }
     });
 
     // observer for chart visibility
@@ -590,13 +595,6 @@ export default defineComponent({
       if (chartRef.value) {
         // observe chart
         isChartVisibleObserver.observe(chartRef.value);
-      }
-    });
-
-    onUnmounted(() => {
-      if (chartRef.value) {
-        // unobserve chart
-        isChartVisibleObserver.unobserve(chartRef.value);
       }
     });
 
