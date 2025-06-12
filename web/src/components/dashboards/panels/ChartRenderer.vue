@@ -494,7 +494,7 @@ export default defineComponent({
       () => store.state.theme,
       (newTheme) => {
         const theme = newTheme === "dark" ? "dark" : "light";
-        chart?.dispose();
+        cleanupChart();
         chart = echarts.init(chartRef.value, theme, {
           renderer: props.renderType,
         });
@@ -591,14 +591,32 @@ export default defineComponent({
         // observe chart
         isChartVisibleObserver.observe(chartRef.value);
       }
+
     });
 
     onUnmounted(() => {
       if (chartRef.value) {
         // unobserve chart
         isChartVisibleObserver.unobserve(chartRef.value);
+        isChartVisibleObserver.disconnect();
       }
+
+      cleanupChart();
     });
+
+    const cleanupChart = () => {
+      if (chart) {
+        chart.dispose();
+        chart?.off("mousemove");
+        chart?.off("mouseout");
+        chart?.off("globalout");
+        chart?.off("legendselectchanged");
+        chart?.off("highlight");
+        chart?.off("dataZoom");
+        chart?.off("click");
+        chart?.off("mouseover");
+      }
+    };
 
     //need to resize chart on activated
     onActivated(() => {
