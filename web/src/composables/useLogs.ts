@@ -2448,12 +2448,12 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      console.log("searchObj.data.queryResults.histogram_interval", searchObj.data.queryResults.histogram_interval);
       if(isAggregation && !queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
         const interval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval + ' seconds' : null;
         let query = await changeHistogramInterval(queryReq.query.sql, interval);
-        console.log("query", query);
-        queryReq.query.sql = query;
+        if(query) {
+          queryReq.query.sql = query;
+        }
       }
 
       const { traceparent, traceId } = generateTraceContext();
