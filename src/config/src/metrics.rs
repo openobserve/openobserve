@@ -905,10 +905,10 @@ pub static PIPELINE_WAL_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static PIPELINE_WAL_INGESTION_MB: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "pipeline_wal_ingestion_mb",
+            "pipeline_wal_ingestion_bytes",
             "Bytes ingested across all pipelines",
         )
         .namespace(NAMESPACE)
@@ -918,10 +918,10 @@ pub static PIPELINE_WAL_INGESTION_MB: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static PIPELINE_EXPORTED_MB: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "pipeline_http_exported_mb",
+            "pipeline_http_exported_bytes",
             "Bytes exported across all pipelines",
         )
         .namespace(NAMESPACE)
