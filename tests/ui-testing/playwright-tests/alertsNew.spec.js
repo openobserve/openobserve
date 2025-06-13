@@ -47,7 +47,7 @@ test.describe.serial("Alerts Module testcases", () => {
     if (!createdDestinationName) {
       await ensureTemplateExists();
       createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
-      const slackUrl = process.env["SLACK_DEST_URL"];
+      const slackUrl = "DEMO";
       await destinationsPage.createDestination(createdDestinationName, slackUrl, createdTemplateName);
       console.log('Created destination for dependency:', createdDestinationName);
     }
@@ -92,7 +92,7 @@ test.describe.serial("Alerts Module testcases", () => {
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
 
     // Create destination with Slack URL from environment
-    const slackUrl = process.env["SLACK_DEST_URL"];
+    const slackUrl = "DEMO";
     await destinationsPage.createDestination(createdDestinationName, slackUrl, createdTemplateName);
     console.log('Successfully created destination:', createdDestinationName);
   });
@@ -138,6 +138,25 @@ test.describe.serial("Alerts Module testcases", () => {
     await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
     await alertsPage.moveAllAlertsToFolder(targetFolderName);
 
+    // Navigate to the target folder
+    await page.waitForTimeout(2000);
+    await alertsPage.navigateToFolder(targetFolderName);
+    await page.waitForTimeout(2000);
+
+    // Search for the alert and verify results
+    await alertsPage.searchAlert(alertName);
+    await alertsPage.verifySearchResults(2);
+
+    // Delete first alert
+    await alertsPage.deleteAlertByRow(alertName, '01');
+
+    // Search again and verify only one result remains
+    await alertsPage.searchAlert(alertName);
+    await alertsPage.verifySearchResults(1);
+
+    // Delete second alert
+    await alertsPage.deleteSingleAlert(alertName);
+
     // // Navigate back to alerts page to delete the original folder
     // await commonActions.navigateToAlerts();
     // await page.waitForTimeout(2000);
@@ -159,4 +178,5 @@ test.describe.serial("Alerts Module testcases", () => {
     // Try to delete template and handle both success and in-use scenarios
     await templatesPage.deleteTemplateAndVerify(createdTemplateName);
   });
+
 });

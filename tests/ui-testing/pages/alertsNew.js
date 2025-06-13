@@ -58,6 +58,11 @@ export class AlertsNewPage {
         this.moveButton = '[data-test="alerts-folder-move"]';
         this.alertsMovedMessage = 'alerts Moved successfully';
 
+        // Alert search and deletion locators
+        this.alertSearchInput = '[data-test="alert-list-search-input"]';
+        this.alertDeleteOption = 'Delete';
+        this.alertDeletedMessage = 'Alert deleted';
+
         // Store the generated folder name and alert name
         this.currentFolderName = '';
         this.currentAlertName = '';
@@ -104,7 +109,10 @@ export class AlertsNewPage {
         await this.page.getByText(folderName).click();
     }
 
-    /** @param {string} folderName */
+    /**
+     * Navigate to a specific folder
+     * @param {string} folderName - Name of the folder to navigate to
+     */
     async navigateToFolder(folderName) {
         await this.page.getByText(folderName).click();
         await this.page.waitForTimeout(2000); // Wait for folder content to load
@@ -239,26 +247,118 @@ export class AlertsNewPage {
     }
 
     async deleteFolder(folderName) {
-        // Step 1: Hover on the full folder row to trigger the three-dot button to appear
-        await this.page.hover(`div.folder-item:has-text("${folderName}")`);
+        // 1. Hover on the folder row to trigger the menu to appear
+        const folderRow = this.page.locator(`div.folder-item:has-text("${folderName}")`);
+        await folderRow.hover();
+        await this.page.waitForTimeout(500); // Give time for hover effect to apply
 
-        // Step 2: Wait a bit to let the DOM update
-        await this.page.waitForTimeout(500);
+        // 2. Wait for the 3-dot button to appear
+        const dotButton = this.page.locator(`div.folder-item:has-text("${folderName}") button.q-btn`);
+        await dotButton.waitFor({ state: 'visible', timeout: 3000 });
 
-        // Step 3: Click the 3-dot button using JS execution inside browser
-        await this.page.evaluate((name) => {
-            const folders = Array.from(document.querySelectorAll('.folder-item'));
-            const target = folders.find(el => el.textContent?.includes(name));
-            const button = target?.querySelector('button.q-btn');
-            button?.click();
-        }, folderName);
+        // 3. Optional: Verify Playwright thinks it's visible and enabled
+        console.log('Button visible:', await dotButton.isVisible());
+        console.log('Button enabled:', await dotButton.isEnabled());
 
-        // Continue as before
+        // 4. Force click the button
+        await dotButton.click({ force: true });
+
+        // Verify the click worked by checking for Delete option
+        await expect(this.page.getByText(this.deleteFolderOption)).toBeVisible({ timeout: 3000 });
+
+        // Continue with the rest of the deletion process
         await this.page.getByText(this.deleteFolderOption).click();
         await expect(this.page.getByText(this.deleteFolderConfirmText)).toBeVisible();
         await this.page.locator(this.confirmButton).click();
         await expect(this.page.getByText(this.folderDeletedMessage)).toBeVisible();
 
         console.log('Successfully deleted folder:', folderName);
+    }
+
+    /**
+     * Pauses an alert
+     * @param {string} alertName - Name of the alert to pause
+     */
+    async pauseAlert(alertName) {
+        await this.page.getByRole('row', { name: `01 ${alertName}` })
+            .locator(`[data-test="alert-list-${alertName}-pause-start-alert"]`)
+            .click();
+        await this.page.getByRole('button', { name: 'start' }).click();
+        await expect(this.page.getByText('Alert Paused Successfully')).toBeVisible();
+    }
+
+    /**
+     * Resumes an alert
+     * @param {string} alertName - Name of the alert to resume
+     */
+    async resumeAlert(alertName) {
+        await this.page.getByRole('row', { name: `01 ${alertName}` })
+            .locator(`[data-test="alert-list-${alertName}-pause-start-alert"]`)
+            .click();
+        await this.page.getByRole('button', { name: 'start' }).click();
+        await expect(this.page.getByText('Alert Resumed Successfully')).toBeVisible();
+    }
+
+    /**
+     * Deletes an alert
+     * @param {string} alertName - Name of the alert to delete
+     * @param {string} [rowNumber='01'] - Row number of the alert (defaults to '01')
+     */
+    async deleteAlert(alertName, rowNumber = '01') {
+        await this.page.getByRole('row', { name: `${rowNumber} ${alertName}` })
+            .locator(`[data-test="alert-list-${alertName}-more-options"]`)
+            .click();
+        await this.page.getByText('Delete').click();
+        await this.page.locator('[data-test="confirm-button"]').click();
+        await expect(this.page.getByText('Alert deleted')).toBeVisible();
+    }
+
+    /**
+     * Search for alerts by name
+     * @param {string} alertName - Name of the alert to search for
+     */
+    async searchAlert(alertName) {
+        await this.page.locator(this.alertSearchInput).click();
+        await this.page.locator(this.alertSearchInput).fill('');  // Clear the input first
+        await this.page.locator(this.alertSearchInput).fill(alertName.toLowerCase());
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Verify search results count
+     * @param {number} expectedCount - Expected number of results
+     */
+    async verifySearchResults(expectedCount) {
+        const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
+        await expect(this.page.getByText(resultText).nth(1)).toBeVisible();
+    }
+
+    /**
+     * Delete alert by row number
+     * @param {string} alertName - Name of the alert to delete
+     * @param {string} rowNumber - Row number of the alert (e.g., '01')
+     */
+    async deleteAlertByRow(alertName, rowNumber) {
+        await this.page.getByRole('row', { name: `${rowNumber} ${alertName}` })
+            .locator(`[data-test="alert-list-${alertName}-more-options"]`)
+            .click();
+        await this.page.waitForTimeout(1000);
+        await this.page.getByText('Delete', { exact: true }).click();
+        await this.page.locator(this.confirmButton).click();
+        await expect(this.page.getByText(this.alertDeletedMessage)).toBeVisible();
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Delete alert when only one result exists
+     * @param {string} alertName - Name of the alert to delete
+     */
+    async deleteSingleAlert(alertName) {
+        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`)
+            .click({ force: true });
+        await this.page.waitForTimeout(1000);
+        await this.page.getByText('Delete', { exact: true }).click();
+        await this.page.locator(this.confirmButton).click();
+        await expect(this.page.getByText(this.alertDeletedMessage)).toBeVisible();
     }
 } 
