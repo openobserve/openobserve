@@ -35,7 +35,10 @@ use super::{
     empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
     streaming_aggs_exec,
 };
-use crate::service::search::{index::IndexCondition, request::Request};
+use crate::service::search::{
+    cache::streaming_aggs::get_streaming_aggs_records_from_disk, index::IndexCondition,
+    request::Request,
+};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
@@ -205,7 +208,7 @@ impl StreamingAggsRewriter {
         let streaming_item = streaming_aggs_exec::GLOBAL_CACHE.id_cache.get(&id);
         if let Some(item) = streaming_item {
             // Check record batch cache for partition start time and end time
-            let cached_result = match streaming_aggs_exec::check_record_batches_cache(
+            let cached_result = match get_streaming_aggs_records_from_disk(
                 start_time,
                 end_time,
                 &item.get_cache_file_path(),

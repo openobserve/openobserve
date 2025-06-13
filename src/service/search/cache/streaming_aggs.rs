@@ -52,6 +52,7 @@ pub struct RecordBatchCacheRequest {
     pub end_time: i64,
 }
 
+// Main handler to write record batches to disk
 pub fn cache_record_batches_to_disk(
     request: RecordBatchCacheRequest,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -182,10 +183,11 @@ pub async fn get_record_batches(
     Ok(batches)
 }
 
+// Main handler for getting streaming aggs records from disk
 pub async fn get_streaming_aggs_records_from_disk(
-    cache_file_path: &str,
     start_time: i64,
     end_time: i64,
+    cache_file_path: &str,
 ) -> std::io::Result<StreamingAggsCacheResult> {
     if !config::get_config().common.result_cache_enabled {
         return Ok(StreamingAggsCacheResult::default());

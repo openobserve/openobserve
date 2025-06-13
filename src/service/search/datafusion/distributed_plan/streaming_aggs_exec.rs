@@ -42,7 +42,7 @@ use crate::{
     common::meta::search::StreamingAggsCacheResult,
     service::search::cache::streaming_aggs::{
         RecordBatchCacheRequest, cache_record_batches_to_disk, generate_record_batch_file_name,
-        get_streaming_aggs_records_from_disk, parse_record_batch_cache_file_path,
+        parse_record_batch_cache_file_path,
     },
 };
 
@@ -581,16 +581,6 @@ impl StreamingIdItem {
 fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> String {
     let cache_file_path = GLOBAL_CACHE.id_cache.get_cache_file_path(streaming_id);
     cache_file_path.unwrap_or_default()
-}
-
-pub async fn check_record_batches_cache(
-    query_start_time: i64,
-    query_end_time: i64,
-    file_path: &str,
-) -> anyhow::Result<StreamingAggsCacheResult> {
-    let cache_result =
-        get_streaming_aggs_records_from_disk(file_path, query_start_time, query_end_time).await?;
-    Ok(cache_result)
 }
 
 // prepare cache for the streaming_id
