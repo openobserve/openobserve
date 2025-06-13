@@ -247,9 +247,8 @@ pub async fn search(
         scan_stats.compressed_size
     );
 
-    if cfg.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
-    }
+    // check memory circuit breaker
+    super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
