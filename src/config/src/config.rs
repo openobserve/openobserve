@@ -1808,6 +1808,12 @@ pub struct Pipeline {
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
+        default = true,
+        help = "Whether to use shared HTTP clients or create new ones for each request"
+    )]
+    pub use_shared_http_client: bool,
 }
 
 #[derive(EnvConfig)]
