@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-show="showSearchHistory">
+    <div v-if="showSearchHistory">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div v-show="showSearchScheduler">
+    <div v-if="showSearchScheduler">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"
