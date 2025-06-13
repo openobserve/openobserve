@@ -412,7 +412,7 @@ pub fn generate_record_batch_interval(start_time: i64, end_time: i64) -> Interva
     let intervals = [
         (Duration::try_hours(24 * 15), Interval::OneDay),
         (Duration::try_hours(24 * 1), Interval::OneHour),
-        (Duration::try_hours(6), Interval::ThirtyMinutes),
+        (Duration::try_hours(3), Interval::ThirtyMinutes),
         (Duration::try_hours(1), Interval::TenMinutes),
         (Duration::try_minutes(15), Interval::FiveMinutes),
     ];
