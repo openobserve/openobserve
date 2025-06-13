@@ -20,7 +20,7 @@ import { createStore } from "vuex";
 import { useRouter } from "vue-router";
 import { createI18n } from "vue-i18n";
 import type { AxiosResponse } from "axios";
-import { defineComponent } from "vue";
+import { defineComponent, nextTick } from "vue";
 import useLogs from "../../composables/useLogs";
 import searchService from "../../services/search";
 import savedviewsService from "../../services/saved_views";
@@ -124,6 +124,7 @@ describe("Use Logs Composable", () => {
       }
     });
 
+
     // Reset mocks
     vi.clearAllMocks();
 
@@ -142,12 +143,18 @@ describe("Use Logs Composable", () => {
 
   afterEach(() => {
     // Cleanup
+    wrapper.vm.searchObj = undefined
     wrapper.unmount();
     document.body.innerHTML = "";
   });
 
 
   describe("Query Partitions", () => {
+
+    afterEach(() => {
+      wrapper.vm.searchObj = undefined
+    });
+
     it("should get query partitions successfully", async () => {
       // Mock partition response
       vi.mocked(searchService.partition).mockImplementationOnce(() => 
@@ -249,6 +256,7 @@ describe("Use Logs Composable", () => {
     });
 
     afterEach(() => {
+      wrapper.vm.searchObj = undefined
       vi.clearAllMocks();
     });
 
@@ -496,6 +504,7 @@ describe("Use Logs Composable", () => {
     });
     afterEach(() => {
       vi.clearAllMocks();
+      wrapper.vm.searchObj = undefined
     });
 
     it("should generate histogram data from aggregations", () => {
@@ -593,6 +602,10 @@ describe("Use Logs Composable", () => {
     await flushPromises();
     });
 
+    afterEach(() => {
+      wrapper.vm.searchObj = undefined
+    });
+
     it('should build search request with SQL mode', async () => {
         await flushPromises();
       wrapper.vm.searchObj.data.stream.selectedStream = ['default_2'];
@@ -631,4 +644,171 @@ describe("Use Logs Composable", () => {
     });
   });
 
+  describe("refreshPartitionPagination", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      wrapper.vm.searchObj = {
+        meta: {
+          jobId: "",
+          resultGrid: {
+            rowsPerPage: 50,
+          },
+          sqlMode: false,
+          showHistogram: false,
+        },
+        data: {
+          resultGrid: {
+            currentPage: 1,
+          },
+          stream: {
+            selectedStream: ["default"],
+          },
+          queryResults: {
+            total: 10,
+            aggs: null,
+            partitionDetail: {
+              partitions: [
+                [1714732800000000, 1714736400000000],
+                [1714736400000000, 1714740000000000]
+                  ],
+              partitionTotal: [10, 22],
+              paginations: [
+                [
+                  {
+                    startTime: 1714732800000000,
+                    endTime: 1714736400000000,
+                    from: 0,
+                    size: 50,
+                  }
+                ],
+                [
+                  {
+                    startTime: 1714736400000000,
+                    endTime: 1714740000000000,
+                    from: 0,
+                    size: 50,
+                  }
+                ]
+              ],
+            },
+          },
+        },
+        loadingHistogram: false,
+      };
+    });
+    afterEach(() => {
+      wrapper.vm.searchObj = undefined
+    });
+
+    it("should correctly generate paginations for given partitions and calculate total", () => {
+
+      console.log(wrapper.vm.searchObj.data.queryResults,'wrapper.vm.searchObj.data.queryResults')
+      wrapper.vm.refreshPartitionPagination(false, false);
+
+      const { paginations, partitionTotal } =
+        wrapper.vm.searchObj.data.queryResults.partitionDetail;
+      const { total } = wrapper.vm.searchObj.data.queryResults;
+
+
+      expect(paginations).toHaveLength(2);
+
+      // Page 1: 50 records from partition 1
+      console.log(paginations,'paginatoins')
+
+      expect(paginations[0]).toEqual([
+        {
+          startTime: 1714732800000000,
+          endTime: 1714736400000000,
+          from: 0,
+          size: 50
+        }
+      ])
+
+      expect(paginations[1]).toEqual([
+        {
+          startTime: 1714736400000000,
+          endTime: 1714740000000000,
+          from: 0,
+          size: 50
+        }
+      ])
+    });
+
+  });
+
+  describe("restoreUrlQueryParams", () => {
+    beforeEach(() => {
+  
+
+      vi.mock('vue-router', () => ({
+        useRouter: () => ({
+          currentRoute: {
+            name: "logs1",
+            value: {
+              query: {
+                stream: "stream1,stream2",
+                from: "1614556800000",
+                to: "1614643200000"
+              }
+            }
+          },
+          push: vi.fn()
+        })
+      }));
+
+      wrapper.vm.searchObj.data.stream.selectedStream = [];
+
+
+      // Mock router
+      wrapper.vm.router = {
+        currentRoute: {
+          value: {
+            query: {
+              stream: "stream1,stream2",
+              from: "1614556800000",
+              to: "1614643200000"
+            }
+          }
+        },
+        push: vi.fn()
+      };
+    });
+
+    afterEach(() => {
+      wrapper.vm.searchObj = undefined;
+    });
+
+    it("should handle empty query params", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+
+      await nextTick();
+
+      expect(wrapper.vm.searchObj.shouldIgnoreWatcher).toBe(false);
+      expect(wrapper.vm.router.push).not.toHaveBeenCalled();
+    });
+
+    it("should restore stream and datetime parameters", async () => {
+
+      wrapper.vm.router.currentRoute.name = "logs1";
+      wrapper.vm.router.currentRoute.query = {
+        stream: "stream1,stream2",
+        from: "1614556800000",
+        to: "1614643200000"
+      };
+
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+
+      await nextTick();
+
+      expect(wrapper.vm.searchObj.data.datetime).toEqual({
+        startTime: 1614556800000,
+        endTime: 1614643200000,
+        relativeTimePeriod: null,
+        type: "absolute"
+      });
+    });
+  });
 });
+
