@@ -748,10 +748,15 @@ export default defineComponent({
     });
 
     onUnmounted(async () => {
+      // console.time("onUnmounted");
+      // clear a few things
+      resetDashboardPanelData();
+
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
 
       removeAiContextHandler();
+      // console.timeEnd("onUnmounted");
 
       // Clear all refs to prevent memory leaks
       dateTimePickerRef.value = null;

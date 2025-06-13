@@ -205,7 +205,6 @@ export default defineComponent({
     const { promqlMode, dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
-
     return {
       t,
       ChartsArray: chartsArray,
