@@ -20,7 +20,8 @@ use prometheus::{
     CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
     TextEncoder,
 };
-pub const NAMESPACE: &str = "zo"; const HELP_SUFFIX: &str =
+pub const NAMESPACE: &str = "zo";
+const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
 pub const SPAN_METRICS_BUCKET: [f64; 15] = [
     0.1, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
@@ -929,7 +930,6 @@ pub static PIPELINE_EXPORTED_MB: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-
 
 fn register_metrics(registry: &Registry) {
     // http latency
