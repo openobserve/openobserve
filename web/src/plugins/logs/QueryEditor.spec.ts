@@ -35,7 +35,7 @@ installQuasar({
 describe("Search Result", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    vi.useFakeTimers();
+    
     wrapper = mount(QueryEditor, {
       attachTo: "#app",
       props: {
