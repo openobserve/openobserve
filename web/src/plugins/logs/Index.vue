@@ -373,9 +373,7 @@ import {
   useLocalInterestingFields,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
-import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -383,8 +381,6 @@ import { cloneDeep } from "lodash-es";
 import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
-import SearchHistory from "@/plugins/logs/SearchHistory.vue";
-import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 
@@ -392,7 +388,9 @@ export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
-    SearchSchedulersList,
+    SearchSchedulersList: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchSchedulersList.vue")
+    ),
     IndexList: defineAsyncComponent(
       () => import("@/plugins/logs/IndexList.vue"),
     ),
@@ -402,9 +400,15 @@ export default defineComponent({
     ConfirmDialog: defineAsyncComponent(
       () => import("@/components/ConfirmDialog.vue"),
     ),
-    SanitizedHtmlRenderer,
-    VisualizeLogsQuery,
-    SearchHistory,
+    SanitizedHtmlRenderer: defineAsyncComponent(
+      () => import("@/components/SanitizedHtmlRenderer.vue")
+    ),
+    VisualizeLogsQuery: defineAsyncComponent(
+      () => import("@/plugins/logs/VisualizeLogsQuery.vue")
+    ),
+    SearchHistory: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchHistory.vue")
+    ),
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
