@@ -114,6 +114,7 @@ pub enum Error {
         )>,
     },
     MemoryTableOverflowError {},
+    MemoryCircuitBreakerError {},
     ExternalError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },

@@ -19,10 +19,7 @@ use config::utils::json;
 use hashbrown::HashMap;
 use serde::Deserialize;
 
-use crate::{
-    common::meta::ingestion::{HecResponse, HecStatus, IngestionRequest},
-    service::ingestion::check_ingestion_allowed,
-};
+use crate::common::meta::ingestion::{HecResponse, HecStatus, IngestionRequest};
 
 #[derive(Deserialize, Clone)]
 struct HecEntry {
@@ -38,11 +35,6 @@ pub async fn ingest(
     body: web::Bytes,
     user_email: &str,
 ) -> Result<HecResponse, anyhow::Error> {
-    // check system resource
-    if check_ingestion_allowed(org_id, None).is_err() {
-        return Ok(HecStatus::InvalidIndex.into());
-    }
-
     let reader = BufReader::new(body.as_ref());
     let mut streams: HashMap<String, Vec<json::Value>> = HashMap::new();
 

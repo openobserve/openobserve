@@ -41,6 +41,10 @@ pub struct QueryParams {
 
 fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Result<()> {
     let cfg = get_config();
+    if !cfg.common.memory_circuit_breaker_enable || cfg.common.memory_circuit_breaker_ratio == 0 {
+        return Ok(());
+    }
+
     let scan_size = if scan_stats.compressed_size > 0 {
         scan_stats.compressed_size
     } else {
@@ -64,7 +68,7 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
                     / 100
             );
             log::warn!("[circuit_breaker {trace_id}] {}", err);
-            return Err(Error::Message(err.to_string()));
+            return Err(Error::IngestionError(err.to_string()));
         }
     }
     Ok(())
