@@ -6,6 +6,8 @@ import { waitForDashboardPage } from "../utils/dashCreation.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
 
+// Refactored test cases using POM
+
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard folder testcases", () => {
@@ -28,10 +30,11 @@ test.describe("dashboard folder testcases", () => {
     const dashboardPage = new DashboardListPage(page);
     const dashboardFolders = new DashboardFolder(page);
 
+    // Navigate to dashboards
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    //  Define folderName first
+    // Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
 
     // Create the folder
@@ -39,24 +42,24 @@ test.describe("dashboard folder testcases", () => {
 
     // Search to confirm it exists
     await dashboardFolders.searchFolder(folderName);
-
     await expect(page.locator(`text=${folderName}`)).toBeVisible();
 
-    //  Delete folder
+    // Delete folder
     await dashboardFolders.deleteFolder(folderName);
     await expect(page.locator(`text=${folderName}`)).toHaveCount(0);
   });
 
-  test("should create and Edit folder name and verify it's updated", async ({
+  test("should create and edit folder name and verify it's updated", async ({
     page,
   }) => {
     const dashboardPage = new DashboardListPage(page);
     const dashboardFolders = new DashboardFolder(page);
 
+    // Navigate to dashboards
     await dashboardPage.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    //  Define folderName first
+    // Define folderName first
     const folderName = dashboardFolders.generateUniqueFolderName("t");
 
     // Create the folder
