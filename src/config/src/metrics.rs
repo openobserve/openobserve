@@ -1172,10 +1172,10 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(PIPELINE_WAL_FILES.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(PIPELINE_WAL_INGESTION_MB.clone()))
+        .register(Box::new(PIPELINE_WAL_INGESTION_BYTES.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(PIPELINE_EXPORTED_MB.clone()))
+        .register(Box::new(PIPELINE_EXPORTED_BYTES.clone()))
         .expect("Metric registered");
 }
 
