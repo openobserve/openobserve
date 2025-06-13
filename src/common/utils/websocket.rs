@@ -70,7 +70,6 @@ pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ra
     range * (1.0 - result_cache_ratio as f64 / 100.0)
 }
 
-
 struct HistogramIntervalVisitorMut {
     pub interval: i64,
 }
