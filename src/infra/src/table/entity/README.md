@@ -14,8 +14,10 @@ sea-orm-cli generate entity \
   --ignore-tables file_list_history \
   --ignore-tables file_list_jobs \
   --ignore-tables file_list \
+  --ignore-tables legacy_records \
   --ignore-tables meta \
   --ignore-tables pipeline \
+  --ignore-tables records \
   --ignore-tables scheduled_jobs \
   --ignore-tables schema_history \
   --ignore-tables seaql_migrations \

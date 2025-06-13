@@ -17,7 +17,7 @@ use config::{
     ider,
     meta::{
         alerts::alert::ListAlertsParams,
-        dashboards::ListDashboardsParams,
+        dashboards::{ListDashboardsParams, reports::ListReportsParams},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
 };
@@ -41,6 +41,11 @@ pub enum FolderError {
     #[error("InfraError# Internal error")]
     InfraError(#[from] infra::errors::Error),
 
+    /// An error that occurs while interacting with reports through the [infra::table::reports]
+    /// module.
+    #[error("ReportsError# Internal error")]
+    TableReportsError(#[from] table::reports::Error),
+
     /// An error that occurs when trying to set a folder name to the empty string.
     #[error("Folder name cannot be empty")]
     MissingName,
@@ -61,6 +66,10 @@ pub enum FolderError {
     /// An error that occurs when trying to delete a folder that contains alerts.
     #[error("Folder contains alerts. Please move/delete alerts from folder.")]
     DeleteWithAlerts,
+
+    /// An error that occurs when trying to delete a folder that contains reports.
+    #[error("Folder contains reports. Please move/delete reports from folder.")]
+    DeleteWithReports,
 
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
@@ -109,6 +118,7 @@ pub async fn save_folder(
     let folder_type_ofga = match folder_type {
         FolderType::Dashboards => "folders",
         FolderType::Alerts => "alert_folders",
+        FolderType::Reports => "report_folders",
     };
     set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
@@ -180,6 +190,7 @@ pub async fn list_folders(
     let folder_ofga_model = match folder_type {
         FolderType::Dashboards => OFGA_MODELS.get("folders").unwrap().key,
         FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
+        FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -231,6 +242,7 @@ pub async fn delete_folder(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), FolderError> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match folder_type {
         FolderType::Dashboards => {
             let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
@@ -240,11 +252,17 @@ pub async fn delete_folder(
             }
         }
         FolderType::Alerts => {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
             let params = ListAlertsParams::new(org_id).in_folder(folder_id);
             let alerts = table::alerts::list(client, params).await?;
             if !alerts.is_empty() {
                 return Err(FolderError::DeleteWithAlerts);
+            }
+        }
+        FolderType::Reports => {
+            let params = ListReportsParams::new(org_id).in_folder(folder_id);
+            let reports = table::reports::list_reports(client, &params).await?;
+            if !reports.is_empty() {
+                return Err(FolderError::DeleteWithReports);
             }
         }
     };
@@ -257,6 +275,7 @@ pub async fn delete_folder(
     let folder_type_ofga = match folder_type {
         FolderType::Dashboards => "folders",
         FolderType::Alerts => "alert_folders",
+        FolderType::Reports => "report_folders",
     };
     remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
@@ -299,6 +318,10 @@ async fn permitted_folders(
         FolderType::Alerts => (
             OFGA_MODELS.get("alert_folders").unwrap().key,
             OFGA_MODELS.get("alerts").unwrap().key,
+        ),
+        FolderType::Reports => (
+            OFGA_MODELS.get("report_folders").unwrap().key,
+            OFGA_MODELS.get("reports").unwrap().key,
         ),
     };
 
