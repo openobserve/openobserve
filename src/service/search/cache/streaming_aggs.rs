@@ -98,6 +98,8 @@ async fn cache_record_batches_to_disk_impl(
         return Ok(());
     }
 
+    // TODO: Skip caching if record batch for the time range is already cached
+
     // Serialize the record batches into bytes
     let data = match serialize_record_batches(&request.records) {
         Ok(bytes) => bytes,
