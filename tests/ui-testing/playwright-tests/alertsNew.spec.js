@@ -97,8 +97,8 @@ test.describe.serial("Alerts Module testcases", () => {
     console.log('Successfully created destination:', createdDestinationName);
   });
 
-  test('Create Folder, Create, Update and Move Alerts', {
-    tag: ['@createFolder', '@createAlert', '@moveAlerts', '@updateAlerts', '@all', '@alerts']
+  test('Alerts E2E Flow - Create, Update, Move, Clone, Delete, Pause, Resume', {
+    tag: ['@createFolder', '@createAlert', '@moveAlerts', '@updateAlerts', '@cloneAlerts', '@deleteAlerts', '@pauseAlerts', '@resumeAlerts', '@all', '@alerts']
   }, async ({ page }) => {
     const streamName = 'auto_playwright_stream';
     const column = 'job';
@@ -156,13 +156,6 @@ test.describe.serial("Alerts Module testcases", () => {
 
     // Delete second alert
     await alertsPage.deleteSingleAlert(alertName);
-
-    // // Navigate back to alerts page to delete the original folder
-    // await commonActions.navigateToAlerts();
-    // await page.waitForTimeout(2000);
-
-    // // Delete only the original folder
-    // await alertsPage.deleteFolder(folderName);
   });
 
   test('Verify Delete alert template functionality', {
@@ -178,5 +171,4 @@ test.describe.serial("Alerts Module testcases", () => {
     // Try to delete template and handle both success and in-use scenarios
     await templatesPage.deleteTemplateAndVerify(createdTemplateName);
   });
-
 });
