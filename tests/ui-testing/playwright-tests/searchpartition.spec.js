@@ -5,8 +5,7 @@ import { toZonedTime } from "date-fns-tz";
 import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
-const folderName = `Folder ${Date.now()}`;
-const dashboardName = `AutomatedDashboard${Date.now()}`;
+
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -82,63 +81,79 @@ test.describe("Search partition testcases", () => {
   });
 
   test("should verify search partition and search API calls for histogram query", async ({ page }) => {
+    const isStreamingEnabled = process.env["ZO_STREAMING_ENABLED"] === "true";
+    
     // Enter the histogram query
     const query = `SELECT histogram(_timestamp) as "x_axis_1", count(distinct(kubernetes_container_name)) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
     
     // Click on the query editor and type the query
     await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
-    // await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor');
     await page.keyboard.type(query);
     await page.waitForTimeout(2000);
 
     // Toggle histogram off
     await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
     await page.waitForTimeout(1000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click()
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
 
-    // Wait for and capture the search partition response
-    const searchPartitionPromise = page.waitForResponse(response => 
-      response.url().includes('/api/default/_search_partition') && 
-      response.request().method() === 'POST'
-    );
-   
-    const searchPartitionResponse = await searchPartitionPromise;
-    const searchPartitionData = await searchPartitionResponse.json();
-
-    // Verify search partition response structure
-    expect(searchPartitionData).toHaveProperty('partitions');
-    expect(searchPartitionData).toHaveProperty('histogram_interval');
-    expect(searchPartitionData).toHaveProperty('order_by', 'asc');
-
-    // Wait for and capture all search API calls
-    const searchCalls = [];
-    page.on('response', async response => {
-      if (response.url().includes('/api/default/_search') && 
-          response.request().method() === 'POST') {
-        const requestData = await response.request().postDataJSON();
-        searchCalls.push({
-          start_time: requestData.query.start_time,
-          end_time: requestData.query.end_time,
-          sql: requestData.query.sql
-        });
-      
-      }
-    });
-
-    // Wait for all search calls to complete
-    await page.waitForTimeout(2000);
-
-    // Verify that the number of search calls matches the number of partitions
-    expect(searchCalls.length).toBe(searchPartitionData.partitions.length);
-    console.log('partition', searchPartitionData.partitions)
-    // Verify each search call matches a partition
-    for (const partition of searchPartitionData.partitions) {
-      const matchingCall = searchCalls.find(call => 
-        call.start_time === partition[0] && 
-        call.end_time === partition[1]
+    if (!isStreamingEnabled) {
+      // Wait for and capture the search partition response
+      const searchPartitionPromise = page.waitForResponse(response => 
+        response.url().includes('/api/default/_search_partition') && 
+        response.request().method() === 'POST'
       );
-      expect(matchingCall).toBeTruthy();
-      expect(matchingCall.sql).toContain('SELECT histogram(_timestamp');
+      
+      const searchPartitionResponse = await searchPartitionPromise;
+      const searchPartitionData = await searchPartitionResponse.json();
+
+      // Verify search partition response structure
+      expect(searchPartitionData).toHaveProperty('partitions');
+      expect(searchPartitionData).toHaveProperty('histogram_interval');
+      expect(searchPartitionData).toHaveProperty('order_by', 'asc');
+
+      // Wait for and capture all search API calls
+      const searchCalls = [];
+      page.on('response', async response => {
+        if (response.url().includes('/api/default/_search') && 
+            response.request().method() === 'POST') {
+          const requestData = await response.request().postDataJSON();
+          searchCalls.push({
+            start_time: requestData.query.start_time,
+            end_time: requestData.query.end_time,
+            sql: requestData.query.sql
+          });
+        }
+      });
+
+      // Wait for all search calls to complete
+      await page.waitForTimeout(2000);
+
+      // Verify that the number of search calls matches the number of partitions
+      expect(searchCalls.length).toBe(searchPartitionData.partitions.length);
+      console.log('partition', searchPartitionData.partitions);
+
+      // Verify each search call matches a partition
+      for (const partition of searchPartitionData.partitions) {
+        const matchingCall = searchCalls.find(call => 
+          call.start_time === partition[0] && 
+          call.end_time === partition[1]
+        );
+        expect(matchingCall).toBeTruthy();
+        expect(matchingCall.sql).toContain('SELECT histogram(_timestamp');
+      }
+    } else {
+      // In streaming mode, verify that the query executes successfully
+      const searchPromise = page.waitForResponse(response => 
+        response.url().includes('/api/default/_search') && 
+        response.request().method() === 'POST'
+      );
+      
+      const searchResponse = await searchPromise;
+      expect(searchResponse.status()).toBe(200);
+      
+      const searchData = await searchResponse.json();
+      expect(searchData).toBeDefined();
+      expect(searchData.hits).toBeDefined();
     }
 
     // Verify histogram is still off
