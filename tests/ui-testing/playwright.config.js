@@ -39,9 +39,15 @@ module.exports = defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, },
-     
-      
-    }
+    },
+    //   {
+    //   name: 'webkit', // Safari/WebKit configuration
+    //   use: {
+    //     ...devices['Desktop Safari'], // Uses Playwright's pre-defined device settings for Safari
+    //     viewport: { width: 1500, height: 1024 },
+    //   },
+    // },
+    // }
 
     /* Test against mobile viewports. */
     // {
@@ -61,7 +67,8 @@ module.exports = defineConfig({
     // {
     //   name: 'Google Chrome',
     //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
+    // }
+  
   ],
 
   /* Run your local dev server before starting the tests */
