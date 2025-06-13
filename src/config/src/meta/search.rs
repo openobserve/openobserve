@@ -223,8 +223,6 @@ pub struct Response {
     pub new_end_time: Option<i64>,
     #[serde(default)]
     pub result_cache_ratio: usize,
-    #[serde(default)]
-    pub aggs_cache_ratio: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -388,7 +386,6 @@ impl Response {
             new_start_time: None,
             new_end_time: None,
             result_cache_ratio: 0,
-            aggs_cache_ratio: 0,
             work_group: None,
             order_by: None,
         }
@@ -488,8 +485,8 @@ impl Response {
         self.order_by = val;
     }
 
-    pub fn set_aggs_cache_ratio(&mut self, val: usize) {
-        self.aggs_cache_ratio = val;
+    pub fn set_result_cache_ratio(&mut self, val: usize) {
+        self.result_cache_ratio = val;
     }
 }
 

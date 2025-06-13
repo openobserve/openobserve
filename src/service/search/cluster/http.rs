@@ -281,7 +281,7 @@ pub async fn search(
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
-    result.set_aggs_cache_ratio(scan_stats.aggs_cache_ratio as usize);
+    result.set_result_cache_ratio(scan_stats.aggs_cache_ratio as usize);
 
     if scan_stats.querier_files > 0 {
         let cached_ratio = (scan_stats.querier_memory_cached_files
