@@ -62,7 +62,7 @@ pub struct Writer {
     write_queue: Arc<mpsc::Sender<(WriterSignal, Vec<Entry>, bool)>>,
 }
 
-// check total memory size
+// check total memtable size
 pub fn check_memtable_size() -> Result<()> {
     let cur_mem = metrics::INGEST_MEMTABLE_ARROW_BYTES
         .with_label_values(&[])
