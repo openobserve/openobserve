@@ -19,9 +19,7 @@ use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
-    cluster::LOCAL_NODE,
-    get_config,
+    DISTINCT_FIELDS, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         otlp::OtlpRequestType,
@@ -56,8 +54,10 @@ use crate::{
     handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
-        db, format_stream_name,
-        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
+        format_stream_name,
+        ingestion::{
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, grpc::get_val, write_file,
+        },
         metadata::{
             MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem,
             write,
@@ -151,54 +151,19 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+        log::error!("[TRACES:OTLP] ingestion error: {:?}", e);
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-
-    if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-
-    // check memory circuit breaker
-    if let Err(e) = ingester::check_memory_circuit_breaker() {
-        log::error!(
-            "[TRACES:OTLP] ingestion error while checking memory circuit breaker: {}",
-            e
-        );
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        log::error!(
-            "[TRACES:OTLP] ingestion error while checking memtable size: {}",
-            e
-        );
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
-    }
 
     let cfg = get_config();
     let traces_stream_name = match in_stream_name {
@@ -592,54 +557,19 @@ pub async fn ingest_json(
     req_type: OtlpRequestType,
     traces_stream_name: &str,
 ) -> Result<HttpResponse, Error> {
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+        log::error!("[TRACES:JSON] ingestion error: {:?}", e);
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-
-    if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-
-    // check memory circuit breaker
-    if let Err(e) = ingester::check_memory_circuit_breaker() {
-        log::error!(
-            "ingestion error while checking memory circuit breaker: {}",
-            e
-        );
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        log::error!(
-            "[TRACES:JSON] ingestion error while checking memtable size: {}",
-            e
-        );
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
-    }
 
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
