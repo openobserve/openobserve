@@ -67,7 +67,12 @@ use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
-    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    service::search::{
+        cache::streaming_aggs::{
+            create_record_batch_cache_file_path, generate_record_batch_interval,
+        },
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    },
 };
 
 pub(crate) mod cache;
@@ -666,16 +671,20 @@ pub async fn search_partition(
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&hash_body.join(","));
 
-    let file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
-
     if let Some(id) = &streaming_id {
         log::info!(
             "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
         );
-        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &file_path);
+        let cache_interval =
+            generate_record_batch_interval(query.start_time, query.end_time) as i64;
+        let cache_file_path = create_record_batch_cache_file_path(
+            org_id,
+            &stream_type.to_string(),
+            &stream_name,
+            hashed_query,
+            cache_interval,
+        );
+        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
     }
 
     let mut files = Vec::new();

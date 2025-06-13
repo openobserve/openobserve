@@ -17,6 +17,8 @@ use std::cmp::max;
 
 use config::meta::sql::OrderBy;
 
+use crate::service::search::cache::streaming_aggs::generate_record_batch_interval;
+
 /// Generates partitions for search queries
 pub struct PartitionGenerator {
     /// Minimum step size in microseconds (usually based on histogram interval)
@@ -192,23 +194,21 @@ impl PartitionGenerator {
         order_by: OrderBy,
     ) -> Vec<[i64; 2]> {
         // Generate partitions by DESC order
-        let window_micros = config::get_config()
-            .common
-            .streaming_aggs_partition_window_secs
-            * 1_000_000;
-        let mut end_window_hour = end_time - (end_time % window_micros);
+        let interval = generate_record_batch_interval(start_time, end_time);
+        let interval_micros = interval.get_interval_microseconds();
+        let mut end_window = end_time - (end_time % interval_micros);
 
         let mut partitions = Vec::new();
 
         // Only add the first partition if it's not empty (end_time != end_window_hour)
-        if end_time != end_window_hour {
-            partitions.push([end_window_hour, end_time]);
+        if end_time != end_window {
+            partitions.push([end_window, end_time]);
         }
 
-        while end_window_hour > start_time {
-            let start = std::cmp::max(end_window_hour - window_micros, start_time);
-            partitions.push([start, end_window_hour]);
-            end_window_hour = start;
+        while end_window > start_time {
+            let start = std::cmp::max(end_window - interval_micros, start_time);
+            partitions.push([start, end_window]);
+            end_window = start;
         }
 
         if order_by == OrderBy::Asc {

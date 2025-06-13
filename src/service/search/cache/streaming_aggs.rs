@@ -9,11 +9,14 @@ use arrow::{
     ipc::{reader::FileReader as ArrowFileReader, writer::FileWriter as ArrowFileWriter},
 };
 use bytes::Bytes;
+use chrono::Duration;
 use infra::cache::file_data::disk;
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 
-use crate::common::meta::search::{StreamingAggsCacheResult, StreamingAggsCacheResultRecordBatch};
+use crate::common::meta::search::{
+    Interval, StreamingAggsCacheResult, StreamingAggsCacheResultRecordBatch,
+};
 
 // Global queue for cache requests
 static CACHE_QUEUE: Lazy<mpsc::UnboundedSender<RecordBatchCacheRequest>> = Lazy::new(|| {
@@ -152,11 +155,11 @@ pub async fn get_record_batches(
 }
 
 pub async fn get_streaming_aggs_records_from_disk(
-    file_path: &str,
+    cache_file_path: &str,
     start_time: i64,
     end_time: i64,
 ) -> std::io::Result<StreamingAggsCacheResult> {
-    let cache_path = construct_cache_path(file_path);
+    let cache_path = construct_cache_path(cache_file_path);
     // TODO: use infra/disk.rs methods
     if !Path::new(&cache_path).exists() {
         return Err(std::io::Error::new(
@@ -230,7 +233,7 @@ pub async fn get_streaming_aggs_records_from_disk(
                 start_time,
                 end_time
             );
-            match get_record_batches(file_path, file_name_str).await {
+            match get_record_batches(cache_file_path, file_name_str).await {
                 Ok(cached_record_batches) => {
                     for batch in cached_record_batches {
                         let record_batch_cache_result = StreamingAggsCacheResultRecordBatch {
@@ -317,6 +320,49 @@ pub async fn get_streaming_aggs_records_from_disk(
     Ok(StreamingAggsCacheResult::default())
 }
 
+pub fn create_record_batch_cache_file_path(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+    hashed_query: u64,
+    cache_interval: i64,
+) -> String {
+    // eg: /org_id/stream_type/stream_name/12345678_5
+    format!(
+        "{}/{}/{}/{}",
+        org_id,
+        stream_type,
+        stream_name,
+        create_record_batch_cache_key(hashed_query, cache_interval)
+    )
+}
+
+fn create_record_batch_cache_key(hashed_query: u64, cache_interval: i64) -> String {
+    // eg: 12345678_5, interval is in minutes
+    format!("{}_{}", hashed_query, cache_interval)
+}
+
+pub fn parse_record_batch_cache_file_path(cache_file_path: &str) -> (u64, i64) {
+    let parts: Vec<&str> = cache_file_path.split("/").collect();
+    if parts.len() < 4 {
+        return (0, 0);
+    }
+    let cache_key = parts.last().unwrap_or(&"");
+
+    let split_cache_key = cache_key.split("_").collect::<Vec<&str>>();
+    if split_cache_key.len() < 2 {
+        return (0, 0);
+    }
+    (
+        split_cache_key[0].parse::<u64>().unwrap_or_default(), // hashed_query
+        split_cache_key[1].parse::<i64>().unwrap_or_default(), // cache_interval
+    )
+}
+
+pub fn generate_record_batch_file_name(start_time: i64, end_time: i64) -> String {
+    format!("{}_{}.arrow", start_time, end_time,)
+}
+
 pub fn construct_cache_path(file_path: &str) -> String {
     format!(
         "{}{}/{}",
@@ -324,4 +370,105 @@ pub fn construct_cache_path(file_path: &str) -> String {
         STREAMING_AGGS_CACHE_DIR,
         file_path
     )
+}
+
+pub fn generate_record_batch_interval(start_time: i64, end_time: i64) -> Interval {
+    let intervals = [
+        (Duration::try_hours(24 * 15), Interval::OneDay),
+        (Duration::try_hours(24 * 1), Interval::OneHour),
+        (Duration::try_hours(6), Interval::ThirtyMinutes),
+        (Duration::try_hours(1), Interval::TenMinutes),
+        (Duration::try_minutes(15), Interval::FiveMinutes),
+    ];
+    for (time, interval) in intervals.iter() {
+        let time = time.unwrap().num_microseconds().unwrap();
+        if (end_time - start_time) >= time {
+            return interval.clone();
+        }
+    }
+    Interval::FiveMinutes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_record_batch_interval() {
+        // Test cases for different time ranges
+        let test_cases = vec![
+            // (time_range, expected_interval)
+            // 15 days range -> OneDay interval
+            (
+                (
+                    0,
+                    Duration::try_hours(24 * 15)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ),
+                Interval::OneDay,
+            ),
+            // 1 day range -> OneHour interval
+            (
+                (
+                    0,
+                    Duration::try_hours(24).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::OneHour,
+            ),
+            // 6 hours range -> ThirtyMinutes interval
+            (
+                (
+                    0,
+                    Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::ThirtyMinutes,
+            ),
+            // 1 hour range -> TenMinutes interval
+            (
+                (
+                    0,
+                    Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
+                ),
+                Interval::TenMinutes,
+            ),
+            // 15 minutes range -> FiveMinutes interval
+            (
+                (
+                    0,
+                    Duration::try_minutes(15)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ),
+                Interval::FiveMinutes,
+            ),
+            // Less than 15 minutes -> FiveMinutes interval (default)
+            (
+                (
+                    0,
+                    Duration::try_minutes(10)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ),
+                Interval::FiveMinutes,
+            ),
+            // 10:15-14:15
+            (
+                (1748513700000 * 1_000, 1748528100000 * 1_000),
+                Interval::TenMinutes,
+            ),
+        ];
+
+        for (time_range, expected_interval) in test_cases {
+            let result = generate_record_batch_interval(time_range.0, time_range.1);
+            assert_eq!(
+                result, expected_interval,
+                "Time range {:?} should return {}, but got {}",
+                time_range, expected_interval, result
+            );
+        }
+    }
 }

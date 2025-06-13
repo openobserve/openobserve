@@ -41,7 +41,8 @@ use once_cell::sync::Lazy;
 use crate::{
     common::meta::search::StreamingAggsCacheResult,
     service::search::cache::streaming_aggs::{
-        RecordBatchCacheRequest, cache_record_batches_to_disk, get_streaming_aggs_records_from_disk,
+        RecordBatchCacheRequest, cache_record_batches_to_disk, generate_record_batch_file_name,
+        get_streaming_aggs_records_from_disk, parse_record_batch_cache_file_path,
     },
 };
 
@@ -49,15 +50,19 @@ pub static GLOBAL_CACHE: Lazy<Arc<StreamingAggsCache>> =
     Lazy::new(|| Arc::new(StreamingAggsCache::default()));
 
 // init streaming cache for the id
-pub fn init_cache(id: &str, start_time: i64, end_time: i64, file_path: &str) {
-    GLOBAL_CACHE
-        .id_cache
-        .insert(id.to_string(), start_time, end_time, file_path.to_string());
+pub fn init_cache(id: &str, start_time: i64, end_time: i64, cache_file_path: &str) {
+    GLOBAL_CACHE.id_cache.insert(
+        id.to_string(),
+        start_time,
+        end_time,
+        cache_file_path.to_string(),
+    );
     log::debug!(
-        "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}",
+        "[StreamingAggs] init_cache: id={}, start_time={}, end_time={}, cache_file_path={}",
         id,
         start_time,
         end_time,
+        cache_file_path,
     );
 }
 
@@ -295,11 +300,9 @@ impl MonitorStream {
     }
 
     fn is_complete_partition_window(&self) -> bool {
-        let window_micros = config::get_config()
-            .common
-            .streaming_aggs_partition_window_secs
-            * 1_000_000;
-        (self.end_time - self.start_time) == window_micros
+        let interval = GLOBAL_CACHE.get_cache_interval(&self.id); // minutes
+        let interval_micros = interval * 60 * 1_000_000; // microseconds
+        (self.end_time - self.start_time) == interval_micros
     }
 }
 
@@ -326,8 +329,8 @@ impl Stream for MonitorStream {
                 if self.is_complete_partition_window() {
                     // get all the record batches
                     let all_records = GLOBAL_CACHE.get(&self.id);
-                    let file_path = get_file_path_from_streaming_id(&self.id);
-                    let file_name = format!("{}_{}.arrow", self.start_time, self.end_time);
+                    let file_path = get_cache_file_path_from_streaming_id(&self.id);
+                    let file_name = generate_record_batch_file_name(self.start_time, self.end_time);
                     // write the record batches to the file
                     if let Some(records) = all_records {
                         let request = RecordBatchCacheRequest {
@@ -402,7 +405,6 @@ impl StreamingAggsCache {
                 item_len
             );
             let gc_keys = self.id_cache.gc(item_len / 100);
-            dbg!(&gc_keys);
             for gc_key in gc_keys {
                 self.data.remove(&gc_key);
                 log::info!(
@@ -446,6 +448,13 @@ impl StreamingAggsCache {
         self.data.remove(k);
         self.id_cache.remove(k);
     }
+
+    pub fn get_cache_interval(&self, k: &str) -> i64 {
+        self.id_cache
+            .get(k)
+            .map(|v| v.get_cache_interval())
+            .unwrap_or_default()
+    }
 }
 
 impl Default for StreamingAggsCache {
@@ -469,14 +478,15 @@ impl StreamingIdCache {
         }
     }
 
-    pub fn insert(&self, k: String, start_time: i64, end_time: i64, file_path: String) {
+    pub fn insert(&self, k: String, start_time: i64, end_time: i64, cache_file_path: String) {
         let mut w = self.data.write();
         if w.get(&k).is_some() {
             return; // trigger the key as last recently used
         }
-        dbg!(&k);
-        w.insert(k, StreamingIdItem::new(start_time, end_time, file_path));
-        dbg!(&w.iter().map(|(k, _)| k).collect::<Vec<_>>());
+        w.insert(
+            k,
+            StreamingIdItem::new(start_time, end_time, cache_file_path),
+        );
     }
 
     pub fn exists(&self, k: &str) -> bool {
@@ -497,13 +507,11 @@ impl StreamingIdCache {
     pub fn gc(&self, len: usize) -> Vec<String> {
         let len = std::cmp::max(1, len);
         let mut w = self.data.write();
-        dbg!(&w.len());
         let mut remove_keys = Vec::new();
         for _ in 0..len {
             let Some((k, _)) = w.remove_lru() else {
                 break;
             };
-            dbg!(&k);
             remove_keys.push(k);
         }
         remove_keys
@@ -513,8 +521,8 @@ impl StreamingIdCache {
         self.data.read().peek(k).cloned()
     }
 
-    pub fn get_file_path(&self, k: &str) -> Option<String> {
-        self.data.read().peek(k).map(|v| v.get_file_path())
+    pub fn get_cache_file_path(&self, k: &str) -> Option<String> {
+        self.data.read().peek(k).map(|v| v.get_cache_file_path())
     }
 }
 
@@ -534,17 +542,17 @@ pub struct StreamingIdItem {
     pub end_time: i64,
     start_ok: bool,
     end_ok: bool,
-    file_path: String,
+    cache_file_path: String,
 }
 
 impl StreamingIdItem {
-    pub fn new(start_time: i64, end_time: i64, file_path: String) -> Self {
+    pub fn new(start_time: i64, end_time: i64, cache_file_path: String) -> Self {
         Self {
             start_time,
             end_time,
             start_ok: false,
             end_ok: false,
-            file_path,
+            cache_file_path,
         }
     }
 
@@ -558,14 +566,19 @@ impl StreamingIdItem {
         self.start_ok && self.end_ok
     }
 
-    pub fn get_file_path(&self) -> String {
-        self.file_path.clone()
+    pub fn get_cache_file_path(&self) -> String {
+        self.cache_file_path.clone()
+    }
+
+    pub fn get_cache_interval(&self) -> i64 {
+        let (_, cache_interval) = parse_record_batch_cache_file_path(&self.cache_file_path);
+        cache_interval
     }
 }
 
-fn get_file_path_from_streaming_id(streaming_id: &str) -> String {
-    let file_path = GLOBAL_CACHE.id_cache.get_file_path(streaming_id);
-    file_path.unwrap_or_default()
+fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> String {
+    let cache_file_path = GLOBAL_CACHE.id_cache.get_cache_file_path(streaming_id);
+    cache_file_path.unwrap_or_default()
 }
 
 pub async fn check_record_batches_cache(

@@ -183,6 +183,38 @@ fn calculate_record_batches_deltas(
     deltas
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Interval {
+    FiveMinutes = 5,
+    TenMinutes = 10,
+    ThirtyMinutes = 30,
+    OneHour = 60,
+    TwoHours = 120,
+    SixHours = 360,
+    TwelveHours = 720,
+    OneDay = 1440,
+}
+
+impl Interval {
+    pub fn get_duration_minutes(&self) -> i64 {
+        *self as i64
+    }
+
+    pub fn get_interval_seconds(&self) -> i64 {
+        self.get_duration_minutes() * 60
+    }
+
+    pub fn get_interval_microseconds(&self) -> i64 {
+        self.get_duration_minutes() * 60 * 1_000_000
+    }
+}
+
+impl std::fmt::Display for Interval {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} minutes", self.get_duration_minutes())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field};

@@ -201,13 +201,14 @@ pub struct StreamingAggsRewriter {
 impl StreamingAggsRewriter {
     pub async fn new(id: String, start_time: i64, end_time: i64) -> Self {
         let mut is_complete_cache_hit = false;
+        // Start of loading `StreamingAggsCache` from disk
         let streaming_item = streaming_aggs_exec::GLOBAL_CACHE.id_cache.get(&id);
         if let Some(item) = streaming_item {
             // Check record batch cache for partition start time and end time
             let cached_result = match streaming_aggs_exec::check_record_batches_cache(
                 start_time,
                 end_time,
-                &item.get_file_path(),
+                &item.get_cache_file_path(),
             )
             .await
             {
