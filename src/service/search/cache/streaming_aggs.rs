@@ -55,12 +55,21 @@ pub struct RecordBatchCacheRequest {
 pub fn cache_record_batches_to_disk(
     request: RecordBatchCacheRequest,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let cfg = config::get_config();
+    if !cfg.common.result_cache_enabled {
+        log::warn!(
+            "[streaming_id: {}] Skipping caching because result cache is disabled",
+            request.streaming_id
+        );
+        return Ok(());
+    }
+
     if request.records.is_empty() {
         return Ok(());
     }
 
     // Skip caching if the time range is within the delay window
-    let delay_window = config::get_config().disk_cache.delay_window_mins;
+    let delay_window = cfg.disk_cache.delay_window_mins;
     let delay_window_micros = delay_window * 60 * 1_000_000;
     if request.end_time - request.start_time <= delay_window_micros {
         log::warn!(
@@ -178,6 +187,10 @@ pub async fn get_streaming_aggs_records_from_disk(
     start_time: i64,
     end_time: i64,
 ) -> std::io::Result<StreamingAggsCacheResult> {
+    if !config::get_config().common.result_cache_enabled {
+        return Ok(StreamingAggsCacheResult::default());
+    }
+
     let cache_path = construct_cache_path(cache_file_path);
     // TODO: use infra/disk.rs methods
     if !Path::new(&cache_path).exists() {
