@@ -14,6 +14,7 @@ pub struct Model {
     pub pattern_id: String,
     #[sea_orm(column_type = "Text")]
     pub policy: String,
+    pub apply_at_search: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

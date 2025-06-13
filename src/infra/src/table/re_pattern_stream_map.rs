@@ -23,21 +23,30 @@ use crate::{
     errors,
 };
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PatternPolicy {
     DropField,
     Redact,
 }
 
-impl TryFrom<String> for PatternPolicy {
-    type Error = errors::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PatternAssociationEntry {
+    pub id: i64,
+    pub org: String,
+    pub stream: String,
+    pub stream_type: StreamType,
+    pub field: String,
+    pub pattern_id: String,
+    pub policy: PatternPolicy,
+    pub apply_at_search: bool,
+}
+
+impl From<String> for PatternPolicy {
+    fn from(value: String) -> Self {
         match value.as_str() {
-            "drop_field" => Ok(Self::DropField),
-            "redact" => Ok(Self::Redact),
-            _ => Err(errors::Error::Message(format!(
-                "invalid pattern policy '{value}' in db"
-            ))),
+            "drop_field" => Self::DropField,
+            "redact" => Self::Redact,
+            _ => Self::Redact,
         }
     }
 }
@@ -51,33 +60,22 @@ impl std::fmt::Display for PatternPolicy {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct PatternStreamMap {
-    pub id: i64,
-    pub org: String,
-    pub stream: String,
-    pub stream_type: StreamType,
-    pub field: String,
-    pub pattern_id: String,
-    pub policy: PatternPolicy,
-}
-
-impl TryInto<PatternStreamMap> for Model {
-    type Error = errors::Error;
-    fn try_into(self) -> Result<PatternStreamMap, Self::Error> {
-        Ok(PatternStreamMap {
-            id: self.id,
-            org: self.org,
-            stream: self.stream,
-            stream_type: StreamType::from(self.stream_type),
-            field: self.field,
-            pattern_id: self.pattern_id,
-            policy: PatternPolicy::try_from(self.policy)?,
-        })
+impl From<Model> for PatternAssociationEntry {
+    fn from(value: Model) -> Self {
+        Self {
+            id: value.id,
+            org: value.org,
+            stream: value.stream,
+            stream_type: StreamType::from(value.stream_type),
+            field: value.field,
+            pattern_id: value.pattern_id,
+            policy: PatternPolicy::from(value.policy),
+            apply_at_search: value.apply_at_search,
+        }
     }
 }
 
-pub async fn add(entry: PatternStreamMap) -> Result<(), errors::Error> {
+pub async fn add(entry: PatternAssociationEntry) -> Result<(), errors::Error> {
     let record = ActiveModel {
         org: Set(entry.org),
         stream: Set(entry.stream),
@@ -85,6 +83,7 @@ pub async fn add(entry: PatternStreamMap) -> Result<(), errors::Error> {
         field: Set(entry.field),
         pattern_id: Set(entry.pattern_id),
         policy: Set(entry.policy.to_string()),
+        apply_at_search: Set(entry.apply_at_search),
         ..Default::default()
     };
 
@@ -135,7 +134,9 @@ pub async fn remove(
     Ok(())
 }
 
-pub async fn get_by_pattern_id(pattern_id: &str) -> Result<Vec<PatternStreamMap>, errors::Error> {
+pub async fn get_by_pattern_id(
+    pattern_id: &str,
+) -> Result<Vec<PatternAssociationEntry>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::PatternId.eq(pattern_id))
@@ -144,20 +145,20 @@ pub async fn get_by_pattern_id(pattern_id: &str) -> Result<Vec<PatternStreamMap>
         .await?;
     let ret = res
         .into_iter()
-        .map(<Model as TryInto<PatternStreamMap>>::try_into)
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(<Model as Into<PatternAssociationEntry>>::into)
+        .collect::<Vec<_>>();
     Ok(ret)
 }
 
-pub async fn list_all() -> Result<Vec<PatternStreamMap>, errors::Error> {
+pub async fn list_all() -> Result<Vec<PatternAssociationEntry>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let records = Entity::find().into_model::<Model>().all(client).await?;
 
     let records = records
         .into_iter()
-        .map(<Model as TryInto<PatternStreamMap>>::try_into)
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(<Model as Into<PatternAssociationEntry>>::into)
+        .collect::<Vec<_>>();
     Ok(records)
 }
 
