@@ -658,7 +658,6 @@ import {
   onActivated,
   computed,
   onMounted,
-  onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";

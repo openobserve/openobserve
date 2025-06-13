@@ -1074,7 +1074,6 @@ import {
   computed,
   inject,
   nextTick,
-  onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";

@@ -43,13 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineAsyncComponent,
-  defineComponent,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { defineAsyncComponent, defineComponent, onMounted, ref, watch } from "vue";
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 
 import DashboardQueryEditor from "./DashboardQueryEditor.vue";
