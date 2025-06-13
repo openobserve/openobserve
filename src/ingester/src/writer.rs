@@ -62,13 +62,27 @@ pub struct Writer {
     write_queue: Arc<mpsc::Sender<(WriterSignal, Vec<Entry>, bool)>>,
 }
 
-// check total memory size
+// check total memtable size
 pub fn check_memtable_size() -> Result<()> {
-    let total_mem_size = metrics::INGEST_MEMTABLE_ARROW_BYTES
+    let cur_mem = metrics::INGEST_MEMTABLE_ARROW_BYTES
         .with_label_values(&[])
         .get();
-    if total_mem_size >= get_config().limit.mem_table_max_size as i64 {
+    if cur_mem >= get_config().limit.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
+    } else {
+        Ok(())
+    }
+}
+
+// check total memory size
+pub fn check_memory_circuit_breaker() -> Result<()> {
+    let cfg = get_config();
+    if !cfg.common.memory_circuit_breaker_enable || cfg.common.memory_circuit_breaker_ratio == 0 {
+        return Ok(());
+    }
+    let cur_mem = metrics::NODE_MEMORY_USAGE.with_label_values(&[]).get() as usize;
+    if cur_mem > cfg.limit.mem_total / 100 * cfg.common.memory_circuit_breaker_ratio {
+        Err(Error::MemoryCircuitBreakerError {})
     } else {
         Ok(())
     }
