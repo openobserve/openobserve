@@ -125,25 +125,9 @@ pub async fn process_search_stream_request(
     // everytime and skip the hits. The following is a global variable to keep track of how many hits to skip across all partitions.
     // This is a temporary hack and will be removed once we have the context of no of hits per partition.
     let mut hits_to_skip = req.query.from;
-    let use_cached_flow = if req.query.from == 0 && !req.query.track_total_hits {
-        if use_cache && hits_to_skip > 0 {
-            // do not use cached flow as its a paginated query
-            // use partitioned search instead
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Skipping cached flow as paginated query, hits_to_skip: {}",
-                trace_id,
-                hits_to_skip
-            );
-            false
-        } else {
-            // check cache for the first page
-            true
-        }
-    } else {
-        false
-    };
 
-    if use_cached_flow {
+    if req.query.from == 0 && !req.query.track_total_hits {
+        // check cache for the first page
         let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
             .instrument(search_span.clone())
             .await
