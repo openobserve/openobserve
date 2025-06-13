@@ -132,7 +132,7 @@ pub async fn process_search_stream_request(
     // partition.
     let mut hits_to_skip = req.query.from;
 
-    if req.query.from == 0 && !req.query.track_total_hits {
+    if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
         let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
             .instrument(search_span.clone())
@@ -560,9 +560,11 @@ pub async fn do_partitioned_search(
 
     // check if `streaming_aggs` is supported
     let is_streaming_aggs = partition_resp.streaming_aggs;
+    let mut use_cache = false;
     if is_streaming_aggs {
         req.query.streaming_output = true;
         req.query.streaming_id = partition_resp.streaming_id.clone();
+        use_cache = true;
     }
 
     // The order by for the partitions is the same as the order by in the query
@@ -599,7 +601,8 @@ pub async fn do_partitioned_search(
         // partition
         req.query.size += *hits_to_skip;
         req.query.from = 0;
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
+        let mut search_res =
+            do_search(trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
 
         let mut total_hits = search_res.total as i64;
 
