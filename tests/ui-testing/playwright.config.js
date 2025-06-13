@@ -36,17 +36,17 @@ module.exports = defineConfig({
    
   /* Configure projects for major browsers */
   projects: [
-    // {
-    //   name: 'chromium',
-    //   use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, },
-     
-      {
-      name: 'webkit', // Safari/WebKit configuration
-      use: {
-        ...devices['Desktop Safari'], // Uses Playwright's pre-defined device settings for Safari
-        viewport: { width: 1500, height: 1024 },
-      },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, },
     },
+    //   {
+    //   name: 'webkit', // Safari/WebKit configuration
+    //   use: {
+    //     ...devices['Desktop Safari'], // Uses Playwright's pre-defined device settings for Safari
+    //     viewport: { width: 1500, height: 1024 },
+    //   },
+    // },
     // }
 
     /* Test against mobile viewports. */
