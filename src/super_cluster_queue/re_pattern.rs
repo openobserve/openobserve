@@ -72,6 +72,17 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         )
                         .await?;
                 }
+                RePatternsMessage::AssociationUpdate {
+                    org,
+                    stype,
+                    stream,
+                    updates,
+                } => {
+                    log::info!(
+                        "[SUPER_CLUSTER:DB] updating associations for {org}/{stype}/{stream}"
+                    );
+                    // TODO @YJDoc2 : update in db as well as in memory associations here
+                }
             }
         }
         _ => {

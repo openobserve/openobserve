@@ -48,7 +48,7 @@ use crate::{
     },
     handler::http::router::ERROR_HEADER,
     service::{
-        db::{self, distinct_values},
+        db::{self, distinct_values, re_pattern::process_association_changes},
         metrics::get_prom_metadata_from_schema,
     },
 };
@@ -193,6 +193,9 @@ pub fn stream_res(
         stream_type,
     ));
 
+    // TODO @YJDoc2 get this from in-memory state
+    let pattern_associations = { unimplemented!() };
+
     Stream {
         name: stream_name.to_string(),
         storage_type: storage_type.to_string(),
@@ -203,6 +206,7 @@ pub fn stream_res(
         stats,
         settings,
         metrics_meta,
+        pattern_associations,
     }
 }
 
@@ -585,6 +589,24 @@ pub async fn update_stream_settings(
             if let Some(partition_time_level) = new_settings.partition_time_level {
                 settings.partition_time_level = Some(partition_time_level);
             }
+
+            // TODO @YJDoc2
+            if let Err(e) = process_association_changes(
+                org_id,
+                stream_name,
+                stream_type,
+                new_settings.pattern_associations,
+            )
+            .await
+            {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Internal server error while updating pattern associations {e}",),
+                    )),
+                );
+            }
+
             save_stream_settings(org_id, stream_name, stream_type, settings).await
         }
         None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(

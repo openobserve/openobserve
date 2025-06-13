@@ -44,8 +44,8 @@ pub struct PatternAssociationEntry {
 impl From<String> for PatternPolicy {
     fn from(value: String) -> Self {
         match value.as_str() {
-            "drop_field" => Self::DropField,
-            "redact" => Self::Redact,
+            "DropField" => Self::DropField,
+            "Redact" => Self::Redact,
             _ => Self::Redact,
         }
     }
@@ -54,8 +54,8 @@ impl From<String> for PatternPolicy {
 impl std::fmt::Display for PatternPolicy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DropField => write!(f, "drop_field"),
-            Self::Redact => write!(f, "redact"),
+            Self::DropField => write!(f, "DropField"),
+            Self::Redact => write!(f, "Redact"),
         }
     }
 }

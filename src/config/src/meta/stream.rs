@@ -541,12 +541,21 @@ impl std::fmt::Display for PartitionTimeLevel {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateSettingsWrapper<D> {
     #[serde(default)]
     pub add: Vec<D>,
     #[serde(default)]
     pub remove: Vec<D>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct PatternAssociation {
+    pub field: String,
+    pub pattern_name: String,
+    pub pattern_id: String,
+    pub policy: String,
+    pub apply_at_search: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -584,6 +593,8 @@ pub struct UpdateStreamSettings {
     pub index_original_data: Option<bool>,
     #[serde(default)]
     pub index_all_values: Option<bool>,
+    #[serde(default)]
+    pub pattern_associations: UpdateSettingsWrapper<PatternAssociation>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]

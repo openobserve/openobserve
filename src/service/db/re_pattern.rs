@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use config::meta::stream::{PatternAssociation, StreamType, UpdateSettingsWrapper};
 use infra::{
     cluster_coordinator::get_coordinator,
     db::Event,
@@ -24,6 +25,8 @@ use infra::{
 
 // DBKey to set patterns
 pub const RE_PATTERN_PREFIX: &str = "/re_patterns/";
+// DBKey to set re_pattern_associations
+pub const RE_PATTERN_ASSOCIATIONS_PREFIX: &str = "/re_pattern_associations/";
 
 pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
     match infra::table::re_pattern::add(entry.clone()).await {
@@ -150,7 +153,55 @@ pub async fn remove(pattern_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn watch() -> Result<(), anyhow::Error> {
+pub async fn process_association_changes(
+    org: &str,
+    stream: &str,
+    stype: StreamType,
+    update: UpdateSettingsWrapper<PatternAssociation>,
+) -> Result<(), errors::Error> {
+    if update.add.is_empty() && update.remove.is_empty() {
+        return Ok(());
+    }
+    todo!();
+
+    let serialized = serde_json::to_vec(&update)?;
+    // trigger watch event by putting value to cluster coordinator
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .put(
+            &format!("{RE_PATTERN_ASSOCIATIONS_PREFIX}{org}/{stype}/{stream}",),
+            bytes::Bytes::from_owner(serialized.clone()),
+            true,
+            None,
+        )
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::pattern_associations_update(
+                org, stype, stream, serialized,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent association update notification to super cluster queue for {org}/{stype}/{stream}",
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending association update notification to super cluster queue for {org}/{stype}/{stream} : {e}",
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn watch_patterns() -> Result<(), anyhow::Error> {
     let prefix = RE_PATTERN_PREFIX;
     let cluster_coordinator = get_coordinator().await;
     let mut events = cluster_coordinator.watch(prefix).await?;
@@ -187,6 +238,37 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // TODO @YJDoc2 : update pattern manager here
             }
             Event::Empty => {}
+        }
+    }
+}
+
+pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
+    let prefix = RE_PATTERN_ASSOCIATIONS_PREFIX;
+    let cluster_coordinator = get_coordinator().await;
+    let mut events = cluster_coordinator.watch(prefix).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching re_pattern_associations");
+
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_re_pattern_associations: event channel closed");
+                return Ok(());
+            }
+        };
+
+        match ev {
+            Event::Put(ev) => {
+                let combo = ev.key.strip_prefix(prefix).unwrap();
+                let splits = combo.split('/').collect::<Vec<_>>();
+                let org = splits[0];
+                let stype = StreamType::from(splits[1]);
+                let stream = splits[2];
+                // TODO @YJDoc2 : update in-memory pattern associations here
+            }
+
+            _ => {}
         }
     }
 }

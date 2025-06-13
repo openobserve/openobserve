@@ -255,7 +255,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { cipher::run().await });
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { db::keys::watch().await });
+    {
+        tokio::task::spawn(async move { db::keys::watch().await });
+        tokio::task::spawn(async move { db::re_pattern::watch_patterns().await });
+        tokio::task::spawn(async move { db::re_pattern::watch_pattern_associations().await });
+    }
 
     // additional for cloud
     #[cfg(feature = "cloud")]
