@@ -122,10 +122,6 @@ pub async fn process_search_stream_request(
 
     // HACK: always search from the first partition
     let mut hits_to_skip = req.query.from;
-    let original_size = req.query.size;
-    req.query.from = 0;
-    req.query.size = original_size + hits_to_skip;
-
     let use_cached_flow = if req.query.from == 0 && !req.query.track_total_hits {
         if use_cache && hits_to_skip > 0 {
             // do not use cached flow as its a paginated query
@@ -135,12 +131,14 @@ pub async fn process_search_stream_request(
                 trace_id,
                 hits_to_skip
             );
+            req.query.from = 0;
             false
         } else {
             // check cache for the first page
             true
         }
     } else {
+        req.query.from = 0;
         false
     };
 
@@ -603,7 +601,8 @@ pub async fn do_partitioned_search(
             req.query.size -= curr_res_size;
         }
 
-        // do not use cache for partitioned search without cache
+        // here we increase the size of the query temporarily to skip the hits_to_skip
+        req.query.size += *hits_to_skip;
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
 
         let mut total_hits = search_res.total as i64;
@@ -612,6 +611,7 @@ pub async fn do_partitioned_search(
         if skip_hits > 0 {
             search_res.hits = search_res.hits[skip_hits as usize..].to_vec();
             search_res.total = search_res.hits.len();
+            search_res.size = search_res.total as i64;
             total_hits = search_res.total as i64;
             *hits_to_skip -= skip_hits;
             log::info!(
@@ -624,14 +624,14 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req.query.size > 0 && total_hits > req.query.size {
+        if req_size > 0 && total_hits > req_size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
-                req.query.size
+                req_size
             );
-            search_res.hits.truncate(req.query.size as usize);
-            curr_res_size += req.query.size;
+            search_res.hits.truncate(req_size as usize);
+            curr_res_size += req_size;
         } else {
             curr_res_size += total_hits;
         }
