@@ -187,7 +187,8 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import VueGridLayout from "vue3-grid-layout";
+import GridLayout from '../../components/vue3-grid-layout/components/Grid/GridLayout.vue';
+import GridItem from '../../components/vue3-grid-layout/components/Grid/GridItem.vue';
 import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
@@ -246,8 +247,8 @@ export default defineComponent({
   },
 
   components: {
-    GridLayout: VueGridLayout.GridLayout,
-    GridItem: VueGridLayout.GridItem,
+    GridLayout,
+    GridItem,
     PanelContainer,
     NoPanel,
     VariablesValueSelector,

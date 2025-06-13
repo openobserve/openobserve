@@ -53,7 +53,7 @@ const getConfig = async () => {
   await configService.get_config().then((res: any) => {
     store.dispatch("setConfig", res.data);
     config.enableAnalytics = res.data.telemetry_enabled.toString();
-    if (res.data.rum.enabled) {
+    if (res.data.rum.enabled && false) {
       const options = {
         clientToken: res.data.rum.client_token,
         applicationId: res.data.rum.application_id,
