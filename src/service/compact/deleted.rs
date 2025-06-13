@@ -14,19 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::stream::FileListDeleted,
+    meta::stream::{FileKey, FileMeta},
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
 use hashbrown::HashMap;
 use infra::{file_list as infra_file_list, storage};
 
-pub async fn delete(
-    org_id: &str,
-    _time_min: i64,
-    time_max: i64,
-    batch_size: i64,
-) -> Result<i64, anyhow::Error> {
-    let files = query_deleted(org_id, time_max, batch_size).await?;
+// Batch size for deleting files from file_list_deleted table
+const BATCH_SIZE: i64 = 10000;
+
+pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
+    let files = infra_file_list::query_deleted(org_id, time_max, BATCH_SIZE).await?;
     if files.is_empty() {
         return Ok(0);
     }

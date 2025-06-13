@@ -114,6 +114,7 @@ impl super::FileList for SqliteFileList {
         }
         let chunks = files.chunks(100);
         for files in chunks {
+            // we don't care the id here, because the id is from file_list table not for this table
             let client = CLIENT_RW.clone();
             let client = client.lock().await;
             let mut tx = client.begin().await?;
@@ -145,7 +146,7 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -157,8 +158,12 @@ impl super::FileList for SqliteFileList {
             let pool = client.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
+                if file.id > 0 {
+                    ids.push(file.id.to_string());
+                    continue;
+                }
                 let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+                    parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
                 let ret: Option<i64> = match sqlx::query_scalar(
                     r#"SELECT id FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )

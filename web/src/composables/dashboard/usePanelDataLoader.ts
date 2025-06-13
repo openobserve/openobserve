@@ -326,6 +326,19 @@ export const usePanelDataLoader = (
   const cancelQueryAbort = () => {
     state.loading = false;
     state.isOperationCancelled = true;
+    state.isPartialData = true; // Set to true when cancelled
+
+    if (
+      isStreamingEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
+      state.searchRequestTraceIds.forEach((traceId) => {
+        cancelStreamQueryBasedOnRequestId({
+          trace_id: traceId,
+          org_id: store?.state?.selectedOrganization?.identifier,
+        });
+      });
+    }
 
     if (isStreamingEnabled() && state.searchRequestTraceIds?.length > 0) {
       state.searchRequestTraceIds.forEach((traceId) => {
@@ -912,7 +925,7 @@ export const usePanelDataLoader = (
 
       const payload: {
         queryReq: any;
-        type: "search" | "histogram" | "pageCount";
+        type: "search" | "histogram" | "pageCount" | "values";
         isPagination: boolean;
         traceId: string;
         org_id: string;

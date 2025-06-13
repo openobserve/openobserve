@@ -118,6 +118,7 @@ impl super::FileList for PostgresFileList {
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
+            // we don't care the id here, because the id is from file_list table not for this table
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
                 "INSERT INTO file_list_deleted (org, stream, date, file, index_file, flattened, created_at)",
@@ -153,7 +154,7 @@ impl super::FileList for PostgresFileList {
         Ok(())
     }
 
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -163,8 +164,12 @@ impl super::FileList for PostgresFileList {
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
+                if file.id > 0 {
+                    ids.push(file.id.to_string());
+                    continue;
+                }
                 let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+                    parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
                 DB_QUERY_NUMS
                     .with_label_values(&["select", "file_list_deleted", ""])
                     .inc();
@@ -619,7 +624,25 @@ SELECT date
         if time_max == 0 {
             return Ok(Vec::new());
         }
-        let pool = CLIENT_RO.clone();
+
+        let pool = CLIENT.clone();
+        let mut tx = pool.begin().await?;
+        let lock_key = "file_list_deleted:query_deleted";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_id = if lock_id > (i64::MAX as u64) {
+            (lock_id >> 1) as i64
+        } else {
+            lock_id as i64
+        };
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
+        DB_QUERY_NUMS.with_label_values(&["get_lock", "", ""]).inc();
+        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback query_deleted error: {}", e);
+            }
+            return Err(e.into());
+        }
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
