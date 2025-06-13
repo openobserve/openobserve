@@ -152,7 +152,7 @@ pub async fn handle_otlp_request(
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
         log::error!("[TRACES:OTLP] ingestion error: {:?}", e);
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -572,7 +572,7 @@ pub async fn ingest_json(
     traces_stream_name: &str,
 ) -> Result<HttpResponse, Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
         log::error!("[TRACES:JSON] ingestion error: {:?}", e);
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
