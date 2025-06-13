@@ -578,36 +578,11 @@ export default defineComponent({
       }
       
       // Clear all refs to prevent memory leaks
-      panelData.value = null;
       chartPanelRef.value = null;
-      drilldownArray.value = [];
-      selectedAnnotationData.value = [];
       drilldownPopUpRef.value = null;
       annotationPopupRef.value = null;
-      limitNumberOfSeriesWarningMessage.value = "";
       tableRendererRef.value = null;
       
-      // Clear reactive objects
-      chartPanelStyle.value = {
-        height: "100%",
-        width: "100%",
-      };
-      
-      isCursorOverPanel.value = false;
-      
-      // Clear annotation data
-      if (annotationToAddEdit.value) {
-        annotationToAddEdit.value = null;
-      }
-      
-      // Clear panel list
-      if (panelsList.value) {
-        panelsList.value = [];
-      }
-      
-      // Reset flags
-      isAddAnnotationMode.value = false;
-      isAddAnnotationDialogVisible.value = false;
     });
     watch(
       [data, store?.state],

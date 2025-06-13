@@ -37,7 +37,7 @@
 </template>
 
 <script>
-import { ref, toRef, defineComponent, watch, onUnmounted } from "vue";
+import { ref, toRef, defineComponent, watch } from "vue";
 import { useSearchInputUsingRegex } from "@/composables/useSearchInputUsingRegex";
 import { useStore } from "vuex";
 import { useSlots } from "vue";
@@ -109,14 +109,6 @@ export default defineComponent({
       return !!slots[name];
     };
 
-    onUnmounted(() => {
-      // Clear refs to prevent memory leaks
-      showOptions.value = false;
-      inputValue.value = "";
-      if (fieldsFilteredOptions.value) {
-        fieldsFilteredOptions.value.splice(0);
-      }
-    });
 
     return {
       showOptions,

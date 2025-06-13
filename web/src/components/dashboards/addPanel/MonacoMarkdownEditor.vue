@@ -133,7 +133,6 @@ export default defineComponent({
       });
 
       onUnmounted(() => {
-        // console.log("onUnmounted");
         if (editorObj) {
           editorObj.dispose();
           editorObj = null;

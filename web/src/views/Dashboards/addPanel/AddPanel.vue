@@ -748,75 +748,13 @@ export default defineComponent({
     });
 
     onUnmounted(async () => {
-      // console.time("onUnmounted");
-      // clear a few things
-      resetDashboardPanelData();
-
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
 
       removeAiContextHandler();
 
       // Clear all refs to prevent memory leaks
-      chartData.value = null;
-      selectedDate.value = null;
       dateTimePickerRef.value = null;
-      metaData.value = null;
-      showViewPanel.value = false;
-      lastTriggeredAt.value = null;
-      expandedSplitterHeight.value = null;
-      
-      // Clear reactive objects
-      if (errorData.errors) {
-        errorData.errors.splice(0);
-      }
-      
-      // Clear variablesData
-      Object.keys(variablesData).forEach(key => {
-        delete variablesData[key];
-      });
-      
-      // Clear updatedVariablesData
-      Object.keys(updatedVariablesData).forEach(key => {
-        delete updatedVariablesData[key];
-      });
-      
-      // Clear hoveredSeriesState
-      if (hoveredSeriesState.value) {
-        hoveredSeriesState.value.hoveredSeriesName = "";
-        hoveredSeriesState.value.panelId = -1;
-        hoveredSeriesState.value.dataIndex = -1;
-        hoveredSeriesState.value.seriesIndex = -1;
-        hoveredSeriesState.value.hoveredTime = null;
-      }
-      
-      // Clear variablesAndPanelsDataLoadingState
-      if (variablesAndPanelsDataLoadingState) {
-        Object.keys(variablesAndPanelsDataLoadingState.variablesData || {}).forEach(key => {
-          delete variablesAndPanelsDataLoadingState.variablesData[key];
-        });
-        Object.keys(variablesAndPanelsDataLoadingState.panels || {}).forEach(key => {
-          delete variablesAndPanelsDataLoadingState.panels[key];
-        });
-        Object.keys(variablesAndPanelsDataLoadingState.searchRequestTraceIds || {}).forEach(key => {
-          delete variablesAndPanelsDataLoadingState.searchRequestTraceIds[key];
-        });
-      }
-      
-      // Clear other refs
-      disable.value = false;
-      
-      // Clear route query params cache
-      routeQueryParamsOnMount = {};
-      
-      // Clear initial variable values
-      if (initialVariableValues.value) {
-        Object.keys(initialVariableValues.value).forEach(key => {
-          delete initialVariableValues.value[key];
-        });
-      }
-      
-      // console.timeEnd("onUnmounted");
     });
 
     onMounted(async () => {

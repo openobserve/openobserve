@@ -785,27 +785,6 @@ export default defineComponent({
       loadStreamsListBasedOnType();
     });
 
-    onUnmounted(() => {
-      // Clear refs to prevent memory leaks
-      filteredStreams.value = [];
-      customQueryFieldsLength.value = 0;
-      
-      // Clear reactive data
-      data.currentFieldsList = [];
-      data.streamType = ["logs", "metrics", "traces"];
-      
-      // Clear pagination
-      pagination.value = {
-        page: 1,
-        rowsPerPage: 250,
-      };
-      
-      // Clear metrics icon mapping
-      Object.keys(metricsIconMapping).forEach(key => {
-        delete metricsIconMapping[key];
-      });
-    });
-
     const getStreamFields = useLoading(
       async (fieldName: string, streamType: string) => {
         return await getStream(fieldName, streamType, true);
