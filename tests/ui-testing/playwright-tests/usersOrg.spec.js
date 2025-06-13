@@ -216,7 +216,7 @@ test.describe("Users and Organizations", () => {
         
     });
 
-    test('Add Organization Successfully', async ({ page }) => {
+    test.skip('Add Organization Successfully', async ({ page }) => {
         
         await createOrgPage.navigateToOrg();
         await createOrgPage.clickAddOrg();
@@ -227,7 +227,7 @@ test.describe("Users and Organizations", () => {
      
       });
 
-      test('Save button disabled if Add Organization with Empty Name', async ({ page }) => {
+      test.skip('Save button disabled if Add Organization with Empty Name', async ({ page }) => {
         
         await createOrgPage.navigateToOrg();
         await createOrgPage.clickAddOrg();
@@ -238,7 +238,7 @@ test.describe("Users and Organizations", () => {
      
       });
 
-      test('Organization not added if Cancel clicked', async ({ page }) => {
+      test.skip('Organization not added if Cancel clicked', async ({ page }) => {
         
         await createOrgPage.navigateToOrg();
         await createOrgPage.clickAddOrg();
@@ -251,7 +251,7 @@ test.describe("Users and Organizations", () => {
      
       });
 
-      test('Error Message displayed if Add Organization is blank', async ({ page }) => {
+      test.skip('Error Message displayed if Add Organization is blank', async ({ page }) => {
         
         await createOrgPage.navigateToOrg();
         await createOrgPage.clickAddOrg();

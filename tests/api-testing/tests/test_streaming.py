@@ -10,6 +10,7 @@ import base64
 from requests.auth import HTTPBasicAuth
 
 # Constants for Streaming URL and user credentials
+ZO_BASE_URL = os.environ.get("ZO_BASE_URL")
 ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
 WS_ZO_BASE_URL = os.environ.get("WS_ZO_BASE_URL")
 ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
