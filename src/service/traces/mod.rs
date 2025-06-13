@@ -51,7 +51,9 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         format_stream_name,
-        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
+        ingestion::{
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, grpc::get_val, write_file,
+        },
         logs::O2IngestJsonData,
         metadata::{
             MetadataItem, MetadataType,
@@ -149,8 +151,8 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
-    // check memory circuit breaker
-    if let Err(e) = ingester::check_memory_circuit_breaker() {
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
         log::error!("[TRACES:OTLP] ingestion error: {:?}", e);
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -569,8 +571,8 @@ pub async fn ingest_json(
     req_type: OtlpRequestType,
     traces_stream_name: &str,
 ) -> Result<HttpResponse, Error> {
-    // check memory circuit breaker
-    if let Err(e) = ingester::check_memory_circuit_breaker() {
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
         log::error!("[TRACES:JSON] ingestion error: {:?}", e);
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
