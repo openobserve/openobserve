@@ -72,7 +72,9 @@ pub fn cache_record_batches_to_disk(
     // Skip caching if the time range is within the delay window
     let delay_window = cfg.disk_cache.delay_window_mins;
     let delay_window_micros = delay_window * 60 * 1_000_000;
-    if request.end_time - request.start_time <= delay_window_micros {
+    let skip_cache = chrono::Utc::now().timestamp_micros() - delay_window_micros;
+    let can_be_cached = request.end_time < skip_cache;
+    if !can_be_cached {
         log::warn!(
             "[streaming_id: {}] Skipping caching because the time range is within the delay window: start_time={}, end_time={}, delay_window={}",
             request.streaming_id,
