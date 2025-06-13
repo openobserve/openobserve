@@ -45,7 +45,6 @@ export default class LogsVisualise {
 
   //search and add fields
   async searchAndAddField(fieldName, target) {
-    console.log(`Adding field: ${fieldName} to: ${target}`);
     const searchInput = this.page.locator(
       '[data-test="index-field-search-input"]'
     );
@@ -77,9 +76,7 @@ export default class LogsVisualise {
 
     // Ensure the button is visible before clicking
     await button.waitFor({ state: "visible", timeout: 5000 });
-    console.log(`Clicking button: ${buttonTestId}`);
     await button.click();
-    console.log("after click");
   }
 
   //show query toggle
@@ -133,7 +130,6 @@ export default class LogsVisualise {
 
   //remove field
   async removeField(fieldName, target) {
-    console.log(`Removing field: ${fieldName} from: ${target}`);
 
     const removeSelectors = {
       x: "dashboard-x-item",
@@ -161,7 +157,6 @@ export default class LogsVisualise {
 
     await removeButton.waitFor({ state: "visible", timeout: 5000 });
     await removeButton.click();
-    console.log(`Removed field: ${fieldName} from ${target}`);
   }
 
   //chart render
@@ -210,7 +205,6 @@ export default class LogsVisualise {
   }
 
   async runQueryAndWaitForCompletion() {
-    console.log("Running query and waiting for completion...");
     const runBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-refresh-btn"]'
     );
@@ -220,18 +214,11 @@ export default class LogsVisualise {
 
     await runBtn.waitFor({ state: "visible" });
     // Click "Run query"
-    console.log("Clicking 'Run query' button...");
     await runBtn.click();
 
-    // console.log("Waiting for 'Cancel query' button to appear...");
-    // Wait for "Cancel query" to appear (query is running)
-    // await cancelBtn.waitFor({ state: "visible" });
-
-    console.log("Waiting for 'Run query' button to reappear...");
     // Wait for "Run query" to reappear (query is finished)
     await runBtn.waitFor({ state: "visible" });
 
-    console.log("Query completed successfully.");
     // Optional: small buffer to ensure UI is stable
     await this.page.waitForTimeout(300);
   }
