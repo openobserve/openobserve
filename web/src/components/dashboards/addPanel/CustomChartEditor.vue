@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, onMounted, ref, watch } from "vue";
+import { defineAsyncComponent, defineComponent, onMounted, ref, watch, onUnmounted } from "vue";
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 
 import DashboardQueryEditor from "./DashboardQueryEditor.vue";
@@ -96,6 +96,12 @@ export default defineComponent({
       }
     };
 
+    onUnmounted(() => {
+      // Clear refs to prevent memory leaks
+      javascriptCodeContent.value = "";
+      splitterModel.value = 50;
+      dataToBeRendered.value = {};
+    });
 
     return {
       javascriptCodeContent,

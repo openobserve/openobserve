@@ -473,7 +473,29 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
+      // Remove event listeners
       window.removeEventListener("resize", resizeEventListener);
+      
+      // Clear refs to prevent memory leaks
+      queryEditorRef.value = null;
+      vrlFnEditorRef.value = null;
+      functionEditorPlaceholderFlag.value = true;
+      selectedFunction.value = "";
+      splitterModel.value = 100;
+      confirmQueryModeChangeDialog.value = false;
+      
+      // Clear function arrays
+      functionList.value = [];
+      functionOptions.value = [];
+      
+      // Clear auto complete data
+      if (autoCompleteData.value) {
+        autoCompleteData.value = null;
+      }
+      
+      if (autoCompletePromqlKeywords.value) {
+        autoCompletePromqlKeywords.value = [];
+      }
     });
     // End for VRL resize
 

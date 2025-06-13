@@ -658,6 +658,7 @@ import {
   onActivated,
   computed,
   onMounted,
+  onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -782,6 +783,27 @@ export default defineComponent({
 
     onMounted(() => {
       loadStreamsListBasedOnType();
+    });
+
+    onUnmounted(() => {
+      // Clear refs to prevent memory leaks
+      filteredStreams.value = [];
+      customQueryFieldsLength.value = 0;
+      
+      // Clear reactive data
+      data.currentFieldsList = [];
+      data.streamType = ["logs", "metrics", "traces"];
+      
+      // Clear pagination
+      pagination.value = {
+        page: 1,
+        rowsPerPage: 250,
+      };
+      
+      // Clear metrics icon mapping
+      Object.keys(metricsIconMapping).forEach(key => {
+        delete metricsIconMapping[key];
+      });
     });
 
     const getStreamFields = useLoading(

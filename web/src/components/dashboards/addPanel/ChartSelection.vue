@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, ref } from "vue";
+import { defineComponent, inject, ref, onUnmounted } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useStore } from "vuex";
@@ -205,6 +205,14 @@ export default defineComponent({
     const { promqlMode, dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
+    onUnmounted(() => {
+      // Clear refs to prevent memory leaks
+      if (chartsArray.value) {
+        chartsArray.value.splice(0);
+      }
+    });
+
     return {
       t,
       ChartsArray: chartsArray,

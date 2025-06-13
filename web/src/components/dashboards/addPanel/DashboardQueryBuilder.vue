@@ -1074,6 +1074,7 @@ import {
   computed,
   inject,
   nextTick,
+  onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -1598,6 +1599,31 @@ export default defineComponent({
         currentField.havingConditions?.[0] || { operator: null, value: null }
       );
     };
+
+    const handleBlur = (field: any, key: any, value: any) => {
+      if (!field[value]) {
+        field[value] = key;
+      }
+    };
+
+    onUnmounted(() => {
+      // Clear refs to prevent memory leaks
+      showXAxis.value = true;
+      panelName.value = "";
+      panelDesc.value = "";
+      
+      // Clear reactive expansion items
+      expansionItems.x = true;
+      expansionItems.y = true;
+      expansionItems.z = true;
+      expansionItems.breakdown = true;
+      expansionItems.config = true;
+      expansionItems.filter = false;
+      
+      // Clear trigger operators arrays
+      triggerOperators.splice(0);
+      triggerOperatorsWithHistogram.splice(0);
+    });
 
     return {
       showXAxis,
