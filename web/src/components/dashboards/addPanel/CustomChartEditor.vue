@@ -20,21 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="width: 100%; height: 100%; overflow: auto"
   >
     <div style="width: 100%; height: calc(100% - 1px)">
-      <div class="col" style="height: 100%">
-        <QueryEditor
-          v-model:query="javascriptCodeContent"
-          :debounceTime="500"
-          @update:query="onEditorValueChange"
-          data-test="dashboard-markdown-editor-query-editor"
-          language="javascript"
-          class="javascript-query-editor"
-          style="padding-left: 20px; height: 100% !important"
-          :style="{
-            backgroundColor:
-              store.state.theme == 'dark' ? '#1e1e1e' : '#fafafa',
-          }"
-        />
-      </div>
+          <div class="col" style="height: 100%">
+            <QueryEditor
+              v-model:query="javascriptCodeContent"
+              :debounceTime="500"
+              @update:query="onEditorValueChange"
+              data-test="dashboard-markdown-editor-query-editor"
+              language="javascript"
+              class="javascript-query-editor "
+              style="padding-left: 20px; height: 100% !important;"
+              :style="{
+                backgroundColor:
+                  store.state.theme == 'dark'
+                    ? '#1e1e1e'
+                    : '#fafafa',
+              }"
+
+            />
+          </div>
     </div>
   </div>
 </template>
@@ -57,6 +60,9 @@ import { useStore } from "vuex";
 import { on } from "events";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 
+
+
+
 export default defineComponent({
   components: {
     MonacoMarkdownEditor: defineAsyncComponent(
@@ -73,7 +79,7 @@ export default defineComponent({
     modelValue: {
       type: String,
       default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
-  `,
+  `
     },
   },
   setup(props, { emit }): any {
@@ -95,6 +101,7 @@ export default defineComponent({
         console.error("Error processing newVal:", error);
       }
     };
+
 
     return {
       javascriptCodeContent,
@@ -136,6 +143,7 @@ export default defineComponent({
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
 }
-.javascript-query-editor {
+.javascript-query-editor{
+
 }
 </style>
