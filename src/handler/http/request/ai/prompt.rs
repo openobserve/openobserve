@@ -28,7 +28,15 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
 )]
 #[get("/{org_id}/ai/prompts")]
-pub async fn list_prompts(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    // Ensure this API is only available for the "_meta" organization
+    let org_id = org_id.into_inner();
+    if org_id != config::META_ORG_ID {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
+        )));
+    }
     match prompt_service::list_prompts().await {
         Ok(response) => Ok(MetaHttpResponse::json(response)),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
@@ -102,7 +110,15 @@ pub async fn create_prompt(
 )]
 #[get("/{org_id}/ai/prompts/{id}")]
 pub async fn get_prompt(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (_org_id, id) = path.into_inner();
+    let (org_id, id) = path.into_inner();
+    // Ensure this API is only available for the "_meta" organization
+    if org_id != config::META_ORG_ID {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
+        )));
+    }
+
     match prompt_service::get_prompt(&id).await {
         Ok(prompt) => Ok(MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Prompt retrieved")
@@ -149,7 +165,14 @@ pub async fn update_prompt(
     path: web::Path<(String, String)>,
     request: web::Json<UpdatePromptRequest>,
 ) -> Result<HttpResponse, Error> {
-    let (_org_id, id) = path.into_inner();
+    let (org_id, id) = path.into_inner();
+     // Ensure this API is only available for the "_meta" organization
+     if org_id != config::META_ORG_ID {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
+        )));
+    }
     match prompt_service::update_prompt(&id, request.into_inner()).await {
         Ok(prompt) => Ok(MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Prompt updated")
@@ -183,7 +206,14 @@ pub async fn update_prompt(
 )]
 #[delete("/{org_id}/ai/prompts/{id}")]
 pub async fn delete_prompt(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (_org_id, id) = path.into_inner();
+    let (org_id, id) = path.into_inner();
+    // Ensure this API is only available for the "_meta" organization
+    if org_id != config::META_ORG_ID {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
+        )));
+    }
     match prompt_service::delete_prompt(&id).await {
         Ok(()) => Ok(HttpResponse::NoContent().finish()),
         Err(err) => Ok(MetaHttpResponse::not_found(err.to_string())),
@@ -213,7 +243,14 @@ pub async fn delete_prompt(path: web::Path<(String, String)>) -> Result<HttpResp
 )]
 #[post("/{org_id}/ai/prompts/{id}/activate")]
 pub async fn activate_prompt(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (_org_id, id) = path.into_inner();
+    let (org_id, id) = path.into_inner();
+    // Ensure this API is only available for the "_meta" organization
+    if org_id != config::META_ORG_ID {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
+        )));
+    }
     match prompt_service::set_active_prompt(&id).await {
         Ok(()) => Ok(MetaHttpResponse::ok("Prompt activated successfully")),
         Err(err) => Ok(MetaHttpResponse::bad_request(err.to_string())),
