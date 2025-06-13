@@ -177,7 +177,7 @@ import { VueDraggableNext } from "vue-draggable-next";
 export default defineComponent({
   name: "VariableSettings",
   components: {
-    draggable: VueDraggableNext,
+    draggable: VueDraggableNext as any,
     AddSettingVariable,
     NoData,
     ConfirmDialog,
