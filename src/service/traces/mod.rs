@@ -172,6 +172,20 @@ pub async fn handle_otlp_request(
         )));
     }
 
+    // check memory circuit breaker
+    if let Err(e) = ingester::check_memory_circuit_breaker() {
+        log::error!(
+            "[TRACES:OTLP] ingestion error while checking memory circuit breaker: {}",
+            e
+        );
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
         log::error!(
@@ -597,6 +611,20 @@ pub async fn ingest_json(
             http::StatusCode::FORBIDDEN.into(),
             format!("Quota exceeded for this organization [{}]", org_id),
         )));
+    }
+
+    // check memory circuit breaker
+    if let Err(e) = ingester::check_memory_circuit_breaker() {
+        log::error!(
+            "ingestion error while checking memory circuit breaker: {}",
+            e
+        );
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
     }
 
     // check memtable

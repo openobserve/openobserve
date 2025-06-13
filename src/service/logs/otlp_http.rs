@@ -105,7 +105,7 @@ pub async fn logs_json_handler(
         Some(name) => format_stream_name(name),
         None => "default".to_owned(),
     };
-    check_ingestion_allowed(org_id, Some(&stream_name))?;
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name))?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();

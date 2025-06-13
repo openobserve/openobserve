@@ -252,12 +252,11 @@ pub async fn search_parquet(
         )
     );
 
-    if cfg.common.memory_circuit_breaker_enable {
-        if let Err(e) = super::check_memory_circuit_breaker(&query.trace_id, &scan_stats) {
-            // release all files
-            wal::release_files(&lock_files);
-            return Err(e);
-        }
+    // check memory circuit breaker
+    if let Err(e) = super::check_memory_circuit_breaker(&query.trace_id, &scan_stats) {
+        // release all files
+        wal::release_files(&lock_files);
+        return Err(e);
     }
 
     // construct latest schema map
