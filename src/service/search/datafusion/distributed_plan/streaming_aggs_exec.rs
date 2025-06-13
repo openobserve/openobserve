@@ -338,6 +338,8 @@ impl Stream for MonitorStream {
                             file_path: file_path.clone(),
                             file_name: file_name.clone(),
                             records,
+                            start_time: self.start_time,
+                            end_time: self.end_time,
                         };
                         if let Err(e) = cache_record_batches_to_disk(request) {
                             log::error!(

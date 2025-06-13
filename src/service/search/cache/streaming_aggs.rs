@@ -48,6 +48,8 @@ pub struct RecordBatchCacheRequest {
     pub file_path: String,
     pub file_name: String,
     pub records: Vec<Arc<RecordBatch>>,
+    pub start_time: i64,
+    pub end_time: i64,
 }
 
 pub fn cache_record_batches_to_disk(
@@ -56,6 +58,21 @@ pub fn cache_record_batches_to_disk(
     if request.records.is_empty() {
         return Ok(());
     }
+
+    // Skip caching if the time range is within the delay window
+    let delay_window = config::get_config().disk_cache.delay_window_mins;
+    let delay_window_micros = delay_window * 60 * 1_000_000;
+    if request.end_time - request.start_time <= delay_window_micros {
+        log::warn!(
+            "[streaming_id: {}] Skipping caching because the time range is within the delay window: start_time={}, end_time={}, delay_window={}",
+            request.streaming_id,
+            request.start_time,
+            request.end_time,
+            delay_window
+        );
+        return Ok(());
+    }
+
     let streaming_id = request.streaming_id.clone();
 
     // Send to background queue (non-blocking)
