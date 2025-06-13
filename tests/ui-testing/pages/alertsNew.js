@@ -13,6 +13,10 @@ export class AlertsNewPage {
         this.folderCancelButton = '[data-test="dashboard-folder-add-cancel"]';
         this.noDataAvailableText = 'No data available';
         this.folderExistsError = 'Folder with this name already exists in this organization';
+        this.folderMoreOptionsButton = '//span[contains(text(),"{folderName}")]/../div/button/span[2]/i';
+        this.deleteFolderOption = 'Delete';
+        this.deleteFolderConfirmText = 'Delete Folder';
+        this.folderDeletedMessage = 'Folder deleted successfully.';
 
         // Alert creation locators
         this.addAlertButton = '[data-test="alert-list-add-alert-btn"]';
@@ -47,6 +51,13 @@ export class AlertsNewPage {
         this.alertMoreOptions = '[data-test="alert-list-{alertName}-more-options"]';
         this.confirmButton = '[data-test="confirm-button"]';
 
+        // Alert movement locators
+        this.selectAllCheckbox = '[data-test="alert-list-select-all-checkbox"]';
+        this.moveAcrossFoldersButton = '[data-test="alert-list-move-across-folders-btn"]';
+        this.folderDropdown = '[data-test="alerts-index-dropdown-stream_type"]';
+        this.moveButton = '[data-test="alerts-folder-move"]';
+        this.alertsMovedMessage = 'alerts Moved successfully';
+
         // Store the generated folder name and alert name
         this.currentFolderName = '';
         this.currentAlertName = '';
@@ -59,6 +70,10 @@ export class AlertsNewPage {
             result += characters.charAt(Math.floor(Math.random() * characters.length));
         }
         return result;
+    }
+
+    generateFolderName() {
+        return 'auto_' + this.generateRandomString();
     }
 
     getCurrentFolderName() {
@@ -189,5 +204,61 @@ export class AlertsNewPage {
         await this.page.getByText(streamName, { exact: true }).click();
         await this.page.locator(this.cloneSubmitButton).click();
         await expect(this.page.getByText(this.alertClonedMessage)).toBeVisible();
+    }
+
+    async ensureFolderExists(folderName, description = '') {
+        try {
+            await this.page.getByText(folderName).waitFor({ timeout: 2000 });
+            console.log('Folder exists:', folderName);
+            return true;
+        } catch (error) {
+            await this.createFolder(folderName, description);
+            console.log('Created folder:', folderName);
+            return false;
+        }
+    }
+
+    async moveAllAlertsToFolder(targetFolderName) {
+        // Select all alerts
+        await this.page.getByRole('row', { name: '# Name Owner Period Frequency' }).getByRole('checkbox').click();
+        await expect(this.page.getByText('Showing 1 - 2 of').nth(1)).toBeVisible();
+
+        // Click move across folders button
+        await this.page.locator(this.moveAcrossFoldersButton).click();
+
+        // Select target folder
+        await this.page.locator(this.folderDropdown).click();
+        await this.page.getByRole('option', { name: targetFolderName }).locator('span').click();
+
+        // Click move button and verify
+        await this.page.locator(this.moveButton).click();
+        await expect(this.page.getByText(this.alertsMovedMessage)).toBeVisible();
+        await expect(this.page.getByText(this.noDataAvailableText)).toBeVisible();
+        
+        console.log('Successfully moved alerts to folder:', targetFolderName);
+    }
+
+    async deleteFolder(folderName) {
+        // Step 1: Hover on the full folder row to trigger the three-dot button to appear
+        await this.page.hover(`div.folder-item:has-text("${folderName}")`);
+
+        // Step 2: Wait a bit to let the DOM update
+        await this.page.waitForTimeout(500);
+
+        // Step 3: Click the 3-dot button using JS execution inside browser
+        await this.page.evaluate((name) => {
+            const folders = Array.from(document.querySelectorAll('.folder-item'));
+            const target = folders.find(el => el.textContent?.includes(name));
+            const button = target?.querySelector('button.q-btn');
+            button?.click();
+        }, folderName);
+
+        // Continue as before
+        await this.page.getByText(this.deleteFolderOption).click();
+        await expect(this.page.getByText(this.deleteFolderConfirmText)).toBeVisible();
+        await this.page.locator(this.confirmButton).click();
+        await expect(this.page.getByText(this.folderDeletedMessage)).toBeVisible();
+
+        console.log('Successfully deleted folder:', folderName);
     }
 } 

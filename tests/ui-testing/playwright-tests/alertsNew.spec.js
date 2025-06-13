@@ -1,6 +1,5 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import logsdata from "../../test-data/logs_data.json";
 import { AlertsNewPage } from '../../ui-testing/pages/alertsNew.js';
 import { AlertTemplatesPage } from '../../ui-testing/pages/alertTemplatesPage.js';
 import { AlertDestinationsPage } from '../../ui-testing/pages/alertDestinationsPage.js';
@@ -48,8 +47,8 @@ test.describe.serial("Alerts Module testcases", () => {
     if (!createdDestinationName) {
       await ensureTemplateExists();
       createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
-      const testUrl = 'DEMO';
-      await destinationsPage.createDestination(createdDestinationName, testUrl, createdTemplateName);
+      const slackUrl = process.env["SLACK_DEST_URL"];
+      await destinationsPage.createDestination(createdDestinationName, slackUrl, createdTemplateName);
       console.log('Created destination for dependency:', createdDestinationName);
     }
     return createdDestinationName;
@@ -92,14 +91,14 @@ test.describe.serial("Alerts Module testcases", () => {
     // Use shared random value for destination name
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
 
-    // Create destination with test URL
-    const testUrl = 'DEMO';
-    await destinationsPage.createDestination(createdDestinationName, testUrl, createdTemplateName);
+    // Create destination with Slack URL from environment
+    const slackUrl = process.env["SLACK_DEST_URL"];
+    await destinationsPage.createDestination(createdDestinationName, slackUrl, createdTemplateName);
     console.log('Successfully created destination:', createdDestinationName);
   });
 
-  test('Create folder and alert', {
-    tag: ['@createFolder', '@createAlert', '@all', '@alerts']
+  test('Create Folder, Create, Update and Move Alerts', {
+    tag: ['@createFolder', '@createAlert', '@moveAlerts', '@updateAlerts', '@all', '@alerts']
   }, async ({ page }) => {
     const streamName = 'auto_playwright_stream';
     const column = 'job';
@@ -112,8 +111,8 @@ test.describe.serial("Alerts Module testcases", () => {
     await commonActions.navigateToAlerts();
     await page.waitForTimeout(2000);
 
-    // Generate folder name once for this test
-    const folderName = 'automationFolder_'+ sharedRandomValue;
+    // Use the shared random value for the folder name
+    const folderName = 'auto_' + sharedRandomValue;
     await alertsPage.createFolder(folderName, 'Test Automation Folder');
     await alertsPage.verifyFolderCreated(folderName);
     console.log('Successfully created folder:', folderName);
@@ -133,6 +132,18 @@ test.describe.serial("Alerts Module testcases", () => {
     // Clone alert
     await alertsPage.cloneAlert(alertName, 'logs', streamName);
     console.log('Successfully cloned alert:', alertName);
+
+    // Ensure target folder exists and move alerts
+    const targetFolderName = 'testfoldermove';
+    await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
+    await alertsPage.moveAllAlertsToFolder(targetFolderName);
+
+    // // Navigate back to alerts page to delete the original folder
+    // await commonActions.navigateToAlerts();
+    // await page.waitForTimeout(2000);
+
+    // // Delete only the original folder
+    // await alertsPage.deleteFolder(folderName);
   });
 
   test('Verify Delete alert template functionality', {
