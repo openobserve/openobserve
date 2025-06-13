@@ -33,15 +33,15 @@ pub struct PatternEntry {
     pub pattern: String,
 }
 
-impl Into<PatternEntry> for Model {
-    fn into(self) -> PatternEntry {
+impl From<Model> for PatternEntry {
+    fn from(val: Model) -> Self {
         PatternEntry {
-            id: self.id,
-            org: self.org,
-            name: self.name,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            pattern: self.pattern,
+            id: val.id,
+            org: val.org,
+            name: val.name,
+            created_at: val.created_at,
+            updated_at: val.updated_at,
+            pattern: val.pattern,
         }
     }
 }
