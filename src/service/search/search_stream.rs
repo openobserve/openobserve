@@ -120,10 +120,12 @@ pub async fn process_search_stream_request(
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
-    // HACK: always search from the first partition, this is becuase to support pagination in http2 streaming
-    // we need context of no of hits per partition, which currently is not available. Hence we start from the first partition
-    // everytime and skip the hits. The following is a global variable to keep track of how many hits to skip across all partitions.
-    // This is a temporary hack and will be removed once we have the context of no of hits per partition.
+    // HACK: always search from the first partition, this is becuase to support pagination in http2
+    // streaming we need context of no of hits per partition, which currently is not available.
+    // Hence we start from the first partition everytime and skip the hits. The following is a
+    // global variable to keep track of how many hits to skip across all partitions.
+    // This is a temporary hack and will be removed once we have the context of no of hits per
+    // partition.
     let mut hits_to_skip = req.query.from;
 
     if req.query.from == 0 && !req.query.track_total_hits {
@@ -586,8 +588,9 @@ pub async fn do_partitioned_search(
             req.query.size -= curr_res_size;
         }
 
-        // here we increase the size of the query to fetch requested hits in addition to the hits_to_skip
-        // we set the from to 0 to fetch the hits from the the beginning of the partition
+        // here we increase the size of the query to fetch requested hits in addition to the
+        // hits_to_skip we set the from to 0 to fetch the hits from the the beginning of the
+        // partition
         req.query.size += *hits_to_skip;
         req.query.from = 0;
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
