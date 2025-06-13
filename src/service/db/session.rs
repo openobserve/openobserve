@@ -78,7 +78,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = match db::get(&ev.key).await {
+                let item_value: String = match db::get(&ev.key).await {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,
                         Err(e) => {
@@ -91,6 +91,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
+                if item_value.is_empty() {
+                    continue;
+                }
                 USER_SESSIONS.insert(item_key.to_string(), item_value);
             }
             db::Event::Delete(ev) => {
@@ -107,7 +110,16 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let session_id = item_key.strip_prefix(key).unwrap();
-        let json_val: String = json::from_slice(&item_value).unwrap();
+        let json_val: String = match json::from_slice(&item_value) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error deserializing session value: {}", e);
+                continue;
+            }
+        };
+        if json_val.is_empty() {
+            continue;
+        }
         USER_SESSIONS.insert(session_id.to_owned(), json_val);
     }
     log::info!("User Sessions Cached");
