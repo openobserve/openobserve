@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="logPage q-my-xs" id="logPage" :key="store.state.selectedOrganization.identifier">
     <div
-      v-if="!showSearchHistory && !showSearchScheduler"
+      v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
       class="full-height"
     >
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
             style="width: 100%"
-            v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-splitter>
           </div>
           <div
-            v-if="searchObj.meta.logsVisualizeToggle == 'visualize'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
             :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
           >
             <VisualizeLogsQuery
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-if="showSearchHistory">
+    <div v-show="showSearchHistory">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div v-if="showSearchScheduler">
+    <div v-show="showSearchScheduler">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"
