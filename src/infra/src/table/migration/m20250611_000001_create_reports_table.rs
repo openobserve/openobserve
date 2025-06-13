@@ -83,16 +83,6 @@ fn create_reports_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Reports::Destinations).json().not_null())        
         .col(ColumnDef::new(Reports::Message).text().null())
         .col(
-            ColumnDef::new(Reports::ChromeDriverLoginEmail)
-                .string_len(256)
-                .null(),
-        )
-        .col(
-            ColumnDef::new(Reports::ChromeDriverLoginPassword)
-                .string_len(256)
-                .null(),
-        )
-        .col(
             ColumnDef::new(Reports::Timezone)
                 .string_len(256)
                 .not_null(),
@@ -103,7 +93,6 @@ fn create_reports_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Reports::CreatedAt).big_integer().not_null())
         .col(ColumnDef::new(Reports::UpdatedAt).big_integer().null())
         .col(ColumnDef::new(Reports::StartAt).big_integer().not_null())
-        .col(ColumnDef::new(Reports::LastTriggeredAt).big_integer().null())
         .foreign_key(
             sea_query::ForeignKey::create()
                     .name(REPORTS_FOLDERS_FK)
@@ -186,8 +175,6 @@ enum Reports {
     Frequency,
     Destinations,
     Message,
-    ChromeDriverLoginEmail,
-    ChromeDriverLoginPassword,
     Timezone,
     TzOffset,
     Owner,
@@ -195,7 +182,6 @@ enum Reports {
     CreatedAt,
     UpdatedAt,
     StartAt,
-    LastTriggeredAt,
 }
 
 /// Identifiers used in queries on the report_dashboards table.
@@ -229,8 +215,6 @@ mod tests {
                 "frequency" json NOT NULL,
                 "destinations" json NOT NULL,
                 "message" text NULL,
-                "chrome_driver_login_email" varchar(256) NULL,
-                "chrome_driver_login_password" varchar(256) NULL,
                 "timezone" varchar(256) NOT NULL,
                 "tz_offset" integer NOT NULL,
                 "owner" varchar(256) NULL,
@@ -238,7 +222,6 @@ mod tests {
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NULL,
                 "start_at" bigint NOT NULL,
-                "last_triggered_at" bigint NULL,
                 CONSTRAINT "reports_folders_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") 
             )"#
         );
@@ -272,8 +255,6 @@ mod tests {
                 `frequency` json NOT NULL,
                 `destinations` json NOT NULL,
                 `message` text NULL,
-                `chrome_driver_login_email` varchar(256) NULL,
-                `chrome_driver_login_password` varchar(256) NULL,
                 `timezone` varchar(256) NOT NULL,
                 `tz_offset` int NOT NULL,
                 `owner` varchar(256) NULL,
@@ -281,7 +262,6 @@ mod tests {
                 `created_at` bigint NOT NULL,
                 `updated_at` bigint NULL,
                 `start_at` bigint NOT NULL,
-                `last_triggered_at` bigint NULL,
                 CONSTRAINT `reports_folders_fk` FOREIGN KEY (`folder_id`) REFERENCES `folders` (`id`)
             )"#
         );
@@ -315,8 +295,6 @@ mod tests {
                 "frequency" json_text NOT NULL,
                 "destinations" json_text NOT NULL,
                 "message" text NULL,
-                "chrome_driver_login_email" varchar(256) NULL,
-                "chrome_driver_login_password" varchar(256) NULL,
                 "timezone" varchar(256) NOT NULL,
                 "tz_offset" integer NOT NULL,
                 "owner" varchar(256) NULL,
@@ -324,7 +302,6 @@ mod tests {
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NULL,
                 "start_at" bigint NOT NULL,
-                "last_triggered_at" bigint NULL,
                 FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") 
             )"#
         );

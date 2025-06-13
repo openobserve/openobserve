@@ -810,22 +810,6 @@ async fn handle_report_triggers(
             trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }
     }
-
-    // Check if the report has been disabled in the mean time
-    let mut old_report = db::dashboards::reports::get(conn, org_id, "default", report_name).await?;
-    if old_report.enabled {
-        old_report.enabled = report.enabled;
-    }
-    old_report.last_triggered_at = Some(triggered_at);
-    let result =
-        db::dashboards::reports::update_without_updating_trigger(conn, "default", None, old_report)
-            .await;
-    if result.is_err() {
-        log::error!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {report_name} after trigger: {}",
-            result.err().unwrap()
-        );
-    }
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
         &trigger_data_stream.key

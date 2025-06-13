@@ -61,7 +61,7 @@ impl TryFrom<infra::table::reports::ListReportsQueryResult> for ListReportsRespo
             name: value.report_name,
             owner: value.report_owner,
             description: value.report_description,
-            last_triggered_at: value.report_last_triggered_at,
+            last_triggered_at: None,
         })
     }
 }

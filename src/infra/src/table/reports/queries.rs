@@ -27,7 +27,7 @@ use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
     QuerySelect, RelationTrait, SelectModel, Selector,
 };
-use serde_json::{json, Value as Json};
+use serde_json::{Value as Json, json};
 
 use super::{
     super::{
@@ -210,13 +210,8 @@ impl TryFrom<SelectReportAndJoinRelationsResult> for (MetaFolder, MetaReport) {
             message: report_model.message.unwrap_or_default(),
             enabled: report_model.enabled,
             media_type: config::meta::dashboards::reports::ReportMediaType::Pdf,
-            user: report_model.chrome_driver_login_email.unwrap_or_default(),
-            password: report_model
-                .chrome_driver_login_password
-                .unwrap_or_default(),
             timezone: report_model.timezone,
             tz_offset: report_model.tz_offset,
-            last_triggered_at: report_model.last_triggered_at,
             created_at: created_at_utc,
             updated_at: updated_at_utc,
             owner: report_model.owner.unwrap_or_default(),
@@ -266,7 +261,6 @@ pub struct ListReportsQueryResult {
     pub report_name: String,
     pub report_owner: Option<String>,
     pub report_description: Option<String>,
-    pub report_last_triggered_at: Option<i64>,
     pub folder_id: String,
     pub folder_name: String,
 }
@@ -288,7 +282,6 @@ impl ListReportsQueryResult {
             .column_as(reports::Column::Name, "report_name")
             .column_as(reports::Column::Owner, "report_owner")
             .column_as(reports::Column::Description, "report_description")
-            .column_as(reports::Column::LastTriggeredAt, "report_last_triggered_at")
             .column_as(folders::Column::FolderId, "folder_id")
             .column_as(folders::Column::Name, "folder_name")
             .join(
@@ -450,8 +443,6 @@ mod tests {
                 "reports"."frequency",
                 "reports"."destinations",
                 "reports"."message",
-                "reports"."chrome_driver_login_email",
-                "reports"."chrome_driver_login_password",
                 "reports"."timezone",
                 "reports"."tz_offset",
                 "reports"."owner",
@@ -459,12 +450,10 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
-                "reports"."last_triggered_at",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
-                "reports"."last_triggered_at" AS "report_last_triggered_at",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
@@ -491,8 +480,6 @@ mod tests {
                 `reports`.`frequency`,
                 `reports`.`destinations`,
                 `reports`.`message`,
-                `reports`.`chrome_driver_login_email`,
-                `reports`.`chrome_driver_login_password`,
                 `reports`.`timezone`,
                 `reports`.`tz_offset`,
                 `reports`.`owner`,
@@ -500,12 +487,10 @@ mod tests {
                 `reports`.`created_at`,
                 `reports`.`updated_at`,
                 `reports`.`start_at`,
-                `reports`.`last_triggered_at`,
                 `reports`.`id` AS `report_id`,
                 `reports`.`name` AS `report_name`,
                 `reports`.`owner` AS `report_owner`,
                 `reports`.`description` AS `report_description`,
-                `reports`.`last_triggered_at` AS `report_last_triggered_at`,
                 `folders`.`folder_id` AS `folder_id`,
                 `folders`.`name` AS `folder_name` 
                 FROM `reports` 
@@ -533,8 +518,6 @@ mod tests {
                 "reports"."frequency",
                 "reports"."destinations",
                 "reports"."message",
-                "reports"."chrome_driver_login_email",
-                "reports"."chrome_driver_login_password",
                 "reports"."timezone",
                 "reports"."tz_offset",
                 "reports"."owner",
@@ -542,7 +525,6 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
-                "reports"."last_triggered_at",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
@@ -588,8 +570,6 @@ mod tests {
                 "reports"."frequency",
                 "reports"."destinations",
                 "reports"."message",
-                "reports"."chrome_driver_login_email",
-                "reports"."chrome_driver_login_password",
                 "reports"."timezone",
                 "reports"."tz_offset",
                 "reports"."owner",
@@ -597,7 +577,6 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
-                "reports"."last_triggered_at",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",

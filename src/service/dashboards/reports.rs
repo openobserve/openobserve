@@ -155,15 +155,12 @@ pub async fn save(
             if create {
                 return Err(ReportError::CreateReportNameAlreadyUsed);
             }
-            report.last_triggered_at = old_report.last_triggered_at;
             report.owner = old_report.owner;
             report.updated_at = Some(datetime_now());
         }
         Err(_) => {
             if !create {
                 return Err(ReportError::ReportNotFound);
-            } else {
-                report.last_triggered_at = None;
             }
         }
     }

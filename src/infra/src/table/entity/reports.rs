@@ -15,8 +15,6 @@ pub struct Model {
     pub frequency: Json,
     pub destinations: Json,
     pub message: Option<String>,
-    pub chrome_driver_login_email: Option<String>,
-    pub chrome_driver_login_password: Option<String>,
     pub timezone: String,
     pub tz_offset: i32,
     pub owner: Option<String>,
@@ -24,7 +22,6 @@ pub struct Model {
     pub created_at: i64,
     pub updated_at: Option<i64>,
     pub start_at: i64,
-    pub last_triggered_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

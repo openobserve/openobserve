@@ -133,8 +133,6 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
         frequency: Set(frequency_json),
         destinations: Set(destinations_json),
         message: Set(Some(report.message).filter(|s| !s.is_empty())),
-        chrome_driver_login_email: Set(Some(report.user).filter(|s| !s.is_empty())),
-        chrome_driver_login_password: Set(Some(report.password).filter(|s| !s.is_empty())),
         timezone: Set(report.timezone),
         tz_offset: Set(report.tz_offset),
         owner: Set(Some(report.owner).filter(|s| !s.is_empty())),
@@ -142,7 +140,6 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
         created_at: Set(now),
         updated_at: Set(Some(now)),
         start_at: Set(report.start),
-        last_triggered_at: Set(report.last_triggered_at),
     };
     let report_model = report_active_model.insert(&txn).await?;
 
@@ -239,8 +236,6 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
         frequency: Set(frequency_json),
         destinations: Set(destinations_json),
         message: Set(Some(report.message).filter(|s| !s.is_empty())),
-        chrome_driver_login_email: Set(Some(report.user).filter(|s| !s.is_empty())),
-        chrome_driver_login_password: Set(Some(report.password).filter(|s| !s.is_empty())),
         timezone: Set(report.timezone),
         tz_offset: Set(report.tz_offset),
         owner: Set(Some(report.owner).filter(|s| !s.is_empty())),
@@ -248,7 +243,6 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
         created_at: NotSet, // Never updated after creation.
         updated_at: Set(Some(Utc::now().timestamp_micros())),
         start_at: Set(report.start),
-        last_triggered_at: Set(report.last_triggered_at),
     };
     report_active_model.update(&txn).await?;
 

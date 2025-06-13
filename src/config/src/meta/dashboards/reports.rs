@@ -150,20 +150,12 @@ pub struct Report {
     pub enabled: bool,
     #[serde(default)]
     pub media_type: ReportMediaType,
-    /// User email for chromedriver login
-    #[serde(default)]
-    pub user: String,
-    /// User password for chromedriver login
-    #[serde(default)]
-    pub password: String,
     #[serde(default)]
     pub timezone: String,
     /// Fixed timezone offset in minutes
     #[serde(default)]
     #[serde(rename = "timezoneOffset")]
     pub tz_offset: i32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_triggered_at: Option<i64>,
     #[serde(default = "datetime_now")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<FixedOffset>,
@@ -188,11 +180,8 @@ impl Default for Report {
             message: "".to_string(),
             enabled: false,
             media_type: ReportMediaType::default(),
-            user: "".to_string(),
-            password: "".to_string(),
             timezone: "".to_string(),
             tz_offset: 0, // UTC
-            last_triggered_at: None,
             created_at: datetime_now(),
             updated_at: None,
             owner: "".to_string(),
