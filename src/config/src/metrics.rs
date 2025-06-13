@@ -20,6 +20,7 @@ use prometheus::{
     CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
     TextEncoder,
 };
+
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
