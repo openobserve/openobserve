@@ -209,7 +209,7 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext },
+  components: { draggable: VueDraggableNext as any },
   props: {
     valueMapping: {
       type: Array,

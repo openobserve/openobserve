@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </span>
     <VariablesValueSelector
+      v-if="currentTimeObj['__global']"
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj['__global']"
@@ -178,6 +179,8 @@ import {
   defineAsyncComponent,
   defineComponent,
   onActivated,
+  onUnmounted,
+  onBeforeUnmount,
   provide,
   ref,
   watch,
@@ -552,6 +555,19 @@ export default defineComponent({
         gridLayoutRef.value.layoutUpdate();
       }
     };
+
+    // Add cleanup to prevent detached nodes
+    onBeforeUnmount(() => {
+      // Clean up grid layout reference
+      if (gridLayoutRef.value) {
+        gridLayoutRef.value = null;
+      }
+      
+      // Clean up any other references that might cause memory leaks
+      if (variablesValueSelectorRef.value) {
+        variablesValueSelectorRef.value = null;
+      }
+    });
 
     /**
      * Updates the initial variable values using the variable value selector ref
