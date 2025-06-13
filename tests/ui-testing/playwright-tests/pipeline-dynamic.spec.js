@@ -75,7 +75,6 @@ async function setupPipelineWithSourceStream(page, pipelinePage, sourceStream) {
   await pipelinePage.selectStream();
   await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
   await pipelinePage.selectLogs();
-  await pipelinePage.enterStreamName("e2e");
   await pipelinePage.enterStreamName(sourceStream);
   await page.waitForTimeout(2000);
   await page.getByRole("option", { name: sourceStream, exact: true }).click();

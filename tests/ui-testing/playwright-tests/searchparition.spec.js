@@ -87,7 +87,7 @@ test.describe("Search partition testcases", () => {
     
     // Click on the query editor and type the query
     await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
-    await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor');
+    // await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor');
     await page.keyboard.type(query);
     await page.waitForTimeout(2000);
 
@@ -121,7 +121,7 @@ test.describe("Search partition testcases", () => {
           end_time: requestData.query.end_time,
           sql: requestData.query.sql
         });
-        console.log('request', requestData)
+      
       }
     });
 
