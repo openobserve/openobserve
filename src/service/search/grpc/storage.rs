@@ -248,7 +248,7 @@ pub async fn search(
     );
 
     // check memory circuit breaker
-    super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
