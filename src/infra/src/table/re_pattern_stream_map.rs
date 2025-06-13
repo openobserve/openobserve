@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::stream::StreamType;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
+use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
 use super::{entity::re_pattern_stream_map::*, get_lock};
@@ -131,6 +131,59 @@ pub async fn remove(
 
     drop(_lock);
 
+    Ok(())
+}
+
+pub async fn batch_process(
+    added: Vec<PatternAssociationEntry>,
+    removed: Vec<PatternAssociationEntry>,
+) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+    let txn = client.begin().await?;
+
+    // we MUST first remove the entries and then add. This is because
+    // the way associations are currently impl in stream settings,
+    // for updated to policy etc, we get the old item in removed
+    // and same item with the updated fields in added array. For this to work
+    // properly, we similarly need to remove the old items first, then add new ones
+    for r in removed {
+        match Entity::delete_many()
+            .filter(Column::Org.eq(r.org))
+            .filter(Column::Stream.eq(r.stream))
+            .filter(Column::StreamType.eq(r.stream_type.to_string()))
+            .filter(Column::Field.eq(r.field))
+            .exec(&txn)
+            .await
+        {
+            Ok(_) | Err(DbErr::RecordNotFound(_)) => {}
+            Err(e) => {
+                txn.rollback().await?;
+                return Err(e.into());
+            }
+        }
+    }
+
+    let models = added.into_iter().map(|a| ActiveModel {
+        org: Set(a.org),
+        stream: Set(a.stream),
+        stream_type: Set(a.stream_type.to_string()),
+        field: Set(a.field),
+        pattern_id: Set(a.pattern_id),
+        policy: Set(a.policy.to_string()),
+        apply_at_search: Set(a.apply_at_search),
+        ..Default::default()
+    });
+
+    match Entity::insert_many(models).exec(&txn).await {
+        Ok(_) => {}
+        Err(e) => {
+            txn.rollback().await?;
+            return Err(e.into());
+        }
+    }
+    txn.commit().await?;
     Ok(())
 }
 

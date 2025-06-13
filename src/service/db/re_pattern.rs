@@ -20,7 +20,10 @@ use infra::{
     cluster_coordinator::get_coordinator,
     db::Event,
     errors::{self, DbError},
-    table::re_pattern::PatternEntry,
+    table::{
+        re_pattern::PatternEntry,
+        re_pattern_stream_map::{PatternAssociationEntry, PatternPolicy},
+    },
 };
 
 // DBKey to set patterns
@@ -162,9 +165,39 @@ pub async fn process_association_changes(
     if update.add.is_empty() && update.remove.is_empty() {
         return Ok(());
     }
-    todo!();
 
     let serialized = serde_json::to_vec(&update)?;
+    let added = update
+        .add
+        .into_iter()
+        .map(|item| PatternAssociationEntry {
+            id: 0,
+            org: org.to_string(),
+            stream: stream.to_string(),
+            stream_type: stype,
+            field: item.field,
+            pattern_id: item.pattern_id,
+            policy: PatternPolicy::from(item.policy),
+            apply_at_search: item.apply_at_search,
+        })
+        .collect();
+    let removed = update
+        .remove
+        .into_iter()
+        .map(|item| PatternAssociationEntry {
+            id: 0,
+            org: org.to_string(),
+            stream: stream.to_string(),
+            stream_type: stype,
+            field: item.field,
+            pattern_id: item.pattern_id,
+            policy: PatternPolicy::from(item.policy),
+            apply_at_search: item.apply_at_search,
+        })
+        .collect();
+
+    infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
+
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
