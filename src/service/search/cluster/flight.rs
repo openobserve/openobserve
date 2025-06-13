@@ -462,6 +462,7 @@ pub async fn run_datafusion(
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
     let streaming_id = req.streaming_id.clone();
+    let use_cache = req.use_cache.unwrap_or(false);
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -495,7 +496,8 @@ pub async fn run_datafusion(
                 "streaming_id is required for streaming aggregation query".to_string(),
             ));
         };
-        let mut rewriter = StreamingAggsRewriter::new(streaming_id, start_time, end_time).await;
+        let mut rewriter =
+            StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
         // Check for aggs cache hit
         if rewriter.is_complete_cache_hit {
             aggs_cache_ratio = 100;

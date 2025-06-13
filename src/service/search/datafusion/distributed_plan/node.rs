@@ -91,6 +91,7 @@ impl RemoteScanNodes {
             start_time: self.req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
             end_time: self.req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
             timeout: self.req.timeout as u64,
+            use_cache: self.req.use_cache,
         };
 
         let index_condition = match &self.index_condition {
@@ -194,6 +195,7 @@ pub struct SearchInfos {
     pub start_time: i64,
     pub end_time: i64,
     pub timeout: u64,
+    pub use_cache: Option<bool>,
 }
 
 impl SearchInfos {
@@ -221,6 +223,7 @@ impl SearchInfos {
             start_time: self.start_time,
             end_time: self.end_time,
             timeout: self.timeout as i64,
+            use_cache: self.use_cache.unwrap_or(false),
         }
     }
 }

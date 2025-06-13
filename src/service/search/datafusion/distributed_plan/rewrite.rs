@@ -202,13 +202,27 @@ pub struct StreamingAggsRewriter {
 }
 
 impl StreamingAggsRewriter {
-    pub async fn new(id: String, start_time: i64, end_time: i64) -> Self {
+    pub async fn new(id: String, start_time: i64, end_time: i64, use_cache: bool) -> Self {
         let mut is_complete_cache_hit = false;
         // Start of loading `StreamingAggsCache` from disk
         let streaming_item = streaming_aggs_exec::GLOBAL_CACHE.id_cache.get(&id);
         if let Some(item) = streaming_item {
+            if !use_cache {
+                log::warn!(
+                    "[streaming_id {}] StreamingAggsRewriter: use_cache is false, skip checking cache",
+                    id
+                );
+                return Self {
+                    id,
+                    start_time,
+                    end_time,
+                    is_complete_cache_hit: false,
+                };
+            }
+
+            // Start - checking cache for record batches
             // Check record batch cache for partition start time and end time
-            let cached_result = match get_streaming_aggs_records_from_disk(
+            let cached_record_batches = match get_streaming_aggs_records_from_disk(
                 start_time,
                 end_time,
                 &item.get_cache_file_path(),
@@ -226,7 +240,7 @@ impl StreamingAggsRewriter {
                 }
             };
 
-            if let Some(cached_result) = cached_result {
+            if let Some(cached_result) = cached_record_batches {
                 is_complete_cache_hit = cached_result.is_complete_match;
                 // Load streaming aggs cache with results from disk
                 if let Err(e) = streaming_aggs_exec::prepare_cache(&id, cached_result) {
@@ -237,6 +251,7 @@ impl StreamingAggsRewriter {
                     );
                 }
             }
+            // end - checking cache for record batches
         }
 
         Self {

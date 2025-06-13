@@ -2937,6 +2937,8 @@ pub struct SearchInfo {
     pub end_time: i64,
     #[prost(int64, tag = "6")]
     pub timeout: i64,
+    #[prost(bool, tag = "7")]
+    pub use_cache: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

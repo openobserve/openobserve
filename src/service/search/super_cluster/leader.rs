@@ -275,6 +275,7 @@ async fn run_datafusion(
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
     let streaming_id = req.streaming_id.clone();
+    let use_cache = req.use_cache.unwrap_or(false);
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -308,7 +309,8 @@ async fn run_datafusion(
     // check for streaming aggregation query
     if streaming_output {
         let mut rewriter =
-            StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time).await;
+            StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time, use_cache)
+                .await;
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 
