@@ -418,7 +418,7 @@ pub fn generate_record_batch_interval(start_time: i64, end_time: i64) -> Interva
     for (time, interval) in intervals.iter() {
         let time = time.unwrap().num_microseconds().unwrap();
         if (end_time - start_time) >= time {
-            return interval.clone();
+            return *interval;
         }
     }
     Interval::FiveMinutes
