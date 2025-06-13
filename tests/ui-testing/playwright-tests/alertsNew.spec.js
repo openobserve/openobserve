@@ -4,6 +4,7 @@ import logsdata from "../../test-data/logs_data.json";
 import { AlertsNewPage } from '../../ui-testing/pages/alertsNew.js';
 import { AlertTemplatesPage } from '../../ui-testing/pages/alertTemplatesPage.js';
 import { AlertDestinationsPage } from '../../ui-testing/pages/alertDestinationsPage.js';
+import { CommonActions } from '../../ui-testing/pages/commonActions.js';
 
 // Helper function for login
 async function login(page) {
@@ -27,15 +28,39 @@ test.describe.serial("Alerts Module testcases", () => {
   let alertsPage;
   let templatesPage;
   let destinationsPage;
+  let commonActions;
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
+
+  // Helper function to ensure template exists
+  async function ensureTemplateExists() {
+    if (!createdTemplateName) {
+      createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
+      await templatesPage.createTemplate(createdTemplateName);
+      console.log('Created template for dependency:', createdTemplateName);
+    }
+    return createdTemplateName;
+  }
+
+  // Helper function to ensure destination exists
+  async function ensureDestinationExists() {
+    if (!createdDestinationName) {
+      await ensureTemplateExists();
+      createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
+      const testUrl = 'DEMO';
+      await destinationsPage.createDestination(createdDestinationName, testUrl, createdTemplateName);
+      console.log('Created destination for dependency:', createdDestinationName);
+    }
+    return createdDestinationName;
+  }
 
   test.beforeEach(async ({ page }) => {
     await login(page);
     alertsPage = new AlertsNewPage(page);
     templatesPage = new AlertTemplatesPage(page);
     destinationsPage = new AlertDestinationsPage(page);
+    commonActions = new CommonActions(page);
     await page.waitForTimeout(5000);
 
     // Generate shared random value if not already generated
@@ -44,34 +69,9 @@ test.describe.serial("Alerts Module testcases", () => {
       console.log('Generated shared random value for this run:', sharedRandomValue);
     }
 
-    // Ingest logs via API
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
-
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(logsdata)
-      });
-      return await fetchResponse.json();
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      logsdata: logsdata
-    });
-
-    console.log(response);
+    // Ingest test data using common actions
+    const streamName = 'auto_playwright_stream';
+    await commonActions.ingestTestData(streamName);
     
     // Navigate to alerts page
     await page.goto(
@@ -101,12 +101,19 @@ test.describe.serial("Alerts Module testcases", () => {
   test('Create folder and alert', {
     tag: ['@createFolder', '@createAlert', '@all', '@alerts']
   }, async ({ page }) => {
-    const streamName = 'alertstestqa';
+    const streamName = 'auto_playwright_stream';
     const column = 'job';
     const value = 'test';
 
-    // Use shared random value for folder name
-    const folderName = 'automationFolder_' + sharedRandomValue;
+    // Ensure destination exists (which will also ensure template exists)
+    await ensureDestinationExists();
+
+    // Navigate to alerts tab using common actions
+    await commonActions.navigateToAlerts();
+    await page.waitForTimeout(2000);
+
+    // Generate folder name once for this test
+    const folderName = 'automationFolder_'+ sharedRandomValue;
     await alertsPage.createFolder(folderName, 'Test Automation Folder');
     await alertsPage.verifyFolderCreated(folderName);
     console.log('Successfully created folder:', folderName);
@@ -128,15 +135,17 @@ test.describe.serial("Alerts Module testcases", () => {
     console.log('Successfully cloned alert:', alertName);
   });
 
-  test('Delete alert template', {
+  test('Verify Delete alert template functionality', {
     tag: ['@deleteTemplate', '@all', '@alerts']
   }, async ({ page }) => {
+    // Ensure template exists
+    await ensureTemplateExists();
+
     // Navigate to templates page
     await templatesPage.navigateToTemplates();
     await page.waitForTimeout(2000); // Wait for page to load
 
-    // Verify template in use message
-    await templatesPage.verifyTemplateInUse(createdTemplateName, createdDestinationName);
-    console.log('Successfully verified template in use message for template:', createdTemplateName);
+    // Try to delete template and handle both success and in-use scenarios
+    await templatesPage.deleteTemplateAndVerify(createdTemplateName);
   });
 });

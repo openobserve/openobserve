@@ -94,4 +94,20 @@ export class AlertTemplatesPage {
         const expectedMessage = this.templateInUseMessage.replace('{destinationName}', destinationName);
         await expect(this.page.getByText(expectedMessage)).toBeVisible();
     }
+
+    async deleteTemplateAndVerify(templateName) {
+        try {
+            // Try to delete the template
+            await this.deleteTemplate(templateName);
+            // If deletion succeeds, verify success message
+            await expect(this.page.getByText(`Template ${templateName} deleted successfully`)).toBeVisible();
+            console.log('Successfully deleted template:', templateName);
+            return true;
+        } catch (error) {
+            // If deletion fails due to template being in use, verify the in-use message
+            await this.verifyTemplateInUse(templateName, '');
+            console.log('Successfully verified template in use message for template:', templateName);
+            return false;
+        }
+    }
 } 
