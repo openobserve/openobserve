@@ -43,7 +43,6 @@ import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
-import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   props: {
@@ -86,9 +85,18 @@ export default defineComponent({
     const editorRef: any = ref();
     // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
-    const { searchObj } = useLogs();
 
     let provider: Ref<monaco.IDisposable | null> = ref(null);
+    // Track all disposables to ensure proper cleanup
+    const disposables: monaco.IDisposable[] = [];
+    // Track event listeners
+    const clickListener = () => {
+      editorObj?.layout();
+    };
+    const resizeListener = async () => {
+      await nextTick();
+      editorObj?.layout();
+    };
 
     const CompletionKind: any = {
       Keyword: monaco.languages.CompletionItemKind.Keyword,
@@ -142,7 +150,10 @@ export default defineComponent({
       });
 
       // Dispose the provider if it already exists before registering a new one
-      provider.value?.dispose();
+      if (provider.value) {
+        provider.value.dispose();
+        provider.value = null;
+      }
       registerAutoCompleteProvider();
 
       let editorElement = document.getElementById(props.editorId);
@@ -162,6 +173,12 @@ export default defineComponent({
       }
 
       if (editorElement && editorElement?.hasChildNodes()) return;
+
+      // Dispose previous editor instance if it exists
+      if (editorObj) {
+        editorObj.dispose();
+        editorObj = null;
+      }
 
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
@@ -196,12 +213,14 @@ export default defineComponent({
         renderValidationDecorations: "on",
       });
 
-      editorObj.onDidChangeModelContent(
+      // Track editor model content change
+      const contentChangeDisposable = editorObj.onDidChangeModelContent(
         debounce((e: any) => {
           emit("update-query", e, editorObj.getValue()?.trim());
           emit("update:query", editorObj.getValue()?.trim());
         }, props.debounceTime),
       );
+      disposables.push(contentChangeDisposable);
 
       editorObj.createContextKey("ctrlenter", true);
       editorObj.addCommand(
@@ -214,44 +233,70 @@ export default defineComponent({
         "ctrlenter",
       );
 
-      editorObj.onDidFocusEditorWidget(() => {
+      // Track focus/blur events
+      const focusDisposable = editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
       });
+      disposables.push(focusDisposable);
 
-      editorObj.onDidBlurEditorWidget(() => {
+      const blurDisposable = editorObj.onDidBlurEditorWidget(() => {
         const model = editorObj.getModel();
         const value = model.getValue();
         const trimmedValue = value.trim();
-        
+
         // Only apply trim if there are actually tailing and leading spaces to trim
         if (value !== trimmedValue) {
           const lastLine = model.getLineCount();
           const lastLineLength = model.getLineLength(lastLine);
-          
+
           // Create an edit operation that replaces the entire content
           // This preserves undo history becuase it treats this as a single edit operation
-          //and it will be in the undo stack as one operation 
+          //and it will be in the undo stack as one operation
           model.pushEditOperations(
             [],
-            [{
-              range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
-              text: trimmedValue
-            }],
-            () => null
+            [
+              {
+                range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
+                text: trimmedValue,
+              },
+            ],
+            () => null,
           );
         }
         emit("blur");
       });
+      disposables.push(blurDisposable);
 
-      window.addEventListener("click", () => {
-        editorObj?.layout();
-      });
+      // Clean up old listeners before adding new ones
+      window.removeEventListener("click", clickListener);
+      window.removeEventListener("resize", resizeListener);
 
-      window.addEventListener("resize", async () => {
-        await nextTick();
-        editorObj?.layout();
-        // queryEditorRef.value.resetEditorLayout();
-      });
+      // Add listeners
+      window.addEventListener("click", clickListener);
+      window.addEventListener("resize", resizeListener);
+    };
+
+    // Comprehensive cleanup function
+    const cleanupEditor = () => {
+      // Remove window event listeners
+      window.removeEventListener("click", clickListener);
+      window.removeEventListener("resize", resizeListener);
+
+      // Dispose all tracked disposables
+      disposables.forEach((d) => d.dispose());
+      disposables.length = 0;
+
+      // Dispose provider
+      if (provider.value) {
+        provider.value.dispose();
+        provider.value = null;
+      }
+
+      // Dispose editor
+      if (editorObj) {
+        editorObj.dispose();
+        editorObj = null;
+      }
     };
 
     onMounted(async () => {
@@ -315,15 +360,20 @@ export default defineComponent({
     });
 
     onDeactivated(() => {
-      provider.value?.dispose();
+      // Just dispose the provider on deactivate, full cleanup on unmount
+      if (provider.value) {
+        provider.value.dispose();
+        provider.value = null;
+      }
     });
 
     onUnmounted(() => {
-      provider.value?.dispose();
+      // Full cleanup on unmount
+      cleanupEditor();
     });
 
     const enableCodeFolding = computed(() => {
-      return ["json", "html","javascript"].includes(props.language);
+      return ["json", "html", "javascript"].includes(props.language);
     });
 
     // update readonly when prop value changes
@@ -362,6 +412,13 @@ export default defineComponent({
 
     const registerAutoCompleteProvider = () => {
       if (!props.showAutoComplete) return;
+
+      // Dispose existing provider
+      if (provider.value) {
+        provider.value.dispose();
+        provider.value = null;
+      }
+
       provider.value = monaco.languages.registerCompletionItemProvider(
         props.language,
         {
@@ -407,6 +464,11 @@ export default defineComponent({
           },
         },
       );
+
+      // Track provider in disposables
+      if (provider.value) {
+        disposables.push(provider.value);
+      }
     };
 
     const resetEditorLayout = () => {
@@ -543,12 +605,12 @@ export default defineComponent({
       disableSuggestionPopup,
       triggerAutoComplete,
       getCursorIndex,
-      searchObj,
       formatDocument,
       getModel,
       getValue,
       decorateRanges,
       addErrorDiagnostics,
+      cleanupEditor, // Expose cleanup method for parent components
     };
   },
 });
