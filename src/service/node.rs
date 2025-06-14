@@ -216,7 +216,7 @@ pub async fn get_node_list(
                     }
                 }
                 Err(e) => {
-                    log::error!("Error getting nodes from cluster node: {:?}", e);
+                    log::error!("Error getting nodes from cluster node: {e}");
                     return Err(anyhow::anyhow!(
                         "Error getting nodes from cluster node: {:?}",
                         e
@@ -225,8 +225,8 @@ pub async fn get_node_list(
             }
         }
         Err(e) => {
-            log::error!("Error awaiting task: {:?}", e);
-            return Err(anyhow::anyhow!("Error awaiting task: {:?}", e));
+            log::error!("Error awaiting task: {e}");
+            return Err(anyhow::anyhow!("Error awaiting task: {e}"));
         }
     }
 

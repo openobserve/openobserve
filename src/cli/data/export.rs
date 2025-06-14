@@ -95,8 +95,8 @@ impl Context for Export {
                 serde_json::to_writer_pretty(file, &res.hits)?;
                 Ok(true)
             }
-            Err(err) => {
-                eprintln!("search error: {:?}", err);
+            Err(e) => {
+                eprintln!("search error: {:?}", e);
                 Ok(false)
             }
         }

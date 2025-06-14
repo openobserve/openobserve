@@ -19,7 +19,6 @@ use std::{
 };
 
 use actix_web::web;
-use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
@@ -35,6 +34,7 @@ use config::{
         time::parse_timestamp_micro_from_value,
     },
 };
+use infra::errors::Result;
 
 use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
@@ -57,7 +57,7 @@ pub async fn ingest(
     org_id: &str,
     body: web::Bytes,
     user_email: &str,
-) -> Result<BulkResponse, anyhow::Error> {
+) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 

@@ -162,7 +162,7 @@ async fn dispatch(
         .await
         .map_err(|e| {
             Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                format!("Failed to parse node list request: {:?}", e).as_str(),
+                format!("Failed to parse node list request: {e}").as_str(),
             )))
         });
     }
@@ -364,7 +364,7 @@ async fn proxy_querier_by_body(
         }
         s if s.ends_with("/_values_stream") => {
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse values stream request data: {:?}", e);
+                log::error!("Failed to parse values stream request data: {e}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
                     "Failed to parse values stream request data",
                 )))
@@ -401,7 +401,7 @@ async fn proxy_querier_by_body(
         }
         s if s.ends_with("/_search_partition") => {
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse search partition request data: {:?}", e);
+                log::error!("Failed to parse search partition request data: {e}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
                     "Failed to parse search partition request data",
                 )))

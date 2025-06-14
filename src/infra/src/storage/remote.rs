@@ -365,19 +365,19 @@ fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
         "aws" | "s3" => match init_aws_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("s3 init config error: {:?}", e);
+                panic!("s3 init config error: {e}");
             }
         },
         "azure" => match init_azure_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("azure init config error: {:?}", e);
+                panic!("azure init config error: {e}");
             }
         },
         "gcs" | "gcp" => match init_gcp_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("gcp init config error: {:?}", e);
+                panic!("gcp init config error: {e}");
             }
         },
         _ => match init_aws_config(config) {
@@ -400,7 +400,7 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
             object_store::Error::PermissionDenied { path: _, source }
                 if source.to_string().contains("ListBucket") => {}
             _ => {
-                return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
+                return Err(anyhow::anyhow!("S3 download test failed: {e}"));
             }
         },
     };
@@ -408,7 +408,7 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
     // Test upload
     let data = Bytes::from("Hello, OpenObserve!");
     if let Err(e) = super::put("", TEST_FILE, data).await {
-        return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
+        return Err(anyhow::anyhow!("S3 upload test failed: {e}"));
     }
     Ok(())
 }
