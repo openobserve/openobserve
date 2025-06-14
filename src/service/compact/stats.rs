@@ -57,7 +57,7 @@ async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyho
     let step_limit = config::get_config().limit.calculate_stats_step_limit;
     let latest_pk = infra_file_list::get_max_pk_value()
         .await
-        .map_err(|e| anyhow::anyhow!("get max pk value error: {:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("get max pk value error: {e}"))?;
     let latest_pk = std::cmp::min(offset + step_limit, latest_pk);
     let pk_value = if offset == 0 && latest_pk == 0 {
         None
@@ -75,13 +75,13 @@ async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyho
     for org_id in orgs {
         let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false)
             .await
-            .map_err(|e| anyhow::anyhow!("get add stream stats error: {:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
         let dumped_add_stats = file_list_dump::stats(&org_id, None, None, pk_value)
             .await
-            .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
         let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true)
             .await
-            .map_err(|e| anyhow::anyhow!("get del stream stats error: {:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("get del stream stats error: {e}"))?;
         // dump never store deleted files, so we do not have to consider deleted here
         let mut stream_stats = HashMap::new();
         for (stream, stats) in add_stream_stats {
@@ -99,7 +99,7 @@ async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyho
             let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
             infra_file_list::set_stream_stats(&org_id, &stream_stats, pk_value)
                 .await
-                .map_err(|e| anyhow::anyhow!("set stream stats error: {:?}", e))?;
+                .map_err(|e| anyhow::anyhow!("set stream stats error: {e}"))?;
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
@@ -107,7 +107,7 @@ async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyho
     // update offset
     db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE.uuid.clone()))
         .await
-        .map_err(|e| anyhow::anyhow!("set offset error: {:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("set offset error: {e}"))?;
 
     Ok(pk_value)
 }

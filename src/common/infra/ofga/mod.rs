@@ -311,7 +311,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
         }
         Err(e) => {
-            log::error!("Error setting OFGA model: {:?}", e);
+            log::error!("Error setting OFGA model: {e}");
         }
     }
     // release lock

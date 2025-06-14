@@ -421,6 +421,7 @@ pub async fn search_memtable(
         )
     );
 
+    // check memory circuit breaker
     ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // construct latest schema map

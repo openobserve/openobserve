@@ -72,7 +72,7 @@ pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<Http
             Ok(HttpResponse::Ok().json(response))
         }
         Err(e) => {
-            log::error!("Failed to shorten URL: {:?}", e);
+            log::error!("Failed to shorten URL: {e}");
             Ok(map_error_to_http_response(&e.into(), None))
         }
     }

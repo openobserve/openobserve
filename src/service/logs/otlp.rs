@@ -16,7 +16,6 @@
 use std::collections::{HashMap, HashSet};
 
 use actix_web::{HttpResponse, http};
-use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -32,6 +31,7 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
+use infra::errors::Result;
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
