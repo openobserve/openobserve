@@ -564,11 +564,7 @@ pub async fn do_partitioned_search(
     if is_streaming_aggs {
         req.query.streaming_output = true;
         req.query.streaming_id = partition_resp.streaming_id.clone();
-        use_cache = if req.use_cache.unwrap_or_default() {
-            true
-        } else {
-            false
-        };
+        use_cache = req.use_cache.unwrap_or_default();
     }
 
     // The order by for the partitions is the same as the order by in the query

@@ -178,7 +178,7 @@ pub async fn get_record_batches(
     file_path: &str,
     file_name: &str,
 ) -> std::io::Result<Vec<RecordBatch>> {
-    let file = format!("record_batches/{}/{}", file_path, file_name);
+    let file = format!("{}/{}/{}", STREAMING_AGGS_CACHE_DIR, file_path, file_name);
     let data = disk::get(&file, None)
         .await
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "File not found"))?;
