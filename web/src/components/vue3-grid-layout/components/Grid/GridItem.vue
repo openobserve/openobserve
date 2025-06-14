@@ -153,6 +153,10 @@ const rtl = ref(false)
 const dragEventSet = ref(false)
 const resizeEventSet = ref(false)
 
+// Destructors for cleanup
+const dragDestructor = ref<(() => void) | null>(null)
+const resizeDestructor = ref<(() => void) | null>(null)
+
 const previousW = ref<number | null>(null)
 const previousH = ref<number | null>(null)
 const previousX = ref<number | null>(null)
@@ -506,8 +510,11 @@ function handleResize(event: SyntheticEvent) {
     
     switch (event.type) {
       case "resizestart": {
+        // Store initial dimensions
         previousW.value = innerW.value
         previousH.value = innerH.value
+        lastW.value = x
+        lastH.value = y
         pos = calcPosition(innerX.value, innerY.value, innerW.value, innerH.value)
         newSize.width = pos.width
         newSize.height = pos.height
@@ -516,15 +523,24 @@ function handleResize(event: SyntheticEvent) {
         break
       }
       case "resizemove": {
+        if (!isResizing.value) return
+        
+        const scale = transformScale.value
         const coreEvent = createCoreData(lastW.value, lastH.value, x, y)
+        
+        // Scale deltas by transform scale and apply RTL if needed
+        const scaledDeltaX = coreEvent.deltaX / scale
+        const scaledDeltaY = coreEvent.deltaY / scale
+        
         if (renderRtl.value) {
-          newSize.width = Number(resizing.value?.width) - coreEvent.deltaX / transformScale.value
+          newSize.width = Math.max(0, Number(resizing.value?.width) - scaledDeltaX)
         } else {
-          newSize.width = Number(resizing.value?.width) + coreEvent.deltaX / transformScale.value
+          newSize.width = Math.max(0, Number(resizing.value?.width) + scaledDeltaX)
         }
-        newSize.height = Number(resizing.value?.height) + coreEvent.deltaY / transformScale.value
-
-        ///console.log("### resize => " + event.type + ", deltaX=" + coreEvent.deltaX + ", deltaY=" + coreEvent.deltaY);
+        newSize.height = Math.max(0, Number(resizing.value?.height) + scaledDeltaY)
+        
+        lastW.value = x
+        lastH.value = y
         resizing.value = newSize
         break
       }
@@ -560,29 +576,35 @@ function handleResize(event: SyntheticEvent) {
     }
     if (pos.w < 1) {
       pos.w = 1
-    }
+    }        // Update stored positions for delta calculations
+        lastW.value = x
+        lastH.value = y
 
-    lastW.value = x
-    lastH.value = y
+        // Only emit resize events if dimensions actually changed
+        const dimensionsChanged = innerW.value !== pos.w || innerH.value !== pos.h
+        if (dimensionsChanged) {
+          // During resize, emit resize event
+          emit("resize", props.i, pos.h, pos.w, newSize.height, newSize.width)
 
-    if (innerW.value !== pos.w || innerH.value !== pos.h) {
-      emit("resize", props.i, pos.h, pos.w, newSize.height, newSize.width)
-    }
-    if (
-      event.type === "resizeend" &&
-      (previousW.value !== innerW.value || previousH.value !== innerH.value)
-    ) {
-      emit("resized", props.i, pos.h, pos.w, newSize.height, newSize.width)
-    }
-    const data = {
-      eventType: event.type,
-      i: props.i,
-      x: innerX.value,
-      y: innerY.value,
-      h: pos.h,
-      w: pos.w
-    }
-    eventBus.emit("resizeEvent", data)
+          // On resize end, emit both resize and resized events
+          if (event.type === "resizeend") {
+            const finalDimensionsChanged = previousW.value !== pos.w || previousH.value !== pos.h
+            if (finalDimensionsChanged) {
+              emit("resized", props.i, pos.h, pos.w, newSize.height, newSize.width)
+            }
+          }
+
+          // Update grid layout via event bus
+          const data = {
+            eventType: event.type,
+            i: props.i,
+            x: innerX.value,
+            y: innerY.value,
+            h: pos.h,
+            w: pos.w
+          }
+          eventBus.emit("resizeEvent", data)
+        }
   }
 }
 
@@ -839,22 +861,34 @@ function tryMakeDraggable() {
 
 function tryMakeResizable() {
   const handle = this$refsItem.value?.querySelector('.' + resizableHandleClass.value)
-  if (!handle) return
+  if (!handle || !this$refsItem.value) return
 
-  if (resizable.value && !props.static && this$refsItem.value) {
-    if (typeof resizeDestructor.value === 'function') {
-      resizeDestructor.value()
-    }
+  // Clean up existing handler
+  if (resizeDestructor.value) {
+    resizeDestructor.value()
+    resizeDestructor.value = null
+  }
 
+  // Only create new handler if resizing is enabled
+  if (resizable.value && !props.static) {
     const maximum = calcPosition(0, 0, props.maxW, props.maxH)
     const minimum = calcPosition(0, 0, props.minW, props.minH)
     const gridMargin: [number, number] = [margin.value[0], margin.value[1]]
-
+    
     resizeDestructor.value = createResizeHandler(this$refsItem.value, handle as HTMLElement, {
       onStart: (e: MouseEvent) => {
+        // Clear any previous state
+        isResizing.value = false
+        resizing.value = null
+        lastW.value = NaN
+        lastH.value = NaN
+        
+        // Start resize process
         handleResize({...e, type: 'resizestart'} as SyntheticEvent)
       },
       onResize: (e: MouseEvent, delta: {x: number, y: number}) => {
+        if (!resizable.value || props.static) return
+        
         const syntheticEvent = {
           ...e,
           type: 'resizemove',
@@ -862,9 +896,14 @@ function tryMakeResizable() {
           clientY: e.clientY + delta.y
         } as SyntheticEvent
         handleResize(syntheticEvent)
-      },
-      onEnd: (e: MouseEvent) => {
+        },      onEnd: (e: MouseEvent) => {
+        // Only handle resize end if we were actually resizing
+        if (!isResizing.value) return
+        
         handleResize({...e, type: 'resizeend'} as SyntheticEvent)
+        // Clean up state after resize
+        isResizing.value = false
+        resizing.value = null
       },
       minWidth: minimum.width,
       minHeight: minimum.height,
@@ -885,10 +924,6 @@ function tryMakeResizable() {
     resizeDestructor.value = null 
   }
 }
-
-// Add refs for cleanup functions
-const dragDestructor = ref<(() => void) | null>(null)
-const resizeDestructor = ref<(() => void) | null>(null)
 
 const $slots = useSlots()
 function autoSize() {
