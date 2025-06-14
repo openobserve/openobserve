@@ -25,7 +25,7 @@ use config::{
 use infra::errors::Error;
 use rand::Rng;
 use sqlparser::{
-    ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
+    ast::{Expr, FunctionArguments, VisitMut, VisitorMut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -70,6 +70,42 @@ pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ra
     range * (1.0 - result_cache_ratio as f64 / 100.0)
 }
 
+struct HistogramIntervalVisitorMut {
+    pub interval: i64,
+}
+
+impl HistogramIntervalVisitorMut {
+    fn new(interval: i64) -> Self {
+        Self { interval }
+    }
+}
+
+impl VisitorMut for HistogramIntervalVisitorMut {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(func) = expr {
+            if func.name.to_string().to_lowercase() == "histogram" {
+                if let FunctionArguments::List(list) = &mut func.args {
+                    let mut args = list.args.iter();
+                    // first is field
+                    let _ = args.next();
+                    // second is interval
+                    if args.next().is_none() {
+                        let interval_value = format!("{} seconds", self.interval);
+                        list.args.push(sqlparser::ast::FunctionArg::Unnamed(
+                            sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(
+                                sqlparser::ast::Value::SingleQuotedString(interval_value),
+                            )),
+                        ));
+                    }
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 /// Updates the `HISTOGRAM` function in a SQL query to include or modify the interval.
 // TODO: should be a utils function in sql crate
 pub fn update_histogram_interval_in_query(
@@ -81,51 +117,10 @@ pub fn update_histogram_interval_in_query(
         .pop()
         .unwrap();
 
-    let _ = visit_statements_mut(&mut statement, |stmt| {
-        if let Statement::Query(query) = stmt {
-            if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
-                for projection in &mut select.projection {
-                    match projection {
-                        // Handle expressions with aliases
-                        sqlparser::ast::SelectItem::ExprWithAlias { expr, alias: _ } => {
-                            update_histogram_in_expr(expr, histogram_interval);
-                        }
-                        // Handle unnamed expressions
-                        sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
-                            update_histogram_in_expr(expr, histogram_interval);
-                        }
-                        // Ignore other types of projections
-                        _ => {}
-                    }
-                }
-            }
-        }
-        ControlFlow::Break(())
-    });
+    let mut histogram_interval_visitor = HistogramIntervalVisitorMut::new(histogram_interval);
+    statement.visit(&mut histogram_interval_visitor);
 
     Ok(statement.to_string())
-}
-
-/// Updates the `HISTOGRAM` function in an expression to include or modify the interval.
-fn update_histogram_in_expr(expr: &mut Expr, histogram_interval: i64) {
-    if let Expr::Function(func) = expr {
-        if func.name.to_string().to_lowercase() == "histogram" {
-            if let FunctionArguments::List(list) = &mut func.args {
-                let mut args = list.args.iter();
-                // first is field
-                let _ = args.next();
-                // second is interval
-                if args.next().is_none() {
-                    let interval_value = format!("{} seconds", histogram_interval);
-                    list.args.push(sqlparser::ast::FunctionArg::Unnamed(
-                        sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(
-                            sqlparser::ast::Value::SingleQuotedString(interval_value),
-                        )),
-                    ));
-                }
-            }
-        }
-    }
 }
 
 /// Calculates the ratio of cache hits to search hits in the accumulated search results.
