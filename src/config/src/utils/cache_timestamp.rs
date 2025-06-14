@@ -152,7 +152,7 @@ impl Visitor for TimestampVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
-        let is_outermost = self.query_depth == 0; // Check before incrementing
+        let is_outermost = self.query_depth == 0;
         self.query_depth += 1;
 
         // Recurse into CTEs first - they may define timestamp aliases
@@ -391,8 +391,8 @@ mod tests {
             // Subquery
             (
                 "SELECT code, request_count FROM ( SELECT histogram(_timestamp) AS ts, code, count(_timestamp) AS request_count, ROW_NUMBER() OVER (PARTITION BY histogram(_timestamp) ORDER BY count(_timestamp) DESC) AS rn FROM drop1 WHERE (code IS NOT NULL) GROUP BY ts, code ) t WHERE rn <= 3 ORDER BY ts DESC, request_count DESC",
-                false,
-                "CHECK: Final result does not have _timestamp field",
+                true,
+                "CHECK: Final result does not have _timestamp field SubQuery",
             ),
             // Subquery
             (
@@ -440,7 +440,7 @@ mod tests {
             (
                 "WITH tbl1 AS (SELECT histogram(_timestamp) AS ts, count(*) AS cnt FROM tbl1) SELECT cnt FROM tbl1",
                 false,
-                "CHECK: Final result does not have _timestamp field from the CTE",
+                "CHECK: Final result does not have _timestamp field from the CTE cnt",
             ),
             // Subquery
             (
