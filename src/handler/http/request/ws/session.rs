@@ -545,7 +545,7 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 
     let mut session = session.write().await;
     let _ = session.text(msg).await.map_err(|e| {
-        log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
+        log::error!("[WS_HANDLER]: Failed to send message: {e}");
         Error::Message(e.to_string())
     });
     drop(session);

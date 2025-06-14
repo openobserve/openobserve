@@ -15,11 +15,11 @@
 
 use std::collections::HashMap;
 
-use anyhow::Result;
 use config::{
     DEFAULT_STREAM_NAME, MESSAGE_COL_NAME, STREAM_NAME_LABEL, TIMESTAMP_COL_NAME,
     utils::{json, schema::format_stream_name},
 };
+use infra::errors::Result;
 use promql_parser::{
     label::MatchOp,
     parser::{self, Expr as PromExpr},

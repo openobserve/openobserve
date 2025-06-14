@@ -62,7 +62,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
     }
 
     if let Err(e) = pipeline::set(&pipeline).await {
-        log::error!("Failed to save pipeline: {:?}", e);
+        log::error!("Failed to save pipeline: {e}");
         return Err(e);
     }
     set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;

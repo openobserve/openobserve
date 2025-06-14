@@ -198,7 +198,7 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                     log::debug!("Deleted objects: {:?}", files);
                 }
                 Err(e) => {
-                    log::error!("Failed to delete objects: {:?}", e);
+                    log::error!("Failed to delete objects: {e}");
                 }
             }
         }
@@ -223,7 +223,7 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                             // ignore search job file deletion error
                             log::debug!("Failed to delete object: {}, error: {:?}", file, e);
                         } else if !is_local_disk_storage() {
-                            log::error!("Failed to delete object: {:?}", e);
+                            log::error!("Failed to delete object: {e}");
                         }
                     }
                 }

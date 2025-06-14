@@ -16,7 +16,6 @@
 use std::collections::{HashMap, HashSet};
 
 use actix_web::{HttpResponse, http};
-use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -32,6 +31,7 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
+use infra::errors::Result;
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -67,7 +67,7 @@ pub async fn handle_request(
 
     // check stream
     let stream_name = in_stream_name.map_or_else(|| "default".to_owned(), format_stream_name);
-    check_ingestion_allowed(org_id, Some(&stream_name))?;
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name))?;
 
     let cfg = get_config();
     let log_ingestion_errors = ingestion_log_enabled().await;

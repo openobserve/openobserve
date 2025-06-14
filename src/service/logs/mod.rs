@@ -20,7 +20,6 @@ use std::{
     time::Instant,
 };
 
-use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
@@ -37,7 +36,10 @@ use config::{
         time::now_micros,
     },
 };
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::{
+    errors::{Error, Result},
+    schema::{SchemaCache, unwrap_partition_time_level},
+};
 
 use super::{
     db::organization::get_org_setting,
@@ -291,10 +293,10 @@ async fn write_logs(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            return Err(anyhow::anyhow!(
+            return Err(Error::IngestionError(format!(
                 "Schema not found for stream: {}",
                 stream_name
-            ));
+            )));
         }
     };
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();

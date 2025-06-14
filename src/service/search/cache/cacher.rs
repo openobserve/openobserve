@@ -99,7 +99,7 @@ pub async fn check_cache(
     let sql = match Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Error parsing sql: {:?}", e);
+            log::error!("Error parsing sql: {e}");
             return MultiCachedQueryResponse::default();
         }
     };
@@ -209,10 +209,7 @@ pub async fn check_cache(
             Ok(responses) => {
                 cached_responses = responses;
             }
-            Err(e) => log::error!(
-                "Error invalidating cached response by stream min ts: {:?}",
-                e
-            ),
+            Err(e) => log::error!("Error invalidating cached response by stream min ts: {e}"),
         }
 
         let total_hits = cached_responses
@@ -499,7 +496,7 @@ pub async fn get_cached_results(
                         })
                     }
                     Err(e) => {
-                        log::error!("[trace_id {trace_id}] Get results from disk failed : {:?}", e);
+                        log::error!("[trace_id {trace_id}] Get results from disk failed : {e}");
                         None
                     }
                 }
@@ -575,7 +572,7 @@ pub async fn cache_results_to_disk(
     match disk::set(&file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
-            log::error!("Error caching results to disk: {:?}", e);
+            log::error!("Error caching results to disk: {e}");
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Error caching results to disk",
@@ -646,7 +643,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
         match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
-                log::error!("Error deleting cache: {:?}", e);
+                log::error!("Error deleting cache: {e}");
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     "Error deleting cache",

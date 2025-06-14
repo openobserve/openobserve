@@ -118,7 +118,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     log::debug!("successfully ingested self-metrics");
                 }
                 Err(e) => {
-                    log::error!("error in ingesting self-metrics : {:?}", e)
+                    log::error!("error in ingesting self-metrics : {e}")
                 }
             }
         } else {
@@ -128,7 +128,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     log::debug!("successfully sent self-metrics for ingestion");
                 }
                 Err(e) => {
-                    log::error!("error in sending self-metrics : {:?}", e)
+                    log::error!("error in sending self-metrics : {e}")
                 }
             }
         }

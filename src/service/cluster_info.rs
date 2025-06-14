@@ -44,7 +44,7 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
         let jobs = match infra_file_list::get_pending_jobs_count().await {
             Ok(jobs) => jobs,
             Err(e) => {
-                log::error!("Failed to get pending jobs count: {:?}", e);
+                log::error!("Failed to get pending jobs count: {e}");
                 return Err(Status::internal(format!(
                     "Failed to get pending jobs count: {:?}",
                     e
@@ -71,16 +71,15 @@ pub async fn get_super_cluster_info(
     let mut client =
         super::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node).await?;
     let response = match client.get_cluster_info(Request::new(empty_request)).await {
-        Ok(response) => convert_response_to_cluster_info(response.into_inner()),
-        Err(err) => {
+        Ok(r) => convert_response_to_cluster_info(r.into_inner()),
+        Err(e) => {
             log::error!(
                 "Failed to get cluster info from cluster node {}: {:?}",
                 node.get_grpc_addr(),
-                err
+                e
             );
             return Err(anyhow::anyhow!(
-                "Error getting cluster info from cluster node: {:?}",
-                err
+                "Error getting cluster info from cluster node: {e}"
             ));
         }
     };

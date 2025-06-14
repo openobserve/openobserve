@@ -245,7 +245,7 @@ impl Stream for MonitorStream {
             }
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
-                log::error!("Error in MonitorStream: {:?}", e);
+                log::error!("Error in MonitorStream: {e}");
                 Poll::Ready(None)
             }
         }

@@ -40,10 +40,7 @@ impl Queue {
 
     fn add(&self, files: Vec<String>) {
         if let Err(e) = self.tx.try_send(files) {
-            log::error!(
-                "[CACHE:FILE_DATA] Failed to send files to pending delete channel: {:?}",
-                e
-            );
+            log::error!("[CACHE:FILE_DATA] Failed to send files to pending delete channel: {e}");
         }
     }
 }
