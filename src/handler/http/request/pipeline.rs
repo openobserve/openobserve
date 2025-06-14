@@ -64,7 +64,9 @@ pub async fn save_pipeline(
     let mut pipeline = pipeline.into_inner();
     pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
-    pipeline.id = ider::generate();
+    if pipeline.id.is_empty() {
+        pipeline.id = ider::generate();
+    } // do not overwrite if pipeline was imported
     match pipeline::save_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK,
