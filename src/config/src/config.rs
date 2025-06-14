@@ -1267,7 +1267,7 @@ pub struct Limit {
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
-    pub http_worker_max_blocking: usize, // equals to 1024 if 0
+    pub http_worker_max_blocking: usize, // equals to 256 if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
@@ -1990,7 +1990,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.http_worker_num = cpu_num;
     }
     if cfg.limit.http_worker_max_blocking == 0 {
-        cfg.limit.http_worker_max_blocking = 1024;
+        cfg.limit.http_worker_max_blocking = 256;
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
