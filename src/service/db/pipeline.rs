@@ -258,7 +258,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
-                log::error!("watch_pipelines: event channel closed");
+                log::error!("[Pipeline::watch] event channel closed");
                 break;
             }
         };
@@ -303,6 +303,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     pipeline_id
                                 );
                             }
+                        } else {
+                            log::error!(
+                                "[Pipeline]: pipeline {} not found in cache to remove.",
+                                pipeline_id
+                            );
                         }
                     }
                 }
@@ -321,6 +326,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             pipeline_id
                         );
                     };
+                } else {
+                    log::error!(
+                        "[Pipeline]: pipeline {} not found in cache to remove.",
+                        pipeline_id
+                    );
                 }
             }
             db::Event::Empty => {}
