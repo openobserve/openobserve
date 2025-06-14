@@ -607,7 +607,9 @@ pub fn get_ts_col_order_by(
     let mut result_ts_col = String::new();
 
     for (original, alias) in &parsed_sql.aliases {
-        if original == ts_col || original.contains("histogram") {
+        if original == ts_col
+            || (original.contains("histogram") && !original.to_lowercase().contains("row_number()"))
+        {
             result_ts_col = alias.clone();
         }
     }

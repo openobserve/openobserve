@@ -15,10 +15,12 @@
 
 use std::ops::ControlFlow;
 
+use hashbrown::HashSet;
 use sqlparser::{
     ast::{
-        DuplicateTreatment, Expr, Function, FunctionArgumentList, FunctionArguments, GroupByExpr,
-        Query, SelectItem, SetExpr, Statement, Visit, Visitor,
+        DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
+        FunctionArguments, GroupByExpr, Query, SelectItem, SetExpr, Statement, TableFactor, Visit,
+        Visitor,
     },
     dialect::GenericDialect,
     parser::Parser,
@@ -322,15 +324,61 @@ fn has_timestamp(stat: &Statement) -> bool {
     visitor.timestamp_selected
 }
 
-struct TimestampVisitor {
+pub struct TimestampVisitor {
     pub timestamp_selected: bool,
+    timestamp_aliases: HashSet<String>, // known aliases for _timestamp or histogram(_timestamp)
 }
 
 impl TimestampVisitor {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             timestamp_selected: false,
+            timestamp_aliases: HashSet::new(),
         }
+    }
+
+    fn is_timestamp_expr(expr: &Expr) -> bool {
+        match expr {
+            Expr::Identifier(ident) => ident.value == TIMESTAMP_COL_NAME,
+
+            Expr::CompoundIdentifier(idents) => idents
+                .last()
+                .map_or(false, |id| id.value == TIMESTAMP_COL_NAME),
+
+            Expr::Function(func) => {
+                func.name.to_string().to_lowercase() == "histogram"
+                    && match &func.args {
+                        FunctionArguments::List(args) => args.args.iter().any(|arg| match arg {
+                            FunctionArg::Unnamed(FunctionArgExpr::Expr(e)) => {
+                                Self::is_timestamp_expr(e)
+                            }
+                            _ => false,
+                        }),
+                        _ => false,
+                    }
+            }
+
+            _ => false,
+        }
+    }
+
+    fn visit_table_factor(&mut self, relation: &TableFactor) -> ControlFlow<()> {
+        match relation {
+            TableFactor::Derived { subquery, .. } => {
+                subquery.visit(self)?;
+            }
+            TableFactor::NestedJoin {
+                table_with_joins,
+                alias: _,
+            } => {
+                for join in &table_with_joins.joins {
+                    join.relation.visit(self)?;
+                }
+                table_with_joins.relation.visit(self)?;
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
     }
 }
 
@@ -338,30 +386,58 @@ impl Visitor for TimestampVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        // 🔁 Recurse into CTEs
+        if let Some(with) = &query.with {
+            for cte in &with.cte_tables {
+                cte.query.visit(self)?;
+            }
+        }
+
+        // 🔁 Recurse into subqueries in FROM clause
         if let SetExpr::Select(select) = query.body.as_ref() {
+            for table in &select.from {
+                self.visit_table_factor(&table.relation)?;
+            }
+
             for item in &select.projection {
                 match item {
-                    SelectItem::UnnamedExpr(expr) => match expr {
-                        Expr::Identifier(ident) if ident.value == TIMESTAMP_COL_NAME => {
+                    SelectItem::UnnamedExpr(expr) => {
+                        if Self::is_timestamp_expr(expr) {
                             self.timestamp_selected = true;
                             return ControlFlow::Break(());
                         }
-                        Expr::CompoundIdentifier(idents) => {
-                            if let Some(last) = idents.last() {
-                                if last.value == TIMESTAMP_COL_NAME {
-                                    self.timestamp_selected = true;
-                                    return ControlFlow::Break(());
-                                }
+
+                        // Handle alias chain: SELECT ts1 FROM (...) where ts1 is alias for
+                        // _timestamp
+                        if let Expr::Identifier(ident) = expr {
+                            if self.timestamp_aliases.contains(&ident.value) {
+                                self.timestamp_selected = true;
+                                return ControlFlow::Break(());
                             }
                         }
-                        _ => {}
-                    },
-                    SelectItem::ExprWithAlias { alias, .. } => {
+                    }
+
+                    SelectItem::ExprWithAlias { expr, alias } => {
+                        // If alias is "_timestamp", count it, regardless of expr
                         if alias.value == TIMESTAMP_COL_NAME {
                             self.timestamp_selected = true;
                             return ControlFlow::Break(());
                         }
+
+                        // If the expression is timestamp-related, remember its alias
+                        if Self::is_timestamp_expr(expr) {
+                            self.timestamp_aliases.insert(alias.value.clone());
+                        }
+
+                        // If the expression is an alias we already know maps to timestamp
+                        if let Expr::Identifier(ident) = expr {
+                            if self.timestamp_aliases.contains(&ident.value) {
+                                self.timestamp_aliases.insert(alias.value.clone());
+                            }
+                        }
                     }
+
+                    // SELECT * — explicitly excluded
                     SelectItem::Wildcard(_) => {
                         self.timestamp_selected = true;
                         return ControlFlow::Break(());
@@ -518,6 +594,18 @@ mod tests {
                 "SELECT MAX(_timestamp) as ts1, ts1 as _timestamp FROM table1",
                 true,
                 "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT ts, code, request_count FROM ( SELECT histogram(_timestamp) AS ts, code, count(_timestamp) AS request_count, ROW_NUMBER() OVER (PARTITION BY histogram(_timestamp) ORDER BY count(_timestamp) DESC) AS rn FROM drop1 WHERE (code IS NOT NULL) GROUP BY ts, code ) t WHERE rn <= 3 ORDER BY ts DESC, request_count DESC",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT  code, request_count FROM ( SELECT histogram(_timestamp) AS ts, code, count(_timestamp) AS request_count, ROW_NUMBER() OVER (PARTITION BY histogram(_timestamp) ORDER BY count(_timestamp) DESC) AS rn FROM drop1 WHERE (code IS NOT NULL) GROUP BY ts, code ) t WHERE rn <= 3 ORDER BY ts DESC, request_count DESC",
+                false,
+                "Final result does not have _timestamp field",
             ),
         ];
 
