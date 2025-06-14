@@ -68,9 +68,12 @@ test.describe("Alerts Module testcases", () => {
       console.log('Generated shared random value for this run:', sharedRandomValue);
     }
 
-    // Ingest test data using common actions
-    const streamName = 'auto_playwright_stream';
-    await commonActions.ingestTestData(streamName);
+    // Skip data ingestion for scheduled alert test
+    if (!test.info().title.includes('Scheduled Alert')) {
+      // Ingest test data using common actions
+      const streamName = 'auto_playwright_stream';
+      await commonActions.ingestTestData(streamName);
+    }
     
     // Navigate to alerts page
     await page.goto(
@@ -170,5 +173,39 @@ test.describe("Alerts Module testcases", () => {
 
     // Try to delete template and handle both success and in-use scenarios
     await templatesPage.deleteTemplateAndVerify(createdTemplateName);
+  });
+
+  test('Create and Delete Scheduled Alert with SQL Query', {
+    tag: ['@createAlert', '@deleteAlerts', '@scheduledAlerts', '@all', '@alerts']
+  }, async ({ page }) => {
+    const streamName = 'auto_playwright_stream';
+
+    // Ensure destination exists (which will also ensure template exists)
+    await ensureDestinationExists();
+
+    // Navigate to alerts tab using common actions
+    await commonActions.navigateToAlerts();
+    await page.waitForTimeout(2000);
+
+    // Ingest custom test data
+    await commonActions.ingestCustomTestData(streamName);
+    await page.waitForTimeout(2000);
+
+    // Use the shared random value for the folder name
+    const folderName = 'auto_' + sharedRandomValue;
+    await alertsPage.createFolder(folderName, 'Test Automation Folder');
+    await alertsPage.verifyFolderCreated(folderName);
+    console.log('Successfully created folder:', folderName);
+
+    // Navigate to the folder
+    await alertsPage.navigateToFolder(folderName);
+
+    // Create scheduled alert with SQL query
+    const alertName = await alertsPage.createScheduledAlertWithSQL(streamName, createdDestinationName, sharedRandomValue);
+    await alertsPage.verifyAlertCreated(alertName);
+    console.log('Successfully created scheduled alert:', alertName);
+
+    // Delete the alert
+    await alertsPage.deleteAlertByRow(alertName);
   });
 });

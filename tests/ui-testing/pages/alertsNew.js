@@ -332,4 +332,80 @@ export class AlertsNewPage {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
         await expect(this.page.getByText(resultText).nth(1)).toBeVisible();
     }
+
+    /**
+     * Create a scheduled alert with SQL query
+     * @param {string} streamName - Name of the stream
+     * @param {string} destinationName - Name of the destination
+     * @param {string} randomValue - Random value for unique naming
+     */
+    async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
+        const randomAlertName = 'auto_scheduled_alert_' + randomValue;
+        this.currentAlertName = randomAlertName;
+        console.log('Creating scheduled alert:', randomAlertName);
+
+        await this.page.locator(this.addAlertButton).click();
+        await this.page.waitForTimeout(1000);
+
+        // Fill alert name
+        await this.page.locator(this.alertNameInput).click();
+        await this.page.locator(this.alertNameInput).fill(randomAlertName);
+        await this.page.waitForTimeout(1000);
+
+        // Select stream type and name
+        await this.page.locator(this.streamTypeDropdown).click();
+        await this.page.waitForTimeout(2000);
+        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        await this.page.locator(this.streamNameDropdown).click();
+        await this.page.waitForTimeout(2000);
+        await this.page.getByText(streamName, { exact: true }).click();
+        await this.page.waitForTimeout(1000);
+
+        // Select scheduled alert radio
+        await this.page.locator('[data-test="add-alert-scheduled-alert-radio"]').click();
+        await this.page.waitForTimeout(1000);
+
+        // Set threshold
+        await this.page.locator('[data-test="scheduled-alert-threshold-operator-select"]').getByLabel('arrow_drop_down').click();
+        await this.page.getByText('>=').click();
+        await this.page.locator('[data-test="scheduled-alert-threshold-value-input"]').getByLabel('').fill('1');
+
+        // Set period
+        await this.page.locator('[data-test="scheduled-alert-period-input"]').getByLabel('').fill('15');
+
+        // Set delay
+        await this.page.locator(this.alertDelayInput).getByLabel('').fill('0');
+
+        // Select destination
+        await this.page.locator(this.destinationSelect).getByLabel('arrow_drop_down').click();
+        await this.page.waitForTimeout(2000);
+        await this.page.getByText(destinationName, { exact: true }).click();
+        await this.page.waitForTimeout(1000);
+
+        // Add time range
+        await this.page.locator('[data-test="multi-time-range-alerts-add-btn"]').click();
+        await this.page.locator('[data-test="date-time-btn"]').click();
+        await this.page.locator('[data-test="date-time-relative-30-m-btn"]').click();
+
+        // Add SQL query
+        await this.page.getByRole('button', { name: 'View Editor' }).click();
+        await this.page.locator('.view-lines').first().click();
+        await this.page.locator('[data-test="scheduled-alert-sql-editor"]').getByRole('textbox', { name: 'Editor content' })
+            .fill('SELECT name\n  FROM "auto_playwright_stream"\n  WHERE \n    gender = \'Male\'\n    AND age > 60\n    AND country IN (\'Germany\', \'Japan\', \'USA\')');
+        await this.page.getByRole('button', { name: 'Run Query' }).click();
+        await this.page.waitForTimeout(2000);
+
+        // Close dialog
+        await this.page.locator('div').filter({ hasText: /^closeAdd Conditions$/ }).locator('i').click();
+        await this.page.waitForTimeout(1000);
+
+        // Submit alert
+        await this.page.locator(this.alertSubmitButton).click();
+        await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible();
+        await expect(this.page.getByRole('cell', { name: '15 Mins' })).toBeVisible();
+
+        return randomAlertName;
+    }
 } 
