@@ -168,7 +168,7 @@ const useRoutes = () => {
       name: "dashboards",
       component: Dashboards,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
