@@ -120,7 +120,16 @@ pub async fn process_search_stream_request(
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
+    // HACK: always search from the first partition, this is becuase to support pagination in http2
+    // streaming we need context of no of hits per partition, which currently is not available.
+    // Hence we start from the first partition everytime and skip the hits. The following is a
+    // global variable to keep track of how many hits to skip across all partitions.
+    // This is a temporary hack and will be removed once we have the context of no of hits per
+    // partition.
+    let mut hits_to_skip = req.query.from;
+
     if req.query.from == 0 && !req.query.track_total_hits {
+        // check cache for the first page
         let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
             .instrument(search_span.clone())
             .await
@@ -296,6 +305,7 @@ pub async fn process_search_stream_request(
                 sender.clone(),
                 values_ctx,
                 fallback_order_by_col,
+                &mut hits_to_skip,
             )
             .instrument(search_span.clone())
             .await
@@ -409,6 +419,7 @@ pub async fn process_search_stream_request(
             sender.clone(),
             values_ctx,
             fallback_order_by_col,
+            &mut hits_to_skip,
         )
         .instrument(search_span.clone())
         .await
@@ -511,6 +522,7 @@ pub async fn do_partitioned_search(
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
+    hits_to_skip: &mut i64,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -576,19 +588,40 @@ pub async fn do_partitioned_search(
             req.query.size -= curr_res_size;
         }
 
-        // do not use cache for partitioned search without cache
+        // here we increase the size of the query to fetch requested hits in addition to the
+        // hits_to_skip we set the from to 0 to fetch the hits from the the beginning of the
+        // partition
+        req.query.size += *hits_to_skip;
+        req.query.from = 0;
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
 
-        let total_hits = search_res.total as i64;
+        let mut total_hits = search_res.total as i64;
 
-        if req.query.size > 0 && total_hits > req.query.size {
+        let skip_hits = std::cmp::min(*hits_to_skip, total_hits);
+        if skip_hits > 0 {
+            search_res.hits = search_res.hits[skip_hits as usize..].to_vec();
+            search_res.total = search_res.hits.len();
+            search_res.size = search_res.total as i64;
+            total_hits = search_res.total as i64;
+            *hits_to_skip -= skip_hits;
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {}, Skipped {} hits, remaining hits to skip: {}, total hits for partition {}: {}",
+                trace_id,
+                skip_hits,
+                *hits_to_skip,
+                idx,
+                total_hits
+            );
+        }
+
+        if req_size > 0 && total_hits > req_size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
-                req.query.size
+                req_size
             );
-            search_res.hits.truncate(req.query.size as usize);
-            curr_res_size += req.query.size;
+            search_res.hits.truncate(req_size as usize);
+            curr_res_size += req_size;
         } else {
             curr_res_size += total_hits;
         }
@@ -1031,7 +1064,7 @@ async fn process_delta(
 
         let total_hits = search_res.total as i64;
 
-        if total_hits > req.query.size {
+        if req.query.size > 0 && total_hits > req.query.size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,

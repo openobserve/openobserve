@@ -26,7 +26,10 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+    },
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -112,6 +115,7 @@ pub async fn handle_grpc_request(
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
 
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
@@ -236,6 +240,8 @@ pub async fn handle_grpc_request(
                     original_options.push(original_data);
                     timestamps.push(timestamp);
                 } else {
+                    let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                    *_size += estimate_json_bytes(&rec);
                     // flattening
                     rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
@@ -350,6 +356,7 @@ pub async fn handle_grpc_request(
                     }
 
                     for (idx, mut res) in stream_pl_results {
+                        let original_size = estimate_json_bytes(&res);
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(v) => v,
@@ -408,6 +415,11 @@ pub async fn handle_grpc_request(
                             );
                         }
 
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
+
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
                             .or_insert((Vec::new(), None));
@@ -453,6 +465,7 @@ pub async fn handle_grpc_request(
         UsageType::Logs,
         &mut status,
         json_data_by_stream,
+        size_by_stream,
     )
     .await
     {

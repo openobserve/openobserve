@@ -29,7 +29,11 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+        time::parse_timestamp_micro_from_value,
+    },
 };
 
 use super::{ingestion_log_enabled, log_failed_record};
@@ -90,6 +94,7 @@ pub async fn ingest(
     let mut store_original_when_pipeline_exists = false;
 
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
@@ -221,6 +226,8 @@ pub async fn ingest(
                     .or_default();
                 inputs.add_input(value, doc_id.to_owned(), original_data);
             } else {
+                let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                *_size += estimate_json_bytes(&value);
                 // JSON Flattening
                 value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
 
@@ -420,6 +427,8 @@ pub async fn ingest(
                         }
 
                         for (idx, mut res) in stream_pl_results {
+                            // we calculate the size BEFORE applying uds
+                            let original_size = estimate_json_bytes(&res);
                             // get json object
                             let mut local_val = match res.take() {
                                 json::Value::Object(v) => v,
@@ -554,6 +563,11 @@ pub async fn ingest(
                                 json::Value::Number(timestamp.into()),
                             );
 
+                            let _size = size_by_stream
+                                .entry(destination_stream.clone())
+                                .or_insert(0);
+                            *_size += original_size;
+
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
                                 .or_insert((Vec::new(), None));
@@ -584,6 +598,7 @@ pub async fn ingest(
             UsageType::Bulk,
             &mut status,
             json_data_by_stream,
+            size_by_stream,
         )
         .await;
         let IngestionStatus::Bulk(mut bulk_res) = status else {

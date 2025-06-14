@@ -28,7 +28,11 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+        time::parse_timestamp_micro_from_value,
+    },
 };
 use flate2::read::GzDecoder;
 use opentelemetry_proto::tonic::{
@@ -166,6 +170,7 @@ pub async fn ingest(
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
     for ret in data.iter() {
         let mut item = match ret {
             Ok(item) => item,
@@ -206,6 +211,9 @@ pub async fn ingest(
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
+            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+            *_size += estimate_json_bytes(&item);
+
             // JSON Flattening
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
@@ -357,6 +365,9 @@ pub async fn ingest(
                             }
                         };
 
+                        // we calculate the size BEFORE applying uds
+                        let original_size = estimate_json_bytes(&res);
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,
@@ -423,6 +434,11 @@ pub async fn ingest(
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
 
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
+
                         tokio::task::coop::consume_budget().await;
                     }
                 }
@@ -455,6 +471,7 @@ pub async fn ingest(
             usage_type,
             &mut status,
             json_data_by_stream,
+            size_by_stream,
         )
         .await;
         stream_status.status = match status {
