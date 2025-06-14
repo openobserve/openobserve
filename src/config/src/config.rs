@@ -774,6 +774,12 @@ pub struct Common {
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
     pub feature_query_streaming_aggs: bool,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_STREAMING_AGGS_PARTITION_WINDOW_SECS",
+        default = 3600,
+        help = "Streaming aggregate partition window in seconds, default is 1 hour, should be either 15mins, 30mins, 1hour"
+    )]
+    pub streaming_aggs_partition_window_secs: i64,
     #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
     pub feature_join_match_one_enabled: bool,
     #[env_config(
@@ -1602,6 +1608,9 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
+    // MB, default is 10% of local volume available space and maximum 20GB
+    #[env_config(name = "ZO_DISK_RECORD_BATCH_CACHE_MAX_SIZE", default = 0)]
+    pub record_batch_max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1615,6 +1624,12 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
+    #[env_config(
+        name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
+        default = 10,
+        help = "Delay window indicates the time range from now to skip caching to disk, default is 10 minutes"
+    )]
+    pub delay_window_mins: i64,
 }
 
 #[derive(EnvConfig)]
@@ -2500,6 +2515,16 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
+
+    if cfg.disk_cache.record_batch_max_size == 0 {
+        cfg.disk_cache.record_batch_max_size = cfg.limit.disk_free / 10; // 10%
+        if cfg.disk_cache.record_batch_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.record_batch_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
+    } else {
+        cfg.disk_cache.record_batch_max_size *= 1024 * 1024;
+    }
+
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
         // 50% of max_size

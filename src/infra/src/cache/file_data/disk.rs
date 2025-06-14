@@ -78,6 +78,26 @@ static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     files
 });
 
+// record batch cache
+static RECORD_BATCH_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(RwLock::new(FileData::new(FileType::RecordBatch)));
+    }
+    files
+});
+
+// read only record batch cache
+static RECORD_BATCH_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(FileData::new(FileType::RecordBatch));
+    }
+    files
+});
+
 pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
 
@@ -98,6 +118,7 @@ pub struct FileData {
 pub enum FileType {
     DATA,
     RESULT,
+    RecordBatch,
 }
 
 impl Default for FileData {
@@ -112,6 +133,7 @@ impl FileData {
         let size = match file_type {
             FileType::DATA => cfg.disk_cache.max_size,
             FileType::RESULT => cfg.disk_cache.result_max_size,
+            FileType::RecordBatch => cfg.disk_cache.record_batch_max_size,
         };
         FileData::with_capacity_and_cache_strategy(size, &cfg.disk_cache.cache_strategy)
     }
@@ -199,6 +221,10 @@ impl FileData {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
                 .add(data_size as i64);
+        } else if columns[0] == "record_batches" && columns.len() >= 3 {
+            metrics::QUERY_DISK_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2]])
+                .add(data_size as i64);
         };
         Ok(())
     }
@@ -275,6 +301,10 @@ impl FileData {
                 metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                     .with_label_values(&[columns[1]])
                     .sub(data_size as i64);
+            } else if columns[0] == "record_batches" && columns.len() >= 3 {
+                metrics::QUERY_DISK_CACHE_USED_BYTES
+                    .with_label_values(&[columns[1], columns[2]])
+                    .sub(data_size as i64);
             }
             release_size += data_size;
             if release_size >= need_release_size {
@@ -331,6 +361,10 @@ impl FileData {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
                 .sub(data_size as i64);
+        } else if columns[0] == "record_batches" && columns.len() >= 3 {
+            metrics::QUERY_DISK_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2]])
+                .sub(data_size as i64);
         }
 
         Ok(())
@@ -367,6 +401,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     // trigger read only files
     for file in FILES_READER.iter() {
+        let root_dir = file.root_dir.clone();
+        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    }
+    // trigger read only record batch files
+    for file in RECORD_BATCH_FILES_READER.iter() {
         let root_dir = file.root_dir.clone();
         std::fs::create_dir_all(&root_dir).expect("create cache dir success");
     }
@@ -410,6 +449,10 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("results") {
+        RESULT_FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("record_batches") {
+        RECORD_BATCH_FILES_READER.get(idx).unwrap()
     } else {
         RESULT_FILES_READER.get(idx).unwrap()
     };
@@ -424,6 +467,10 @@ pub async fn get_size(file: &str) -> Option<usize> {
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("results") {
+        RESULT_FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("record_batches") {
+        RECORD_BATCH_FILES_READER.get(idx).unwrap()
     } else {
         RESULT_FILES_READER.get(idx).unwrap()
     };
@@ -438,6 +485,10 @@ pub async fn exist(file: &str) -> bool {
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES[idx].read().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].read().await
+    } else if file.starts_with("record_batches") {
+        RECORD_BATCH_FILES[idx].read().await
     } else {
         RESULT_FILES[idx].read().await
     };
@@ -471,6 +522,10 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     // get all the files from the bucket
     let mut files = if file.starts_with("files") {
         FILES[idx].write().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].write().await
+    } else if file.starts_with("record_batches") {
+        RECORD_BATCH_FILES[idx].write().await
     } else {
         RESULT_FILES[idx].write().await
     };
@@ -488,6 +543,10 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     let idx = get_bucket_idx(file);
     let mut files = if file.starts_with("files") {
         FILES[idx].write().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].write().await
+    } else if file.starts_with("record_batches") {
+        RECORD_BATCH_FILES[idx].write().await
     } else {
         RESULT_FILES[idx].write().await
     };
@@ -607,6 +666,19 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .add(data_size as i64);
 
                         metrics_cache.push(file_key);
+                    } else if file_key.starts_with("record_batches") {
+                        let mut w = RECORD_BATCH_FILES[idx].write().await;
+                        w.cur_size += data_size;
+                        w.data.insert(file_key.clone(), data_size);
+                        drop(w);
+
+                        // metrics for record batches
+                        let columns = file_key.split('/').collect::<Vec<&str>>();
+                        if columns.len() >= 3 {
+                            metrics::QUERY_DISK_CACHE_USED_BYTES
+                                .with_label_values(&[columns[1], columns[2]])
+                                .add(data_size as i64);
+                        }
                     }
                 }
             }
@@ -647,6 +719,17 @@ async fn gc() -> Result<(), anyhow::Error> {
         w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
+    for file in RECORD_BATCH_FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + cfg.disk_cache.release_size < r.max_size {
+            drop(r);
+            continue;
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc(cfg.disk_cache.gc_size).await?;
+        drop(w);
+    }
     Ok(())
 }
 
@@ -657,6 +740,7 @@ pub async fn stats(file_type: FileType) -> (usize, usize) {
     let files = match file_type {
         FileType::DATA => &FILES,
         FileType::RESULT => &RESULT_FILES,
+        FileType::RecordBatch => &RECORD_BATCH_FILES,
     };
 
     for file in files.iter() {
@@ -674,6 +758,7 @@ pub async fn len(file_type: FileType) -> usize {
     let files = match file_type {
         FileType::DATA => &FILES,
         FileType::RESULT => &RESULT_FILES,
+        FileType::RecordBatch => &RECORD_BATCH_FILES,
     };
     for file in files.iter() {
         let r = file.read().await;
@@ -687,6 +772,7 @@ pub async fn is_empty(file_type: FileType) -> bool {
     let files = match file_type {
         FileType::DATA => &FILES,
         FileType::RESULT => &RESULT_FILES,
+        FileType::RecordBatch => &RECORD_BATCH_FILES,
     };
 
     for file in files.iter() {
@@ -754,6 +840,46 @@ pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, Res
         is_descending,
     };
 
+    Some((org_id, stream_type, query_key, meta))
+}
+
+// parse the record batch cache key from the file name
+// returns (org_id, stream_type, query_key, ResultCacheMeta)
+// record_batches/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow
+pub fn parse_record_batch_cache_key(
+    file: &str,
+) -> Option<(String, String, String, ResultCacheMeta)> {
+    let columns = file.split('/').collect::<Vec<&str>>();
+    if columns.len() < 6 {
+        return None;
+    }
+    let org_id = columns[1].to_string();
+    let stream_type = columns[2].to_string();
+    let query_key = format!(
+        "{}_{}_{}_{}",
+        columns[1], columns[2], columns[3], columns[4]
+    );
+
+    // Remove file extension before parsing
+    let filename = columns[5];
+    let filename_without_ext = if let Some(dot_pos) = filename.rfind('.') {
+        &filename[..dot_pos]
+    } else {
+        filename
+    };
+
+    let meta = filename_without_ext.split('_').collect::<Vec<&str>>();
+    if meta.len() < 2 {
+        return None;
+    }
+
+    let meta = ResultCacheMeta {
+        start_time: meta[0].parse().unwrap(),
+        end_time: meta[1].parse().unwrap(),
+        is_aggregate: true,
+        // NOTE: aggregate record batches don't honor order by
+        is_descending: false,
+    };
     Some((org_id, stream_type, query_key, meta))
 }
 
@@ -894,5 +1020,19 @@ mod tests {
         assert_eq!(meta.end_time, 1744081170000000);
         assert_eq!(meta.is_aggregate, true);
         assert_eq!(meta.is_descending, false);
+    }
+
+    #[tokio::test]
+    async fn test_parse_record_batch_cache_key() {
+        let file_key = "record_batches/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
+        let Some((org_id, stream_type, query_key, meta)) = parse_record_batch_cache_key(file_key)
+        else {
+            panic!("parse record batch cache key error");
+        };
+        assert_eq!(org_id, "default");
+        assert_eq!(stream_type, "logs");
+        assert_eq!(query_key, "default_logs_default_16042959487540176184");
+        assert_eq!(meta.start_time, 1744081170000000);
+        assert_eq!(meta.end_time, 1744081170000000);
     }
 }
