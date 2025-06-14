@@ -603,10 +603,71 @@ mod tests {
             ),
             // Subquery
             (
-                "SELECT  code, request_count FROM ( SELECT histogram(_timestamp) AS ts, code, count(_timestamp) AS request_count, ROW_NUMBER() OVER (PARTITION BY histogram(_timestamp) ORDER BY count(_timestamp) DESC) AS rn FROM drop1 WHERE (code IS NOT NULL) GROUP BY ts, code ) t WHERE rn <= 3 ORDER BY ts DESC, request_count DESC",
+                "SELECT code, request_count FROM ( SELECT histogram(_timestamp) AS ts, code, count(_timestamp) AS request_count, ROW_NUMBER() OVER (PARTITION BY histogram(_timestamp) ORDER BY count(_timestamp) DESC) AS rn FROM drop1 WHERE (code IS NOT NULL) GROUP BY ts, code ) t WHERE rn <= 3 ORDER BY ts DESC, request_count DESC",
                 false,
                 "Final result does not have _timestamp field",
             ),
+            // Subquery
+            (
+                "SELECT histogram(_timestamp) AS ts, count(*) FROM tbl1 WHERE a=b AND c IN(SELECT c FROM tbl2 WHERE c=d) GROUP BY ts ORDER BY ts ASC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT ts, cnt FROM (SELECT histogram(_timestamp) AS ts, count(*) AS cnt GROUP BY ts) LIMIT 10",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT * FROM (SELECT histogram(_timestamp) AS ts, count(*) AS cnt GROUP BY ts) LIMIT 10",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT histogram(_timestamp,'5 minutes') as t1, responsecode, COUNT(_timestamp) as total_count FROM (SELECT _timestamp, array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) AS responsecode FROM tbl WHERE log LIKE '%api/v1/%' and array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) = 200) GROUP BY t1, responsecode ORDER BY t1 DESC",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT histogram(_timestamp,'5 minutes') as t1, responsecode, COUNT(_timestamp) as total_count FROM tbl WHERE responsecode IN(SELECT array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) AS responsecode FROM tbl WHERE log LIKE '%api/v1/%' and array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) = 200) GROUP BY t1, responsecode ORDER BY t1 DESC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH tbl1 AS (SELECT histogram(_timestamp) AS ts, count(*) AS cnt FROM tbl1) SELECT * FROM tbl1",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH tbl1 AS (SELECT histogram(_timestamp) AS ts, count(*) AS cnt FROM tbl1) SELECT ts, cnt FROM tbl1",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH tbl1 AS (SELECT histogram(_timestamp) AS ts, count(*) AS cnt FROM tbl1) SELECT cnt FROM tbl1",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Join
+            (
+                "SELECT histogram(a._timestamp) AS ts, b.name, count(*) FROM tbl1 AS a LEFT JOIN tbl2 AS b ON a.userid=b.userid GROUP BY ts, name ORDER BY ts ASC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // CTE
+            (
+                "WITH a AS (SELECT histogram(_timestamp) AS ts, userid, count(*) as cnt FROM tbl1 GROUP BY ts, userid HAVING cnt > 40) SELECT ts, SUM(cnt) AS cnt, COUNT(DISTINCT userid) AS user_cnt FROM a GROUP BY ts",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // CTE
         ];
 
         for (sql, expected, test_name) in test_cases {
