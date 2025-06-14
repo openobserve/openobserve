@@ -1600,6 +1600,9 @@ export default defineComponent({
       if (intervalId.value) {
         clearInterval(intervalId.value);
       }
+
+      queryEditorRef.value = null;
+      fnEditorRef.value = null;
     });
 
     const importSqlParser = async () => {

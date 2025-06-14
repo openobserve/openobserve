@@ -576,6 +576,7 @@ export default defineComponent({
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const indexListRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
@@ -1549,6 +1550,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
+      indexListRef,
       splitterModel,
       // loadPageData,
       getQueryData,
