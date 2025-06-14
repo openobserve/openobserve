@@ -68,11 +68,18 @@ pub async fn bulk(
     let mut resp = match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
-            log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
+            log::error!("Error processing request {org_id}/_bulk: {e}");
+            if e.to_string().contains("MemoryCircuitBreakerError") {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                    e.to_string(),
+                ))
+            } else {
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
         }
     };
 
@@ -136,14 +143,18 @@ pub async fn multi(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!(
-                "Error processing request {org_id}/{stream_name}/_multi: {:?}",
-                e
-            );
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
+            log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
+            if e.to_string().contains("MemoryCircuitBreakerError") {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                    e.to_string(),
+                ))
+            } else {
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
         }
     };
 
@@ -207,14 +218,18 @@ pub async fn json(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!(
-                "Error processing request {org_id}/{stream_name}/_json: {:?}",
-                e
-            );
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
+            log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
+            if e.to_string().contains("MemoryCircuitBreakerError") {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                    e.to_string(),
+                ))
+            } else {
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
         }
     };
 
@@ -276,7 +291,7 @@ pub async fn handle_kinesis_request(
                 error_message: None,
             }),
             Err(e) => {
-                log::error!("Error processing kinesis request: {:?}", e);
+                log::error!("Error processing kinesis request: {e}");
                 HttpResponse::BadRequest().json(KinesisFHIngestionResponse {
                     request_id,
                     timestamp: request_time,
@@ -309,10 +324,7 @@ pub async fn handle_gcp_request(
         {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
-                log::error!(
-                    "Error processing request {org_id}/{stream_name}/_gcp: {:?}",
-                    e
-                );
+                log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e}");
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
@@ -353,9 +365,8 @@ pub async fn otlp_logs_write(
             Ok(v) => Ok(v),
             Err(e) => {
                 log::error!(
-                    "Error processing otlp pb logs write request {org_id}/{:?}: {:?}",
+                    "Error processing otlp pb logs write request {org_id}/{:?}: {e}",
                     in_stream_name,
-                    e
                 );
                 Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
@@ -369,9 +380,8 @@ pub async fn otlp_logs_write(
             Ok(v) => Ok(v),
             Err(e) => {
                 log::error!(
-                    "Error processing otlp json logs write request {org_id}/{:?}: {:?}",
+                    "Error processing otlp json logs write request {org_id}/{:?}: {e}",
                     in_stream_name,
-                    e
                 );
                 Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
