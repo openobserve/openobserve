@@ -170,7 +170,7 @@ async fn dispatch(
     let new_url = get_url(&path).await;
     if new_url.is_error {
         log::error!(
-            "dispatch: {} to {}, get urlerror: {:?}, took: {} ms",
+            "dispatch: {} to {}, get url details error: {:?}, took: {} ms",
             new_url.path,
             new_url.node_addr,
             new_url.error,
