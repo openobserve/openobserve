@@ -579,6 +579,7 @@ export default defineComponent({
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const indexListRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
@@ -678,6 +679,27 @@ export default defineComponent({
 
       searchBarRef.value = null;
       searchResultRef.value = null;
+      indexListRef.value = null;
+      searchObj.data.stream.selectedStream = [];
+      searchObj.data.stream.streamLists = [];
+      searchObj.data.stream = {
+        loading: false,
+        streamLists: [],
+        selectedStream: [],
+        selectedStreamFields: [],
+        selectedFields: [],
+        filterField: "",
+        addToFilter: "",
+        functions: [],
+        streamType: "logs",
+        interestingFieldList: [],
+        userDefinedSchema: [],
+        expandGroupRows: {},
+        expandGroupRowsFieldCount: {},
+        filteredField: [],
+        missingStreamMultiStreamFilter: [],
+        pipelineQueryStream: [],
+      };
     });
 
     onActivated(() => {
@@ -1646,6 +1668,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
+      indexListRef,
       splitterModel,
       // loadPageData,
       getQueryData,
