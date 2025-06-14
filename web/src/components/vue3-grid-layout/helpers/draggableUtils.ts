@@ -1,26 +1,21 @@
 // Get {x, y} positions from event.
-export function getControlPosition(e: MouseEvent) {
-  return offsetXYFromParentOf(e)
+export function getControlPosition(e: MouseEvent, element: HTMLElement) {
+  const elementRect = element.getBoundingClientRect()
+  const parentElement = element.parentElement || document.body
+  const parentRect = parentElement.getBoundingClientRect()
+  
+  const scrollLeft = parentElement.scrollLeft || 0
+  const scrollTop = parentElement.scrollTop || 0
+
+  return {
+    x: e.clientX - parentRect.left + scrollLeft,
+    y: e.clientY - parentRect.top + scrollTop
+  }
 }
 
 export interface Point {
   x: number
   y: number
-}
-// Get from offsetParent
-export function offsetXYFromParentOf(evt: MouseEvent): Point {
-  const t = evt.target as HTMLElement
-  const offsetParent = t.offsetParent || document.body
-  const offsetParentRect =
-    t.offsetParent === document.body ? {left: 0, top: 0} : offsetParent.getBoundingClientRect()
-
-  const x = evt.clientX + offsetParent.scrollLeft - offsetParentRect.left
-  const y = evt.clientY + offsetParent.scrollTop - offsetParentRect.top
-
-  /*const x = Math.round(evt.clientX + offsetParent.scrollLeft - offsetParentRect.left);
-  const y = Math.round(evt.clientY + offsetParent.scrollTop - offsetParentRect.top);*/
-
-  return {x, y}
 }
 
 export interface DraggableCoreData {

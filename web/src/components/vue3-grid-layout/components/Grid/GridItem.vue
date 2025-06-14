@@ -2,36 +2,34 @@
   <div ref="this$refsItem" class="vue-grid-item" :class="classObj" :style="styleObj">
     <slot :style="styleObj"></slot>
     <span v-if="resizableAndNotStatic" ref="handle" :class="resizableHandleClass"></span>
-    <!--<span v-if="draggable" ref="dragHandle" class="vue-draggable-handle"></span>-->
+    <span v-if="showDragHandle" class="vue-draggable-handle"></span>
   </div>
 </template>
 <script lang="ts" setup>
 import {ref, inject, computed, watch, onBeforeUnmount, onMounted, useSlots} from "vue"
-// import useCurrentInstance from "@/hooks/useInstance"
 import {setTopLeft, setTopRight, setTransformRtl, setTransform, Layout} from "../../helpers/utils"
 import {getControlPosition, createCoreData} from "../../helpers/draggableUtils"
 import {getColsFromBreakpoint, Breakpoints} from "../../helpers/responsiveUtils"
 import {getDocumentDir, EventsData} from "../../helpers/DOM"
-
-import "@interactjs/auto-start"
-import "@interactjs/auto-scroll"
-import "@interactjs/actions/drag"
-import "@interactjs/actions/resize"
-import "@interactjs/modifiers"
-import "@interactjs/dev-tools"
-import interact from "@interactjs/interact"
+import {createDragHandler, createResizeHandler} from "../../helpers/localDragResize"
 import {Emitter} from "mitt"
 import {Props, LayoutData} from "./GridLayout.vue"
 
-import {Interactable} from "@interactjs/core/Interactable"
-
 import useCurrentInstance from "../../hooks/useInstance"
+
+// Add event interface for our synthetic events
+interface SyntheticEvent extends MouseEvent {
+  type: string;
+  dx?: number;
+  dy?: number;
+}
+
 const {proxy} = useCurrentInstance()
 
 // for parent's instance
 // const thisLayout: (Props & LayoutData) | undefined = inject("thisLayout")
 type Ins = (Props & LayoutData) | undefined
-const thisLayout = proxy?.$parent as Ins
+const thisLayout = inject('layoutInstance') as Ins
 // console.log(thisLayout)
 
 // eventBus
@@ -133,7 +131,7 @@ const this$refsItem = ref<HTMLElement>({} as HTMLElement)
 const cols = ref<number>(1)
 const containerWidth = ref<number>(100)
 const rowHeight = ref<number>(30)
-const margin = ref<Array<number>>([10, 10])
+const margin = ref<[number, number]>([10, 10])
 const maxRows = ref<number>(Infinity)
 const draggable = ref<boolean | null>(null)
 const resizable = ref<boolean | null>(null)
@@ -166,7 +164,6 @@ const innerH = ref<number>(props.h)
 
 const bounded = ref<boolean | null>(null)
 
-const interactObj = ref<Interactable | null>(null)
 // computed
 
 const resizableAndNotStatic = computed(() => {
@@ -180,6 +177,9 @@ const isAndroid = computed(() => {
 })
 const renderRtl = computed(() => {
   return thisLayout?.isMirrored ? !rtl.value : rtl.value
+})
+const showDragHandle = computed(() => {
+  return draggable.value && !props.static && !props.dragAllowFrom
 })
 const classObj = computed(() => {
   return {
@@ -313,7 +313,7 @@ watch(
     if (!newMargin || (newMargin[0] == margin.value[0] && newMargin[1] == margin.value[1])) {
       return
     }
-    margin.value = newMargin.map(m => Number(m))
+    margin.value = [Number(newMargin[0]), Number(newMargin[1])]
     createStyle()
     emitContainerResized()
   }
@@ -392,21 +392,15 @@ onBeforeUnmount(() => {
   eventBus.off("directionchange", directionchangeHandler)
   eventBus.off("setColNum", setColNum)
   
-  // Properly destroy interact instance to prevent memory leaks
-  if (interactObj.value) {
-    // Remove all event listeners
-    interactObj.value.off("resizestart resizemove resizeend")
-    interactObj.value.off("dragstart dragmove dragend")
-    
-    // Disable all interactions
-    interactObj.value.draggable({enabled: false})
-    interactObj.value.resizable({enabled: false})
-    
-    // Unset the interact instance
-    interactObj.value.unset()
-    interactObj.value = null
+  // Clean up drag and resize handlers
+  if (dragDestructor.value) {
+    dragDestructor.value()
+    dragDestructor.value = null
   }
-
+  if (resizeDestructor.value) {
+    resizeDestructor.value()
+    resizeDestructor.value = null
+  }
 })
 
 onMounted(() => {
@@ -417,7 +411,9 @@ onMounted(() => {
   }
   rowHeight.value = thisLayout?.rowHeight as number
   containerWidth.value = thisLayout?.width !== null ? (thisLayout?.width as number) : 100
-  margin.value = thisLayout?.margin !== undefined ? thisLayout.margin : [10, 10]
+  margin.value = thisLayout?.margin !== undefined 
+    ? [thisLayout.margin[0], thisLayout.margin[1]]
+    : [10, 10]
   maxRows.value = thisLayout?.maxRows as number
   if (props.isDraggable === null) {
     draggable.value = thisLayout?.isDraggable as boolean
@@ -498,19 +494,18 @@ function emitContainerResized() {
   emit("container-resized", props.i, props.h, props.w, styleProps.height, styleProps.width)
 }
 
-function handleResize(event: MouseEvent) {
+function handleResize(event: SyntheticEvent) {
   {
     if (props.static) return
-    const position = getControlPosition(event)
-    // Get the current drag point from the event. This is used as the offset.
-    if (position == null) return // not possible but satisfies flow
-    const {x, y} = position
+    const position = getControlPosition(event, this$refsItem.value)
+    if (!position) return
 
+    const {x, y} = position
     const newSize = {width: 0, height: 0}
     let pos
+    
     switch (event.type) {
       case "resizestart": {
-        tryMakeResizable()
         previousW.value = innerW.value
         previousH.value = innerH.value
         pos = calcPosition(innerX.value, innerY.value, innerW.value, innerH.value)
@@ -521,7 +516,6 @@ function handleResize(event: MouseEvent) {
         break
       }
       case "resizemove": {
-        //                        console.log("### resize => " + event.type + ", lastW=" + this.lastW + ", lastH=" + this.lastH);
         const coreEvent = createCoreData(lastW.value, lastH.value, x, y)
         if (renderRtl.value) {
           newSize.width = Number(resizing.value?.width) - coreEvent.deltaX / transformScale.value
@@ -592,42 +586,30 @@ function handleResize(event: MouseEvent) {
   }
 }
 
-function handleDrag(event: MouseEvent) {
+function handleDrag(event: SyntheticEvent) {
   if (props.static) return
   if (isResizing.value) return
 
-  const position = getControlPosition(event)
+  const position = getControlPosition(event, this$refsItem.value)
+  if (!position) return
 
-  // Get the current drag point from the event. This is used as the offset.
-  if (position === null) return
-
-  // not possible but satisfies flow
   const {x, y} = position
-  // let shouldUpdate = false;
   let newPosition = {top: 0, left: 0}
+  
   switch (event.type) {
     case "dragstart": {
       previousX.value = innerX.value
       previousY.value = innerY.value
 
-      const tg = event.target as HTMLElement
-      const parentTg = tg.offsetParent as HTMLElement
-      let parentRect = parentTg.getBoundingClientRect()
-      let clientRect = tg.getBoundingClientRect()
-
-      const cLeft = clientRect.left / transformScale.value
-      const pLeft = parentRect.left / transformScale.value
-      const cRight = clientRect.right / transformScale.value
-      const pRight = parentRect.right / transformScale.value
-      const cTop = clientRect.top / transformScale.value
-      const pTop = parentRect.top / transformScale.value
+      const rect = this$refsItem.value.getBoundingClientRect()
+      const parentRect = (this$refsItem.value.parentElement || document.body).getBoundingClientRect()
 
       if (renderRtl.value) {
-        newPosition.left = (cRight - pRight) * -1
+        newPosition.left = (rect.right - parentRect.right) * -1
       } else {
-        newPosition.left = cLeft - pLeft
+        newPosition.left = rect.left - parentRect.left
       }
-      newPosition.top = cTop - pTop
+      newPosition.top = rect.top - parentRect.top
       dragging.value = newPosition as Pos
       isDragging.value = true
       break
@@ -635,36 +617,23 @@ function handleDrag(event: MouseEvent) {
     case "dragend": {
       if (!isDragging.value) return
       emit("dragend", event, props.i)
-      const tg = event.target as HTMLElement
-      const parentTg = tg.offsetParent as HTMLElement
-      let parentRect = parentTg.getBoundingClientRect()
-      let clientRect = tg.getBoundingClientRect()
 
-      const cLeft = clientRect.left / transformScale.value
-      const pLeft = parentRect.left / transformScale.value
-      const cRight = clientRect.right / transformScale.value
-      const pRight = parentRect.right / transformScale.value
-      const cTop = clientRect.top / transformScale.value
-      const pTop = parentRect.top / transformScale.value
+      const rect = this$refsItem.value.getBoundingClientRect()
+      const parentRect = (this$refsItem.value.parentElement || document.body).getBoundingClientRect()
 
-      //                        Add rtl support
       if (renderRtl.value) {
-        newPosition.left = (cRight - pRight) * -1
+        newPosition.left = (rect.right - parentRect.right) * -1
       } else {
-        newPosition.left = cLeft - pLeft
+        newPosition.left = rect.left - parentRect.left
       }
-      newPosition.top = cTop - pTop
-      //                        console.log("### drag end => " + JSON.stringify(newPosition));
-      //                        console.log("### DROP: " + JSON.stringify(newPosition));
+      newPosition.top = rect.top - parentRect.top
       dragging.value = null
       isDragging.value = false
-      // shouldUpdate = true;
       break
     }
     case "dragmove": {
       emit("dragging", event, props.i)
       const coreEvent = createCoreData(lastX.value, lastY.value, x, y)
-      //                        Add rtl support
       if (renderRtl.value) {
         newPosition.left = Number(dragging.value?.left) - coreEvent.deltaX / transformScale.value
       } else {
@@ -672,19 +641,15 @@ function handleDrag(event: MouseEvent) {
       }
       newPosition.top = Number(dragging.value?.top) + coreEvent.deltaY / transformScale.value
       if (bounded.value) {
-        const tg = event.target as HTMLElement
-        const parentTg = tg.offsetParent as HTMLElement
+        const parentElement = this$refsItem.value.parentElement as HTMLElement
         const bottomBoundary =
-          parentTg.clientHeight - calcGridItemWHPx(props.h, rowHeight.value, margin.value[1])
+          parentElement.clientHeight - calcGridItemWHPx(props.h, rowHeight.value, margin.value[1])
         newPosition.top = clamp(newPosition.top, 0, bottomBoundary)
         const colWidth = calcColWidth()
         const rightBoundary =
           containerWidth.value - calcGridItemWHPx(props.w, colWidth, margin.value[0])
         newPosition.left = clamp(newPosition.left, 0, rightBoundary)
       }
-      //                        console.log("### drag => " + event.type + ", x=" + x + ", y=" + y);
-      //                        console.log("### drag => " + event.type + ", deltaX=" + coreEvent.deltaX + ", deltaY=" + coreEvent.deltaY);
-      //                        console.log("### drag end => " + JSON.stringify(newPosition));
       dragging.value = newPosition as Pos
       break
     }
@@ -833,97 +798,98 @@ function selfCompact(layout?: Layout) {
 }
 
 function tryMakeDraggable() {
-  if (interactObj.value === null || interactObj.value === undefined) {
-    interactObj.value = interact(this$refsItem.value)
-    if (!useStyleCursor.value) {
-      // @ts-ignore
-      interactObj.value.styleCursor(false)
+  if (draggable.value && !props.static && this$refsItem.value) {
+    if (typeof dragDestructor.value === 'function') {
+      dragDestructor.value()
     }
-  }
-  if (draggable.value && !props.static) {
-    const opts = {
+
+    dragDestructor.value = createDragHandler(this$refsItem.value, {
+      onStart: (e: MouseEvent) => {
+        handleDrag({...e, type: 'dragstart'} as SyntheticEvent)
+      },
+      onDrag: (e: MouseEvent, delta: {x: number, y: number}) => {
+        const syntheticEvent = {
+          ...e,
+          type: 'dragmove',
+          clientX: e.clientX + delta.x,
+          clientY: e.clientY + delta.y
+        } as SyntheticEvent
+        handleDrag(syntheticEvent)
+      },
+      onEnd: (e: MouseEvent) => {
+        handleDrag({...e, type: 'dragend'} as SyntheticEvent)
+      },
+      bounds: props.isBounded ? this$refsItem.value.parentElement : undefined,
+      scale: transformScale.value,
       ignoreFrom: props.dragIgnoreFrom,
-      allowFrom: props.dragAllowFrom,
-      ...props.dragOption
-    }
-    // @ts-ignore
-    interactObj.value.draggable(opts)
-    /*this.interactObj.draggable({allowFrom: '.vue-draggable-handle'});*/
-    if (!dragEventSet.value) {
-      dragEventSet.value = true
-      interactObj.value.on("dragstart dragmove dragend", function (event) {
-        handleDrag(event)
-      })
-    }
-  } else {
-    // @ts-ignore
-    interactObj.value.draggable({
-      enabled: false
-    })
+      allowFrom: props.dragAllowFrom || '.vue-draggable-handle', // Default to draggable handle if not specified
+      grid: {
+        colWidth: calcColWidth(),
+        rowHeight: rowHeight.value,
+        margin: [margin.value[0], margin.value[1]],
+        maxRows: maxRows.value,
+        cols: cols.value
+      }
+    }).destroy
+  } else if (typeof dragDestructor.value === 'function') {
+    dragDestructor.value()
+    dragDestructor.value = null
   }
 }
+
 function tryMakeResizable() {
-  if (interactObj.value === null || interactObj.value === undefined) {
-    interactObj.value = interact(this$refsItem.value)
-    if (!useStyleCursor.value) {
-      // @ts-ignore
-      interactObj.value.styleCursor(false)
+  const handle = this$refsItem.value?.querySelector('.' + resizableHandleClass.value)
+  if (!handle) return
+
+  if (resizable.value && !props.static && this$refsItem.value) {
+    if (typeof resizeDestructor.value === 'function') {
+      resizeDestructor.value()
     }
-  }
-  if (resizable.value && !props.static) {
-    let maximum = calcPosition(0, 0, props.maxW, props.maxH)
-    let minimum = calcPosition(0, 0, props.minW, props.minH)
 
-    // console.log("### MAX " + JSON.stringify(maximum));
-    // console.log("### MIN " + JSON.stringify(minimum));
+    const maximum = calcPosition(0, 0, props.maxW, props.maxH)
+    const minimum = calcPosition(0, 0, props.minW, props.minH)
+    const gridMargin: [number, number] = [margin.value[0], margin.value[1]]
 
-    const opts = {
-      // allowFrom: "." + this.resizableHandleClass.trim().replace(" ", "."),
-      edges: {
-        left: false,
-        right: "." + resizableHandleClass.value.trim().replace(" ", "."),
-        bottom: "." + resizableHandleClass.value.trim().replace(" ", "."),
-        top: false
+    resizeDestructor.value = createResizeHandler(this$refsItem.value, handle as HTMLElement, {
+      onStart: (e: MouseEvent) => {
+        handleResize({...e, type: 'resizestart'} as SyntheticEvent)
       },
-      ignoreFrom: props.resizeIgnoreFrom,
-      restrictSize: {
-        min: {
-          height: minimum.height * transformScale.value,
-          width: minimum.width * transformScale.value
-        },
-        max: {
-          height: maximum.height * transformScale.value,
-          width: maximum.width * transformScale.value
-        }
+      onResize: (e: MouseEvent, delta: {x: number, y: number}) => {
+        const syntheticEvent = {
+          ...e,
+          type: 'resizemove',
+          clientX: e.clientX + delta.x,
+          clientY: e.clientY + delta.y
+        } as SyntheticEvent
+        handleResize(syntheticEvent)
       },
-      ...props.resizeOption
-    }
-
-    if (props.preserveAspectRatio) {
-      // @ts-ignore
-      opts.modifiers = [
-        // @ts-ignore
-        interact.modifiers.aspectRatio({
-          ratio: "preserve"
-        })
-      ]
-    }
-
-    // @ts-ignore
-    interactObj.value.resizable(opts)
-    if (!resizeEventSet.value) {
-      resizeEventSet.value = true
-      interactObj.value.on("resizestart resizemove resizeend", function (event) {
-        handleResize(event)
-      })
-    }
-  } else {
-    // @ts-ignore
-    interactObj.value.resizable({
-      enabled: false
-    })
+      onEnd: (e: MouseEvent) => {
+        handleResize({...e, type: 'resizeend'} as SyntheticEvent)
+      },
+      minWidth: minimum.width,
+      minHeight: minimum.height,
+      maxWidth: maximum.width,
+      maxHeight: maximum.height,
+      preserveAspectRatio: props.preserveAspectRatio,
+      scale: transformScale.value,
+      grid: {
+        colWidth: calcColWidth(),
+        rowHeight: rowHeight.value,
+        margin: gridMargin,
+        maxRows: maxRows.value,
+        cols: cols.value
+      }
+    }).destroy
+  } else if (typeof resizeDestructor.value === 'function') {
+    resizeDestructor.value()
+    resizeDestructor.value = null 
   }
 }
+
+// Add refs for cleanup functions
+const dragDestructor = ref<(() => void) | null>(null)
+const resizeDestructor = ref<(() => void) | null>(null)
+
 const $slots = useSlots()
 function autoSize() {
   // ok here we want to calculate if a resize is needed
@@ -1031,7 +997,7 @@ defineExpose({
   height: 20px;
   bottom: 0;
   right: 0;
-  background: url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/Pg08IS0tIEdlbmVyYXRvcjogQWRvYmUgRmlyZXdvcmtzIENTNiwgRXhwb3J0IFNWRyBFeHRlbnNpb24gYnkgQWFyb24gQmVhbGwgKGh0dHA6Ly9maXJld29ya3MuYWJlYWxsLmNvbSkgLiBWZXJzaW9uOiAwLjYuMSAgLS0+DTwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DTxzdmcgaWQ9IlVudGl0bGVkLVBhZ2UlMjAxIiB2aWV3Qm94PSIwIDAgNiA2IiBzdHlsZT0iYmFja2dyb3VuZC1jb2xvcjojZmZmZmZmMDAiIHZlcnNpb249IjEuMSINCXhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHhtbDpzcGFjZT0icHJlc2VydmUiDQl4PSIwcHgiIHk9IjBweCIgd2lkdGg9IjZweCIgaGVpZ2h0PSI2cHgiDT4NCTxnIG9wYWNpdHk9IjAuMzAyIj4NCQk8cGF0aCBkPSJNIDYgNiBMIDAgNiBMIDAgNC4yIEwgNCA0LjIgTCA0LjIgNC4yIEwgNC4yIDAgTCA2IDAgTCA2IDYgTCA2IDYgWiIgZmlsbD0iIzAwMDAwMCIvPg0JPC9nPg08L3N2Zz4=");
+  background: url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/Pg08IS0tIEdlbmVyYXRvcjogQWRvYmUgRmlyZXdvcmtzIENTNiwgRXhwb3J0IFNWRyBFeHRlbnNpb24gYnkgQVFyb24gQmVhbGwgKGh0dHA6Ly9maXJld29ya3MuYWJlYWxsLmNvbSkgLiBWZXJzaW9uOiAwLjYuMSAgLS0+DTwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DTxzdmcgaWQ9IlVudGl0bGVkLVBhZ2UlMjAxIiB2aWV3Qm94PSIwIDAgNiA2IiBzdHlsZT0iYmFja2dyb3VuZC1jb2xvcjojZmZmZmZmMDAiIHZlcnNpb249IjEuMSINCXhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHhtbDpzcGFjZT0icHJlc2VydmUiDQl4PSIwcHgiIHk9IjBweCIgd2lkdGg9IjZweCIgaGVpZ2h0PSI2cHgiDT4NCTxnIG9wYWNpdHk9IjAuMzAyIj4NCQk8cGF0aCBkPSJNIDYgNiBMIDAgNiBMIDAgNC4yIEwgNCA0LjIgTCA0LjIgNC4yIEwgNC4yIDAgTCA2IDAgTCA2IDYgTCA2IDYgWiIgZmlsbD0iIzAwMDAwMCIvPg0JPC9nPg08L3N2Zz4=");
   background-position: bottom right;
   padding: 0 3px 3px 0;
   background-repeat: no-repeat;
@@ -1054,5 +1020,21 @@ defineExpose({
 
 .vue-grid-item.disable-userselect {
   user-select: none;
+}
+
+.vue-draggable-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="5" cy="5" r="5" fill="#999999"/></svg>') no-repeat;
+  background-position: bottom right;
+  padding: 0 8px 8px 0;
+  background-repeat: no-repeat;
+  background-origin: content-box;
+  box-sizing: border-box;
+  cursor: move;
+  z-index: 1;
 }
 </style>

@@ -145,6 +145,42 @@ const eventBus: Emitter<{
 
 provide("eventBus", eventBus)
 // provide("thisLayout", proxy)
+// Add layoutInstance provide
+const layoutInstance: Props & LayoutData = {
+  autoSize: props.autoSize,
+  colNum: props.colNum,
+  rowHeight: props.rowHeight,
+  maxRows: props.maxRows,
+  margin: props.margin,
+  isDraggable: props.isDraggable,
+  isResizable: props.isResizable,
+  isMirrored: props.isMirrored,
+  isBounded: props.isBounded,
+  useCssTransforms: props.useCssTransforms,
+  verticalCompact: props.verticalCompact,
+  restoreOnDrag: props.restoreOnDrag,
+  responsive: props.responsive,
+  responsiveLayouts: props.responsiveLayouts,
+  transformScale: props.transformScale,
+  breakpoints: props.breakpoints,
+  cols: props.cols,
+  preventCollision: props.preventCollision,
+  useStyleCursor: props.useStyleCursor,
+  layout: props.layout,
+  width: width.value,
+  mergeStyle: mergeStyle.value,
+  lastLayoutLength: lastLayoutLength.value,
+  isDragging: isDragging.value,
+  placeholder: placeholder.value,
+  layouts: layouts.value,
+  lastBreakpoint: lastBreakpoint.value,
+  originalLayout: originalLayout.value,
+  erd: erd.value,
+  positionsBeforeDrag: positionsBeforeDrag.value,
+  this$refsLayout: this$refsLayout.value
+}
+
+provide("layoutInstance", layoutInstance)
 // add listen
 const emit = defineEmits<{
   (e: "layout-created", layout: Layout): void
