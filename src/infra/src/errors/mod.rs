@@ -81,6 +81,8 @@ pub enum Error {
     #[error("Error# {0}")]
     Reqwest(#[from] reqwest::Error),
     #[error("Error# {0}")]
+    ResourceError(String),
+    #[error("Error# {0}")]
     WalFileError(String),
     #[error("Error# {0}")]
     OtherError(#[from] anyhow::Error),

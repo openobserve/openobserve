@@ -405,7 +405,11 @@ pub async fn write_file(
     Ok(req_stats)
 }
 
-pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
+pub fn check_ingestion_allowed(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: Option<&str>,
+) -> Result<()> {
     if !LOCAL_NODE.is_ingester() {
         return Err(anyhow!("not an ingester"));
     }
@@ -419,10 +423,13 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
 
     // check if we are allowed to ingest
     if let Some(stream_name) = stream_name {
-        if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, stream_name, None) {
+        if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
     };
+
+    // check memory circuit breaker
+    ingester::check_memory_circuit_breaker()?;
 
     // check memtable
     ingester::check_memtable_size()?;
