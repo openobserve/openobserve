@@ -692,10 +692,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
-                        .wrap(middlewares::SlowLog::new(
-                            cfg.limit.http_slow_log_threshold,
-                            cfg.limit.circuit_breaker_enabled,
-                        ))
+                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                         .wrap(from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
@@ -711,10 +708,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
-                    .wrap(middlewares::SlowLog::new(
-                        cfg.limit.http_slow_log_threshold,
-                        cfg.limit.circuit_breaker_enabled,
-                    ))
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                     .wrap(from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
@@ -812,10 +806,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
-                        .wrap(middlewares::SlowLog::new(
-                            cfg.limit.http_slow_log_threshold,
-                            cfg.limit.circuit_breaker_enabled,
-                        ))
+                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                         .wrap(from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
@@ -831,10 +822,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
-                    .wrap(middlewares::SlowLog::new(
-                        cfg.limit.http_slow_log_threshold,
-                        cfg.limit.circuit_breaker_enabled,
-                    ))
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                     .wrap(from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
