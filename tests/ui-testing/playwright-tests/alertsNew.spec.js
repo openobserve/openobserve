@@ -23,7 +23,7 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
 }
 
-test.describe.serial("Alerts Module testcases", () => {
+test.describe("Alerts Module testcases", () => {
   let alertsPage;
   let templatesPage;
   let destinationsPage;
@@ -148,14 +148,14 @@ test.describe.serial("Alerts Module testcases", () => {
     await alertsPage.verifySearchResults(2);
 
     // Delete first alert
-    await alertsPage.deleteAlertByRow(alertName, '01');
+    await alertsPage.deleteAlertByRow(alertName);
 
     // Search again and verify only one result remains
     await alertsPage.searchAlert(alertName);
     await alertsPage.verifySearchResults(1);
 
     // Delete second alert
-    await alertsPage.deleteSingleAlert(alertName);
+    await alertsPage.deleteAlertByRow(alertName);
   });
 
   test('Verify Delete alert template functionality', {

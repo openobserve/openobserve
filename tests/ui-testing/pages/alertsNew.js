@@ -300,17 +300,17 @@ export class AlertsNewPage {
     }
 
     /**
-     * Deletes an alert
+     * Delete alert by name
      * @param {string} alertName - Name of the alert to delete
-     * @param {string} [rowNumber='01'] - Row number of the alert (defaults to '01')
      */
-    async deleteAlert(alertName, rowNumber = '01') {
-        await this.page.getByRole('row', { name: `${rowNumber} ${alertName}` })
-            .locator(`[data-test="alert-list-${alertName}-more-options"]`)
-            .click();
-        await this.page.getByText('Delete').click();
-        await this.page.locator('[data-test="confirm-button"]').click();
-        await expect(this.page.getByText('Alert deleted')).toBeVisible();
+    async deleteAlertByRow(alertName) {
+        const kebabButton = this.page.locator(`//button[@data-test='alert-list-${alertName}-more-options']`).first();
+        await kebabButton.click();
+        await this.page.waitForTimeout(1000);
+        await this.page.getByText('Delete', { exact: true }).click();
+        await this.page.locator(this.confirmButton).click();
+        await expect(this.page.getByText(this.alertDeletedMessage)).toBeVisible();
+        await this.page.waitForTimeout(1000);
     }
 
     /**
@@ -331,34 +331,5 @@ export class AlertsNewPage {
     async verifySearchResults(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
         await expect(this.page.getByText(resultText).nth(1)).toBeVisible();
-    }
-
-    /**
-     * Delete alert by row number
-     * @param {string} alertName - Name of the alert to delete
-     * @param {string} rowNumber - Row number of the alert (e.g., '01')
-     */
-    async deleteAlertByRow(alertName, rowNumber) {
-        await this.page.getByRole('row', { name: `${rowNumber} ${alertName}` })
-            .locator(`[data-test="alert-list-${alertName}-more-options"]`)
-            .click();
-        await this.page.waitForTimeout(1000);
-        await this.page.getByText('Delete', { exact: true }).click();
-        await this.page.locator(this.confirmButton).click();
-        await expect(this.page.getByText(this.alertDeletedMessage)).toBeVisible();
-        await this.page.waitForTimeout(1000);
-    }
-
-    /**
-     * Delete alert when only one result exists
-     * @param {string} alertName - Name of the alert to delete
-     */
-    async deleteSingleAlert(alertName) {
-        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`)
-            .click({ force: true });
-        await this.page.waitForTimeout(1000);
-        await this.page.getByText('Delete', { exact: true }).click();
-        await this.page.locator(this.confirmButton).click();
-        await expect(this.page.getByText(this.alertDeletedMessage)).toBeVisible();
     }
 } 
