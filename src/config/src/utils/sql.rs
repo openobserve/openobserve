@@ -386,14 +386,14 @@ impl Visitor for TimestampVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
-        // 🔁 Recurse into CTEs
+        //  Recurse into CTEs
         if let Some(with) = &query.with {
             for cte in &with.cte_tables {
                 cte.query.visit(self)?;
             }
         }
 
-        // 🔁 Recurse into subqueries in FROM clause
+        //  Recurse into subqueries in FROM clause
         if let SetExpr::Select(select) = query.body.as_ref() {
             for table in &select.from {
                 self.visit_table_factor(&table.relation)?;
