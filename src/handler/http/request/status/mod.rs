@@ -576,6 +576,13 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
 
+            if access_token.is_empty() {
+                audit_message.response_meta.http_response_code = 400;
+                audit_message._timestamp = now_micros();
+                audit(audit_message).await;
+                return Ok(HttpResponse::Unauthorized().json("access token is empty".to_string()));
+            }
+
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
@@ -634,6 +641,21 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 #[cfg(feature = "enterprise")]
 #[get("/dex_refresh")]
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
+    let mut audit_message = AuditMessage {
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/dex_refresh".to_string(),
+            http_body: "".to_string(),
+            http_query_params: req.query_string().to_string(),
+            http_response_code: 302,
+            error_msg: None,
+            trace_id: None,
+        },
+    };
     let token = if let Some(cookie) = req.cookie("auth_tokens") {
         let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
@@ -656,6 +678,13 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
         Ok((access_token, refresh_token)) => {
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
+
+            if access_token.is_empty() {
+                audit_message.response_meta.http_response_code = 400;
+                audit_message._timestamp = now_micros();
+                audit(audit_message).await;
+                return HttpResponse::Unauthorized().json("access token is empty".to_string());
+            }
 
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
