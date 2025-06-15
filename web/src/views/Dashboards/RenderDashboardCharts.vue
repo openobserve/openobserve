@@ -522,11 +522,6 @@ export default defineComponent({
       gridStackInstance.value.on("resizestop", (event, element) => {
         window.dispatchEvent(new Event("resize"));
       });
-
-      // Save dashboard after drag operation completes
-      gridStackInstance.value.on("dragstop", (event, element) => {
-        saveDashboardData.execute();
-      });
     };    // Update panel layout data from GridStack items
     const updatePanelLayouts = (items) => {
       items.forEach((item) => {
