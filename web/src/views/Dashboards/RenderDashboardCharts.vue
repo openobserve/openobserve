@@ -872,8 +872,12 @@ export default defineComponent({
 
     &.ui-resizable-resizing {
       opacity: 0.9;
-    }    > .ui-resizable-handle {
-      background: none;      &.ui-resizable-se {
+    }
+    
+    > .ui-resizable-handle {
+      background: none;      
+      
+      &.ui-resizable-se {
         background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
           no-repeat center;
         background-size: 8px 8px;
