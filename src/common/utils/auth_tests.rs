@@ -3007,6 +3007,8 @@ mod tests {
                 max_frame_size: usize::default(),
                 max_continuation_size: usize::default(),
                 max_channel_buffer_size: usize::default(),
+                streaming_response_chunk_size: usize::default(),
+                streaming_enabled: bool::default(),
             },
             route: config::Route {
                 timeout: u64::default(),
@@ -3136,6 +3138,7 @@ mod tests {
                 min_auto_refresh_interval: u32::default(),
                 feature_ingester_none_compression: bool::default(),
                 ingestion_url: String::default(),
+                use_stream_settings_for_partitions_enabled: todo!(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3248,6 +3251,10 @@ mod tests {
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
                 search_mini_partition_duration_secs: u64::default(),
+                file_download_priority_queue_thread_num: i64::default(),
+                file_download_priority_queue_window_secs: i64::default(),
+                file_download_enable_priority_queue: i64::default(),
+                calculate_stats_step_limit: i64::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
