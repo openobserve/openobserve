@@ -19,7 +19,6 @@ use std::{
 };
 
 use actix_web::http;
-use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
@@ -35,6 +34,7 @@ use config::{
     },
 };
 use flate2::read::GzDecoder;
+use infra::errors::{Error, Result};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -183,7 +183,7 @@ pub async fn ingest(
             Ok(item) => item,
             Err(e) => {
                 log::error!("IngestionError: {:?}", e);
-                return Err(anyhow::anyhow!("Failed processing: {:?}", e));
+                return Err(Error::IngestionError(format!("Failed processing: {:?}", e)));
             }
         };
 

@@ -18,7 +18,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Result, anyhow};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
@@ -35,7 +34,10 @@ use config::{
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
 };
-use infra::schema::STREAM_RECORD_ID_GENERATOR;
+use infra::{
+    errors::{Error, Result},
+    schema::STREAM_RECORD_ID_GENERATOR,
+};
 use proto::cluster_rpc::IngestionType;
 use vrl::{
     compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
@@ -397,7 +399,7 @@ pub async fn write_file(
             stream_name,
             e
         );
-        return Err(e.into());
+        return Err(Error::IngestionError(e.to_string()));
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;
@@ -411,28 +413,32 @@ pub fn check_ingestion_allowed(
     stream_name: Option<&str>,
 ) -> Result<()> {
     if !LOCAL_NODE.is_ingester() {
-        return Err(anyhow!("not an ingester"));
+        return Err(Error::IngestionError("not an ingester".to_string()));
     }
 
     // check if the org is blocked
     if !db::file_list::BLOCKED_ORGS.is_empty()
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
-        return Err(anyhow!("Quota exceeded for this organization [{}]", org_id));
+        return Err(Error::IngestionError(format!(
+            "Quota exceeded for this organization [{org_id}]"
+        )));
     }
 
     // check if we are allowed to ingest
     if let Some(stream_name) = stream_name {
         if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-            return Err(anyhow!("stream [{stream_name}] is being deleted"));
+            return Err(Error::IngestionError(format!(
+                "stream [{stream_name}] is being deleted"
+            )));
         }
     };
 
     // check memory circuit breaker
-    ingester::check_memory_circuit_breaker()?;
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // check memtable
-    ingester::check_memtable_size()?;
+    ingester::check_memtable_size().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     Ok(())
 }
@@ -572,7 +578,9 @@ pub fn create_log_ingestion_req(
         Ok(IngestionType::Multi) => Ok(IngestionRequest::Multi(data)),
         Ok(IngestionType::Usage) => Ok(IngestionRequest::Usage(data)),
         Ok(IngestionType::Rum) => Ok(IngestionRequest::RUM(data)),
-        _ => Err(anyhow::anyhow!("Not yet supported")),
+        _ => Err(Error::IngestionError(
+            "Ingestion type not yet supported".to_string(),
+        )),
     }
 }
 

@@ -104,7 +104,7 @@ pub async fn search(
     let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
+            log::error!("[trace_id {trace_id}] http->search: err: {e}");
             return Err(e);
         }
     };

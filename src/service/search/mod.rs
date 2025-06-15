@@ -373,7 +373,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+            return Err(Error::Message(format!("decode sql error: {e}")));
         }
     }
     let queries_len = queries.len();
@@ -435,7 +435,7 @@ pub async fn search_multi(
                 }
             }
             Err(e) => {
-                log::error!("search_multi: search error: {:?}", e);
+                log::error!("search_multi: search error: {e}");
                 if index == 0 {
                     // Error in the first query, return the error
                     return Err(e); // TODO: return partial results
@@ -831,7 +831,7 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(1);
+        let hist_int = sql.histogram_interval.unwrap_or(0);
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;

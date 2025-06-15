@@ -153,7 +153,7 @@ pub async fn search(
                 }
             }
             Err(e) => {
-                log::error!("Error parsing sql: {:?}", e);
+                log::error!("Error parsing sql: {e}");
                 MultiCachedQueryResponse::default()
             }
         }
@@ -689,7 +689,7 @@ pub async fn _write_results(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });
@@ -844,7 +844,7 @@ pub async fn write_results_v2(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });
