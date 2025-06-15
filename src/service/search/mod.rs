@@ -605,6 +605,18 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
+    let ts_column = if ts_column.is_none() {
+        let result = config::utils::cache_timestamp::analyze_timestamp_selection(&req.sql);
+        match result {
+            Ok(result) => result.column_names.first().cloned(),
+            Err(e) => {
+                log::error!("Error analyzing timestamp selection: {}", e);
+                None
+            }
+        }
+    } else {
+        ts_column
+    };
     let is_streaming_aggregate = ts_column.is_none()
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
         && cfg.common.feature_query_streaming_aggs;

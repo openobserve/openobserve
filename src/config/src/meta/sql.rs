@@ -988,9 +988,9 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyho
         }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
-        SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
+        // SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
         SqlExpr::CompositeAccess { expr, .. } => get_field_name_from_expr(expr),
-        SqlExpr::Subscript { expr, .. } => get_field_name_from_expr(expr),
+        // SqlExpr::Subscript { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Subquery(subquery) => get_field_name_from_query(subquery),
         SqlExpr::InSubquery { expr, subquery, .. } => {
             let mut fields = Vec::new();
