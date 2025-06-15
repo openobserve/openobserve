@@ -105,8 +105,16 @@ pub async fn check_cache(
     };
 
     // skip the queries with no timestamp column
-    let ts_result = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
-    let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
+    // let ts_result = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
+    let result = config::utils::cache_timestamp::analyze_timestamp_selection(origin_sql);
+    let mut result_ts_col = match result {
+        Ok(result) => result.column_names.first().cloned(),
+        Err(e) => {
+            log::error!("Error analyzing timestamp selection: {}", e);
+            None
+        }
+    };
+    // let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
     if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
         return MultiCachedQueryResponse::default();
     }
@@ -599,29 +607,23 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
 
 pub fn get_ts_col_order_by(
     parsed_sql: &Sql,
-    ts_col: &str,
-    is_aggregate: bool,
+    _ts_col: &str,
+    _is_aggregate: bool,
 ) -> Option<(String, bool)> {
     let mut is_descending = true;
     let order_by = &parsed_sql.order_by;
-    let mut result_ts_col = String::new();
-
-    for (original, alias) in &parsed_sql.aliases {
-        if original == ts_col
-            || (original.contains("histogram") && !original.to_lowercase().contains("row_number()"))
-        {
-            result_ts_col = alias.clone();
+    let result = config::utils::cache_timestamp::analyze_timestamp_selection(&parsed_sql.sql);
+    let result_ts_col = match result {
+        Ok(result) => result
+            .column_names
+            .first()
+            .cloned()
+            .unwrap_or("".to_string()),
+        Err(e) => {
+            log::error!("Error analyzing timestamp selection: {}", e);
+            "".to_string()
         }
-    }
-    if !is_aggregate
-        && (parsed_sql
-            .columns
-            .iter()
-            .any(|(_, v)| v.contains(&ts_col.to_owned()))
-            || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
-    {
-        result_ts_col = ts_col.to_string();
-    }
+    };
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
