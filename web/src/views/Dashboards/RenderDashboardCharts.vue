@@ -251,6 +251,9 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
     const gridStackContainer = ref(null);
+
+    // Initialize GridStack instance 
+    // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
     let gridStackInstance = null;
     const variablesValueSelectorRef = ref(null);
     const isTransitioning = ref(false);
