@@ -1387,7 +1387,6 @@ async fn send_cached_responses(
         }
     }
 
-    // TODO: report usage stats
     let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: cached.cached_response.hits.len() as i64,
