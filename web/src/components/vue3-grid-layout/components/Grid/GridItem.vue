@@ -6,7 +6,7 @@
   </div>
 </template>
 <script lang="ts" setup>
-import {ref, inject, computed, watch, onBeforeUnmount, onMounted, useSlots} from "vue"
+import {ref, inject, computed, watch, onBeforeUnmount, onMounted, useSlots, nextTick} from "vue"
 import {setTopLeft, setTopRight, setTransformRtl, setTransform, Layout} from "../../helpers/utils"
 import {getControlPosition, createCoreData} from "../../helpers/draggableUtils"
 import {getColsFromBreakpoint, Breakpoints} from "../../helpers/responsiveUtils"
@@ -126,6 +126,7 @@ const props = withDefaults(defineProps<PropsChild>(), {
 
 // item dom
 const this$refsItem = ref<HTMLElement>({} as HTMLElement)
+const handle = ref<HTMLElement | null>(null)
 
 // self data
 const cols = ref<number>(1)
@@ -147,6 +148,33 @@ const lastX = ref(NaN)
 const lastY = ref(NaN)
 const lastW = ref(NaN)
 const lastH = ref(NaN)
+
+// Global mouse event tracking
+const globalMouseEventHandler = (e: MouseEvent | FocusEvent) => {
+  if (isResizing.value) {
+    console.log(`[GLOBAL-${props.i}] Mouse/Focus event during resize:`, {
+      type: e.type,
+      button: 'button' in e ? e.button : 'N/A',
+      buttons: 'buttons' in e ? e.buttons : 'N/A',
+      target: (e.target as HTMLElement)?.tagName,
+      className: (e.target as HTMLElement)?.className,
+      timeStamp: e.timeStamp,
+      isTrusted: e.isTrusted,
+      clientX: 'clientX' in e ? e.clientX : 'N/A',
+      clientY: 'clientY' in e ? e.clientY : 'N/A',
+      relatedTarget: 'relatedTarget' in e ? (e.relatedTarget as HTMLElement)?.tagName : 'N/A'
+    });
+    
+    // Special logging for blur events
+    if (e.type === 'blur') {
+      console.warn(`[GLOBAL-${props.i}] BLUR event during resize - this might cause premature resize end!`, {
+        target: (e.target as HTMLElement)?.tagName,
+        className: (e.target as HTMLElement)?.className,
+        relatedTarget: 'relatedTarget' in e ? (e.relatedTarget as HTMLElement)?.tagName : 'N/A'
+      });
+    }
+  }
+};
 const styleObj = ref({} as any)
 const rtl = ref(false)
 
@@ -155,6 +183,13 @@ const resizeEventSet = ref(false)
 
 // Destructors for cleanup
 const dragDestructor = ref<(() => void) | null>(null)
+const resizeTimeoutId = ref<NodeJS.Timeout | null>(null)
+const resizeSessionId = ref<number>(0)
+const safetyTimeoutActive = ref<boolean>(false)
+// Debounce timeout for tryMakeResizable to prevent excessive handler recreation
+const makeResizableTimeoutId = ref<NodeJS.Timeout | null>(null)
+// Debounced emission of final resize events to prevent rapid saves
+const resizedEventTimeoutId = ref<NodeJS.Timeout | null>(null)
 const resizeDestructor = ref<(() => void) | null>(null)
 
 const previousW = ref<number | null>(null)
@@ -214,14 +249,21 @@ watch(
   }
 )
 watch(
-  () => props.static,
-  () => {
-    tryMakeDraggable()
-    tryMakeResizable()
+  () => props.static,  () => {
+    try {
+      tryMakeDraggable()
+      debouncedTryMakeResizable()
+    } catch (error) {
+      console.error('Error in static watcher:', error)
+    }
   }
 )
 watch(draggable, () => {
-  tryMakeDraggable()
+  try {
+    tryMakeDraggable()
+  } catch (error) {
+    console.error('Error in draggable watcher:', error)
+  }
 })
 watch(
   () => props.isResizable,
@@ -235,22 +277,85 @@ watch(
     bounded.value = val
   }
 )
-watch(resizable, () => {
-  tryMakeResizable()
+watch([resizable, this$refsItem], async (newValues, oldValues) => {
+  try {    const [newResizable, newItem] = newValues
+    const [oldResizable] = oldValues || [null]
+    
+    console.log(`[DEBUG] Resizable watcher triggered for item ${props.i}`, {
+      resizable: newResizable,
+      oldResizable,
+      hasItem: !!newItem,
+      isResizing: isResizing.value,
+      safetyTimeoutActive: safetyTimeoutActive.value,
+      timeStamp: Date.now(),
+      stackTrace: new Error().stack?.split('\n').slice(0, 8).join('\n')
+    })
+
+    // Skip handler recreation if safety timeout is active
+    if (safetyTimeoutActive.value) {
+      console.log(`[DEBUG] Skipping resizable watcher actions - safety timeout active for item ${props.i}`)
+      return
+    }
+
+    // If resizing was disabled while in progress, don't force end it
+    // Let the resize complete naturally to avoid conflicts with the drag handler
+    if (oldResizable === true && newResizable === false && isResizing.value) {
+      console.log(`[DEBUG] Resizing disabled during resize operation for item ${props.i} - will skip handler recreation`)
+      // Don't call forceEndResize() - let the resize finish naturally
+      // Just skip recreation of the handler since resizable is now false
+      return
+    }
+      // Use nextTick to ensure DOM is updated
+    await nextTick()
+    debouncedTryMakeResizable()
+  } catch (error) {
+    console.error(`[DEBUG] Error in resizable watcher for item ${props.i}:`, error)
+  }
+})
+
+// Watch for when the handle becomes available
+watch(handle, async (newHandle, oldHandle) => {
+  try {
+    console.log(`[DEBUG] Handle watcher triggered for item ${props.i}`, {
+      handle: newHandle,
+      oldHandle,
+      resizable: resizable.value,
+      isResizing: isResizing.value
+    })
+      // If we have a new handle and resizing is enabled, set up handlers
+    if (resizable.value && newHandle && !isResizing.value) {
+      await nextTick()
+      debouncedTryMakeResizable()
+    }
+  } catch (error) {
+    console.error(`[DEBUG] Error in handle watcher for item ${props.i}:`, error)
+  }
 })
 watch(rowHeight, () => {
-  createStyle()
-  emitContainerResized()
+  try {
+    createStyle()
+    emitContainerResized()
+  } catch (error) {
+    console.error('Error in rowHeight watcher:', error)
+  }
 })
 watch(cols, () => {
-  tryMakeResizable()
-  createStyle()
-  emitContainerResized()
+  try {
+    debouncedTryMakeResizable()
+    createStyle()
+    emitContainerResized()
+  } catch (error) {
+    console.error('Error in cols watcher:', error)
+  }
 })
 watch(containerWidth, () => {
-  tryMakeResizable()
-  createStyle()
-  emitContainerResized
+  try {
+    debouncedTryMakeResizable()
+    createStyle()
+    emitContainerResized()
+  } catch (error) {
+    console.error('Error in containerWidth watcher:', error)
+  }
 })
 watch(
   () => props.x,
@@ -284,31 +389,47 @@ watch(
 )
 watch(renderRtl, () => {
   // console.log("### renderRtl");
-  tryMakeResizable()
-  createStyle()
+  try {
+    debouncedTryMakeResizable()
+    createStyle()
+  } catch (error) {
+    console.error('Error in renderRtl watcher:', error)
+  }
 })
-watch(
-  () => props.minH,
+watch(  () => props.minH,
   () => {
-    tryMakeResizable()
+    try {
+      debouncedTryMakeResizable()
+    } catch (error) {
+      console.error('Error in minH watcher:', error)
+    }
   }
 )
 watch(
-  () => props.maxH,
-  () => {
-    tryMakeResizable()
+  () => props.maxH,  () => {
+    try {
+      debouncedTryMakeResizable()
+    } catch (error) {
+      console.error('Error in maxH watcher:', error)
+    }
   }
 )
 watch(
   () => props.minW,
-  () => {
-    tryMakeResizable()
+  () => {    try {
+      debouncedTryMakeResizable()
+    } catch (error) {
+      console.error('Error in minW watcher:', error)
+    }
   }
 )
 watch(
   () => props.maxW,
   () => {
-    tryMakeResizable()
+    try {      debouncedTryMakeResizable()
+    } catch (error) {
+      console.error('Error in maxW watcher:', error)
+    }
   }
 )
 watch(
@@ -396,7 +517,16 @@ onBeforeUnmount(() => {
   eventBus.off("directionchange", directionchangeHandler)
   eventBus.off("setColNum", setColNum)
   
-  // Clean up drag and resize handlers
+  // Force end any ongoing operations
+  if (isResizing.value) {
+    forceEndResize()
+  }
+  
+  if (isDragging.value) {
+    isDragging.value = false
+    dragging.value = null
+  }
+    // Clean up drag and resize handlers
   if (dragDestructor.value) {
     dragDestructor.value()
     dragDestructor.value = null
@@ -405,6 +535,26 @@ onBeforeUnmount(() => {
     resizeDestructor.value()
     resizeDestructor.value = null
   }
+    // Clean up debounce timeout
+  if (makeResizableTimeoutId.value) {
+    clearTimeout(makeResizableTimeoutId.value)
+    makeResizableTimeoutId.value = null  }  // Clean up resized event timeout
+  if (resizedEventTimeoutId.value) {
+    clearTimeout(resizedEventTimeoutId.value)
+    resizedEventTimeoutId.value = null
+  }
+  
+  // Clear safety timeout flag
+  safetyTimeoutActive.value = false
+  
+  // Clean up global mouse event listeners
+  document.removeEventListener('mousedown', globalMouseEventHandler);
+  document.removeEventListener('mousemove', globalMouseEventHandler);
+  document.removeEventListener('mouseup', globalMouseEventHandler);
+  document.removeEventListener('blur', globalMouseEventHandler as EventListener);
+  window.removeEventListener('blur', globalMouseEventHandler as EventListener);
+  
+  console.log(`[DEBUG] Removed global mouse event listeners for item ${props.i}`);
 })
 
 onMounted(() => {
@@ -429,8 +579,7 @@ onMounted(() => {
     resizable.value = thisLayout?.isResizable as boolean
   } else {
     resizable.value = props.isResizable
-  }
-  if (props.isBounded === null) {
+  }  if (props.isBounded === null) {
     bounded.value = thisLayout?.isBounded as boolean
   } else {
     bounded.value = props.isBounded
@@ -439,6 +588,18 @@ onMounted(() => {
   useCssTransforms.value = thisLayout?.useCssTransforms as boolean
   useStyleCursor.value = thisLayout?.useStyleCursor as boolean
   createStyle()
+    // Initialize drag and resize handlers after DOM is ready
+  nextTick(() => {    tryMakeDraggable()
+    debouncedTryMakeResizable()
+  })
+    // Add global mouse event listeners for debugging
+  document.addEventListener('mousedown', globalMouseEventHandler);
+  document.addEventListener('mousemove', globalMouseEventHandler);  
+  document.addEventListener('mouseup', globalMouseEventHandler);
+  document.addEventListener('blur', globalMouseEventHandler as EventListener);
+  window.addEventListener('blur', globalMouseEventHandler as EventListener);
+  
+  console.log(`[DEBUG] Added global mouse event listeners for item ${props.i}`);
 })
 // methods
 function createStyle() {
@@ -499,112 +660,215 @@ function emitContainerResized() {
 }
 
 function handleResize(event: SyntheticEvent) {
-  {
-    if (props.static) return
-    const position = getControlPosition(event, this$refsItem.value)
-    if (!position) return
-
-    const {x, y} = position
-    const newSize = {width: 0, height: 0}
-    let pos
-    
-    switch (event.type) {
-      case "resizestart": {
-        // Store initial dimensions
-        previousW.value = innerW.value
-        previousH.value = innerH.value
-        lastW.value = x
-        lastH.value = y
-        pos = calcPosition(innerX.value, innerY.value, innerW.value, innerH.value)
-        newSize.width = pos.width
-        newSize.height = pos.height
-        resizing.value = newSize
-        isResizing.value = true
-        break
+  console.log(`[DEBUG] handleResize called for item ${props.i}`, {
+    type: event.type,
+    static: props.static,
+    isResizing: isResizing.value
+  })
+  
+  if (props.static) return
+  
+  const newSize = {width: 0, height: 0}
+  let pos
+  
+  switch (event.type) {    case "resizestart": {
+      console.log(`[DEBUG] Resize start handler for item ${props.i}`)
+        // Clear any existing timeout
+      if (resizeTimeoutId.value) {
+        clearTimeout(resizeTimeoutId.value)
+        resizeTimeoutId.value = null
       }
-      case "resizemove": {
-        if (!isResizing.value) return
-        
-        const scale = transformScale.value
-        const coreEvent = createCoreData(lastW.value, lastH.value, x, y)
-        
-        // Scale deltas by transform scale and apply RTL if needed
-        const scaledDeltaX = coreEvent.deltaX / scale
-        const scaledDeltaY = coreEvent.deltaY / scale
-        
-        if (renderRtl.value) {
-          newSize.width = Math.max(0, Number(resizing.value?.width) - scaledDeltaX)
-        } else {
-          newSize.width = Math.max(0, Number(resizing.value?.width) + scaledDeltaX)
-        }
-        newSize.height = Math.max(0, Number(resizing.value?.height) + scaledDeltaY)
-        
-        lastW.value = x
-        lastH.value = y
-        resizing.value = newSize
-        break
+      
+      // Clear any pending resized event emission from previous resize
+      if (resizedEventTimeoutId.value) {
+        clearTimeout(resizedEventTimeoutId.value)
+        resizedEventTimeoutId.value = null
+        console.log(`[DEBUG] Cancelled pending resized event for item ${props.i} - new resize started`)
       }
-      case "resizeend": {
-        //console.log("### resize end => x=" +this.innerX + " y=" + this.innerY + " w=" + this.innerW + " h=" + this.innerH);
-        pos = calcPosition(innerX.value, innerY.value, innerW.value, innerH.value)
-        newSize.width = pos.width
-        newSize.height = pos.height
-        //                        console.log("### resize end => " + JSON.stringify(newSize));
-        resizing.value = null
-        isResizing.value = false
-        break
-      }
-    }
-
-    // Get new WH
-    pos = calcWH(newSize.height, newSize.width)
-    if (pos.w < props.minW) {
-      pos.w = props.minW
-    }
-    if (pos.w > props.maxW) {
-      pos.w = props.maxW
-    }
-    if (pos.h < props.minH) {
-      pos.h = props.minH
-    }
-    if (pos.h > props.maxH) {
-      pos.h = props.maxH
-    }
-
-    if (pos.h < 1) {
-      pos.h = 1
-    }
-    if (pos.w < 1) {
-      pos.w = 1
-    }        // Update stored positions for delta calculations
-        lastW.value = x
-        lastH.value = y
-
-        // Only emit resize events if dimensions actually changed
-        const dimensionsChanged = innerW.value !== pos.w || innerH.value !== pos.h
-        if (dimensionsChanged) {
-          // During resize, emit resize event
-          emit("resize", props.i, pos.h, pos.w, newSize.height, newSize.width)
-
-          // On resize end, emit both resize and resized events
-          if (event.type === "resizeend") {
-            const finalDimensionsChanged = previousW.value !== pos.w || previousH.value !== pos.h
-            if (finalDimensionsChanged) {
-              emit("resized", props.i, pos.h, pos.w, newSize.height, newSize.width)
+      
+      // Create new resize session
+      resizeSessionId.value = Date.now()
+      const currentSessionId = resizeSessionId.value
+      
+      previousW.value = innerW.value
+      previousH.value = innerH.value
+      
+      pos = calcPosition(innerX.value, innerY.value, innerW.value, innerH.value)
+      newSize.width = pos.width
+      newSize.height = pos.height
+      resizing.value = newSize
+      isResizing.value = true
+      
+      console.log(`[DEBUG] Resize state set for item ${props.i}`, {
+        isResizing: isResizing.value,
+        sessionId: currentSessionId,
+        newSize
+      })        // Safety timeout to prevent stuck resize state (10 seconds instead of 3)
+      resizeTimeoutId.value = setTimeout(() => {
+        if (isResizing.value && resizeSessionId.value === currentSessionId) {
+          console.warn(`[DEBUG] Safety timeout triggered for item ${props.i} - clearing stuck resize state after 10 seconds`)
+          
+          // Set flag to indicate safety timeout is active
+          safetyTimeoutActive.value = true
+          
+          // Force end the resize cleanly
+          isResizing.value = false
+          resizing.value = null
+          resizeTimeoutId.value = null
+          
+          // Emit a resize end event to clean up any listeners in localDragResize
+          if (resizeDestructor.value) {
+            try {
+              resizeDestructor.value()
+              resizeDestructor.value = null
+            } catch (error) {
+              console.error(`[DEBUG] Error cleaning up resize handler for item ${props.i}:`, error)
             }
           }
-
-          // Update grid layout via event bus
-          const data = {
-            eventType: event.type,
-            i: props.i,
-            x: innerX.value,
-            y: innerY.value,
-            h: pos.h,
-            w: pos.w
-          }
-          eventBus.emit("resizeEvent", data)
+          
+          // Don't emit the resized event immediately to avoid save cascade
+          // The timeout cleanup should not trigger saves
+          console.log(`[DEBUG] Safety timeout cleanup complete for item ${props.i} - skipping save emission`)
+          
+          // Clear the safety timeout flag after a brief delay
+          setTimeout(() => {
+            safetyTimeoutActive.value = false
+          }, 100)
         }
+      }, 10000) // Increased to 10 seconds
+      break
+    }    case "resizemove": {
+      console.log(`[DEBUG] Resize move handler for item ${props.i}`, {
+        isResizing: isResizing.value,
+        resizable: resizable.value,
+        hasItemRef: !!this$refsItem.value
+      })
+      
+      if (!isResizing.value) {
+        console.log(`[DEBUG] Resize move ignored - not in resize state for item ${props.i}`)
+        return
+      }
+      
+      // Log if we're continuing resize while resizable is false (expected during saves)
+      if (!resizable.value) {
+        console.log(`[DEBUG] Continuing resize despite resizable=false for item ${props.i} (expected during saves)`)
+      }
+      
+      // Get current element size from the DOM
+      const rect = this$refsItem.value.getBoundingClientRect()
+      newSize.width = rect.width
+      newSize.height = rect.height
+      
+      console.log(`[DEBUG] Current element size for item ${props.i}:`, {
+        width: newSize.width,
+        height: newSize.height
+      })
+      
+      resizing.value = newSize
+      
+      // Convert to grid units and emit resize event
+      pos = calcWH(newSize.height, newSize.width)
+      pos.w = Math.max(props.minW, Math.min(pos.w, props.maxW, cols.value - innerX.value))
+      pos.h = Math.max(props.minH, Math.min(pos.h, props.maxH))
+      
+      console.log(`[DEBUG] Grid position calculated for item ${props.i}:`, pos)
+      
+      // Only emit if dimensions actually changed
+      if (innerW.value !== pos.w || innerH.value !== pos.h) {
+        console.log(`[DEBUG] Emitting resize event for item ${props.i}`, {
+          from: { w: innerW.value, h: innerH.value },
+          to: { w: pos.w, h: pos.h }
+        })
+        
+        emit("resize", props.i, pos.h, pos.w, newSize.height, newSize.width)
+        
+        eventBus.emit("resizeEvent", {
+          eventType: event.type,
+          i: props.i,
+          x: innerX.value,
+          y: innerY.value,
+          h: pos.h,
+          w: pos.w
+        })
+      }
+      break
+    }    case "resizeend": {
+      console.log(`[DEBUG] Resize end handler for item ${props.i}`, {
+        isResizing: isResizing.value,
+        hasItemRef: !!this$refsItem.value
+      })
+      
+      if (!isResizing.value) {
+        console.log(`[DEBUG] Resize end ignored - not in resize state for item ${props.i}`)
+        return
+      }
+      
+      // Get final size from the DOM
+      const rect = this$refsItem.value.getBoundingClientRect()
+      newSize.width = rect.width
+      newSize.height = rect.height
+      
+      console.log(`[DEBUG] Final element size for item ${props.i}:`, {
+        width: newSize.width,
+        height: newSize.height
+      })
+      
+      // Convert pixel size to grid units
+      pos = calcWH(newSize.height, newSize.width)
+      
+      // Apply constraints
+      pos.w = Math.max(props.minW, Math.min(pos.w, props.maxW, cols.value - innerX.value))
+      pos.h = Math.max(props.minH, Math.min(pos.h, props.maxH))
+      
+      console.log(`[DEBUG] Final grid position for item ${props.i}:`, pos)
+      
+      // Update internal state
+      innerW.value = pos.w
+      innerH.value = pos.h
+        // Clear resize state and timeout
+      resizing.value = null
+      isResizing.value = false
+      
+      // Clear safety timeout if it exists
+      if (resizeTimeoutId.value) {
+        clearTimeout(resizeTimeoutId.value)
+        resizeTimeoutId.value = null
+      }
+        console.log(`[DEBUG] Resize state cleared for item ${props.i}`)
+      
+      // Emit immediate resize event for layout updates
+      emit("resize", props.i, pos.h, pos.w, newSize.height, newSize.width)
+      
+      // Debounce the final "resized" event to prevent immediate saves
+      // This gives the user time to continue resizing if they want to
+      if (resizedEventTimeoutId.value) {
+        clearTimeout(resizedEventTimeoutId.value)
+      }
+        resizedEventTimeoutId.value = setTimeout(() => {
+        console.log(`[DEBUG] Emitting delayed resized event for item ${props.i}`, {
+          timeStamp: Date.now(),
+          isResizing: isResizing.value,
+          resizable: resizable.value,
+          stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n')
+        })
+        emit("resized", props.i, pos.h, pos.w, newSize.height, newSize.width)
+        resizedEventTimeoutId.value = null
+      }, 500) // 500ms delay before triggering save
+
+      // Update layout via event bus (immediate for visual feedback)
+      eventBus.emit("resizeEvent", {
+        eventType: event.type,
+        i: props.i,
+        x: innerX.value,
+        y: innerY.value,
+        h: pos.h,
+        w: pos.w
+      })      // Update styles to reflect new grid position
+      createStyle()
+      
+      console.log(`[DEBUG] Resize end complete for item ${props.i}`)
+      break
+    }
   }
 }
 
@@ -841,7 +1105,7 @@ function tryMakeDraggable() {
       onEnd: (e: MouseEvent) => {
         handleDrag({...e, type: 'dragend'} as SyntheticEvent)
       },
-      bounds: props.isBounded ? this$refsItem.value.parentElement : undefined,
+      bounds: props.isBounded && this$refsItem.value?.parentElement ? this$refsItem.value.parentElement : undefined,
       scale: transformScale.value,
       ignoreFrom: props.dragIgnoreFrom,
       allowFrom: props.dragAllowFrom || '.vue-draggable-handle', // Default to draggable handle if not specified
@@ -859,69 +1123,337 @@ function tryMakeDraggable() {
   }
 }
 
-function tryMakeResizable() {
-  const handle = this$refsItem.value?.querySelector('.' + resizableHandleClass.value)
-  if (!handle || !this$refsItem.value) return
-
-  // Clean up existing handler
-  if (resizeDestructor.value) {
-    resizeDestructor.value()
-    resizeDestructor.value = null
-  }
-
-  // Only create new handler if resizing is enabled
-  if (resizable.value && !props.static) {
-    const maximum = calcPosition(0, 0, props.maxW, props.maxH)
-    const minimum = calcPosition(0, 0, props.minW, props.minH)
-    const gridMargin: [number, number] = [margin.value[0], margin.value[1]]
+function observeForHandle(retryCount: number) {
+  console.log(`[DEBUG] Starting aggressive handle search for item ${props.i}`);
+  
+  let attempts = 0;
+  const maxAttempts = 20;
+  
+  const waitForHandle = () => {
+    attempts++;
+    console.log(`[DEBUG] Handle search attempt ${attempts}/${maxAttempts} for item ${props.i}`);
     
-    resizeDestructor.value = createResizeHandler(this$refsItem.value, handle as HTMLElement, {
-      onStart: (e: MouseEvent) => {
-        // Clear any previous state
-        isResizing.value = false
-        resizing.value = null
-        lastW.value = NaN
-        lastH.value = NaN
-        
-        // Start resize process
-        handleResize({...e, type: 'resizestart'} as SyntheticEvent)
-      },
-      onResize: (e: MouseEvent, delta: {x: number, y: number}) => {
-        if (!resizable.value || props.static) return
-        
-        const syntheticEvent = {
-          ...e,
-          type: 'resizemove',
-          clientX: e.clientX + delta.x,
-          clientY: e.clientY + delta.y
-        } as SyntheticEvent
-        handleResize(syntheticEvent)
-        },      onEnd: (e: MouseEvent) => {
-        // Only handle resize end if we were actually resizing
-        if (!isResizing.value) return
-        
-        handleResize({...e, type: 'resizeend'} as SyntheticEvent)
-        // Clean up state after resize
-        isResizing.value = false
-        resizing.value = null
-      },
-      minWidth: minimum.width,
-      minHeight: minimum.height,
-      maxWidth: maximum.width,
-      maxHeight: maximum.height,
-      preserveAspectRatio: props.preserveAspectRatio,
-      scale: transformScale.value,
-      grid: {
-        colWidth: calcColWidth(),
-        rowHeight: rowHeight.value,
-        margin: gridMargin,
-        maxRows: maxRows.value,
-        cols: cols.value
+    // Use nextTick to ensure we're checking after any Vue renders
+    nextTick(() => {
+      let foundHandle: HTMLElement | null = null;
+      
+      // Strategy 1: Check the ref directly
+      if (handle.value && handle.value instanceof HTMLElement) {
+        foundHandle = handle.value;
+        console.log(`[DEBUG] Found handle via ref on attempt ${attempts} for item ${props.i}`);
       }
-    }).destroy
-  } else if (typeof resizeDestructor.value === 'function') {
-    resizeDestructor.value()
-    resizeDestructor.value = null 
+      
+      // Strategy 2: Query selector on the item element
+      if (!foundHandle && this$refsItem.value) {
+        const selector = '.' + resizableHandleClass.value.split(' ').join('.');
+        foundHandle = this$refsItem.value.querySelector(selector) as HTMLElement;
+        if (foundHandle) {
+          console.log(`[DEBUG] Found handle via querySelector on attempt ${attempts} for item ${props.i}`);
+        }
+      }
+        // Strategy 3: Global search with item matching (fallback)
+      if (!foundHandle && this$refsItem.value) {
+        const handleSelector = '.' + resizableHandleClass.value.split(' ').join('.');
+        const allHandles = document.querySelectorAll(handleSelector);
+        Array.from(allHandles).forEach(handleEl => {
+          const gridItem = handleEl.closest('.vue-grid-item');
+          if (gridItem === this$refsItem.value && !foundHandle) {
+            foundHandle = handleEl as HTMLElement;
+            console.log(`[DEBUG] Found handle via global search on attempt ${attempts} for item ${props.i}`);
+          }
+        });
+      }
+      
+      if (foundHandle) {
+        console.log(`[DEBUG] Handle found! Retrying makeResizable for item ${props.i}`);
+        // Direct call to create the resize handler instead of recursive tryMakeResizable
+        if (resizable.value && !props.static && this$refsItem.value) {
+          const maximum = calcPosition(0, 0, props.maxW, props.maxH);
+          const minimum = calcPosition(0, 0, props.minW, props.minH);
+          
+          try {            resizeDestructor.value = createResizeHandler(this$refsItem.value, foundHandle, {              onStart: (e: MouseEvent) => {
+                console.log(`[DEBUG] Resize start triggered for item ${props.i}`, {
+                  eventType: e.type,
+                  button: e.button,
+                  buttons: e.buttons,
+                  target: e.target,
+                  timeStamp: e.timeStamp,
+                  isTrusted: e.isTrusted,
+                  resizable: resizable.value
+                });
+                if (!resizable.value) {
+                  console.log(`[DEBUG] Resize start cancelled - resizing disabled for item ${props.i}`);
+                  return;
+                }
+                handleResize({...e, type: 'resizestart'} as SyntheticEvent);
+              },              onResize: (e: MouseEvent, delta: {x: number, y: number}) => {
+                // Once resize starts, only check isResizing.value, not resizable.value
+                // This prevents external changes to resizable (e.g., from saves) from interrupting an active resize
+                if (!isResizing.value) {
+                  console.log(`[DEBUG] Resize move cancelled - not in resize state for item ${props.i}`, {
+                    eventType: e.type,
+                    button: e.button,
+                    buttons: e.buttons,
+                    timeStamp: e.timeStamp
+                  });
+                  return;
+                }
+                
+                // Log every 10th move to avoid spam but capture issues
+                if (Math.random() < 0.1) {
+                  console.log(`[DEBUG] Resize move for item ${props.i}`, {
+                    eventType: e.type,
+                    button: e.button,
+                    buttons: e.buttons,
+                    deltaX: delta.x,
+                    deltaY: delta.y,
+                    timeStamp: e.timeStamp,
+                    resizable: resizable.value,
+                    isResizing: isResizing.value
+                  });
+                }
+                
+                handleResize({
+                  ...e,
+                  type: 'resizemove',
+                  clientX: e.clientX,
+                  clientY: e.clientY
+                } as SyntheticEvent);
+              },              onEnd: (e: MouseEvent) => {
+                console.log(`[DEBUG] Resize END triggered for item ${props.i}`, {
+                  eventType: e.type,
+                  button: e.button,
+                  buttons: e.buttons,
+                  target: (e.target as HTMLElement)?.tagName,
+                  className: (e.target as HTMLElement)?.className,
+                  timeStamp: e.timeStamp,
+                  isTrusted: e.isTrusted,
+                  clientX: e.clientX,
+                  clientY: e.clientY,
+                  resizable: resizable.value,
+                  isResizing: isResizing.value,
+                  stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n')
+                });
+                handleResize({...e, type: 'resizeend'} as SyntheticEvent);
+              },
+              minWidth: minimum.width,
+              minHeight: minimum.height,
+              maxWidth: maximum.width,
+              maxHeight: maximum.height,
+              preserveAspectRatio: props.preserveAspectRatio,
+              scale: transformScale.value,
+              grid: {
+                colWidth: calcColWidth(),
+                rowHeight: rowHeight.value,
+                margin: [margin.value[0], margin.value[1]],
+                maxRows: maxRows.value,
+                cols: cols.value
+              }
+            }).destroy;
+            
+            console.log(`[DEBUG] Resize handler created successfully via observer for item ${props.i}`);
+          } catch (error) {
+            console.error(`[DEBUG] Error creating resize handler for item ${props.i}:`, error);
+          }
+        }
+      } else if (attempts < maxAttempts) {
+        // Continue trying with exponential backoff
+        const delay = Math.min(50 * Math.pow(1.2, attempts), 500);
+        setTimeout(waitForHandle, delay);
+      } else {
+        console.warn(`[DEBUG] Failed to find handle after ${maxAttempts} attempts for item ${props.i}`);
+      }
+    });
+  };
+  
+  waitForHandle();
+}
+
+function forceEndResize() {
+  if (isResizing.value) {
+    console.log(`[DEBUG] Force ending resize for item ${props.i}`, {
+      stackTrace: new Error().stack?.split('\n').slice(0, 10).join('\n'),
+      timeStamp: Date.now(),
+      resizeSessionId: resizeSessionId.value
+    })
+    
+    // Clear resize state immediately
+    isResizing.value = false
+    resizing.value = null
+    
+    // Clear safety timeout if it exists
+    if (resizeTimeoutId.value) {
+      clearTimeout(resizeTimeoutId.value)
+      resizeTimeoutId.value = null
+    }
+    
+    // Emit final events if needed
+    emit("resized", props.i, innerH.value, innerW.value, 0, 0)
+    
+    eventBus.emit("resizeEvent", {
+      eventType: "resizeend",
+      i: props.i,
+      x: innerX.value,
+      y: innerY.value,
+      h: innerH.value,
+      w: innerW.value
+    })
+    
+    // Update styles to ensure clean state
+    createStyle()
+  }
+}
+
+// Debounced wrapper to prevent excessive handler recreation
+function debouncedTryMakeResizable(retryCount = 0) {
+  // Clear any existing timeout
+  if (makeResizableTimeoutId.value) {
+    clearTimeout(makeResizableTimeoutId.value)
+  }
+  
+  // Set a new timeout to debounce the calls
+  makeResizableTimeoutId.value = setTimeout(() => {
+    makeResizableTimeoutId.value = null
+    tryMakeResizable(retryCount)
+  }, 10) // 10ms debounce delay
+}
+
+function tryMakeResizable(retryCount = 0) {
+  console.log(`[DEBUG] tryMakeResizable called for item ${props.i}`, {
+    resizable: resizable.value,
+    static: props.static,
+    hasItem: !!this$refsItem.value,
+    retry: retryCount,
+    isResizing: isResizing.value,
+    safetyTimeoutActive: safetyTimeoutActive.value
+  })
+  
+  // Skip if safety timeout is active
+  if (safetyTimeoutActive.value) {
+    console.log(`[DEBUG] Skipping tryMakeResizable - safety timeout active for item ${props.i}`)
+    return
+  }
+  
+  try {
+    // Clean up existing handler first
+    if (resizeDestructor.value) {
+      resizeDestructor.value()
+      resizeDestructor.value = null
+    }
+
+    // Don't create new handlers if we're in the middle of a resize operation
+    // This prevents conflicts with existing handlers from localDragResize
+    if (isResizing.value) {
+      console.log(`[DEBUG] Skipping handler creation - resize operation in progress for item ${props.i}`)
+      return
+    }
+
+    // Only create new handler if resizing is enabled and we have the required elements
+    if (resizable.value && !props.static && this$refsItem.value) {
+      // Get the handle element - prioritize the direct ref first
+      let handleElement: HTMLElement | null = null
+      
+      // Try to get from ref first
+      if (handle.value && handle.value instanceof HTMLElement) {
+        handleElement = handle.value
+      } else {
+        // If not available, try querySelector as fallback
+        const selector = '.' + resizableHandleClass.value.split(' ').join('.')
+        handleElement = this$refsItem.value.querySelector(selector) as HTMLElement
+      }      
+      // Ensure we have a valid DOM element
+      if (!handleElement || !(handleElement instanceof HTMLElement)) {
+        // If handle not found and we haven't retried much, wait and retry
+        if (retryCount < 5) { // Increased retry count for better reliability
+          console.log(`[DEBUG] Handle not found for item ${props.i}, retrying in 100ms... (attempt ${retryCount + 1})`)
+          setTimeout(() => {
+            tryMakeResizable(retryCount + 1)
+          }, 100)
+          return
+        }
+        
+        // If all retries failed, try to observe DOM changes
+        if (retryCount < 10) {
+          console.log(`[DEBUG] Setting up DOM observer for item ${props.i}`)
+          observeForHandle(retryCount + 1)
+          return
+        }
+          console.warn(`[DEBUG] Could not find valid resize handle element for item ${props.i} after ${retryCount} retries`)
+        return
+      }
+      
+      const maximum = calcPosition(0, 0, props.maxW, props.maxH)
+      const minimum = calcPosition(0, 0, props.minW, props.minH)
+        resizeDestructor.value = createResizeHandler(this$refsItem.value, handleElement, {
+        onStart: (e: MouseEvent) => {
+          console.log(`Resize start for item ${props.i}`)
+          // Check if resizing is still enabled before starting
+          if (!resizable.value) {
+            console.log(`[DEBUG] Resize start cancelled - resizing disabled for item ${props.i}`)
+            return
+          }
+          handleResize({...e, type: 'resizestart'} as SyntheticEvent)
+        },
+        onResize: (e: MouseEvent, delta: {x: number, y: number}) => {
+          // Only check if we're in resize state - don't check resizable.value during active resize
+          // as it can be temporarily disabled by saves or other operations
+          if (!isResizing.value) {
+            console.log(`[DEBUG] Resize move cancelled - not in resize state for item ${props.i}`)
+            return
+          }
+          
+          console.log(`[DEBUG] Processing resize move for item ${props.i}`, {
+            isResizing: isResizing.value,
+            resizable: resizable.value,
+            deltaX: delta.x,
+            deltaY: delta.y
+          })
+          
+          handleResize({
+            ...e,
+            type: 'resizemove',
+            clientX: e.clientX,
+            clientY: e.clientY
+          } as SyntheticEvent)
+        },        onEnd: (e: MouseEvent) => {
+          console.log(`[DEBUG] Resize end triggered for item ${props.i}`, {
+            isResizing: isResizing.value,
+            resizable: resizable.value,
+            eventType: e.type,
+            button: e.button,
+            buttons: e.buttons,
+            target: e.target,
+            timeStamp: e.timeStamp,
+            isTrusted: e.isTrusted,
+            bubbles: e.bubbles,
+            defaultPrevented: e.defaultPrevented
+          })
+          
+          // Only process resize end if we were actually resizing
+          if (isResizing.value) {
+            handleResize({...e, type: 'resizeend'} as SyntheticEvent)
+          } else {
+            console.log(`[DEBUG] Resize end ignored - not in resize state for item ${props.i}`)
+          }
+        },
+        minWidth: minimum.width,
+        minHeight: minimum.height,
+        maxWidth: maximum.width,
+        maxHeight: maximum.height,        preserveAspectRatio: props.preserveAspectRatio,
+        scale: transformScale.value,
+        grid: {
+          colWidth: calcColWidth(),
+          rowHeight: rowHeight.value,
+          margin: [margin.value[0], margin.value[1]],
+          maxRows: maxRows.value,
+          cols: cols.value
+        }
+      }).destroy
+      
+      console.log(`Resize handler created successfully for item ${props.i}`)
+    }
+  } catch (error) {
+    console.error(`Error in tryMakeResizable for item ${props.i}:`, error)
   }
 }
 
@@ -1009,6 +1541,12 @@ defineExpose({
   z-index: 3;
 }
 
+.vue-grid-item.resizing > .vue-resizable-handle {
+  z-index: 1000;
+  border: 2px solid #007bff;
+  background-color: rgba(0, 123, 255, 0.2);
+}
+
 .vue-grid-item.vue-draggable-dragging {
   transition: none;
   z-index: 3;
@@ -1039,6 +1577,18 @@ defineExpose({
   background-origin: content-box;
   box-sizing: border-box;
   cursor: se-resize;
+  z-index: 10;
+  border: 2px solid transparent;
+  /* Make handle more visible */
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.vue-grid-item > .vue-resizable-handle:hover {
+  border: 2px solid #007bff;
+  background-color: rgba(0, 123, 255, 0.1);
+  transform: scale(1.1);
 }
 
 .vue-grid-item > .vue-rtl-resizable-handle {

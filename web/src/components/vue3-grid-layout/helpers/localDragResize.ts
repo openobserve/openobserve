@@ -224,182 +224,220 @@ export function createResizeHandler(element: HTMLElement, handle: HTMLElement, o
   scale?: number
   grid?: GridOptions
 }) {
-  let isEnabled = true
-  let activeListeners: { type: string, listener: (e: MouseEvent) => void }[] = []
-
-  const state = ref<ResizeState>({
-    isResizing: false,
-    startX: 0,
-    startY: 0,
-    lastX: 0,
-    lastY: 0,
-    startWidth: 0,
-    startHeight: 0,
-    aspectRatio: null,
-    gridPosition: { x: 0, y: 0 },
-    accumulatedError: { x: 0, y: 0 }
+  console.log('[DEBUG] createResizeHandler called', {
+    element,
+    handle,
+    elementType: element?.constructor?.name,
+    handleType: handle?.constructor?.name,
+    options
   })
-
-  function resetState() {
-    state.value = {
-      ...state.value,
-      isResizing: false,
-      gridPosition: { x: 0, y: 0 },
-      accumulatedError: { x: 0, y: 0 }
+  
+  // Validate that we have valid DOM elements
+  if (!(element instanceof HTMLElement) || !(handle instanceof HTMLElement)) {
+    console.error('[DEBUG] createResizeHandler: Invalid element or handle provided', { element, handle })
+    return {
+      destroy() { console.log('[DEBUG] destroy called (no-op)') },
+      enable() { console.log('[DEBUG] enable called (no-op)') },
+      disable() { console.log('[DEBUG] disable called (no-op)') },
+      isEnabled() { return false }
     }
   }
 
-  function removeActiveListeners() {
-    activeListeners.forEach(({ type, listener }) => {
-      document.removeEventListener(type, listener)
+  let isResizing = false
+  let startX = 0
+  let startY = 0
+  let startWidth = 0
+  let startHeight = 0
+    function onMouseDown(e: MouseEvent) {
+    console.log('[DEBUG] resize onMouseDown', {
+      button: e.button,
+      isResizing,
+      target: e.target,
+      handle: handle
     })
-    activeListeners = []
-  }
-
-  function onMouseDown(e: MouseEvent) {
-    if (!isEnabled || e.button !== 0) return
+    
+    if (e.button !== 0 || isResizing) {
+      console.log('[DEBUG] resize onMouseDown ignored', { button: e.button, isResizing })
+      return
+    }
     
     e.preventDefault()
     e.stopPropagation()
     
-    const scale = options.scale || 1
+    isResizing = true
+    startX = e.clientX
+    startY = e.clientY
+    
     const rect = element.getBoundingClientRect()
-
-    state.value = {
-      isResizing: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      lastX: e.clientX,
-      lastY: e.clientY,
-      startWidth: rect.width,
-      startHeight: rect.height,
-      aspectRatio: options.preserveAspectRatio ? rect.width / rect.height : null,
-      gridPosition: { x: 0, y: 0 },
-      accumulatedError: { x: 0, y: 0 }
-    }
-
+    startWidth = rect.width
+    startHeight = rect.height
+    
+    console.log('[DEBUG] resize started', {
+      startX,
+      startY,
+      startWidth,
+      startHeight,
+      isResizing
+    })
+    
     options.onStart?.(e)
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!state.value.isResizing || !isEnabled) return
-
-      // Calculate incremental movement
-      const moveX = (e.clientX - state.value.lastX)
-      const moveY = (e.clientY - state.value.lastY)
-
-      // Calculate accumulated movement from start
-      const totalMoveX = (e.clientX - state.value.startX)
-      const totalMoveY = (e.clientY - state.value.startY)
-
-      // Update size based on total movement
-      let newWidth = state.value.startWidth + (totalMoveX / scale)
-      let newHeight = state.value.startHeight + (totalMoveY / scale)
-
-      // Apply min/max constraints
-      newWidth = Math.max(options.minWidth || 0, newWidth)
-      newHeight = Math.max(options.minHeight || 0, newHeight)
-      if (options.maxWidth) newWidth = Math.min(newWidth, options.maxWidth)
-      if (options.maxHeight) newHeight = Math.min(newHeight, options.maxHeight)
-
-      // Handle aspect ratio based on current movement direction
-      if (state.value.aspectRatio) {
-        if (Math.abs(moveX) > Math.abs(moveY)) {
-          newHeight = newWidth / state.value.aspectRatio
-        } else {
-          newWidth = newHeight * state.value.aspectRatio
-        }
-      }
-
-      if (options.grid) {
-        const { colWidth, rowHeight, margin } = options.grid
-
-        // Calculate grid sizes
-        const gridWidth = (newWidth + margin[0]) / (colWidth + margin[0])
-        const gridHeight = (newHeight + margin[1]) / (rowHeight + margin[1])
-        
-        // Track fractional changes
-        const fractionalX = gridWidth - Math.floor(gridWidth)
-        const fractionalY = gridHeight - Math.floor(gridHeight)
-        
-        state.value.accumulatedError.x += fractionalX
-        state.value.accumulatedError.y += fractionalY
-        
-        // Snap to grid
-        let finalGridWidth = Math.floor(gridWidth)
-        let finalGridHeight = Math.floor(gridHeight)
-        
-        if (state.value.accumulatedError.x >= 0.5) {
-          finalGridWidth++
-          state.value.accumulatedError.x -= 1
-        }
-        if (state.value.accumulatedError.y >= 0.5) {
-          finalGridHeight++
-          state.value.accumulatedError.y -= 1
-        }
-        
-        // Convert back to pixels
-        newWidth = Math.max(colWidth, finalGridWidth * (colWidth + margin[0]) - margin[0])
-        newHeight = Math.max(rowHeight, finalGridHeight * (rowHeight + margin[1]) - margin[1])
-      }
-
-      // Update for next movement and notify
-      state.value.lastX = e.clientX
-      state.value.lastY = e.clientY
-      
-      options.onResize?.(e, {
-        x: newWidth - state.value.startWidth,
-        y: newHeight - state.value.startHeight
-      })
-    }
-
-    const onMouseUp = (e: MouseEvent) => {
-      if (!state.value.isResizing) return
-      
-      resetState()
-      state.value.isResizing = false
-      options.onEnd?.(e)
-      removeActiveListeners()
-    }
-
-    // Properly bind and track listeners
-    const boundOnMouseMove = onMouseMove.bind(null)
-    const boundOnMouseUp = onMouseUp.bind(null)
+      // Use capture: true to ensure we get the events even if they happen outside the element
+    document.addEventListener('mousemove', onMouseMove, { passive: false, capture: true })
+    document.addEventListener('mouseup', onMouseUp, { passive: false, capture: true })
+    // Also listen for mouseleave on document to handle case where mouse leaves the window
+    document.addEventListener('mouseleave', onMouseUp, { passive: false, capture: true })
+    // Listen for visibility change to handle tab switching
+    document.addEventListener('visibilitychange', onMouseUp, { passive: false, capture: true })
+    // Listen for blur to handle window losing focus
+    window.addEventListener('blur', onMouseUp, { passive: false, capture: true })
     
-    document.addEventListener('mousemove', boundOnMouseMove)
-    document.addEventListener('mouseup', boundOnMouseUp)
+    // Prevent text selection during resize  
+    document.body.style.userSelect = 'none'
+    document.body.style.pointerEvents = 'none'
+    handle.style.pointerEvents = 'auto'
+    element.style.pointerEvents = 'auto'
+  }
+  function onMouseMove(e: MouseEvent) {
+    if (!isResizing) {
+      console.log('[DEBUG] resize onMouseMove ignored - not resizing')
+      return
+    }
     
-    activeListeners = [
-      { type: 'mousemove', listener: boundOnMouseMove },
-      { type: 'mouseup', listener: boundOnMouseUp }
-    ]
+    console.log('[DEBUG] resize onMouseMove', {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      startX,
+      startY,
+      isResizing
+    })
+    
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const deltaX = e.clientX - startX
+    const deltaY = e.clientY - startY
+    
+    let newWidth = startWidth + deltaX
+    let newHeight = startHeight + deltaY
+    
+    console.log('[DEBUG] resize calculated size', {
+      deltaX,
+      deltaY,
+      newWidth,
+      newHeight,
+      minWidth: options.minWidth,
+      minHeight: options.minHeight
+    })
+    
+    // Apply minimum constraints
+    newWidth = Math.max(options.minWidth || 50, newWidth)
+    newHeight = Math.max(options.minHeight || 50, newHeight)
+    
+    // Apply maximum constraints
+    if (options.maxWidth && options.maxWidth !== Infinity) {
+      newWidth = Math.min(newWidth, options.maxWidth)
+    }
+    if (options.maxHeight && options.maxHeight !== Infinity) {
+      newHeight = Math.min(newHeight, options.maxHeight)
+    }
+    
+    // Apply aspect ratio if needed
+    if (options.preserveAspectRatio) {
+      const aspectRatio = startWidth / startHeight
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        newHeight = newWidth / aspectRatio
+      } else {
+        newWidth = newHeight * aspectRatio
+      }    }
+    
+    console.log('[DEBUG] resize final size', {
+      newWidth,
+      newHeight
+    })
+    
+    // Apply the new size to the element immediately
+    element.style.width = newWidth + 'px'
+    element.style.height = newHeight + 'px'
+    
+    // Notify of the resize
+    options.onResize?.(e, {
+      x: newWidth - startWidth,
+      y: newHeight - startHeight
+    })
   }
 
-  function enable() {
-    if (!isEnabled) {
-      handle.addEventListener('mousedown', onMouseDown)
-      isEnabled = true
+  function onMouseUp(e: MouseEvent) {
+    console.log('[DEBUG] resize onMouseUp', {
+      isResizing,
+      target: e.target
+    })
+    
+    if (!isResizing) {
+      console.log('[DEBUG] resize onMouseUp ignored - not resizing')
+      return
     }
+    
+    console.log('[DEBUG] resize ending, cleaning up event listeners')
+    isResizing = false
+      // Remove all event listeners with capture: true
+    document.removeEventListener('mousemove', onMouseMove, { capture: true })
+    document.removeEventListener('mouseup', onMouseUp, { capture: true })
+    document.removeEventListener('mouseleave', onMouseUp, { capture: true })
+    document.removeEventListener('visibilitychange', onMouseUp, { capture: true })
+    window.removeEventListener('blur', onMouseUp, { capture: true })
+      // Restore default styles
+    document.body.style.userSelect = ''
+    document.body.style.pointerEvents = ''
+    handle.style.pointerEvents = ''
+    element.style.pointerEvents = ''
+    
+    options.onEnd?.(e)
+    
+    console.log('[DEBUG] resize completed')
   }
-
-  function disable() {
-    if (isEnabled) {
+  
+  // Add the mousedown listener to the handle
+  console.log('[DEBUG] Adding mousedown listener to handle')
+  handle.addEventListener('mousedown', onMouseDown)
+    return {
+    destroy() {
+      console.log('[DEBUG] destroy called - removing event listeners')
       handle.removeEventListener('mousedown', onMouseDown)
-      if (state.value.isResizing) {
-        state.value.isResizing = false
-        removeActiveListeners()
+      if (isResizing) {
+        console.log('[DEBUG] destroy called while resizing - cleaning up')
+        document.removeEventListener('mousemove', onMouseMove, { capture: true })
+        document.removeEventListener('mouseup', onMouseUp, { capture: true })
+        document.removeEventListener('mouseleave', onMouseUp, { capture: true })
+        document.removeEventListener('visibilitychange', onMouseUp, { capture: true })
+        window.removeEventListener('blur', onMouseUp, { capture: true })
+        isResizing = false
+        // Restore styles if interrupted
+        document.body.style.userSelect = ''
+        document.body.style.pointerEvents = ''
+        handle.style.pointerEvents = ''
+        element.style.pointerEvents = ''
       }
-      isEnabled = false
-      resetState()
-    }
-  }
-
-  // Initial setup
-  enable()
-
-  return {
-    destroy() { disable() },
-    enable() { if (!isEnabled) enable() },
-    disable() { if (isEnabled) disable() },
-    isEnabled() { return isEnabled }
+    },    enable() {
+      console.log('[DEBUG] enable called')
+      handle.addEventListener('mousedown', onMouseDown)
+    },
+    disable() {
+      console.log('[DEBUG] disable called')
+      handle.removeEventListener('mousedown', onMouseDown)
+      if (isResizing) {
+        console.log('[DEBUG] disable called while resizing - cleaning up')
+        document.removeEventListener('mousemove', onMouseMove, { capture: true })
+        document.removeEventListener('mouseup', onMouseUp, { capture: true })
+        document.removeEventListener('mouseleave', onMouseUp, { capture: true })
+        document.removeEventListener('visibilitychange', onMouseUp, { capture: true })
+        window.removeEventListener('blur', onMouseUp, { capture: true })
+        isResizing = false
+        document.body.style.userSelect = ''
+        document.body.style.pointerEvents = ''
+        handle.style.pointerEvents = ''
+        element.style.pointerEvents = ''
+      }
+    },
+    isEnabled() { return true }
   }
 }
