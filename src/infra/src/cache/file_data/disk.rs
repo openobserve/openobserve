@@ -215,15 +215,15 @@ impl FileData {
                 .add(data_size as i64);
         } else if columns[0] == "results" {
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
+                .with_label_values(&[columns[1], columns[2], "results"])
                 .add(data_size as i64);
         } else if columns[0] == "metrics_results" {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
                 .add(data_size as i64);
         } else if columns[0] == "record_batches" && columns.len() >= 3 {
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2], "record_batches"])
                 .add(data_size as i64);
         };
         Ok(())
@@ -295,15 +295,15 @@ impl FileData {
                     .sub(data_size as i64);
             } else if columns[0] == "results" {
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2]])
+                    .with_label_values(&[columns[1], columns[2], "results"])
                     .sub(data_size as i64);
             } else if columns[0] == "metrics_results" {
                 metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                     .with_label_values(&[columns[1]])
                     .sub(data_size as i64);
             } else if columns[0] == "record_batches" && columns.len() >= 3 {
-                metrics::QUERY_DISK_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2]])
+                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                    .with_label_values(&[columns[1], columns[2], "record_batches"])
                     .sub(data_size as i64);
             }
             release_size += data_size;
@@ -355,15 +355,15 @@ impl FileData {
                 .sub(data_size as i64);
         } else if columns[0] == "results" {
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
+                .with_label_values(&[columns[1], columns[2], "results"])
                 .sub(data_size as i64);
         } else if columns[0] == "metrics_results" {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
                 .sub(data_size as i64);
         } else if columns[0] == "record_batches" && columns.len() >= 3 {
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2], "record_batches"])
                 .sub(data_size as i64);
         }
 
@@ -651,7 +651,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
                         // metrics
                         metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                            .with_label_values(&[org_id.as_str(), stream_type.as_str(), "results"])
                             .add(data_size as i64);
 
                         result_cache
@@ -667,10 +667,25 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
                         metrics_cache.push(file_key);
                     } else if file_key.starts_with("record_batches") {
+                        let Some((org_id, stream_type, ..)) =
+                            parse_record_batch_cache_key(&file_key)
+                        else {
+                            log::error!("parse record batch cache key error: {}", file_key);
+                            continue;
+                        };
                         let mut w = RECORD_BATCH_FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
                         drop(w);
+
+                        // metrics
+                        metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                            .with_label_values(&[
+                                org_id.as_str(),
+                                stream_type.as_str(),
+                                "record_batches",
+                            ])
+                            .add(data_size as i64);
 
                         // metrics for record batches
                         let columns = file_key.split('/').collect::<Vec<&str>>();
