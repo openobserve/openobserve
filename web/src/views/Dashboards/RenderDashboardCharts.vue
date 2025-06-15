@@ -480,65 +480,67 @@ export default defineComponent({
           tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,
         },
       });
-    };
-
-    // GridStack initialization and methods
+    };    // GridStack initialization and methods
     const initGridStack = () => {
       if (!gridStackContainer.value || gridStackInstance.value) return;
 
+      // Initialize GridStack with optimal configuration
       gridStackInstance.value = GridStack.init(
         {
-          column: 48,
-          cellHeight: "34px",
-          margin: 2,
+          column: 48, // 48-column grid for fine-grained positioning
+          cellHeight: "34px", // Base cell height
+          margin: 2, // Minimal margin between panels
           draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value,
-            handle: ".drag-allow",
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
+            handle: ".drag-allow", // Only allow dragging from specific handle
           },
           resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value,
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable resizing unless view-only or saving
           },
-          acceptWidgets: false,
-          removable: false,
-          animate: false,
-          float: false,
-          minRow: 1,
-          disableOneColumnMode: true,
-          styleInHead: true,
+          acceptWidgets: false, // Don't accept external widgets
+          removable: false, // Don't allow removal by dragging out
+          animate: false, // Disable animations for better performance
+          float: false, // Keep panels aligned to grid
+          minRow: 1, // Minimum grid height
+          disableOneColumnMode: true, // Prevent mobile column collapse
+          styleInHead: true, // Inject styles in head for better performance
         },
         gridStackContainer.value,
       );
 
-      // Event listeners for GridStack
+      // Event listeners for GridStack interactions
+      
+      // Handle layout changes (drag/resize)
       gridStackInstance.value.on("change", (event, items) => {
         if (items && items.length > 0) {
-          updatePanelLayouts(items);
-          saveDashboardData.execute();
+          updatePanelLayouts(items); // Update panel layout data
+          saveDashboardData.execute(); // Save changes to backend
         }
       });
 
+      // Trigger window resize after panel resize to update charts
       gridStackInstance.value.on("resizestop", (event, element) => {
         window.dispatchEvent(new Event("resize"));
       });
 
+      // Save dashboard after drag operation completes
       gridStackInstance.value.on("dragstop", (event, element) => {
         saveDashboardData.execute();
       });
-    };
-
+    };    // Update panel layout data from GridStack items
     const updatePanelLayouts = (items) => {
       items.forEach((item) => {
         const panelId = item.id;
         const panel = panels.value.find((p) => p.id === panelId);
         if (panel && panel.layout) {
+          // Update panel layout coordinates
           panel.layout.x = item.x;
           panel.layout.y = item.y;
           panel.layout.w = item.w;
           panel.layout.h = item.h;
         }
       });
-    };
-
+    };    // Optimized GridStack refresh function
     const refreshGridStack = async () => {
       if (!gridStackInstance.value || !gridStackContainer.value) return;
 
@@ -548,11 +550,11 @@ export default defineComponent({
 
       const grid = gridStackInstance.value;
 
-      // IMPORTANT: Disable animation and floating during reconstruction
+      // IMPORTANT: Disable animation and floating during reconstruction for better performance
       grid.float(false);
       grid.setAnimation(false);
 
-      // Clear all existing widgets completely
+      // Clear all existing widgets completely to prevent stale references
       const existingElements = grid.getGridItems();
       // console.log("🧹 Removing existing widgets:", existingElements.length);
 
@@ -563,10 +565,10 @@ export default defineComponent({
       // Force clear any remaining grid state
       grid.removeAll(false);
 
-      // Wait for DOM cleanup
+      // Wait for DOM cleanup to complete
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Reset grid to clean state
+      // Reset grid to clean state with compact layout
       grid.compact("compact");
 
       // console.log("📊 Current panels to add:", panels.value.length);
@@ -576,7 +578,7 @@ export default defineComponent({
         return;
       }
 
-      // Sort panels by their Y position first, then X position
+      // Sort panels by their Y position first, then X position for optimal layout
       const sortedPanels = [...panels.value].sort((a, b) => {
         const aY = getPanelLayout(a, "y");
         const bY = getPanelLayout(b, "y");
@@ -584,7 +586,7 @@ export default defineComponent({
         return getPanelLayout(a, "x") - getPanelLayout(b, "x");
       });
 
-      // Add panels in sorted order
+      // Add panels in sorted order to maintain proper layout
       for (const panel of sortedPanels) {
         // Wait for the element to be available in DOM
         await nextTick();
@@ -689,8 +691,7 @@ export default defineComponent({
         return panelData?.layout?.i || panelData.id;
       }
       return 0;
-    };
-
+    };    // Get minimum height based on panel type for optimal display
     const getMinimumHeight = (type) => {
       switch (type) {
         case "area":
@@ -700,13 +701,14 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 4;
+          return 4; // 4 grid units minimum height
 
         default:
           break;
       }
     };
 
+    // Get minimum width based on panel type for optimal display  
     const getMinimumWidth = (type) => {
       switch (type) {
         case "area":
@@ -716,7 +718,7 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 3;
+          return 3; // 3 grid units minimum width
 
         default:
           break;
@@ -733,19 +735,17 @@ export default defineComponent({
     //     }
     //   },
     //   { immediate: false }
-    // );
-
-    // Update the panels watch to be more specific
+    // );    // Watch for changes in panels array and refresh grid when needed
     watch(
       () => panels.value,
       async (newPanels, oldPanels) => {
-        // Only refresh if the number of panels changed or if we're switching tabs
+        // Only refresh if the number of panels changed to avoid unnecessary re-renders
         if (!oldPanels || newPanels.length !== oldPanels.length) {
           // console.log("Panel count changed, refreshing grid");
           await refreshGridStack();
         }
       },
-      { deep: true },
+      { deep: true }, // Deep watch to catch layout changes within panels
     );
 
     // Add this watcher for better tab change detection
@@ -758,23 +758,31 @@ export default defineComponent({
     //     }
     //   },
     //   { deep: true }
-    // );
+    // );    // Watch for viewOnly changes and dashboard saving state
+    watch(
+      () => [props.viewOnly, saveDashboardData.isLoading.value],
+      ([viewOnly, isLoading]) => {
+        if (gridStackInstance.value) {
+          // Disable interactions during saving or in view-only mode
+          const enableInteraction = !viewOnly && !isLoading;
+          
+          console.log(
+            `GridStack interaction state: ${enableInteraction ? "Enabled" : "Disabled"}`, gridStackInstance.value
+          );
 
-    // Watch for viewOnly changes
-    // watch(
-    //   () => [props.viewOnly, saveDashboardData.isLoading.value],
-    //   ([viewOnly, isLoading]) => {
-    //     if (gridStackInstance.value) {
-    //       const enableInteraction = !viewOnly && !isLoading;
-    //       gridStackInstance.value.setStatic(!enableInteraction);
-    //     }
-    //   },
-    // );
-
+          // Update draggable state
+          if(enableInteraction){
+            gridStackInstance.value.enable();
+          } else {
+            gridStackInstance.value.disable();
+          }
+        }
+      },
+    );    // Initialize GridStack when component is mounted
     onMounted(async () => {
-      await nextTick();
-      initGridStack();
-      await nextTick();
+      await nextTick(); // Wait for DOM to be ready
+      initGridStack(); // Initialize the grid system
+      await nextTick(); // Wait for grid initialization to complete
 
       // Make existing elements into GridStack widgets
       // if (gridStackInstance.value && panels.value.length > 0) {
@@ -782,7 +790,7 @@ export default defineComponent({
       // }
     });
 
-    // Add cleanup to prevent detached nodes
+    // Clean up GridStack instance before component unmounts to prevent memory leaks
     onBeforeUnmount(() => {
       // Clean up GridStack instance
       if (gridStackInstance.value) {
@@ -796,6 +804,7 @@ export default defineComponent({
       }
     });
 
+    // Final cleanup when component is fully unmounted
     onUnmounted(() => {
       if (gridStackInstance.value) {
         gridStackInstance.value.destroy(false);
@@ -913,13 +922,14 @@ export default defineComponent({
   border-color: rgba(204, 204, 220, 0.12) !important;
 }
 
-/* Optimized grid styles */
+/* Optimized GridStack layout styles for better performance and visual feedback */
 .grid-stack {
   min-height: 0 !important;
   height: auto !important;
   background: transparent;
   margin: 2px;
   
+  /* When grid is static (disabled), hide resize handles */
   &.grid-stack-static {
     .ui-resizable-handle {
       display: none !important;
@@ -928,9 +938,8 @@ export default defineComponent({
 }
 
 .grid-stack-item {
-  
   background: transparent;
-  will-change: transform; /* Optimize for animations */
+  will-change: transform; /* Optimize for animations and transforms */
 
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
