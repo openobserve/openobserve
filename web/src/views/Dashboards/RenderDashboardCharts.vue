@@ -885,7 +885,6 @@ export default defineComponent({
     &.ui-draggable-dragging {
       opacity: 0.8;
       z-index: 1000;
-      transform: rotate(2deg);
       transition: transform 0.15s ease;
     }
 
