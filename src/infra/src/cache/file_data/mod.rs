@@ -73,7 +73,6 @@ impl CacheStrategy {
     fn insert(&mut self, key: String, size: usize) {
         match self {
             CacheStrategy::Lru(cache) => {
-                let size = 5 * 1024 * 1024;
                 cache.insert(key, size);
             }
             CacheStrategy::Fifo(queue, set) => {
