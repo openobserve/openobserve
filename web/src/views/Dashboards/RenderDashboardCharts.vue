@@ -900,14 +900,10 @@ export default defineComponent({
   clear: both;
   min-height: 0;
   height: auto;
-
-  .grid-stack {
-    transition: none !important; /* Disable transitions during tab switch */
-  }
 }
 
 .gridBackground {
-  background: #00000000 !important;
+  background: transparent !important;
   border-radius: 4px;
   border-color: #c2c2c27a !important;
 }
@@ -916,16 +912,24 @@ export default defineComponent({
   border-color: rgba(204, 204, 220, 0.12) !important;
 }
 
-/* Force grid to recalculate height */
+/* Optimized grid styles */
 .grid-stack {
   min-height: 0 !important;
   height: auto !important;
   background: transparent;
+  
+  &.grid-stack-static {
+    .ui-resizable-handle {
+      display: none !important;
+    }
+  }
 }
+
 .grid-stack-item {
   border: 1px solid #c2c2c27a;
   border-radius: 4px;
   background: transparent;
+  will-change: transform; /* Optimize for animations */
 
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
@@ -942,36 +946,32 @@ export default defineComponent({
 /* GridStack theme overrides */
 :deep(.grid-stack) {
   .grid-stack-item {
+
+    .drag-allow {
+      cursor: move;
+    }
+
     &.ui-draggable-dragging {
       opacity: 0.8;
       z-index: 1000;
-      transform: rotate(3deg);
-      transition: transform 0.2s ease;
+      transform: rotate(2deg);
+      transition: transform 0.15s ease;
     }
 
     &.ui-resizable-resizing {
-      opacity: 0.8;
-    }
-
-    > .ui-resizable-handle {
-      background: none;
-
-      &.ui-resizable-se {
-        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='5' cy='5' r='2' fill='%23999999'/></svg>")
+      opacity: 0.9;
+    }    > .ui-resizable-handle {
+      background: none;      &.ui-resizable-se {
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
           no-repeat center;
         background-size: 8px 8px;
         width: 16px;
         height: 16px;
         bottom: 2px;
         right: 2px;
+        cursor: se-resize;
+        transform: rotate(0deg) !important;
       }
-    }
-  }
-
-  /* Hide resize handles in static mode */
-  &.grid-stack-static {
-    .ui-resizable-handle {
-      display: none !important;
     }
   }
 }
