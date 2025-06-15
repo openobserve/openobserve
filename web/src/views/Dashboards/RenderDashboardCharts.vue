@@ -559,9 +559,8 @@ export default defineComponent({
       grid.removeAll(false);
 
       // Wait for DOM cleanup to complete
-      await new Promise((resolve) => setTimeout(resolve, 100));      // Reset grid to clean state with compact layout
-      grid.compact("compact");
-
+      await new Promise((resolve) => setTimeout(resolve, 100));      
+      
       if (panels.value.length === 0) {
         return;
       }
@@ -577,7 +576,8 @@ export default defineComponent({
       // Add panels in sorted order to maintain proper layout
       for (const panel of sortedPanels) {
         // Wait for the element to be available in DOM
-        await nextTick();        const element = gridStackContainer.value.querySelector(
+        await nextTick();        
+        const element = gridStackContainer.value.querySelector(
           `[gs-id="${panel.id}"]`,
         );
 
@@ -604,14 +604,13 @@ export default defineComponent({
       }
 
       // Wait for all widgets to be added
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await nextTick(); // Ensure DOM is updated
 
-      // Compact the grid to remove any gaps
-      grid.compact("compact");      // Trigger window resize to ensure charts render correctly
-      resizeTimeout = setTimeout(() => {
-        window.dispatchEvent(new Event("resize"));
-      }, 200);
-    };    // Add a method to reset grid layout
+      // Trigger window resize to ensure charts render correctly
+      window.dispatchEvent(new Event("resize"));
+    };    
+    
+    // Add a method to reset grid layout
     const resetGridLayout = async () => {
       if (!gridStackInstance) return;
 
@@ -620,9 +619,6 @@ export default defineComponent({
 
       // Wait for cleanup
       await nextTick();
-
-      // Compact the grid
-      gridStackInstance.compact("compact");
 
       // Refresh with current panels
       await refreshGridStack();
@@ -773,12 +769,6 @@ export default defineComponent({
       emit("openEditLayout", id);
     };
 
-    const layoutUpdate = () => {
-      if (gridStackInstance) {
-        gridStackInstance.compact();
-      }
-    };
-
     return {
       store,
       addPanelData,
@@ -789,7 +779,6 @@ export default defineComponent({
       variablesData,
       variablesDataUpdated,
       gridStackContainer,
-      layoutUpdate,
       showViewPanel,
       viewPanelId,
       selectedTabId,
