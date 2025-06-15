@@ -747,38 +747,8 @@ export default defineComponent({
       },
       { deep: true }, // Deep watch to catch layout changes within panels
     );
-
-    // Add this watcher for better tab change detection
-    // watch(
-    //   () => props.dashboardData?.tabs,
-    //   async () => {
-    //     // Dashboard tabs structure changed, refresh grid
-    //     if (gridStackInstance.value) {
-    //       await handleTabChange();
-    //     }
-    //   },
-    //   { deep: true }
-    // );    // Watch for viewOnly changes and dashboard saving state
-    watch(
-      () => [props.viewOnly, saveDashboardData.isLoading.value],
-      ([viewOnly, isLoading]) => {
-        if (gridStackInstance.value) {
-          // Disable interactions during saving or in view-only mode
-          const enableInteraction = !viewOnly && !isLoading;
-          
-          console.log(
-            `GridStack interaction state: ${enableInteraction ? "Enabled" : "Disabled"}`, gridStackInstance.value
-          );
-
-          // Update draggable state
-          if(enableInteraction){
-            gridStackInstance.value.enable();
-          } else {
-            gridStackInstance.value.disable();
-          }
-        }
-      },
-    );    // Initialize GridStack when component is mounted
+    
+    // Initialize GridStack when component is mounted
     onMounted(async () => {
       await nextTick(); // Wait for DOM to be ready
       initGridStack(); // Initialize the grid system
