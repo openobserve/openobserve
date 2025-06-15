@@ -55,6 +55,7 @@
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.46",
     "monaco-editor-vue": "^1.0.2",
+    "monaco-editor": "^0.52.2",
     "node-polyfill-webpack-plugin": "^4.1.0",
     "quasar": "^2.17.7",
     "rollup-plugin-node-polyfills": "^0.2.1",
