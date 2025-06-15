@@ -28,6 +28,12 @@ pub struct TimestampVisitor {
     query_queue: VecDeque<QueryInfo>,
 }
 
+impl Default for TimestampVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TimestampVisitor {
     pub fn new() -> Self {
         Self {
@@ -587,6 +593,10 @@ mod tests {
             let result = analyze_timestamp_selection(sql);
             match result {
                 Ok(result) => {
+                    println!(
+                        "test case '{}': expected {}, got {}. Columns: {:?}.",
+                        sql, expected, result.has_timestamp, result.column_names
+                    );
                     assert_eq!(
                         result.has_timestamp, expected,
                         "Failed test case '{}': expected {}, got {}. Columns: {:?}.",

@@ -343,7 +343,7 @@ impl TimestampVisitor {
 
             Expr::CompoundIdentifier(idents) => idents
                 .last()
-                .map_or(false, |id| id.value == TIMESTAMP_COL_NAME),
+                .is_some_and(|id| id.value == TIMESTAMP_COL_NAME),
 
             Expr::Function(func) => {
                 func.name.to_string().to_lowercase() == "histogram"
@@ -379,6 +379,12 @@ impl TimestampVisitor {
             _ => {}
         }
         ControlFlow::Continue(())
+    }
+}
+
+impl Default for TimestampVisitor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
