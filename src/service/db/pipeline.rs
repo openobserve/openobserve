@@ -86,8 +86,8 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, 
     Ok(infra_pipeline::list_streams_with_pipeline(org).await?)
 }
 
-/// Transform the initialized and enabled pipeline into ExecutablePipeline struct that's ready for
-/// batch processing records.
+/// Retrieve cached ExecutablePipeline struct that's ready for batch processing records by
+/// StreamParams
 ///
 /// Used for pipeline execution.
 pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
@@ -153,7 +153,12 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             .await;
         log::info!("[PIPELINE:CACHE] done waiting");
     }
+    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
     let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+    // clear the cache first in case of a refresh
+    pipeline_stream_mapping_cache.clear();
+    stream_exec_pl.clear();
+
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
             if let PipelineSource::Realtime(stream_params) = &pipeline.source {
@@ -167,12 +172,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                         )
                     }
                     Ok(exec_pl) => {
+                        pipeline_stream_mapping_cache.insert(pipeline.id, stream_params.clone());
                         stream_exec_pl.insert(stream_params.clone(), exec_pl);
                     }
                 };
             }
         }
     }
+
     log::info!("[Pipeline] Cached with len: {}", stream_exec_pl.len());
     Ok(())
 }
@@ -251,7 +258,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
-                log::error!("watch_pipelines: event channel closed");
+                log::error!("[Pipeline::watch] event channel closed");
                 break;
             }
         };
@@ -296,6 +303,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     pipeline_id
                                 );
                             }
+                        } else {
+                            log::error!(
+                                "[Pipeline]: pipeline {} not found in cache to remove.",
+                                pipeline_id
+                            );
                         }
                     }
                 }
@@ -314,6 +326,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             pipeline_id
                         );
                     };
+                } else {
+                    log::error!(
+                        "[Pipeline]: pipeline {} not found in cache to remove.",
+                        pipeline_id
+                    );
                 }
             }
             db::Event::Empty => {}
