@@ -1,8 +1,11 @@
 import { expect } from '@playwright/test';
+import fs from 'fs';
+import { CommonActions } from './commonActions';
 
 export class AlertsNewPage {
     constructor(page) {
         this.page = page;
+        this.commonActions = new CommonActions(page);
         
         // Alert related locators
         this.alertMenuItem = '[data-test="menu-link-\\/alerts-item"]';
@@ -134,7 +137,6 @@ export class AlertsNewPage {
     async createAlert(streamName, column, value, destinationName, randomValue) {
         const randomAlertName = 'Automation_Alert_' + randomValue;
         this.currentAlertName = randomAlertName;  // Store the alert name
-        console.log('Created alert:', randomAlertName);
 
         await this.page.locator(this.addAlertButton).click();
         await this.page.waitForTimeout(1000); // Wait for alert creation form to load
@@ -160,9 +162,13 @@ export class AlertsNewPage {
         await this.page.locator(this.alertDelayInput).getByLabel('').fill('0');
         await this.page.waitForTimeout(1000); // Wait after setting delay
 
+        // Handle destination selection with scrolling
         await this.page.locator('[data-test="add-alert-destination-select"]').getByLabel('arrow_drop_down').click();
         await this.page.waitForTimeout(2000); // Wait for destination options to load
-        await this.page.getByText(destinationName, { exact: true }).click();
+        
+        // Use the common scroll function
+        await this.commonActions.scrollAndFindOption(destinationName, 'template');
+        
         await this.page.waitForTimeout(1000); // Wait after selecting destination
 
         await this.page.locator(this.columnInput).click();
@@ -180,6 +186,7 @@ export class AlertsNewPage {
 
         await this.page.locator(this.alertSubmitButton).click();
         await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible();
+        console.log('Successfully created alert:', randomAlertName);
 
         return randomAlertName;
     }
@@ -191,14 +198,20 @@ export class AlertsNewPage {
         await expect(this.page.locator(this.pauseStartAlert.replace('{alertName}', nameToVerify))).toBeVisible();
     }
 
-    /** @param {string} alertName @param {string} newOperator */
-    async updateAlert(alertName, newOperator) {
+    /** @param {string} alertName */
+    async updateAlert(alertName) {
         await this.page.locator(this.alertUpdateButton.replace('{alertName}', alertName)).click();
         await expect(this.page.getByText(this.alertSetupText)).toBeVisible();
-        await this.page.locator(this.operatorSelect).getByText(this.arrowDropDownText).click();
-        await this.page.getByRole('option', { name: newOperator, exact: true }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000); // Wait for form to load
+
+        // Click the operator dropdown and select new operator
+        await this.page.locator('[data-test="alert-conditions-operator-select"] div').filter({ hasText: 'Contains' }).nth(3).click();
+        await this.page.getByText('=', { exact: true }).click();
+        await this.page.waitForTimeout(1000); // Wait after selecting operator
+
         await this.page.locator(this.alertSubmitButton).click();
         await expect(this.page.getByText(this.alertUpdatedMessage)).toBeVisible();
+        console.log('Successfully updated alert:', alertName);
     }
 
     /** @param {string} alertName @param {string} streamType @param {string} streamName */
@@ -212,6 +225,7 @@ export class AlertsNewPage {
         await this.page.getByText(streamName, { exact: true }).click();
         await this.page.locator(this.cloneSubmitButton).click();
         await expect(this.page.getByText(this.alertClonedMessage)).toBeVisible();
+        console.log('Successfully cloned alert:', alertName);
     }
 
     async ensureFolderExists(folderName, description = '') {
@@ -234,9 +248,12 @@ export class AlertsNewPage {
         // Click move across folders button
         await this.page.locator(this.moveAcrossFoldersButton).click();
 
-        // Select target folder
+        // Handle folder selection with scrolling
         await this.page.locator(this.folderDropdown).click();
-        await this.page.getByRole('option', { name: targetFolderName }).locator('span').click();
+        await this.page.waitForTimeout(2000); // Wait for folder options to load
+        
+        // Use the common scroll function
+        await this.commonActions.scrollAndFindOption(targetFolderName, 'folder');
 
         // Click move button and verify
         await this.page.locator(this.moveButton).click();
@@ -342,7 +359,6 @@ export class AlertsNewPage {
     async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
         const randomAlertName = 'auto_scheduled_alert_' + randomValue;
         this.currentAlertName = randomAlertName;
-        console.log('Creating scheduled alert:', randomAlertName);
 
         await this.page.locator(this.addAlertButton).click();
         await this.page.waitForTimeout(1000);
@@ -378,11 +394,14 @@ export class AlertsNewPage {
         // Set delay
         await this.page.locator(this.alertDelayInput).getByLabel('').fill('0');
 
-        // Select destination
+        // Select destination with scrolling
         await this.page.locator(this.destinationSelect).getByLabel('arrow_drop_down').click();
-        await this.page.waitForTimeout(2000);
-        await this.page.getByText(destinationName, { exact: true }).click();
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForTimeout(2000); // Wait for destination options to load
+        
+        // Use the common scroll function
+        await this.commonActions.scrollAndFindOption(destinationName, 'template');
+        
+        await this.page.waitForTimeout(1000); // Wait after selecting destination
 
         // Add time range
         await this.page.locator('[data-test="multi-time-range-alerts-add-btn"]').click();
@@ -405,7 +424,91 @@ export class AlertsNewPage {
         await this.page.locator(this.alertSubmitButton).click();
         await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible();
         await expect(this.page.getByRole('cell', { name: '15 Mins' })).toBeVisible();
+        console.log('Successfully created scheduled alert:', randomAlertName);
 
         return randomAlertName;
+    }
+
+    async exportAlerts() {
+        await this.page.getByRole('row', { name: '# Name Owner Period Frequency' }).getByRole('checkbox').click();
+        const downloadPromise = this.page.waitForEvent('download');
+        await this.page.locator('[data-test="alert-list-export-alerts-btn"]').click();
+        const download = await downloadPromise;
+        await expect(this.page.getByText('Successfully exported 2 alerts')).toBeVisible();
+        return download;
+    }
+
+    async importInvalidFile(filePath) {
+        await this.page.locator('[data-test="alert-import"]').click();
+        await expect(this.page.locator('[data-test="tab-import_json_file"]')).toBeVisible();
+        await this.page.locator('[data-test="alert-import-json-file-input"]').setInputFiles(filePath);
+        await this.page.locator('[data-test="alert-import-json-btn"]').click();
+        await expect(this.page.getByText('Error importing Alert(s)')).toBeVisible();
+    }
+
+    async importValidFile(filePath) {
+        await this.page.locator('[data-test="tab-import_json_file"]').click();
+        await this.page.locator('[data-test="alert-import-json-file-input"]').setInputFiles(filePath);
+        await this.page.locator('[data-test="alert-import-json-btn"]').click();
+        await expect(this.page.getByRole('cell').filter({ hasText: this.currentAlertName }).first()).toBeVisible();
+    }
+
+    async deleteImportedAlert(alertName) {
+        let alertExists = true;
+        let attempts = 0;
+        const maxAttempts = 10; // Set a reasonable maximum number of attempts
+
+        while (alertExists && attempts < maxAttempts) {
+            try {
+                // Wait for any instance of the alert to be visible
+                await this.page.getByRole('cell', { name: alertName }).first().waitFor({ timeout: 2000 });
+                
+                // Get all instances of the alert
+                const alertRows = this.page.getByRole('row').filter({ hasText: alertName });
+                const count = await alertRows.count();
+                
+                if (count === 0) {
+                    alertExists = false;
+                    break;
+                }
+
+                // Click the first instance's more options button
+                await alertRows.first()
+                    .locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
+                await this.page.waitForTimeout(1000); // Wait for menu to appear
+                
+                // Click delete and confirm
+                await this.page.getByText('Delete').click();
+                await this.page.waitForTimeout(1000); // Wait for confirmation dialog
+                await this.page.locator('[data-test="confirm-button"]').click();
+                await expect(this.page.getByText('Alert deleted')).toBeVisible();
+                
+                // Wait longer for the deletion to take effect and UI to update
+                await this.page.waitForTimeout(3000);
+                attempts++;
+                
+                console.log(`Successfully deleted alert instance ${attempts} of ${alertName}`);
+            } catch (error) {
+                console.log('No more instances found or error occurred:', error.message);
+                alertExists = false;
+            }
+        }
+        
+        if (attempts > 0) {
+            console.log(`Successfully deleted all ${attempts} instances of alert: ${alertName}`);
+        } else {
+            console.log(`No instances of alert found to delete: ${alertName}`);
+        }
+    }
+
+    async cleanupDownloadedFile(filePath) {
+        try {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log('Successfully deleted file:', filePath);
+            }
+        } catch (error) {
+            console.error('Error deleting file:', error);
+        }
     }
 } 

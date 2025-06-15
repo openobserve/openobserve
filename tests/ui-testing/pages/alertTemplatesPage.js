@@ -110,4 +110,39 @@ export class AlertTemplatesPage {
             return false;
         }
     }
+
+    async ensureTemplateExists(templateName) {
+        await this.navigateToTemplates();
+        await this.page.waitForTimeout(2000);
+
+        try {
+            // Try to find the template directly first
+            await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
+            console.log('Found existing template:', templateName);
+            return templateName;
+        } catch (error) {
+            // If not found, create new template
+            await this.createTemplate(templateName);
+            console.log('Created new template:', templateName);
+            return templateName;
+        }
+    }
+
+    /**
+     * Verify that a newly created template exists in the list
+     * @param {string} templateName - Name of the template to verify
+     * @throws {Error} if template is not found
+     */
+    async verifyCreatedTemplateExists(templateName) {
+        await this.navigateToTemplates();
+        await this.page.waitForTimeout(2000);
+
+        try {
+            // Try to find the template
+            await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
+            console.log('Successfully verified template exists:', templateName);
+        } catch (error) {
+            throw new Error(`Template ${templateName} not found in the list`);
+        }
+    }
 } 
