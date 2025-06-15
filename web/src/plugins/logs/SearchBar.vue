@@ -1305,6 +1305,7 @@ import {
   onDeactivated,
   defineAsyncComponent,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1529,6 +1530,13 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
+    watch(
+      () => searchObj.data.transforms,
+      (newVal) => {
+        functionOptions.value = newVal;
+      }
+    );
+
     const { closeSocketWithError } = useSearchWebSocket();
 
     const transformsExpandState = ref({
@@ -1596,6 +1604,7 @@ export default defineComponent({
     const savedViewDropdownModel = ref(false);
     const moreOptionsDropdownModel = ref(false);
     const searchTerm = ref("");
+    const intervalId = ref(null);
 
     const filteredFunctionOptions = computed(() => {
       if (searchObj.data.transformType !== "function") return [];
@@ -1708,6 +1717,12 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importSqlParser();
+    });
+
+    onBeforeUnmount(() => {
+      if (intervalId.value) {
+        clearInterval(intervalId.value);
+      }
     });
 
     const importSqlParser = async () => {
@@ -2259,7 +2274,7 @@ export default defineComponent({
     };
 
     const resetEditorLayout = () => {
-      setTimeout(() => {
+      intervalId.value = setTimeout(() => {
         queryEditorRef?.value?.resetEditorLayout();
         fnEditorRef?.value?.resetEditorLayout();
       }, 100);
@@ -2622,7 +2637,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            setTimeout(async () => {
+            intervalId.value = setTimeout(async () => {
               try {
                 searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;

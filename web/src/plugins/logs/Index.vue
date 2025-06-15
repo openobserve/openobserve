@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage">
+  <q-page class="logPage q-my-xs" id="logPage" :key="store.state.selectedOrganization.identifier">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar"
             ref="searchBarRef"
             :fieldValues="fieldValues"
-            :key="searchObj.data.transforms.length || -1"
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
@@ -283,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-show="showSearchHistory">
+    <div v-if="showSearchHistory">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -336,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div v-show="showSearchScheduler">
+    <div v-if="showSearchScheduler">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"
@@ -375,9 +374,7 @@ import {
   useLocalInterestingFields,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
-import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -385,8 +382,6 @@ import { cloneDeep } from "lodash-es";
 import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
-import SearchHistory from "@/plugins/logs/SearchHistory.vue";
-import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import useAiChat from "@/composables/useAiChat";
@@ -395,7 +390,9 @@ export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
-    SearchSchedulersList,
+    SearchSchedulersList: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchSchedulersList.vue")
+    ),
     IndexList: defineAsyncComponent(
       () => import("@/plugins/logs/IndexList.vue"),
     ),
@@ -405,9 +402,15 @@ export default defineComponent({
     ConfirmDialog: defineAsyncComponent(
       () => import("@/components/ConfirmDialog.vue"),
     ),
-    SanitizedHtmlRenderer,
-    VisualizeLogsQuery,
-    SearchHistory,
+    SanitizedHtmlRenderer: defineAsyncComponent(
+      () => import("@/components/SanitizedHtmlRenderer.vue")
+    ),
+    VisualizeLogsQuery: defineAsyncComponent(
+      () => import("@/plugins/logs/VisualizeLogsQuery.vue")
+    ),
+    SearchHistory: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchHistory.vue")
+    ),
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -668,6 +671,13 @@ export default defineComponent({
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
       removeAiContextHandler();
+
+      if (intervalId.value) {
+        clearInterval(intervalId.value);
+      }
+
+      searchBarRef.value = null;
+      searchResultRef.value = null;
     });
 
     onActivated(() => {
@@ -1627,6 +1637,8 @@ export default defineComponent({
 
     // [END] O2 AI Context Handler
 
+    const intervalId = ref(null);
+
     return {
       t,
       store,
@@ -1684,6 +1696,7 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
+      intervalId,
     };
   },
   computed: {
@@ -1736,7 +1749,7 @@ export default defineComponent({
         this.searchObj.meta.showHistogram == true &&
         this.searchObj.meta.sqlMode == false
       ) {
-        setTimeout(() => {
+        this.intervalId = setTimeout(() => {
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
@@ -1833,7 +1846,7 @@ export default defineComponent({
               this.searchObj.loadingHistogram = false;
             });
 
-          setTimeout(() => {
+          this.intervalId = setTimeout(() => {
             if (this.searchResultRef) this.searchResultRef.reDrawChart();
           }, 100);
         }
@@ -1867,7 +1880,7 @@ export default defineComponent({
     // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
-      setTimeout(() => {
+      this.intervalId = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },
