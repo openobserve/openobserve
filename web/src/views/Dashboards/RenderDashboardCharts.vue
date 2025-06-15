@@ -195,7 +195,6 @@ import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
-import { pad } from "lodash-es";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -408,9 +407,9 @@ export default defineComponent({
           }
           currentVariablesDataRef.value = { __global: variablesData.value };
         }
-        return;
+        return;      
       } catch (error) {
-        // console.error("Error in variablesDataUpdated", error);
+        return;
       }
     };
 
@@ -550,11 +549,8 @@ export default defineComponent({
 
       // IMPORTANT: Disable animation and floating during reconstruction for better performance
       grid.float(false);
-      grid.setAnimation(false);
-
-      // Clear all existing widgets completely to prevent stale references
+      grid.setAnimation(false);      // Clear all existing widgets completely to prevent stale references
       const existingElements = grid.getGridItems();
-      // console.log("🧹 Removing existing widgets:", existingElements.length);
 
       existingElements.forEach((element) => {
         grid.removeWidget(element, false);
@@ -564,15 +560,10 @@ export default defineComponent({
       grid.removeAll(false);
 
       // Wait for DOM cleanup to complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Reset grid to clean state with compact layout
+      await new Promise((resolve) => setTimeout(resolve, 100));      // Reset grid to clean state with compact layout
       grid.compact("compact");
 
-      // console.log("📊 Current panels to add:", panels.value.length);
-
       if (panels.value.length === 0) {
-        // console.log("🚫 No panels to add, cleaning up grid");
         return;
       }
 
@@ -587,12 +578,9 @@ export default defineComponent({
       // Add panels in sorted order to maintain proper layout
       for (const panel of sortedPanels) {
         // Wait for the element to be available in DOM
-        await nextTick();
-
-        const element = gridStackContainer.value.querySelector(
+        await nextTick();        const element = gridStackContainer.value.querySelector(
           `[gs-id="${panel.id}"]`,
         );
-        // console.log(`🔍 Panel ${panel.id}:`, element ? "Found" : "Not found");
 
         if (element) {
           try {
@@ -605,17 +593,13 @@ export default defineComponent({
               minH: getMinimumHeight(panel.type),
               id: panel.id,
               noMove: props.viewOnly,
-              noResize: props.viewOnly,
+              noResize: props.viewOnly,            
             };
-
-            // console.log(`Adding panel ${panel.id} with layout:`, layoutConfig);
 
             // Make widget with explicit layout
             grid.makeWidget(element, layoutConfig);
-
-            // console.log(`✅ Successfully added widget for panel ${panel.id}`);
           } catch (error) {
-            // console.error(`❌ Error adding widget for panel ${panel.id}:`, error);
+            // Error adding widget, skip this panel
           }
         }
       }
@@ -624,42 +608,11 @@ export default defineComponent({
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Compact the grid to remove any gaps
-      grid.compact("compact");
-
-      // Trigger window resize to ensure charts render correctly
+      grid.compact("compact");      // Trigger window resize to ensure charts render correctly
       setTimeout(() => {
         window.dispatchEvent(new Event("resize"));
       }, 200);
-
-      // console.log("🏁 GridStack refresh completed");
-    };
-
-    // Add this new function to handle tab changes specifically
-    // const handleTabChange = async () => {
-    //   // console.log("🏷️ Tab change detected, refreshing grid");
-
-    //   if (!gridStackInstance) return;
-
-    //   // Set transitioning state
-    //   isTransitioning.value = true;
-
-    //   // Clear the grid completely
-    //   gridStackInstance.removeAll(false);
-
-    //   // Wait for DOM updates
-    //   await nextTick();
-    //   await nextTick();
-
-    //   // Refresh the grid with new panels
-    //   await refreshGridStack();
-
-    //   // Remove transitioning state
-    //   setTimeout(() => {
-    //     isTransitioning.value = false;
-    //   }, 100);
-    // };
-
-    // Add a method to reset grid layout
+    };    // Add a method to reset grid layout
     const resetGridLayout = async () => {
       if (!gridStackInstance) return;
 
@@ -689,7 +642,9 @@ export default defineComponent({
         return panelData?.layout?.i || panelData.id;
       }
       return 0;
-    };    // Get minimum height based on panel type for optimal display
+    };    
+    
+    // Get minimum height based on panel type for optimal display
     const getMinimumHeight = (type) => {
       switch (type) {
         case "area":
@@ -737,10 +692,8 @@ export default defineComponent({
 
     watch(
       () => panels.value,
-      async (newPanels, oldPanels) => {
-        // Only refresh if the number of panels changed to avoid unnecessary re-renders
+      async (newPanels, oldPanels) => {        // Only refresh if the number of panels changed to avoid unnecessary re-renders
         if (!oldPanels || newPanels.length !== oldPanels.length) {
-          // console.log("Panel count changed, refreshing grid");
           await refreshGridStack();
         }
       },
@@ -752,11 +705,6 @@ export default defineComponent({
       await nextTick(); // Wait for DOM to be ready
       initGridStack(); // Initialize the grid system
       await nextTick(); // Wait for grid initialization to complete
-
-      // Make existing elements into GridStack widgets
-      // if (gridStackInstance && panels.value.length > 0) {
-      //   await refreshGridStack();
-      // }
     });
 
     // Clean up GridStack instance before component unmounts to prevent memory leaks
@@ -847,10 +795,8 @@ export default defineComponent({
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
       openEditLayout,
-      saveDashboardData,
-      currentVariablesDataRef,
+      saveDashboardData,      currentVariablesDataRef,
       isTransitioning,
-      // handleTabChange,
       resetGridLayout,
       refreshGridStack,
     };
@@ -913,12 +859,9 @@ export default defineComponent({
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
   }
-
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;
     border-radius: 4px; 
-    // height: 100%;
-    // width: 100%;
     overflow: hidden;
     border-radius: inherit;
   }
