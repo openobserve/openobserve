@@ -251,7 +251,7 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
     const gridStackContainer = ref(null);
-    const gridStackInstance = ref(null);
+    let gridStackInstance = null;
     const variablesValueSelectorRef = ref(null);
     const isTransitioning = ref(false);
 
@@ -482,10 +482,10 @@ export default defineComponent({
       });
     };    // GridStack initialization and methods
     const initGridStack = () => {
-      if (!gridStackContainer.value || gridStackInstance.value) return;
+      if (!gridStackContainer.value || gridStackInstance) return;
 
       // Initialize GridStack with optimal configuration
-      gridStackInstance.value = GridStack.init(
+      gridStackInstance = GridStack.init(
         {
           column: 48, // 48-column grid for fine-grained positioning
           cellHeight: "34px", // Base cell height
@@ -511,7 +511,7 @@ export default defineComponent({
       // Event listeners for GridStack interactions
       
       // Handle layout changes (drag/resize)
-      gridStackInstance.value.on("change", (event, items) => {
+      gridStackInstance.on("change", (event, items) => {
         if (items && items.length > 0) {
           updatePanelLayouts(items); // Update panel layout data
           saveDashboardData.execute(); // Save changes to backend
@@ -519,7 +519,7 @@ export default defineComponent({
       });
 
       // Trigger window resize after panel resize to update charts
-      gridStackInstance.value.on("resizestop", (event, element) => {
+      gridStackInstance.on("resizestop", (event, element) => {
         window.dispatchEvent(new Event("resize"));
       });
     };    // Update panel layout data from GridStack items
@@ -537,13 +537,13 @@ export default defineComponent({
       });
     };    // Optimized GridStack refresh function
     const refreshGridStack = async () => {
-      if (!gridStackInstance.value || !gridStackContainer.value) return;
+      if (!gridStackInstance || !gridStackContainer.value) return;
 
       // Wait for Vue to finish DOM updates
       await nextTick();
       await nextTick();
 
-      const grid = gridStackInstance.value;
+      const grid = gridStackInstance;
 
       // IMPORTANT: Disable animation and floating during reconstruction for better performance
       grid.float(false);
@@ -635,13 +635,13 @@ export default defineComponent({
     // const handleTabChange = async () => {
     //   // console.log("🏷️ Tab change detected, refreshing grid");
 
-    //   if (!gridStackInstance.value) return;
+    //   if (!gridStackInstance) return;
 
     //   // Set transitioning state
     //   isTransitioning.value = true;
 
     //   // Clear the grid completely
-    //   gridStackInstance.value.removeAll(false);
+    //   gridStackInstance.removeAll(false);
 
     //   // Wait for DOM updates
     //   await nextTick();
@@ -658,16 +658,16 @@ export default defineComponent({
 
     // Add a method to reset grid layout
     const resetGridLayout = async () => {
-      if (!gridStackInstance.value) return;
+      if (!gridStackInstance) return;
 
       // Remove all widgets
-      gridStackInstance.value.removeAll(false);
+      gridStackInstance.removeAll(false);
 
       // Wait for cleanup
       await nextTick();
 
       // Compact the grid
-      gridStackInstance.value.compact("compact");
+      gridStackInstance.compact("compact");
 
       // Refresh with current panels
       await refreshGridStack();
@@ -720,17 +720,18 @@ export default defineComponent({
       }
     };
 
-    // Update the watch for selectedTabId
-    // watch(
-    //   () => selectedTabId.value,
-    //   async (newTabId, oldTabId) => {
-    //     if (newTabId !== oldTabId) {
-    //       // console.log(`Tab changed from ${oldTabId} to ${newTabId}`);
-    //       await handleTabChange();
-    //     }
-    //   },
-    //   { immediate: false }
-    // );    // Watch for changes in panels array and refresh grid when needed
+    // disable resize and drag for view only mode and when saving dashboard
+    // do it based on watcher on viewOnly and saveDashboardData.isLoading
+    watch(
+      () => props.viewOnly || saveDashboardData.isLoading.value,
+      (newValue) => {
+        if (gridStackInstance) {
+          gridStackInstance.setStatic(newValue === true);
+        }
+      },
+      { immediate: true },
+    );
+
     watch(
       () => panels.value,
       async (newPanels, oldPanels) => {
@@ -750,7 +751,7 @@ export default defineComponent({
       await nextTick(); // Wait for grid initialization to complete
 
       // Make existing elements into GridStack widgets
-      // if (gridStackInstance.value && panels.value.length > 0) {
+      // if (gridStackInstance && panels.value.length > 0) {
       //   await refreshGridStack();
       // }
     });
@@ -758,9 +759,9 @@ export default defineComponent({
     // Clean up GridStack instance before component unmounts to prevent memory leaks
     onBeforeUnmount(() => {
       // Clean up GridStack instance
-      if (gridStackInstance.value) {
-        gridStackInstance.value.destroy(false);
-        gridStackInstance.value = null;
+      if (gridStackInstance) {
+        gridStackInstance.destroy(false);
+        gridStackInstance = null;
       }
 
       // Clean up other references
@@ -771,9 +772,9 @@ export default defineComponent({
 
     // Final cleanup when component is fully unmounted
     onUnmounted(() => {
-      if (gridStackInstance.value) {
-        gridStackInstance.value.destroy(false);
-        gridStackInstance.value = null;
+      if (gridStackInstance) {
+        gridStackInstance.destroy(false);
+        gridStackInstance = null;
       }
     });
 
@@ -815,8 +816,8 @@ export default defineComponent({
     };
 
     const layoutUpdate = () => {
-      if (gridStackInstance.value) {
-        gridStackInstance.value.compact();
+      if (gridStackInstance) {
+        gridStackInstance.compact();
       }
     };
 
