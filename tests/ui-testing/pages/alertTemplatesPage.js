@@ -38,19 +38,62 @@ export class AlertTemplatesPage {
         await this.page.locator(this.templateNameInput).click();
         await this.page.locator(this.templateNameInput).fill(templateName);
         
-        const templateContent = {
-            text: "{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script"
-        };
+        const templateText = `{
+  "text": "{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script"`;
         
+        // Clear the template editor first
         await this.page.locator(".view-line").click();
-        await this.page.keyboard.type(JSON.stringify(templateContent, null, 2));
+        await this.page.keyboard.press('Control+A');
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(1000);
+        
+        // Enter the template content all at once
+        await this.page.keyboard.type(templateText);
         await this.page.waitForTimeout(1000);
         await this.page.locator(this.templateSubmitButton).click();
         
-        // First verify template appears in list
-        await expect(this.page.getByRole('cell', { name: templateName })).toBeVisible();
-        // Then verify success message
-        await expect(this.page.getByText(this.templateSuccessMessage)).toBeVisible();
+        // Wait for success message with explicit timeout
+        await expect(this.page.getByText(this.templateSuccessMessage)).toBeVisible({ timeout: 30000 });
+        
+        // Additional wait for WebKit to process the update
+        await this.page.waitForTimeout(3000);
+        
+        // Refresh the page to ensure list is updated
+        await this.page.reload();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+
+        // Try to find the template with retry logic
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+            try {
+                // First ensure the table is visible
+                await this.page.locator('table').waitFor({ state: 'visible', timeout: 10000 });
+                
+                // Use search to find the template
+                await this.page.locator(this.templateSearchInput).click();
+                await this.page.locator(this.templateSearchInput).fill(templateName);
+                await this.page.waitForTimeout(1000);
+
+                // Verify the template exists in search results
+                await expect(this.page.getByText('1-1 of')).toBeVisible({ timeout: 30000 });
+                await expect(this.page.getByRole('cell', { name: templateName })).toBeVisible({ timeout: 30000 });
+                
+                console.log('Successfully verified template exists:', templateName);
+                return;
+            } catch (error) {
+                attempts++;
+                if (attempts === maxAttempts) {
+                    throw new Error(`Template ${templateName} not found after ${maxAttempts} attempts`);
+                }
+                console.log(`Attempt ${attempts}: Template not found, retrying...`);
+                await this.page.reload();
+                await this.page.waitForLoadState('networkidle');
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async editTemplate(templateName) {

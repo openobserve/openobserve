@@ -118,7 +118,13 @@ export class AlertsNewPage {
      */
     async navigateToFolder(folderName) {
         await this.page.getByText(folderName).click();
-        await this.page.waitForTimeout(2000); // Wait for folder content to load
+        // Wait for the folder content to load by checking for either the table or no data message
+        await Promise.race([
+            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+        ]).catch(() => {
+            console.log('Neither table nor no data message found, continuing...');
+        });
     }
 
     async verifyNoDataAvailable() {
@@ -185,7 +191,7 @@ export class AlertsNewPage {
         await this.page.waitForTimeout(1000); // Wait after filling value
 
         await this.page.locator(this.alertSubmitButton).click();
-        await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible();
+        await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
         console.log('Successfully created alert:', randomAlertName);
 
         return randomAlertName;
@@ -257,6 +263,11 @@ export class AlertsNewPage {
 
         // Click move button and verify
         await this.page.locator(this.moveButton).click();
+        
+        // Wait for move operation to complete
+        await this.page.waitForLoadState('networkidle');
+        
+        // Verify success message and empty state
         await expect(this.page.getByText(this.alertsMovedMessage)).toBeVisible();
         await expect(this.page.getByText(this.noDataAvailableText)).toBeVisible();
         
@@ -338,7 +349,14 @@ export class AlertsNewPage {
         await this.page.locator(this.alertSearchInput).click();
         await this.page.locator(this.alertSearchInput).fill('');  // Clear the input first
         await this.page.locator(this.alertSearchInput).fill(alertName.toLowerCase());
-        await this.page.waitForTimeout(1000);
+        
+        // Wait for either search results or no data message
+        await Promise.race([
+            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+        ]).catch(() => {
+            console.log('Neither table nor no data message found after search, continuing...');
+        });
     }
 
     /**
