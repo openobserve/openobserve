@@ -253,7 +253,6 @@ export default defineComponent({
     // Initialize GridStack instance 
     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
     let gridStackInstance = null;
-    let resizeTimeout = null;
     const variablesValueSelectorRef = ref(null);
 
     const showViewPanel = ref(false);
@@ -559,7 +558,7 @@ export default defineComponent({
       grid.removeAll(false);
 
       // Wait for DOM cleanup to complete
-      await new Promise((resolve) => setTimeout(resolve, 100));      
+      await nextTick(); // Ensure DOM is ready
       
       if (panels.value.length === 0) {
         return;
@@ -686,11 +685,10 @@ export default defineComponent({
     );
 
     watch(
-      () => panels.value,
-      async (newPanels, oldPanels) => {        // Only refresh if the number of panels changed to avoid unnecessary re-renders
-        if (!oldPanels || newPanels.length !== oldPanels.length) {
-          await refreshGridStack();
-        }
+      () => [selectedTabId.value],
+      async (newPanels, oldPanels) => {        
+        // Only refresh if the number of tab changes
+        await refreshGridStack();
       },
       { deep: true }, // Deep watch to catch layout changes within panels
     );
@@ -704,11 +702,6 @@ export default defineComponent({
 
     // Clean up GridStack instance before component unmounts to prevent memory leaks
     onBeforeUnmount(() => {
-      // Clear timeout
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = null;
-      }
 
       // Clean up GridStack instance
       if (gridStackInstance) {
