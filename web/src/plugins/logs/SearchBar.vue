@@ -1183,6 +1183,7 @@ import {
   onDeactivated,
   defineAsyncComponent,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1520,6 +1521,13 @@ export default defineComponent({
     });
 
     watch(
+      () => searchObj.data.transforms,
+      (newVal) => {
+        functionOptions.value = newVal;
+      }
+    );
+
+    watch(
       () => searchObj.data.stream.selectedStreamFields,
       (fields) => {
         if (fields != undefined && fields.length) updateFieldKeywords(fields);
@@ -1585,6 +1593,11 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importSqlParser();
+    });
+
+    onBeforeUnmount(() => {
+      queryEditorRef.value = null;
+      fnEditorRef.value = null;
     });
 
     const importSqlParser = async () => {

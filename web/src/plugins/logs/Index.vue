@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage">
+  <q-page class="logPage q-my-xs" id="logPage" key="logs-page-main-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #before>
                 <div class="relative-position full-height">
                   <index-list
+                    ref="indexListRef"
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
@@ -283,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-show="showSearchHistory">
+    <div v-if="showSearchHistory">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -336,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div v-show="showSearchScheduler">
+    <div v-if="showSearchScheduler">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"
@@ -393,7 +394,9 @@ export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
-    SearchSchedulersList,
+    SearchSchedulersList: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchSchedulersList.vue")
+    ),
     IndexList: defineAsyncComponent(
       () => import("@/plugins/logs/IndexList.vue"),
     ),
@@ -403,9 +406,15 @@ export default defineComponent({
     ConfirmDialog: defineAsyncComponent(
       () => import("@/components/ConfirmDialog.vue"),
     ),
-    SanitizedHtmlRenderer,
-    VisualizeLogsQuery,
-    SearchHistory,
+    SanitizedHtmlRenderer: defineAsyncComponent(
+      () => import("@/components/SanitizedHtmlRenderer.vue")
+    ),
+    VisualizeLogsQuery: defineAsyncComponent(
+      () => import("@/plugins/logs/VisualizeLogsQuery.vue")
+    ),
+    SearchHistory: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchHistory.vue")
+    ),
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -570,9 +579,11 @@ export default defineComponent({
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
+      cleanUpSearchObj,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const indexListRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
@@ -658,6 +669,11 @@ export default defineComponent({
     });
 
     onBeforeUnmount(() => {
+      cleanUpSearchObj();
+      searchBarRef.value.cleanupEditor();
+      searchBarRef.value = null;
+      searchResultRef.value = null;
+      indexListRef.value = null;
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
     });
@@ -1546,6 +1562,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
+      indexListRef,
       splitterModel,
       // loadPageData,
       getQueryData,
