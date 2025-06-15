@@ -102,7 +102,7 @@ const useRoutes = () => {
       name: "metrics",
       component: AppMetrics,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -113,7 +113,7 @@ const useRoutes = () => {
       name: "traces",
       component: AppTraces,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -149,7 +149,7 @@ const useRoutes = () => {
       name: "tickets",
       component: Tickets,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -160,7 +160,7 @@ const useRoutes = () => {
       name: "about",
       component: About,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
     },
     {
@@ -168,7 +168,7 @@ const useRoutes = () => {
       name: "dashboards",
       component: Dashboards,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -215,7 +215,7 @@ const useRoutes = () => {
       name: "member_subscription",
       component: MemberSubscription,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -311,7 +311,7 @@ const useRoutes = () => {
           name: "Sessions",
           component: AppSessions,
           meta: {
-            keepAlive: true,
+            keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -334,7 +334,7 @@ const useRoutes = () => {
           name: "ErrorTracking",
           component: AppErrors,
           meta: {
-            keepAlive: true,
+            keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -346,7 +346,7 @@ const useRoutes = () => {
           component: ErrorViewer,
           props: true,
           meta: {
-            keepAlive: true,
+            keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -358,7 +358,7 @@ const useRoutes = () => {
           component: AppPerformance,
           props: true,
           meta: {
-            keepAlive: true,
+            keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -406,7 +406,7 @@ const useRoutes = () => {
       path: "/:catchAll(.*)*",
       component: Error404,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
     },
   ];

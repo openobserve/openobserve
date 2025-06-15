@@ -744,7 +744,7 @@ export default defineComponent({
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const openedFilterFields = ref<string[]>([]);
 
-    const intervalId = ref(null);
+    const intervalId = ref();
 
     const userDefinedSchemaBtnGroupOption = [
       {

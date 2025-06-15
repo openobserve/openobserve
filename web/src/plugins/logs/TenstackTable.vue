@@ -568,7 +568,7 @@ watch(
   },
 );
 
-const intervalId = ref(null);
+const intervalId = ref();
 
 const updateTableWidth = async () => {
   tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;

@@ -329,7 +329,7 @@ export const usePanelDataLoader = (
     state.isPartialData = true; // Set to true when cancelled
 
     if (
-      isStreamingEnabled(store.state) &&
+      isStreamingEnabled() &&
       state.searchRequestTraceIds?.length > 0
     ) {
       state.searchRequestTraceIds.forEach((traceId) => {
