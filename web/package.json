@@ -46,6 +46,7 @@
     "echarts": "^5.6.0",
     "echarts-gl": "^2.0.9",
     "flag-icons": "^7.3.2",
+    "gridstack": "^12.2.1",
     "highlight.js": "^11.11.1",
     "js-cookie": "^3.0.5",
     "jszip": "^3.10.1",
