@@ -6469,6 +6469,60 @@ const useLogs = () => {
   const isActionsEnabled = computed(() => {
     return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
   });
+
+  const cleanUpSearchObj = () => {
+    searchObj.data = defaultObject.data;
+    searchObj.data.stream.streamLists = [];
+    searchObj.data.stream.selectedStream = [];
+    searchObj.data.stream.selectedStreamFields = [];
+    searchObj.data.stream.selectedFields = [];
+    searchObj.data.stream.filterField = "";
+    searchObj.data.stream.addToFilter = "";
+    searchObj.data.stream.functions = [];
+    searchObj.data.stream.streamType = "logs";
+    searchObj.data.stream.interestingFieldList = [];
+    searchObj.data.stream.userDefinedSchema = [];
+    searchObj.data.stream.expandGroupRows = {};
+
+    searchObj.data.stream.expandGroupRowsFieldCount = {};
+    searchObj.data.stream.filteredField = [];
+    searchObj.data.stream.missingStreamMultiStreamFilter = [];
+    searchObj.data.stream.pipelineQueryStream = [];
+
+    searchObj.data.resultGrid.columns = [];
+    searchObj.data.resultGrid.colOrder = {};
+    searchObj.data.resultGrid.colSizes = {};
+
+    searchObj.data.histogramInterval = 0;
+    searchObj.data.transforms = [];
+    searchObj.data.actions = [];
+    searchObj.data.savedViews = [];
+    searchObj.data.queryResults = {};
+    searchObj.data.sortedQueryResults = [];
+    searchObj.data.streamResults = [];
+    searchObj.data.histogram = {
+      "xData": [],
+      "yData": [],
+      "chartParams": {
+        "title": "",
+        "unparsed_x_data": [],
+        "timezone": ""
+      },
+      "errorCode": 0,
+      "errorMsg": "",
+      "errorDetail": ""
+    };
+    
+    searchObj.loading = defaultObject.loading;
+    searchObj.loadingHistogram = defaultObject.loadingHistogram;
+    searchObj.loadingCounter = defaultObject.loadingCounter;
+    searchObj.loadingStream = defaultObject.loadingStream;
+    searchObj.loadingSavedView = defaultObject.loadingSavedView;
+    searchObj.shouldIgnoreWatcher = defaultObject.shouldIgnoreWatcher;
+    searchObj.communicationMethod = defaultObject.communicationMethod;
+
+    console.log(JSON.stringify(searchObj));
+  };
   
   return {
     searchObj,
@@ -6528,6 +6582,8 @@ const useLogs = () => {
     sendCancelSearchMessage,
     isDistinctQuery,
     isWithQuery,
+    getStream,
+    cleanUpSearchObj,
   };
 };
 
