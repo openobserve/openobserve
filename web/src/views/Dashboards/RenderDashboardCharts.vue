@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="gridStackContainer"
         v-if="panels.length > 0"
         class="grid-stack"
-        :class="{ transitioning: isTransitioning, ready: !isTransitioning }"
       >
         <div
           v-for="item in panels"
@@ -256,7 +255,6 @@ export default defineComponent({
     let gridStackInstance = null;
     let resizeTimeout = null;
     const variablesValueSelectorRef = ref(null);
-    const isTransitioning = ref(false);
 
     const showViewPanel = ref(false);
     // holds the view panel id
@@ -804,8 +802,8 @@ export default defineComponent({
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
       openEditLayout,
-      saveDashboardData,      currentVariablesDataRef,
-      isTransitioning,
+      saveDashboardData,      
+      currentVariablesDataRef,
       resetGridLayout,
       refreshGridStack,
     };
