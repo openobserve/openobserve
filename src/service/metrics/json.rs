@@ -59,7 +59,7 @@ use crate::{
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
-        log::error!("Metrics ingestion error: {:?}", e);
+        log::error!("Metrics ingestion error: {e}");
         return Ok(IngestionResponse {
             code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
             status: vec![],
