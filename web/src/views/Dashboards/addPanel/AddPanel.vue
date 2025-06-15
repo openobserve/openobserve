@@ -745,6 +745,9 @@ export default defineComponent({
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
       // console.timeEnd("onUnmounted");
+
+      // Clear all refs to prevent memory leaks
+      dateTimePickerRef.value = null;
     });
 
     onMounted(async () => {
