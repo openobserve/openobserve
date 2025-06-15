@@ -16,8 +16,8 @@
 use std::cmp::max;
 
 use config::meta::sql::OrderBy;
-
-use crate::service::search::cache::streaming_aggs::generate_record_batch_interval;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::cache::streaming_agg::generate_record_batch_interval;
 
 /// Generates partitions for search queries
 pub struct PartitionGenerator {

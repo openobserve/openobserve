@@ -34,6 +34,8 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
     config::get_config as get_o2_config,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use serde_json::Map;
 use tokio::sync::mpsc;
 use tracing::Instrument;
@@ -44,7 +46,7 @@ use crate::{
         utils::{stream::get_max_query_range, websocket::calc_queried_range},
     },
     service::{
-        search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
+        search::{self as SearchService, cache},
         self_reporting::report_request_usage_stats,
         websocket_events::{
             search::write_results_to_cache, sort::order_search_results,

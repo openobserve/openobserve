@@ -15,7 +15,6 @@
 
 use std::str::FromStr;
 
-use arrow::array::RecordBatch;
 use config::meta::search::Response;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -90,128 +89,6 @@ impl FromStr for ResultCacheSelectionStrategy {
             "both" => Ok(ResultCacheSelectionStrategy::Both),
             _ => Ok(ResultCacheSelectionStrategy::Both),
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct StreamingAggsCacheResultRecordBatch {
-    pub record_batch: RecordBatch,
-    pub cache_start_time: i64,
-    pub cache_end_time: i64,
-}
-
-#[derive(Default)]
-pub struct StreamingAggsCacheResult {
-    pub cache_result: Vec<StreamingAggsCacheResultRecordBatch>,
-    pub is_complete_match: bool,
-    pub deltas: Vec<QueryDelta>,
-}
-
-impl StreamingAggsCacheResult {
-    pub fn get_record_batches(&self) -> Vec<RecordBatch> {
-        self.cache_result
-            .iter()
-            .map(|v| v.record_batch.clone())
-            .collect::<Vec<_>>()
-    }
-
-    pub fn calculate_deltas(
-        &mut self,
-        query_start_time: i64,
-        query_end_time: i64,
-    ) -> Vec<QueryDelta> {
-        let deltas =
-            calculate_record_batches_deltas(query_start_time, query_end_time, &self.cache_result);
-        self.deltas = deltas.clone();
-        deltas
-    }
-}
-
-fn calculate_record_batches_deltas(
-    query_start_time: i64,
-    query_end_time: i64,
-    cache_result: &[StreamingAggsCacheResultRecordBatch],
-) -> Vec<QueryDelta> {
-    let mut deltas = Vec::new();
-
-    if cache_result.is_empty() {
-        // No cache, entire query range is a delta
-        deltas.push(QueryDelta {
-            delta_start_time: query_start_time,
-            delta_end_time: query_end_time,
-            delta_removed_hits: false,
-        });
-        return deltas;
-    }
-
-    // Sort cache results by start time
-    let mut sorted_cache: Vec<_> = cache_result.iter().collect();
-    sorted_cache.sort_by_key(|cache| cache.cache_start_time);
-
-    // Check if there's a gap before the first cached range
-    if sorted_cache[0].cache_start_time > query_start_time {
-        deltas.push(QueryDelta {
-            delta_start_time: query_start_time,
-            delta_end_time: sorted_cache[0].cache_start_time,
-            delta_removed_hits: false,
-        });
-    }
-
-    // Check for gaps between cached ranges
-    for i in 0..sorted_cache.len() - 1 {
-        let current_end = sorted_cache[i].cache_end_time;
-        let next_start = sorted_cache[i + 1].cache_start_time;
-        if current_end < next_start {
-            deltas.push(QueryDelta {
-                delta_start_time: current_end,
-                delta_end_time: next_start,
-                delta_removed_hits: false,
-            });
-        }
-    }
-
-    // Check if there's a gap after the last cached range
-    let last_cache = sorted_cache.last().unwrap();
-    if last_cache.cache_end_time < query_end_time {
-        deltas.push(QueryDelta {
-            delta_start_time: last_cache.cache_end_time,
-            delta_end_time: query_end_time,
-            delta_removed_hits: false,
-        });
-    }
-
-    deltas
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Interval {
-    FiveMinutes = 5,
-    TenMinutes = 10,
-    ThirtyMinutes = 30,
-    OneHour = 60,
-    TwoHours = 120,
-    SixHours = 360,
-    TwelveHours = 720,
-    OneDay = 1440,
-}
-
-impl Interval {
-    pub fn get_duration_minutes(&self) -> i64 {
-        *self as i64
-    }
-
-    pub fn get_interval_seconds(&self) -> i64 {
-        self.get_duration_minutes() * 60
-    }
-
-    pub fn get_interval_microseconds(&self) -> i64 {
-        self.get_duration_minutes() * 60 * 1_000_000
-    }
-}
-
-impl std::fmt::Display for Interval {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} minutes", self.get_duration_minutes())
     }
 }
 

@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
-        DataFusionError, Result, TableReference,
+        Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     physical_expr::LexOrdering,
@@ -31,14 +31,8 @@ use datafusion::{
 use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
-use super::{
-    empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
-    streaming_aggs_exec,
-};
-use crate::service::search::{
-    cache::streaming_aggs::get_streaming_aggs_records_from_disk, index::IndexCondition,
-    request::Request,
-};
+use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
+use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
@@ -191,143 +185,5 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
         } else {
             Ok(TreeNodeRecursion::Continue)
         }
-    }
-}
-
-pub struct StreamingAggsRewriter {
-    id: String,
-    start_time: i64,
-    end_time: i64,
-    pub is_complete_cache_hit: bool,
-}
-
-impl StreamingAggsRewriter {
-    pub async fn new(id: String, start_time: i64, end_time: i64, use_cache: bool) -> Self {
-        let mut is_complete_cache_hit = false;
-        // Start of loading `StreamingAggsCache` from disk
-        let streaming_item = streaming_aggs_exec::GLOBAL_CACHE.id_cache.get(&id);
-        if let Some(item) = streaming_item {
-            if !use_cache {
-                log::warn!(
-                    "[streaming_id {}] StreamingAggsRewriter: use_cache is false, skip checking cache",
-                    id
-                );
-                return Self {
-                    id,
-                    start_time,
-                    end_time,
-                    is_complete_cache_hit: false,
-                };
-            }
-
-            // Start - checking cache for record batches
-            // Check record batch cache for partition start time and end time
-            let cached_record_batches = match get_streaming_aggs_records_from_disk(
-                start_time,
-                end_time,
-                &item.get_cache_file_path(),
-            )
-            .await
-            {
-                Ok(v) => Some(v),
-                Err(e) => {
-                    log::warn!(
-                        "[streaming_id {}] StreamingAggsRewriter: error checking cached results: {}",
-                        id,
-                        e
-                    );
-                    None
-                }
-            };
-
-            if let Some(cached_result) = cached_record_batches {
-                is_complete_cache_hit = cached_result.is_complete_match;
-                // Load streaming aggs cache with results from disk
-                if let Err(e) = streaming_aggs_exec::prepare_cache(&id, cached_result) {
-                    log::error!(
-                        "[streaming_id {}] StreamingAggsRewriter: error preparing cache: {}",
-                        id,
-                        e
-                    );
-                }
-            }
-            // end - checking cache for record batches
-        }
-
-        Self {
-            id,
-            start_time,
-            end_time,
-            is_complete_cache_hit,
-        }
-    }
-}
-
-impl TreeNodeRewriter for StreamingAggsRewriter {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RemoteScanExec"
-            && !node.children().is_empty()
-            && node.children().first().unwrap().name() == "AggregateExec"
-            && config::get_config().common.feature_query_streaming_aggs
-        {
-            if !streaming_aggs_exec::GLOBAL_CACHE.exists(&self.id) {
-                return Err(DataFusionError::Plan(format!(
-                    "streaming aggregation cache not found with id: {}",
-                    self.id
-                )));
-            }
-
-            let cached_data = streaming_aggs_exec::GLOBAL_CACHE
-                .get(&self.id)
-                .unwrap_or_default();
-
-            log::info!(
-                "[streaming_id {}] StreamingAggsRewriter: cache_strategy={}, cached_batches={}",
-                self.id,
-                if self.is_complete_cache_hit {
-                    "complete_hit"
-                } else {
-                    "miss"
-                },
-                cached_data.len()
-            );
-
-            // For complete cache hits, create minimal execution plan to avoid expensive operations
-            let input_plan = if self.is_complete_cache_hit {
-                log::info!(
-                    "[streaming_id {}] Complete cache hit detected - creating minimal execution plan to bypass: RemoteScanExec->AggregateExec->CoalesceBatchesExec->FilterExec->NewEmptyExec",
-                    self.id
-                );
-                // Create a minimal NewEmptyExec as placeholder since we won't execute it
-                // Use the schema from the original RemoteScanExec for consistency
-                let schema = node.schema();
-                Arc::new(NewEmptyExec::new(
-                    "streaming_cache_hit",
-                    schema.clone(),
-                    None,
-                    &[],
-                    None,
-                    false,
-                    schema.clone(),
-                )) as Arc<dyn ExecutionPlan>
-            } else {
-                node
-            };
-
-            let streaming_node: Arc<dyn ExecutionPlan> = Arc::new(
-                streaming_aggs_exec::StreamingAggsExec::new_with_cache_strategy(
-                    self.id.clone(),
-                    self.start_time,
-                    self.end_time,
-                    cached_data,
-                    input_plan,
-                    self.is_complete_cache_hit,
-                ),
-            ) as _;
-            return Ok(Transformed::yes(streaming_node));
-        }
-        Ok(Transformed::no(node))
     }
 }

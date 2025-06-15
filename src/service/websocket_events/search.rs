@@ -28,6 +28,8 @@ use config::{
     utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use tracing::Instrument;
 
 use super::sort::order_search_results;
@@ -45,10 +47,7 @@ use crate::{
     },
     handler::http::request::ws::session::send_message,
     service::{
-        search::{
-            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
-            sql::Sql,
-        },
+        search::{self as SearchService, cache, sql::Sql},
         setup_tracing_with_trace_id,
         websocket_events::{WsServerEvents, calculate_progress_percentage},
     },

@@ -41,13 +41,18 @@ use config::{
         time::now_micros,
     },
 };
-use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::cache::streaming_agg::{
+    create_record_batch_cache_file_path, generate_record_batch_interval,
+};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
@@ -67,12 +72,7 @@ use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
-    service::search::{
-        cache::streaming_aggs::{
-            create_record_batch_cache_file_path, generate_record_batch_interval,
-        },
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    },
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 pub(crate) mod cache;

@@ -44,6 +44,8 @@ use infra::{
     file_list::FileId,
 };
 use itertools::Itertools;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter;
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -56,9 +58,7 @@ use crate::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
                 distributed_plan::{
-                    EmptyExecVisitor,
-                    remote_scan::RemoteScanExec,
-                    rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+                    EmptyExecVisitor, remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter,
                 },
                 exec::{prepare_datafusion_context, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
