@@ -760,15 +760,15 @@ export default defineComponent({
     // );
 
     // Watch for viewOnly changes
-    watch(
-      () => [props.viewOnly, saveDashboardData.isLoading.value],
-      ([viewOnly, isLoading]) => {
-        if (gridStackInstance.value) {
-          const enableInteraction = !viewOnly && !isLoading;
-          gridStackInstance.value.setStatic(!enableInteraction);
-        }
-      },
-    );
+    // watch(
+    //   () => [props.viewOnly, saveDashboardData.isLoading.value],
+    //   ([viewOnly, isLoading]) => {
+    //     if (gridStackInstance.value) {
+    //       const enableInteraction = !viewOnly && !isLoading;
+    //       gridStackInstance.value.setStatic(!enableInteraction);
+    //     }
+    //   },
+    // );
 
     onMounted(async () => {
       await nextTick();
