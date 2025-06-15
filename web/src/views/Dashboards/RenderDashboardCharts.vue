@@ -254,6 +254,7 @@ export default defineComponent({
     // Initialize GridStack instance 
     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
     let gridStackInstance = null;
+    let resizeTimeout = null;
     const variablesValueSelectorRef = ref(null);
     const isTransitioning = ref(false);
 
@@ -609,7 +610,7 @@ export default defineComponent({
 
       // Compact the grid to remove any gaps
       grid.compact("compact");      // Trigger window resize to ensure charts render correctly
-      setTimeout(() => {
+      resizeTimeout = setTimeout(() => {
         window.dispatchEvent(new Event("resize"));
       }, 200);
     };    // Add a method to reset grid layout
@@ -709,8 +710,16 @@ export default defineComponent({
 
     // Clean up GridStack instance before component unmounts to prevent memory leaks
     onBeforeUnmount(() => {
+      // Clear timeout
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = null;
+      }
+
       // Clean up GridStack instance
       if (gridStackInstance) {
+        gridStackInstance.off("change");
+        gridStackInstance.off("resizestop");
         gridStackInstance.destroy(false);
         gridStackInstance = null;
       }
