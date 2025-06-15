@@ -114,12 +114,21 @@ impl TimestampVisitor {
                     };
 
                     if is_timestamp {
+                        // Get the actual column name being selected
+                        let column_name = match expr {
+                            Expr::Identifier(ident) => ident.value.clone(), // "ts"
+                            Expr::CompoundIdentifier(parts) => parts
+                                .last()
+                                .map(|part| part.value.clone())
+                                .unwrap_or_else(|| TIMESTAMP_COL_NAME.to_string()),
+                            _ => TIMESTAMP_COL_NAME.to_string(),
+                        };
+
                         self.current_scope_timestamp_columns
-                            .insert(TIMESTAMP_COL_NAME.to_string());
-                        // Only set final result for main query
+                            .insert(column_name.clone()); // Use actual name
                         if is_main_query {
                             self.timestamp_selected = true;
-                            self.add_timestamp_column(TIMESTAMP_COL_NAME.to_string());
+                            self.add_timestamp_column(column_name); // Use actual name
                         }
                     }
                 }
@@ -165,12 +174,21 @@ impl TimestampVisitor {
                 }
 
                 SelectItem::Wildcard(_) => {
-                    self.current_scope_timestamp_columns
-                        .insert(TIMESTAMP_COL_NAME.to_string());
-                    // Only set final result for main query
-                    if is_main_query {
-                        self.timestamp_selected = true;
-                        self.add_timestamp_column(TIMESTAMP_COL_NAME.to_string());
+                    // For wildcard, use whatever timestamp columns are available in current scope
+                    for col in &self.current_scope_timestamp_columns.clone() {
+                        if is_main_query {
+                            self.timestamp_selected = true;
+                            self.add_timestamp_column(col.clone());
+                        }
+                    }
+                    // If no scope columns, default to _timestamp
+                    if self.current_scope_timestamp_columns.is_empty() {
+                        self.current_scope_timestamp_columns
+                            .insert(TIMESTAMP_COL_NAME.to_string());
+                        if is_main_query {
+                            self.timestamp_selected = true;
+                            self.add_timestamp_column(TIMESTAMP_COL_NAME.to_string());
+                        }
                     }
                 }
 
