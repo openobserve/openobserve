@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #before>
                 <div class="relative-position full-height">
                   <index-list
+                    ref="indexListRef"
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
@@ -576,6 +577,7 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       getStream,
+      cleanUpSearchObj,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -677,29 +679,11 @@ export default defineComponent({
         clearInterval(intervalId.value);
       }
 
+      cleanUpSearchObj();
+
       searchBarRef.value = null;
       searchResultRef.value = null;
       indexListRef.value = null;
-      searchObj.data.stream.selectedStream = [];
-      searchObj.data.stream.streamLists = [];
-      searchObj.data.stream = {
-        loading: false,
-        streamLists: [],
-        selectedStream: [],
-        selectedStreamFields: [],
-        selectedFields: [],
-        filterField: "",
-        addToFilter: "",
-        functions: [],
-        streamType: "logs",
-        interestingFieldList: [],
-        userDefinedSchema: [],
-        expandGroupRows: {},
-        expandGroupRowsFieldCount: {},
-        filteredField: [],
-        missingStreamMultiStreamFilter: [],
-        pipelineQueryStream: [],
-      };
     });
 
     onActivated(() => {
