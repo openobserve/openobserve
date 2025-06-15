@@ -195,6 +195,7 @@ import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
+import { pad } from "lodash-es";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -488,8 +489,8 @@ export default defineComponent({
       gridStackInstance.value = GridStack.init(
         {
           column: 48,
-          cellHeight: "30px",
-          margin: "4px",
+          cellHeight: "34px",
+          margin: 2,
           draggable: {
             enable: !props.viewOnly && !saveDashboardData.isLoading.value,
             handle: ".drag-allow",
@@ -917,6 +918,7 @@ export default defineComponent({
   min-height: 0 !important;
   height: auto !important;
   background: transparent;
+  margin: 2px;
   
   &.grid-stack-static {
     .ui-resizable-handle {
@@ -926,8 +928,7 @@ export default defineComponent({
 }
 
 .grid-stack-item {
-  border: 1px solid #c2c2c27a;
-  border-radius: 4px;
+  
   background: transparent;
   will-change: transform; /* Optimize for animations */
 
@@ -936,8 +937,10 @@ export default defineComponent({
   }
 
   .grid-stack-item-content {
-    height: 100%;
-    width: 100%;
+    border: 1px solid #c2c2c27a;
+    border-radius: 4px; 
+    // height: 100%;
+    // width: 100%;
     overflow: hidden;
     border-radius: inherit;
   }
