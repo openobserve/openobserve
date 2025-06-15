@@ -6494,6 +6494,8 @@ const useLogs = () => {
     searchObj.data.resultGrid.colSizes = {};
 
     searchObj.data.histogramInterval = 0;
+    searchObj.data.query = "";
+    searchObj.data.tempFunctionContent = "";
     searchObj.data.transforms = [];
     searchObj.data.actions = [];
     searchObj.data.savedViews = [];
@@ -6520,8 +6522,6 @@ const useLogs = () => {
     searchObj.loadingSavedView = defaultObject.loadingSavedView;
     searchObj.shouldIgnoreWatcher = defaultObject.shouldIgnoreWatcher;
     searchObj.communicationMethod = defaultObject.communicationMethod;
-
-    console.log(JSON.stringify(searchObj));
   };
   
   return {

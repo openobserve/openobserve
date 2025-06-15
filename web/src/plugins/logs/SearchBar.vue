@@ -709,6 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <query-editor
+              v-if="router.currentRoute.value.name === 'logs'"
               data-test="logs-search-bar-query-editor"
               editor-id="logsQueryEditor"
               ref="queryEditorRef"
@@ -738,6 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template v-if="showFunctionEditor">
                 <query-editor
+                  v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"
@@ -757,6 +759,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
                 <query-editor
+                  v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"

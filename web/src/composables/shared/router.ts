@@ -22,7 +22,7 @@ import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 
-const Search = () => import("@/views/Search.vue");
+const Search = () => import("@/plugins/logs/Index.vue");
 const AppMetrics = () => import("@/views/AppMetrics.vue");
 const AppTraces = () => import("@/views/AppTraces.vue");
 
@@ -83,7 +83,7 @@ const useRoutes = () => {
       name: "home",
       component: Home,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
     },
     {
@@ -91,7 +91,7 @@ const useRoutes = () => {
       name: "logs",
       component: Search,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

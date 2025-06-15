@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage" key="logs-page-main-container">
+  <q-page class="logPage q-my-xs" id="logPage">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar"
             ref="searchBarRef"
             :fieldValues="fieldValues"
-            :key="searchObj.data.transforms.length || -1"
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
@@ -64,10 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ref="indexListRef"
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    :key="
-                      searchObj.data.stream.selectedStream.join(',') ||
-                      'default'
-                    "
+                    key="index-list-key"
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
@@ -670,7 +666,6 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       cleanUpSearchObj();
-      searchBarRef.value.cleanupEditor();
       searchBarRef.value = null;
       searchResultRef.value = null;
       indexListRef.value = null;
