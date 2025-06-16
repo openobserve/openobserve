@@ -141,6 +141,7 @@ jobs:
             "unflattened.spec.js",
             "usersOrg.spec.js",
             "websocket.spec.js",
+            "alertsNew.spec.js",
              # "remotepipeline.spec.js",
 
           ]

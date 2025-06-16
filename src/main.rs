@@ -351,7 +351,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
             };
             if let Err(e) = ret {
-                log::error!("gRPC server init failed: {:?}", e);
+                log::error!("gRPC server init failed: {e}");
                 std::process::exit(1);
             }
         });
@@ -581,7 +581,7 @@ async fn init_common_grpc_server(
         })
         .await;
     if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{:?}", e));
+        return Err(anyhow::anyhow!("{e}"));
     }
 
     stopped_tx.send(()).ok();
@@ -637,7 +637,7 @@ async fn init_router_grpc_server(
         })
         .await;
     if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{:?}", e));
+        return Err(anyhow::anyhow!("{e}"));
     }
 
     stopped_tx.send(()).ok();

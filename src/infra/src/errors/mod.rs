@@ -18,7 +18,7 @@ use config::utils::json;
 use thiserror::Error as ThisError;
 pub mod grpc;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(ThisError, Debug)]
 pub enum Error {
@@ -82,6 +82,8 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("Error# {0}")]
     ResourceError(String),
+    #[error("Error# {0}")]
+    IngestionError(String),
     #[error("Error# {0}")]
     WalFileError(String),
     #[error("Error# {0}")]

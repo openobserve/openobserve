@@ -48,7 +48,7 @@ impl PuffinDirReader {
         let Some(metadata) = source.get_metadata().await.map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,
-                format!("Error reading metadata from puffin file: {:?}", e),
+                format!("Error reading metadata from puffin file: {e}"),
             )
         })?
         else {
@@ -124,7 +124,7 @@ impl FileHandle for PuffinSliceHandle {
             .map_err(|e| {
                 io::Error::new(
                     io::ErrorKind::Other,
-                    format!("Error reading bytes from blob: {:?}", e),
+                    format!("Error reading bytes from blob: {e}"),
                 )
             })?;
         Ok(OwnedBytes::new(data.to_vec()))
@@ -539,7 +539,7 @@ mod tests {
             Err(OpenReadError::FileDoesNotExist(_)) => {
                 // Expected for files not in empty puffin directory
             }
-            Err(e) => panic!("Unexpected error: {:?}", e),
+            Err(e) => panic!("Unexpected error: {e}"),
         }
     }
 
