@@ -34,7 +34,10 @@ use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
     Term,
-    query::{BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
+    query::{
+        AllQuery, BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery,
+        TermQuery,
+    },
     schema::{Field, IndexRecordOption, Schema},
 };
 
@@ -159,6 +162,15 @@ impl IndexCondition {
             }
         }
         projection
+    }
+
+    pub fn need_all_term_fields(&self) -> Vec<String> {
+        self.conditions
+            .iter()
+            .flat_map(|condition| condition.need_all_term_fields())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect()
     }
 
     pub fn to_physical_expr(
@@ -304,7 +316,9 @@ impl Condition {
                 let default_field = default_field.ok_or_else(|| {
                     anyhow::anyhow!("There's no FullTextSearch field for match_all() function")
                 })?;
-                if value.starts_with("*") && value.ends_with("*") {
+                if value.is_empty() || value == "*" {
+                    Box::new(AllQuery {})
+                } else if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
                     Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else if value.to_lowercase().starts_with("re:") {
@@ -317,18 +331,25 @@ impl Condition {
                         Term::from_field_text(default_field, value),
                     )]))
                 } else {
-                    if value.is_empty() {
-                        return Err(anyhow::anyhow!(
-                            "The value of match_all() function can't be empty"
-                        ));
-                    }
-                    let mut terms: Vec<Box<dyn Query>> = o2_collect_tokens(value)
+                    let mut tokens = o2_collect_tokens(value);
+                    let last_prefix = if value.ends_with("*") {
+                        tokens.pop()
+                    } else {
+                        None
+                    };
+                    let mut terms: Vec<Box<dyn Query>> = tokens
                         .into_iter()
                         .map(|value| {
                             let term = Term::from_field_text(default_field, &value);
                             Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
                         })
                         .collect();
+                    if let Some(value) = last_prefix {
+                        terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
+                            0,
+                            Term::from_field_text(default_field, &value),
+                        )])));
+                    }
                     if terms.len() > 1 {
                         Box::new(BooleanQuery::intersection(terms))
                     } else {
@@ -361,6 +382,23 @@ impl Condition {
                 Box::new(BooleanQuery::intersection(vec![left_query, right_query]))
             }
         })
+    }
+
+    pub fn need_all_term_fields(&self) -> Vec<String> {
+        match self {
+            Condition::Regex(field, _) => vec![field.clone()],
+            Condition::MatchAll(value) => {
+                if (value.len() > 1 && (value.starts_with("*") || value.ends_with("*")))
+                    || (value.len() > 3 && value.starts_with("re:"))
+                {
+                    vec![INDEX_FIELD_NAME_FOR_ALL.to_string()]
+                } else {
+                    vec![]
+                }
+            }
+            Condition::FuzzyMatchAll(..) => vec![INDEX_FIELD_NAME_FOR_ALL.to_string()],
+            _ => vec![],
+        }
     }
 
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
