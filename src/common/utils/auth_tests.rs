@@ -3007,6 +3007,8 @@ mod tests {
                 max_frame_size: usize::default(),
                 max_continuation_size: usize::default(),
                 max_channel_buffer_size: usize::default(),
+                streaming_enabled: bool::default(),
+                streaming_response_chunk_size: usize::default(),
             },
             route: config::Route {
                 timeout: u64::default(),
@@ -3015,6 +3017,7 @@ mod tests {
             common: config::Common {
                 app_name: String::default(),
                 local_mode: bool::default(),
+                use_stream_settings_for_partitions_enabled: bool::default(),
                 local_mode_storage: String::default(),
                 is_local_storage: true,
                 cluster_coordinator: String::default(),
@@ -3244,6 +3247,10 @@ mod tests {
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
                 search_mini_partition_duration_secs: u64::default(),
+                file_download_priority_queue_thread_num: usize::default(),
+                file_download_priority_queue_window_secs: u64::default(),
+                file_download_enable_priority_queue: bool::default(),
+                calculate_stats_step_limit: u64::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
