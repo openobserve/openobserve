@@ -1,3 +1,5 @@
+//dashboard variables page object
+//methods: addDashboardVariable, selectValueFromVariableDropDown
 import { expect } from "@playwright/test";
 
 export default class DashboardVariables {
