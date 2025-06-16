@@ -412,6 +412,8 @@ export default defineComponent({
           (response.type === "search_response" ||
             response.type === "search_response_hits")
         ) {
+          // variableObject.isVariablePartialLoaded = true;
+
           const hits = response.content.results.hits;
 
           const fieldHit = hits.find(
