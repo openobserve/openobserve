@@ -567,6 +567,13 @@ pub async fn do_partitioned_search(
         req.query.streaming_output = true;
         req.query.streaming_id = partition_resp.streaming_id.clone();
         use_cache = req.use_cache.unwrap_or_default();
+        log::info!(
+            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] is_streaming_aggs: {}, use_cache: {}",
+            trace_id,
+            partition_resp.streaming_id.clone().unwrap(),
+            is_streaming_aggs,
+            use_cache
+        );
     }
 
     // The order by for the partitions is the same as the order by in the query

@@ -684,6 +684,12 @@ pub async fn search_partition(
                 cache_interval,
             );
             streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
+            log::info!(
+                "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
+                trace_id,
+                id,
+                cache_file_path
+            );
         }
     }
 
