@@ -35,7 +35,7 @@ export class CommonActions {
         const dropdown = this.page.locator('.q-menu');
         let optionFound = false;
         let maxScrolls = 20;
-        let scrollAmount = 200;
+        let scrollAmount = 300;
         let totalScrolled = 0;
 
         while (!optionFound && maxScrolls > 0) {
@@ -53,6 +53,7 @@ export class CommonActions {
                     }
                     optionFound = true;
                     console.log(`Found ${optionType} after scrolling:`, optionName);
+                    await this.page.waitForTimeout(1000);
                 } else {
                     // Get the current scroll position and height
                     const { scrollTop, scrollHeight, clientHeight } = await dropdown.evaluate(el => ({
@@ -65,20 +66,20 @@ export class CommonActions {
                     if (scrollTop + clientHeight >= scrollHeight) {
                         await dropdown.evaluate(el => el.scrollTop = 0);
                         totalScrolled = 0;
+                        await this.page.waitForTimeout(1000);
                     } else {
                         // Scroll down
                         await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
                         totalScrolled += scrollAmount;
+                        await this.page.waitForTimeout(1000);
                     }
-                    
-                    await this.page.waitForTimeout(500);
                     maxScrolls--;
                 }
             } catch (error) {
                 // If option not found, scroll and try again
                 await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
                 totalScrolled += scrollAmount;
-                await this.page.waitForTimeout(500);
+                await this.page.waitForTimeout(1000);
                 maxScrolls--;
             }
         }
