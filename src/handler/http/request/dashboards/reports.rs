@@ -44,6 +44,7 @@ impl From<ReportError> for HttpResponse {
             ReportError::ParseCronError(e) => MetaHttpResponse::bad_request(e),
             ReportError::DbError(e) => MetaHttpResponse::internal_error(e),
             ReportError::SendReportError(e) => MetaHttpResponse::internal_error(e),
+            ReportError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
         }
     }
 }

@@ -97,6 +97,9 @@ pub enum ReportError {
 
     #[error(transparent)]
     SendReportError(#[from] SendReportError),
+
+    #[error("Error creating default reports folder")]
+    CreateDefaultFolderError,
 }
 
 pub async fn save(

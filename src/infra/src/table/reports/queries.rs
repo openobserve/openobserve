@@ -307,6 +307,7 @@ pub struct ListReportsQueryResult {
     pub report_description: Option<String>,
     pub folder_id: String,
     pub folder_name: String,
+    pub report_enabled: bool,
 }
 
 impl ListReportsQueryResult {
@@ -328,6 +329,7 @@ impl ListReportsQueryResult {
             .column_as(reports::Column::Description, "report_description")
             .column_as(folders::Column::FolderId, "folder_id")
             .column_as(folders::Column::Name, "folder_name")
+            .column_as(reports::Column::Enabled, "report_enabled")
             .join(
                 sea_orm::JoinType::InnerJoin,
                 reports::Relation::Folders.def(),
@@ -499,7 +501,8 @@ mod tests {
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
                 "folders"."folder_id" AS "folder_id",
-                "folders"."name" AS "folder_name" FROM "reports" 
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 WHERE "folders"."org" = 'TEST_ORG_ID' 
                 ORDER BY 
@@ -536,7 +539,8 @@ mod tests {
                 `reports`.`owner` AS `report_owner`,
                 `reports`.`description` AS `report_description`,
                 `folders`.`folder_id` AS `folder_id`,
-                `folders`.`name` AS `folder_name` 
+                `folders`.`name` AS `folder_name`,
+                `reports`.`enabled` AS `report_enabled` 
                 FROM `reports` 
                 INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
                 WHERE `folders`.`org` = 'TEST_ORG_ID' 
@@ -574,7 +578,8 @@ mod tests {
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
                 "folders"."folder_id" AS "folder_id",
-                "folders"."name" AS "folder_name" FROM "reports" 
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 WHERE "folders"."org" = 'TEST_ORG_ID' 
                 ORDER BY 

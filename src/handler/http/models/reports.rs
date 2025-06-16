@@ -33,6 +33,7 @@ pub struct ListReportsResponseBodyItem {
     pub owner: Option<String>,
     pub description: Option<String>,
     pub last_triggered_at: Option<i64>,
+    pub enabled: bool,
 }
 
 impl TryFrom<Vec<infra::table::reports::ListReportsQueryResult>> for ListReportsResponseBody {
@@ -62,6 +63,7 @@ impl TryFrom<infra::table::reports::ListReportsQueryResult> for ListReportsRespo
             owner: value.report_owner,
             description: value.report_description,
             last_triggered_at: None,
+            enabled: value.report_enabled,
         })
     }
 }

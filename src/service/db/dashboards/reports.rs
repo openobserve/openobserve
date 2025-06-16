@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::dashboards::reports::{ListReportsParams, Report};
+use config::meta::{
+    dashboards::reports::{ListReportsParams, Report},
+    folder::{DEFAULT_FOLDER, Folder, FolderType},
+};
 use infra::table;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::{Ksuid, KsuidLike};
 
-use crate::service::db;
+use crate::service::{dashboards::reports::ReportError, db, folders};
 
 pub async fn get<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
@@ -107,6 +110,12 @@ pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTra
 ) -> Result<(), anyhow::Error> {
     let report_id = Ksuid::new(None, None);
     let _report_id_str = report_id.to_string();
+    // Check if the folder_id is default and if it already exists.
+    if folder_snowflake_id == DEFAULT_FOLDER
+        && !table::folders::exists(&report.org_id, DEFAULT_FOLDER, FolderType::Reports).await?
+    {
+        create_default_reports_folder(&report.org_id).await?;
+    }
     table::reports::create_report(conn, folder_snowflake_id, report.clone(), Some(report_id))
         .await?;
     #[cfg(feature = "enterprise")]
@@ -118,6 +127,17 @@ pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTra
     )
     .await?;
     Ok(())
+}
+
+async fn create_default_reports_folder(org_id: &str) -> Result<Folder, ReportError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: "default".to_owned(),
+        description: "default".to_owned(),
+    };
+    folders::save_folder(org_id, default_folder, FolderType::Reports, true)
+        .await
+        .map_err(|_| ReportError::CreateDefaultFolderError)
 }
 
 pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
