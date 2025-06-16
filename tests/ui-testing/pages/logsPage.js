@@ -14,6 +14,8 @@ export class LogsPage {
     this.logsMenuItem = page.locator('[data-test="menu-link-\\/logs-item"]');
     this.indexDropDown = page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
     this.streamToggle = page.locator('[data-test="log-search-index-list-stream-toggle-default"] div');
+    this.exploreButton = page.getByRole('button', { name: 'Explore' });
+    this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
 
     this.filterMessage = page.locator('div:has-text("info Adjust filter parameters and click \'Run query\'")');
 
@@ -657,6 +659,62 @@ async verifyStreamingModeResponse() {
   const searchData = await searchResponse.json();
   expect(searchData).toBeDefined();
   expect(searchData.hits).toBeDefined();
+}
+
+async clickExplore() {
+  try {
+    // Wait for the explore button to be visible and clickable
+    await this.exploreButton.first().waitFor({ state: 'visible', timeout: 10000 });
+    await this.exploreButton.first().waitFor({ state: 'attached', timeout: 10000 });
+    
+    // Click the button and wait for any network requests to complete
+    await Promise.all([
+      this.page.waitForLoadState('networkidle'),
+      this.exploreButton.first().click()
+    ]);
+    
+    // Wait for the results to load
+    await this.page.waitForTimeout(3000);
+  } catch (error) {
+    console.error('Error in clickExplore:', error);
+    throw error;
+  }
+}
+
+async openTimestampMenu() {
+  try {
+    // Wait for the table to be visible first
+    await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { state: 'visible', timeout: 10000 });
+    
+    // Wait for the timestamp column to be visible
+    await this.page.waitForSelector('[data-test="log-table-column-1-_timestamp"]', { state: 'visible', timeout: 10000 });
+    
+    // Wait for the menu button to be visible and clickable
+    await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 10000 });
+    
+    // Ensure the menu button is in viewport
+    await this.timestampColumnMenu.scrollIntoViewIfNeeded();
+    
+    // Click the menu and wait for any network requests to complete
+    await Promise.all([
+      this.page.waitForLoadState('networkidle'),
+      this.timestampColumnMenu.click({ force: true })
+    ]);
+    
+    // Wait for the menu to open
+    await this.page.waitForTimeout(1000);
+  } catch (error) {
+    console.error('Error in openTimestampMenu:', error);
+    // Try alternative approach if first attempt fails
+    try {
+      await this.page.waitForTimeout(2000); // Give more time for the table to load
+      await this.timestampColumnMenu.click({ force: true });
+      await this.page.waitForTimeout(1000);
+    } catch (retryError) {
+      console.error('Error in openTimestampMenu retry:', retryError);
+      throw retryError;
+    }
+  }
 }
 
 }
