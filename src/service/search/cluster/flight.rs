@@ -459,9 +459,13 @@ pub async fn run_datafusion(
         }
     }
 
+    #[cfg(feature = "enterprise")]
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+    #[cfg(feature = "enterprise")]
     let streaming_output = req.streaming_output;
+    #[cfg(feature = "enterprise")]
     let streaming_id = req.streaming_id.clone();
+    #[cfg(feature = "enterprise")]
     let use_cache = req.use_cache.unwrap_or(false);
 
     let context = tracing::Span::current().context();
@@ -489,21 +493,25 @@ pub async fn run_datafusion(
     }
 
     // check for streaming aggregation query
+    #[allow(unused_mut)]
     let mut aggs_cache_ratio = 0;
-    if streaming_output {
-        let Some(streaming_id) = streaming_id else {
-            return Err(Error::Message(
-                "streaming_id is required for streaming aggregation query".to_string(),
-            ));
-        };
-        let mut rewriter =
-            StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
-        // Check for aggs cache hit
-        if rewriter.is_complete_cache_hit {
-            aggs_cache_ratio = 100;
-        }
+    #[cfg(feature = "enterprise")]
+    {
+        if streaming_output {
+            let Some(streaming_id) = streaming_id else {
+                return Err(Error::Message(
+                    "streaming_id is required for streaming aggregation query".to_string(),
+                ));
+            };
+            let mut rewriter =
+                StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
+            // Check for aggs cache hit
+            if rewriter.is_complete_cache_hit {
+                aggs_cache_ratio = 100;
+            }
 
-        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+            physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+        }
     }
 
     let mut visitor = EmptyExecVisitor::default();

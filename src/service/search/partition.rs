@@ -61,9 +61,16 @@ impl PartitionGenerator {
                 start_time, end_time, step, order_by,
             )
         } else if is_streaming_aggregate {
-            self.generate_partitions_with_streaming_aggregate_partition_window(
-                start_time, end_time, order_by,
-            )
+            #[cfg(feature = "enterprise")]
+            {
+                self.generate_partitions_with_streaming_aggregate_partition_window(
+                    start_time, end_time, order_by,
+                )
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
+            }
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
@@ -187,6 +194,7 @@ impl PartitionGenerator {
         partitions
     }
 
+    #[cfg(feature = "enterprise")]
     fn generate_partitions_with_streaming_aggregate_partition_window(
         &self,
         start_time: i64,
