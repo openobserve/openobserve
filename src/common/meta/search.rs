@@ -94,11 +94,7 @@ impl FromStr for ResultCacheSelectionStrategy {
 
 #[cfg(test)]
 mod tests {
-    use arrow_schema::{DataType, Field};
     use config::meta::search::Response;
-    use o2_enterprise::enterprise::common::streaming_agg_cache::{
-        StreamingAggsCacheResultRecordBatch, calculate_record_batches_deltas,
-    };
 
     use super::*;
 
@@ -256,6 +252,16 @@ mod tests {
             assert_eq!(strategy, deserialized);
         }
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "enterprise")]
+mod enterprise_tests {
+    use arrow_schema::{DataType, Field};
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::common::streaming_agg_cache::{
+        StreamingAggsCacheResultRecordBatch, calculate_record_batches_deltas,
+    };
 
     #[test]
     fn test_calculate_record_batches_deltas() {
