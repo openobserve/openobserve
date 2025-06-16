@@ -573,7 +573,6 @@ mod tests {
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
-                "reports"."last_triggered_at" AS "report_last_triggered_at",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
@@ -625,7 +624,6 @@ mod tests {
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
-                "reports"."last_triggered_at" AS "report_last_triggered_at",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
@@ -659,8 +657,6 @@ mod tests {
                 `reports`.`frequency`,
                 `reports`.`destinations`,
                 `reports`.`message`,
-                `reports`.`chrome_driver_login_email`,
-                `reports`.`chrome_driver_login_password`,
                 `reports`.`timezone`,
                 `reports`.`tz_offset`,
                 `reports`.`owner`,
@@ -668,12 +664,10 @@ mod tests {
                 `reports`.`created_at`,
                 `reports`.`updated_at`,
                 `reports`.`start_at`,
-                `reports`.`last_triggered_at`,
                 `reports`.`id` AS `report_id`,
                 `reports`.`name` AS `report_name`,
                 `reports`.`owner` AS `report_owner`,
                 `reports`.`description` AS `report_description`,
-                `reports`.`last_triggered_at` AS `report_last_triggered_at`,
                 `folders`.`folder_id` AS `folder_id`,
                 `folders`.`name` AS `folder_name` 
                 FROM `reports` 
@@ -707,8 +701,6 @@ mod tests {
                 "reports"."frequency",
                 "reports"."destinations",
                 "reports"."message",
-                "reports"."chrome_driver_login_email",
-                "reports"."chrome_driver_login_password",
                 "reports"."timezone",
                 "reports"."tz_offset",
                 "reports"."owner",
@@ -716,12 +708,10 @@ mod tests {
                 "reports"."created_at",
                 "reports"."updated_at",
                 "reports"."start_at",
-                "reports"."last_triggered_at",
                 "reports"."id" AS "report_id",
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
-                "reports"."last_triggered_at" AS "report_last_triggered_at",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 

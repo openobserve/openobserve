@@ -886,7 +886,7 @@ mod tests {
         let stmnt = OrgWithReport::statement();
         assert_eq!(
             &stmnt.to_string(PostgresQueryBuilder),
-            r#"SELECT "key1" FROM "meta" WHERE "module" = 'reports' GROUP BY "key1""#
+            r#"SELECT "key1" FROM "meta" WHERE "module" = 'reports' GROUP BY "key1" ORDER BY "key1" ASC"#
         );
     }
 
@@ -895,7 +895,7 @@ mod tests {
         let stmnt = OrgWithReport::statement();
         assert_eq!(
             &stmnt.to_string(MysqlQueryBuilder),
-            r#"SELECT `key1` FROM `meta` WHERE `module` = 'reports' GROUP BY `key1`"#
+            r#"SELECT `key1` FROM `meta` WHERE `module` = 'reports' GROUP BY `key1` ORDER BY `key1` ASC"#
         );
     }
 
@@ -904,7 +904,7 @@ mod tests {
         let stmnt = OrgWithReport::statement();
         assert_eq!(
             &stmnt.to_string(SqliteQueryBuilder),
-            r#"SELECT "key1" FROM "meta" WHERE "module" = 'reports' GROUP BY "key1""#
+            r#"SELECT "key1" FROM "meta" WHERE "module" = 'reports' GROUP BY "key1" ORDER BY "key1" ASC"#
         );
     }
 
@@ -921,7 +921,7 @@ mod tests {
                 LEFT JOIN "folders" 
                 ON "folders"."org" = "meta"."key1" 
                 WHERE "meta"."module" = 'reports' 
-                AND "folders"."type" = 1 
+                AND "folders"."type" = 2 
                 AND "folders"."folder_id" = 'default'
             "#
         );
@@ -940,7 +940,7 @@ mod tests {
                 LEFT JOIN `folders` 
                 ON `folders`.`org` = `meta`.`key1` 
                 WHERE `meta`.`module` = 'reports' 
-                AND `folders`.`type` = 1 
+                AND `folders`.`type` = 2 
                 AND `folders`.`folder_id` = 'default'
             "#
         );
@@ -959,7 +959,7 @@ mod tests {
                 LEFT JOIN "folders" 
                 ON "folders"."org" = "meta"."key1" 
                 WHERE "meta"."module" = 'reports' 
-                AND "folders"."type" = 1 
+                AND "folders"."type" = 2 
                 AND "folders"."folder_id" = 'default'
             "#
         );
