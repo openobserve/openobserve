@@ -358,6 +358,8 @@ async fn run_datafusion(
                     .build()
             )
         );
+        // Update scan stats to include aggregation cache ratio
+        visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
