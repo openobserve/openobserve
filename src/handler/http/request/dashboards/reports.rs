@@ -16,12 +16,18 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
-use config::meta::dashboards::reports::{Report, ReportListFilters};
+use config::meta::{
+    dashboards::reports::{Report, ReportListFilters},
+    triggers::{Trigger, TriggerModule},
+};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::reports::ListReportsResponseBody,
-    service::dashboards::reports::{self, ReportError},
+    handler::http::models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+    service::{
+        dashboards::reports::{self, ReportError},
+        db::scheduler,
+    },
 };
 
 impl From<ReportError> for HttpResponse {
@@ -190,17 +196,33 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
         // Get List of allowed objects ends
     }
 
+    let scheduled_jobs = scheduler::list_by_org(&org_id, Some(TriggerModule::Report))
+        .await
+        .unwrap_or_default();
+    let mut scheduled_jobs: HashMap<String, Trigger> = scheduled_jobs
+        .into_iter()
+        .map(|t| (t.module_key.clone(), t))
+        .collect();
     let data = match reports::list(&org_id, filters, _permitted).await {
-        Ok(data) => data,
+        Ok(data) => ListReportsResponseBody(
+            data.into_iter()
+                .map(|d| {
+                    let scheduled_job = scheduled_jobs.remove(&d.report_id);
+                    let Ok(mut item) = ListReportsResponseBodyItem::try_from(d) else {
+                        return None;
+                    };
+                    item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
+                    Some(item)
+                })
+                .collect::<Option<Vec<_>>>()
+                .unwrap_or_default(),
+        ),
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
 
-    match ListReportsResponseBody::try_from(data) {
-        Ok(response) => Ok(MetaHttpResponse::json(response)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-    }
+    Ok(MetaHttpResponse::json(data))
 }
 
 /// GetReport

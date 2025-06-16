@@ -481,6 +481,7 @@ mod tests {
             r#"
                 SELECT 
                 "reports"."id",
+                "reports"."org",
                 "reports"."folder_id",
                 "reports"."name",
                 "reports"."title",
@@ -519,6 +520,7 @@ mod tests {
             r#"
                 SELECT 
                 `reports`.`id`,
+                `reports`.`org`,
                 `reports`.`folder_id`,
                 `reports`.`name`,
                 `reports`.`title`,
@@ -558,6 +560,7 @@ mod tests {
             r#"
                 SELECT 
                 "reports"."id",
+                "reports"."org",
                 "reports"."folder_id",
                 "reports"."name",
                 "reports"."title",
@@ -610,6 +613,7 @@ mod tests {
             r#"
                 SELECT 
                 "reports"."id",
+                "reports"."org",
                 "reports"."folder_id",
                 "reports"."name",
                 "reports"."title",
@@ -630,7 +634,9 @@ mod tests {
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
                 "folders"."folder_id" AS "folder_id",
-                "folders"."name" AS "folder_name" FROM "reports" 
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled"
+                FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
@@ -654,6 +660,7 @@ mod tests {
             r#"
                 SELECT 
                 `reports`.`id`,
+                `reports`.`org`,
                 `reports`.`folder_id`,
                 `reports`.`name`,
                 `reports`.`title`,
@@ -674,7 +681,8 @@ mod tests {
                 `reports`.`owner` AS `report_owner`,
                 `reports`.`description` AS `report_description`,
                 `folders`.`folder_id` AS `folder_id`,
-                `folders`.`name` AS `folder_name` 
+                `folders`.`name` AS `folder_name`,
+                `reports`.`enabled` AS `report_enabled`
                 FROM `reports` 
                 INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
                 INNER JOIN `report_dashboards` ON `reports`.`id` = `report_dashboards`.`report_id` 
@@ -698,6 +706,7 @@ mod tests {
             r#"
                 SELECT 
                 "reports"."id",
+                "reports"."org",
                 "reports"."folder_id",
                 "reports"."name",
                 "reports"."title",
@@ -718,7 +727,8 @@ mod tests {
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
                 "folders"."folder_id" AS "folder_id",
-                "folders"."name" AS "folder_name" FROM "reports" 
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 

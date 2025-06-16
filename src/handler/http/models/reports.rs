@@ -21,7 +21,7 @@ use utoipa::ToSchema;
 
 /// HTTP response body for `ListReports` endpoint.
 #[derive(Clone, Debug, Serialize, ToSchema)]
-pub struct ListReportsResponseBody(Vec<ListReportsResponseBodyItem>);
+pub struct ListReportsResponseBody(pub Vec<ListReportsResponseBodyItem>);
 
 /// An item in the list returned by the `ListReports` endpoint.
 #[derive(Clone, Debug, Serialize, ToSchema)]
