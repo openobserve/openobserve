@@ -7,6 +7,7 @@ export class CommonActions {
         // Navigation locators
         this.alertsMenuItem = '[data-test="menu-link-\\/alerts-item"]';
         this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.homeMenuItem = '[data-test="menu-link-\\/-item"]';
     }
 
     async navigateToAlerts() {
@@ -16,6 +17,11 @@ export class CommonActions {
 
     async navigateToSettings() {
         await this.page.locator(this.settingsMenuItem).click();
+        await this.page.waitForTimeout(2000);
+    }
+
+    async navigateToHome() {
+        await this.page.locator(this.homeMenuItem).click();
         await this.page.waitForTimeout(2000);
     }
 

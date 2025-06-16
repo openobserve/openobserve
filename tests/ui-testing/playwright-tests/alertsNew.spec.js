@@ -250,4 +250,80 @@ test.describe("Alerts Module testcases", () => {
     // Clean up
     await alertsPage.deleteAlertByRow(alertName);
   });
+
+  /**
+   * Test: Alert Module UI Validations and Filters Check
+   * Tests UI validations and filter functionality
+   */
+  test('Alert Module UI Validations and Filters Check', {
+    tag: ['@all', '@alerts', '@alertsUIValidations']
+  }, async ({ page }) => {
+    // Initialize page objects
+    alertsPage = new AlertsNewPage(page);
+    templatesPage = new AlertTemplatesPage(page);
+    destinationsPage = new AlertDestinationsPage(page);
+    commonActions = new CommonActions(page);
+
+    // Create template
+    const templateName = 'auto_playwright_template_' + sharedRandomValue;
+    await templatesPage.createTemplate(templateName);
+    console.log('Created template:', templateName);
+
+    // Create destination
+    const destinationName = 'auto_playwright_destination_' + sharedRandomValue;
+    const slackUrl = "DEMO";
+    await destinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
+    console.log('Created destination:', destinationName);
+
+    // Navigate to alerts page
+    await commonActions.navigateToAlerts();
+
+    // Create folder
+    const folderName = 'auto_' + sharedRandomValue;
+    await alertsPage.createFolder(folderName, 'Test Automation Folder');
+    console.log('Created folder:', folderName);
+
+    // Get initial alert counts
+    await commonActions.navigateToHome();
+    const { scheduledAlertsCount, realTimeAlertsCount } = await alertsPage.verifyAlertCounts();
+    console.log('Initial Active Scheduled Alerts Count:', scheduledAlertsCount);
+    console.log('Initial Active Real-time Alerts Count:', realTimeAlertsCount);
+
+    // Navigate to alerts and verify ui validations
+    await commonActions.navigateToAlerts();
+    await alertsPage.navigateToFolder(folderName);
+    console.log('Navigated to folder:', folderName);
+
+    // Verify invalid alert name validation
+    await alertsPage.verifyInvalidAlertCreation();
+
+    // Verify field required validation
+    await alertsPage.verifyFieldRequiredValidation();
+
+    // Create a valid alert using existing function
+    const streamName = 'auto_playwright_stream';
+    const column = 'job';
+    const value = 'test';
+    const alertName = await alertsPage.createAlert(streamName, column, value, destinationName, sharedRandomValue);
+    await alertsPage.verifyAlertCreated(alertName);
+    console.log('Successfully created valid alert:', alertName);
+
+    // Navigate back to home and verify alert count increased
+    await commonActions.navigateToHome();
+    const { realTimeAlertsCount: newRealTimeAlertsCount } = await alertsPage.verifyAlertCounts();
+    console.log('New Active Real-time Alerts Count:', newRealTimeAlertsCount);
+    
+    // Verify count increased by 1
+    await alertsPage.verifyAlertCountIncreased(realTimeAlertsCount, newRealTimeAlertsCount);
+
+    // Navigate back to alerts and verify clone validation
+    await commonActions.navigateToAlerts();
+    await alertsPage.navigateToFolder(folderName);
+    console.log('Navigated back to folder:', folderName);
+    await alertsPage.verifyCloneAlertUIValidation(alertName);
+
+    // Continue with rest of the test...
+    await alertsPage.verifyTabContents();
+    await alertsPage.verifyFolderSearch(folderName);
+  });
 });

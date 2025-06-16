@@ -529,4 +529,63 @@ export class AlertsNewPage {
             console.error('Error deleting file:', error);
         }
     }
+
+    async verifyInvalidAlertCreation() {
+        await this.page.locator(this.addAlertButton).click();
+        await this.page.waitForTimeout(1000); // Wait for dialog to load
+        await this.page.locator(this.alertNameInput).click();
+        await this.page.locator(this.alertNameInput).fill('a b c');
+        await this.page.waitForTimeout(1000); // Wait for validation to trigger
+        await expect(this.page.getByText('Characters like :, ?, /, #,')).toBeVisible({ timeout: 10000 });
+        await this.page.locator('[data-test="add-alert-back-btn"]').click();
+    }
+
+    async verifyAlertCounts() {
+        const scheduledAlertsCount = await this.page.locator('div:nth-child(3) > .q-w-sm > .row > div > .text-h6').first().textContent();
+        const realTimeAlertsCount = await this.page.locator('div:nth-child(3) > .q-w-sm > .row > div:nth-child(3) > .text-h6').textContent();
+        return { scheduledAlertsCount, realTimeAlertsCount };
+    }
+
+    async verifyCloneAlertUIValidation(alertName) {
+        await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
+        await this.page.locator('[data-test="clone-alert-submit-btn"]').click();
+        await expect(this.page.getByText('Please select stream type')).toBeVisible();
+        await this.page.locator('[data-test="clone-alert-cancel-btn"]').click();
+        await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
+        await this.page.locator('[data-test="add-alert-back-btn"]').click();
+    }
+
+    async verifyTabContents() {
+        await this.page.locator('[data-test="tab-scheduled"]').click();
+        await expect(this.page.getByText('No data available')).toBeVisible();
+        await this.page.locator('[data-test="tab-realTime"]').click();
+        await expect(this.page.getByText('Showing 1 - 1 of').nth(1)).toBeVisible();
+        await this.page.locator('[data-test="tab-all"]').click();
+        await expect(this.page.getByText('Showing 1 - 1 of').nth(1)).toBeVisible();
+    }
+
+    async verifyFolderSearch(folderName) {
+        await this.page.locator('[data-test="folder-search"]').click();
+        await this.page.locator('[data-test="folder-search"]').fill(folderName);
+        await expect(this.page.getByText(folderName)).toBeVisible();
+        await this.page.getByRole('button', { name: 'Clear' }).click();
+        await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
+    }
+
+    async verifyFieldRequiredValidation() {
+        await this.page.locator(this.addAlertButton).click();
+        await this.page.waitForTimeout(1000); // Wait for dialog to load
+        await this.page.locator(this.alertNameInput).click();
+        await this.page.locator(this.alertNameInput).fill('abc');
+        await this.page.locator(this.alertSubmitButton).click();
+        await expect(this.page.locator('[data-test="add-alert-stream-type-select"]').getByText('Field is required!')).toBeVisible();
+        await this.page.locator('[data-test="add-alert-back-btn"]').click();
+    }
+
+    async verifyAlertCountIncreased(initialCount, newCount) {
+        const initial = parseInt(initialCount);
+        const updated = parseInt(newCount);
+        expect(updated).toBe(initial + 1);
+        console.log(`Alert count verification successful: Count increased from ${initial} to ${updated} (increased by 1)`);
+    }
 } 
