@@ -94,7 +94,7 @@ class PipelinePage {
     this.containsOption = page.getByText("Contains", { exact: true });
     this.valueInput = page.getByPlaceholder("Value");
     this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
-    this.conditionButton = page.getByRole("button", { name: "kubernetes_container_name" });
+    this.conditionText = page.getByRole("button", { name: "kubernetes_container_name" });
     this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
   }
 
@@ -454,7 +454,7 @@ async setupContainerNameCondition() {
   await this.valueInput.fill("ziox");
   await this.saveCondition();
   await this.page.waitForTimeout(2000);
-  await this.conditionButton.hover();
+  await this.conditionText.hover();
 }
 
 async setupDestinationStream(dynamicDestinationName) {
