@@ -543,6 +543,7 @@ pub async fn run_datafusion(
     // run datafusion
     let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+    dbg!(&ret);
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
     if let Err(e) = ret {
