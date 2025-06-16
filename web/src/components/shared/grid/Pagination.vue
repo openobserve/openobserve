@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="q-table__control q-ml-auto">
       <span class="q-table__bottom-item">
         {{ t("search.showing") }}
-        {{ (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 }} -
+        {{ resultTotal > 0 ?  (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }} -
         {{
           scope.pagination.page * scope.pagination.rowsPerPage >= resultTotal
             ? resultTotal

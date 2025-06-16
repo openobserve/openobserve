@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!showImportTemplate && !showTemplateEditor">
       <q-table
         data-test="alert-templates-list-table"
-        ref="q-table"
+        ref="qTableRef"
         :rows="templates"
         :columns="columns"
         row-key="id"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </q-td>
         </template>
-        <template #top>
+        <template #top="scope">
           <div class="q-table__title" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
@@ -106,6 +106,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             :label="t(`alert_templates.add`)"
             @click="editTemplate(null)"
+          />
+          <QTablePagination
+            :scope="scope"
+            :pageTitle="t('alert_destinations.header')"
+            :position="'top'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </template>
+        <template #bottom="scope">
+          <q-table-pagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
           />
         </template>
       </q-table>
@@ -143,6 +160,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -179,13 +197,29 @@ const columns: any = ref<QTableProps["columns"]>([
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
+  const perPageOptions: any = [
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 }
+];
+const resultTotal = ref<number>(0);
+const selectedPerPage = ref<number>(20);
+const qTableRef = ref<any>(null);
+
 const confirmDelete: Ref<{
   visible: boolean;
   data: any;
 }> = ref({ visible: false, data: null });
-const pagination = {
+const pagination: any = ref({
   page: 1,
-  rowsPerPage: 0, // 0 means all rows
+  rowsPerPage: 20, // 0 means all rows
+});
+const changePagination = (val: { label: string; value: any }) => {
+  selectedPerPage.value = val.value;
+  pagination.value.rowsPerPage = val.value;
+  qTableRef.value?.setPagination(pagination.value);
 };
 const filterQuery = ref("");
 onActivated(() => {
@@ -216,6 +250,7 @@ const getTemplates = () => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then((res) => {
+      resultTotal.value = res.data.length;
       templates.value = res.data.map((data: any, index: number) => ({
         ...data,
         "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
