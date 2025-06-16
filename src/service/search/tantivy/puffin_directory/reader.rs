@@ -211,6 +211,7 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
+    need_all_term_fields: Vec<tantivy::schema::Field>,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
@@ -219,11 +220,6 @@ pub async fn warm_up_terms(
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
             if terms.is_empty() {
-                let inv_idx_clone = inv_idx.clone();
-                warm_up_fields_futures
-                    .push(async move { inv_idx_clone.warm_postings_full(false).await });
-                warm_up_fields_term_futures
-                    .push(async move { inv_idx.terms().warm_up_dictionary().await });
                 continue;
             }
             for (term, position_needed) in terms.iter() {
@@ -233,6 +229,19 @@ pub async fn warm_up_terms(
             }
         }
     }
+
+    // warn up the all term fields
+    for field in need_all_term_fields {
+        for segment_reader in searcher.segment_readers() {
+            let inv_idx = segment_reader.inverted_index(field)?;
+            let inv_idx_clone = inv_idx.clone();
+            warm_up_fields_futures
+                .push(async move { inv_idx_clone.warm_postings_full(false).await });
+            warm_up_fields_term_futures
+                .push(async move { inv_idx.terms().warm_up_dictionary().await });
+        }
+    }
+
     if !warm_up_fields_futures.is_empty() {
         try_join_all(warm_up_fields_futures).await?;
     }

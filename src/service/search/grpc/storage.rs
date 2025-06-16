@@ -814,7 +814,8 @@ pub async fn filter_file_list_by_tantivy_index(
     file_list.extend(file_list_map.into_values());
     Ok((
         start.elapsed().as_millis() as usize,
-        is_add_filter_back,
+        // only need add filter back if the feature is enabled
+        is_add_filter_back && cfg.common.feature_query_remove_filter_with_index,
         total_hits,
     ))
 }
@@ -920,6 +921,11 @@ async fn search_tantivy_index(
         "[trace_id {trace_id}] search->storage: IndexCondition not found"
     ))?;
     let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
+    let need_all_term_fields = condition
+        .need_all_term_fields()
+        .into_iter()
+        .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
+        .collect::<Vec<_>>();
 
     // warm up the terms in the query
     if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Puffin.to_string() {
@@ -930,14 +936,7 @@ async fn search_tantivy_index(
             let entry = warm_terms.entry(field).or_default();
             entry.insert(term.clone(), need_position);
         });
-        // if no terms are found in the query, warm up all fields
-        if warm_terms.is_empty() {
-            for field in condition.get_tantivy_fields() {
-                let field = tantivy_schema.get_field(&field).unwrap();
-                warm_terms.insert(field, HashMap::new());
-            }
-        }
-        warm_up_terms(&tantivy_searcher, &warm_terms).await?;
+        warm_up_terms(&tantivy_searcher, &warm_terms, need_all_term_fields).await?;
     }
 
     // search the index
