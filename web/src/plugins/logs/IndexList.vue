@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="column logs-index-menu full-height"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
-    :key="store.state.selectedOrganization?.identifier"
   >
     <div>
       <q-select
