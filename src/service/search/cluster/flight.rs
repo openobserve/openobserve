@@ -493,7 +493,7 @@ pub async fn run_datafusion(
     }
 
     // check for streaming aggregation query
-    #[cfg(feature = "enterprise")]
+    #[allow(unused_mut)]
     let mut skip_empty_exec_visitor = false;
     #[allow(unused_mut)]
     let mut aggs_cache_ratio = 0;

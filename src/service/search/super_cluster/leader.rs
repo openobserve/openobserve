@@ -306,11 +306,26 @@ async fn run_datafusion(
     }
 
     // check for streaming aggregation query
-    if streaming_output {
-        let mut rewriter =
-            StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time, use_cache)
-                .await;
-        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    #[allow(unused_mut)]
+    let mut aggs_cache_ratio = 0;
+    #[cfg(feature = "enterprise")]
+    {
+        if streaming_output {
+            let Some(streaming_id) = streaming_id else {
+                return Err(Error::Message(
+                    "streaming_id is required for streaming aggregation query".to_string(),
+                ));
+            };
+            let mut rewriter =
+                StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
+
+            physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+
+            // Check for aggs cache hit
+            if rewriter.is_complete_cache_hit {
+                aggs_cache_ratio = 100;
+            }
+        }
     }
 
     if cfg.common.print_key_sql {

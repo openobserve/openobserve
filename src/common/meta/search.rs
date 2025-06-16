@@ -97,7 +97,7 @@ mod tests {
     use arrow_schema::{DataType, Field};
     use config::meta::search::Response;
     use o2_enterprise::enterprise::common::streaming_agg_cache::{
-        calculate_record_batches_deltas, StreamingAggsCacheResultRecordBatch,
+        StreamingAggsCacheResultRecordBatch, calculate_record_batches_deltas,
     };
 
     use super::*;
