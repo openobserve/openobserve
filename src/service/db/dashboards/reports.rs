@@ -19,7 +19,6 @@ use config::meta::{
 };
 use infra::table;
 use sea_orm::{ConnectionTrait, TransactionTrait};
-use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::service::{dashboards::reports::ReportError, db, folders};
 
@@ -51,14 +50,13 @@ pub async fn create<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<(), anyhow::Error> {
     let org = report.org_id.clone();
-    let schedule_key = report.name.clone();
     let next_run_at = report.start;
 
-    create_without_updating_trigger(conn, folder_snowflake_id, report).await?;
+    let report_id = create_without_updating_trigger(conn, folder_snowflake_id, report).await?;
     let trigger = db::scheduler::Trigger {
         org,
         module: db::scheduler::TriggerModule::Report,
-        module_key: schedule_key,
+        module_key: report_id,
         next_run_at,
         ..Default::default()
     };
@@ -75,18 +73,18 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<(), anyhow::Error> {
     let org_id = report.org_id.clone();
-    let schedule_key = report.name.clone();
     let next_run_at = report.start;
 
-    update_without_updating_trigger(conn, folder_snowflake_id, new_folder_snowflake_id, report)
-        .await?;
+    let report_id =
+        update_without_updating_trigger(conn, folder_snowflake_id, new_folder_snowflake_id, report)
+            .await?;
     let scheduler_exists =
-        db::scheduler::exists(&org_id, db::scheduler::TriggerModule::Report, &schedule_key).await;
+        db::scheduler::exists(&org_id, db::scheduler::TriggerModule::Report, &report_id).await;
 
     let trigger = db::scheduler::Trigger {
         org: org_id.clone(),
         module: db::scheduler::TriggerModule::Report,
-        module_key: schedule_key,
+        module_key: report_id,
         next_run_at,
         ..Default::default()
     };
@@ -107,26 +105,24 @@ pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTra
     conn: &C,
     folder_snowflake_id: &str,
     report: Report,
-) -> Result<(), anyhow::Error> {
-    let report_id = Ksuid::new(None, None);
-    let _report_id_str = report_id.to_string();
+) -> Result<String, anyhow::Error> {
     // Check if the folder_id is default and if it already exists.
     if folder_snowflake_id == DEFAULT_FOLDER
         && !table::folders::exists(&report.org_id, DEFAULT_FOLDER, FolderType::Reports).await?
     {
         create_default_reports_folder(&report.org_id).await?;
     }
-    table::reports::create_report(conn, folder_snowflake_id, report.clone(), Some(report_id))
-        .await?;
+    let (report_id, _) =
+        table::reports::create_report(conn, folder_snowflake_id, report.clone(), None).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(
         &report.org_id.clone(),
         folder_snowflake_id,
-        &_report_id_str,
+        &report_id,
         report,
     )
     .await?;
-    Ok(())
+    Ok(report_id)
 }
 
 async fn create_default_reports_folder(org_id: &str) -> Result<Folder, ReportError> {
@@ -145,8 +141,8 @@ pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTra
     folder_snowflake_id: &str,
     new_folder_snowflake_id: Option<&str>,
     report: Report,
-) -> Result<(), anyhow::Error> {
-    table::reports::update_report(
+) -> Result<String, anyhow::Error> {
+    let report_id = table::reports::update_report(
         conn,
         folder_snowflake_id,
         new_folder_snowflake_id,
@@ -162,7 +158,7 @@ pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTra
         report,
     )
     .await?;
-    Ok(())
+    Ok(report_id)
 }
 
 pub async fn delete<C: ConnectionTrait + TransactionTrait>(
@@ -171,10 +167,10 @@ pub async fn delete<C: ConnectionTrait + TransactionTrait>(
     folder_snowflake_id: &str,
     name: &str,
 ) -> Result<(), anyhow::Error> {
-    table::reports::delete_by_name(conn, org_id, folder_snowflake_id, name)
+    let report_id = table::reports::delete_by_name(conn, org_id, folder_snowflake_id, name)
         .await
         .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
-    let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, name)
+    let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, &report_id)
         .await
         .inspect_err(|e| log::error!("Failed to delete trigger: {}", e));
     #[cfg(feature = "enterprise")]

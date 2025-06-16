@@ -103,7 +103,7 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
     folder_snowflake_id: &str,
     report: MetaReport,
     report_id: Option<Ksuid>,
-) -> Result<MetaReport, Error> {
+) -> Result<(String, MetaReport), Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
@@ -184,7 +184,7 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
     let (_folder, report) = models.try_into()?;
 
     txn.commit().await?;
-    Ok(report)
+    Ok((report_id, report))
 }
 
 /// Updates the report.
@@ -197,7 +197,7 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
     folder_snowflake_id: &str,
     new_folder_snowflake_id: Option<&str>,
     report: MetaReport,
-) -> Result<(), Error> {
+) -> Result<String, Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
@@ -291,7 +291,7 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
     }
 
     txn.commit().await?;
-    Ok(())
+    Ok(models.report.id)
 }
 
 /// Deletes a report by its name.
@@ -300,17 +300,18 @@ pub async fn delete_by_name<C: ConnectionTrait + TransactionTrait>(
     org_id: &str,
     folder_snowflake_id: &str,
     report_name: &str,
-) -> Result<(), Error> {
+) -> Result<String, Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some((_folder_model, Some(report_model))) =
         queries::get_report_from_folder(conn, org_id, folder_snowflake_id, report_name).await?
     else {
-        return Ok(());
+        return Ok(String::new());
     };
+    let report_id = report_model.id.clone();
     report_model.delete(&txn).await?;
     txn.commit().await?;
-    Ok(())
+    Ok(report_id)
 }
 
 /// Delete all reports.
