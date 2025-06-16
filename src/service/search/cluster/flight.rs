@@ -493,6 +493,8 @@ pub async fn run_datafusion(
     }
 
     // check for streaming aggregation query
+    #[cfg(feature = "enterprise")]
+    let mut skip_empty_exec_visitor = false;
     #[allow(unused_mut)]
     let mut aggs_cache_ratio = 0;
     #[cfg(feature = "enterprise")]
@@ -505,26 +507,33 @@ pub async fn run_datafusion(
             };
             let mut rewriter =
                 StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
+
+            physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+
             // Check for aggs cache hit
             if rewriter.is_complete_cache_hit {
                 aggs_cache_ratio = 100;
+                // skip empty exec visitor for streaming aggregation query
+                // since the new plan after rewrite will have a `EmptyExec` for a complete cache
+                // hit
+                skip_empty_exec_visitor = true;
             }
-
-            physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
         }
     }
 
-    let mut visitor = EmptyExecVisitor::default();
-    if physical_plan.visit(&mut visitor).is_err() {
-        log::error!(
-            "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
-        );
-        return Err(Error::Message(
-            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
-        ));
-    }
-    if visitor.get_data().is_some() {
-        return Ok((vec![], ScanStats::default(), "".to_string()));
+    if !skip_empty_exec_visitor {
+        let mut visitor = EmptyExecVisitor::default();
+        if physical_plan.visit(&mut visitor).is_err() {
+            log::error!(
+                "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
+            );
+            return Err(Error::Message(
+                "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+            ));
+        }
+        if visitor.get_data().is_some() {
+            return Ok((vec![], ScanStats::default(), "".to_string()));
+        }
     }
 
     if cfg.common.print_key_sql {
