@@ -70,6 +70,7 @@ fn create_reports_table_statement() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
+        .col(ColumnDef::new(Reports::Org).string_len(256).not_null())
         // Foreign key to the folders table. This is a 27-character human
         // readable KSUID.
         .col(ColumnDef::new(Reports::FolderId)
@@ -167,6 +168,7 @@ enum Dashboards {
 enum Reports {
     Table,
     Id,
+    Org,
     FolderId,
     Name,
     Title,
@@ -207,6 +209,7 @@ mod tests {
             &create_reports_table_statement().to_string(PostgresQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS "reports" ( 
                 "id" char(27) NOT NULL PRIMARY KEY,
+                "org" varchar(256) NOT NULL,
                 "folder_id" char(27) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "title" varchar(256) NOT NULL,
@@ -247,6 +250,7 @@ mod tests {
             &create_reports_table_statement().to_string(MysqlQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS `reports` ( 
                 `id` char(27) NOT NULL PRIMARY KEY,
+                `org` varchar(256) NOT NULL,
                 `folder_id` char(27) NOT NULL,
                 `name` varchar(256) NOT NULL,
                 `title` varchar(256) NOT NULL,
@@ -287,6 +291,7 @@ mod tests {
             &create_reports_table_statement().to_string(SqliteQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS "reports" ( 
                 "id" char(27) NOT NULL PRIMARY KEY,
+                "org" varchar(256) NOT NULL,
                 "folder_id" char(27) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "title" varchar(256) NOT NULL,

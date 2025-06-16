@@ -307,6 +307,7 @@ mod reports_table {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: String,
+        pub org: String,
         pub folder_id: String,
         pub name: String,
         pub title: String,
@@ -664,6 +665,7 @@ impl TryFrom<(Ksuid, &meta_table_reports::Report)> for reports_table::ActiveMode
 
         Ok(reports_table::ActiveModel {
             id: Set(id),
+            org: Set(report_json.org_id.clone()),
             folder_id: Set(folder_id),
             name: Set(report_json.name.clone()),
             title: Set(report_json.title.clone()),

@@ -141,6 +141,7 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
     // Create the new `report` record.
     let report_active_model = reports::ActiveModel {
         id: Set(report_id.clone()),
+        org: Set(report.org_id.clone()),
         folder_id: Set(report_folder_model.id.clone()),
         name: Set(report.name),
         title: Set(report.title),
@@ -244,6 +245,7 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
     // Update the `reports` record.
     let report_active_model = reports::ActiveModel {
         id: Set(models.report.id.clone()),
+        org: Set(models.report.org.clone()),
         folder_id,
         name: Set(report.name),
         title: Set(report.title),
