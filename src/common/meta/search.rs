@@ -96,6 +96,9 @@ impl FromStr for ResultCacheSelectionStrategy {
 mod tests {
     use arrow_schema::{DataType, Field};
     use config::meta::search::Response;
+    use o2_enterprise::enterprise::common::streaming_agg_cache::{
+        calculate_record_batches_deltas, StreamingAggsCacheResultRecordBatch,
+    };
 
     use super::*;
 
@@ -315,17 +318,14 @@ mod tests {
         // Delta 1: 10:00 - 11:00 (before first cache)
         assert_eq!(deltas[0].delta_start_time, 10_000_000);
         assert_eq!(deltas[0].delta_end_time, 11_000_000);
-        assert_eq!(deltas[0].delta_removed_hits, false);
 
         // Delta 2: 12:00 - 14:00 (between caches)
         assert_eq!(deltas[1].delta_start_time, 12_000_000);
         assert_eq!(deltas[1].delta_end_time, 14_000_000);
-        assert_eq!(deltas[1].delta_removed_hits, false);
 
         // Delta 3: 15:00 - 16:00 (after last cache)
         assert_eq!(deltas[2].delta_start_time, 15_000_000);
         assert_eq!(deltas[2].delta_end_time, 16_000_000);
-        assert_eq!(deltas[2].delta_removed_hits, false);
     }
 
     #[test]
@@ -341,7 +341,6 @@ mod tests {
         assert_eq!(deltas.len(), 1);
         assert_eq!(deltas[0].delta_start_time, 10_000_000);
         assert_eq!(deltas[0].delta_end_time, 16_000_000);
-        assert_eq!(deltas[0].delta_removed_hits, false);
     }
 
     #[test]
