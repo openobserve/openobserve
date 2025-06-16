@@ -283,7 +283,7 @@ export const isGivenFieldInOrderBy = async (
 // Function to extract field names, aliases, and aggregation functions
 export function extractFields(parsedAst: any, timeField: string) {
   let fields = parsedAst.columns.map((column: any) => {
-    const field = {
+    const field: any = {
       column: "",
       alias: "",
       aggregationFunction: null,
