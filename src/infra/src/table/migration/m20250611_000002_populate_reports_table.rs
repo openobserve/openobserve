@@ -54,7 +54,7 @@ impl MigrationTrait for Migration {
                     r#type: Set(REPORTS_FOLDER_TYPE),
                 })
                 .collect_vec();
-            println!("Inserting folders: {:?}", folders);
+            log::debug!("Inserting folders: {:?}", folders);
             folders_table::Entity::insert_many(folders)
                 .exec(&txn)
                 .await?;
@@ -66,7 +66,7 @@ impl MigrationTrait for Migration {
         // memory.
         let mut meta_pages = MetaReportWithFolder::paginate(&txn, 100);
         while let Some(metas) = meta_pages.fetch_and_next().await? {
-            println!("Meta table query results: {:?}", metas);
+            log::debug!("Meta table query results: {:?}", metas);
             for m in metas {
                 // Use the report JSON from the meta table and the associated folder ID to create a
                 // new record in the new reports table.
@@ -315,8 +315,6 @@ mod reports_table {
         pub frequency: Json,
         pub destinations: Json,
         pub message: Option<String>,
-        pub chrome_driver_login_email: Option<String>,
-        pub chrome_driver_login_password: Option<String>,
         pub timezone: String,
         pub tz_offset: i32,
         pub owner: Option<String>,
@@ -324,7 +322,6 @@ mod reports_table {
         pub created_at: i64,
         pub updated_at: Option<i64>,
         pub start_at: i64,
-        pub last_triggered_at: Option<i64>,
     }
 
     // There are relations but they are not important to this migration.
@@ -489,20 +486,12 @@ mod meta_table_reports {
         #[allow(unused)]
         #[serde(default)]
         pub media_type: ReportMediaType,
-        /// User email for chromedriver login
-        #[serde(default)]
-        pub user: String,
-        /// User password for chromedriver login
-        #[serde(default)]
-        pub password: String,
         #[serde(default)]
         pub timezone: String,
         /// Fixed timezone offset in minutes
         #[serde(default)]
         #[serde(rename = "timezoneOffset")]
         pub tz_offset: i32,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub last_triggered_at: Option<i64>,
         #[serde(default = "datetime_now")]
         pub created_at: DateTime<FixedOffset>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -525,11 +514,8 @@ mod meta_table_reports {
                 message: "".to_string(),
                 enabled: false,
                 media_type: ReportMediaType::default(),
-                user: "".to_string(),
-                password: "".to_string(),
                 timezone: "".to_string(),
                 tz_offset: 0, // UTC
-                last_triggered_at: None,
                 created_at: datetime_now(),
                 updated_at: None,
                 owner: "".to_string(),
@@ -686,10 +672,6 @@ impl TryFrom<(Ksuid, &meta_table_reports::Report)> for reports_table::ActiveMode
             frequency: Set(frequency_json),
             destinations: Set(destionations_json),
             message: Set(Some(report_json.message.clone()).filter(|s| !s.is_empty())),
-            chrome_driver_login_email: Set(Some(report_json.user.clone()).filter(|s| !s.is_empty())),
-            chrome_driver_login_password: Set(
-                Some(report_json.password.clone()).filter(|s| !s.is_empty())
-            ),
             timezone: Set(report_json.timezone.clone()),
             tz_offset: Set(report_json.tz_offset),
             owner: Set(Some(report_json.owner.clone()).filter(|s| !s.is_empty())),
@@ -697,7 +679,6 @@ impl TryFrom<(Ksuid, &meta_table_reports::Report)> for reports_table::ActiveMode
             created_at: Set(report_json.created_at.timestamp_micros()),
             updated_at: Set(report_json.updated_at.map(|t| t.timestamp_micros())),
             start_at: Set(report_json.start),
-            last_triggered_at: Set(report_json.last_triggered_at),
         })
     }
 }
