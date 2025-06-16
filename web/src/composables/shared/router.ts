@@ -83,7 +83,7 @@ const useRoutes = () => {
       name: "home",
       component: Home,
       meta: {
-        keepAlive: false,
+        keepAlive: true,
       },
     },
     {
@@ -91,7 +91,7 @@ const useRoutes = () => {
       name: "logs",
       component: Search,
       meta: {
-        keepAlive: false,
+        keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
