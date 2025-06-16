@@ -165,10 +165,13 @@ impl IndexCondition {
         projection
     }
 
-    pub fn has_prefix_match(&self) -> bool {
+    pub fn need_all_term_fields(&self) -> Vec<String> {
         self.conditions
             .iter()
-            .any(|condition| condition.has_prefix_match())
+            .flat_map(|condition| condition.need_all_term_fields())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect()
     }
 
     pub fn to_physical_expr(
@@ -378,10 +381,20 @@ impl Condition {
         })
     }
 
-    pub fn has_prefix_match(&self) -> bool {
+    pub fn need_all_term_fields(&self) -> Vec<String> {
         match self {
-            Condition::MatchAll(value) => value.len() > 1 && value.ends_with("*"),
-            _ => false,
+            Condition::Regex(field, _) => vec![field.clone()],
+            Condition::MatchAll(value) => {
+                if (value.len() > 1 && (value.starts_with("*") || value.ends_with("*")))
+                    || (value.len() > 3 && value.starts_with("re:"))
+                {
+                    vec![INDEX_FIELD_NAME_FOR_ALL.to_string()]
+                } else {
+                    vec![]
+                }
+            }
+            Condition::FuzzyMatchAll(..) => vec![INDEX_FIELD_NAME_FOR_ALL.to_string()],
+            _ => vec![],
         }
     }
 
