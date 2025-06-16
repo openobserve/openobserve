@@ -30,6 +30,7 @@ use hashbrown::HashMap;
 
 use super::{apply_filter, apply_projection};
 use crate::service::search::index::IndexCondition;
+use config::get_config;
 
 #[derive(Debug)]
 pub(crate) struct NewMemTable {
@@ -121,13 +122,17 @@ impl TableProvider for NewMemTable {
             memory_exec,
         )?;
 
-        let filter_exec = apply_filter(
-            self.index_condition.as_ref(),
-            &projection_exec.schema(),
-            &self.fst_fields,
-            projection_exec,
-            filter_projection,
-        )?;
+        let filter_exec = if get_config().common.feature_query_remove_filter_with_index {
+            apply_filter(
+                self.index_condition.as_ref(),
+                &projection_exec.schema(),
+                &self.fst_fields,
+                projection_exec,
+                filter_projection,
+            )?
+        } else {
+            projection_exec
+        };
 
         apply_sort(filter_exec, self.sorted_by_time)
     }
