@@ -77,7 +77,7 @@ pub fn check_memtable_size() -> Result<()> {
 // check total memory size
 pub fn check_memory_circuit_breaker() -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.memory_circuit_breaker_enable || cfg.common.memory_circuit_breaker_ratio == 0 {
+    if !cfg.common.memory_circuit_breaker_enabled || cfg.common.memory_circuit_breaker_ratio == 0 {
         return Ok(());
     }
     let cur_mem = metrics::NODE_MEMORY_USAGE.with_label_values(&[]).get() as usize;
