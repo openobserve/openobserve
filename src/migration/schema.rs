@@ -28,7 +28,7 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::{
-    db::{self as infra_db, connect_to_orm, NO_NEED_WATCH, ORM_CLIENT},
+    db::{self as infra_db, NO_NEED_WATCH, ORM_CLIENT, connect_to_orm},
     dist_lock,
     errors::{DbError, Error},
     scheduler,
