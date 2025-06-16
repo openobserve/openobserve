@@ -19,6 +19,8 @@ use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
+#[cfg(feature = "enterprise")]
+use config::utils::hash::Sum64;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -39,13 +41,18 @@ use config::{
         time::now_micros,
     },
 };
-use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::cache::streaming_agg::{
+    create_record_batch_cache_file_path, generate_record_batch_interval,
+};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
@@ -178,6 +185,9 @@ pub async fn search(
     }
     if let Some(v) = in_req.local_mode {
         request.set_local_mode(Some(v));
+    }
+    if let Some(v) = in_req.use_cache {
+        request.set_use_cache(Some(v));
     }
     let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
@@ -631,11 +641,50 @@ pub async fn search_partition(
     } else {
         None
     };
-    if let Some(id) = &streaming_id {
-        log::info!(
-            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
-        );
-        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time);
+
+    let origin_sql = req.sql.clone();
+    #[cfg(feature = "enterprise")]
+    let (stream_name, _all_streams) = match resolve_stream_names(&origin_sql) {
+        // TODO: cache don't not support multiple stream names
+        Ok(v) => (v[0].clone(), v.join(",")),
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
+        }
+    };
+
+    // calculate hash for the query
+    let mut hash_body = vec![origin_sql];
+    if let Some(vrl_function) = &req.query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
+    #[cfg(feature = "enterprise")]
+    let mut h = config::utils::hash::gxhash::new();
+    #[cfg(feature = "enterprise")]
+    let hashed_query = h.sum64(&hash_body.join(","));
+
+    #[cfg(feature = "enterprise")]
+    {
+        if let Some(id) = &streaming_id {
+            log::info!(
+                "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
+            );
+            let cache_interval =
+                generate_record_batch_interval(query.start_time, query.end_time) as i64;
+            let cache_file_path = create_record_batch_cache_file_path(
+                org_id,
+                &stream_type.to_string(),
+                &stream_name,
+                hashed_query,
+                cache_interval,
+            );
+            streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
+        }
     }
 
     let mut files = Vec::new();
@@ -769,7 +818,7 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        streaming_output: req.streaming_output,
+        streaming_output: req.streaming_output && is_streaming_aggregate,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),
     };
@@ -861,8 +910,13 @@ pub async fn search_partition(
     );
 
     // Generate partitions
-    let partitions =
-        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+    let partitions = generator.generate_partitions(
+        req.start_time,
+        req.end_time,
+        step,
+        sql_order_by,
+        is_streaming_aggregate,
+    );
 
     if sql_order_by == OrderBy::Asc {
         resp.order_by = OrderBy::Asc;
@@ -966,6 +1020,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
                 file_list_took: scan_stats.file_list_took,
+                aggs_cache_ratio: scan_stats.aggs_cache_ratio,
             });
         let query_status = if result.is_queue {
             "waiting"
