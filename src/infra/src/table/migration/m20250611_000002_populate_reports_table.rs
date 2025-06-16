@@ -109,7 +109,7 @@ impl MigrationTrait for Migration {
                         })?;
 
                         let report_dashboard_am: report_dashboards_table::ActiveModel =
-                            (report_id.clone(), dashbaord_id, meta_rd)
+                            (report_id, dashbaord_id, meta_rd)
                                 .try_into()
                                 .map_err(DbErr::Migration)?;
                         report_dashboard_am.insert(&txn).await?;
@@ -220,7 +220,7 @@ impl MetaReportWithFolder {
         if let Some(id) = &self.id {
             Ksuid::from_str(id).map_err(|e| e.to_string())
         } else {
-            return Err("Could not find folder for the report".to_owned());
+            Err("Could not find folder for the report".to_owned())
         }
     }
 }
@@ -845,9 +845,9 @@ fn folder_ksuid_from_hash(
 ) -> svix_ksuid::Ksuid {
     use sha1::{Digest, Sha1};
     let mut hasher = Sha1::new();
-    hasher.update(org.to_owned());
+    hasher.update(org);
     hasher.update(folder_type.to_string());
-    hasher.update(folder_snowflake_id.to_owned());
+    hasher.update(folder_snowflake_id);
     let hash = hasher.finalize();
     svix_ksuid::Ksuid::from_bytes(hash.into())
 }

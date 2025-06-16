@@ -16,7 +16,7 @@
 use config::meta::dashboards::reports::ReportDashboard as MetaReportDashboard;
 use sea_orm::{ActiveValue::NotSet, ConnectionTrait, Set};
 
-use super::{super::entity::report_dashboards, intermediate, queries, Error};
+use super::{super::entity::report_dashboards, Error, intermediate, queries};
 
 /// Takes the list of existing report-dashboard relations for a single report and the list of
 /// desired report-dashboard relations for that report. Returns the list of report-dashboard
@@ -30,13 +30,9 @@ pub async fn relations_to_create<C: ConnectionTrait>(
 ) -> Result<Vec<report_dashboards::ActiveModel>, Error> {
     // Find the desiered relations that don't exist yet.
     let missing_rltns = desired_rltns.iter().filter(|d| {
-        existing_rltns
-            .iter()
-            .find(|e| {
-                d.dashboard == e.dashboard_snowflake_id
-                    && d.folder == e.dashboard_folder_snowflake_id
-            })
-            .is_none()
+        !existing_rltns.iter().any(|e| {
+            d.dashboard == e.dashboard_snowflake_id && d.folder == e.dashboard_folder_snowflake_id
+        })
     });
 
     let mut to_create = vec![];
@@ -169,13 +165,10 @@ pub fn relations_to_delete(
     existing
         .iter()
         .filter(|e| {
-            desired
-                .iter()
-                .find(|d| {
-                    d.dashboard == e.dashboard_snowflake_id
-                        && d.folder == e.dashboard_folder_snowflake_id
-                })
-                .is_none()
+            !desired.iter().any(|d| {
+                d.dashboard == e.dashboard_snowflake_id
+                    && d.folder == e.dashboard_folder_snowflake_id
+            })
         })
         .map(|e| (e.report_id.clone(), e.dashboard_id.clone()))
         .collect()
