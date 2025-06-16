@@ -126,7 +126,6 @@ impl Alert {
     pub fn get_last_satisfied_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
         if trigger.is_some() {
             let trigger = trigger.unwrap();
-            log::info!("Trigger data: {}", trigger.data);
             let trigger_data: ScheduledTriggerData =
                 json::from_str(&trigger.data).unwrap_or_default();
             // last_satisfied_at is now supposed to be part of the trigger data
