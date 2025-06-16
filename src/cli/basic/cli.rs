@@ -15,7 +15,10 @@
 
 use chrono::TimeZone;
 use config::utils::file::set_permission;
-use infra::{file_list as infra_file_list, table};
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    file_list as infra_file_list, table,
+};
 
 use crate::{
     cli::data::{
@@ -307,7 +310,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     table::dashboards::delete_all().await?;
                 }
                 "report" => {
-                    db::dashboards::reports::reset().await?;
+                    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+                    db::dashboards::reports::reset(conn).await?;
                 }
                 "function" => {
                     db::functions::reset().await?;

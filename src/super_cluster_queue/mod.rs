@@ -25,6 +25,7 @@ mod org_user;
 mod organization;
 mod pipelines;
 mod ratelimit;
+mod reports;
 mod scheduler;
 mod schemas;
 mod search_job;
@@ -70,6 +71,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
     let dashboards_queue = DashboardsQueue {
         on_dashboard_msg: dashboards::process,
+        on_report_msg: reports::process,
     };
     let pipelines_queue = PipelinesQueue {
         on_pipeline_msg: pipelines::process,
