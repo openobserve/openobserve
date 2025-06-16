@@ -76,6 +76,22 @@ pub async fn get_by_name<C: ConnectionTrait + TransactionTrait>(
     Ok(Some((folder, report)))
 }
 
+pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    report_id: &str,
+) -> Result<Option<(MetaFolder, MetaReport)>, Error> {
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+    let Some(models) =
+        queries::SelectReportAndJoinRelationsResult::get_by_id(conn, report_id).await?
+    else {
+        return Ok(None);
+    };
+    txn.commit().await?;
+    let (folder, report) = models.try_into()?;
+    Ok(Some((folder, report)))
+}
+
 /// Creates a new report.
 ///
 /// The new report is created in the report folder with the given `folder_snowflake_id`.

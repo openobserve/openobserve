@@ -56,6 +56,7 @@ mod m20250320_000001_remove_alert_name_unique_constraint;
 mod m20250422_000001_add_alert_align_time;
 mod m20250611_000001_create_reports_table;
 mod m20250611_000002_populate_reports_table;
+mod m20250611_000003_populate_reports_scheduled_jobs;
 
 pub struct Migrator;
 
@@ -104,6 +105,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250422_000001_add_alert_align_time::Migration),
             Box::new(m20250611_000001_create_reports_table::Migration),
             Box::new(m20250611_000002_populate_reports_table::Migration),
+            Box::new(m20250611_000003_populate_reports_scheduled_jobs::Migration),
         ]
     }
 }

@@ -632,9 +632,10 @@ async fn handle_report_triggers(
     );
     let org_id = &trigger.org;
     // For report, trigger.module_key is the report name
-    let report_name = &trigger.module_key;
+    let report_id = &trigger.module_key;
 
-    let mut report = db::dashboards::reports::get(conn, org_id, "default", report_name).await?;
+    let mut report = db::dashboards::reports::get_by_id(conn, report_id).await?;
+    let report_name = report.name.clone();
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_realtime: false,
@@ -646,9 +647,10 @@ async fn handle_report_triggers(
 
     if !report.enabled {
         log::debug!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {}, report: {}",
+            "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {}, report name: {} id: {}",
             org_id,
-            report_name
+            report_name,
+            report_id
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
@@ -731,7 +733,7 @@ async fn handle_report_triggers(
         } else {
             TriggerDataType::Report
         },
-        key: trigger.module_key.clone(),
+        key: format!("{}/{}", report_name, report_id),
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
@@ -764,8 +766,9 @@ async fn handle_report_triggers(
     match report.send_subscribers().await {
         Ok(_) => {
             log::info!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Report {} sent to destination",
-                report_name
+                "[SCHEDULER trace_id {scheduler_trace_id}] Report name: {} id: {} sent to destination",
+                report_name,
+                report_id
             );
             // Report generation successful, update the trigger
             if run_once {
@@ -773,8 +776,9 @@ async fn handle_report_triggers(
             }
             db::scheduler::update_trigger(new_trigger).await?;
             log::debug!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report: {}",
-                report_name
+                "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {} id: {}",
+                report_name,
+                report_id
             );
             trigger_data_stream.end_time = now_micros();
         }

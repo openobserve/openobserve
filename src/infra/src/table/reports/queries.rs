@@ -66,6 +66,25 @@ impl SelectReportAndJoinRelationsResult {
             joined_dashboards: joined_dashboard_models,
         }))
     }
+
+    /// Tries to get a report SeaORM entity and its parent folder SeaORM entity.
+    pub async fn get_by_id<C: ConnectionTrait>(
+        conn: &C,
+        report_id: &str,
+    ) -> Result<Option<Self>, super::Error> {
+        let Some((report_model, Some(folder_model))) =
+            get_report_and_folder_from_id(conn, report_id).await?
+        else {
+            return Ok(None);
+        };
+        let joined_dashboard_models =
+            JoinReportDashboardFolderResults::get(conn, &report_model.id).await?;
+        Ok(Some(Self {
+            report: report_model,
+            report_folder: folder_model,
+            joined_dashboards: joined_dashboard_models,
+        }))
+    }
 }
 
 /// Tries to get a report SeaORM entity and its parent folder SeaORM entity.
@@ -84,6 +103,31 @@ pub async fn get_report_from_folder<C: ConnectionTrait>(
         .one(conn)
         .await?;
     Ok(results)
+}
+
+/// Tries to get a report SeaORM entity and its parent folder SeaORM entity.
+pub async fn get_report_and_folder_from_id<C: ConnectionTrait>(
+    conn: &C,
+    report_id: &str,
+) -> Result<Option<(reports::Model, Option<folders::Model>)>, sea_orm::DbErr> {
+    let result = reports::Entity::find()
+        .find_also_related(folders::Entity)
+        .filter(reports::Column::Id.eq(report_id))
+        .one(conn)
+        .await?;
+    Ok(result)
+}
+
+/// Tries to get a report SeaORM entity by its ID.
+pub async fn _get_report_from_id<C: ConnectionTrait>(
+    conn: &C,
+    report_id: &str,
+) -> Result<Option<reports::Model>, sea_orm::DbErr> {
+    let result = reports::Entity::find()
+        .filter(reports::Column::Id.eq(report_id))
+        .one(conn)
+        .await?;
+    Ok(result)
 }
 
 /// A result of querying for the related `report_dashboards`, `dashboards`, and dashboard `folder`
