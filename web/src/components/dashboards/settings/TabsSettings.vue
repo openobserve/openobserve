@@ -178,7 +178,7 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "TabsSettings",
   components: {
-    draggable: VueDraggableNext,
+    draggable: VueDraggableNext as any,
     DashboardHeader,
     AddTab,
     TabsDeletePopUp,

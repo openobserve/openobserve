@@ -20,6 +20,7 @@ import useNotifications from "./useNotifications";
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
+import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 
 const colors = [
   "#5960b2",
@@ -205,6 +206,7 @@ const getDefaultCustomChartText = () => {
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
+  const valuesWebSocket = useValuesWebSocket();
 
   // Initialize the state for this page key if it doesn't already exist
   if (!dashboardPanelDataObj[pageKey]) {
@@ -1249,7 +1251,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
 
     try {
-      const res = await StreamService.fieldValues({
+      const queryReq = {
         org_identifier: store.state.selectedOrganization.identifier,
         stream_name: currentQuery.fields.stream,
         start_time: new Date(
@@ -1262,14 +1264,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         size: 100,
         type: currentQuery.fields.stream_type,
         no_count: true,
-      });
+      };
 
-      dashboardPanelData.meta.filterValue.push({
-        column: name,
-        value: res?.data?.hits?.[0]?.values
-          .map((it: any) => it.zo_sql_key)
-          .filter((it: any) => it),
-      });
+      const res = await valuesWebSocket.fetchFieldValues(
+        queryReq,
+        dashboardPanelData,
+        name,
+      );
     } catch (error: any) {
       const errorDetailValue =
         error.response?.data.error_detail ||
@@ -1284,53 +1285,44 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  const loadFilterItem = (name: any) => {
-    StreamService.fieldValues({
-      org_identifier: store.state.selectedOrganization.identifier,
-      stream_name:
-        dashboardPanelData.data.queries[
+  const loadFilterItem = async (name: any) => {
+    try {
+      const queryReq = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        stream_name:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+        start_time: new Date(
+          dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
+        ).getTime(),
+        end_time: new Date(
+          dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
+        ).getTime(),
+        fields: [name],
+        size: 100,
+        type: dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-      start_time: new Date(
-        dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
-      ).getTime(),
-      end_time: new Date(
-        dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
-      ).getTime(),
-      fields: [name],
-      size: 100,
-      type: dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream_type,
-      no_count: true,
-    })
-      .then((res: any) => {
-        const find = dashboardPanelData.meta.filterValue.findIndex(
-          (it: any) => it.column == name,
-        );
-        if (find >= 0) {
-          dashboardPanelData.meta.filterValue.splice(find, 1);
-        }
-        dashboardPanelData.meta.filterValue.push({
-          column: name,
-          value: res?.data?.hits?.[0]?.values
-            .map((it: any) => it.zo_sql_key)
-            .filter((it: any) => it)
-            .map((it: any) => String(it)),
-        });
-      })
-      .catch((error: any) => {
-        const errorDetailValue =
-          error.response?.data.error_detail ||
-          error.response?.data.message ||
-          "Something went wrong!";
-        const trimmedErrorMessage =
-          errorDetailValue.length > 300
-            ? errorDetailValue.slice(0, 300) + " ..."
-            : errorDetailValue;
+        ].fields.stream_type,
+        no_count: true,
+      };
 
-        showErrorNotification(trimmedErrorMessage);
-      });
+      const response = await valuesWebSocket.fetchFieldValues(
+        queryReq,
+        dashboardPanelData,
+        name,
+      );
+    } catch (error: any) {
+      const errorDetailValue =
+        error.response?.data.error_detail ||
+        error.response?.data.message ||
+        "Something went wrong!";
+      const trimmedErrorMessage =
+        errorDetailValue.length > 300
+          ? errorDetailValue.slice(0, 300) + " ..."
+          : errorDetailValue;
+      showErrorNotification(trimmedErrorMessage);
+    }
   };
 
   const removeXYFilters = () => {

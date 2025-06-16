@@ -652,10 +652,9 @@ pub async fn upload_zipped_action(
                 }
             }
             Err(e) => {
-                log::error!("Error reading ZIP file: {:?}", e);
-                Ok(HttpResponse::BadRequest().json(
-                    serde_json::json!({"message":format!("Error reading ZIP file: {:?}", e)}),
-                ))
+                log::error!("Error reading ZIP file: {e}");
+                Ok(HttpResponse::BadRequest()
+                    .json(serde_json::json!({"message":format!("Error reading ZIP file: {e}")})))
             }
         }
     }

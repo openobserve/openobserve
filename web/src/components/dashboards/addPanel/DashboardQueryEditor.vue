@@ -473,7 +473,12 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
+      // Remove event listeners
       window.removeEventListener("resize", resizeEventListener);
+      
+      // Clear refs to prevent memory leaks
+      queryEditorRef.value = null;
+      vrlFnEditorRef.value = null;
     });
     // End for VRL resize
 

@@ -120,31 +120,16 @@ pub async fn process_search_stream_request(
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
-    // HACK: always search from the first partition
+    // HACK: always search from the first partition, this is becuase to support pagination in http2
+    // streaming we need context of no of hits per partition, which currently is not available.
+    // Hence we start from the first partition everytime and skip the hits. The following is a
+    // global variable to keep track of how many hits to skip across all partitions.
+    // This is a temporary hack and will be removed once we have the context of no of hits per
+    // partition.
     let mut hits_to_skip = req.query.from;
-    let original_size = req.query.size;
-    req.query.from = 0;
-    req.query.size = original_size + hits_to_skip;
 
-    let use_cached_flow = if req.query.from == 0 && !req.query.track_total_hits {
-        if use_cache && hits_to_skip > 0 {
-            // do not use cached flow as its a paginated query
-            // use partitioned search instead
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Skipping cached flow as paginated query, hits_to_skip: {}",
-                trace_id,
-                hits_to_skip
-            );
-            false
-        } else {
-            // check cache for the first page
-            true
-        }
-    } else {
-        false
-    };
-
-    if use_cached_flow {
+    if req.query.from == 0 && !req.query.track_total_hits {
+        // check cache for the first page
         let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
             .instrument(search_span.clone())
             .await
@@ -603,7 +588,11 @@ pub async fn do_partitioned_search(
             req.query.size -= curr_res_size;
         }
 
-        // do not use cache for partitioned search without cache
+        // here we increase the size of the query to fetch requested hits in addition to the
+        // hits_to_skip we set the from to 0 to fetch the hits from the the beginning of the
+        // partition
+        req.query.size += *hits_to_skip;
+        req.query.from = 0;
         let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
 
         let mut total_hits = search_res.total as i64;
@@ -612,6 +601,7 @@ pub async fn do_partitioned_search(
         if skip_hits > 0 {
             search_res.hits = search_res.hits[skip_hits as usize..].to_vec();
             search_res.total = search_res.hits.len();
+            search_res.size = search_res.total as i64;
             total_hits = search_res.total as i64;
             *hits_to_skip -= skip_hits;
             log::info!(
@@ -624,14 +614,14 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req.query.size > 0 && total_hits > req.query.size {
+        if req_size > 0 && total_hits > req_size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
-                req.query.size
+                req_size
             );
-            search_res.hits.truncate(req.query.size as usize);
-            curr_res_size += req.query.size;
+            search_res.hits.truncate(req_size as usize);
+            curr_res_size += req_size;
         } else {
             curr_res_size += total_hits;
         }

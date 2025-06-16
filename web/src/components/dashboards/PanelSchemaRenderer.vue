@@ -151,7 +151,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
+        <LoadingProgress
+          :loading="loading"
+          :loadingProgressPercentage="loadingProgressPercentage"
+        />
       </div>
       <div
         v-if="allowAnnotationsAdd && isCursorOverPanel"
@@ -277,6 +280,7 @@ import {
   nextTick,
   defineAsyncComponent,
   onMounted,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
@@ -287,7 +291,6 @@ import {
   getFoldersList,
 } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
-import { onUnmounted } from "vue";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
@@ -397,6 +400,7 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "is-partial-data-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -447,6 +451,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
       loadingProgressPercentage,
+      isPartialData,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -571,6 +576,13 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
+      
+      // Clear all refs to prevent memory leaks
+      chartPanelRef.value = null;
+      drilldownPopUpRef.value = null;
+      annotationPopupRef.value = null;
+      tableRendererRef.value = null;
+      
     });
     watch(
       [data, store?.state],
@@ -1863,6 +1875,11 @@ export default defineComponent({
       }
     };
 
+    // Watch isPartialData changes and emit them
+    watch(isPartialData, (newValue) => {
+      emit("is-partial-data-update", newValue);
+    });
+
     return {
       store,
       chartPanelRef,
@@ -1897,6 +1914,7 @@ export default defineComponent({
       downloadDataAsCSV,
       downloadDataAsJSON,
       loadingProgressPercentage,
+      isPartialData,
     };
   },
 });

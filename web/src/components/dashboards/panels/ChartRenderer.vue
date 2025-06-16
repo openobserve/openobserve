@@ -219,6 +219,10 @@ export default defineComponent({
     const store = useStore();
 
     const cleanupChart = () => {
+      //dispose
+      if (chart) {
+        chart.dispose();
+      }
       // Remove all event listeners from chart
       chart?.off('mousemove');
       chart?.off('mouseout');
@@ -228,6 +232,9 @@ export default defineComponent({
       chart?.off('dataZoom');
       chart?.off('click');
       chart?.off('mouseover');
+
+      chart = null;
+      chartRef.value = null;
     };
 
     const windowResizeEventCallback = async () => {
@@ -494,7 +501,7 @@ export default defineComponent({
       () => store.state.theme,
       (newTheme) => {
         const theme = newTheme === "dark" ? "dark" : "light";
-        chart?.dispose();
+        cleanupChart();
         chart = echarts.init(chartRef.value, theme, {
           renderer: props.renderType,
         });
@@ -560,11 +567,16 @@ export default defineComponent({
       chart = null;
 
       // Clean up intersection observer
-      if (chartRef.value) {
-        isChartVisibleObserver?.unobserve(chartRef.value);
-        isChartVisibleObserver?.disconnect();
+      if (chartRef.value && isChartVisibleObserver) {
+        isChartVisibleObserver.unobserve(chartRef.value);
+        isChartVisibleObserver.disconnect();
+        isChartVisibleObserver = null;
       }
-      isChartVisibleObserver = null;
+      
+      // Clear chart reference
+      if (chartRef.value) {
+        chartRef.value = null;
+      }
     });
 
     // observer for chart visibility
@@ -591,13 +603,17 @@ export default defineComponent({
         // observe chart
         isChartVisibleObserver.observe(chartRef.value);
       }
+
     });
 
     onUnmounted(() => {
       if (chartRef.value) {
         // unobserve chart
-        isChartVisibleObserver.unobserve(chartRef.value);
+        isChartVisibleObserver?.unobserve(chartRef.value);
+        isChartVisibleObserver?.disconnect();
       }
+
+      cleanupChart();
     });
 
     //need to resize chart on activated

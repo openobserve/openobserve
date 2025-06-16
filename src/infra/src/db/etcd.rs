@@ -554,7 +554,7 @@ pub async fn keep_alive_connection() -> Result<()> {
             match client.get(key, None).await {
                 Ok(ret) => for _item in ret.kvs() {},
                 Err(e) => {
-                    log::error!("keep alive connection error: {:?}", e);
+                    log::error!("keep alive connection error: {e}");
                     break;
                 }
             };

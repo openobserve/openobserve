@@ -142,7 +142,18 @@ export default defineComponent({
       });
 
       onUnmounted(() => {
-        provider.value?.dispose();
+        if (editorObj) {
+          editorObj.dispose();
+          editorObj = null;
+        }
+        
+        if (provider.value) {
+          provider.value.dispose();
+          provider.value = null;
+        }
+        
+        // Clear refs to prevent memory leaks
+        editorRef.value = null;
       });
 
       window.addEventListener("click", () => {
