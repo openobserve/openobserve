@@ -472,6 +472,12 @@ mod tests {
             "Mini partition should start at start_time"
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "enterprise")]
+mod enterprise_tests {
+    use super::*;
 
     #[test]
     fn test_partition_generator_with_streaming_aggregate_partition_window() {
