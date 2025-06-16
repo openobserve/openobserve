@@ -1,32 +1,29 @@
 import { test, expect } from './baseFixtures.js';
 import logData from "../cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
-import { toZonedTime } from "date-fns-tz";
 import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
-
-async function login(page) {
+// Helper functions
+async function setupTest(page) {
+  const logsPage = new LogsPage(page);
   await page.goto(process.env["ZO_BASE_URL"]);
+  
+  // Login
   if (await page.getByText('Login as internal user').isVisible()) {
     await page.getByText('Login as internal user').click();
   }
-  console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+  await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
   await page.locator('[data-cy="login-sign-in"]').click();
   await page.waitForTimeout(4000);
-  await page.goto(process.env["ZO_BASE_URL"]);
+  
+  return logsPage;
 }
 
-async function ingestion(page) {
+async function ingestTestData(page) {
   const orgId = process.env["ORGNAME"];
   const streamName = "e2e_automate";
   const basicAuthCredentials = Buffer.from(
@@ -37,7 +34,8 @@ async function ingestion(page) {
     "Authorization": `Basic ${basicAuthCredentials}`,
     "Content-Type": "application/json",
   };
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+  
+  await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
     const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
       method: 'POST',
       headers: headers,
@@ -51,88 +49,43 @@ async function ingestion(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
 }
 
-async function applyQueryButton(page) {
+async function applyQuery(page) {
   const search = page.waitForResponse(logData.applyQuery);
   await page.waitForTimeout(3000);
-  await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-    force: true,
-  });
+  await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
   await expect.poll(async () => (await search).status()).toBe(200);
 }
 
-test.describe("Search partition testcases", () => {
+test.describe("Search Partition Tests", () => {
   let logsPage;
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    logsPage = new LogsPage(page);
-    await page.waitForTimeout(1000)
-    await ingestion(page);
-    await page.waitForTimeout(2000)
-
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
+    logsPage = await setupTest(page);
+    await ingestTestData(page);
+    await page.waitForTimeout(2000);
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
-    await applyQueryButton(page);
+    await applyQuery(page);
   });
 
   test("should verify search partition and search API calls for histogram query", async ({ page }) => {
     const isStreamingEnabled = process.env["ZO_STREAMING_ENABLED"] === "true";
+    const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(distinct(kubernetes_container_name)) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
     
-    // Enter the histogram query
-    const query = `SELECT histogram(_timestamp) as "x_axis_1", count(distinct(kubernetes_container_name)) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
-    
-    // Click on the query editor and type the query
-    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
-    await page.keyboard.type(query);
-    await page.waitForTimeout(2000);
-
-    // Toggle histogram off
-    await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
-    await page.waitForTimeout(1000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    // Setup and execute query
+    await logsPage.executeHistogramQuery(histogramQuery);
+    await logsPage.toggleHistogramAndExecute();
 
     if (!isStreamingEnabled) {
-      // Wait for and capture the search partition response
-      const searchPartitionPromise = page.waitForResponse(response => 
-        response.url().includes('/api/default/_search_partition') && 
-        response.request().method() === 'POST'
-      );
+      // Verify search partition response
+      const searchPartitionData = await logsPage.verifySearchPartitionResponse();
+      const searchCalls = await logsPage.captureSearchCalls();
       
-      const searchPartitionResponse = await searchPartitionPromise;
-      const searchPartitionData = await searchPartitionResponse.json();
-
-      // Verify search partition response structure
-      expect(searchPartitionData).toHaveProperty('partitions');
-      expect(searchPartitionData).toHaveProperty('histogram_interval');
-      expect(searchPartitionData).toHaveProperty('order_by', 'asc');
-
-      // Wait for and capture all search API calls
-      const searchCalls = [];
-      page.on('response', async response => {
-        if (response.url().includes('/api/default/_search') && 
-            response.request().method() === 'POST') {
-          const requestData = await response.request().postDataJSON();
-          searchCalls.push({
-            start_time: requestData.query.start_time,
-            end_time: requestData.query.end_time,
-            sql: requestData.query.sql
-          });
-        }
-      });
-
-      // Wait for all search calls to complete
-      await page.waitForTimeout(2000);
-
-      // Verify that the number of search calls matches the number of partitions
       expect(searchCalls.length).toBe(searchPartitionData.partitions.length);
-      console.log('partition', searchPartitionData.partitions);
 
-      // Verify each search call matches a partition
+      // Verify each partition has a matching search call
       for (const partition of searchPartitionData.partitions) {
         const matchingCall = searchCalls.find(call => 
           call.start_time === partition[0] && 
@@ -142,25 +95,11 @@ test.describe("Search partition testcases", () => {
         expect(matchingCall.sql).toContain('SELECT histogram(_timestamp');
       }
     } else {
-      // In streaming mode, verify that the query executes successfully
-      const searchPromise = page.waitForResponse(response => 
-        response.url().includes('/api/default/_search') && 
-        response.request().method() === 'POST'
-      );
-      
-      const searchResponse = await searchPromise;
-      expect(searchResponse.status()).toBe(200);
-      
-      const searchData = await searchResponse.json();
-      expect(searchData).toBeDefined();
-      expect(searchData.hits).toBeDefined();
+      await logsPage.verifyStreamingModeResponse();
     }
 
-    // Verify histogram is still off
-    const isHistogramOff = await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
-      .evaluate(el => el.getAttribute('aria-checked') === 'false');
-    expect(isHistogramOff).toBeTruthy();
+    // Verify histogram state
+    await logsPage.verifyHistogramState();
   });
 });
-
 

@@ -2,6 +2,7 @@
 import { expect } from '@playwright/test';
 const { chromium } = require('playwright');
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/CommonLocator.js';
+import logData from '../cypress/fixtures/log.json';
 
 export class LogsPage {
   constructor(page) {
@@ -46,6 +47,15 @@ export class LogsPage {
 
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.signOutButton = page.getByText('Sign Out');
+
+    // Search Partition locators
+    this.searchPartitionButton = page.locator('[data-test="logs-search-partition-btn"]');
+    this.partitionDropdown = page.locator('[data-test="logs-search-partition-dropdown"]');
+    this.partitionOption = (option) => page.getByRole('option', { name: option });
+    this.partitionValueInput = page.locator('[data-test="logs-search-partition-value-input"]');
+    this.partitionApplyButton = page.locator('[data-test="logs-search-partition-apply-btn"]');
+    this.partitionClearButton = page.locator('[data-test="logs-search-partition-clear-btn"]');
+    this.partitionActiveIndicator = page.locator('[data-test="logs-search-partition-active"]');
 
   }
 
@@ -205,15 +215,12 @@ export class LogsPage {
   }
 
   async applyQuery() {
-    const search = this.page.waitForResponse("**/api/default/_search**");
+    const search = this.page.waitForResponse(logData.applyQuery);
     await this.page.waitForTimeout(3000);
-    await this.page.locator(this.queryButton).click({ force: true });
-    try {
-      const response = await search;
-      await expect.poll(async () => response.status()).toBe(200);
-    } catch (error) {
-      throw new Error(`Failed to get response: ${error.message}`);
-    }
+    await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({
+      force: true,
+    });
+    await expect.poll(async () => (await search).status()).toBe(200);
   }
 
   async applyQueryButton(expectedUrl) {
@@ -584,6 +591,72 @@ async executeQueryWithErrorHandling() {
   
   // Click on result detail
   await this.page.locator('[data-test="logs-search-result-detail-undefined"]').click();
+}
+
+// New methods for histogram query test
+async executeHistogramQuery(query) {
+  await this.page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+  await this.page.keyboard.type(query);
+  await this.page.waitForTimeout(2000);
+}
+
+async toggleHistogramAndExecute() {
+  await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
+  await this.page.waitForTimeout(1000);
+  await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+}
+
+async verifyHistogramState() {
+  const isHistogramOff = await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
+    .evaluate(el => el.getAttribute('aria-checked') === 'false');
+  expect(isHistogramOff).toBeTruthy();
+}
+
+async verifySearchPartitionResponse() {
+  const searchPartitionPromise = this.page.waitForResponse(response => 
+    response.url().includes('/api/default/_search_partition') && 
+    response.request().method() === 'POST'
+  );
+  
+  const searchPartitionResponse = await searchPartitionPromise;
+  const searchPartitionData = await searchPartitionResponse.json();
+
+  expect(searchPartitionData).toHaveProperty('partitions');
+  expect(searchPartitionData).toHaveProperty('histogram_interval');
+  expect(searchPartitionData).toHaveProperty('order_by', 'asc');
+
+  return searchPartitionData;
+}
+
+async captureSearchCalls() {
+  const searchCalls = [];
+  this.page.on('response', async response => {
+    if (response.url().includes('/api/default/_search') && 
+        response.request().method() === 'POST') {
+      const requestData = await response.request().postDataJSON();
+      searchCalls.push({
+        start_time: requestData.query.start_time,
+        end_time: requestData.query.end_time,
+        sql: requestData.query.sql
+      });
+    }
+  });
+  await this.page.waitForTimeout(2000);
+  return searchCalls;
+}
+
+async verifyStreamingModeResponse() {
+  const searchPromise = this.page.waitForResponse(response => 
+    response.url().includes('/api/default/_search') && 
+    response.request().method() === 'POST'
+  );
+  
+  const searchResponse = await searchPromise;
+  expect(searchResponse.status()).toBe(200);
+  
+  const searchData = await searchResponse.json();
+  expect(searchData).toBeDefined();
+  expect(searchData.hits).toBeDefined();
 }
 
 }

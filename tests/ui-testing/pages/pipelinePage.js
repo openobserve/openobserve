@@ -84,9 +84,18 @@ class PipelinePage {
     this.headerKeyInput = page.locator('[data-test="add-destination-header--key-input"]');
     this.headerValueInput = page.locator('[data-test="add-destination-header-Authorization-value-input"]');
     this.submitButton = page.locator('[data-test="add-destination-submit-btn"]');
-
-
-
+    this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
+    this.refreshStatsButton = page.locator('[data-test="log-stream-refresh-stats-btn"]');
+    this.searchStreamInput = page.getByPlaceholder('Search Stream');
+    this.exploreButton = page.getByRole('button', { name: 'Explore' });
+    this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+    this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
+    this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
+    this.containsOption = page.getByText("Contains", { exact: true });
+    this.valueInput = page.getByPlaceholder("Value");
+    this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
+    this.conditionButton = page.getByRole("button", { name: "kubernetes_container_name" });
+    this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
   }
 
   async openPipelineMenu() {
@@ -403,6 +412,134 @@ async createRemoteDestination(randomNodeName, AuthorizationToken) {
   await this.submitButton.click();
 }
 
+async navigateToStreams() {
+  await this.streamsMenuItem.click();
+  await this.page.waitForTimeout(1000);
+}
+
+async refreshStreamStats() {
+  await this.refreshStatsButton.click();
+  await this.page.waitForTimeout(1000);
+}
+
+async searchStream(streamName) {
+  await this.searchStreamInput.click();
+  await this.searchStreamInput.fill(streamName);
+  await this.page.waitForTimeout(1000);
+}
+
+async clickExplore() {
+  await this.exploreButton.first().click();
+  await this.page.waitForTimeout(3000);
+}
+
+async openTimestampMenu() {
+  await this.timestampColumnMenu.click();
+}
+
+async navigateToPipeline() {
+  await this.page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+}
+
+async setupContainerNameCondition() {
+  await this.editButton.hover();
+  await this.streamIcon.click();
+  await this.columnInput.click();
+  await this.columnInput.fill("container_name");
+  await this.page.waitForTimeout(1000);
+  await this.kubernetesContainerNameOption.click();
+  await this.page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native").click();
+  await this.containsOption.click();
+  await this.valueInput.click();
+  await this.valueInput.fill("ziox");
+  await this.saveCondition();
+  await this.page.waitForTimeout(2000);
+  await this.conditionButton.hover();
+}
+
+async setupDestinationStream(dynamicDestinationName) {
+  await this.outputStreamIcon.click();
+  await this.streamNameInput.click();
+  await this.page.waitForTimeout(1000);
+  await this.streamNameInput.fill(dynamicDestinationName);
+  await this.page.waitForTimeout(1000);
+  await this.clickInputNodeStreamSave();
+}
+
+async waitForPipelineSaved() {
+  await this.pipelineSavedMessage.waitFor({ state: "visible" });
+}
+
+async exploreStreamAndNavigateToPipeline(streamName) {
+  // Ingestion for the specific stream
+  const orgId = process.env["ORGNAME"];
+  const headers = {
+    "Authorization": `Basic ${Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString('base64')}`,
+    "Content-Type": "application/json",
+  };
+  
+  const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  await this.page.evaluate(async ({ url, headers, logsdata }) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(logsdata)
+    });
+    return await response.json();
+  }, {
+    url: url,
+    headers: headers,
+    logsdata: require('../../test-data/logs_data.json')
+  });
+  await this.page.waitForTimeout(2000);
+
+  // Navigate and explore
+  await this.navigateToStreams();
+  await this.refreshStreamStats();
+  await this.searchStream(streamName);
+  await this.clickExplore();
+  await this.openTimestampMenu();
+  await this.navigateToPipeline();
+}
+
+async setupPipelineWithSourceStream(sourceStream) {
+  await this.openPipelineMenu();
+  await this.page.waitForTimeout(1000);
+  await this.addPipeline();
+  await this.selectStream();
+  await this.dragStreamToTarget(this.streamButton);
+  await this.selectLogs();
+  await this.enterStreamName(sourceStream);
+  await this.page.waitForTimeout(2000);
+  await this.page.getByRole("option", { name: sourceStream, exact: true }).click();
+  await this.saveInputNodeStream();
+  await this.page.waitForTimeout(2000);
+  await this.page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+  await this.page.locator('[data-test="confirm-button"]').click();
+}
+
+async createAndVerifyPipeline(expectedStreamName, sourceStream) {
+  const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
+  await this.enterPipelineName(pipelineName);
+  await this.savePipeline();
+  await this.waitForPipelineSaved();
+
+  // Verify the dynamic destination stream exists
+  await this.exploreStreamAndNavigateToPipeline(expectedStreamName);
+
+  // Verify pipeline creation and cleanup
+  await this.searchPipeline(pipelineName);
+  await this.page.waitForTimeout(1000);
+  const deletePipelineButton = this.page.locator(
+    `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+  );
+  await deletePipelineButton.waitFor({ state: "visible" });
+  await deletePipelineButton.click();
+  await this.confirmDeletePipeline();
+  await this.verifyPipelineDeleted();
+}
 }
 
 export default PipelinePage;
