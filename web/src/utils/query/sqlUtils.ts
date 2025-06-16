@@ -314,8 +314,7 @@ export function extractFields(parsedAst: any, timeField: string) {
         } else if (column?.expr?.args?.value[1]?.value === "0.99") {
           field.aggregationFunction = "p99";
         } else {
-          // default to p50
-          field.aggregationFunction = "p50";
+          throw new Error("Unsupported percentile value");
         }
       }
     }
