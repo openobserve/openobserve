@@ -267,8 +267,8 @@ arrow-schema = { version = "55.1.0", features = ["serde"] }
 parquet = { version = "55.1.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.1", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
-liquid-cache-parquet = { version = "0.1.6", git = "https://github.com/haohuaijin/liquid-cache", rev = "a4b98cdc79e67df6215b9906ff547adfccb82032" }
-liquid-cache-common = { version = "0.1.6", git = "https://github.com/haohuaijin/liquid-cache", rev = "a4b98cdc79e67df6215b9906ff547adfccb82032" }
+liquid-cache-parquet = { git = "https://github.com/haohuaijin/liquid-cache", rev = "a4b98cdc79e67df6215b9906ff547adfccb82032" }
+liquid-cache-common = { git = "https://github.com/haohuaijin/liquid-cache", rev = "a4b98cdc79e67df6215b9906ff547adfccb82032" }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"
