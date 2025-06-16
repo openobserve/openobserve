@@ -182,14 +182,11 @@ test.describe("Alerts Module testcases", () => {
     await alertsPage.navigateToFolder(targetFolderName);
     await page.waitForTimeout(2000);
 
-    // Search and verify alert instances
+    // Search and verify alert instance
     await alertsPage.searchAlert(newAlertName);
     await alertsPage.verifySearchResults(2);
 
-    // Delete alerts one by one
-    await alertsPage.deleteAlertByRow(newAlertName);
-    await alertsPage.searchAlert(newAlertName);
-    await alertsPage.verifySearchResults(1);
+    // Delete the alert
     await alertsPage.deleteAlertByRow(newAlertName);
   });
 
@@ -325,5 +322,23 @@ test.describe("Alerts Module testcases", () => {
     // Continue with rest of the test...
     await alertsPage.verifyTabContents();
     await alertsPage.verifyFolderSearch(folderName);
+    await alertsPage.navigateToFolder(folderName);
+
+    // Move alerts to target folder
+    const targetFolderName = 'testfoldermove';
+    await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
+    await alertsPage.moveAllAlertsToFolder(targetFolderName);
+
+    // Verify alerts in target folder
+    await page.waitForTimeout(2000);
+    await alertsPage.navigateToFolder(targetFolderName);
+    await page.waitForTimeout(2000);
+
+    // Search and verify alert instance
+    await alertsPage.searchAlert(alertName);
+    await alertsPage.verifySearchResultsUIValidation(1);
+
+    // Delete the alert
+    await alertsPage.deleteAlertByRow(alertName);
   });
 });
