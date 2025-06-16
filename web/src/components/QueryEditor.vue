@@ -292,12 +292,6 @@ export default defineComponent({
         provider.value = null;
       }
 
-      editorObj.removeCommand(
-        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        "ctrlenter",
-      );
-      editorObj.removeContextKey("ctrlenter");
-
       // Dispose editor
       if (editorObj) {
         editorObj.dispose();
