@@ -999,6 +999,11 @@ async fn search_tantivy_index(
         "[trace_id {trace_id}] search->storage: IndexCondition not found"
     ))?;
     let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
+    let prefix_field = if condition.has_prefix_match() {
+        fts_field
+    } else {
+        None
+    };
 
     // warm up the terms in the query
     if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Puffin.to_string() {
@@ -1019,7 +1024,13 @@ async fn search_tantivy_index(
         let need_fast_field = idx_optimize_rule
             .as_ref()
             .is_some_and(|rule| matches!(rule, InvertedIndexOptimizeMode::SimpleHistogram(..)));
-        warm_up_terms(&tantivy_searcher, &warm_terms, need_fast_field).await?;
+        warm_up_terms(
+            &tantivy_searcher,
+            &warm_terms,
+            prefix_field,
+            need_fast_field,
+        )
+        .await?;
     }
 
     // search the index

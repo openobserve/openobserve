@@ -213,6 +213,7 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
+    prefix_field: Option<tantivy::schema::Field>,
     need_fast_field: bool,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
@@ -224,11 +225,6 @@ pub async fn warm_up_terms(
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
             if terms.is_empty() {
-                let inv_idx_clone = inv_idx.clone();
-                warm_up_fields_futures
-                    .push(async move { inv_idx_clone.warm_postings_full(false).await });
-                warm_up_fields_term_futures
-                    .push(async move { inv_idx.terms().warm_up_dictionary().await });
                 continue;
             }
             for (term, position_needed) in terms.iter() {
@@ -239,7 +235,19 @@ pub async fn warm_up_terms(
         }
     }
 
-    // only warm up fast fields if needed
+    // warn up the prefix match if need
+    if let Some(field) = prefix_field {
+        for segment_reader in searcher.segment_readers() {
+            let inv_idx = segment_reader.inverted_index(field)?;
+            let inv_idx_clone = inv_idx.clone();
+            warm_up_fields_futures
+                .push(async move { inv_idx_clone.warm_postings_full(false).await });
+            warm_up_fields_term_futures
+                .push(async move { inv_idx.terms().warm_up_dictionary().await });
+        }
+    }
+
+    // warm up fast fields if needed
     if need_fast_field {
         for segment_reader in searcher.segment_readers() {
             // only warm up fast fields once per segment
@@ -659,7 +667,7 @@ mod tests {
 
         // Test with empty terms
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, false).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, None, false).await;
         assert!(result.is_ok());
     }
 
@@ -696,7 +704,40 @@ mod tests {
         field_terms.insert(term, false);
         terms_grouped_by_field.insert(text_field, field_terms);
 
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, false).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, None, false).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_warm_up_terms_with_prefix_field() {
+        // Create a simple in-memory index for testing
+        let mut schema_builder = Schema::builder();
+        let text_field = schema_builder.add_text_field("text", TEXT | STORED);
+        let schema = schema_builder.build();
+
+        let index = Index::create_in_ram(schema.clone());
+        let mut index_writer = index
+            .writer(50_000_000)
+            .expect("Failed to create index writer");
+
+        // Add a document
+        index_writer
+            .add_document(doc!(text_field => "hello world"))
+            .expect("Failed to add document");
+        index_writer.commit().expect("Failed to commit");
+
+        let reader = index
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::Manual)
+            .try_into()
+            .expect("Failed to create reader");
+
+        let searcher = reader.searcher();
+
+        // Test with prefix field
+        let terms_grouped_by_field = HashbrownHashMap::new();
+        let result =
+            warm_up_terms(&searcher, &terms_grouped_by_field, Some(text_field), false).await;
         assert!(result.is_ok());
     }
 
@@ -728,7 +769,7 @@ mod tests {
 
         // Test with fast fields enabled
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, true).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, None, true).await;
         // This might fail if _timestamp field is not present, which is expected in this simple test
         // The important thing is that the function doesn't panic
         let _ = result;
@@ -772,7 +813,7 @@ mod tests {
         terms_grouped_by_field.insert(text_field, field_terms);
 
         let start = Instant::now();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, false).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, None, false).await;
         let duration = start.elapsed();
 
         assert!(result.is_ok());

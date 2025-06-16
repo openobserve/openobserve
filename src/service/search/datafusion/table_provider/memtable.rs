@@ -18,6 +18,7 @@ use std::{any::Any, sync::Arc};
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
+use config::get_config;
 use datafusion::{
     catalog::Session,
     common::{Constraints, Result},
@@ -30,7 +31,6 @@ use hashbrown::HashMap;
 
 use super::{apply_filter, apply_projection};
 use crate::service::search::index::IndexCondition;
-use config::get_config;
 
 #[derive(Debug)]
 pub(crate) struct NewMemTable {
