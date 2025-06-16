@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <QTablePagination
             :scope="scope"
-            :pageTitle="t('alert_destinations.header')"
+            :pageTitle="t('alert_templates.header')"
             :position="'top'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
