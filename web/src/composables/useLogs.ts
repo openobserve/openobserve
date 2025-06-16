@@ -6571,6 +6571,9 @@ const useLogs = () => {
     fnHistogramParsedSQL,
     importSqlParser,
     parser,
+    router,
+    $q,
+    getPageCount,
   };
 };
 

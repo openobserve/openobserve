@@ -25,8 +25,13 @@ import useLogs from "../../composables/useLogs";
 import searchService from "../../services/search";
 import savedviewsService from "../../services/saved_views";
 import * as zincutils from "../../utils/zincutils";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 import store from "../../test/unit/helpers/store";
+
+installQuasar({
+  plugins: [Dialog, Notify],
+});
 
 // Create i18n instance
 const i18n = createI18n({
@@ -738,77 +743,262 @@ describe("Use Logs Composable", () => {
 
   describe("restoreUrlQueryParams", () => {
     beforeEach(() => {
-  
-
       vi.mock('vue-router', () => ({
         useRouter: () => ({
           currentRoute: {
             name: "logs1",
             value: {
               query: {
-                stream: "stream1,stream2",
-                from: "1614556800000",
-                to: "1614643200000"
+                stream:"",
+                from:"",
+                to:""
               }
             }
           },
           push: vi.fn()
         })
       }));
-
-      wrapper.vm.searchObj.data.stream.selectedStream = [];
-
-
-      // Mock router
-      wrapper.vm.router = {
-        currentRoute: {
-          value: {
-            query: {
-              stream: "stream1,stream2",
-              from: "1614556800000",
-              to: "1614643200000"
-            }
-          }
-        },
-        push: vi.fn()
+  
+    });
+  
+    afterEach(() => {
+      wrapper.vm.searchObj = undefined;
+      wrapper.vm.router.currentRoute.value.query = {};
+    });
+  
+    it("should handle empty query params", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+  
+      await nextTick();
+  
+      expect(wrapper.vm.searchObj.shouldIgnoreWatcher).toBe(false);
+      expect(wrapper.vm.router.push).not.toHaveBeenCalled();
+    });
+  
+    it("should restore stream and datetime parameters", async () => {
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1,stream2",
+        from: "1614556800008",
+        to: "1614643200000"
       };
+  
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+  
+      await nextTick();
+  
+      expect(wrapper.vm.searchObj.data.datetime).toEqual({
+        startTime: 1614556800008,
+        endTime: 1614643200000,
+        relativeTimePeriod: null,
+        type: "absolute"
+      });
+    });
+  
+    it("should handle relative time period", async () => {
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1,stream2",
+        period: "15m"
+      };
+  
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+      await nextTick();
+  
+      expect(wrapper.vm.searchObj.data.datetime.type).toBe("relative");
+      expect(wrapper.vm.searchObj.data.datetime.relativeTimePeriod).toBe("15m");
+    });
+  
+    it("should handle SQL mode and encoded query", async () => {
+      const encodedQuery = btoa("SELECT * FROM logs");
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1,stream2",
+        sql_mode: "true",
+        query: encodedQuery
+      };
+  
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+      await nextTick();
+  
+      expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("SELECT * FROM logs");
+      expect(wrapper.vm.searchObj.data.query).toBe("SELECT * FROM logs");
+    });
+  });
+  
+  describe("refreshData", () => {
+    let notifySpy: any;
+    beforeEach(() => {
+      // Mock store
+      wrapper.vm.store = {
+        state: {
+          refreshIntervalID: null
+        },
+        dispatch: vi.fn()
+      };
+
+      // Mock getQueryData
+      wrapper.vm.getQueryData = vi.fn();
+      notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+
+
+      // Mock clearInterval and setInterval
+      vi.spyOn(global, 'clearInterval');
+      const mockIntervalId = setInterval(() => {}, 1000);
+      vi.spyOn(global, 'setInterval').mockReturnValue(mockIntervalId);
+    });
+
+    afterEach(() => {
+      vi.clearAllMocks();
+      wrapper.vm.searchObj = undefined;
+    });
+
+    it("should enable refresh interval when conditions are met", async () => {
+      wrapper.vm.searchObj.meta.refreshInterval = 5; // 5 seconds
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.router.currentRoute.value.name = "logs";
+      wrapper.vm.searchObj.loadingHistogram = false;
+
+
+      const { refreshData } = wrapper.vm;
+      refreshData();
+
+      await nextTick();
+      vi.useFakeTimers();
+      await flushPromises();
+
+      await wrapper.vm.$nextTick();
+
+      expect(notifySpy).toHaveBeenCalledWith({
+        message: `Live mode is enabled. Only top ${wrapper.vm.searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+        color: "positive",
+        position: "top",
+        timeout: 1000,
+      });
+
+
+    });
+
+    it("should not enable refresh if not on logs page", () => {
+      wrapper.vm.router.currentRoute.value.name = "not-logs";
+      wrapper.vm.searchObj.meta.refreshInterval = 5;
+
+      const { refreshData } = wrapper.vm;
+      refreshData();
+      expect(global.setInterval).not.toHaveBeenCalled();
+
+      expect(notifySpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getPageCount", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      // Mock getHistogramTitle
+      wrapper.vm.getHistogramTitle = vi.fn().mockReturnValue("Test Histogram");
     });
 
     afterEach(() => {
       wrapper.vm.searchObj = undefined;
     });
 
-    it("should handle empty query params", async () => {
-      const { restoreUrlQueryParams } = wrapper.vm;
-      await restoreUrlQueryParams();
+    it("should successfully get page count and update partition totals", async () => {
+      wrapper.vm.searchObj = {
+        organizationIdentifier: "test-org",
+        meta: {
+          jobId: "",
+          resultGrid: {
+            rowsPerPage: 50
+          }
+        },
+        data: {
+          stream: {
+            streamType: "logs"
+          },
+          queryResults: {
+            scan_size: 0,
+            took: 0,
+            partitionDetail: {
+              partitions: [[1000, 2000]],
+              partitionTotal: [-1],
+              paginations: [[{
+                startTime: 1000,
+                endTime: 2000,
+                from: 0,
+                size: 50
+              }]]
+            }
+          },
+          countErrorMsg: "",
+          isOperationCancelled: false,
+          histogram: {
+            chartParams: {
+              title: ""
+            }
+          }
+        },
+        loading: false,
+        loadingCounter: false
+      };
+      // Mock search service response
+      vi.mocked(searchService.search).mockImplementationOnce(() =>
+        Promise.resolve({
+          data: {
+            hits: [],
+            total: 100,
+            scan_size: 1000,
+            took: 50
+          },
+          status: 200,
+          statusText: "OK",
+          headers: {},
+          config: {}
+        } as AxiosResponse)
+      );
 
-      await nextTick();
-
-      expect(wrapper.vm.searchObj.shouldIgnoreWatcher).toBe(false);
-      expect(wrapper.vm.router.push).not.toHaveBeenCalled();
-    });
-
-    it("should restore stream and datetime parameters", async () => {
-
-      wrapper.vm.router.currentRoute.name = "logs1";
-      wrapper.vm.router.currentRoute.query = {
-        stream: "stream1,stream2",
-        from: "1614556800000",
-        to: "1614643200000"
+      const queryReq = {
+        query: {
+          sql: "SELECT * FROM logs",
+          start_time: 1000,
+          end_time: 2000,
+          from: 0,
+          size: 50,
+          quick_mode: true,
+          streaming_output: false
+        }
       };
 
-      const { restoreUrlQueryParams } = wrapper.vm;
-      await restoreUrlQueryParams();
+      const { getPageCount } = wrapper.vm;
+      await getPageCount(queryReq);
 
-      await nextTick();
+      // Verify search service was called with correct parameters
+      expect(searchService.search).toHaveBeenCalledWith({
+        org_identifier: "test-org",
+        query: {
+          sql: "SELECT * FROM logs",
+          start_time: 1000,
+          end_time: 2000,
+          size: 0,
+          sql_mode: "full",
+          track_total_hits: true
+        },
+        page_type: "logs",
+        traceparent: expect.any(String)
+      }, "ui");
 
-      expect(wrapper.vm.searchObj.data.datetime).toEqual({
-        startTime: 1614556800000,
-        endTime: 1614643200000,
-        relativeTimePeriod: null,
-        type: "absolute"
-      });
+      // Verify state updates
+
+      console.log(wrapper.vm.searchObj.data.queryResults,'wrapper.vm.searchObj.data.queryResults')
+      expect(wrapper.vm.searchObj.data.queryResults.scan_size).toBe(1000);
+      expect(wrapper.vm.searchObj.data.queryResults.took).toBe(50);
+      expect(wrapper.vm.searchObj.data.queryResults.partitionDetail.partitionTotal[0]).toBe(100);
+      expect(wrapper.vm.searchObj.loadingCounter).toBe(false);
+      expect(wrapper.vm.searchObj.data.histogram.chartParams.title).toBe("Test Histogram");
     });
+
   });
+
 });
 
