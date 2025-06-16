@@ -69,9 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-item-section>
           <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
-            <q-item-label>{{
-              variableItem.multiSelect ? "Select All" : "All"
-            }}</q-item-label>
+            <q-item-label>{{ variableItem.multiSelect ? 'Select All' : 'All' }}</q-item-label>
           </q-item-section>
         </q-item>
         <q-separator />
@@ -118,6 +116,7 @@ export default defineComponent({
         opt.label.toLowerCase().includes(searchText),
       );
     });
+
     const filterOptions = (val: string, update: Function) => {
       filterText.value = val;
       update();
@@ -125,37 +124,27 @@ export default defineComponent({
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return (
-          Array.isArray(selectedValue.value) &&
-          selectedValue.value?.[0] === SELECT_ALL_VALUE
-        );
+        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
       }
       return selectedValue.value === SELECT_ALL_VALUE;
-    });
-    const toggleSelectAll = () => {
+    });    const toggleSelectAll = () => {
       const newValue = props.variableItem.multiSelect
-        ? isAllSelected.value
-          ? []
-          : [SELECT_ALL_VALUE]
+        ? isAllSelected.value ? [] : [SELECT_ALL_VALUE]
         : SELECT_ALL_VALUE;
-
+      
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
     };
 
     const onUpdateValue = (val: any) => {
       // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
-      if (
-        props.variableItem.multiSelect &&
-        Array.isArray(val) &&
-        val.length > 0
-      ) {
+      if (props.variableItem.multiSelect && Array.isArray(val) && val.length > 0) {
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
-          val = val.filter((v) => v !== SELECT_ALL_VALUE);
+          val = val.filter(v => v !== SELECT_ALL_VALUE);
         }
       }
       selectedValue.value = val;
-      if (!props.variableItem.multiSelect) {
+      if(!props.variableItem.multiSelect) {
         emit("update:modelValue", val);
       }
     };
@@ -184,12 +173,9 @@ export default defineComponent({
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
-          } else if (
-            props.variableItem.options.length === 0 &&
-            selectedValue.value.length === 0
-          ) {
+          } else if (props.variableItem.options.length === 0 && selectedValue.value.length === 0) {
             return "(No Data Found)";
-          } else {
+          } else {            
             return selectedValue.value
               .map((it: any) => {
                 if (it === "") return "<blank>";
