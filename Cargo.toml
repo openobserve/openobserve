@@ -267,8 +267,8 @@ arrow-schema = { version = "55.1.0", features = ["serde"] }
 parquet = { version = "55.1.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.1", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
-liquid-cache-parquet = { git = "https://github.com/haohuaijin/liquid-cache", rev = "a4b98cdc79e67df6215b9906ff547adfccb82032" }
-liquid-cache-common = { git = "https://github.com/haohuaijin/liquid-cache", rev = "a4b98cdc79e67df6215b9906ff547adfccb82032" }
+liquid-cache-parquet = { git = "https://github.com/haohuaijin/liquid-cache", rev = "3957ba6ee91ea80991caf280f403f959472012a9" }
+liquid-cache-common = { git = "https://github.com/haohuaijin/liquid-cache", rev = "3957ba6ee91ea80991caf280f403f959472012a9" }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"
@@ -299,7 +299,7 @@ murmur3 = "0.5"
 async-nats = "0.39"
 once_cell = "1.20"
 ordered-float = { version = "4.5.0", features = ["serde"] }
-parking_lot = "0.12"
+parking_lot = "0.12.4"
 prometheus = { version = "0.13", features = ["process"] }
 prost = "0.13.1"
 prost-wkt-types = "0.6"
