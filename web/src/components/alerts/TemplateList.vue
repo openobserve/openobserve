@@ -381,6 +381,7 @@ const filterData = (rows: any, terms: any) => {
       filtered.push(rows[i]);
     }
   }
+  resultTotal.value = filtered.length;
   return filtered;
 };
 const exportTemplate = (row: any) => {
