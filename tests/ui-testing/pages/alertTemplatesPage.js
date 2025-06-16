@@ -1,4 +1,5 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { test as base } from '@playwright/test';
 
 export class AlertTemplatesPage {
     constructor(page) {
@@ -25,7 +26,9 @@ export class AlertTemplatesPage {
         this.templateInUseMessage = 'Template is in use for destination {destinationName}';
     }
 
-    async navigateToTemplates() {
+    async navigateToTemplates(retryCount = 0) {
+        const maxRetries = 2; // Maximum number of retry attempts
+        
         try {
             await this.page.waitForLoadState('networkidle');
             await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 10000 });
@@ -41,13 +44,19 @@ export class AlertTemplatesPage {
             await this.page.waitForTimeout(2000);
         } catch (error) {
             console.error('Error navigating to templates:', error);
+            
+            // Check if we've exceeded max retries
+            if (retryCount >= maxRetries) {
+                throw new Error(`Failed to navigate to templates after ${maxRetries} attempts`);
+            }
+            
             // Try to recover by reloading the page
             await this.page.reload();
             await this.page.waitForLoadState('networkidle');
             await this.page.waitForTimeout(2000);
             
-            // Retry navigation once
-            await this.navigateToTemplates();
+            // Retry navigation with incremented retry count
+            await this.navigateToTemplates(retryCount + 1);
         }
     }
 

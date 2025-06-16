@@ -44,7 +44,7 @@ test.describe("Alerts Module testcases", () => {
    * - Ingests test data (except for scheduled alert test)
    * - Navigates to alerts page
    */
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     await login(page);
     alertsPage = new AlertsPage(page);
     templatesPage = new AlertTemplatesPage(page);
@@ -82,11 +82,13 @@ test.describe("Alerts Module testcases", () => {
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await templatesPage.createTemplate(createdTemplateName);
     await templatesPage.verifyCreatedTemplateExists(createdTemplateName);
+    console.log('Created template:', createdTemplateName);
 
     // Create destination with shared random value
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
     await destinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
+    console.log('Created destination:', createdDestinationName);
   });
 
   /**

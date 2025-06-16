@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import { CommonActions } from './commonActions';
 
@@ -185,8 +185,6 @@ export class AlertsPage {
 
         await this.page.locator('[data-test="alert-conditions-operator-select"] div').filter({ hasText: '>' }).nth(3).click();
         await this.page.getByText('Contains', { exact: true }).click();
-        await this.page.getByPlaceholder('Value').fill('test');
-
         await this.page.locator(this.valueInput).fill(value);
         await this.page.waitForTimeout(1000); // Wait after filling value
 
@@ -356,7 +354,7 @@ export class AlertsPage {
             this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
             this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
         ]).catch(() => {
-            console.log('Neither table nor no data message found after search, continuing...');
+            console.log('Neither table nor no data message found, continuing...');
         });
     }
 
