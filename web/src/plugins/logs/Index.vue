@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage">
+  <q-page class="logPage q-my-xs" id="logPage" :key="store.state.selectedOrganization?.identifier">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
