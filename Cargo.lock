@@ -5706,8 +5706,8 @@ checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 
 [[package]]
 name = "liquid-cache-common"
-version = "0.1.5"
-source = "git+https://github.com/haohuaijin/liquid-cache?rev=9cefcf49b970a8208a930ed8daf9bb74ecb3a0b9#9cefcf49b970a8208a930ed8daf9bb74ecb3a0b9"
+version = "0.1.6"
+source = "git+https://github.com/haohuaijin/liquid-cache?rev=a4b98cdc79e67df6215b9906ff547adfccb82032#a4b98cdc79e67df6215b9906ff547adfccb82032"
 dependencies = [
  "arrow",
  "arrow-flight",
@@ -5720,8 +5720,8 @@ dependencies = [
 
 [[package]]
 name = "liquid-cache-parquet"
-version = "0.1.5"
-source = "git+https://github.com/haohuaijin/liquid-cache?rev=9cefcf49b970a8208a930ed8daf9bb74ecb3a0b9#9cefcf49b970a8208a930ed8daf9bb74ecb3a0b9"
+version = "0.1.6"
+source = "git+https://github.com/haohuaijin/liquid-cache?rev=a4b98cdc79e67df6215b9906ff547adfccb82032#a4b98cdc79e67df6215b9906ff547adfccb82032"
 dependencies = [
  "ahash 0.8.12",
  "arrow",
