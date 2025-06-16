@@ -412,8 +412,6 @@ export default defineComponent({
           (response.type === "search_response" ||
             response.type === "search_response_hits")
         ) {
-          // variableObject.isVariablePartialLoaded = true;
-
           const hits = response.content.results.hits;
 
           const fieldHit = hits.find(
@@ -448,20 +446,55 @@ export default defineComponent({
                     ? value.zo_sql_key.toString()
                     : "<blank>",
                 value: value.zo_sql_key.toString(),
-              }))
-              // remove duplicates from previous options
-              .filter(
-                (option: any) =>
-                  !variableObject.options.some(
-                    (existingOption: any) =>
-                      existingOption.value === option.value,
-                  ),
+              }));
+
+            // For first response, completely replace options instead of merging
+            if (isFirstResponse) {
+              variableObject.options = newOptions;
+              variableObject.options.sort((a: any, b: any) =>
+                a.label.localeCompare(b.label),
               );
 
-            variableObject.options = [...newOptions, ...variableObject.options];
-            variableObject.options.sort((a: any, b: any) =>
-              a.label.localeCompare(b.label),
-            );
+              // Filter out values that are not in new options
+              if (
+                variableObject.multiSelect &&
+                Array.isArray(variableObject.value)
+              ) {
+                const validValues = variableObject.value.filter((val: string) =>
+                  newOptions.some(
+                    (opt: any) => opt.value === val || val === SELECT_ALL_VALUE,
+                  ),
+                );
+                if (validValues.length !== variableObject.value.length) {
+                  variableObject.value = validValues;
+                }
+              } else if (
+                !variableObject.multiSelect &&
+                variableObject.value !== null
+              ) {
+                const valueExists = newOptions.some(
+                  (opt: any) => opt.value === variableObject.value,
+                );
+                if (!valueExists) {
+                  variableObject.value =
+                    newOptions.length > 0 ? newOptions[0].value : null;
+                }
+              }
+            } else {
+              // For subsequent responses, merge with existing options
+              variableObject.options = [
+                ...newOptions,
+                ...variableObject.options,
+              ];
+              // Remove duplicates
+              variableObject.options = variableObject.options.filter(
+                (option: any, index: number, self: any[]) =>
+                  index === self.findIndex((o) => o.value === option.value),
+              );
+              variableObject.options.sort((a: any, b: any) =>
+                a.label.localeCompare(b.label),
+              );
+            }
 
             variableLog(
               variableObject.name,
@@ -794,7 +827,7 @@ export default defineComponent({
     onUnmounted(() => {
       // Clean up any in-flight promises to prevent memory leaks
       rejectAllPromises();
-      Object.keys(currentlyExecutingPromises).forEach(key => {
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
         currentlyExecutingPromises[key] = null;
       });
     });
