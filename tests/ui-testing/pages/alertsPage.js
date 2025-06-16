@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator } from '../pages/CommonLocator.js';
 import DashboardFolder from "./dashboardPages/dashboard-folder.js";
+import { CommonActions } from './commonActions';
 
 export class AlertsPage {
   constructor(page) {
@@ -40,6 +41,7 @@ export class AlertsPage {
     this.alertImportError13Input = '[data-test="alert-import-error-1-3"] [data-test="alert-import-destination-name-input"]';
     this.alertImportFileInput = '[data-test="alert-import-json-file-input"]';
     
+    this.commonActions = new CommonActions(page);
   }
 
   async navigateToAlerts() {
@@ -144,7 +146,10 @@ export class AlertsPage {
     
     await this.page.locator('[data-test="add-alert-destination-select"]').click();
     await this.page.waitForTimeout(2000);
-    await this.page.locator(`[data-test="add-alert-destination-${destinationName}-select-item"]`).click();
+    
+    // Use the common scroll function for destination selection
+    await this.commonActions.scrollAndFindOption(destinationName, 'template');
+    
     await this.page.waitForTimeout(500);
     await this.page.locator('[data-test="chart-renderer"] div').first().click();
     await this.page.waitForTimeout(1000);
