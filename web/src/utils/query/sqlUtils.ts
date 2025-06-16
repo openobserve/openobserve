@@ -300,6 +300,27 @@ export function extractFields(parsedAst: any, timeField: string) {
         column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
       field.aggregationFunction =
         column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
+
+      if (field.aggregationFunction === "approx_percentile_cont") {
+        // check 2nd argument of function
+        if (
+          column?.expr?.args?.value[1]?.value === "0.5" ||
+          column?.expr?.args?.value[1]?.value === "0.50"
+        ) {
+          field.aggregationFunction = "p50";
+        } else if (
+          column?.expr?.args?.value[1]?.value === "0.9" ||
+          column?.expr?.args?.value[1]?.value === "0.90"
+        ) {
+          field.aggregationFunction = "p90";
+        } else if (column?.expr?.args?.value[1]?.value === "0.95") {
+          field.aggregationFunction = "p95";
+        } else if (column?.expr?.args?.value[1]?.value === "0.99") {
+          field.aggregationFunction = "p99";
+        } else {
+          throw new Error("Unsupported percentile value");
+        }
+      }
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
