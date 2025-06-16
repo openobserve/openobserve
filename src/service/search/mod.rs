@@ -20,7 +20,7 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 #[cfg(feature = "enterprise")]
-use config::utils::hash::gxhash::Sum64;
+use config::utils::hash::Sum64;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
