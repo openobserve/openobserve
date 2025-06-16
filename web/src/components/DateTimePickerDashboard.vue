@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, reactive, watch, computed } from "vue";
+import { ref, defineComponent, reactive, watch, computed, onUnmounted } from "vue";
 import DateTime from "@/components/DateTime.vue";
 
 export default defineComponent({
@@ -92,6 +92,17 @@ export default defineComponent({
     const getConsumableDateTime = () => {
       return dateTimePicker.value.getConsumableDateTime();
     };
+
+    // Clean up resources on unmount to prevent memory leaks
+    onUnmounted(() => {
+      // If you add intervals, listeners, or subscriptions, clean them up here.
+      // Example:
+      // if (someInterval) clearInterval(someInterval);
+      // if (someListener) someListener.off();
+      if (dateTimePicker.value) {
+        dateTimePicker.value = null;
+      }
+    });
 
     return {
       updateDateTime,

@@ -155,13 +155,13 @@ async fn recursive_process_multiple_metas(
                 match json::from_str::<Response>(&v) {
                     Ok(v) => Some(v),
                     Err(e) => {
-                        log::error!("[trace_id {trace_id}] Error parsing cached response: {:?}", e);
+                        log::error!("[trace_id {trace_id}] Error parsing cached response: {e}");
                         None
                     }
                 }
             }
             Err(e) => {
-                log::error!("[trace_id {trace_id}] Get results from disk failed: {:?}", e);
+                log::error!("[trace_id {trace_id}] Get results from disk failed: {e}");
                 None
             }
         };

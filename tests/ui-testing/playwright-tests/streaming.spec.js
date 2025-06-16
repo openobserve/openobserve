@@ -40,7 +40,7 @@ test.describe("Streaming for logs", () => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
-        await logsPage.enableSQLMode();
+       // await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
         await logsPage.displayTwoStreams();
        
@@ -52,7 +52,7 @@ test.describe("Streaming for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.kubernetesContainerName();
-        await logsPage.enableSQLMode();
+       // await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
     
@@ -64,7 +64,7 @@ test.describe("Streaming for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.kubernetesContainerNameJoin();
-        await logsPage.enableSQLMode();
+       // await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
         await logsPage.displayCountQuery();
         await logsPage.validateResult();
@@ -77,7 +77,7 @@ test.describe("Streaming for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.kubernetesContainerNameJoinLimit();
-        await logsPage.enableSQLMode();
+       // await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
       
@@ -126,7 +126,7 @@ test.describe("Streaming for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.kubernetesContainerNameFullJoin();
-        await logsPage.enableSQLMode();
+       // await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
     
@@ -159,7 +159,7 @@ test.describe("Streaming for logs", () => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
-        await logsPage.enableSQLMode();
+       // await logsPage.enableSQLMode();
         await logsPage.clickQuickModeToggle();
         await logsPage.selectRunQuery();
         await logsPage.clickInterestingFields();

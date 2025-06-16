@@ -1563,7 +1563,7 @@ impl StreamResponses {
                                     hits,
                                 })
                                 .unwrap_or_else(|e| {
-                                    log::error!("Failed to serialize hits: {:?}", e);
+                                    log::error!("Failed to serialize hits: {e}");
                                     String::new()
                                 });
                             ("search_response_hits", data)

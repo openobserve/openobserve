@@ -710,7 +710,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
     {
         Ok(nodes) => nodes,
         Err(e) => {
-            log::error!("Failed to get super clusters: {:?}", e);
+            log::error!("Failed to get super clusters: {e}");
             return Ok(response); // Return empty response instead of failing
         }
     };
@@ -734,7 +734,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
                     cluster_name,
                     e
                 );
-                return Err(anyhow::anyhow!("Failed to get node list: {:?}", e));
+                return Err(anyhow::anyhow!("Failed to get node list: {e}"));
             }
         }
     }
@@ -780,7 +780,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     {
         Ok(nodes) => nodes,
         Err(e) => {
-            log::error!("Failed to get super cluster nodes: {:?}", e);
+            log::error!("Failed to get super cluster nodes: {e}");
             return Ok(response); // Return empty response instead of failing
         }
     };
@@ -803,7 +803,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
                     e
                 );
                 // Return error
-                return Err(anyhow::anyhow!("Failed to get cluster info: {:?}", e));
+                return Err(anyhow::anyhow!("Failed to get cluster info: {e}"));
             }
         }
     }

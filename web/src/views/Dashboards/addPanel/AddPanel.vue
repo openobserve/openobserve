@@ -757,6 +757,9 @@ export default defineComponent({
 
       removeAiContextHandler();
       // console.timeEnd("onUnmounted");
+
+      // Clear all refs to prevent memory leaks
+      dateTimePickerRef.value = null;
     });
 
     onMounted(async () => {

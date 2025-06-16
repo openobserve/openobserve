@@ -10,6 +10,7 @@ import base64
 from requests.auth import HTTPBasicAuth
 
 # Constants for Streaming URL and user credentials
+ZO_BASE_URL = os.environ.get("ZO_BASE_URL")
 ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
 WS_ZO_BASE_URL = os.environ.get("WS_ZO_BASE_URL")
 ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
@@ -171,6 +172,7 @@ test_data_histog = [
         1,
         2002,
     ),
+
   
   
  
@@ -267,6 +269,7 @@ test_data_sql = [
     (
         "Stream",
         f"SELECT * FROM \"{stream_name}\"",
+        0,
         100,
         100,
     ),
@@ -274,6 +277,7 @@ test_data_sql = [
     (
         "AND",
         f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
+        0,
         100,
         100,
     ),
@@ -282,12 +286,14 @@ test_data_sql = [
 
         "OR",
         f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
+        0,
         100,
         100,
     ),
     (
         "Match_all",
         f"SELECT * FROM \"{stream_name}\" WHERE match_all('ziox')",
+        0,
         100,
         18,
     ),
@@ -295,6 +301,7 @@ test_data_sql = [
     (
         "Str_match",
         f"SELECT * FROM \"{stream_name}\" where str_match(kubernetes_container_name, 'ziox')",
+        0,
         100,
         100,
     ),
@@ -302,6 +309,7 @@ test_data_sql = [
     (
         "Like",
         f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%'",
+        0,
         100,
         100,
     ),
@@ -309,6 +317,7 @@ test_data_sql = [
     (
         "AS",
         f"SELECT kubernetes_container_name as \"breakdown_1\" FROM \"{stream_name}\"",
+        0,
         100,
         100,
     ),
@@ -316,6 +325,7 @@ test_data_sql = [
     (
         "IN",
         f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox')",
+        0,
         100,
         100,
     ),
@@ -323,6 +333,7 @@ test_data_sql = [
     (
         "str_match_ignore_case",
         f"SELECT * FROM \"{stream_name}\" where str_match_ignore_case(kubernetes_container_name, 'ziox')",
+        0,
         100,
         100,
     ),
@@ -331,6 +342,7 @@ test_data_sql = [
     (
         "Limit",
         f"SELECT * FROM \"{stream_name}\" LIMIT 10",
+        0,
         10,
         10,
     ),
@@ -338,6 +350,7 @@ test_data_sql = [
     (
         "DISTINCT",
         f"SELECT DISTINCT code FROM \"{stream_name}\"",
+        0,
         100,
         3,
     ),
@@ -345,6 +358,7 @@ test_data_sql = [
     (
         "UNION",
         f"SELECT * FROM \"{stream_name}\" UNION SELECT * FROM \"{stream_join}\"",
+        0,
         50,
         50,
     ),
@@ -352,6 +366,7 @@ test_data_sql = [
     (
         "UNION ALL",
         f"SELECT * FROM \"{stream_name}\" UNION ALL SELECT * FROM \"{stream_join}\"",
+        0,
         50,
         50,
     ),
@@ -359,6 +374,7 @@ test_data_sql = [
     (
         "Join",
         f"SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"{stream_name}\" as a join \"{stream_join}\" as b on a.kubernetes_namespace_name  = b.kubernetes_namespace_name",
+        0,
         50,
         50,
     ),
@@ -366,6 +382,7 @@ test_data_sql = [
     (
         "LEFT Join",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a LEFT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
+        0,
         50,
         50,
     ),
@@ -373,6 +390,7 @@ test_data_sql = [
     (
         "RIGHT Join",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a RIGHT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
+        0,
         50,
         50,
     ),
@@ -380,6 +398,7 @@ test_data_sql = [
     (
         "FULL Join",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id",
+        0,
         50,
         50,
     ),
@@ -387,6 +406,7 @@ test_data_sql = [
     (
         "Join Where",
         f"SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"{stream_name}\" as a join \"{stream_join}\" as b on a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        0,
         50,
         50,
     ),
@@ -394,6 +414,7 @@ test_data_sql = [
     (
         "LEFT Join Where",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a LEFT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        0,
         50,
         50,
     ),
@@ -401,6 +422,7 @@ test_data_sql = [
     (
         "RIGHT Join Where",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a RIGHT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        0,
         50,
         50,
     ),
@@ -408,6 +430,7 @@ test_data_sql = [
     (
         "FULL Join",
         f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        0,
         50,
         50,
     ),
@@ -415,6 +438,7 @@ test_data_sql = [
     (
         "INNER Join Like",
         f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name LIKE '%ziox%'",
+        0,
         50,
         50,
     ),
@@ -422,6 +446,7 @@ test_data_sql = [
     (
         "INNER Join Like Limit",
         f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name LIKE '%ziox%' LIMIT 10",
+        0,
         50,
         10,
     ),
@@ -429,6 +454,7 @@ test_data_sql = [
     (
         "INNER Join IN",
         f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name IN ('ziox')",
+        0,
         50,
         50,
     ),
@@ -436,6 +462,7 @@ test_data_sql = [
     (
         "INNER Join IN Limit",
         f"SELECT \"a\".kubernetes_docker_id, \"b\".kubernetes_docker_id FROM \"{stream_name}\" AS \"a\" INNER JOIN \"{stream_join}\" AS \"b\" ON \"a\".kubernetes_docker_id = \"b\".kubernetes_docker_id WHERE \"a\".kubernetes_container_name IN ('ziox') LIMIT 10",
+        0,
         50,
         10,
     ),
@@ -443,6 +470,7 @@ test_data_sql = [
     (
         "Count Having",
         f"SELECT COUNT(_timestamp) as totallogcount FROM \"{stream_name}\" Having totallogcount > 1000",
+        0,
         -1,
         1,
     ),
@@ -450,6 +478,7 @@ test_data_sql = [
     (
         "regexp_match",
         f"SELECT _timestamp, array_extract(regexp_match(log, '^[^\\\\]\\n]*\\\\]\\\\s+(?P<httpMethod>\\\\w+)(?:[^/\\n]*/){4}(?P<catalogApi>\\\\w+)(?:[^\\n]* ){2}(?P<httpStatusCode>[^ ]+)\\\\s+(?P<apiPayloadSize>[^ ]+)\\\\s+(?P<responseTime>\\\\d+)'), 3) AS status FROM \"{stream_name}\"",
+        0,
         100,
         100,
     ),
@@ -457,6 +486,7 @@ test_data_sql = [
     (
         "Count Distinct",
         f"SELECT count(distinct(kubernetes_container_name)) FROM \"{stream_name}\"",
+        0,
         -1,
         1,
     ),
@@ -464,6 +494,7 @@ test_data_sql = [
     (
         "MAX",
         f"SELECT MAX(_timestamp), count(_timestamp) FROM \"{stream_name}\"",
+        0,
         -1,
         1,
     ),
@@ -471,6 +502,7 @@ test_data_sql = [
     (
         "Count Aggregate",
         f"SELECT count(*) FROM \"{stream_name}\"",
+        0,
         -1,
         1,
     ),
@@ -478,6 +510,7 @@ test_data_sql = [
     (
         "Not Null",
         f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_image IS NOT NULL",
+        0,
         -1,
         1000,
     ),
@@ -485,6 +518,7 @@ test_data_sql = [
     (
         "Avg",
         f"SELECT avg(code) FROM \"{stream_name}\" WHERE code > 200",
+        0,
         -1,
         1,
     ),
@@ -492,10 +526,52 @@ test_data_sql = [
     (
         "re_match",
         f"SELECT * FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox')",
+        0,
         50,
         50,
     ),
 
+      (
+        "page_one",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        0,
+        100,
+        100,
+    ),
+
+      (
+        "page_two",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        100,
+        101,
+        101,
+    ),
+
+      (
+        "page_three",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        200,
+        101,
+        101,
+    ), 
+
+    (
+        "page_four",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        300,
+        101,
+        101,
+    ), 
+
+    (
+        "page_five",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        400,
+        101,
+        40,
+    ), 
+      
+     
 
 
 
@@ -512,8 +588,8 @@ test_data_sql = [
 
 ]
 
-@pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
-def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total_exp):
+@pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
+def test_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp):
     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
 
     session = create_session
@@ -527,7 +603,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total
         "sql": sql_query,
         "start_time": ten_min_ago,
         "end_time": end_time,
-        "from": 0,
+        "from": sql_from,
         "size": sql_size,
         "quick_mode": False,
         "sql_mode": "full"
@@ -862,8 +938,8 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
         pytest.fail("No hits found in the response.")
 
 
-@pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
-def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total_exp):
+@pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
+def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp):
     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
 
     session = create_session
@@ -877,7 +953,7 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_s
         "sql": sql_query,
         "start_time": ten_min_ago,
         "end_time": end_time,
-        "from": 0,
+        "from": sql_from,
         "size": sql_size,
         "quick_mode": False,
         "sql_mode": "full"

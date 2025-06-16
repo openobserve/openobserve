@@ -924,8 +924,7 @@ pub async fn merge_files(
         Ok(v) => v,
         Err(e) => {
             log::error!(
-                "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
-                e,
+                "merge_parquet_files err: {e}, files: {:?}, schema: {:?}",
                 files,
                 latest_schema
             );

@@ -665,7 +665,7 @@ impl Engine {
         }
         let task_results = try_join_all(tasks)
             .await
-            .map_err(|e| DataFusionError::Plan(format!("task error: {:?}", e)))?;
+            .map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
 
         let mut metrics: HashMap<HashLabelValue, RangeValue> = HashMap::default();
         let task_results_len = task_results.len();
