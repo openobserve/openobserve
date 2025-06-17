@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage">
+  <q-page class="logPage q-my-xs" id="logPage" :key="store.state.selectedOrganization?.identifier">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar"
             ref="searchBarRef"
             :fieldValues="fieldValues"
-            :key="searchObj.data.transforms.length || -1"
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"

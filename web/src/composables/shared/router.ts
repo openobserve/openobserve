@@ -123,6 +123,9 @@ const useRoutes = () => {
       path: "traces/trace-details",
       name: "traceDetails",
       component: TraceDetails,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -131,6 +134,9 @@ const useRoutes = () => {
       name: "streamExplorer",
       path: "streams/stream-explore",
       component: StreamExplorer,
+      meta: {
+        keepAlive: true,
+      },
       props: true,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -226,6 +232,9 @@ const useRoutes = () => {
       path: "pipeline",
       name: "pipeline",
       component: Functions,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -286,6 +295,9 @@ const useRoutes = () => {
       path: "alerts",
       name: "alertList",
       component: AlertList,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -294,6 +306,9 @@ const useRoutes = () => {
       path: "short/:id",
       name: "shortUrl",
       component: ShortUrl,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -302,6 +317,9 @@ const useRoutes = () => {
       path: "rum",
       name: "RUM",
       component: RealUserMonitoring,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -420,6 +438,9 @@ const useRoutes = () => {
         name: "reports",
         component: ReportList,
         props: true,
+        meta: {
+          keepAlive: true,
+        },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
@@ -429,6 +450,9 @@ const useRoutes = () => {
         name: "createReport",
         component: CreateReport,
         props: true,
+        meta: {
+          keepAlive: true,
+        },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
