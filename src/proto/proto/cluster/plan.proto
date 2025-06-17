@@ -43,6 +43,7 @@ message SearchInfo {
     int64                      start_time = 4;
     int64                        end_time = 5;
     int64                         timeout = 6;
+    bool                        use_cache = 7;
 }
 
 message IndexInfo {

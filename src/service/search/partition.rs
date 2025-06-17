@@ -52,11 +52,23 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        is_streaming_aggregate: bool,
     ) -> Vec<[i64; 2]> {
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
                 start_time, end_time, step, order_by,
             )
+        } else if is_streaming_aggregate {
+            #[cfg(feature = "enterprise")]
+            {
+                self.generate_partitions_with_streaming_aggregate_partition_window(
+                    start_time, end_time, order_by,
+                )
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
+            }
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
@@ -137,6 +149,41 @@ impl PartitionGenerator {
         partitions
     }
 
+    #[cfg(feature = "enterprise")]
+    fn generate_partitions_with_streaming_aggregate_partition_window(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
+        // Generate partitions by DESC order
+        let interval =
+            o2_enterprise::enterprise::search::cache::streaming_agg::generate_aggregation_cache_interval(
+                start_time, end_time,
+            );
+        let interval_micros = interval.get_interval_microseconds();
+        let mut end_window = end_time - (end_time % interval_micros);
+
+        let mut partitions = Vec::new();
+
+        // Only add the first partition if it's not empty (end_time != end_window_hour)
+        if end_time != end_window {
+            partitions.push([end_window, end_time]);
+        }
+
+        while end_window > start_time {
+            let start = std::cmp::max(end_window - interval_micros, start_time);
+            partitions.push([start, end_window]);
+            end_window = start;
+        }
+
+        if order_by == OrderBy::Asc {
+            partitions.reverse();
+        }
+
+        partitions
+    }
+
     /// Generate partitions using the old logic
     /// This method implements the original partition generation strategy
     fn generate_partitions_aligned_with_histogram_interval(
@@ -200,7 +247,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false);
 
         // Expected partitions:
         // Partition 1: 10:15 - 10:17
@@ -252,7 +300,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false);
 
         // Expected partitions for ASC order:
         // Partition 1: 10:02 - 10:05
@@ -324,7 +373,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false);
 
         // Expected partitions:
         // 1. 10:16 - 10:17 (mini partition)
@@ -381,7 +431,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false);
 
         // Expected partitions with ASC order:
         // 1. 10:02 - 10:03 (mini partition)
@@ -421,5 +472,88 @@ mod tests {
             mini_partition[0], start_time,
             "Mini partition should start at start_time"
         );
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "enterprise")]
+mod enterprise_tests {
+    use super::*;
+
+    #[test]
+    fn test_partition_generator_with_streaming_aggregate_partition_window() {
+        let start_time: i64 = 1748513700000 * 1_000; // 10:15
+        let end_time: i64 = 1748528100000 * 1_000; // 14:15
+
+        let min_step = 300000000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
+        let step = 300000000; // 5 minutes
+
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true);
+
+        let mut expected_partitions = vec![
+            [1748527200000000, 1748528100000000], // 14:00 - 14:15
+            [1748523600000000, 1748527200000000], // 13:00 - 14:00
+            [1748520000000000, 1748523600000000], // 12:00 - 13:00
+            [1748516400000000, 1748520000000000], // 11:00 - 12:00
+            [1748513700000000, 1748516400000000], // 10:15 - 11:00
+        ];
+        assert_eq!(partitions, expected_partitions);
+
+        let partitions_asc =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true);
+        expected_partitions.reverse();
+        assert_eq!(partitions_asc, expected_partitions);
+    }
+
+    #[test]
+    fn test_partition_generator_with_streaming_aggregate_aligned_boundary() {
+        // Test case where end_time is exactly aligned to window boundary
+        // This should not create empty partitions
+        let start_time: i64 = 1748966400000000; // Aligned to hour
+        let end_time: i64 = 1749153600000000; // Aligned to hour (52 hours later)
+
+        let min_step = 300000000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
+        let step = 300000000; // 5 minutes
+
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true);
+
+        // Verify no empty partitions exist
+        for [start, end] in &partitions {
+            assert!(
+                *end > *start,
+                "Partition [{}, {}] should not be empty",
+                start,
+                end
+            );
+        }
+
+        // Verify full coverage
+        assert_eq!(
+            partitions.last().unwrap()[0],
+            start_time,
+            "First partition should start at start_time"
+        );
+        assert_eq!(
+            partitions.first().unwrap()[1],
+            end_time,
+            "Last partition should end at end_time"
+        );
+
+        // Verify partitions are contiguous
+        for i in 1..partitions.len() {
+            assert_eq!(
+                partitions[i][1],
+                partitions[i - 1][0],
+                "Partitions should be contiguous"
+            );
+        }
     }
 }

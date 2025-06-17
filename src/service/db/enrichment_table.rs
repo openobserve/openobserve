@@ -54,7 +54,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: false,
         local_mode: Some(true),
     };
     log::debug!(

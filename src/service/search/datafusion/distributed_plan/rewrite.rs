@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
-        DataFusionError, Result, TableReference,
+        Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     physical_expr::LexOrdering,
@@ -31,10 +31,7 @@ use datafusion::{
 use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
-use super::{
-    empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
-    streaming_aggs_exec,
-};
+use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
 use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
@@ -188,53 +185,5 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
         } else {
             Ok(TreeNodeRecursion::Continue)
         }
-    }
-}
-
-pub struct StreamingAggsRewriter {
-    id: String,
-    start_time: i64,
-    end_time: i64,
-}
-
-impl StreamingAggsRewriter {
-    pub fn new(id: String, start_time: i64, end_time: i64) -> Self {
-        Self {
-            id,
-            start_time,
-            end_time,
-        }
-    }
-}
-
-impl TreeNodeRewriter for StreamingAggsRewriter {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RemoteScanExec"
-            && !node.children().is_empty()
-            && node.children().first().unwrap().name() == "AggregateExec"
-            && config::get_config().common.feature_query_streaming_aggs
-        {
-            if !streaming_aggs_exec::GLOBAL_ID_CACHE.exists(&self.id) {
-                return Err(DataFusionError::Plan(format!(
-                    "streaming aggregation cache not found with id: {}",
-                    self.id
-                )));
-            }
-            let cached_data = streaming_aggs_exec::GLOBAL_CACHE
-                .get(&self.id)
-                .unwrap_or_default();
-            let streaming_node: Arc<dyn ExecutionPlan> =
-                Arc::new(streaming_aggs_exec::StreamingAggsExec::new(
-                    self.id.clone(),
-                    self.start_time,
-                    self.end_time,
-                    cached_data,
-                    node,
-                )) as _;
-            return Ok(Transformed::yes(streaming_node));
-        }
-        Ok(Transformed::no(node))
     }
 }

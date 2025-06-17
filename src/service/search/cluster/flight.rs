@@ -55,9 +55,7 @@ use crate::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
                 distributed_plan::{
-                    EmptyExecVisitor,
-                    remote_scan::RemoteScanExec,
-                    rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+                    EmptyExecVisitor, remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter,
                 },
                 exec::{prepare_datafusion_context, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
@@ -455,6 +453,7 @@ pub async fn run_datafusion(
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
     let streaming_id = req.streaming_id.clone();
+    let use_cache = req.use_cache;
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -481,27 +480,43 @@ pub async fn run_datafusion(
     }
 
     // check for streaming aggregation query
+    #[allow(unused_mut)]
+    let mut skip_empty_exec_visitor = false;
+    #[allow(unused_mut)]
+    let mut aggs_cache_ratio = 0;
+    #[cfg(feature = "enterprise")]
     if streaming_output {
         let Some(streaming_id) = streaming_id else {
             return Err(Error::Message(
                 "streaming_id is required for streaming aggregation query".to_string(),
             ));
         };
-        let mut rewriter = StreamingAggsRewriter::new(streaming_id, start_time, end_time);
+        let mut rewriter =
+        o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+        // Check for aggs cache hit
+        if rewriter.is_complete_cache_hit {
+            aggs_cache_ratio = 100;
+            // skip empty exec visitor for streaming aggregation query
+            // since the new plan after rewrite will have a `EmptyExec` for a complete cache
+            // hit
+            skip_empty_exec_visitor = true;
+        }
     }
 
-    let mut visitor = EmptyExecVisitor::default();
-    if physical_plan.visit(&mut visitor).is_err() {
-        log::error!(
-            "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
-        );
-        return Err(Error::Message(
-            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
-        ));
-    }
-    if visitor.get_data().is_some() {
-        return Ok((vec![], ScanStats::default(), "".to_string()));
+    if !skip_empty_exec_visitor {
+        let mut visitor = EmptyExecVisitor::default();
+        if physical_plan.visit(&mut visitor).is_err() {
+            log::error!(
+                "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
+            );
+            return Err(Error::Message(
+                "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+            ));
+        }
+        if visitor.get_data().is_some() {
+            return Ok((vec![], ScanStats::default(), "".to_string()));
+        }
     }
 
     if cfg.common.print_key_sql {
@@ -529,7 +544,10 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
+        let mut scan_stats = visit.scan_stats;
+        // Update scan stats to include aggregation cache ratio
+        scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+        ret.map(|data| (data, scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
 }

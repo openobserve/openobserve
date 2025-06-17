@@ -223,7 +223,7 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    // let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -232,7 +232,7 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
-    req.use_cache = Some(use_cache);
+    req.use_cache = get_use_cache_from_request(&query);
 
     // set search event type
     if req.search_type.is_none() {
@@ -848,7 +848,7 @@ pub async fn build_search_request_per_field(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(req.use_cache),
+        use_cache: req.use_cache,
         local_mode: None,
     };
 
@@ -907,7 +907,7 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let cfg = get_config();
+    // let cfg = get_config();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -1019,7 +1019,7 @@ async fn values_v1(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
+    // let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
 
     // search
     let req_query = config::meta::search::Query {
@@ -1051,7 +1051,7 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(use_cache),
+        use_cache: get_use_cache_from_request(query),
         local_mode: None,
     };
 

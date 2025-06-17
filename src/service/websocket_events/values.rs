@@ -116,7 +116,7 @@ pub async fn handle_values_request(
                 org_id,
                 stream_type,
                 &search_req,
-                search_req.use_cache.unwrap_or(false),
+                search_req.use_cache,
             )
             .instrument(ws_values_span.clone())
             .await?;
@@ -170,7 +170,7 @@ pub async fn handle_values_request(
                     search_type: search_req.search_type.unwrap_or(SearchEventType::Values),
                     search_event_context: None,
                     trace_id: trace_id.clone(),
-                    use_cache: search_req.use_cache.unwrap_or(false),
+                    use_cache: search_req.use_cache,
                     payload: search_req.clone(),
                     user_id: Some(user_id.to_string()),
                     time_offset: None,
@@ -217,7 +217,7 @@ pub async fn handle_values_request(
                     search_type: search_req.search_type.unwrap_or(SearchEventType::Values),
                     search_event_context: None,
                     trace_id: trace_id.clone(),
-                    use_cache: search_req.use_cache.unwrap_or(false),
+                    use_cache: search_req.use_cache,
                     payload: search_req.clone(),
                     user_id: Some(user_id.to_string()),
                     time_offset: None,
@@ -275,7 +275,7 @@ pub async fn handle_values_request(
                 search_type: search_req.search_type.unwrap_or(SearchEventType::Values),
                 search_event_context: None,
                 trace_id: trace_id.clone(),
-                use_cache: search_req.use_cache.unwrap_or(false),
+                use_cache: search_req.use_cache,
                 payload: search_req.clone(),
                 user_id: Some(user_id.to_string()),
                 time_offset: None,
