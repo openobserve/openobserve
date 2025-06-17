@@ -794,7 +794,7 @@ export default defineComponent({
     onUnmounted(() => {
       // Clean up any in-flight promises to prevent memory leaks
       rejectAllPromises();
-      Object.keys(currentlyExecutingPromises).forEach(key => {
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
         currentlyExecutingPromises[key] = null;
       });
     });
@@ -1658,6 +1658,10 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
+      // Check if there's already a loading request in progress
+      if (variableObject.isLoading || variableObject.isVariableLoadingPending) {
+        return;
+      }
       // When a dropdown is opened, only load the variable data
       await loadSingleVariableDataByName(variableObject);
     };
