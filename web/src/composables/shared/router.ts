@@ -170,9 +170,6 @@ const useRoutes = () => {
       path: "streams",
       name: "logstreams",
       component: LogStream,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
