@@ -16,7 +16,7 @@
 use chrono::TimeZone;
 use config::utils::file::set_permission;
 use infra::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
 
