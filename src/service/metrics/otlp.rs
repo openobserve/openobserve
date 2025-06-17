@@ -119,7 +119,7 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
         log::error!("[TRACES:OTLP] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
