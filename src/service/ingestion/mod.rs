@@ -437,7 +437,9 @@ pub async fn check_ingestion_allowed(
     #[cfg(feature = "cloud")]
     {
         if !super::organization::is_org_in_free_trial_period(org_id).await? {
-            return Err(anyhow!("org {org_id} has expired its trial period"));
+            return Err(Error::IngestionError(format!(
+                "org {org_id} has expired its trial period"
+            )));
         }
     }
 
