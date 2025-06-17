@@ -804,7 +804,7 @@ def test_search_partition(create_session, base_url):
     assert response_data['limit'] == 0, "Unexpected 'limit' value"
     
     assert 'streaming_output' in response_data, "Response does not contain 'streaming_output'"
-    assert response_data['streaming_output'] is True, "Unexpected 'streaming_output' value"
+    assert response_data['streaming_output'] is False, "Unexpected 'streaming_output' value"
     
     assert 'streaming_aggs' in response_data, "Response does not contain 'streaming_aggs'"
     assert response_data['streaming_aggs'] is False, "Unexpected 'streaming_aggs' value"

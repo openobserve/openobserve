@@ -185,7 +185,7 @@ async fn inner_exec(
         false,
     )
     .await?;
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
+    let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, partitions).await?;
     ctx.register_table("file_list", tbl)?;
     let df = ctx.sql(query).await?;
     let ret = df.collect().await?;
