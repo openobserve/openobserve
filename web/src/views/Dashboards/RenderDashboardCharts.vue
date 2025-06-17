@@ -851,7 +851,7 @@ export default defineComponent({
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;
     border-radius: 4px; 
-    overflow: hidden;
+    overflow: visible;
     border-radius: inherit;
   }
 }
