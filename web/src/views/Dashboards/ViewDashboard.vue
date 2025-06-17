@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
               :disable="arePanelsLoading"
+              @hide="setTimeForVariables"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -462,6 +463,23 @@ export default defineComponent({
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 
+    const setTimeForVariables = () => {
+      if (selectedDate.value && dateTimePicker.value) {
+        const date = dateTimePicker.value?.getConsumableDateTime();
+        const startTime = new Date(date.startTime);
+        const endTime = new Date(date.endTime);
+
+        // Update only the variables time object
+        currentTimeObjPerPanel.value = {
+          ...currentTimeObjPerPanel.value,
+          __variables: {
+            start_time: startTime,
+            end_time: endTime,
+          },
+        };
+      }
+    };
+
     const dateTimePicker = ref(null); // holds a reference to the date time picker
 
     // holds the date picker v-modal
@@ -595,7 +613,6 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
-      
     });
 
     const setTimeString = () => {
@@ -1079,7 +1096,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
-      
+
       // Clear all refs
       cleanupRefs();
     });
@@ -1207,6 +1224,7 @@ export default defineComponent({
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
+      setTimeForVariables,
     };
   },
 });
