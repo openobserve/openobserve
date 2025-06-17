@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { CommonActions } from './commonActions';
+import { CommonActions } from '../commonActions';
 
 export class AlertDestinationsPage {
     constructor(page) {
