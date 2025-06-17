@@ -843,7 +843,6 @@ export default defineComponent({
 
 .grid-stack-item {
   background: transparent;
-  will-change: transform; /* Optimize for animations and transforms */
 
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
