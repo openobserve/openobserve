@@ -455,13 +455,17 @@ impl TableProvider for NewListingTable {
             parquet_exec,
         )?;
 
-        apply_filter(
-            self.index_condition.as_ref(),
-            &projection_exec.schema(),
-            &self.fst_fields,
-            projection_exec,
-            filter_projection,
-        )
+        if get_config().common.feature_query_remove_filter_with_index {
+            apply_filter(
+                self.index_condition.as_ref(),
+                &projection_exec.schema(),
+                &self.fst_fields,
+                projection_exec,
+                filter_projection,
+            )
+        } else {
+            Ok(projection_exec)
+        }
     }
 
     fn supports_filters_pushdown(
