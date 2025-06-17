@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </span>
     <VariablesValueSelector
-      v-if="currentTimeObj['__global']"
+      v-if="currentTimeObj['__global'] || currentTimeObj['__variables'] "
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-      :selectedTimeDate="currentTimeObj['__global']"
+      :selectedTimeDate="currentTimeObj['__variables'] || currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         ref="gridStackContainer"
-        v-if="panels.length > 0"
         class="grid-stack"
       >
         <div
@@ -843,7 +842,6 @@ export default defineComponent({
 
 .grid-stack-item {
   background: transparent;
-  will-change: transform; /* Optimize for animations and transforms */
 
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
@@ -851,7 +849,7 @@ export default defineComponent({
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;
     border-radius: 4px; 
-    overflow: hidden;
+    overflow: visible;
     border-radius: inherit;
   }
 }
