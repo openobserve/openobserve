@@ -447,7 +447,7 @@ fn get_file_time(file: &str) -> Option<u64> {
             }
             format!("{}{}{}{}", parts[4], parts[5], parts[6], parts[7])
         }
-        "record_batches" => {
+        "aggregations" => {
             let (_, _, _, meta) = disk::parse_aggregation_cache_key(file)?;
             get_ymdh_from_micros(meta.start_time).replace("/", "")
         }
