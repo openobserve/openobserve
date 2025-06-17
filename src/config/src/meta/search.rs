@@ -793,7 +793,7 @@ impl ScanStats {
         self.idx_scan_size += other.idx_scan_size;
         self.idx_took = std::cmp::max(self.idx_took, other.idx_took);
         self.file_list_took = std::cmp::max(self.file_list_took, other.file_list_took);
-        self.aggs_cache_ratio = std::cmp::max(self.aggs_cache_ratio, other.aggs_cache_ratio);
+        self.aggs_cache_ratio = std::cmp::min(self.aggs_cache_ratio, other.aggs_cache_ratio);
     }
 
     pub fn format_to_mb(&mut self) {

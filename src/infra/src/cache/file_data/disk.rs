@@ -44,7 +44,7 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(RwLock::new(FileData::new(FileType::DATA)));
+        files.push(RwLock::new(FileData::new(FileType::Data)));
     }
     files
 });
@@ -54,7 +54,7 @@ static FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(FileData::new(FileType::DATA));
+        files.push(FileData::new(FileType::Data));
     }
     files
 });
@@ -63,7 +63,7 @@ static RESULT_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(RwLock::new(FileData::new(FileType::RESULT)));
+        files.push(RwLock::new(FileData::new(FileType::Result)));
     }
     files
 });
@@ -73,27 +73,27 @@ static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(FileData::new(FileType::RESULT));
+        files.push(FileData::new(FileType::Result));
     }
     files
 });
 
-// record batch cache
-static RECORD_BATCH_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
+// aggregation cache
+static AGGREGATION_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(RwLock::new(FileData::new(FileType::RecordBatch)));
+        files.push(RwLock::new(FileData::new(FileType::Aggregation)));
     }
     files
 });
 
-// read only record batch cache
-static RECORD_BATCH_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
+// read only aggregation cache
+static AGGREGATION_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(FileData::new(FileType::RecordBatch));
+        files.push(FileData::new(FileType::Aggregation));
     }
     files
 });
@@ -116,14 +116,14 @@ pub struct FileData {
 
 #[derive(Debug)]
 pub enum FileType {
-    DATA,
-    RESULT,
-    RecordBatch,
+    Data,
+    Result,
+    Aggregation,
 }
 
 impl Default for FileData {
     fn default() -> Self {
-        Self::new(FileType::DATA)
+        Self::new(FileType::Data)
     }
 }
 
@@ -131,9 +131,9 @@ impl FileData {
     fn new(file_type: FileType) -> FileData {
         let cfg = get_config();
         let size = match file_type {
-            FileType::DATA => cfg.disk_cache.max_size,
-            FileType::RESULT => cfg.disk_cache.result_max_size,
-            FileType::RecordBatch => cfg.disk_cache.record_batch_max_size,
+            FileType::Data => cfg.disk_cache.max_size,
+            FileType::Result => cfg.disk_cache.result_max_size,
+            FileType::Aggregation => cfg.disk_cache.aggregation_max_size,
         };
         FileData::with_capacity_and_cache_strategy(size, &cfg.disk_cache.cache_strategy)
     }
@@ -221,9 +221,9 @@ impl FileData {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
                 .add(data_size as i64);
-        } else if columns[0] == "record_batches" && columns.len() >= 3 {
+        } else if columns[0] == "aggregations" && columns.len() >= 3 {
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "record_batches"])
+                .with_label_values(&[columns[1], columns[2], "aggregations"])
                 .add(data_size as i64);
         };
         Ok(())
@@ -301,9 +301,9 @@ impl FileData {
                 metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                     .with_label_values(&[columns[1]])
                     .sub(data_size as i64);
-            } else if columns[0] == "record_batches" && columns.len() >= 3 {
+            } else if columns[0] == "aggregations" && columns.len() >= 3 {
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2], "record_batches"])
+                    .with_label_values(&[columns[1], columns[2], "aggregations"])
                     .sub(data_size as i64);
             }
             release_size += data_size;
@@ -361,9 +361,9 @@ impl FileData {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
                 .sub(data_size as i64);
-        } else if columns[0] == "record_batches" && columns.len() >= 3 {
+        } else if columns[0] == "aggregations" && columns.len() >= 3 {
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "record_batches"])
+                .with_label_values(&[columns[1], columns[2], "aggregations"])
                 .sub(data_size as i64);
         }
 
@@ -401,13 +401,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     // trigger read only files
     for file in FILES_READER.iter() {
-        let root_dir = file.root_dir.clone();
-        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+        std::fs::create_dir_all(&file.root_dir).expect("create cache dir success");
     }
-    // trigger read only record batch files
-    for file in RECORD_BATCH_FILES_READER.iter() {
-        let root_dir = file.root_dir.clone();
-        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    // trigger read only aggregation files
+    for file in AGGREGATION_FILES_READER.iter() {
+        std::fs::create_dir_all(&file.root_dir).expect("create cache dir success");
     }
 
     tokio::task::spawn(async move {
@@ -451,8 +449,8 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         FILES_READER.get(idx).unwrap()
     } else if file.starts_with("results") {
         RESULT_FILES_READER.get(idx).unwrap()
-    } else if file.starts_with("record_batches") {
-        RECORD_BATCH_FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES_READER.get(idx).unwrap()
     } else {
         RESULT_FILES_READER.get(idx).unwrap()
     };
@@ -469,8 +467,8 @@ pub async fn get_size(file: &str) -> Option<usize> {
         FILES_READER.get(idx).unwrap()
     } else if file.starts_with("results") {
         RESULT_FILES_READER.get(idx).unwrap()
-    } else if file.starts_with("record_batches") {
-        RECORD_BATCH_FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES_READER.get(idx).unwrap()
     } else {
         RESULT_FILES_READER.get(idx).unwrap()
     };
@@ -487,8 +485,8 @@ pub async fn exist(file: &str) -> bool {
         FILES[idx].read().await
     } else if file.starts_with("results") {
         RESULT_FILES[idx].read().await
-    } else if file.starts_with("record_batches") {
-        RECORD_BATCH_FILES[idx].read().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].read().await
     } else {
         RESULT_FILES[idx].read().await
     };
@@ -524,8 +522,8 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         FILES[idx].write().await
     } else if file.starts_with("results") {
         RESULT_FILES[idx].write().await
-    } else if file.starts_with("record_batches") {
-        RECORD_BATCH_FILES[idx].write().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].write().await
     } else {
         RESULT_FILES[idx].write().await
     };
@@ -545,8 +543,8 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
         FILES[idx].write().await
     } else if file.starts_with("results") {
         RESULT_FILES[idx].write().await
-    } else if file.starts_with("record_batches") {
-        RECORD_BATCH_FILES[idx].write().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].write().await
     } else {
         RESULT_FILES[idx].write().await
     };
@@ -666,14 +664,14 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .add(data_size as i64);
 
                         metrics_cache.push(file_key);
-                    } else if file_key.starts_with("record_batches") {
+                    } else if file_key.starts_with("aggregations") {
                         let Some((org_id, stream_type, ..)) =
-                            parse_record_batch_cache_key(&file_key)
+                            parse_aggregation_cache_key(&file_key)
                         else {
-                            log::error!("parse record batch cache key error: {}", file_key);
+                            log::error!("parse aggregation cache key error: {}", file_key);
                             continue;
                         };
-                        let mut w = RECORD_BATCH_FILES[idx].write().await;
+                        let mut w = AGGREGATION_FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
                         drop(w);
@@ -683,11 +681,11 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .with_label_values(&[
                                 org_id.as_str(),
                                 stream_type.as_str(),
-                                "record_batches",
+                                "aggregations",
                             ])
                             .add(data_size as i64);
 
-                        // metrics for record batches
+                        // metrics for aggregations
                         let columns = file_key.split('/').collect::<Vec<&str>>();
                         if columns.len() >= 3 {
                             metrics::QUERY_DISK_CACHE_USED_BYTES
@@ -734,7 +732,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
-    for file in RECORD_BATCH_FILES.iter() {
+    for file in AGGREGATION_FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
             drop(r);
@@ -753,9 +751,9 @@ pub async fn stats(file_type: FileType) -> (usize, usize) {
     let mut total_size = 0;
     let mut used_size = 0;
     let files = match file_type {
-        FileType::DATA => &FILES,
-        FileType::RESULT => &RESULT_FILES,
-        FileType::RecordBatch => &RECORD_BATCH_FILES,
+        FileType::Data => &FILES,
+        FileType::Result => &RESULT_FILES,
+        FileType::Aggregation => &AGGREGATION_FILES,
     };
 
     for file in files.iter() {
@@ -771,9 +769,9 @@ pub async fn stats(file_type: FileType) -> (usize, usize) {
 pub async fn len(file_type: FileType) -> usize {
     let mut total = 0;
     let files = match file_type {
-        FileType::DATA => &FILES,
-        FileType::RESULT => &RESULT_FILES,
-        FileType::RecordBatch => &RECORD_BATCH_FILES,
+        FileType::Data => &FILES,
+        FileType::Result => &RESULT_FILES,
+        FileType::Aggregation => &AGGREGATION_FILES,
     };
     for file in files.iter() {
         let r = file.read().await;
@@ -785,9 +783,9 @@ pub async fn len(file_type: FileType) -> usize {
 #[inline]
 pub async fn is_empty(file_type: FileType) -> bool {
     let files = match file_type {
-        FileType::DATA => &FILES,
-        FileType::RESULT => &RESULT_FILES,
-        FileType::RecordBatch => &RECORD_BATCH_FILES,
+        FileType::Data => &FILES,
+        FileType::Result => &RESULT_FILES,
+        FileType::Aggregation => &AGGREGATION_FILES,
     };
 
     for file in files.iter() {
@@ -858,10 +856,10 @@ pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, Res
     Some((org_id, stream_type, query_key, meta))
 }
 
-// parse the record batch cache key from the file name
+// parse the aggregation cache key from the file name
 // returns (org_id, stream_type, query_key, ResultCacheMeta)
-// record_batches/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow
-pub fn parse_record_batch_cache_key(
+// aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow
+pub fn parse_aggregation_cache_key(
     file: &str,
 ) -> Option<(String, String, String, ResultCacheMeta)> {
     let columns = file.split('/').collect::<Vec<&str>>();
@@ -1038,11 +1036,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_parse_record_batch_cache_key() {
-        let file_key = "record_batches/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
-        let Some((org_id, stream_type, query_key, meta)) = parse_record_batch_cache_key(file_key)
+    async fn test_parse_aggregation_cache_key() {
+        let file_key = "aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
+        let Some((org_id, stream_type, query_key, meta)) = parse_aggregation_cache_key(file_key)
         else {
-            panic!("parse record batch cache key error");
+            panic!("parse aggregation cache key error");
         };
         assert_eq!(org_id, "default");
         assert_eq!(stream_type, "logs");

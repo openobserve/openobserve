@@ -1603,8 +1603,8 @@ pub struct DiskCache {
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
     // MB, default is 10% of local volume available space and maximum 20GB
-    #[env_config(name = "ZO_DISK_RECORD_BATCH_CACHE_MAX_SIZE", default = 0)]
-    pub record_batch_max_size: usize,
+    #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
+    pub aggregation_max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -2502,7 +2502,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10%
         if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
             cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
         }
@@ -2510,13 +2510,13 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
 
-    if cfg.disk_cache.record_batch_max_size == 0 {
-        cfg.disk_cache.record_batch_max_size = cfg.limit.disk_free / 10; // 10%
-        if cfg.disk_cache.record_batch_max_size > 1024 * 1024 * 1024 * 20 {
-            cfg.disk_cache.record_batch_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+    if cfg.disk_cache.aggregation_max_size == 0 {
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10%
+        if cfg.disk_cache.aggregation_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.aggregation_max_size = 1024 * 1024 * 1024 * 20; // 20GB
         }
     } else {
-        cfg.disk_cache.record_batch_max_size *= 1024 * 1024;
+        cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
     }
 
     if cfg.disk_cache.skip_size == 0 {

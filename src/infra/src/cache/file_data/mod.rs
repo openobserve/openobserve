@@ -426,8 +426,8 @@ pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_st
 /// 1744081170000000_1744081170000000_1_0.json
 /// parquet_cache:
 /// files/default/logs/disk/2025/04/08/06/7315292721030106704.parquet
-/// record_batches cache:
-/// record_batches/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.json
+/// aggregation cache:
+/// aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow
 fn get_file_time(file: &str) -> Option<u64> {
     let parts = file.split('/').collect::<Vec<_>>();
     if parts.len() < 6 {
@@ -448,7 +448,7 @@ fn get_file_time(file: &str) -> Option<u64> {
             format!("{}{}{}{}", parts[4], parts[5], parts[6], parts[7])
         }
         "record_batches" => {
-            let (_, _, _, meta) = disk::parse_record_batch_cache_key(file)?;
+            let (_, _, _, meta) = disk::parse_aggregation_cache_key(file)?;
             get_ymdh_from_micros(meta.start_time).replace("/", "")
         }
         _ => {
@@ -519,7 +519,7 @@ mod tests {
         let time = get_file_time(file);
         assert_eq!(time, Some(2022100310));
 
-        let file = "record_batches/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
+        let file = "aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
         let time = get_file_time(file);
         assert_eq!(time, Some(2025040802));
     }
