@@ -58,20 +58,13 @@ use crate::{
 
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         log::error!("Metrics ingestion error: {e}");
         return Ok(IngestionResponse {
             code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
             status: vec![],
             error: Some(e.to_string()),
         });
-    }
-
-    #[cfg(feature = "cloud")]
-    {
-        if !crate::service::organization::is_org_in_free_trial_period(org_id).await? {
-            return Err(anyhow!("org {org_id} has expired its trial period"));
-        }
     }
 
     let start = std::time::Instant::now();

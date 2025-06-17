@@ -68,7 +68,7 @@ pub async fn remote_write(
     body: web::Bytes,
 ) -> std::result::Result<(), anyhow::Error> {
     // check system resource
-    check_ingestion_allowed(org_id, StreamType::Metrics, None)?;
+    check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();

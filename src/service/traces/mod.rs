@@ -152,7 +152,7 @@ pub async fn handle_otlp_request(
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         log::error!("[TRACES:OTLP] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -591,7 +591,7 @@ pub async fn ingest_json(
     traces_stream_name: &str,
 ) -> Result<HttpResponse, Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         log::error!("[TRACES:JSON] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -599,25 +599,6 @@ pub async fn ingest_json(
                 e,
             )),
         );
-    }
-
-    #[cfg(feature = "cloud")]
-    {
-        match super::organization::is_org_in_free_trial_period(org_id).await {
-            Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                )));
-            }
-            Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
-            }
-            _ => {}
-        }
     }
 
     let start = std::time::Instant::now();

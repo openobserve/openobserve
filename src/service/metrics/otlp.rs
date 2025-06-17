@@ -119,7 +119,7 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         log::error!("Metrics ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -127,16 +127,6 @@ pub async fn handle_otlp_request(
                 e,
             )),
         );
-    }
-
-    #[cfg(feature = "cloud")]
-    {
-        if !crate::service::organization::is_org_in_free_trial_period(org_id).await? {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                http::StatusCode::FORBIDDEN,
-                format!("org {org_id} has expired its trial period"),
-            )));
-        }
     }
 
     let start = std::time::Instant::now();
