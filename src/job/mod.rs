@@ -93,7 +93,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    if !cfg.common.mmdb_disable_download || !LOCAL_NODE.is_compactor() {
+    if !cfg.common.mmdb_disable_download && !LOCAL_NODE.is_compactor() {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
