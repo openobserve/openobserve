@@ -571,11 +571,29 @@ test_data_sql = [
         40,
     ), 
       
-     
+    (
+        "match_all query one",
+        f"SELECT * FROM \"{stream_name}\" WHERE match_all('zio*')",
+        0,
+        50,
+        18,
+    ), 
 
+    (
+        "match_all query two",
+        f"SELECT * FROM \"{stream_name}\" WHERE match_all('us*')",
+        0,
+        50,
+        50,
+    ), 
 
-
-
+    (
+        "match_all query three",
+        f"SELECT * FROM \"{stream_name}\" WHERE match_all('ip-10-2-29-163.us-east-2.co*)",
+        0,
+        50,
+        18,
+    ), 
 
  
 
