@@ -167,7 +167,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::organization::org_settings_watch().await });
 
-    tokio::task::spawn(async move { db::pipeline::watch().await });
+    // pipeline not used on compactors
+    if !LOCAL_NODE.is_compactor() {
+        tokio::task::spawn(async move { db::pipeline::watch().await });
+    }
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
@@ -291,6 +294,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
+    // pipeline not used on compactors
     db::pipeline::cache().await.expect("Pipeline cache failed");
 
     Ok(())
