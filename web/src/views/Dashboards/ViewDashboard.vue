@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
               :disable="arePanelsLoading"
+              @hide="setTimeForVariables"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
