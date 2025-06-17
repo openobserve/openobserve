@@ -39,7 +39,6 @@ test.describe("Alerts E2E Flow", () => {
   /**
    * Setup for each test
    * - Logs in
-   * - Initializes page objects
    * - Generates shared random value
    * - Ingests test data (except for scheduled alert test)
    * - Navigates to alerts page
