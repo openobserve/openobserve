@@ -3322,6 +3322,7 @@ mod tests {
                 multi_dir: String::default(),
                 aggregation_max_size: usize::default(),
                 delay_window_mins: i64::default(),
+                aggregation_cache_enabled: bool::default(),
             },
             log: config::Log {
                 level: String::default(),
