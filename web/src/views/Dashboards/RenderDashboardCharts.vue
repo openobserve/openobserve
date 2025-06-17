@@ -326,7 +326,7 @@ export default defineComponent({
 
     // watch on currentTimeObj to update the variablesData
     watch(
-      () => [props?.currentTimeObj?.__variables, props?.currentTimeObj?.__global],
+      () => props?.currentTimeObj?.__global,
       () => {
         currentVariablesDataRef.value = {
           __global: JSON.parse(JSON.stringify(variablesData.value)),
