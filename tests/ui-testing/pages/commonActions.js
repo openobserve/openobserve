@@ -1,4 +1,6 @@
 import { exec } from 'child_process';
+import { test } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 export class CommonActions {
     constructor(page) {
@@ -13,6 +15,7 @@ export class CommonActions {
     async navigateToAlerts() {
         await this.page.locator(this.alertsMenuItem).click();
         await this.page.waitForTimeout(2000);
+        await expect(this.page.locator('[data-test="alerts-list-title"]')).toContainText('Alerts');
     }
 
     async navigateToSettings() {
@@ -35,7 +38,7 @@ export class CommonActions {
         const dropdown = this.page.locator('.q-menu');
         let optionFound = false;
         let maxScrolls = 20;
-        let scrollAmount = 200;
+        let scrollAmount = 300;
         let totalScrolled = 0;
 
         while (!optionFound && maxScrolls > 0) {
@@ -52,7 +55,8 @@ export class CommonActions {
                         await option.locator('span').click();
                     }
                     optionFound = true;
-                    console.log(`Found ${optionType} after scrolling:`, optionName);
+                    console.log(`Found ${optionType} after scrolling: ${optionName}`);
+                    await this.page.waitForTimeout(1000);
                 } else {
                     // Get the current scroll position and height
                     const { scrollTop, scrollHeight, clientHeight } = await dropdown.evaluate(el => ({
@@ -65,20 +69,20 @@ export class CommonActions {
                     if (scrollTop + clientHeight >= scrollHeight) {
                         await dropdown.evaluate(el => el.scrollTop = 0);
                         totalScrolled = 0;
+                        await this.page.waitForTimeout(1000);
                     } else {
                         // Scroll down
                         await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
                         totalScrolled += scrollAmount;
+                        await this.page.waitForTimeout(1000);
                     }
-                    
-                    await this.page.waitForTimeout(500);
                     maxScrolls--;
                 }
             } catch (error) {
                 // If option not found, scroll and try again
                 await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
                 totalScrolled += scrollAmount;
-                await this.page.waitForTimeout(500);
+                await this.page.waitForTimeout(1000);
                 maxScrolls--;
             }
         }
@@ -95,15 +99,15 @@ export class CommonActions {
         const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/default/${streamName}/_json -d '[{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}]'`;
         
         return new Promise((resolve, reject) => {
-            exec(curlCommand, (error, stdout) => {
+            exec(curlCommand, (error, stdout, stderr) => {
                 if (error) {
-                    console.error(`Error executing curl command: ${error}`);
+                    console.error('Error executing curl command:', error);
                     reject(error);
                     return;
                 }
                 console.log('Curl command response:', stdout);
                 console.log('Successfully ingested test data');
-                resolve(stdout);
+                resolve();
             });
         });
     }
@@ -112,15 +116,15 @@ export class CommonActions {
         const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/default/${streamName}/_json -d @utils/td150.json`;
         
         return new Promise((resolve, reject) => {
-            exec(curlCommand, (error, stdout) => {
+            exec(curlCommand, (error, stdout, stderr) => {
                 if (error) {
-                    console.error(`Error executing curl command: ${error}`);
+                    console.error('Error executing curl command:', error);
                     reject(error);
                     return;
                 }
                 console.log('Custom curl command response:', stdout);
                 console.log('Successfully ingested custom test data');
-                resolve(stdout);
+                resolve();
             });
         });
     }

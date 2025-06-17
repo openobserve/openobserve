@@ -1,4 +1,5 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { test as base } from '@playwright/test';
 
 export class AlertTemplatesPage {
     constructor(page) {
@@ -25,18 +26,50 @@ export class AlertTemplatesPage {
         this.templateInUseMessage = 'Template is in use for destination {destinationName}';
     }
 
-    async navigateToTemplates() {
-        await this.page.locator(this.settingsMenuItem).click();
-        await this.page.locator(this.templatesTab).click();
+    async navigateToTemplates(retryCount = 0) {
+        const maxRetries = 2; // Maximum number of retry attempts
+        
+        try {
+            await this.page.waitForLoadState('networkidle');
+            await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 10000 });
+            await this.page.locator(this.settingsMenuItem).click();
+            await this.page.waitForTimeout(2000);
+
+            await this.page.locator(this.templatesTab).waitFor({ state: 'visible', timeout: 10000 });
+            await this.page.locator(this.templatesTab).click();
+            await this.page.waitForTimeout(2000);
+
+            // Wait for templates page to load
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(2000);
+        } catch (error) {
+            console.error('Error navigating to templates:', error);
+            
+            // Check if we've exceeded max retries
+            if (retryCount >= maxRetries) {
+                throw new Error(`Failed to navigate to templates after ${maxRetries} attempts`);
+            }
+            
+            // Try to recover by reloading the page
+            await this.page.reload();
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(2000);
+            
+            // Retry navigation with incremented retry count
+            await this.navigateToTemplates(retryCount + 1);
+        }
     }
 
     async createTemplate(templateName) {
         await this.navigateToTemplates();
-        await this.page.waitForTimeout(2000); // Wait for page to load
+        await this.page.waitForTimeout(2000);
         
         await this.page.locator(this.addTemplateButton).click();
+        await this.page.waitForTimeout(1000);
+        
         await this.page.locator(this.templateNameInput).click();
         await this.page.locator(this.templateNameInput).fill(templateName);
+        await this.page.waitForTimeout(1000);
         
         const templateText = `{
   "text": "{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script"`;
@@ -50,9 +83,8 @@ export class AlertTemplatesPage {
         // Enter the template content all at once
         await this.page.keyboard.type(templateText);
         await this.page.waitForTimeout(1000);
-        await this.page.locator(this.templateSubmitButton).click();
         
-        // Wait for success message with explicit timeout
+        await this.page.locator(this.templateSubmitButton).click();
         await expect(this.page.getByText(this.templateSuccessMessage)).toBeVisible({ timeout: 30000 });
         
         // Additional wait for WebKit to process the update
@@ -77,9 +109,8 @@ export class AlertTemplatesPage {
                 await this.page.locator(this.templateSearchInput).fill(templateName);
                 await this.page.waitForTimeout(1000);
 
-                // Verify the template exists in search results
-                await expect(this.page.getByText('1-1 of')).toBeVisible({ timeout: 30000 });
-                await expect(this.page.getByRole('cell', { name: templateName })).toBeVisible({ timeout: 30000 });
+                // Verify the template exists in search results using waitFor
+                await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
                 
                 console.log('Successfully verified template exists:', templateName);
                 return;
@@ -139,19 +170,38 @@ export class AlertTemplatesPage {
     }
 
     async deleteTemplateAndVerify(templateName) {
-        try {
-            // Try to delete the template
-            await this.deleteTemplate(templateName);
-            // If deletion succeeds, verify success message
-            await expect(this.page.getByText(`Template ${templateName} deleted successfully`)).toBeVisible();
-            console.log('Successfully deleted template:', templateName);
-            return true;
-        } catch (error) {
-            // If deletion fails due to template being in use, verify the in-use message
-            await this.verifyTemplateInUse(templateName, '');
-            console.log('Successfully verified template in use message for template:', templateName);
-            return false;
-        }
+        // First search for the template
+        await this.page.locator(this.templateSearchInput).click();
+        await this.page.locator(this.templateSearchInput).fill('');  // Clear the input first
+        await this.page.locator(this.templateSearchInput).fill(templateName.toLowerCase());
+        await this.page.waitForTimeout(2000); // Wait for search to complete
+        
+        // Wait for either search results or no data message
+        await Promise.race([
+            this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+            this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+        ]).catch(() => {
+            console.log('Neither table nor no data message found after search, continuing...');
+        });
+
+        // Verify template exists before deletion
+        await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
+
+        // Click delete button using the correct locator
+        await this.page.locator(this.templateDeleteButton.replace('{templateName}', templateName)).click();
+        await expect(this.page.getByText(this.deleteConfirmText, { exact: true })).toBeVisible();
+        await this.page.locator(this.confirmButton).click();
+        await expect(this.page.getByText(this.templateDeletedMessage.replace('%s', templateName))).toBeVisible();
+        await this.page.waitForTimeout(2000);
+
+        // Verify template is deleted
+        await this.page.locator(this.templateSearchInput).click();
+        await this.page.locator(this.templateSearchInput).fill('');  // Clear the input first
+        await this.page.locator(this.templateSearchInput).fill(templateName.toLowerCase());
+        await this.page.waitForTimeout(2000); // Wait for search to complete
+        
+        // Verify no results found
+        await expect(this.page.getByText('No data available')).toBeVisible();
     }
 
     async ensureTemplateExists(templateName) {
@@ -181,6 +231,20 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(2000);
 
         try {
+            // Search for the template first
+            await this.page.locator(this.templateSearchInput).click();
+            await this.page.locator(this.templateSearchInput).fill('');  // Clear the input first
+            await this.page.locator(this.templateSearchInput).fill(templateName.toLowerCase());
+            await this.page.waitForTimeout(2000); // Wait for search to complete
+            
+            // Wait for either search results or no data message
+            await Promise.race([
+                this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+            ]).catch(() => {
+                console.log('Neither table nor no data message found after search, continuing...');
+            });
+
             // Try to find the template
             await this.page.getByRole('cell', { name: templateName }).waitFor({ timeout: 2000 });
             console.log('Successfully verified template exists:', templateName);

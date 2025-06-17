@@ -423,8 +423,11 @@ pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_st
 /// 17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb
 /// log_cache:
 /// results/default/logs/default/16042959487540176184_30_zo_sql_key/
-/// 1744081170000000_1744081170000000_1_0.json parquet_cache:
+/// 1744081170000000_1744081170000000_1_0.json
+/// parquet_cache:
 /// files/default/logs/disk/2025/04/08/06/7315292721030106704.parquet
+/// aggregation cache:
+/// aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow
 fn get_file_time(file: &str) -> Option<u64> {
     let parts = file.split('/').collect::<Vec<_>>();
     if parts.len() < 6 {
@@ -443,6 +446,10 @@ fn get_file_time(file: &str) -> Option<u64> {
                 return None;
             }
             format!("{}{}{}{}", parts[4], parts[5], parts[6], parts[7])
+        }
+        "aggregations" => {
+            let (_, _, _, meta) = disk::parse_aggregation_cache_key(file)?;
+            get_ymdh_from_micros(meta.start_time).replace("/", "")
         }
         _ => {
             return None;
@@ -511,5 +518,9 @@ mod tests {
         let file = "files/default/logs/disk/2022/10/03/10/7315292721030106704.parquet";
         let time = get_file_time(file);
         assert_eq!(time, Some(2022100310));
+
+        let file = "aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
+        let time = get_file_time(file);
+        assert_eq!(time, Some(2025040802));
     }
 }
