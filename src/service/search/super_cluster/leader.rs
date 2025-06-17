@@ -35,9 +35,10 @@ use datafusion::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter;
-use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
+use o2_enterprise::enterprise::{
+    search::{WorkGroup, datafusion::distributed_plan::rewrite::StreamingAggsRewriter},
+    super_cluster::search::get_cluster_nodes,
+};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -306,11 +307,7 @@ async fn run_datafusion(
     }
 
     // check for streaming aggregation query
-    #[cfg(not(feature = "enterprise"))]
-    let aggs_cache_ratio = 0;
-    #[cfg(feature = "enterprise")]
     let mut aggs_cache_ratio = 0;
-    #[cfg(feature = "enterprise")]
     if streaming_output {
         let Some(streaming_id) = streaming_id else {
             return Err(Error::Message(

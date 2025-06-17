@@ -44,8 +44,6 @@ use infra::{
     file_list::FileId,
 };
 use itertools::Itertools;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter;
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -505,7 +503,7 @@ pub async fn run_datafusion(
             ));
         };
         let mut rewriter =
-            StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
+        o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
 
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
 

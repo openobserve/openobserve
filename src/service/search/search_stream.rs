@@ -30,12 +30,13 @@ use config::{
 };
 use log;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::{
-    auditor::{AuditMessage, Protocol, ResponseMeta},
-    config::get_config as get_o2_config,
+use o2_enterprise::enterprise::{
+    common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config as get_o2_config,
+    },
+    search::datafusion::distributed_plan::streaming_aggs_exec,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use serde_json::Map;
 use tokio::sync::mpsc;
 use tracing::Instrument;

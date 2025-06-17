@@ -19,8 +19,6 @@ use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
-#[cfg(feature = "enterprise")]
-use config::utils::hash::Sum64;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -47,12 +45,6 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::cache::streaming_agg::{
-    create_record_batch_cache_file_path, generate_record_batch_interval,
-};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
@@ -64,13 +56,26 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use {
     crate::service::grpc::make_grpc_search_client,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
-    std::collections::HashSet, tracing::info_span,
+    o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup,
+    o2_enterprise::enterprise::search::cache::streaming_agg::{
+        create_aggregation_cache_file_path, generate_aggregation_cache_interval,
+        get_aggregation_cache_key_from_request,
+    },
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
+    std::collections::HashSet,
+    tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
+    common::{
+        infra::cluster as infra_cluster,
+        utils::{
+            functions::{get_all_transform_keys, init_vrl_runtime},
+            stream::get_settings_max_query_range,
+        },
+    },
     handler::grpc::request::search::Searcher,
     service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
@@ -394,7 +399,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in common::utils::functions::get_all_transform_keys(org_id).await {
+        for fn_name in get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -459,7 +464,7 @@ pub async fn search_multi(
         if apply_over_hits {
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
-        let mut runtime = common::utils::functions::init_vrl_runtime();
+        let mut runtime = init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
@@ -642,55 +647,37 @@ pub async fn search_partition(
         None
     };
 
-    let origin_sql = req.sql.clone();
     #[cfg(feature = "enterprise")]
-    let (stream_name, _all_streams) = match resolve_stream_names(&origin_sql) {
-        // TODO: cache don't not support multiple stream names
-        Ok(v) => (v[0].clone(), v.join(",")),
-        Err(e) => {
-            return Err(Error::Message(e.to_string()));
-        }
-    };
+    if let Some(id) = &streaming_id {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
+        );
 
-    // calculate hash for the query
-    let mut hash_body = vec![origin_sql];
-    if let Some(vrl_function) = &req.query_fn {
-        hash_body.push(vrl_function.to_string());
-    }
-    if !req.regions.is_empty() {
-        hash_body.extend(req.regions.clone());
-    }
-    if !req.clusters.is_empty() {
-        hash_body.extend(req.clusters.clone());
-    }
-    #[cfg(feature = "enterprise")]
-    let mut h = config::utils::hash::gxhash::new();
-    #[cfg(feature = "enterprise")]
-    let hashed_query = h.sum64(&hash_body.join(","));
+        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
+            // TODO: cache don't not support multiple stream names
+            Ok(v) => (v[0].clone(), v.join(",")),
+            Err(e) => {
+                return Err(Error::Message(e.to_string()));
+            }
+        };
 
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(id) = &streaming_id {
-            log::info!(
-                "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
-            );
-            let cache_interval =
-                generate_record_batch_interval(query.start_time, query.end_time) as i64;
-            let cache_file_path = create_record_batch_cache_file_path(
-                org_id,
-                &stream_type.to_string(),
-                &stream_name,
-                hashed_query,
-                cache_interval,
-            );
-            streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
-            log::info!(
-                "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
-                trace_id,
-                id,
-                cache_file_path
-            );
-        }
+        let cache_interval =
+            generate_aggregation_cache_interval(query.start_time, query.end_time) as i64;
+        let hashed_query = get_aggregation_cache_key_from_request(req);
+        let cache_file_path = create_aggregation_cache_file_path(
+            org_id,
+            &stream_type.to_string(),
+            &stream_name,
+            hashed_query,
+            cache_interval,
+        );
+        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
+        log::info!(
+            "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
+            trace_id,
+            id,
+            cache_file_path
+        );
     }
 
     let mut files = Vec::new();

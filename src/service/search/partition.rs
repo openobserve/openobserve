@@ -16,8 +16,6 @@
 use std::cmp::max;
 
 use config::meta::sql::OrderBy;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::cache::streaming_agg::generate_record_batch_interval;
 
 /// Generates partitions for search queries
 pub struct PartitionGenerator {
@@ -202,7 +200,10 @@ impl PartitionGenerator {
         order_by: OrderBy,
     ) -> Vec<[i64; 2]> {
         // Generate partitions by DESC order
-        let interval = generate_record_batch_interval(start_time, end_time);
+        let interval =
+            o2_enterprise::enterprise::search::cache::streaming_agg::generate_aggregation_cache_interval(
+                start_time, end_time,
+            );
         let interval_micros = interval.get_interval_microseconds();
         let mut end_window = end_time - (end_time % interval_micros);
 
