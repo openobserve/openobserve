@@ -139,6 +139,8 @@ jobs:
             "unflattened.spec.js",
             "usersOrg.spec.js",
             "websocket.spec.js",
+            "pipeline-dynamic.spec.js",
+            "searchpartition.spec.js"
              # "remotepipeline.spec.js",
 
           ]
