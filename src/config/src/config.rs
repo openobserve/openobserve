@@ -1604,8 +1604,8 @@ pub struct DiskCache {
     pub result_max_size: usize,
     #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
     pub aggregation_max_size: usize,
-    #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_ENABLED", default = true)]
-    pub disk_aggregation_cache_enabled: bool,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
