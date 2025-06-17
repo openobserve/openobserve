@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         ref="gridStackContainer"
-        v-if="panels.length > 0"
         class="grid-stack"
       >
         <div
