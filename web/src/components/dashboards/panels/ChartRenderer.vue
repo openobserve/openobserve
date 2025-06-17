@@ -219,22 +219,22 @@ export default defineComponent({
     const store = useStore();
 
     const cleanupChart = () => {
+      // Remove all event listeners from chart
+      chart?.off("mousemove");
+      chart?.off("mouseout");
+      chart?.off("globalout");
+      chart?.off("legendselectchanged");
+      chart?.off("highlight");
+      chart?.off("dataZoom");
+      chart?.off("click");
+      chart?.off("mouseover");
+
       //dispose
       if (chart) {
         chart.dispose();
       }
-      // Remove all event listeners from chart
-      chart?.off('mousemove');
-      chart?.off('mouseout');
-      chart?.off('globalout');
-      chart?.off('legendselectchanged');
-      chart?.off('highlight');
-      chart?.off('dataZoom');
-      chart?.off('click');
-      chart?.off('mouseover');
 
       chart = null;
-      chartRef.value = null;
     };
 
     const windowResizeEventCallback = async () => {
@@ -541,6 +541,7 @@ export default defineComponent({
         await nextTick();
         const theme = store.state.theme === "dark" ? "dark" : "light";
         if (chartRef.value) {
+          cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
@@ -617,15 +618,38 @@ export default defineComponent({
     });
 
     //need to resize chart on activated
-    onActivated(() => {
-      windowResizeEventCallback();
+    onActivated(async () => {
+      try {
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        const theme = store.state.theme === "dark" ? "dark" : "light";
+        if (chartRef.value) {
+          cleanupChart();
+          chart = echarts.init(chartRef.value, theme, {
+            renderer: props.renderType,
+          });
+        }
+        chart?.setOption(props?.data?.options || {}, true);
+        chartInitialSetUp();
+        windowResizeEventCallback();
 
-      // we need that toolbox datazoom button initially selected
-      chart?.dispatchAction({
-        type: "takeGlobalCursor",
-        key: "dataZoomSelect",
-        dataZoomSelectActive: true,
-      });
+        // we need that toolbox datazoom button initially selected
+        chart?.dispatchAction({
+          type: "takeGlobalCursor",
+          key: "dataZoomSelect",
+          dataZoomSelectActive: true,
+        });
+      } catch (e: any) {
+        emit("error", {
+          message: e,
+          code: "",
+        });
+      }
     });
 
     // Clean up on deactivate
