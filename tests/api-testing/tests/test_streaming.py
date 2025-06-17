@@ -589,7 +589,7 @@ test_data_sql = [
 
     (
         "match_all query three",
-        f"SELECT * FROM \"{stream_name}\" WHERE match_all('ip-10-2-29-163.us-east-2.co*)",
+        f"SELECT * FROM \"{stream_name}\" WHERE match_all('ip-10-2-29-163.us-east-2.co*')",
         0,
         50,
         18,
