@@ -474,7 +474,8 @@ export default defineComponent({
                 if (
                   !newOptions.some(
                     (opt: any) => opt.value === variableObject.value,
-                  )
+                  ) &&
+                  variableObject.value !== SELECT_ALL_VALUE
                 ) {
                   newOptions.push({
                     label: variableObject.value,
