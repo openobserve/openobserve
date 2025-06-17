@@ -196,6 +196,7 @@ export default class DashboardSetting {
   }
 
   //select Constant type
+
   async selectConstantType(type, variableName, value) {
     await this.page
       .locator('[data-test="dashboard-variable-add-btn"]')
