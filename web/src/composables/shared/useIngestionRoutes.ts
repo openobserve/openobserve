@@ -111,6 +111,9 @@ const useIngestionRoutes = () => {
       path: "ingestion",
       name: "ingestion",
       component: Ingestion,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -781,6 +784,9 @@ const useIngestionRoutes = () => {
     path: "syslog",
     name: "syslog",
     component: SysLog,
+    meta: {
+      keepAlive: true,
+    },
     beforeEnter(to: any, from: any, next: any) {
       routeGuard(to, from, next);
     },
@@ -790,6 +796,9 @@ const useIngestionRoutes = () => {
     path: "syslogng",
     name: "syslogNg",
     component: SyslogNg,
+    meta: {
+      keepAlive: true,
+    },
     beforeEnter(to: any, from: any, next: any) {
       routeGuard(to, from, next);
     },

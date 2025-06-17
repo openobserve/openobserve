@@ -44,6 +44,9 @@ const useEnterpriseRoutes = () => {
       path: "iam",
       name: "iam",
       component: IdentityAccessManagement,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -73,6 +76,9 @@ const useEnterpriseRoutes = () => {
       path: "actions",
       name: "actionScripts",
       component: ActionScipts,
+      meta: {
+        keepAlive: true,
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
