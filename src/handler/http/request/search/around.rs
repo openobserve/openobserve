@@ -18,7 +18,7 @@ use chrono::{Duration, Utc};
 use config::{
     DEFAULT_SEARCH_AROUND_FIELDS, TIMESTAMP_COL_NAME,
     meta::{
-        search::SearchEventType,
+        search::{SearchEventType, default_use_cache},
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
@@ -152,14 +152,14 @@ pub(crate) async fn around(
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
-        },
+    },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: regions.clone(),
         clusters: clusters.clone(),
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
@@ -192,7 +192,7 @@ pub(crate) async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)

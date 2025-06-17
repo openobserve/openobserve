@@ -28,6 +28,7 @@ use config::{
     utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
 
@@ -46,10 +47,7 @@ use crate::{
     },
     handler::http::request::ws::session::send_message_2,
     service::{
-        search::{
-            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
-            sql::Sql,
-        },
+        search::{self as SearchService, cache, sql::Sql},
         setup_tracing_with_trace_id,
         websocket_events::{WsServerEvents, calculate_progress_percentage},
     },
@@ -351,7 +349,7 @@ async fn do_search(
     use_cache: bool,
 ) -> Result<Response, Error> {
     let mut req = req.clone();
-    req.payload.use_cache = Some(use_cache);
+    req.payload.use_cache = use_cache;
     let res = SearchService::cache::search(
         &req.trace_id,
         &req.org_id,
