@@ -968,7 +968,7 @@ export default defineComponent({
         // console.timeEnd("watch:dashboardPanelData.data.type");
       },
     );
-    const dateTimeForVariables = ref(null);
+    const dateTimeForVariables: any = ref(null);
 
     const setTimeForVariables = () => {
       const date = dateTimePickerRef.value?.getConsumableDateTime();
