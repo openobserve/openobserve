@@ -86,6 +86,7 @@ pub async fn search(
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx = prepare_datafusion_context(
+        &trace_id,
         req.work_group.clone(),
         vec![],
         vec![],
@@ -294,6 +295,7 @@ pub async fn search(
         start_time: req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
         end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
         timeout: req.timeout as u64,
+        use_cache: req.use_cache,
     };
 
     let context = tracing::Span::current().context();

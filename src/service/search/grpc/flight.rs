@@ -81,9 +81,15 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx =
-        prepare_datafusion_context(work_group.clone(), vec![], vec![], false, cfg.limit.cpu_num)
-            .await?;
+    let mut ctx = prepare_datafusion_context(
+        &trace_id,
+        work_group.clone(),
+        vec![],
+        vec![],
+        false,
+        cfg.limit.cpu_num,
+    )
+    .await?;
 
     // register udf
     register_udf(&ctx, &org_id)?;

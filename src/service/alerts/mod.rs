@@ -395,7 +395,7 @@ impl QueryConditionExt for QueryCondition {
                 timeout: 0,
                 search_type,
                 search_event_context,
-                use_cache: None,
+                use_cache: false,
                 local_mode: None,
             };
             log::debug!(
