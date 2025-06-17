@@ -20,6 +20,7 @@ import { DashboardPage } from "../../pages/dashboardPage.js";
 import DashboardShareExportPage from "../../pages/dashboardPages/dashboard-share-export.js";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
 import DashboardVariables from "../../pages/dashboardPages/dashboard-variables.js";
+import Dashboardfilter from "../../pages/dashboardPages/dashboard-filter.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -61,8 +62,9 @@ test.describe("dashboard filter testcases", () => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardVariables = new DashboardVariables(page);
     const dashboardSetting = new DashboardSetting(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+    // const dashboardDrilldown = new DashboardactionPage(page);
+
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
     const dashboardRefresh = new DashboardTimeRefresh(page);
 
     // Navigate to dashboards
@@ -128,6 +130,7 @@ test.describe("dashboard filter testcases", () => {
     );
 
     await dashboardActions.applyDashboardBtn();
+
     await dashboardActions.waitForChartToRender();
 
     // await page.waitForTimeout(2000);
@@ -192,7 +195,8 @@ test.describe("dashboard filter testcases", () => {
     const dashboardDrilldown = new DashboardDrilldownPage(page);
     const dashboardPanel = new DashboardPanel(page);
     const dashboardSetting = new DashboardSetting(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
+
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
     const variableName = new DashboardVariables(page);
 
     // Navigate to dashboards
@@ -225,6 +229,8 @@ test.describe("dashboard filter testcases", () => {
       "filter"
     );
     await dashboardActions.applyDashboardBtn();
+
+    await dashboardActions.waitForChartToRender();
 
     await variableName.selectValueFromVariableDropDown("variablename", "ziox");
 
@@ -270,7 +276,7 @@ test.describe("dashboard filter testcases", () => {
     await dashboardCreate.searchDashboard(randomDashboardName);
     await dashboardCreate.deleteDashboard(randomDashboardName);
   });
-  test.skip("Should apply the filter group inside group", async ({ page }) => {
+  test("Should apply the filter group inside group", async ({ page }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
@@ -280,10 +286,12 @@ test.describe("dashboard filter testcases", () => {
     const dashboardDrilldown = new DashboardDrilldownPage(page);
     const dashboardPanel = new DashboardPanel(page);
     const dashboardSetting = new DashboardSetting(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     const variableName = new DashboardVariables(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
     const dashboardVariables = new DashboardVariables(page);
+    const dashboardFilter = new Dashboardfilter(page);
+
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -329,41 +337,12 @@ test.describe("dashboard filter testcases", () => {
 
     await page.getByText("Add Group").click();
 
-    const textContent = await page
-      .locator("div.field_label")
-      .first()
-      .evaluate((el) => {
-        return Array.from(el.childNodes)
-          .filter((node) => node.nodeType === Node.TEXT_NODE) // Get only text nodes
-          .map((node) => node.textContent.trim()) // Trim whitespace
-          .join("");
-      });
-
-    await page
-      .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-      .waitFor({ state: "visible" });
-    await page
-      .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-      .click();
-
-    await page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .click();
-
-    await page
-      .getByRole("option", { name: "kubernetes_container_name" })
-      .click();
-    await page
-      .locator('[data-test="dashboard-add-condition-condition-0"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-add-condition-operator"]')
-      .first()
-      .click();
-
-    await page.getByText("=", { exact: true }).click();
-    await page.getByLabel("Value").click();
-    await page.getByLabel("Value").fill("$variablename");
+    await dashboardFilter.addFilterCondition11(
+      0,
+      "kubernetes_container_name",
+      "=",
+      "$variablename"
+    );
 
     await page
       .locator("div")
@@ -372,63 +351,44 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator("div").filter({ hasText: "Add Group" }).nth(3).click();
 
-    await page
-      .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-      .click();
+    await dashboardFilter.addFilterCondition11(
+      0,
+      "kubernetes_container_image",
+      "<>",
+      "$variablename"
+    );
 
-    const lastInput = page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .last();
-    await lastInput.click();
-    lastInput.fill("kubernetes_container_image");
+    await dashboardActions.applyDashboardBtn();
 
-    await page.getByText("kubernetes_container_image", { exact: true }).click();
+    // await page.locator('[data-test="dashboard-apply"]').click();
 
-    await page
-      .locator('[data-test="dashboard-add-condition-condition-0"]')
-      .first()
-      .click();
-
-    await page
-      .locator('[data-test="dashboard-add-condition-operator"]')
-      .click();
-    await page
-      .getByRole("option", { name: "<>" })
-      .locator("div")
-      .nth(2)
-      .click();
-
-    await page.getByLabel("Value").click();
-    await page.getByLabel("Value").fill("$variablename");
-
-    await page.locator('[data-test="dashboard-apply"]').click();
-
-    await page.locator('[data-test="dashboard-apply"]').click();
     await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
+
     await expect(page.getByText("'$variablename'").first()).toBeVisible();
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
     await expect(
       page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         exact: true,
       })
     ).toBeVisible();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page
-      .locator('[data-test="dashboard-panel-name"]')
-      .fill("Dashbaord_test");
-    await page.locator('[data-test="dashboard-panel-save"]').click();
 
-    // Delete dashbaord
-    await page.locator('[data-test="dashboard-back-btn"]').click();
-    await deleteDashboard(page, randomDashboardName);
+    // Save the dashboard panel
+    await dashboardActions.savePanel();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await dashboardCreate.searchDashboard(randomDashboardName);
+    await dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test.skip("1Should apply the filter group inside group", async ({ page }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
+
+    const dashboardFilter = new Dashboardfilter(page);
+
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -496,7 +456,7 @@ test.describe("dashboard filter testcases", () => {
       .waitFor({ state: "visible" });
     await page.locator('[data-test="index-dropdown-stream"]').click();
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(4000);
 
     await page
       .getByRole("option", { name: "e2e_automate", exact: true })
@@ -533,48 +493,12 @@ test.describe("dashboard filter testcases", () => {
 
     await page.getByText("Add Group").click();
 
-    // const textContent = await page
-    //   .locator("div.field_label")
-    //   .first()
-    //   .evaluate((el) => {
-    //     return Array.from(el.childNodes)
-    //       .filter((node) => node.nodeType === Node.TEXT_NODE) // Get only text nodes
-    //       .map((node) => node.textContent.trim()) // Trim whitespace
-    //       .join("");
-    //   });
-    // Add filter conditions
-    await chartTypeSelector.addFilterCondition11(
+    await dashboardFilter.addFilterCondition11(
       0,
       "kubernetes_container_name",
-      "",
       "=",
       "$variablename"
     );
-    // await page
-    //   .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-    //   .waitFor({ state: "visible" });
-    // await page
-    //   .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-    //   .click();
-
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-    //   .click();
-
-    // await page
-    //   .getByRole("option", { name: "kubernetes_container_name" })
-    //   .click();
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-condition-0"]')
-    //   .click();
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-operator"]')
-    //   .first()
-    //   .click();
-
-    // await page.getByText("=", { exact: true }).click();
-    // await page.getByLabel("Value").click();
-    // await page.getByLabel("Value").fill("$variablename");
 
     await page
       .locator("div")
@@ -583,34 +507,12 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator("div").filter({ hasText: "Add Group" }).nth(3).click();
 
-    await page
-      .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-      .click();
-
-    const lastInput = page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .last();
-    await lastInput.click();
-    lastInput.fill("kubernetes_container_image");
-
-    await page.getByText("kubernetes_container_image", { exact: true }).click();
-
-    await page
-      .locator('[data-test="dashboard-add-condition-condition-0"]')
-      .first()
-      .click();
-
-    await page
-      .locator('[data-test="dashboard-add-condition-operator"]')
-      .click();
-    await page
-      .getByRole("option", { name: "<>" })
-      .locator("div")
-      .nth(2)
-      .click();
-
-    await page.getByLabel("Value").click();
-    await page.getByLabel("Value").fill("$variablename");
+    await dashboardFilter.addFilterCondition11(
+      0,
+      "kubernetes_container_image",
+      "<>",
+      "$variablename"
+    );
 
     await page.locator('[data-test="dashboard-apply"]').click();
 
@@ -622,10 +524,11 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await expect(
       page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         exact: true,
       })
     ).toBeVisible();
+
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
@@ -651,9 +554,10 @@ test.describe("dashboard filter testcases", () => {
     const dashboardDrilldown = new DashboardDrilldownPage(page);
     const dashboardPanel = new DashboardPanel(page);
     const dashboardSetting = new DashboardSetting(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     const variableName = new DashboardVariables(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
+
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -740,9 +644,10 @@ test.describe("dashboard filter testcases", () => {
     const dashboardDrilldown = new DashboardDrilldownPage(page);
     const dashboardPanel = new DashboardPanel(page);
     const dashboardSetting = new DashboardSetting(page);
-    const panelName = dashboardDrilldown.generateUniquePanelName("panel-test");
     const variableName = new DashboardVariables(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
+
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");

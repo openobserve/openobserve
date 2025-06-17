@@ -106,7 +106,7 @@ jobs:
             "changeOrg.spec.js",
             "dashboards/custom-charts.spec.js",
             "dashboards/dashboard.spec.js",
-            # "dashboards/dashboard-filter.spec.js",
+            "dashboards/dashboard-filter.spec.js",
             "dashboards/dashboard-folder.spec.js",
             # "dashboards/dashboard-geoMap.spec.js",
             "dashboards/dashboard-general-setting.spec.js",
