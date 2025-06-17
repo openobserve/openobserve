@@ -32,8 +32,6 @@ test.describe("Alerts Import/Export", () => {
   let templatesPage;
   let destinationsPage;
   let commonActions;
-  let createdTemplateName;
-  let createdDestinationName;
   let sharedRandomValue;
 
   /**
