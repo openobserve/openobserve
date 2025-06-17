@@ -324,12 +324,6 @@ impl Condition {
                 } else if value.to_lowercase().starts_with("re:") {
                     let value = value[3..].trim();
                     Box::new(RegexQuery::from_pattern(value, default_field)?)
-                } else if value.ends_with("*") {
-                    let value = value.strip_suffix("*").unwrap();
-                    Box::new(PhrasePrefixQuery::new_with_offset(vec![(
-                        0,
-                        Term::from_field_text(default_field, value),
-                    )]))
                 } else {
                     let mut tokens = o2_collect_tokens(value);
                     let last_prefix = if value.ends_with("*") {
@@ -350,11 +344,17 @@ impl Condition {
                             Term::from_field_text(default_field, &value),
                         )])));
                     }
-                    if terms.len() > 1 {
-                        Box::new(BooleanQuery::intersection(terms))
+                    if !terms.is_empty() {
+                        Ok(if terms.len() > 1 {
+                            Box::new(BooleanQuery::intersection(terms))
+                        } else {
+                            terms.remove(0)
+                        })
                     } else {
-                        terms.remove(0)
-                    }
+                        Err(anyhow::anyhow!(
+                            "The value of match_all() function can't be empty"
+                        ))
+                    }?
                 }
             }
             Condition::FuzzyMatchAll(value, distance) => {
