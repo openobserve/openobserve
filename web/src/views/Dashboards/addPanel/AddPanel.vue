@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
+          @hide="setTimeForVariables"
         />
         <q-btn
           class="q-ml-md text-bold"
@@ -214,7 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           currentDashboardData.data?.variables
                             ?.showDynamicFilters
                         "
-                        :selectedTimeDate="dashboardPanelData.meta.dateTime"
+                        :selectedTimeDate="
+                          dateTimeForVariables ||
+                          dashboardPanelData.meta.dateTime
+                        "
                         @variablesData="variablesDataUpdated"
                         :initialVariableValues="initialVariableValues"
                       />
@@ -974,7 +978,19 @@ export default defineComponent({
         // console.timeEnd("watch:dashboardPanelData.data.type");
       },
     );
+    const dateTimeForVariables = ref(null);
 
+    const setTimeForVariables = () => {
+      const date = dateTimePickerRef.value?.getConsumableDateTime();
+      const startTime = new Date(date.startTime);
+      const endTime = new Date(date.endTime);
+
+      // Update only the variables time object
+      dateTimeForVariables.value = {
+        start_time: startTime,
+        end_time: endTime,
+      };
+    };
     watch(selectedDate, () => {
       // console.time("watch:selectedDate");
       updateDateTime(selectedDate.value);
@@ -1066,6 +1082,10 @@ export default defineComponent({
           end_time: new Date(date.endTime),
         };
 
+        dateTimeForVariables.value = {
+          start_time: new Date(selectedDate.value.startTime),
+          end_time: new Date(selectedDate.value.endTime),
+        };
         router.replace({
           query: {
             ...route.query,
@@ -1704,6 +1724,8 @@ export default defineComponent({
       collapseFieldList,
       splitterModel,
       inputStyle,
+      setTimeForVariables,
+      dateTimeForVariables,
     };
   },
   methods: {
