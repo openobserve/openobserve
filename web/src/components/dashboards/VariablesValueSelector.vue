@@ -1320,7 +1320,7 @@ export default defineComponent({
               (!Array.isArray(variableObject.value) ||
                 variableObject.value.length > 0)
             ) {
-              finalizePartialVariableLoading(variableObject, true);
+              finalizePartialVariableLoading(variableObject, true, isInitialLoad);
               finalizeVariableLoading(variableObject, true);
               emitVariablesData();
               return true;
@@ -1632,6 +1632,7 @@ export default defineComponent({
     const finalizePartialVariableLoading = async (
       variableObject: any,
       success: boolean,
+      isInitialLoad: boolean = false, // this important for the the children load while initial loading
     ) => {
       try {
         variableLog(
@@ -1666,23 +1667,38 @@ export default defineComponent({
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
 
-          // Only load children if the parent value actually changed
-          if (oldVariablesData[name] !== variableObject.value) {
+          
             variableLog(
               variableObject.name,
               `finalizePartialVariableLoading: loading child variables: ${childVariables}, ${JSON.stringify(childVariableObjects)}`,
             );
             const results = await Promise.all(
-              childVariableObjects.map((childVariable: any) =>
-                loadSingleVariableDataByName(childVariable),
-              ),
+              childVariableObjects.map((childVariable: any) => {
+                // Only load children if the parent value actually changed 
+                // OR child is waiting for the load
+                if(childVariable.isVariableLoadingPending || oldVariablesData[name] !== variableObject.value) {
+                  
+                  variableLog(
+                    variableObject.name,
+                    `finalizePartialVariableLoading: Loading child variable ${childVariable.name} as parent value changed`,
+                  )
+                  
+                  return loadSingleVariableDataByName(childVariable, isInitialLoad);
+                } else {
+                  
+                  variableLog(
+                    variableObject.name,
+                    `finalizePartialVariableLoading: Skipping child variable ${childVariable.name} loading as parent value did not change`,
+                  );
+                
+                }
+              }),
             );
 
             variableLog(
               variableObject.name,
               `finalizePartialVariableLoading: child variables results: ${JSON.stringify(results)}`,
             );
-          }
         }
       } catch (error) {
         // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
