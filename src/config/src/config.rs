@@ -900,9 +900,9 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
-    pub memory_circuit_breaker_enable: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 90)]
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_ENABLED", default = false)]
+    pub memory_circuit_breaker_enabled: bool,
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
     #[env_config(
         name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
@@ -1219,7 +1219,7 @@ pub struct Limit {
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
-    pub http_worker_max_blocking: usize, // equals to 1024 if 0
+    pub http_worker_max_blocking: usize, // equals to 256 if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
@@ -1246,18 +1246,6 @@ pub struct Limit {
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
     pub http_slow_log_threshold: u64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLED", default = false)]
-    pub circuit_breaker_enabled: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_WATCHING_WINDOW", default = 60)] // seconds
-    pub circuit_breaker_watching_window: i64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RESET_WINDOW_NUM", default = 3)] // 3 * watching window
-    pub circuit_breaker_reset_window_num: i64,
-    #[env_config(
-        name = "ZO_CIRCUIT_BREAKER_SLOW_REQUEST_THRESHOLD",
-        default = 100,
-        help = "Trigger circuit break if over this threshold in watching window, and will be reset after 2 * watching window"
-    )] // slow requests
-    pub circuit_breaker_slow_request_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1958,7 +1946,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.http_worker_num = cpu_num;
     }
     if cfg.limit.http_worker_max_blocking == 0 {
-        cfg.limit.http_worker_max_blocking = 1024;
+        cfg.limit.http_worker_max_blocking = 256;
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;

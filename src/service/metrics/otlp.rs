@@ -81,7 +81,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[METRICS:OTLP] Error while handling grpc trace request: org_id: {}, error: {}",
+                "[METRICS:OTLP] Error while handling grpc metrics request: org_id: {}, error: {}",
                 org_id,
                 e
             );
@@ -105,7 +105,7 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[METRICS:OTLP] Error while handling http trace request: {}",
+                "[METRICS:OTLP] Error while handling http metrics request: {}",
                 e
             );
             Err(Error::new(ErrorKind::Other, e))
@@ -120,7 +120,7 @@ pub async fn handle_otlp_request(
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
-        log::error!("Metrics ingestion error: {:?}", e);
+        log::error!("[METRICS:OTLP] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                 http::StatusCode::SERVICE_UNAVAILABLE.into(),
