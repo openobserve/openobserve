@@ -70,12 +70,15 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub use_cache: Option<bool>, // used for search job
+    #[serde(default = "default_use_cache")]
+    pub use_cache: bool,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local_mode: Option<bool>,
+}
+
+pub fn default_use_cache() -> bool {
+    get_config().common.result_cache_enabled
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -622,7 +625,7 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
-            use_cache: None,
+            use_cache: default_use_cache(),
             local_mode: None,
         };
         Ok(search_req)
@@ -1170,7 +1173,7 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
-                use_cache: None,
+                use_cache: default_use_cache(),
                 local_mode: None,
             });
         }

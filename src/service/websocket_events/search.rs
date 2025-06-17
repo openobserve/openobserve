@@ -357,7 +357,7 @@ async fn do_search(
     use_cache: bool,
 ) -> Result<Response, Error> {
     let mut req = req.clone();
-    req.payload.use_cache = Some(use_cache);
+    req.payload.use_cache = use_cache;
     let res = SearchService::cache::search(
         &req.trace_id,
         &req.org_id,

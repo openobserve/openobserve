@@ -464,7 +464,7 @@ pub async fn run_datafusion(
     #[cfg(feature = "enterprise")]
     let streaming_id = req.streaming_id.clone();
     #[cfg(feature = "enterprise")]
-    let use_cache = req.use_cache.unwrap_or(true);
+    let use_cache = req.use_cache;
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(

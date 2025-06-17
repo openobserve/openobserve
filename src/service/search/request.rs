@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::StreamType;
+use config::meta::{search::default_use_cache, stream::StreamType};
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
 #[derive(Debug, Clone)]
@@ -30,7 +30,7 @@ pub struct Request {
     pub streaming_output: bool,
     pub streaming_id: Option<String>,
     pub local_mode: Option<bool>,
-    pub use_cache: Option<bool>,
+    pub use_cache: bool,
 }
 
 impl Default for Request {
@@ -48,7 +48,7 @@ impl Default for Request {
             streaming_output: false,
             streaming_id: None,
             local_mode: None,
-            use_cache: None,
+            use_cache: default_use_cache(),
         }
     }
 }
@@ -77,7 +77,7 @@ impl Request {
             streaming_output: false,
             streaming_id: None,
             local_mode: None,
-            use_cache: None,
+            use_cache: default_use_cache(),
         }
     }
 
@@ -110,18 +110,13 @@ impl Request {
         self.local_mode = local_mode;
     }
 
-    pub fn set_use_cache(&mut self, use_cache: Option<bool>) {
+    pub fn set_use_cache(&mut self, use_cache: bool) {
         self.use_cache = use_cache;
     }
 }
 
 impl From<FlightSearchRequest> for Request {
     fn from(req: FlightSearchRequest) -> Self {
-        let use_cache = if req.search_info.use_cache {
-            Some(req.search_info.use_cache)
-        } else {
-            None
-        };
         Self {
             trace_id: req.query_identifier.trace_id,
             org_id: req.query_identifier.org_id,
@@ -135,7 +130,7 @@ impl From<FlightSearchRequest> for Request {
             streaming_output: false,
             streaming_id: None,
             local_mode: req.super_cluster_info.local_mode,
-            use_cache,
+            use_cache: req.search_info.use_cache,
         }
     }
 }

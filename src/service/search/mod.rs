@@ -191,9 +191,8 @@ pub async fn search(
     if let Some(v) = in_req.local_mode {
         request.set_local_mode(Some(v));
     }
-    if let Some(v) = in_req.use_cache {
-        request.set_use_cache(Some(v));
-    }
+    request.set_use_cache(in_req.use_cache);
+
     let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(

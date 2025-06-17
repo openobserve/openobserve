@@ -195,7 +195,7 @@ pub struct SearchInfos {
     pub start_time: i64,
     pub end_time: i64,
     pub timeout: u64,
-    pub use_cache: Option<bool>,
+    pub use_cache: bool,
 }
 
 impl SearchInfos {
@@ -223,7 +223,7 @@ impl SearchInfos {
             start_time: self.start_time,
             end_time: self.end_time,
             timeout: self.timeout as i64,
-            use_cache: self.use_cache.unwrap_or(true),
+            use_cache: self.use_cache,
         }
     }
 }

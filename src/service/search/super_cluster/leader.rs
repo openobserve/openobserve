@@ -275,7 +275,7 @@ async fn run_datafusion(
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
     let streaming_id = req.streaming_id.clone();
-    let use_cache = req.use_cache.unwrap_or(true);
+    let use_cache = req.use_cache;
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(

@@ -120,7 +120,7 @@ pub async fn process_search_stream_request(
     let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
-    let use_cache = req.use_cache.unwrap_or(true);
+    let use_cache = req.use_cache;
     let start_time = req.query.start_time;
     let end_time = req.query.end_time;
     let all_streams = stream_names.join(",");
@@ -567,7 +567,7 @@ pub async fn do_partitioned_search(
     if is_streaming_aggs {
         req.query.streaming_output = true;
         req.query.streaming_id = partition_resp.streaming_id.clone();
-        use_cache = req.use_cache.unwrap_or(true);
+        use_cache = req.use_cache;
         log::info!(
             "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] is_streaming_aggs: {}, use_cache: {}",
             trace_id,
@@ -797,7 +797,7 @@ async fn do_search(
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
 
-    req.use_cache = Some(use_cache);
+    req.use_cache = use_cache;
     let res = SearchService::cache::search(
         trace_id,
         org_id,
@@ -1791,7 +1791,7 @@ mod tests {
                 track_total_hits: false,
                 ..Default::default()
             },
-            use_cache: Some(false),
+            use_cache: false,
             search_type: Some(SearchEventType::UI),
             ..Default::default()
         };
@@ -1854,7 +1854,7 @@ mod tests {
                 track_total_hits: false,
                 ..Default::default()
             },
-            use_cache: Some(true),
+            use_cache: true,
             search_type: Some(SearchEventType::UI),
             ..Default::default()
         }
@@ -1866,7 +1866,7 @@ mod tests {
         assert_eq!(req.query.sql, "SELECT * FROM test_stream");
         assert_eq!(req.query.from, 0);
         assert_eq!(req.query.size, 100);
-        assert!(req.use_cache.unwrap_or(true));
+        assert!(req.use_cache);
         assert_eq!(req.search_type, Some(SearchEventType::UI));
     }
 
