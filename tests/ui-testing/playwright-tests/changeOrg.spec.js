@@ -16,12 +16,13 @@ import { IamPage } from "../pages/iamPage.js";
 import { ManagementPage } from "../pages/managementPage.js";
 import { AboutPage } from "../pages/aboutPage.js";
 import { CreateOrgPage } from "../pages/createOrgPage.js";
+import { CommonActions } from "../pages/commonActions.js";
 
 
 test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage,
-        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage,
+        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage, commonActions,
         multiOrgIdentifier;
         const timestamp = Date.now(); 
         const randomSuffix = Math.floor(Math.random() * 1000); 
@@ -45,6 +46,7 @@ test.describe("Change Organisation", () => {
         managementPage = new ManagementPage(page);
         aboutPage = new AboutPage(page);
         createOrgPage = new CreateOrgPage(page);
+        commonActions = new CommonActions(page);
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -240,7 +242,7 @@ test.describe("Change Organisation", () => {
     test("Alerts Page default validation", async ({ page }) => {
 
 
-        await alertsPage.navigateToAlerts();
+        await commonActions.navigateToAlerts();
         await homePage.clickDefaultOrg();
         await page.waitForTimeout(5000);
         await homePage.homePageURLValidationDefaultOrg();
@@ -252,7 +254,7 @@ test.describe("Change Organisation", () => {
         multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
         await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
         await homePage.homePageOrg(newOrgName);
-        await alertsPage.navigateToAlerts();
+        await commonActions.navigateToAlerts();
         await homePage.homeURLContains(multiOrgIdentifier);
 
     });
