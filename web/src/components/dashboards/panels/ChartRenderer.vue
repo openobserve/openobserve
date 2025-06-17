@@ -541,6 +541,7 @@ export default defineComponent({
         await nextTick();
         const theme = store.state.theme === "dark" ? "dark" : "light";
         if (chartRef.value) {
+          cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
@@ -628,6 +629,7 @@ export default defineComponent({
         await nextTick();
         const theme = store.state.theme === "dark" ? "dark" : "light";
         if (chartRef.value) {
+          cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
