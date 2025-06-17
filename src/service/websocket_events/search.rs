@@ -29,6 +29,8 @@ use config::{
 };
 use infra::errors::Error;
 use tokio::sync::mpsc::Sender;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use tracing::Instrument;
 
 use super::sort::order_search_results;
@@ -46,10 +48,7 @@ use crate::{
     },
     handler::http::request::ws::session::send_message_2,
     service::{
-        search::{
-            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
-            sql::Sql,
-        },
+        search::{self as SearchService, cache, sql::Sql},
         setup_tracing_with_trace_id,
         websocket_events::{WsServerEvents, calculate_progress_percentage},
     },
@@ -351,7 +350,7 @@ async fn do_search(
     use_cache: bool,
 ) -> Result<Response, Error> {
     let mut req = req.clone();
-    req.payload.use_cache = Some(use_cache);
+    req.payload.use_cache = use_cache;
     let res = SearchService::cache::search(
         &req.trace_id,
         &req.org_id,
@@ -764,6 +763,7 @@ async fn process_delta(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
 
@@ -1075,6 +1075,7 @@ pub async fn do_partitioned_search(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
     Ok(())

@@ -119,7 +119,8 @@ pub async fn submit_job(
         if let Err(e) = req.decode() {
             return Ok(MetaHttpResponse::bad_request(e));
         }
-        req.use_cache = Some(use_cache);
+
+        req.use_cache = get_use_cache_from_request(&query);
 
         // update timeout
         if req.timeout == 0 {

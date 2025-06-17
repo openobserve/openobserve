@@ -24,6 +24,7 @@ use config::{
     meta::{
         alerts::alert,
         promql::*,
+        search::default_use_cache,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -755,7 +756,7 @@ pub(crate) async fn get_series(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
@@ -899,7 +900,7 @@ pub(crate) async fn get_label_values(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {

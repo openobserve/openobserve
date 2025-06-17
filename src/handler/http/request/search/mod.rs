@@ -21,7 +21,7 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse},
+        search::{SearchEventType, SearchHistoryHitResponse, default_use_cache},
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -232,7 +232,8 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
-    req.use_cache = Some(use_cache);
+
+    req.use_cache = get_use_cache_from_request(&query);
 
     // set search event type
     if req.search_type.is_none() {
@@ -848,7 +849,7 @@ pub async fn build_search_request_per_field(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(req.use_cache),
+        use_cache: req.use_cache,
         local_mode: None,
     };
 
@@ -907,7 +908,6 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let cfg = get_config();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -1051,9 +1051,11 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(use_cache),
+        use_cache: default_use_cache(),
         local_mode: None,
     };
+
+    req.use_cache = get_use_cache_from_request(query);
 
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
