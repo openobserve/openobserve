@@ -445,17 +445,55 @@ export default defineComponent({
                     ? value.zo_sql_key.toString()
                     : "<blank>",
                 value: value.zo_sql_key.toString(),
-              }))
-              // remove duplicates from previous options
-              .filter(
-                (option: any) =>
-                  !variableObject.options.some(
-                    (existingOption: any) =>
-                      existingOption.value === option.value,
-                  ),
-              );
-
-            variableObject.options = [...newOptions, ...variableObject.options];
+              }));
+            // For first response or subsequent responses, merge with existing options and keep selected values
+            if (isFirstResponse) {
+              // Add missing selected values to newOptions
+              if (
+                variableObject.multiSelect &&
+                Array.isArray(variableObject.value)
+              ) {
+                variableObject.value.forEach((val: string) => {
+                  if (
+                    !newOptions.some((opt: any) => opt.value === val) &&
+                    val !== SELECT_ALL_VALUE
+                  ) {
+                    newOptions.push({
+                      label: val,
+                      value: val,
+                    });
+                  }
+                });
+              } else if (
+                !variableObject.multiSelect &&
+                variableObject.value !== null
+              ) {
+                if (
+                  !newOptions.some(
+                    (opt: any) => opt.value === variableObject.value,
+                  ) &&
+                  variableObject.value !== SELECT_ALL_VALUE
+                ) {
+                  newOptions.push({
+                    label: variableObject.value,
+                    value: variableObject.value,
+                  });
+                }
+              }
+              variableObject.options = newOptions;
+            } else {
+              // For subsequent responses, merge with existing options
+              variableObject.options = [
+                ...newOptions,
+                ...variableObject.options,
+              ];
+            }
+            // Remove duplicates
+            variableObject.options = variableObject.options.filter(
+              (option: any, index: number, self: any[]) =>
+                index === self.findIndex((o) => o.value === option.value),
+            );
+            // Sort options
             variableObject.options.sort((a: any, b: any) =>
               a.label.localeCompare(b.label),
             );
@@ -791,7 +829,7 @@ export default defineComponent({
     onUnmounted(() => {
       // Clean up any in-flight promises to prevent memory leaks
       rejectAllPromises();
-      Object.keys(currentlyExecutingPromises).forEach(key => {
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
         currentlyExecutingPromises[key] = null;
       });
     });
@@ -1280,7 +1318,7 @@ export default defineComponent({
               (!Array.isArray(variableObject.value) ||
                 variableObject.value.length > 0)
             ) {
-              finalizePartialVariableLoading(variableObject, true);
+              finalizePartialVariableLoading(variableObject, true, isInitialLoad);
               finalizeVariableLoading(variableObject, true);
               emitVariablesData();
               return true;
@@ -1589,6 +1627,7 @@ export default defineComponent({
     const finalizePartialVariableLoading = async (
       variableObject: any,
       success: boolean,
+      isInitialLoad: boolean = false, // this important for the the children load while initial loading
     ) => {
       try {
         variableLog(
@@ -1623,23 +1662,38 @@ export default defineComponent({
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
 
-          // Only load children if the parent value actually changed
-          if (oldVariablesData[name] !== variableObject.value) {
+          
             variableLog(
               variableObject.name,
               `finalizePartialVariableLoading: loading child variables: ${childVariables}, ${JSON.stringify(childVariableObjects)}`,
             );
             const results = await Promise.all(
-              childVariableObjects.map((childVariable: any) =>
-                loadSingleVariableDataByName(childVariable),
-              ),
+              childVariableObjects.map((childVariable: any) => {
+                // Only load children if the parent value actually changed 
+                // OR child is waiting for the load
+                if(childVariable.isVariableLoadingPending || oldVariablesData[name] !== variableObject.value) {
+                  
+                  variableLog(
+                    variableObject.name,
+                    `finalizePartialVariableLoading: Loading child variable ${childVariable.name} as parent value changed`,
+                  )
+                  
+                  return loadSingleVariableDataByName(childVariable, isInitialLoad);
+                } else {
+                  
+                  variableLog(
+                    variableObject.name,
+                    `finalizePartialVariableLoading: Skipping child variable ${childVariable.name} loading as parent value did not change`,
+                  );
+                
+                }
+              }),
             );
 
             variableLog(
               variableObject.name,
               `finalizePartialVariableLoading: child variables results: ${JSON.stringify(results)}`,
             );
-          }
         }
       } catch (error) {
         // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
@@ -1652,6 +1706,10 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
+      // Check if there's already a loading request in progress
+      if (variableObject.isLoading) {
+        return;
+      }
       // When a dropdown is opened, only load the variable data
       await loadSingleVariableDataByName(variableObject);
     };
