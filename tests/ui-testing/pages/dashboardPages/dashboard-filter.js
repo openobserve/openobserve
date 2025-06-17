@@ -1,4 +1,4 @@
-export default class ChartTypeSelector {
+export default class DashboardFilter {
   constructor(page) {
     this.page = page;
   }
@@ -90,86 +90,92 @@ export default class ChartTypeSelector {
     }
   }
   ///group inside grup filter method for that crewting this method ,but it isin progress
-  // async addFilterCondition11(index, newFieldName, operator, value) {
-  //   const idx = String(index);
 
-  //   // Step 1: Detect the dynamic field label if needed
-  //   const dynamicLabelLocator = this.page.locator("div.field_label").nth(index);
+  async addFilterCondition11(index, newFieldName, operator, value) {
+    const idx = String(index);
 
-  //   const textContent = await dynamicLabelLocator.evaluate((el) => {
-  //     return Array.from(el.childNodes)
-  //       .filter((node) => node.nodeType === Node.TEXT_NODE)
-  //       .map((node) => node.textContent.trim())
-  //       .join("");
-  //   });
+    // Step 1: Detect the dynamic field label if needed
 
-  //   const fieldLabelLocator = this.page.locator(
-  //     `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
-  //   );
-  //   await fieldLabelLocator.waitFor({ state: "visible" });
-  //   await fieldLabelLocator.click();
+    const dynamicLabelLocator = this.page.locator("div.field_label").nth(index);
 
-  //   // Step 2: Open and select from column dropdown
-  //   const columnLocator = this.page.locator(
-  //     `[data-test="dashboard-add-condition-column-${idx}"]`
-  //   );
-  //   await columnLocator.click();
-  //   await columnLocator.fill(newFieldName);
-  //   await this.page
-  //     .getByRole("option", { name: newFieldName, exact: true })
-  //     .first()
-  //     .click();
+    await dynamicLabelLocator.waitFor({ state: "visible" });
 
-  //   // Step 3: Click the condition dropdown
-  //   if (operator || value) {
-  //     const conditionLocator = this.page.locator(
-  //       `[data-test="dashboard-add-condition-condition-${idx}"]`
-  //     );
-  //     await conditionLocator.click();
-  //     await conditionLocator.click(); // for safety
-  //   }
+    const textContent = await dynamicLabelLocator.evaluate((el) => {
+      return Array.from(el.childNodes)
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent.trim())
+        .join("");
+    });
 
-  //   // Step 4: Operator selection — use `.first()` for 0 and `.last()` for others
-  //   if (operator) {
-  //     const operatorLocator =
-  //       index === 0
-  //         ? this.page
-  //             .locator('[data-test="dashboard-add-condition-operator"]')
-  //             .first()
-  //         : this.page
-  //             .locator('[data-test="dashboard-add-condition-operator"]')
-  //             .last();
+    const fieldLabelLocator = this.page.locator(
+      `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
+    );
+    // await fieldLabelLocator.waitFor({ state: "visible" });
+    // await this.page.waitForTimeout(3000); // waits for 1 second
 
-  //     await operatorLocator.click();
-  //     await this.page
-  //       .getByRole("option", { name: operator, exact: true })
-  //       .first()
-  //       .click();
-  //   }
+    await fieldLabelLocator.click();
 
-  //   // Step 5: Fill the value field (if needed)
-  //   if (value) {
-  //     const valueInput =
-  //       index === 0
-  //         ? this.page.locator('[data-test="common-auto-complete"]').first()
-  //         : this.page.locator('[data-test="common-auto-complete"]').last();
+    // Step 2: Open and select from column dropdown
+    const columnLocator = this.page.locator(
+      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+    );
+    await columnLocator.click();
+    await columnLocator.fill(newFieldName);
+    await this.page
+      .getByRole("option", { name: newFieldName, exact: true })
+      .first()
+      .click();
 
-  //     await expect(valueInput).toBeVisible({ timeout: 10000 });
-  //     await valueInput.click();
-  //     await valueInput.fill(value);
+    // Step 3: Click the condition dropdown
+    if (operator || value) {
+      const conditionLocator = this.page.locator(
+        `[data-test="dashboard-add-condition-condition-${idx}"]`
+      );
+      await conditionLocator.click();
+      await conditionLocator.click(); // for safety
+    }
 
-  //     const suggestion = this.page
-  //       .locator('[data-test="common-auto-complete-option"]')
-  //       .first();
-  //     await expect(suggestion).toBeVisible({ timeout: 10000 });
-  //     await suggestion.click();
-  //   } else if (operator && newFieldName) {
-  //     const expectedError = `Filter: ${newFieldName}: Condition value required`;
-  //     const errorMessage = this.page
-  //       .locator("div")
-  //       .filter({ hasText: expectedError });
-  //   }
-  // }
+    // Step 4: Operator selection — use `.first()` for 0 and `.last()` for others
+    if (operator) {
+      const operatorLocator =
+        index === 0
+          ? this.page
+              .locator('[data-test="dashboard-add-condition-operator"]')
+              .first()
+          : this.page
+              .locator('[data-test="dashboard-add-condition-operator"]')
+              .last();
+
+      await operatorLocator.click();
+      await this.page
+        .getByRole("option", { name: operator, exact: true })
+        .first()
+        .click();
+    }
+
+    // Step 5: Fill the value field (if needed)
+    if (value) {
+      const valueInput =
+        index === 0
+          ? this.page.locator('[data-test="common-auto-complete"]').first()
+          : this.page.locator('[data-test="common-auto-complete"]').last();
+
+      // await expect(valueInput).toBeVisible({ timeout: 10000 });
+      await valueInput.click();
+      await valueInput.fill(value);
+
+      const suggestion = this.page
+        .locator('[data-test="common-auto-complete-option"]')
+        .first();
+      // await expect(suggestion).toBeVisible({ timeout: 10000 });
+      await suggestion.click();
+    } else if (operator && newFieldName) {
+      const expectedError = `Filter: ${newFieldName}: Condition value required`;
+      const errorMessage = this.page
+        .locator("div")
+        .filter({ hasText: expectedError });
+    }
+  }
 
   // Select List Filter Items in the test case we have to slect the itesm pass in Array
   //eg   ["ingress-nginx", "kube-system"]
