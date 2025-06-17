@@ -38,6 +38,7 @@ use infra::{
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
+use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use super::db::enrichment_table;
 use crate::{
@@ -68,7 +69,13 @@ pub async fn get_stream(
     if schema != Schema::empty() {
         let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
         transform_stats(&mut stats, org_id, stream_name, stream_type).await;
-        Some(stream_res(stream_name, stream_type, schema, Some(stats)))
+        Some(stream_res(
+            org_id,
+            stream_name,
+            stream_type,
+            schema,
+            Some(stats),
+        ))
     } else {
         None
     }
@@ -119,6 +126,7 @@ pub async fn get_streams(
             && stream_loc.stream_type != StreamType::EnrichmentTables
         {
             indices_res.push(stream_res(
+                org_id,
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
                 stream_loc.schema,
@@ -133,6 +141,7 @@ pub async fn get_streams(
             )
             .await;
             indices_res.push(stream_res(
+                org_id,
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
                 stream_loc.schema,
@@ -144,6 +153,7 @@ pub async fn get_streams(
 }
 
 pub fn stream_res(
+    org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     schema: Schema,
@@ -193,8 +203,15 @@ pub fn stream_res(
         stream_type,
     ));
 
-    // TODO @YJDoc2 get this from in-memory state
-    let pattern_associations = { unimplemented!() };
+    let pattern_associations = {
+        loop {
+            let mgr = match PATTERN_MANAGER.get() {
+                Some(m) => m,
+                None => continue,
+            };
+            break mgr.get_associations(org_id, stream_type, stream_name);
+        }
+    };
 
     Stream {
         name: stream_name.to_string(),
@@ -590,7 +607,7 @@ pub async fn update_stream_settings(
                 settings.partition_time_level = Some(partition_time_level);
             }
 
-            // TODO @YJDoc2
+            // TODO @YJDoc2 make this ent-only
             if let Err(e) = process_association_changes(
                 org_id,
                 stream_name,
@@ -786,7 +803,13 @@ mod tests {
     fn test_stream_res() {
         let stats = StreamStats::default();
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
-        let res = stream_res("Test", StreamType::Logs, schema, Some(stats.clone()));
+        let res = stream_res(
+            "default",
+            "Test",
+            StreamType::Logs,
+            schema,
+            Some(stats.clone()),
+        );
         assert_eq!(res.stats, stats);
     }
 }

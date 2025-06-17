@@ -236,8 +236,17 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+
         let (org_id, id) = path.into_inner();
-        // TODO @YJDoc2: Check if pattern is being used by any field
+        let mgr = get_pattern_manager().await;
+        let pattern_usage = mgr.get_pattern_usage(&id);
+        if !pattern_usage.is_empty() {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                format!("cannot delete pattern, associated with {:?}", pattern_usage),
+            )));
+        }
         match crate::service::db::re_pattern::remove(&id).await {
             Ok(_) => {
                 remove_ownership(&org_id, "re_pattern", Authz::new(&id)).await;

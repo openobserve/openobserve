@@ -41,8 +41,20 @@ pub struct PatternAssociationEntry {
     pub apply_at_search: bool,
 }
 
+// TODO @YJDoc2 : check if we can user AsRef<&str> or something here
+
 impl From<String> for PatternPolicy {
     fn from(value: String) -> Self {
+        match value.as_str() {
+            "DropField" => Self::DropField,
+            "Redact" => Self::Redact,
+            _ => Self::Redact,
+        }
+    }
+}
+
+impl From<&String> for PatternPolicy {
+    fn from(value: &String) -> Self {
         match value.as_str() {
             "DropField" => Self::DropField,
             "Redact" => Self::Redact,

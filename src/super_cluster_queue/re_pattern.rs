@@ -19,7 +19,10 @@ use infra::{
     errors::{DbError, Error, Result},
     table::re_pattern_stream_map::{PatternAssociationEntry, PatternPolicy},
 };
-use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType, RePatternsMessage};
+use o2_enterprise::enterprise::{
+    re_patterns::get_pattern_manager,
+    super_cluster::queue::{Message, MessageType, RePatternsMessage},
+};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -29,6 +32,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 RePatternsMessage::Delete { id } => {
                     log::info!("[SUPER_CLUSTER:DB] deleting pattern with id {id}");
                     infra::table::re_pattern::remove(&id).await?;
+                    let mgr = get_pattern_manager().await;
+                    mgr.remove_pattern(&id);
+
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .delete(&format!("/re_patterns/{id}"), false, true, None)
@@ -42,6 +48,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         entry.id
                     );
                     let id = entry.id.clone();
+
+                    let mgr = get_pattern_manager().await;
+                    mgr.insert_pattern(entry.clone());
+
                     match infra::table::re_pattern::add(entry).await {
                         Ok(_) => {}
                         // this is the case when the cluster sending the message also receives
@@ -51,6 +61,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         Err(Error::DbError(DbError::UniqueViolation)) => {}
                         Err(e) => return Err(e),
                     };
+
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .put(
@@ -64,6 +75,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 RePatternsMessage::Update { id, pattern } => {
                     log::info!("[SUPER_CLUSTER:DB] updating pattern {id}",);
                     infra::table::re_pattern::update_pattern(&id, &pattern).await?;
+
+                    let mgr = get_pattern_manager().await;
+                    mgr.update_pattern(id.clone(), pattern);
+
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .put(
@@ -90,8 +105,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     if update.add.is_empty() && update.remove.is_empty() {
                         return Ok(());
                     }
+
                     let added = update
                         .add
+                        .clone()
                         .into_iter()
                         .map(|item| PatternAssociationEntry {
                             id: 0,
@@ -106,6 +123,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         .collect();
                     let removed = update
                         .remove
+                        .clone()
                         .into_iter()
                         .map(|item| PatternAssociationEntry {
                             id: 0,
@@ -121,6 +139,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
                     infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
 
+                    let mgr = get_pattern_manager().await;
+                    mgr.update_associations(&org, stype, &stream, update.remove, update.add);
+
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .put(
@@ -130,7 +151,6 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                             None,
                         )
                         .await?;
-                    // TODO @YJDoc2 : update in memory associations here
                 }
             }
         }

@@ -25,6 +25,7 @@ use infra::{
         re_pattern_stream_map::{PatternAssociationEntry, PatternPolicy},
     },
 };
+use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
 // DBKey to set patterns
 pub const RE_PATTERN_PREFIX: &str = "/re_patterns/";
@@ -253,7 +254,7 @@ pub async fn watch_patterns() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let pattern_id = ev.key.strip_prefix(prefix).unwrap();
-                let _item = match infra::table::re_pattern::get(pattern_id).await {
+                let new_pattern = match infra::table::re_pattern::get(pattern_id).await {
                     Ok(Some(val)) => val,
                     Ok(None) => {
                         log::error!("unexpected missing pattern for id {pattern_id}");
@@ -264,11 +265,13 @@ pub async fn watch_patterns() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                // TODO @YJDoc2 : update pattern manager here
+                let mgr = get_pattern_manager().await;
+                mgr.update_pattern(new_pattern.id, new_pattern.pattern);
             }
             Event::Delete(ev) => {
-                let _pattern_id = ev.key.strip_prefix(prefix).unwrap();
-                // TODO @YJDoc2 : update pattern manager here
+                let pattern_id = ev.key.strip_prefix(prefix).unwrap();
+                let mgr = get_pattern_manager().await;
+                mgr.remove_pattern(&pattern_id);
             }
             Event::Empty => {}
         }
@@ -298,7 +301,12 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                 let org = splits[0];
                 let stype = StreamType::from(splits[1]);
                 let stream = splits[2];
-                // TODO @YJDoc2 : update in-memory pattern associations here
+
+                let updates: UpdateSettingsWrapper<PatternAssociation> =
+                    serde_json::from_slice(&ev.value.unwrap()).unwrap();
+
+                let mgr = get_pattern_manager().await;
+                mgr.update_associations(org, stype, stream, updates.remove, updates.add);
             }
 
             _ => {}
