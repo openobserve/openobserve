@@ -448,17 +448,54 @@ export default defineComponent({
                     ? value.zo_sql_key.toString()
                     : "<blank>",
                 value: value.zo_sql_key.toString(),
-              }))
-              // remove duplicates from previous options
-              .filter(
-                (option: any) =>
-                  !variableObject.options.some(
-                    (existingOption: any) =>
-                      existingOption.value === option.value,
-                  ),
-              );
-
-            variableObject.options = [...newOptions, ...variableObject.options];
+              }));
+            // For first response or subsequent responses, merge with existing options and keep selected values
+            if (isFirstResponse) {
+              // Add missing selected values to newOptions
+              if (
+                variableObject.multiSelect &&
+                Array.isArray(variableObject.value)
+              ) {
+                variableObject.value.forEach((val: string) => {
+                  if (
+                    !newOptions.some((opt: any) => opt.value === val) &&
+                    val !== SELECT_ALL_VALUE
+                  ) {
+                    newOptions.push({
+                      label: val,
+                      value: val,
+                    });
+                  }
+                });
+              } else if (
+                !variableObject.multiSelect &&
+                variableObject.value !== null
+              ) {
+                if (
+                  !newOptions.some(
+                    (opt: any) => opt.value === variableObject.value,
+                  )
+                ) {
+                  newOptions.push({
+                    label: variableObject.value,
+                    value: variableObject.value,
+                  });
+                }
+              }
+              variableObject.options = newOptions;
+            } else {
+              // For subsequent responses, merge with existing options
+              variableObject.options = [
+                ...newOptions,
+                ...variableObject.options,
+              ];
+            }
+            // Remove duplicates
+            variableObject.options = variableObject.options.filter(
+              (option: any, index: number, self: any[]) =>
+                index === self.findIndex((o) => o.value === option.value),
+            );
+            // Sort options
             variableObject.options.sort((a: any, b: any) =>
               a.label.localeCompare(b.label),
             );
