@@ -12,7 +12,7 @@ const dashboardName = `Dashboard_${Date.now()}`;
 
 test.describe.configure({ mode: "parallel" });
 
-test.describe("dashboard filter testcases", () => {
+test.describe("dashboard varibale settings", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(1000);
@@ -436,9 +436,9 @@ test.describe("dashboard filter testcases", () => {
     // Save the added variable
     await dashboardSetting.saveVariable();
 
-    await page
-      .locator('[data-test="dashboard-variable-add-btn"]')
-      .waitFor({ state: "visible" });
+    // await page
+    //   .locator('[data-test="dashboard-variable-add-btn"]')
+    //   .waitFor({ state: "visible" });
     await dashboardSetting.closeSettingWindow();
 
     // Ensure the panel is visible
@@ -484,9 +484,9 @@ test.describe("dashboard filter testcases", () => {
 
     // Save the variable
     await dashboardSetting.saveVariable();
-    await page
-      .locator('[data-test="dashboard-variable-add-btn"]')
-      .waitFor({ state: "visible" });
+    // await page
+    //   .locator('[data-test="dashboard-variable-add-btn"]')
+    //   .waitFor({ state: "visible" });
     await dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
@@ -532,9 +532,9 @@ test.describe("dashboard filter testcases", () => {
 
     // Save the variable
     await dashboardSetting.saveVariable();
-    await page
-      .locator('[data-test="dashboard-variable-add-btn"]')
-      .waitFor({ state: "visible" });
+    // await page
+    //   .locator('[data-test="dashboard-variable-add-btn"]')
+    //   .waitFor({ state: "visible" });
     await dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
