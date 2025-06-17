@@ -1659,7 +1659,7 @@ export default defineComponent({
      */
     const loadVariableOptions = async (variableObject: any) => {
       // Check if there's already a loading request in progress
-      if (variableObject.isLoading || variableObject.isVariableLoadingPending) {
+      if (variableObject.isLoading) {
         return;
       }
       // When a dropdown is opened, only load the variable data
