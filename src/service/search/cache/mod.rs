@@ -69,7 +69,7 @@ pub async fn search(
     let cfg = get_config();
     // result cache can be enable only when its from the start
     let use_cache = if in_req.query.from == 0 {
-        in_req.use_cache.unwrap_or(false)
+        in_req.use_cache
     } else {
         false
     };
@@ -152,7 +152,7 @@ pub async fn search(
                 }
             }
             Err(e) => {
-                log::error!("Error parsing sql: {:?}", e);
+                log::error!("Error parsing sql: {e}");
                 MultiCachedQueryResponse::default()
             }
         }
@@ -688,7 +688,7 @@ pub async fn _write_results(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });
@@ -843,7 +843,7 @@ pub async fn write_results_v2(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });

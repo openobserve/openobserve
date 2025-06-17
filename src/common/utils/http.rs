@@ -23,7 +23,7 @@ use actix_web::{
     web::Query,
 };
 use config::meta::{
-    search::{SearchEventContext, SearchEventType},
+    search::{SearchEventContext, SearchEventType, default_use_cache},
     stream::StreamType,
 };
 use hashbrown::{HashMap, HashSet};
@@ -88,6 +88,9 @@ pub(crate) fn get_search_event_context_from_request(
 
 #[inline(always)]
 pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>) -> bool {
+    if !default_use_cache() {
+        return false;
+    }
     let Some(v) = query.get("use_cache") else {
         return true;
     };

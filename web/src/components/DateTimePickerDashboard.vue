@@ -26,12 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @on:date-change="updateDateTime"
     :initialTimezone="initialTimezone"
     :disable="disable"
+    @hide="onHide"
+    @show="onShow"
   >
   </date-time>
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, reactive, watch, computed } from "vue";
+import { ref, defineComponent, reactive, watch, computed, onUnmounted } from "vue";
 import DateTime from "@/components/DateTime.vue";
 
 export default defineComponent({
@@ -62,7 +64,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "hide", "show"],
 
   setup(props, { emit }) {
     const dateTimePicker: any = ref(null);
@@ -93,12 +95,33 @@ export default defineComponent({
       return dateTimePicker.value.getConsumableDateTime();
     };
 
+    const onHide = () => {
+      emit("hide");
+    };
+
+    const onShow = () => {
+      emit("show");
+    };
+
+    // Clean up resources on unmount to prevent memory leaks
+    onUnmounted(() => {
+      // If you add intervals, listeners, or subscriptions, clean them up here.
+      // Example:
+      // if (someInterval) clearInterval(someInterval);
+      // if (someListener) someListener.off();
+      if (dateTimePicker.value) {
+        dateTimePicker.value = null;
+      }
+    });
+
     return {
       updateDateTime,
       refresh,
       dateTimePicker,
       setCustomDate,
       getConsumableDateTime,
+      onShow,
+      onHide,
     };
   },
 });

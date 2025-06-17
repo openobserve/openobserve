@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
               :disable="arePanelsLoading"
+              @hide="setTimeForVariables"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -357,7 +358,6 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
-import ScheduledDashboards from "./ScheduledDashboards.vue";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
 import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
@@ -369,10 +369,17 @@ import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
-import DashboardJsonEditor from "./DashboardJsonEditor.vue";
+
+const DashboardJsonEditor = defineAsyncComponent(() => {
+  return import("./DashboardJsonEditor.vue");
+});
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
+});
+
+const ScheduledDashboards = defineAsyncComponent(() => {
+  return import("./ScheduledDashboards.vue");
 });
 
 export default defineComponent({
@@ -455,6 +462,28 @@ export default defineComponent({
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : "15m",
     });
+
+    const setTimeForVariables = () => {
+      if (selectedDate.value && dateTimePicker.value) {
+        const date = dateTimePicker.value?.getConsumableDateTime();
+        const startTime = new Date(date.startTime);
+        const endTime = new Date(date.endTime);
+
+        // Update only the variables time object
+        currentTimeObjPerPanel.value = {
+          ...currentTimeObjPerPanel.value,
+          __variables: {
+            start_time: startTime,
+            end_time: endTime,
+          },
+        };
+
+        console.log(
+          "Time updated for variables:",
+          currentTimeObjPerPanel.value,
+        );
+      }
+    };
 
     const dateTimePicker = ref(null); // holds a reference to the date time picker
 
@@ -548,9 +577,30 @@ export default defineComponent({
     const refreshedVariablesDataUpdated = (variablesData: any) => {
       Object.assign(refreshedVariablesData, variablesData);
     };
-
     const isVariablesChanged = computed(() => {
-      return !isEqual(variablesData, refreshedVariablesData);
+      // Convert both objects to a consistent format for comparison
+      const normalizeVariables = (obj) => {
+        const normalized = JSON.parse(JSON.stringify(obj));
+        // Sort arrays to ensure consistent ordering
+        if (normalized.values) {
+          normalized.values = normalized.values
+            .map((variable) => {
+              if (Array.isArray(variable.value)) {
+                variable.value.sort((a, b) =>
+                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
+                );
+              }
+              return variable;
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return normalized;
+      };
+
+      const normalizedCurrent = normalizeVariables(variablesData);
+      const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
+
+      return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
     // ======= [START] default variable values
 
@@ -568,6 +618,7 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
+      
     });
 
     const setTimeString = () => {
@@ -1031,12 +1082,29 @@ export default defineComponent({
         });
     };
 
+    // Cleanup references
+    const cleanupRefs = () => {
+      // Clear all component refs to prevent memory leaks
+      if (dateTimePicker.value) {
+        dateTimePicker.value = null;
+      }
+      if (renderDashboardChartsRef.value) {
+        renderDashboardChartsRef.value = null;
+      }
+      if (fullscreenDiv.value) {
+        fullscreenDiv.value = null;
+      }
+    };
+
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
     });
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+      
+      // Clear all refs
+      cleanupRefs();
     });
 
     onMounted(() => {
@@ -1162,6 +1230,7 @@ export default defineComponent({
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
+      setTimeForVariables,
     };
   },
 });

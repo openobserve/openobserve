@@ -924,8 +924,7 @@ pub async fn merge_files(
         Ok(v) => v,
         Err(e) => {
             log::error!(
-                "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
-                e,
+                "merge_parquet_files err: {e}, files: {:?}, schema: {:?}",
                 files,
                 latest_schema
             );
@@ -1167,6 +1166,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         .iter()
         .filter(|v| v.deleted)
         .map(|v| FileListDeleted {
+            id: 0,
             account: v.account.clone(),
             file: v.key.clone(),
             index_file: v.meta.index_size > 0,

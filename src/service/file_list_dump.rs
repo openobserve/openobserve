@@ -185,7 +185,7 @@ async fn inner_exec(
         false,
     )
     .await?;
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
+    let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, partitions).await?;
     ctx.register_table("file_list", tbl)?;
     let df = ctx.sql(query).await?;
     let ret = df.collect().await?;
@@ -322,6 +322,7 @@ async fn move_and_delete(
         .iter()
         .chain(dump_files.iter())
         .map(|f| FileListDeleted {
+            id: 0,
             account: f.account.to_string(),
             file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
             index_file: false,

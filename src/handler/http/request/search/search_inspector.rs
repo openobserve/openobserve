@@ -174,10 +174,7 @@ pub async fn get_search_profile(
         return Ok(meta::http::HttpResponse::bad_request(e));
     }
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    req.use_cache = get_use_cache_from_request(&query);
 
     // get stream settings
     if let Some(settings) = infra::schema::get_settings(&org_id, &stream_name, stream_type).await {

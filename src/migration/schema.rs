@@ -28,7 +28,7 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::{
-    db::{self as infra_db, NO_NEED_WATCH},
+    db::{self as infra_db, NO_NEED_WATCH, ORM_CLIENT, connect_to_orm},
     dist_lock,
     errors::{DbError, Error},
     scheduler,
@@ -340,10 +340,13 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "reports", &report.name, &mut write_tuples);
             // First create an report copy with formatted report name
-            match db::dashboards::reports::set(keys[0], &report, true).await {
+            let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            match db::dashboards::reports::create(conn, "default", report).await {
                 // Delete report with unsupported report name
                 Ok(_) => {
-                    if let Err(e) = db::dashboards::reports::delete(keys[0], report_name).await {
+                    if let Err(e) =
+                        db::dashboards::reports::delete(conn, keys[0], "default", report_name).await
+                    {
                         log::error!(
                             "[Report:Migration]: Error deleting report with unsupported report name: {report_name}: {e}"
                         );

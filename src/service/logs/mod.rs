@@ -20,11 +20,10 @@ use std::{
     time::Instant,
 };
 
-use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    DISTINCT_FIELDS, get_config,
+    DISTINCT_FIELDS, SIZE_IN_MB, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -37,7 +36,10 @@ use config::{
         time::now_micros,
     },
 };
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::{
+    errors::{Error, Result},
+    schema::{SchemaCache, unwrap_partition_time_level},
+};
 
 use super::{
     db::organization::get_org_setting,
@@ -197,6 +199,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
     org_id: &str,
@@ -205,6 +208,7 @@ async fn write_logs_by_stream(
     usage_type: UsageType,
     status: &mut IngestionStatus,
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    byte_size_by_stream: HashMap<String, usize>,
 ) -> Result<()> {
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
@@ -244,6 +248,14 @@ async fn write_logs_by_stream(
         };
 
         if let Some(fns_length) = fn_num {
+            // the issue here is req_stats.size calculates size after flattening and
+            // adding _timestamp col etc ; which inflates the size compared to the actual
+            // data sent by user. So when reporting we check if the calling function has provided us
+            // an "actual" size of the input, and is so use that instead of the req_stats
+            if let Some(size) = byte_size_by_stream.get(&stream_name) {
+                // req_stats already divides the size in mb
+                req_stats.size = *size as f64 / SIZE_IN_MB;
+            }
             report_request_usage_stats(
                 req_stats,
                 org_id,
@@ -281,10 +293,10 @@ async fn write_logs(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            return Err(anyhow::anyhow!(
+            return Err(Error::IngestionError(format!(
                 "Schema not found for stream: {}",
                 stream_name
-            ));
+            )));
         }
     };
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();

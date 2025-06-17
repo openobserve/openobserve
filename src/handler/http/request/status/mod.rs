@@ -359,13 +359,13 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let mem_file_num = cache::file_data::memory::len().await;
     let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::DATA).await;
+    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::Data).await;
     let (disk_max_size, disk_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::DATA).await;
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Data).await;
     let disk_result_file_num =
-        cache::file_data::disk::len(cache::file_data::disk::FileType::RESULT).await;
+        cache::file_data::disk::len(cache::file_data::disk::FileType::Result).await;
     let (disk_result_max_size, disk_result_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::RESULT).await;
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Result).await;
     stats.insert(
         "FILE_DATA",
         json::json!({

@@ -140,10 +140,7 @@ pub async fn submit_job(
             return Ok(MetaHttpResponse::bad_request(e));
         }
 
-        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-        if use_cache {
-            req.use_cache = Some(use_cache);
-        }
+        req.use_cache = get_use_cache_from_request(&query);
 
         // update timeout
         if req.timeout == 0 {

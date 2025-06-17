@@ -24,7 +24,6 @@ use bytes::BytesMut;
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
-    cluster::LOCAL_NODE,
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
@@ -48,12 +47,11 @@ use prost::Message;
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
-    handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            TriggerAlertData, evaluate_trigger,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger,
             grpc::{get_exemplar_val, get_metric_val, get_val},
             write_file,
         },
@@ -120,13 +118,15 @@ pub async fn handle_otlp_request(
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
-    if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                "not an ingester",
-            )));
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
+        log::error!("Metrics ingestion error: {e}");
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                e,
+            )),
+        );
     }
 
     #[cfg(feature = "cloud")]
@@ -137,25 +137,6 @@ pub async fn handle_otlp_request(
                 format!("org {org_id} has expired its trial period"),
             )));
         }
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN,
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
     }
 
     let start = std::time::Instant::now();

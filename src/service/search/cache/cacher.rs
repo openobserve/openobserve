@@ -99,7 +99,7 @@ pub async fn check_cache(
     let sql = match Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Error parsing sql: {:?}", e);
+            log::error!("Error parsing sql: {e}");
             return MultiCachedQueryResponse::default();
         }
     };
@@ -209,10 +209,7 @@ pub async fn check_cache(
             Ok(responses) => {
                 cached_responses = responses;
             }
-            Err(e) => log::error!(
-                "Error invalidating cached response by stream min ts: {:?}",
-                e
-            ),
+            Err(e) => log::error!("Error invalidating cached response by stream min ts: {e}"),
         }
 
         let total_hits = cached_responses
@@ -499,7 +496,7 @@ pub async fn get_cached_results(
                         })
                     }
                     Err(e) => {
-                        log::error!("[trace_id {trace_id}] Get results from disk failed : {:?}", e);
+                        log::error!("[trace_id {trace_id}] Get results from disk failed : {e}");
                         None
                     }
                 }
@@ -575,7 +572,7 @@ pub async fn cache_results_to_disk(
     match disk::set(&file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
-            log::error!("Error caching results to disk: {:?}", e);
+            log::error!("Error caching results to disk: {e}");
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Error caching results to disk",
@@ -598,27 +595,42 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
 
 pub fn get_ts_col_order_by(
     parsed_sql: &Sql,
-    ts_col: &str,
-    is_aggregate: bool,
+    _ts_col: &str,
+    _is_aggregate: bool,
 ) -> Option<(String, bool)> {
     let mut is_descending = true;
     let order_by = &parsed_sql.order_by;
-    let mut result_ts_col = String::new();
-
-    for (original, alias) in &parsed_sql.aliases {
-        if original == ts_col || original.contains("histogram") {
-            result_ts_col = alias.clone();
+    let result_ts_col = {
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let mut ts_col = String::new();
+            for (original, alias) in &parsed_sql.aliases {
+                if original == _ts_col || original.contains("histogram") {
+                    ts_col = alias.clone();
+                }
+            }
+            if !_is_aggregate
+                && (parsed_sql
+                    .columns
+                    .iter()
+                    .any(|(_, v)| v.contains(&_ts_col.to_owned()))
+                    || parsed_sql.order_by.iter().any(|v| v.0.eq(&_ts_col)))
+            {
+                ts_col = _ts_col.to_string();
+            }
+            ts_col
         }
-    }
-    if !is_aggregate
-        && (parsed_sql
-            .columns
-            .iter()
-            .any(|(_, v)| v.contains(&ts_col.to_owned()))
-            || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
-    {
-        result_ts_col = ts_col.to_string();
-    }
+
+        #[cfg(feature = "enterprise")]
+        {
+            match o2_enterprise::enterprise::search::cache_ts_util::get_timestamp_column_name(
+                &parsed_sql.sql,
+            ) {
+                Some(result) => result,
+                None => "".to_string(),
+            }
+        }
+    };
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
@@ -646,7 +658,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
         match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
-                log::error!("Error deleting cache: {:?}", e);
+                log::error!("Error deleting cache: {e}");
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     "Error deleting cache",

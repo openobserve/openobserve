@@ -182,10 +182,7 @@ pub async fn search_http2_stream(
     }
 
     // Set use_cache from query params
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    req.use_cache = get_use_cache_from_request(&query);
 
     // Set search type if not set
     if req.search_type.is_none() {
@@ -561,7 +558,7 @@ pub async fn values_http2_stream(
     let top_k = values_req.size;
 
     // Get use_cache from query params
-    values_req.use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    values_req.use_cache = get_use_cache_from_request(&query);
 
     // Build search requests per field and use only the first one
     let reqs = match build_search_request_per_field(

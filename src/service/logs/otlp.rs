@@ -16,7 +16,6 @@
 use std::collections::{HashMap, HashSet};
 
 use actix_web::{HttpResponse, http};
-use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -27,8 +26,12 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+    },
 };
+use infra::errors::Result;
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -64,7 +67,7 @@ pub async fn handle_request(
 
     // check stream
     let stream_name = in_stream_name.map_or_else(|| "default".to_owned(), format_stream_name);
-    check_ingestion_allowed(org_id, Some(&stream_name)).await?;
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let cfg = get_config();
     let log_ingestion_errors = ingestion_log_enabled().await;
@@ -110,6 +113,7 @@ pub async fn handle_request(
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
 
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
@@ -242,6 +246,8 @@ pub async fn handle_request(
                     original_options.push(original_data);
                     timestamps.push(timestamp);
                 } else {
+                    let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                    *_size += estimate_json_bytes(&rec);
                     // JSON Flattening
                     rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
@@ -352,6 +358,7 @@ pub async fn handle_request(
                     }
 
                     for (idx, mut res) in stream_pl_results {
+                        let original_size = estimate_json_bytes(&res);
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(v) => v,
@@ -406,6 +413,11 @@ pub async fn handle_request(
                             local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
                         }
 
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
+
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
                             .or_insert((Vec::new(), None));
@@ -457,6 +469,7 @@ pub async fn handle_request(
         UsageType::Logs,
         &mut status,
         json_data_by_stream,
+        size_by_stream,
     )
     .await
     {

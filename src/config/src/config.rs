@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 4;
+pub const DB_SCHEMA_VERSION: u64 = 5;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -662,6 +662,14 @@ pub struct TCP {
     pub tcp_port: u16,
     #[env_config(name = "ZO_UDP_PORT", default = 5514)]
     pub udp_port: u16,
+    #[env_config(name = "ZO_TCP_TLS_ENABLED", default = false)]
+    pub tcp_tls_enabled: bool,
+    #[env_config(name = "ZO_TCP_TLS_CERT_PATH", default = "")]
+    pub tcp_tls_cert_path: String,
+    #[env_config(name = "ZO_TCP_TLS_KEY_PATH", default = "")]
+    pub tcp_tls_key_path: String,
+    #[env_config(name = "ZO_TCP_TLS_CA_CERT_PATH", default = "")]
+    pub tcp_tls_ca_cert_path: String,
 }
 
 #[derive(EnvConfig)]
@@ -914,9 +922,9 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
-    pub memory_circuit_breaker_enable: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_ENABLED", default = false)]
+    pub memory_circuit_breaker_enabled: bool,
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
     #[env_config(
         name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
@@ -1261,7 +1269,7 @@ pub struct Limit {
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
-    pub http_worker_max_blocking: usize, // equals to 1024 if 0
+    pub http_worker_max_blocking: usize, // equals to 256 if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
@@ -1276,7 +1284,7 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 10000)] // records
+    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 100000)] // records
     pub calculate_stats_step_limit: i64,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
@@ -1288,18 +1296,6 @@ pub struct Limit {
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
     pub http_slow_log_threshold: u64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLED", default = false)]
-    pub circuit_breaker_enabled: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_WATCHING_WINDOW", default = 60)] // seconds
-    pub circuit_breaker_watching_window: i64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RESET_WINDOW_NUM", default = 3)] // 3 * watching window
-    pub circuit_breaker_reset_window_num: i64,
-    #[env_config(
-        name = "ZO_CIRCUIT_BREAKER_SLOW_REQUEST_THRESHOLD",
-        default = 100,
-        help = "Trigger circuit break if over this threshold in watching window, and will be reset after 2 * watching window"
-    )] // slow requests
-    pub circuit_breaker_slow_request_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1608,6 +1604,10 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
+    #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
+    pub aggregation_max_size: usize,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1621,6 +1621,12 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
+    #[env_config(
+        name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
+        default = 10,
+        help = "Delay window indicates the time range from now to skip caching to disk, default is 10 minutes"
+    )]
+    pub delay_window_mins: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1931,6 +1937,10 @@ pub fn init() -> Config {
         panic!("common config error: {e}")
     }
 
+    if let Err(e) = check_tcp_tls_config(&mut cfg) {
+        panic!("syslog config error: {e}")
+    }
+
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -1992,7 +2002,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.http_worker_num = cpu_num;
     }
     if cfg.limit.http_worker_max_blocking == 0 {
-        cfg.limit.http_worker_max_blocking = 1024;
+        cfg.limit.http_worker_max_blocking = 256;
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
@@ -2495,13 +2505,23 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10%
         if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
             cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
         }
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
+
+    if cfg.disk_cache.aggregation_max_size == 0 {
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10%
+        if cfg.disk_cache.aggregation_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.aggregation_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
+    } else {
+        cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
+    }
+
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
         // 50% of max_size
@@ -2762,6 +2782,19 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 return Err(anyhow::anyhow!("invalid master encryption key: {e}"));
             }
         }
+    }
+    Ok(())
+}
+
+fn check_tcp_tls_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.tcp.tcp_tls_enabled
+        && (cfg.tcp.tcp_tls_cert_path.is_empty()
+            || cfg.tcp.tcp_tls_key_path.is_empty()
+            || cfg.tcp.tcp_tls_ca_cert_path.is_empty())
+    {
+        return Err(anyhow::anyhow!(
+            "ZO_TCP_TLS_CERT_PATH, ZO_TCP_TLS_KEY_PATH and ZO_TCP_TLS_CA_CERT_PATH must be set when ZO_TCP_TLS_ENABLED is true"
+        ));
     }
     Ok(())
 }

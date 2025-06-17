@@ -19,7 +19,6 @@ use std::{
 };
 
 use actix_web::http;
-use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
@@ -28,9 +27,14 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+        time::parse_timestamp_micro_from_value,
+    },
 };
 use flate2::read::GzDecoder;
+use infra::errors::{Error, Result};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -75,7 +79,9 @@ pub async fn ingest(
     } else {
         format_stream_name(in_stream_name)
     };
-    check_ingestion_allowed(org_id, Some(&stream_name)).await?;
+
+    // check system resource
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
@@ -171,12 +177,13 @@ pub async fn ingest(
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
     for ret in data.iter() {
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {
                 log::error!("IngestionError: {:?}", e);
-                return Err(anyhow::anyhow!("Failed processing: {:?}", e));
+                return Err(Error::IngestionError(format!("Failed processing: {:?}", e)));
             }
         };
 
@@ -211,6 +218,9 @@ pub async fn ingest(
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
+            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+            *_size += estimate_json_bytes(&item);
+
             // JSON Flattening
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
@@ -362,6 +372,9 @@ pub async fn ingest(
                             }
                         };
 
+                        // we calculate the size BEFORE applying uds
+                        let original_size = estimate_json_bytes(&res);
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,
@@ -428,6 +441,11 @@ pub async fn ingest(
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
 
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
+
                         tokio::task::coop::consume_budget().await;
                     }
                 }
@@ -460,6 +478,7 @@ pub async fn ingest(
             usage_type,
             &mut status,
             json_data_by_stream,
+            size_by_stream,
         )
         .await;
         stream_status.status = match status {

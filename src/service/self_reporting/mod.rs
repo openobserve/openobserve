@@ -315,7 +315,9 @@ pub async fn flush_audit() {
 async fn publish_audit(
     req: cluster_rpc::IngestionRequest,
 ) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
-    crate::service::ingestion::ingestion_service::ingest(req).await
+    crate::service::ingestion::ingestion_service::ingest(req)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
 #[inline]
