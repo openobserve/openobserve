@@ -210,6 +210,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <q-separator />
                       <VariablesValueSelector
+                        v-if="dateTimeForVariables ||
+                          (dashboardPanelData.meta.dateTime 
+                            && dashboardPanelData.meta.dateTime.start_time 
+                            && dashboardPanelData.meta.dateTime.end_time)"
                         :variablesConfig="currentDashboardData.data?.variables"
                         :showDynamicFilters="
                           currentDashboardData.data?.variables
