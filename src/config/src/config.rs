@@ -1422,6 +1422,12 @@ pub struct Limit {
         help = "Duration of each mini search partition in seconds"
     )]
     pub search_mini_partition_duration_secs: u64,
+    #[env_config(
+        name = "ZO_HISTOGRAM_ENABLED",
+        help = "Show histogram for logs page",
+        default = true
+    )]
+    pub histogram_enabled: bool,
 }
 
 #[derive(EnvConfig)]
