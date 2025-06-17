@@ -137,13 +137,19 @@ impl Sql {
             .pop()
             .unwrap();
 
+        //********************Change the sql here*********************************//
         // 2. rewrite track_total_hits
         if query.track_total_hits {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
             let _ = statement.visit(&mut trace_total_hits_visitor);
         }
 
-        // 3. get column name, alias, group by, order by
+        // 3. rewrite all filter that include DASHBOARD_ALL with true
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        //********************Change the sql here*********************************//
+
+        // 4. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         let _ = statement.visit(&mut column_visitor);
 
@@ -178,12 +184,12 @@ impl Sql {
             }
         }
 
-        // 4. get match_all() value
+        // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
         let need_fst_fields = match_visitor.match_items.is_some();
 
-        // 5. check if have full text search filed in stream
+        // 6. check if have full text search filed in stream
         if stream_names.len() == 1 && need_fst_fields {
             let schema = total_schemas.values().next().unwrap();
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
@@ -200,7 +206,7 @@ impl Sql {
             }
         }
 
-        // 6. generate used schema
+        // 7. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
@@ -223,21 +229,21 @@ impl Sql {
             }
         }
 
-        // 7. get partition column value
+        // 8. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 8. get prefix column value
+        // 9. get prefix column value
         let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut prefix_column_visitor);
 
-        // 9. pick up histogram interval
+        // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
 
-        // NOTE: only this place modify the sql
-        // 10. add _timestamp and _o2_id if need
+        //********************Change the sql here*********************************//
+        // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -246,11 +252,6 @@ impl Sql {
                 let _ = statement.visit(&mut add_o2_id_visitor);
             }
         }
-
-        // NOTE: only this place modify the sql
-        // 11. replace all filter that include DASHBOARD_ALL with true
-        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
 
         // 12. generate tantivy query
         let mut index_condition = None;
@@ -276,6 +277,7 @@ impl Sql {
                 conditions: vec![Condition::All()],
             });
         }
+        //********************Change the sql here*********************************//
 
         // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
