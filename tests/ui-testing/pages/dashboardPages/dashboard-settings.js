@@ -184,7 +184,11 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-stream-select"]')
       .click();
-    await this.page.getByRole("option", { name: Stream }).click();
+    await this.page.getByText(Stream, { exact: true }).click();
+    //  await this.page
+    //       .locator('[data-test="dashboard-variable-stream-select"]')
+    //       .click();
+    //     await this.page.getByText(Stream, { exact: true }).click();
     await this.page
       .locator('[data-test="dashboard-variable-field-select"]')
       .click();
@@ -362,7 +366,7 @@ export default class DashboardSetting {
   }
 
   //save edited tab name
-   async saveEditedtab() {
+  async saveEditedtab() {
     await this.page
       .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
       .click();
