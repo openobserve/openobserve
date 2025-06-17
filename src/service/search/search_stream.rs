@@ -119,7 +119,7 @@ pub async fn process_search_stream_request(
     let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
-    let use_cache = req.use_cache.unwrap_or(false);
+    let use_cache = req.use_cache.unwrap_or(true);
     let start_time = req.query.start_time;
     let end_time = req.query.end_time;
     let all_streams = stream_names.join(",");
@@ -566,7 +566,7 @@ pub async fn do_partitioned_search(
     if is_streaming_aggs {
         req.query.streaming_output = true;
         req.query.streaming_id = partition_resp.streaming_id.clone();
-        use_cache = req.use_cache.unwrap_or_default();
+        use_cache = req.use_cache.unwrap_or(true);
         log::info!(
             "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] is_streaming_aggs: {}, use_cache: {}",
             trace_id,
@@ -1865,7 +1865,7 @@ mod tests {
         assert_eq!(req.query.sql, "SELECT * FROM test_stream");
         assert_eq!(req.query.from, 0);
         assert_eq!(req.query.size, 100);
-        assert!(req.use_cache.unwrap_or(false));
+        assert!(req.use_cache.unwrap_or(true));
         assert_eq!(req.search_type, Some(SearchEventType::UI));
     }
 

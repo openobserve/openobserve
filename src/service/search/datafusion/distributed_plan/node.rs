@@ -223,7 +223,7 @@ impl SearchInfos {
             start_time: self.start_time,
             end_time: self.end_time,
             timeout: self.timeout as i64,
-            use_cache: self.use_cache.unwrap_or(false),
+            use_cache: self.use_cache.unwrap_or(true),
         }
     }
 }
