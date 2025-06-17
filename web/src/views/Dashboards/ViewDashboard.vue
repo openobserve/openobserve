@@ -463,6 +463,28 @@ export default defineComponent({
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 
+    const setTimeForVariables = () => {
+      if (selectedDate.value && dateTimePicker.value) {
+        const date = dateTimePicker.value?.getConsumableDateTime();
+        const startTime = new Date(date.startTime);
+        const endTime = new Date(date.endTime);
+
+        // Update only the variables time object
+        currentTimeObjPerPanel.value = {
+          ...currentTimeObjPerPanel.value,
+          __variables: {
+            start_time: startTime,
+            end_time: endTime,
+          },
+        };
+
+        console.log(
+          "Time updated for variables:",
+          currentTimeObjPerPanel.value,
+        );
+      }
+    };
+
     const dateTimePicker = ref(null); // holds a reference to the date time picker
 
     // holds the date picker v-modal
@@ -1208,6 +1230,7 @@ export default defineComponent({
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
+      setTimeForVariables,
     };
   },
 });

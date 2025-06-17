@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </span>
     <VariablesValueSelector
-      v-if="currentTimeObj['__global']"
+      v-if="currentTimeObj['__global'] || currentTimeObj['__variables'] "
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-      :selectedTimeDate="currentTimeObj['__global']"
+      :selectedTimeDate="currentTimeObj['__variables'] || currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
@@ -326,7 +326,7 @@ export default defineComponent({
 
     // watch on currentTimeObj to update the variablesData
     watch(
-      () => props?.currentTimeObj?.__global,
+      () => [props?.currentTimeObj?.__variables, props?.currentTimeObj?.__global],
       () => {
         currentVariablesDataRef.value = {
           __global: JSON.parse(JSON.stringify(variablesData.value)),
