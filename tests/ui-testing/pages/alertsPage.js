@@ -71,6 +71,10 @@ export class AlertsPage {
         this.currentAlertName = '';
     }
 
+    async alertsURLValidation() {
+        await expect(this.page).toHaveURL(/alerts/);
+    }
+
     generateRandomString() {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         let result = '';

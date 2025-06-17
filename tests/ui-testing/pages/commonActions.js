@@ -15,6 +15,7 @@ export class CommonActions {
     async navigateToAlerts() {
         await this.page.locator(this.alertsMenuItem).click();
         await this.page.waitForTimeout(2000);
+        await expect(this.page.locator('[data-test="alerts-list-title"]')).toContainText('Alerts');
     }
 
     async navigateToSettings() {
