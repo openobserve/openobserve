@@ -144,6 +144,7 @@ pub async fn merge_parquet_files(
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
     let ctx = prepare_datafusion_context(
+        "",
         None,
         vec![],
         vec![],
@@ -252,6 +253,7 @@ pub async fn merge_parquet_files_with_downsampling(
     let sort_by_timestamp_desc = true;
     let target_partitions = 2; // force use 2 cpu cores for one merge task
     let ctx = prepare_datafusion_context(
+        "",
         None,
         vec![],
         vec![],
@@ -478,6 +480,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
 }
 
 pub async fn prepare_datafusion_context(
+    _trace_id: &str,
     _work_group: Option<String>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
@@ -490,8 +493,13 @@ pub async fn prepare_datafusion_context(
     #[cfg(feature = "enterprise")]
     let (target_partition, memory_size) = (target_partitions, cfg.memory_cache.datafusion_max_size);
     #[cfg(feature = "enterprise")]
-    let (target_partition, memory_size) =
-        get_cpu_and_mem_limit(_work_group.clone(), target_partition, memory_size).await?;
+    let (target_partition, memory_size) = get_cpu_and_mem_limit(
+        _trace_id,
+        _work_group.clone(),
+        target_partition,
+        memory_size,
+    )
+    .await?;
 
     let session_config = create_session_config(sorted_by_time, target_partition)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
@@ -572,6 +580,7 @@ pub async fn register_table(
         sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
 
     let ctx = prepare_datafusion_context(
+        &session.id,
         session.work_group.clone(),
         vec![],
         vec![],
@@ -620,8 +629,13 @@ pub async fn create_parquet_table(
     };
 
     #[cfg(feature = "enterprise")]
-    let (target_partitions, _) =
-        get_cpu_and_mem_limit(session.work_group.clone(), target_partitions, 0).await?;
+    let (target_partitions, _) = get_cpu_and_mem_limit(
+        &session.id,
+        session.work_group.clone(),
+        target_partitions,
+        0,
+    )
+    .await?;
 
     let target_partitions = if target_partitions == 0 {
         DATAFUSION_MIN_PARTITION
@@ -713,6 +727,7 @@ pub async fn create_parquet_table(
 
 #[cfg(feature = "enterprise")]
 async fn get_cpu_and_mem_limit(
+    trace_id: &str,
     work_group: Option<String>,
     mut target_partitions: usize,
     mut memory_size: usize,
@@ -726,8 +741,9 @@ async fn get_cpu_and_mem_limit(
                 target_partitions = target_partitions * cpu as usize / 100;
             }
             memory_size = memory_size * mem as usize / 100;
-            log::debug!(
-                "[datafusion:{}] target_partition: {}, memory_size: {}",
+            log::info!(
+                "[trace_id: {}] work_group: {}, target_partition: {}, memory_size: {}",
+                trace_id,
                 wg,
                 target_partitions,
                 memory_size

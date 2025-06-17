@@ -86,6 +86,7 @@ pub async fn search(
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx = prepare_datafusion_context(
+        &trace_id,
         req.work_group.clone(),
         vec![],
         vec![],

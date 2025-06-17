@@ -842,6 +842,7 @@ pub async fn generate_context(
     let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
     let mut ctx = prepare_datafusion_context(
+        &req.trace_id,
         req.work_group.clone(),
         analyzer_rules,
         optimizer_rules,
