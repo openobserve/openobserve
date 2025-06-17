@@ -498,26 +498,24 @@ pub async fn run_datafusion(
     #[allow(unused_mut)]
     let mut aggs_cache_ratio = 0;
     #[cfg(feature = "enterprise")]
-    {
-        if streaming_output {
-            let Some(streaming_id) = streaming_id else {
-                return Err(Error::Message(
-                    "streaming_id is required for streaming aggregation query".to_string(),
-                ));
-            };
-            let mut rewriter =
-                StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
+    if streaming_output {
+        let Some(streaming_id) = streaming_id else {
+            return Err(Error::Message(
+                "streaming_id is required for streaming aggregation query".to_string(),
+            ));
+        };
+        let mut rewriter =
+            StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
 
-            physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
 
-            // Check for aggs cache hit
-            if rewriter.is_complete_cache_hit {
-                aggs_cache_ratio = 100;
-                // skip empty exec visitor for streaming aggregation query
-                // since the new plan after rewrite will have a `EmptyExec` for a complete cache
-                // hit
-                skip_empty_exec_visitor = true;
-            }
+        // Check for aggs cache hit
+        if rewriter.is_complete_cache_hit {
+            aggs_cache_ratio = 100;
+            // skip empty exec visitor for streaming aggregation query
+            // since the new plan after rewrite will have a `EmptyExec` for a complete cache
+            // hit
+            skip_empty_exec_visitor = true;
         }
     }
 
@@ -543,7 +541,6 @@ pub async fn run_datafusion(
     // run datafusion
     let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
-    dbg!(&ret);
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
     if let Err(e) = ret {

@@ -118,7 +118,6 @@ pub async fn search(
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
         let json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-        dbg!(&json_rows);
         let mut sources: Vec<json::Value> = if query_fn.is_empty() {
             json_rows
                 .into_iter()
