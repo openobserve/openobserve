@@ -839,6 +839,7 @@ export default defineComponent({
         }
 
         searchObj.meta.quickMode = isQuickModeEnabled();
+        searchObj.meta.showHistogram = isHistogramEnabled();
 
         isLogsMounted.value = true;
       } catch (error) {
@@ -868,6 +869,11 @@ export default defineComponent({
     // Helper function to check if quick mode is enabled
     function isQuickModeEnabled() {
       return store.state.zoConfig.quick_mode_enabled;
+    }
+
+    // Helper function to check if histogram is enabled
+    function isHistogramEnabled() {
+      return store.state.zoConfig.histogram_enabled;
     }
 
     const handleActivation = async () => {
