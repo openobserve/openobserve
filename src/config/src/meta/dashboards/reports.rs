@@ -33,7 +33,7 @@ pub enum ReportMediaType {
     Pdf, // Supports Pdf only
 }
 
-#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq, Eq)]
 pub struct ReportDashboardVariable {
     pub key: String,
     pub value: String,
@@ -53,7 +53,7 @@ pub struct ReportDashboard {
     pub timerange: ReportTimerange,
 }
 
-#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq, Eq)]
 pub enum ReportTimerangeType {
     #[default]
     #[serde(rename = "relative")]
@@ -62,7 +62,7 @@ pub enum ReportTimerangeType {
     Absolute,
 }
 
-#[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Debug, Deserialize, Clone, ToSchema, PartialEq, Eq)]
 pub struct ReportTimerange {
     #[serde(rename = "type")]
     pub range_type: ReportTimerangeType,
@@ -150,20 +150,12 @@ pub struct Report {
     pub enabled: bool,
     #[serde(default)]
     pub media_type: ReportMediaType,
-    /// User email for chromedriver login
-    #[serde(default)]
-    pub user: String,
-    /// User password for chromedriver login
-    #[serde(default)]
-    pub password: String,
     #[serde(default)]
     pub timezone: String,
     /// Fixed timezone offset in minutes
     #[serde(default)]
     #[serde(rename = "timezoneOffset")]
     pub tz_offset: i32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_triggered_at: Option<i64>,
     #[serde(default = "datetime_now")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<FixedOffset>,
@@ -188,11 +180,8 @@ impl Default for Report {
             message: "".to_string(),
             enabled: false,
             media_type: ReportMediaType::default(),
-            user: "".to_string(),
-            password: "".to_string(),
             timezone: "".to_string(),
             tz_offset: 0, // UTC
-            last_triggered_at: None,
             created_at: datetime_now(),
             updated_at: None,
             owner: "".to_string(),
@@ -218,11 +207,96 @@ pub struct HttpReportPayload {
     pub email_details: ReportEmailDetails,
 }
 
+/// Parameters for listing reports.
+#[derive(Debug, Clone)]
+pub struct ListReportsParams {
+    /// The org ID primary key with which to filter reports.
+    pub org_id: String,
+
+    /// The optional folder ID snowflake primary key with which to filter reports.
+    ///
+    /// When set the list will only include reports that belong to the specified reports folder.
+    pub folder_snowflake_id: Option<String>,
+
+    /// The optional dashboard ID snowflake primary key with which to filter reports.
+    ///
+    /// When set the list will only include reports that are associated with the specified
+    /// dashboard.
+    pub dashboard_snowflake_id: Option<String>,
+
+    /// The optional page size and page index of results to retrieve.
+    pub page_size_and_idx: Option<(u64, u64)>,
+
+    /// When set to `true` the list will only include reports that have destinations. When set to
+    /// `false` the list will only include reports that do not have destinations.
+    pub has_destinations: Option<bool>,
+}
+
+impl ListReportsParams {
+    /// Returns new parameters to list reports for the given org ID primary key.
+    pub fn new(org_id: &str) -> Self {
+        Self {
+            org_id: org_id.to_owned(),
+            folder_snowflake_id: None,
+            dashboard_snowflake_id: None,
+            page_size_and_idx: None,
+            has_destinations: None,
+        }
+    }
+
+    /// Filter reports that belong to the specified reports folder.
+    pub fn in_folder(mut self, folder_snowflake_id: &str) -> Self {
+        self.folder_snowflake_id = Some(folder_snowflake_id.to_string());
+        self
+    }
+
+    /// Filter reports by that are associated with the specified dashboard.
+    pub fn for_dashboard(mut self, dashboard_snowflake_id: &str) -> Self {
+        self.dashboard_snowflake_id = Some(dashboard_snowflake_id.to_string());
+        self
+    }
+
+    /// Filter reports by whether they have any destinations or not.
+    pub fn has_destinations(mut self, has_destinations: bool) -> Self {
+        self.has_destinations = Some(has_destinations);
+        self
+    }
+
+    /// Paginate the results by the given page size and page index.
+    pub fn paginate(mut self, page_size: u64, page_idx: u64) -> Self {
+        self.page_size_and_idx = Some((page_size, page_idx));
+        self
+    }
+}
+
+/// An item in a list of reports which only includes a subset of all the report fields.
+#[derive(Debug, Clone)]
+pub struct ListReportItem {
+    pub name: String,
+    pub owner: String,
+    pub description: Option<String>,
+
+    /// The last time the report was triggered in Unix microseconds.
+    pub last_triggered_at: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct ReportListFilters {
     pub dashboard: Option<String>,
     pub folder: Option<String>,
     pub destination_less: Option<bool>,
+}
+
+impl ReportListFilters {
+    pub fn into_parmas(self, org_id: &str) -> ListReportsParams {
+        ListReportsParams {
+            org_id: org_id.to_string(),
+            folder_snowflake_id: self.folder,
+            dashboard_snowflake_id: self.dashboard,
+            has_destinations: self.destination_less.map(|v| !v),
+            page_size_and_idx: None,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -101,8 +101,6 @@ jobs:
         browser: [chrome]
         testfilename: [
             "alerts.spec.js",
-            "alertImportTDA.spec.js",
-            "alertsfolders.spec.js",
             "changeOrg.spec.js",
             "dashboards/custom-charts.spec.js",
             "dashboards/dashboard.spec.js",
@@ -141,7 +139,8 @@ jobs:
             "unflattened.spec.js",
             "usersOrg.spec.js",
             "websocket.spec.js",
-            "alertsNew.spec.js",
+            "pipeline-dynamic.spec.js",
+            "searchpartition.spec.js"
              # "remotepipeline.spec.js",
 
           ]

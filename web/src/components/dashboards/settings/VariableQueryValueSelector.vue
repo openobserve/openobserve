@@ -204,7 +204,11 @@ export default defineComponent({
         if (isOpen.value && selectRef.value) {
           nextTick(() => {
             if (selectRef.value) {
-              (selectRef.value as any).updateInputValue();
+              if (!filterText.value) {
+                (selectRef.value as any).updateInputValue();
+              } else {
+                filterOptions(filterText.value, () => {});
+              }
             }
           });
         }

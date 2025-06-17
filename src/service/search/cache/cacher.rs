@@ -595,27 +595,42 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
 
 pub fn get_ts_col_order_by(
     parsed_sql: &Sql,
-    ts_col: &str,
-    is_aggregate: bool,
+    _ts_col: &str,
+    _is_aggregate: bool,
 ) -> Option<(String, bool)> {
     let mut is_descending = true;
     let order_by = &parsed_sql.order_by;
-    let mut result_ts_col = String::new();
-
-    for (original, alias) in &parsed_sql.aliases {
-        if original == ts_col || original.contains("histogram") {
-            result_ts_col = alias.clone();
+    let result_ts_col = {
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let mut ts_col = String::new();
+            for (original, alias) in &parsed_sql.aliases {
+                if original == _ts_col || original.contains("histogram") {
+                    ts_col = alias.clone();
+                }
+            }
+            if !_is_aggregate
+                && (parsed_sql
+                    .columns
+                    .iter()
+                    .any(|(_, v)| v.contains(&_ts_col.to_owned()))
+                    || parsed_sql.order_by.iter().any(|v| v.0.eq(&_ts_col)))
+            {
+                ts_col = _ts_col.to_string();
+            }
+            ts_col
         }
-    }
-    if !is_aggregate
-        && (parsed_sql
-            .columns
-            .iter()
-            .any(|(_, v)| v.contains(&ts_col.to_owned()))
-            || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
-    {
-        result_ts_col = ts_col.to_string();
-    }
+
+        #[cfg(feature = "enterprise")]
+        {
+            match o2_enterprise::enterprise::search::cache_ts_util::get_timestamp_column_name(
+                &parsed_sql.sql,
+            ) {
+                Some(result) => result,
+                None => "".to_string(),
+            }
+        }
+    };
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
