@@ -974,7 +974,12 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
 };
 
 export const deepCopy = (value: any) => {
-  return JSON.parse(JSON.stringify(value));
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.error("Error deep copying value", error);
+    return value;
+  }
 };
 
 export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
