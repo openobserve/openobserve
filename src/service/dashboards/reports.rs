@@ -112,7 +112,7 @@ pub async fn save(
     let cfg = get_config();
     if cfg.common.report_server_url.is_empty() {
         // Check if SMTP is enabled, otherwise don't save the report
-        if !cfg.smtp.smtp_enabled {
+        if !cfg.smtp.smtp_enabled && !report.destinations.is_empty() {
             return Err(ReportError::SmtpNotEnabled);
         }
 
