@@ -1894,6 +1894,10 @@ export default defineComponent({
         label: t("dashboard.insideBottom"),
         value: "insideBottom",
       },
+      {
+        label: t("dashboard.outside"),
+        value: "outside",
+      },
     ];
 
     const showSymbol = [

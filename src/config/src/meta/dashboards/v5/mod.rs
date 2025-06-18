@@ -593,4 +593,5 @@ pub enum LabelPosition {
     Inside,
     InsideTop,
     InsideBottom,
+    Outside,
 }
