@@ -135,3 +135,26 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
         Ok(Some(offset))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn setup() {
+        infra::db::init().await.unwrap();
+        // setup the offset
+        _ = db::compact::stats::set_offset(1024, Some(&LOCAL_NODE.uuid.clone())).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_stats_from_file_list() {
+        setup().await;
+        let latest_pk = 1002000;
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, Some((1024, 1001024)));
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, Some((1001024, 1002000)));
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, None);
+    }
+}
