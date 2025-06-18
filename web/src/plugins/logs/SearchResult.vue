@@ -256,8 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @expand-row="expandLog"
         @view-trace="redirectToTraces"
       />
-
-      <q-dialog
+    </div>
+  </div>
+  <q-dialog
         data-test="logs-search-result-detail-dialog"
         v-model="searchObj.meta.showDetailTab"
         position="right"
@@ -266,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @escap.stop="reDrawChart"
         @hide="reDrawChart"
         @before-hide="reDrawChart"
+        key="search-result-detail-dialog-key"
       >
         <DetailTable
           v-if="searchObj.data.queryResults?.hits?.length"
@@ -296,8 +298,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </q-dialog>
-    </div>
-  </div>
 </template>
 
 <script lang="ts">
