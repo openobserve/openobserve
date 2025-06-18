@@ -152,7 +152,7 @@ pub(crate) async fn around(
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
-    },
+        },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: regions.clone(),
         clusters: clusters.clone(),

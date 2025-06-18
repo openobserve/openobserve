@@ -906,6 +906,32 @@ pub static PIPELINE_WAL_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static QUERY_AGGREGATION_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_aggregation_cache_items",
+            "Total number of aggregation cache items",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_aggregation_cache_bytes",
+            "Total number of aggregation cache bytes",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1145,6 +1171,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(PIPELINE_WAL_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_AGGREGATION_CACHE_ITEMS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_AGGREGATION_CACHE_BYTES.clone()))
         .expect("Metric registered");
 }
 
