@@ -906,6 +906,37 @@ pub static PIPELINE_WAL_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+
+pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_wal_ingestion_bytes",
+            "Bytes ingested across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_http_exported_bytes",
+            "Bytes exported across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+
+
+
+
 pub static QUERY_AGGREGATION_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -919,6 +950,7 @@ pub static QUERY_AGGREGATION_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+
 pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -931,6 +963,7 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+
 
 fn register_metrics(registry: &Registry) {
     // http latency
@@ -1171,6 +1204,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(PIPELINE_WAL_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_INGESTION_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_EXPORTED_BYTES.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_AGGREGATION_CACHE_ITEMS.clone()))

@@ -366,7 +366,7 @@ pub async fn otlp_logs_write(
             Err(e) => {
                 log::error!(
                     "Error processing otlp pb logs write request {org_id}/{:?}: {e}",
-                    in_stream_name,
+                    in_stream_name
                 );
                 Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
@@ -381,7 +381,7 @@ pub async fn otlp_logs_write(
             Err(e) => {
                 log::error!(
                     "Error processing otlp json logs write request {org_id}/{:?}: {e}",
-                    in_stream_name,
+                    in_stream_name
                 );
                 Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),

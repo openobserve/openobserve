@@ -46,7 +46,7 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
     Ok(match metrics::json::ingest(&org_id, body).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
-            log::error!("Error processing request {org_id}/metrics/_json: {:?}", e);
+            log::error!("Error processing request {org_id}/metrics/_json: {e}");
             HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 e.to_string(),
