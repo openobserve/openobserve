@@ -280,14 +280,6 @@ export default defineComponent({
         await import(
           "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"
         );
-        monaco.languages.setMonarchTokensProvider("sql", {
-          tokenizer: {
-            root: [
-              [/'[^']+?'/, 'string.content'],
-              [/"[^"]+?"/, 'string.content']
-            ]
-          }
-        });
       }
 
       if (props.language === "json") {
