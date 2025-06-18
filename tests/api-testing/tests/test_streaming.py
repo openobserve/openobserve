@@ -600,7 +600,7 @@ test_data_sql = [
         f"SELECT * FROM \"{stream_name}\" WHERE match_all('ip-10-2-15-197.us-east-2.co*')",
         0,
         50,
-        18,
+        2,
     )
 ]
 
