@@ -83,6 +83,8 @@ pub enum Error {
     #[error("Error# {0}")]
     ResourceError(String),
     #[error("Error# {0}")]
+    IngestionError(String),
+    #[error("Error# {0}")]
     WalFileError(String),
     #[error("Error# {0}")]
     OtherError(#[from] anyhow::Error),

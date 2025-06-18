@@ -1422,6 +1422,12 @@ pub struct Limit {
         help = "Duration of each mini search partition in seconds"
     )]
     pub search_mini_partition_duration_secs: u64,
+    #[env_config(
+        name = "ZO_HISTOGRAM_ENABLED",
+        help = "Show histogram for logs page",
+        default = true
+    )]
+    pub histogram_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1806,6 +1812,36 @@ pub struct Pipeline {
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_ENABLED",
+        default = true,
+        help = "Enable batching of entries before sending HTTP requests"
+    )]
+    pub batch_enabled: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE",
+        default = 100,
+        help = "Maximum number of entries to batch together"
+    )]
+    pub batch_size: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_TIMEOUT_MS",
+        default = 1000,
+        help = "Maximum time to wait for a batch to fill up (in milliseconds)"
+    )]
+    pub batch_timeout_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE_BYTES",
+        default = 10485760, // 10MB
+        help = "Maximum size of a batch in bytes"
+    )]
+    pub batch_size_bytes: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
+        default = false,
+        help = "Use shared HTTP client instances for better connection pooling"
+    )]
+    pub use_shared_http_client: bool,
 }
 
 #[derive(EnvConfig)]
