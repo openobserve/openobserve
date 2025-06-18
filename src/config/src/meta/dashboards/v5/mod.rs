@@ -590,7 +590,17 @@ pub enum LineInterpolation {
 #[serde(rename_all = "camelCase")]
 pub enum LabelPosition {
     Top,
+    Left,
+    Right,
+    Bottom,
     Inside,
+    InsideLeft,
+    InsideRight,
     InsideTop,
     InsideBottom,
+    InsideTopLeft,
+    InsideBottomLeft,
+    InsideTopRight,
+    InsideBottomRight,
+    Outside,
 }
