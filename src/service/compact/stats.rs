@@ -20,8 +20,11 @@ use infra::{dist_lock, file_list as infra_file_list};
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
+    let latest_pk = infra_file_list::get_max_pk_value()
+        .await
+        .map_err(|e| anyhow::anyhow!("get max pk value error: {:?}", e))?;
     loop {
-        let Some(offset) = update_stats_from_file_list_inner().await? else {
+        let Some(offset) = update_stats_from_file_list_inner(latest_pk).await? else {
             break;
         };
         log::info!(
@@ -33,7 +36,9 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     Ok(None)
 }
 
-async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyhow::Error> {
+async fn update_stats_from_file_list_inner(
+    latest_pk: i64,
+) -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -49,11 +54,8 @@ async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyho
         }
     }
 
-    // get latest offset and apply step limit
+    // apply step limit
     let step_limit = config::get_config().limit.calculate_stats_step_limit;
-    let latest_pk = infra_file_list::get_max_pk_value()
-        .await
-        .map_err(|e| anyhow::anyhow!("get max pk value error: {:?}", e))?;
     let latest_pk = std::cmp::min(offset + step_limit, latest_pk);
     let pk_value = if offset == 0 && latest_pk == 0 {
         None
