@@ -85,6 +85,10 @@ export default class ChartTypeSelector {
 
     // Click the button
     await button.click();
+    //    // Clear the search input after adding the field
+    // await page.getByLabel("Clear").click();
+
+    await this.page.getByLabel("Clear").click();
   }
 
   // Add filter condition
