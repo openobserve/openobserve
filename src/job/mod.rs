@@ -93,7 +93,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    if !cfg.common.mmdb_disable_download {
+    if !cfg.common.mmdb_disable_download
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager())
+    {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
@@ -170,7 +172,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::organization::org_settings_watch().await });
 
-    tokio::task::spawn(async move { db::pipeline::watch().await });
+    // pipeline not used on compactors
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
+        tokio::task::spawn(async move { db::pipeline::watch().await });
+    }
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
@@ -216,7 +221,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
 
     #[cfg(feature = "enterprise")]
-    if !LOCAL_NODE.is_compactor() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         db::session::cache()
             .await
             .expect("user session cache failed");
@@ -290,6 +295,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 /// Additional jobs that init processes should be deferred until the gRPC service
 /// starts in the main thread
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
+        return Ok(());
+    }
+
     db::schema::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
