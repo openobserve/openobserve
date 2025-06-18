@@ -1684,6 +1684,10 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
+      processInterestingFiledInSQLQuery,
+      removeFieldByName,
+      setFieldsAndConditions,
+      dashboardPanelData
     };
   },
   computed: {
