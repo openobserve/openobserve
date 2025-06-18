@@ -4,6 +4,7 @@ import { AlertsPage } from '../../pages/alertsPages/alertsPage.js';
 import { AlertTemplatesPage } from '../../pages/alertsPages/alertTemplatesPage.js';
 import { AlertDestinationsPage } from '../../pages/alertsPages/alertDestinationsPage.js';
 import { CommonActions } from '../../pages/commonActions.js';
+import DashboardFolder from '../../pages/dashboardPages/dashboard-folder.js';
 
 /**
  * Helper function for login
@@ -32,6 +33,7 @@ test.describe("Alerts E2E Flow", () => {
   let templatesPage;
   let destinationsPage;
   let commonActions;
+  let dashboardFolders;
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
@@ -49,6 +51,7 @@ test.describe("Alerts E2E Flow", () => {
     templatesPage = new AlertTemplatesPage(page);
     destinationsPage = new AlertDestinationsPage(page);
     commonActions = new CommonActions(page);
+    dashboardFolders = new DashboardFolder(page);
     await page.waitForTimeout(5000);
 
     // Generate shared random value if not already generated
@@ -77,6 +80,13 @@ test.describe("Alerts E2E Flow", () => {
   test('Alerts E2E Flow - Create, Update, Move, Clone, Delete, Pause, Resume', {
     tag: ['@e2eAlerts', '@all', '@alerts']
   }, async ({ page }) => {
+    // Initialize page objects
+    alertsPage = new AlertsPage(page);
+    templatesPage = new AlertTemplatesPage(page);
+    destinationsPage = new AlertDestinationsPage(page);
+    commonActions = new CommonActions(page);
+    dashboardFolders = new DashboardFolder(page);
+    
     // Test data setup
     const streamName = 'auto_playwright_stream';
     const column = 'job';
@@ -145,9 +155,16 @@ test.describe("Alerts E2E Flow", () => {
     const targetFolderName = 'testfoldermove';
     await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
     await alertsPage.moveAllAlertsToFolder(targetFolderName);
+    await page.waitForTimeout(2000);
+
+    await dashboardFolders.searchFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await dashboardFolders.deleteFolder(folderName);
 
     // Verify alerts in target folder
     await page.waitForTimeout(2000);
+    await dashboardFolders.searchFolder(targetFolderName);
+    await expect(page.locator(`text=${targetFolderName}`)).toBeVisible();
     await alertsPage.navigateToFolder(targetFolderName);
     await page.waitForTimeout(2000);
 

@@ -4,6 +4,7 @@ import { AlertsPage } from '../../pages/alertsPages/alertsPage.js';
 import { AlertTemplatesPage } from '../../pages/alertsPages/alertTemplatesPage.js';
 import { AlertDestinationsPage } from '../../pages/alertsPages/alertDestinationsPage.js';
 import { CommonActions } from '../../pages/commonActions.js';
+import DashboardFolder from '../../pages/dashboardPages/dashboard-folder.js';
 
 /**
  * Helper function for login
@@ -33,6 +34,7 @@ test.describe("Alerts Import/Export", () => {
   let destinationsPage;
   let commonActions;
   let sharedRandomValue;
+  let dashboardFolders;
 
   /**
    * Setup for each test
@@ -78,6 +80,7 @@ test.describe("Alerts Import/Export", () => {
     templatesPage = new AlertTemplatesPage(page);
     destinationsPage = new AlertDestinationsPage(page);
     commonActions = new CommonActions(page);
+    dashboardFolders = new DashboardFolder(page);
 
     // Create template
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
@@ -122,6 +125,11 @@ test.describe("Alerts Import/Export", () => {
 
     // Clean up imported alert
     await alertsPage.deleteImportedAlert(alertName);
+
+    await dashboardFolders.searchFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await dashboardFolders.deleteFolder(folderName);
+
     await alertsPage.cleanupDownloadedFile(downloadPath);
   });
 
@@ -137,6 +145,7 @@ test.describe("Alerts Import/Export", () => {
     templatesPage = new AlertTemplatesPage(page);
     destinationsPage = new AlertDestinationsPage(page);
     commonActions = new CommonActions(page);
+    dashboardFolders = new DashboardFolder(page);
 
     // Test URLs
     const webhookTemplateUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Webhook_Template_Import.json';
@@ -209,6 +218,7 @@ test.describe("Alerts Import/Export", () => {
     templatesPage = new AlertTemplatesPage(page);
     destinationsPage = new AlertDestinationsPage(page);
     commonActions = new CommonActions(page);
+    dashboardFolders = new DashboardFolder(page);
 
     // Create webhook template for webhook destination
     const webhookTemplateName = 'auto_webhook_template_' + sharedRandomValue;

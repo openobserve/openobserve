@@ -4,6 +4,7 @@ import { AlertsPage } from '../../pages/alertsPages/alertsPage.js';
 import { AlertTemplatesPage } from '../../pages/alertsPages/alertTemplatesPage.js';
 import { AlertDestinationsPage } from '../../pages/alertsPages/alertDestinationsPage.js';
 import { CommonActions } from '../../pages/commonActions.js';
+import DashboardFolder from '../../pages/dashboardPages/dashboard-folder.js';
 
 /**
  * Helper function for login
@@ -35,6 +36,7 @@ test.describe("Alerts UI Operations", () => {
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
+  let dashboardFolders;
 
   /**
    * Setup for each test
@@ -117,6 +119,7 @@ test.describe("Alerts UI Operations", () => {
   test('Create and Delete Scheduled Alert with SQL Query', {
     tag: ['@scheduledAlerts', '@all', '@alerts']
   }, async ({ page }) => {
+    dashboardFolders = new DashboardFolder(page);
     const streamName = 'auto_playwright_stream';
 
     // Ensure prerequisites exist
@@ -147,6 +150,9 @@ test.describe("Alerts UI Operations", () => {
 
     // Clean up
     await alertsPage.deleteAlertByRow(alertName);
+    await dashboardFolders.searchFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await dashboardFolders.deleteFolder(folderName);
   });
 
   /**
@@ -161,6 +167,7 @@ test.describe("Alerts UI Operations", () => {
     templatesPage = new AlertTemplatesPage(page);
     destinationsPage = new AlertDestinationsPage(page);
     commonActions = new CommonActions(page);
+    dashboardFolders = new DashboardFolder(page);
 
     // Create template
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
@@ -240,8 +247,13 @@ test.describe("Alerts UI Operations", () => {
     await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
     await alertsPage.moveAllAlertsToFolder(targetFolderName);
 
+    await dashboardFolders.searchFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await dashboardFolders.deleteFolder(folderName);
+
     // Verify alerts in target folder
     await page.waitForTimeout(2000);
+    await dashboardFolders.searchFolder(targetFolderName);
     await alertsPage.navigateToFolder(targetFolderName);
     await page.waitForTimeout(2000);
 

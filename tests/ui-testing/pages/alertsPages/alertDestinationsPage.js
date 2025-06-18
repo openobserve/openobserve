@@ -134,57 +134,8 @@ export class AlertDestinationsPage {
         await this.page.locator(this.destinationImportJsonBtn).click();
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
         await this.page.locator(this.destinationImportTemplateInput).click();
+        await this.commonActions.scrollAndFindOption(templateName, 'template');
         
-        // Scroll through template list to find the template
-        const dropdown = this.page.locator('.q-menu');
-        let templateFound = false;
-        let maxScrolls = 20;
-        let scrollAmount = 300;
-        let totalScrolled = 0;
-
-        while (!templateFound && maxScrolls > 0) {
-            try {
-                const template = this.page.getByText(templateName, { exact: true });
-                if (await template.isVisible()) {
-                    await template.click();
-                    templateFound = true;
-                    console.log(`Found template after scrolling: ${templateName}`);
-                    await this.page.waitForTimeout(1000);
-                } else {
-                    // Get the current scroll position and height
-                    const { scrollTop, scrollHeight, clientHeight } = await dropdown.evaluate(el => ({
-                        scrollTop: el.scrollTop,
-                        scrollHeight: el.scrollHeight,
-                        clientHeight: el.clientHeight
-                    }));
-
-                    // If we've scrolled to the bottom, start from the top again
-                    if (scrollTop + clientHeight >= scrollHeight) {
-                        await dropdown.evaluate(el => el.scrollTop = 0);
-                        totalScrolled = 0;
-                        await this.page.waitForTimeout(1000);
-                    } else {
-                        // Scroll down
-                        await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
-                        totalScrolled += scrollAmount;
-                        await this.page.waitForTimeout(1000);
-                    }
-                    maxScrolls--;
-                }
-            } catch (error) {
-                // If template not found, scroll and try again
-                await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
-                totalScrolled += scrollAmount;
-                await this.page.waitForTimeout(1000);
-                maxScrolls--;
-            }
-        }
-
-        if (!templateFound) {
-            console.error(`Failed to find template ${templateName} after scrolling ${totalScrolled}px`);
-            throw new Error(`Template ${templateName} not found in dropdown after scrolling`);
-        }
-
         await this.page.locator(this.destinationImportNameInput).click();
         await this.page.locator(this.destinationImportNameInput).fill(destinationName);
         await this.page.locator(this.destinationImportJsonBtn).click();
@@ -226,57 +177,8 @@ export class AlertDestinationsPage {
         await this.page.locator(this.destinationImportJsonBtn).click();
         await this.page.waitForTimeout(1000); // Wait for error message
         await this.page.locator(this.destinationImportTemplateInput).click();
+        await this.commonActions.scrollAndFindOption(templateName, 'template');
         
-        // Scroll through template list to find the template
-        const dropdown = this.page.locator('.q-menu');
-        let templateFound = false;
-        let maxScrolls = 20;
-        let scrollAmount = 300;
-        let totalScrolled = 0;
-
-        while (!templateFound && maxScrolls > 0) {
-            try {
-                const template = this.page.getByText(templateName, { exact: true });
-                if (await template.isVisible()) {
-                    await template.click();
-                    templateFound = true;
-                    console.log(`Found template after scrolling: ${templateName}`);
-                    await this.page.waitForTimeout(1000);
-                } else {
-                    // Get the current scroll position and height
-                    const { scrollTop, scrollHeight, clientHeight } = await dropdown.evaluate(el => ({
-                        scrollTop: el.scrollTop,
-                        scrollHeight: el.scrollHeight,
-                        clientHeight: el.clientHeight
-                    }));
-
-                    // If we've scrolled to the bottom, start from the top again
-                    if (scrollTop + clientHeight >= scrollHeight) {
-                        await dropdown.evaluate(el => el.scrollTop = 0);
-                        totalScrolled = 0;
-                        await this.page.waitForTimeout(1000);
-                    } else {
-                        // Scroll down
-                        await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
-                        totalScrolled += scrollAmount;
-                        await this.page.waitForTimeout(1000);
-                    }
-                    maxScrolls--;
-                }
-            } catch (error) {
-                // If template not found, scroll and try again
-                await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
-                totalScrolled += scrollAmount;
-                await this.page.waitForTimeout(1000);
-                maxScrolls--;
-            }
-        }
-
-        if (!templateFound) {
-            console.error(`Failed to find template ${templateName} after scrolling ${totalScrolled}px`);
-            throw new Error(`Template ${templateName} not found in dropdown after scrolling`);
-        }
-
         await this.page.locator(this.destinationImportNameInput).click();
         await this.page.locator(this.destinationImportNameInput).fill(destinationName);
         await this.page.locator(this.destinationImportJsonBtn).click();
