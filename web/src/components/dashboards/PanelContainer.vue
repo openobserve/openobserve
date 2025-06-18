@@ -603,14 +603,6 @@ export default defineComponent({
       const { sqlParser }: any = useSqlParser.default();
       parser = await sqlParser();
     };
-    const parseQuery = async (originalQuery: string, parser: any) => {
-      try {
-        return parser.astify(originalQuery);
-      } catch (error) {
-        console.error("Failed to parse query:", error);
-        return null;
-      }
-    };
 
     const onLogPanel = async () => {
       const queryDetails = props.data;
@@ -626,9 +618,6 @@ export default defineComponent({
       if (!parser) {
         await importSqlParser();
       }
-
-      const ast = await parseQuery(originalQuery, parser);
-      if (!ast) return;
 
       let modifiedQuery = originalQuery;
 
