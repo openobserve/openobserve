@@ -87,7 +87,7 @@ export default class ChartTypeSelector {
     await button.click();
     //    // Clear the search input after adding the field
     // await page.getByLabel("Clear").click();
-
+    await this.page.waitForTimeout(1000); // Wait for any UI updates
     await this.page.getByLabel("Clear").click();
   }
 
