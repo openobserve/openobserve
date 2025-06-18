@@ -1144,6 +1144,20 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
+      if (runCount == 0) {
+        log("loadData: panelcache: run count is 0");
+        // restore from the cache and return
+        const isRestoredFromCache = await restoreFromCache();
+        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
+        if (isRestoredFromCache) {
+          state.loading = false;
+          state.isOperationCancelled = false;
+          log("loadData: panelcache: restored from cache");
+          runCount++;
+          return;
+        }
+      }
+
       // Wait for isVisible to become true
       await waitForThePanelToBecomeVisible(abortController.signal);
 
@@ -1169,20 +1183,6 @@ export const usePanelDataLoader = (
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
-      }
-
-      if (runCount == 0) {
-        log("loadData: panelcache: run count is 0");
-        // restore from the cache and return
-        const isRestoredFromCache = await restoreFromCache();
-        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
-        if (isRestoredFromCache) {
-          state.loading = false;
-          state.isOperationCancelled = false;
-          log("loadData: panelcache: restored from cache");
-          runCount++;
-          return;
-        }
       }
 
       log(
