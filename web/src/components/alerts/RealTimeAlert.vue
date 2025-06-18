@@ -147,7 +147,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="width: 200px"
                   @filter="filterDestinations"
                   @update:model-value="updateDestinations"
+                  @popup-show="isDestinationDropdownOpen = true"
+                  @popup-hide="isDestinationDropdownOpen = false"
                 >
+                  <q-tooltip
+                    v-if="!isDestinationDropdownOpen && destinations.length > 0"
+                    anchor="top middle"
+                    self="bottom middle"
+                    :offset="[0, 8]"
+                    max-width="300px"
+                  >
+                    {{ destinations }}
+                  </q-tooltip>
                   <template v-slot:option="option">
                     <q-list dense>
                       <q-item
@@ -250,6 +261,8 @@ const filteredDestinations = ref(props.formattedDestinations)
 const inputData = ref(props.conditions);
 
 const destinationSelectRef = ref(null);
+
+const isDestinationDropdownOpen = ref(false);
 
 watch(()=> destinations.value, (newVal, oldVal)=>{
   //check if the newVal length is greater than oldVal length

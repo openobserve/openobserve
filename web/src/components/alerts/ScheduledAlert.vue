@@ -773,13 +773,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div data-test="add-alert-destination-select">
                 <q-select
-                ref="destinationSelectRef"
-                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                  ref="destinationSelectRef"
+                  :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                   v-model="destinations"
                   :options="filteredDestinations"
                   :input-debounce="300"
                   color="input-border"
-                  bg-color="input-bg "
+                  bg-color="input-bg"
                   class="no-case"
                   stack-label
                   outlined
@@ -788,14 +788,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   multiple
                   use-input
                   fill-input
-                  @filter="filterDestinations"
                   :rules="[(val: any) =>{
                     return val.length > 0 || 'Field is required!'
                   }]"
                   :required="true"
                   style="width: 200px"
+                  @filter="filterDestinations"
                   @update:model-value="updateDestinations"
+                  @popup-show="isDestinationDropdownOpen = true"
+                  @popup-hide="isDestinationDropdownOpen = false"
                 >
+                  <q-tooltip
+                    v-if="!isDestinationDropdownOpen && destinations.length > 0"
+                    anchor="top middle"
+                    self="bottom middle"
+                    :offset="[0, 8]"
+                    max-width="300px"
+                  >
+                    {{ destinations }}
+                  </q-tooltip>
                   <template v-slot:option="option">
                     <q-list dense>
                       <q-item
@@ -1685,6 +1696,7 @@ const cronJobError = ref("");
 
 const expandState = ref(props.expandState);
 
+const isDestinationDropdownOpen = ref(false);
 
 onMounted(()=>{
   if(dateTimePicker.value.length > 0){
