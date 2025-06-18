@@ -33,6 +33,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         );
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }
+    log::info!("done updating stream stats from file list");
     Ok(None)
 }
 
