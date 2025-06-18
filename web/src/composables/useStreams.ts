@@ -15,20 +15,35 @@
 
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
-import { reactive } from "vue";
+import { computed, ComputedRef, reactive } from "vue";
 import { ref } from "vue";
 import { useQuasar } from "quasar";
-
-let streams: any = reactive({});
-
-let streamsIndexMapping: any = reactive({});
-
-const areAllStreamsFetched = ref(false);
+import { deepCopy } from "@/utils/zincutils";
 
 const getStreamsPromise: any = ref(null);
 
 const useStreams = () => {
+
   const store = useStore();
+  
+
+  const updateStreamsInStore = (streamType: string, streams: any) => {
+    store.dispatch('streams/setStreams', { streamType, streams });
+  }
+
+  const updateStreamIndexMappingInStore = (streamIndexMapping: any) => {
+    console.log("updateStreamIndexMappingInStore", streamIndexMapping);
+    store.commit('streams/updateStreamIndexMapping', streamIndexMapping);
+  }
+
+  const updateStreamsFetchedInStore = (areAllStreamsFetched: any) => {
+    store.commit('streams/updateStreamsFetched', areAllStreamsFetched);
+  }
+
+  const streamsCache = (streamType: string) => {
+    console.log("streamsCache", store.state.streams.streams);
+    return store.state.streams.streams?.[streamType] || null;
+  }
 
   const q = useQuasar();
 
@@ -40,6 +55,7 @@ const useStreams = () => {
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
 
+      console.log("getStreams", streamName, schema);
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
@@ -70,7 +86,7 @@ const useStreams = () => {
             ];
 
             const streamsToFetch = streamList.filter(
-              (_stream) => !streams[_stream]
+              (_streamType) => !!!streamsCache(_streamType)
             );
 
             getStreamsPromise.value = Promise.allSettled(
@@ -91,9 +107,9 @@ const useStreams = () => {
                   }
                 });
 
-                areAllStreamsFetched.value = streamList.every(
-                  (stream) => !!streams[stream]
-                );
+                updateStreamsFetchedInStore(streamList.every(
+                  (stream) => !!streamsCache(stream)
+                ));
 
                 getStreamsPromise.value = null;
 
@@ -114,6 +130,7 @@ const useStreams = () => {
             );
             getStreamsPromise.value
               .then((res: any) => {
+                console.log("res", res);
                 setStreams(streamName, res.data.list);
                 const streamData = {
                   name: streamName,
@@ -134,10 +151,11 @@ const useStreams = () => {
           if (streamName === "all") {
             resolve(getAllStreamsPayload());
           } else {
-            resolve(streams[streamName]);
+            resolve(deepCopy(streamsCache(streamName) || {}));
           }
         }
       } catch (e: any) {
+        console.log("e", e);
         reject(new Error(e.message));
       }
     });
@@ -213,8 +231,9 @@ const useStreams = () => {
     streamObject.name = "all";
     streamObject.schema = false;
 
-    Object.keys(streams).forEach((key) => {
-      streamObject.list.push(...streams[key].list);
+    Object.keys(streamsCache).forEach((key) => {
+      console.log("key", key, streamsCache(key));
+      streamObject.list.push(...deepCopy(streamsCache(key)?.list || []));
     });
 
     return streamObject;
@@ -245,18 +264,22 @@ const useStreams = () => {
         }
       }
 
+      console.log("store.state.streams", streamsCache(streamType));
+      console.log("streamType", streamType, store.state.streams.streamsIndexMapping[streamType]);
       try {
         if (
-          streams[streamType] &&
-          streams[streamType].list.length &&
+          streamsCache(streamType) &&
+          streamsCache(streamType)?.list?.length &&
           Object.prototype.hasOwnProperty.call(
-            streamsIndexMapping[streamType],
+           store.state.streams.streamsIndexMapping[streamType],
             streamName
           )
         ) {
-          const streamIndex = streamsIndexMapping[streamType][streamName];
-          const hasSchema = !!streams[streamType].list[streamIndex]?.schema;
 
+          const streamIndex = store.state.streams.streamsIndexMapping[streamType][streamName];
+          const hasSchema = !!streamsCache(streamType)?.list[streamIndex]?.schema;
+
+          console.log(streamIndex, hasSchema, schema, force);
           if ((schema && !hasSchema) || force) {
             try {
               const _stream: any = await StreamService.schema(
@@ -264,14 +287,18 @@ const useStreams = () => {
                 streamName,
                 streamType
               );
-              streams[streamType].list[streamIndex] = removeSchemaFields(
+              console.log("stream", _stream);
+              const streamList = deepCopy(streamsCache(streamType)?.list || []);
+              streamList[streamIndex] = removeSchemaFields(
                 _stream.data
               );
+              updateStreamsInStore(streamType, streamList);
             } catch (err) {
               return reject("Error while fetching schema");
             }
           }
-          return resolve(streams[streamType].list[streamIndex]);
+          console.log("streamsCache[streamType].value?.list[streamIndex]", streamsCache(streamType)?.list[streamIndex]);
+          return resolve(deepCopy(streamsCache(streamType)?.list[streamIndex] || {}));
         } else {
           // await StreamService.schema(
           //   store.state.selectedOrganization.identifier,
@@ -309,15 +336,15 @@ const useStreams = () => {
         try {
           // Check if the stream exists and has been indexed.
           if (
-            streams[streamType] &&
-            streams[streamType].list.length &&
+            streamsCache(streamType) &&
+            streamsCache(streamType)?.list?.length &&
             Object.prototype.hasOwnProperty.call(
-              streamsIndexMapping[streamType],
+              store.state.streams.streamsIndexMapping[streamType],
               streamName
             )
           ) {
-            const streamIndex = streamsIndexMapping[streamType][streamName];
-            const hasSchema = !!streams[streamType].list[streamIndex]?.schema;
+            const streamIndex = store.state.streams.streamsIndexMapping[streamType][streamName];
+            const hasSchema = !!streamsCache(streamType)?.list[streamIndex]?.schema;
 
             // If schema is requested but not present, fetch and update it.
             if (schema && !hasSchema) {
@@ -327,16 +354,19 @@ const useStreams = () => {
                 streamType
               );
 
-              streams[streamType].list[streamIndex] = removeSchemaFields(
+              console.log("fetchedStream", streamsCache(streamType)?.list[streamIndex]);
+              const streamList = deepCopy(streamsCache(streamType)?.list || []);
+              streamList[streamIndex] = removeSchemaFields(
                 fetchedStream.data
               );
+              updateStreamsInStore(streamType, streamList);
             }
           }
 
           // Return the stream object (with or without updated schema).
-          return streams[streamType]?.list[
-            streamsIndexMapping[streamType][streamName]
-          ];
+          const streamIndex = store.state.streams.streamsIndexMapping[streamType][streamName];
+          console.log("streamIndex", streamIndex, streamsCache(streamType)?.list[streamIndex]);
+          return deepCopy(streamsCache(streamType)?.list[streamIndex] || {});
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
           throw new Error(e.message);
@@ -357,15 +387,17 @@ const useStreams = () => {
   const isStreamFetched = (streamType: string) => {
     let isStreamFetched = false;
     if (streamType === "all") {
-      isStreamFetched = areAllStreamsFetched.value;
+      isStreamFetched = store.state.streams.areStreamsFetched;
     } else {
-      isStreamFetched = !!streams[streamType];
+      isStreamFetched = !!streamsCache(streamType);
     }
 
     return isStreamFetched;
   };
 
   const setStreams = (streamName: string = "all", streamList: any[] = []) => {
+    console.log("isStreamFetched", isStreamFetched(streamName || "all"));
+    console.log("streamName", streamName);
     if (isStreamFetched(streamName || "all")) return;
 
     if (!store.state.organizationData.isDataIngested && !!streamList.length)
@@ -376,38 +408,67 @@ const useStreams = () => {
     streamObject.list = streamList;
     streamObject.schema = false;
 
+    console.log("streamObject", streamObject);
+
     // If the stream name is all, then we need to store each type of stream separately manually
     if (streamName === "all") {
-      streams = reactive({});
+      Object.keys(streamsCache).forEach((key) => {
+        updateStreamsInStore(key, {});
+      });
 
       streamList.forEach((stream: any) => {
-        if (streams[stream.stream_type]) {
-          streams[stream.stream_type].list.push(stream);
+        if (!!streamsCache(stream.stream_type)) {
+          const streamList = deepCopy(streamsCache(stream.stream_type)?.list || []);
+          streamList.push(stream);
+          updateStreamsInStore(stream.stream_type, streamList);
         } else {
-          streams[stream.stream_type] = {
+          updateStreamsInStore(stream.stream_type, {
             name: stream.stream_type,
             list: [stream],
             schema: false,
-          };
+          });
         }
       });
     } else {
-      streams[streamName] = streamObject;
+      updateStreamsInStore(streamName, deepCopy(streamObject));
     }
 
     // Mapping stream index for each stream type
     if (streamName === "all") {
-      streamsIndexMapping = reactive({});
-      Object.keys(streams).forEach((key) => {
-        streamsIndexMapping[key] = {};
-        streams[key].list.forEach((stream: any, index: number) => {
-          streamsIndexMapping[key][stream.name] = index;
+      updateStreamIndexMappingInStore({});
+      Object.keys(streamsCache).forEach((key) => {
+        const streamIndexMapping = deepCopy(store.state.streams.streamsIndexMapping || {});
+        streamIndexMapping[key] = {};
+
+        console.log("streamIndexMapping", deepCopy(streamIndexMapping));
+
+        updateStreamIndexMappingInStore(deepCopy(streamIndexMapping || {}));
+
+        streamsCache(key)?.list?.forEach((stream: any, index: number) => {
+          streamIndexMapping[key][stream.name] = index;
+
+          console.log("streamIndexMapping", deepCopy(streamIndexMapping));
+
+          updateStreamIndexMappingInStore(deepCopy(streamIndexMapping || {}));
         });
       });
     } else {
-      streamsIndexMapping[streamName] = {};
-      streams[streamName].list.forEach((stream: any, index: number) => {
-        streamsIndexMapping[streamName][stream.name] = index;
+      const streamIndexMapping = deepCopy(store.state.streams.streamsIndexMapping || {});
+      streamIndexMapping[streamName] = {};
+      console.log("streamIndexMapping", deepCopy(streamIndexMapping));
+
+      console.log("streamIndexMapping", deepCopy(streamIndexMapping));
+
+      updateStreamIndexMappingInStore(streamIndexMapping);
+
+
+      console.log("streamsCache[streamName].value?.list", streamsCache(streamName));
+      streamsCache(streamName)?.list?.forEach((stream: any, index: number) => {
+        streamIndexMapping[streamName][stream.name] = index;
+
+        console.log("streamIndexMapping", deepCopy(streamIndexMapping));
+
+        updateStreamIndexMappingInStore(streamIndexMapping);
       });
     }
 
@@ -431,55 +492,74 @@ const useStreams = () => {
   const removeStream = (streamName: string, streamType: string) => {
     if (
       Object.prototype.hasOwnProperty.call(
-        streamsIndexMapping[streamType],
+        store.state.streams.streamsIndexMapping[streamType],
         streamName
       )
     ) {
-      const indexToRemove = streamsIndexMapping[streamType][streamName];
+      const indexToRemove = store.state.streams.streamsIndexMapping[streamType][streamName];
 
       // Deleting stream index that was mapped
-      delete streamsIndexMapping[streamType][streamName];
+      delete store.state.streams.streamsIndexMapping[streamType][streamName];
 
       if (
         indexToRemove >= 0 &&
-        indexToRemove < streams[streamType].list.length
+        indexToRemove < streamsCache(streamType)?.list?.length
       ) {
         for (
           let i = indexToRemove;
-          i < streams[streamType].list.length - 1;
+          i < streamsCache(streamType)?.list?.length - 1;
           i++
         ) {
           // Shift each element one position to the left
-          streams[streamType].list[i] = streams[streamType].list[i + 1];
-          streamsIndexMapping[streamType][streams[streamType].list[i].name] = i;
+          const streamList = deepCopy(streamsCache(streamType)?.list || []);
+          streamList[i] = streamList[i + 1];
+
+          const streamIndexMapping = deepCopy(store.state.streams.streamsIndexMapping || {});
+          streamIndexMapping[streamType][streamList[i].name] = i;
+
+          console.log("streamIndexMapping", deepCopy(streamIndexMapping));
+
+          updateStreamIndexMappingInStore(streamIndexMapping);
         }
         // Remove the last element since it's now duplicated
-        streams[streamType].list.length = streams[streamType].list.length - 1;
+        const streamList = deepCopy(streamsCache(streamType)?.list || []);
+        streamList.length = streamList.length - 1;
+        updateStreamsInStore(streamType, streamList);
       }
     }
   };
 
   const addStream = async (stream: any) => {
     if (
-      !!streams[stream.stream_type] &&
-      streamsIndexMapping[stream.stream_type][stream.name] >= 0
+      !!streamsCache(stream.stream_type) &&
+      store.state.streams.streamsIndexMapping[stream.stream_type][stream.name] >= 0
     )
       return;
 
     // If that stream type is not present create that stream
-    if (!streams[stream.stream_type]) {
+    if (!streamsCache(stream.stream_type)) {
       getStream(stream.name, stream.stream_type, true);
     } else {
-      streams[stream.stream_type].list.push(stream);
-      streamsIndexMapping[stream.stream_type][stream.name] =
-        streams[stream.stream_type].list.length - 1;
+      const streamList = deepCopy(streamsCache(stream.stream_type)?.list || []);
+      streamList.push(stream);
+      
+      const streamIndexMapping = deepCopy(store.state.streams.streamsIndexMapping);
+      streamIndexMapping[stream.stream_type][stream.name] =
+        streamList.length - 1;
+
+        console.log("streamIndexMapping", deepCopy(streamIndexMapping));
+
+      updateStreamIndexMappingInStore(streamIndexMapping);
+      updateStreamsInStore(stream.stream_type, streamList);
     }
   };
 
   const resetStreams = () => {
-    streams = reactive({});
-    streamsIndexMapping = reactive({});
-    areAllStreamsFetched.value = false;
+    Object.keys(streamsCache).forEach((key) => {
+      updateStreamsInStore(key, {});
+    });
+    updateStreamIndexMappingInStore({});
+    updateStreamsFetchedInStore(false);
     getStreamsPromise.value = null;
     store.dispatch("setIsDataIngested", false);
   };
@@ -635,10 +715,10 @@ const useStreams = () => {
     return updatedSettings;
   };
 
-  const resetStreamType = (streamType="") => {
+  const resetStreamType = (streamType: string = "") => {
     try {
-      if (streamType != "" && Object.hasOwn(streams, streamType)) {
-        delete streams[streamType];
+      if (streamType != "" && streamsCache(streamType)) {
+        updateStreamsInStore(streamType, {});
       }
     } catch (e) {
       console.log("Error while clearing local cache for stream type.", e);
