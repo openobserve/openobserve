@@ -149,7 +149,7 @@ const useStreams = () => {
           if (streamName === "all") {
             resolve(getAllStreamsPayload());
           } else {
-            resolve(deepCopy(streamsCache[streamName].value || {}));
+            resolve(streamsCache[streamName].value || {});
           }
         }
       } catch (e: any) {
@@ -226,7 +226,7 @@ const useStreams = () => {
     streamObject.schema = false;
 
     Object.keys(streamsCache).forEach((key) => {
-      streamObject.list.push(...deepCopy(streamsCache[key].value?.list || []));
+      streamObject.list.push(...(streamsCache[key].value?.list || []));
     });
 
     return streamObject;
@@ -287,7 +287,7 @@ const useStreams = () => {
             }
           }
           return resolve(
-            deepCopy(streamsCache[streamType].value?.list[streamIndex] || {}),
+            (streamsCache[streamType].value?.list[streamIndex] || {}),
           );
         } else {
           // await StreamService.schema(
@@ -357,8 +357,8 @@ const useStreams = () => {
           // Return the stream object (with or without updated schema).
           const streamIndex =
             store.state.streams.streamsIndexMapping[streamType][streamName];
-          return deepCopy(
-            streamsCache[streamType].value?.list[streamIndex] || {},
+          return (
+            streamsCache[streamType].value?.list[streamIndex] || {}
           );
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
@@ -437,25 +437,22 @@ const useStreams = () => {
         );
         streamIndexMapping[key] = {};
 
-        updateStreamIndexMappingInStore(deepCopy(streamIndexMapping || {}));
-
         streamsCache[key].value?.list.forEach((stream: any, index: number) => {
           streamIndexMapping[key][stream.name] = index;
-          updateStreamIndexMappingInStore(deepCopy(streamIndexMapping || {}));
         });
+        updateStreamIndexMappingInStore(streamIndexMapping || {});
       });
     } else {
       const streamIndexMapping = deepCopy(
         store.state.streams.streamsIndexMapping || {},
       );
       streamIndexMapping[streamName] = {};
-      updateStreamIndexMappingInStore(streamIndexMapping);
       streamsCache[streamName].value?.list.forEach(
         (stream: any, index: number) => {
           streamIndexMapping[streamName][stream.name] = index;
-          updateStreamIndexMappingInStore(streamIndexMapping);
         },
       );
+      updateStreamIndexMappingInStore(streamIndexMapping);
     }
 
     return streamObject;
