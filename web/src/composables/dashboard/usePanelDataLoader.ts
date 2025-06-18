@@ -74,9 +74,9 @@ export const usePanelDataLoader = (
   reportId: any,
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (true) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
   let runCount = 0;
 
@@ -242,13 +242,16 @@ export const usePanelDataLoader = (
   // an async function that waits for the panel to become visible
   const waitForThePanelToBecomeVisible = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
+      log("waitForThePanelToBecomeVisible: entering...");
       // Immediately resolve if forceLoad is true
       if (forceLoad.value == true) {
+        log("waitForThePanelToBecomeVisible: forceLoad is true, resolving...");
         resolve();
         return;
       }
       // Immediately resolve if isVisible is already true
       if (isVisible.value) {
+        log("waitForThePanelToBecomeVisible: isVisible is already true, resolving...");
         resolve();
         return;
       }
@@ -256,6 +259,7 @@ export const usePanelDataLoader = (
       // Watch for changes in isVisible
       const stopWatching = watch(isVisible, (newValue) => {
         if (newValue) {
+          log("waitForThePanelToBecomeVisible: isVisible is now true, resolving...");
           resolve();
           stopWatching(); // Stop watching once isVisible is true
         }
@@ -263,6 +267,7 @@ export const usePanelDataLoader = (
 
       // Listen to the abort signal
       signal.addEventListener("abort", () => {
+        log("waitForThePanelToBecomeVisible: abort signal received, stopping watch...");
         stopWatching(); // Stop watching on abort
         reject(new Error("Aborted waiting for loading"));
       });

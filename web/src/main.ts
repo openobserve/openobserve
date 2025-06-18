@@ -53,48 +53,48 @@ const getConfig = async () => {
   await configService.get_config().then((res: any) => {
     store.dispatch("setConfig", res.data);
     config.enableAnalytics = res.data.telemetry_enabled.toString();
-    if (res.data.rum.enabled) {
-      const options = {
-        clientToken: res.data.rum.client_token,
-        applicationId: res.data.rum.application_id,
-        site: res.data.rum.site,
-        service: res.data.rum.service,
-        env: res.data.rum.env,
-        version: res.data.rum.version || "0.0.1",
-        organizationIdentifier: res.data.rum.organization_identifier,
-        insecureHTTP: res.data.rum.insecure_http || false,
-        apiVersion: res.data.rum.api_version || "v1",
-      };
+    // if (res.data.rum.enabled) {
+    //   const options = {
+    //     clientToken: res.data.rum.client_token,
+    //     applicationId: res.data.rum.application_id,
+    //     site: res.data.rum.site,
+    //     service: res.data.rum.service,
+    //     env: res.data.rum.env,
+    //     version: res.data.rum.version || "0.0.1",
+    //     organizationIdentifier: res.data.rum.organization_identifier,
+    //     insecureHTTP: res.data.rum.insecure_http || false,
+    //     apiVersion: res.data.rum.api_version || "v1",
+    //   };
 
-      openobserveRum.init({
-        applicationId: options.applicationId, // required, any string identifying your application
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        trackResources: true,
-        trackLongTasks: true,
-        trackUserInteractions: true,
-        apiVersion: options.apiVersion,
-        insecureHTTP: options.insecureHTTP,
-      });
+    //   openobserveRum.init({
+    //     applicationId: options.applicationId, // required, any string identifying your application
+    //     clientToken: options.clientToken,
+    //     site: options.site,
+    //     organizationIdentifier: options.organizationIdentifier,
+    //     service: options.service,
+    //     env: options.env,
+    //     version: options.version,
+    //     trackResources: true,
+    //     trackLongTasks: true,
+    //     trackUserInteractions: true,
+    //     apiVersion: options.apiVersion,
+    //     insecureHTTP: options.insecureHTTP,
+    //   });
 
-      openobserveLogs.init({
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        forwardErrorsToLogs: true,
-        insecureHTTP: options.insecureHTTP,
-        apiVersion: options.apiVersion,
-      });
+    //   openobserveLogs.init({
+    //     clientToken: options.clientToken,
+    //     site: options.site,
+    //     organizationIdentifier: options.organizationIdentifier,
+    //     service: options.service,
+    //     env: options.env,
+    //     version: options.version,
+    //     forwardErrorsToLogs: true,
+    //     insecureHTTP: options.insecureHTTP,
+    //     apiVersion: options.apiVersion,
+    //   });
 
-      openobserveRum.startSessionReplayRecording();
-    }
+    //   openobserveRum.startSessionReplayRecording();
+    // }
   });
 };
 
