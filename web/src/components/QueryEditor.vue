@@ -140,6 +140,16 @@ export default defineComponent({
           "editor.border": "#000000",
         },
       });
+      monaco.editor.defineTheme("myDarkTheme", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+            { token: 'string.content.sql', foreground: 'FF6255' },
+            { token: 'string.sql', foreground: 'FF6255' }
+          ],
+
+        colors: {}
+      });
 
       // Dispose the provider if it already exists before registering a new one
       provider.value?.dispose();
@@ -166,7 +176,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+        theme: store.state.theme == "dark" ? "myDarkTheme" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
         folding: enableCodeFolding.value,
         wordWrap: "on",
@@ -270,6 +280,14 @@ export default defineComponent({
         await import(
           "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"
         );
+        monaco.languages.setMonarchTokensProvider("sql", {
+          tokenizer: {
+            root: [
+              [/'[^']+?'/, 'string.content'],
+              [/"[^"]+?"/, 'string.content']
+            ]
+          }
+        });
       }
 
       if (props.language === "json") {
@@ -338,7 +356,7 @@ export default defineComponent({
       () => store.state.theme,
       () => {
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+          store.state.theme == "dark" ? "myDarkTheme" : "myCustomTheme",
         );
       },
     );
