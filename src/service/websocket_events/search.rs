@@ -28,13 +28,15 @@ use config::{
     utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
+#[cfg(feature = "enterprise")]
+use {
+    crate::service::websocket_events::enterprise_utils,
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
+};
 
 use super::sort::order_search_results;
-#[allow(unused_imports)]
-use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
@@ -762,6 +764,7 @@ async fn process_delta(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
 
@@ -1073,6 +1076,7 @@ pub async fn do_partitioned_search(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
     Ok(())

@@ -641,6 +641,8 @@ pub async fn search_partition(
     } else {
         None
     };
+
+    #[cfg(feature = "enterprise")]
     if let Some(id) = &streaming_id {
         log::info!(
             "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
