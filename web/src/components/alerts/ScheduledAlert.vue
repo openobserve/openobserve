@@ -773,9 +773,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div data-test="add-alert-destination-select">
                 <q-select
+                ref="destinationSelectRef"
                  :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                   v-model="destinations"
-                  :options="formattedDestinations"
+                  :options="filteredDestinations"
+                  :input-debounce="300"
                   color="input-border"
                   bg-color="input-bg "
                   class="no-case"
@@ -786,6 +788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   multiple
                   use-input
                   fill-input
+                  @filter="filterDestinations"
                   :rules="[(val: any) =>{
                     return val.length > 0 || 'Field is required!'
                   }]"
@@ -1637,6 +1640,8 @@ const aggregationData = ref(props.aggregation);
 
 const destinations = ref(props.destinations);
 
+const destinationSelectRef = ref<any>(null);
+
 const isFullScreen = ref(false);
 
 const viewSqlEditor = ref(false);
@@ -1647,7 +1652,7 @@ const expandSqlOutput = ref(true);
 
 const expandCombinedOutput = ref(false);
 
-const formattedDestinations = ref(props.formattedDestinations);
+const filteredDestinations = ref(props.formattedDestinations)
 
 const filteredFields = ref(props.columns);
 
@@ -1855,6 +1860,15 @@ watch(
     functionOptions.value = [...functions];
   },
 );
+watch(()=> destinations.value, (newVal, oldVal)=>{
+  //check if the newVal length is greater than oldVal length
+  //then if any filter is applied then clear the input
+  if(newVal.length > oldVal.length){
+    //have to clear the input
+    //this runs every time if users types or not because setting the previous value ('') to ('') is same
+    destinationSelectRef.value.updateInputValue('');
+  }
+})
 
 const vrlFunctionContent = computed({
   get() {
@@ -2481,10 +2495,21 @@ const routeToCreateDestination = () => {
       vrlFunctionContent.value = "";
     };
 
+    const filterDestinations = (val: string, update: Function) => {
+      if (val === "") {
+        update(() => {
+          filteredDestinations.value = [...props.formattedDestinations];
+        });
+        return;
+      }
 
-
-
-
+      update(() => {
+        const needle = val.toLowerCase();
+        filteredDestinations.value = props.formattedDestinations.filter(
+          (destination: string) => destination.toLowerCase().includes(needle)
+        );
+      });
+    };
 
 
 defineExpose({
@@ -2517,7 +2542,10 @@ defineExpose({
   isHovered,
   getBtnLogo,
   convertMinutesToDisplayValue,
-  scheduledAlertRef
+  scheduledAlertRef,
+  filterDestinations,
+  filteredDestinations,
+  destinationSelectRef
 });
 </script>
 

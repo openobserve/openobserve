@@ -126,12 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div data-test="add-alert-destination-select">
                 <q-select
+                  ref="destinationSelectRef"
                   v-model="destinations"
-                  :options="formattedDestinations"
+                  :options="filteredDestinations"
+                  :input-debounce="300"
                   color="input-border"
                   class="no-case"
                   :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-
                   stack-label
                   outlined
                   filled
@@ -144,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }]"
                   :required="true"
                   style="width: 200px"
+                  @filter="filterDestinations"
                   @update:model-value="updateDestinations"
                 >
                   <template v-slot:option="option">
@@ -219,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import FieldsInput from "./FieldsInput.vue";
 import AlertsContainer from "./AlertsContainer.vue";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { useStore } from "vuex";
@@ -242,8 +244,22 @@ const triggerData = ref(props.trigger);
 
 const destinations = ref(props.destinations);
 
-const formattedDestinations = ref(props.formattedDestinations);
+
+const filteredDestinations = ref(props.formattedDestinations)
+
 const inputData = ref(props.conditions);
+
+const destinationSelectRef = ref(null);
+
+watch(()=> destinations.value, (newVal, oldVal)=>{
+  //check if the newVal length is greater than oldVal length
+  //then if any filter is applied then clear the input
+  if(newVal.length > oldVal.length){
+    //have to clear the input
+    //this runs every time if users types or not because setting the previous value ('') to ('') is same
+    destinationSelectRef.value.updateInputValue('');
+  }
+})
 
 
 const updateTrigger = () => {
@@ -291,6 +307,22 @@ function updateGroup(updatedGroup:any) {
       return getImageURL('images/alerts/conditions_image_light.svg')
     }
   })
+
+  const filterDestinations = (val: string, update: Function) => {
+    if (val === "") {
+      update(() => {
+        filteredDestinations.value = [...props.formattedDestinations];
+      });
+      return;
+    }
+
+    update(() => {
+      const needle = val.toLowerCase();
+      filteredDestinations.value = props.formattedDestinations.filter(
+        (destination: string) => destination.toLowerCase().includes(needle)
+      );
+    });
+  };
 </script>
 
 <style lang="scss" scoped></style>
