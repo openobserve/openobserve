@@ -62,6 +62,7 @@ use {
         create_aggregation_cache_file_path, generate_aggregation_cache_interval,
         get_aggregation_cache_key_from_request,
     },
+    o2_enterprise::enterprise::search::cache_aggs_util,
     o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
     std::collections::HashSet,
     tracing::info_span,
@@ -618,9 +619,20 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
-    let is_streaming_aggregate = ts_column.is_none()
-        && is_simple_aggregate_query(&req.sql).unwrap_or(false)
-        && cfg.common.feature_query_streaming_aggs;
+
+    let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
+
+    #[cfg(feature = "enterprise")]
+    {
+        let res: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
+            cache_aggs_util::analyze_count_aggregation_pattern(&req.sql);
+        if let Ok(result) = res {
+            is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
+        }
+    }
+
+    let is_streaming_aggregate =
+        ts_column.is_none() && is_cachable_aggs && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
     let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct && is_http_req;
