@@ -91,91 +91,91 @@ export default class DashboardFilter {
   }
   ///group inside grup filter method for that crewting this method ,but it isin progress
 
-  async addFilterCondition11(index, newFieldName, operator, value) {
-    const idx = String(index);
+  // async addFilterCondition11(index, newFieldName, operator, value) {
+  //   const idx = String(index);
 
-    // Step 1: Detect the dynamic field label if needed
+  //   // Step 1: Detect the dynamic field label if needed
 
-    const dynamicLabelLocator = this.page.locator("div.field_label").nth(index);
+  //   const dynamicLabelLocator = this.page.locator("div.field_label").nth(index);
 
-    await dynamicLabelLocator.waitFor({ state: "visible" });
+  //   await dynamicLabelLocator.waitFor({ state: "visible" });
 
-    const textContent = await dynamicLabelLocator.evaluate((el) => {
-      return Array.from(el.childNodes)
-        .filter((node) => node.nodeType === Node.TEXT_NODE)
-        .map((node) => node.textContent.trim())
-        .join("");
-    });
+  //   const textContent = await dynamicLabelLocator.evaluate((el) => {
+  //     return Array.from(el.childNodes)
+  //       .filter((node) => node.nodeType === Node.TEXT_NODE)
+  //       .map((node) => node.textContent.trim())
+  //       .join("");
+  //   });
 
-    const fieldLabelLocator = this.page.locator(
-      `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
-    );
-    // await fieldLabelLocator.waitFor({ state: "visible" });
-    // await this.page.waitForTimeout(3000); // waits for 1 second
+  //   const fieldLabelLocator = this.page.locator(
+  //     `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
+  //   );
+  //   // await fieldLabelLocator.waitFor({ state: "visible" });
+  //   // await this.page.waitForTimeout(3000); // waits for 1 second
 
-    await fieldLabelLocator.click();
+  //   await fieldLabelLocator.click();
 
-    // Step 2: Open and select from column dropdown
-    const columnLocator = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
-    );
-    await columnLocator.click();
-    await columnLocator.fill(newFieldName);
-    await this.page
-      .getByRole("option", { name: newFieldName, exact: true })
-      .first()
-      .click();
+  //   // Step 2: Open and select from column dropdown
+  //   const columnLocator = this.page.locator(
+  //     `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+  //   );
+  //   await columnLocator.click();
+  //   await columnLocator.fill(newFieldName);
+  //   await this.page
+  //     .getByRole("option", { name: newFieldName, exact: true })
+  //     .first()
+  //     .click();
 
-    // Step 3: Click the condition dropdown
-    if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
-      await conditionLocator.click();
-      await conditionLocator.click(); // for safety
-    }
+  //   // Step 3: Click the condition dropdown
+  //   if (operator || value) {
+  //     const conditionLocator = this.page.locator(
+  //       `[data-test="dashboard-add-condition-condition-${idx}"]`
+  //     );
+  //     await conditionLocator.click();
+  //     await conditionLocator.click(); // for safety
+  //   }
 
-    // Step 4: Operator selection — use `.first()` for 0 and `.last()` for others
-    if (operator) {
-      const operatorLocator =
-        index === 0
-          ? this.page
-              .locator('[data-test="dashboard-add-condition-operator"]')
-              .first()
-          : this.page
-              .locator('[data-test="dashboard-add-condition-operator"]')
-              .last();
+  //   // Step 4: Operator selection — use `.first()` for 0 and `.last()` for others
+  //   if (operator) {
+  //     const operatorLocator =
+  //       index === 0
+  //         ? this.page
+  //             .locator('[data-test="dashboard-add-condition-operator"]')
+  //             .first()
+  //         : this.page
+  //             .locator('[data-test="dashboard-add-condition-operator"]')
+  //             .last();
 
-      await operatorLocator.click();
-      await this.page
-        .getByRole("option", { name: operator, exact: true })
-        .first()
-        .click();
-    }
+  //     await operatorLocator.click();
+  //     await this.page
+  //       .getByRole("option", { name: operator, exact: true })
+  //       .first()
+  //       .click();
+  //   }
 
-    // Step 5: Fill the value field (if needed)
-    if (value) {
-      const valueInput =
-        index === 0
-          ? this.page.locator('[data-test="common-auto-complete"]').first()
-          : this.page.locator('[data-test="common-auto-complete"]').last();
+  //   // Step 5: Fill the value field (if needed)
+  //   if (value) {
+  //     const valueInput =
+  //       index === 0
+  //         ? this.page.locator('[data-test="common-auto-complete"]').first()
+  //         : this.page.locator('[data-test="common-auto-complete"]').last();
 
-      // await expect(valueInput).toBeVisible({ timeout: 10000 });
-      await valueInput.click();
-      await valueInput.fill(value);
+  //     // await expect(valueInput).toBeVisible({ timeout: 10000 });
+  //     await valueInput.click();
+  //     await valueInput.fill(value);
 
-      const suggestion = this.page
-        .locator('[data-test="common-auto-complete-option"]')
-        .first();
-      // await expect(suggestion).toBeVisible({ timeout: 10000 });
-      await suggestion.click();
-    } else if (operator && newFieldName) {
-      const expectedError = `Filter: ${newFieldName}: Condition value required`;
-      const errorMessage = this.page
-        .locator("div")
-        .filter({ hasText: expectedError });
-    }
-  }
+  //     const suggestion = this.page
+  //       .locator('[data-test="common-auto-complete-option"]')
+  //       .first();
+  //     // await expect(suggestion).toBeVisible({ timeout: 10000 });
+  //     await suggestion.click();
+  //   } else if (operator && newFieldName) {
+  //     const expectedError = `Filter: ${newFieldName}: Condition value required`;
+  //     const errorMessage = this.page
+  //       .locator("div")
+  //       .filter({ hasText: expectedError });
+  //   }
+  // }
 
   // Select List Filter Items in the test case we have to slect the itesm pass in Array
   //eg   ["ingress-nginx", "kube-system"]
@@ -212,6 +212,101 @@ export default class DashboardFilter {
 
       await option.waitFor({ state: "visible" });
       await option.click();
+    }
+  }
+
+  async addFilterCondition11(index, newFieldName, operator, value) {
+    const idx = String(index);
+
+    // Step 1: Get the dynamic label
+    const dynamicLabelLocator = this.page.locator("div.field_label").nth(index);
+    await dynamicLabelLocator.waitFor({ state: "visible" });
+
+    const textContent = await dynamicLabelLocator.evaluate((el) => {
+      return Array.from(el.childNodes)
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent.trim())
+        .join("");
+    });
+
+    console.log("Dynamic label text content:", textContent);
+    console.log("Index:", index, "Dynamic label text content:", textContent);
+
+    await this.page.waitForTimeout(1000); // waits for 1 second
+
+    const fieldLabelLocator = this.page.locator(
+      `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
+    );
+    await fieldLabelLocator.click();
+
+    // Step 2: Handle multiple matching elements for column dropdown
+    const allColumnLocators = this.page.locator(
+      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+    );
+    const count = await allColumnLocators.count();
+
+    const columnLocator =
+      count === 1
+        ? allColumnLocators.first()
+        : index === 0
+        ? allColumnLocators.first()
+        : allColumnLocators.last();
+
+    await columnLocator.click();
+    await columnLocator.fill(newFieldName);
+
+    await this.page
+      .getByRole("option", { name: newFieldName, exact: true })
+      .first()
+      .click();
+
+    // Step 3: Condition dropdown
+    if (operator || value) {
+      const conditionLocator = this.page.locator(
+        `[data-test="dashboard-add-condition-condition-${idx}"]`
+      );
+      await conditionLocator.click();
+      await conditionLocator.click(); // safety click
+    }
+
+    // Step 4: Operator dropdown
+    if (operator) {
+      const operatorLocator =
+        index === 0
+          ? this.page
+              .locator('[data-test="dashboard-add-condition-operator"]')
+              .first()
+          : this.page
+              .locator('[data-test="dashboard-add-condition-operator"]')
+              .last();
+
+      await operatorLocator.click();
+      await this.page
+        .getByRole("option", { name: operator, exact: true })
+        .first()
+        .click();
+    }
+
+    // Step 5: Fill value field
+    if (value) {
+      const valueInput =
+        index === 0
+          ? this.page.locator('[data-test="common-auto-complete"]').first()
+          : this.page.locator('[data-test="common-auto-complete"]').last();
+
+      await valueInput.click();
+      await valueInput.fill(value);
+
+      const suggestion = this.page
+        .locator('[data-test="common-auto-complete-option"]')
+        .first();
+      await suggestion.click();
+    } else if (operator && newFieldName) {
+      const expectedError = `Filter: ${newFieldName}: Condition value required`;
+      const errorMessage = this.page
+        .locator("div")
+        .filter({ hasText: expectedError });
+      // Optional: Assert here if needed
     }
   }
 }
