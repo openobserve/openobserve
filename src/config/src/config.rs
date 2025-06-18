@@ -2097,7 +2097,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check for calculate stats
     if cfg.limit.calculate_stats_step_limit < 1 {
-        cfg.limit.calculate_stats_step_limit = 10000;
+        cfg.limit.calculate_stats_step_limit = 100000;
     }
 
     Ok(())
