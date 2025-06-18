@@ -93,7 +93,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    if !cfg.common.mmdb_disable_download && !LOCAL_NODE.is_compactor() {
+    if !cfg.common.mmdb_disable_download
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager())
+    {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
@@ -168,7 +170,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::organization::org_settings_watch().await });
 
     // pipeline not used on compactors
-    if !LOCAL_NODE.is_compactor() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         tokio::task::spawn(async move { db::pipeline::watch().await });
     }
 
@@ -216,7 +218,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
 
     #[cfg(feature = "enterprise")]
-    if !LOCAL_NODE.is_compactor() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         db::session::cache()
             .await
             .expect("user session cache failed");
