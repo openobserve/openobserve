@@ -1,7 +1,6 @@
 export default {
     namespaced: true,
     state: {
-      streams: {},
       logs: {},
       metrics: {},
       traces: {},
