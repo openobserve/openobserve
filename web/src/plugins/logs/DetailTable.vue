@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card
     class="column full-height no-wrap searchdetaildialog"
     data-test="dialog-box"
+    key="search-result-detail-dialog-key"
   >
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">

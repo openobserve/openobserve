@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+
   <q-btn
     id="date-time-button"
     ref="datetimeBtn"
@@ -26,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon-right="arrow_drop_down"
     class="date-time-button"
     color=""
+    key="date-time-container"
   >
     <q-menu
       no-route-dismiss
