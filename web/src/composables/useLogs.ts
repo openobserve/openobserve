@@ -1498,7 +1498,16 @@ const useLogs = () => {
                 if (lastPartitionSize != rowsPerPage) {
                   recordSize = rowsPerPage - lastPartitionSize;
                 }
+
+                if (total == 0) {
+                  recordSize = 0;
+                }
+      
+                if (total !== -1 && total < recordSize) {
+                  recordSize = total;
+                }
               }
+
               if (!partitionDetail.paginations[pageNumber]) {
                 partitionDetail.paginations[pageNumber] = [];
               }
@@ -1581,29 +1590,6 @@ const useLogs = () => {
       return false;
     }
   };
-
-  /**
-   * This function is used to get the total pages for the single partition 
-   * This method handles the case where previous partition is not fully loaded and we are loading the next partition
-   * In this case, we need to add the size of the previous partition to the total size of the current partition for accurate total pages
-   * @param total - The total number of records in the partition
-   * @returns The total number of pages for the partition
-   */
-  const getPartitionTotalPages = (total: number) => {
-    const lastPage = searchObj.data.queryResults.partitionDetail.paginations?.length - 1;
-
-    let lastPartitionSize = 0;
-    let partitionTotal = 0;
-    for (const item of searchObj.data.queryResults.partitionDetail.paginations[lastPage]) {
-      lastPartitionSize += item.size;
-    }
-
-    if (lastPartitionSize < searchObj.meta.resultGrid.rowsPerPage) {
-        partitionTotal = total + lastPartitionSize;
-    }
-
-    return Math.ceil(partitionTotal / searchObj.meta.resultGrid.rowsPerPage);
-  }
 
 
   /**
@@ -3774,6 +3760,7 @@ const useLogs = () => {
       let plusSign: string = "";
       if (
         searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 &&
+        endCount < totalCount &&
         searchObj.meta.showHistogram == false
       ) {
         plusSign = "+";
@@ -5152,7 +5139,9 @@ const useLogs = () => {
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       
-      if(searchObj.meta.refreshInterval === 0) updatePageCountSearchSize(queryReq);
+      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval === 0) {
+        queryReq.query.size = queryReq.query.size + 1;
+      }
 
       // in case of live refresh, reset from to 0
       if (
@@ -5388,9 +5377,13 @@ const useLogs = () => {
       );
     } 
     
-    if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval === 0 && (searchObj.data.queryResults.hits.length === payload.queryReq.query.size)) {
-      searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, payload.queryReq.query.size - 1);
+    if (searchObj.meta.refreshInterval === 0) {
+      updatePageCountTotal(payload.queryReq, response.content.results.hits.length, searchObj.data.queryResults.hits.length);
+      trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
     }
+
+    refreshPagination(true);
+
     processPostPaginationData();
   }
 
@@ -5444,6 +5437,8 @@ const useLogs = () => {
     if(searchObj.meta.refreshInterval === 0) {
       if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
+      } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total != payload.queryReq.query.size)){
+        searchObj.data.queryResults.pageCountTotal = (payload.queryReq.query.size * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + response.content.results.total;
       }
     }
 
