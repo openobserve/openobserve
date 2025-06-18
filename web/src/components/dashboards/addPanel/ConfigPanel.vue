@@ -1883,8 +1883,28 @@ export default defineComponent({
         value: "top",
       },
       {
+        label: t("dashboard.left"),
+        value: "left",
+      },
+      {
+        label: t("dashboard.right"),
+        value: "right",
+      },
+      {
+        label: t("dashboard.bottom"),
+        value: "bottom",
+      },
+      {
         label: t("dashboard.inside"),
         value: "inside",
+      },
+      {
+        label: t("dashboard.insideLeft"),
+        value: "insideLeft",
+      },
+      {
+        label: t("dashboard.insideRight"),
+        value: "insideRight",
       },
       {
         label: t("dashboard.insideTop"),
@@ -1893,6 +1913,26 @@ export default defineComponent({
       {
         label: t("dashboard.insideBottom"),
         value: "insideBottom",
+      },
+      {
+        label: t("dashboard.insideTopLeft"),
+        value: "insideTopLeft",
+      },
+      {
+        label: t("dashboard.insideBottomLeft"),
+        value: "insideBottomLeft",
+      },
+      {
+        label: t("dashboard.insideTopRight"),
+        value: "insideTopRight",
+      },
+      {
+        label: t("dashboard.insideBottomRight"),
+        value: "insideBottomRight",
+      },
+      {
+        label: t("dashboard.outside"),
+        value: "outside",
       },
     ];
 
