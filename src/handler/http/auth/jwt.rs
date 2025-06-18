@@ -115,7 +115,7 @@ pub async fn process_token(
                 if openfga_cfg.map_group_to_role {
                     custom_roles.push(format_role_name(
                         &role_org.org,
-                        role_org.custom_role.unwrap(),
+                        &role_org.custom_role.unwrap(),
                     ));
                 } else {
                     source_orgs.push(UserOrg {
@@ -551,9 +551,15 @@ async fn map_group_to_custom_role(
 }
 
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-fn format_role_name(org: &str, role: String) -> String {
-    let role = RE_ROLE_NAME.replace_all(&role, "_").to_string();
+fn format_role_name(org: &str, role: &str) -> String {
+    let role = format_role_name_only(role);
     format!("{org}/{role}")
+}
+
+#[cfg(feature = "enterprise")]
+pub fn format_role_name_only(role: &str) -> String {
+    let role = RE_ROLE_NAME.replace_all(role, "_").to_string();
+    role
 }
 
 #[cfg(feature = "cloud")]
