@@ -207,7 +207,6 @@ const useStreams = () => {
             };
             getStreamsPromise.value = null;
             dismiss();
-            setStreams(streamType, res.data.list);
             resolve(streamData);
           })
           .catch((e: any) => {

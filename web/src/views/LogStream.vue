@@ -543,8 +543,6 @@ export default defineComponent({
         });
         logStream.value = [];
 
-        if (refresh) resetStreams();
-
         let counter = 1;
         let streamResponse;
         // if(selectedStreamType.value == "all") {
