@@ -15,9 +15,12 @@
 
 use std::sync::Arc;
 
-use config::meta::{
-    pipeline::{Pipeline, components::PipelineSource},
-    stream::StreamParams,
+use config::{
+    cluster::LOCAL_NODE,
+    meta::{
+        pipeline::{Pipeline, components::PipelineSource},
+        stream::StreamParams,
+    },
 };
 use infra::{
     cluster_coordinator::pipelines::PIPELINES_WATCH_PREFIX,
@@ -141,6 +144,9 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
 
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
+    if LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
     let pipelines = list().await?;
     if pipelines
         .iter()
