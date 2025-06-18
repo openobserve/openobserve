@@ -19,6 +19,7 @@ import {
   useLocalCurrentUser,
   useLocalTimezone,
 } from "../utils/zincutils";
+import streams from "./streams";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -361,5 +362,7 @@ export default createStore({
       context.commit("setModulesToDisplay", payload);
     },
   },
-  modules: {},
+  modules: {
+    streams,
+  },
 });
