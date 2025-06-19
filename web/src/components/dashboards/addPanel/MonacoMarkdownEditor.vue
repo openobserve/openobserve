@@ -36,10 +36,10 @@ import {
   watch,
 } from "vue";
 
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/markdown/markdown.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+// import "monaco-editor/esm/vs/editor/editor.all.js";
+// import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
+// import "monaco-editor/esm/vs/basic-languages/markdown/markdown.js";
+// import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
@@ -120,7 +120,7 @@ export default defineComponent({
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
           emit("update:modelValue", editorObj.getValue());
-        }, props.debounceTime)
+        }, props.debounceTime),
       );
 
       onActivated(async () => {
@@ -137,12 +137,12 @@ export default defineComponent({
           editorObj.dispose();
           editorObj = null;
         }
-        
+
         if (provider.value) {
           provider.value.dispose();
           provider.value = null;
         }
-        
+
         // Clear refs to prevent memory leaks
         editorRef.value = null;
       });
@@ -160,9 +160,9 @@ export default defineComponent({
       () => store.state.theme,
       () => {
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
-      }
+      },
     );
   },
 });
