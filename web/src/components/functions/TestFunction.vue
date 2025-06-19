@@ -308,9 +308,9 @@ import {
   computed,
   nextTick,
   onMounted,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
@@ -332,6 +332,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["function-error"]);
+
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/CodeQueryEditor.vue"),
+);
 
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
