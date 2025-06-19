@@ -523,7 +523,7 @@ pub async fn values_http2_stream(
 
     // Get query params
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let mut stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
@@ -556,6 +556,11 @@ pub async fn values_http2_stream(
     };
     let no_count = values_req.no_count;
     let top_k = values_req.size;
+
+    // check stream type from request
+    if values_req.stream_type != stream_type {
+        stream_type = values_req.stream_type;
+    }
 
     // Get use_cache from query params
     values_req.use_cache = get_use_cache_from_request(&query);

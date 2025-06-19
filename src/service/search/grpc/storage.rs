@@ -1028,7 +1028,7 @@ async fn search_tantivy_index(
 
     // search the index
     let file_in_range =
-        parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
+        parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
     let idx_optimize_rule_clone = idx_optimize_rule.clone();
     // TODO(taiming): refactor the return type throughout the tantivy index search
     let matched_docs =
