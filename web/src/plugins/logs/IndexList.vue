@@ -54,6 +54,7 @@ import {
   watch,
   computed,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -193,6 +194,10 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importSqlParser();
+    });
+
+    onBeforeUnmount(() => {
+      parser = null;
     });
 
     const importSqlParser = async () => {
