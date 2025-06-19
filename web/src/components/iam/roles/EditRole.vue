@@ -355,7 +355,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import commonService from "@/services/common";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 onBeforeMount(() => {
@@ -1574,7 +1574,13 @@ const getPipelines = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("pipeline", ["pipeline_id"], [...pipelines.data.list],false,"name");
+  updateResourceEntities(
+    "pipeline",
+    ["pipeline_id"],
+    [...pipelines.data.list],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1661,8 +1667,13 @@ const getActionScripts = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-
-  updateResourceEntities("action_scripts", ["id"], [...actionScripts.data],false,"name");
+  updateResourceEntities(
+    "action_scripts",
+    ["id"],
+    [...actionScripts.data],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);

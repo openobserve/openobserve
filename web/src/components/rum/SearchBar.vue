@@ -82,7 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onBeforeMount } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onBeforeMount,
+  onBeforeUnmount,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -100,7 +106,7 @@ export default defineComponent({
   components: {
     DateTime,
     QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue")
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
   },
@@ -166,12 +172,16 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
+    onBeforeUnmount(() => {
+      parser = null;
+    });
+
     watch(
       () => searchObj.data.stream.selectedStreamFields,
       (fields) => {
         if (fields.length) updateFieldKeywords(fields);
       },
-      { immediate: true, deep: true }
+      { immediate: true, deep: true },
     );
 
     const updateAutoComplete = (value) => {
