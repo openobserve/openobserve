@@ -52,23 +52,19 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
-        is_streaming_aggregate: bool,
+        #[cfg(feature = "enterprise")] is_streaming_aggregate: bool,
     ) -> Vec<[i64; 2]> {
+        #[cfg(feature = "enterprise")]
+        if is_streaming_aggregate {
+            return self.generate_partitions_with_streaming_aggregate_partition_window(
+                start_time, end_time, order_by,
+            );
+        }
+
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
                 start_time, end_time, step, order_by,
             )
-        } else if is_streaming_aggregate {
-            #[cfg(feature = "enterprise")]
-            {
-                self.generate_partitions_with_streaming_aggregate_partition_window(
-                    start_time, end_time, order_by,
-                )
-            }
-            #[cfg(not(feature = "enterprise"))]
-            {
-                self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
-            }
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
