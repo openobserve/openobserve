@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage" :key="store.state.selectedOrganization?.identifier">
+  <q-page class="logPage q-my-xs" id="logPage">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #before>
                 <div class="relative-position full-height">
-                  <index-list
+                  <!-- <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
                     "
-                  />
+                  /> -->
                   <q-btn
                     data-test="logs-search-field-list-collapse-btn"
                     :icon="
@@ -659,6 +659,7 @@ export default defineComponent({
     onBeforeUnmount(() => {
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
+      searchBarRef.value = null;
     });
 
     onActivated(() => {
@@ -1667,7 +1668,12 @@ export default defineComponent({
         : 0;
     },
     async showHistogram(newVal, oldVal) {
-      if(newVal == true && oldVal == false && this.searchObj.meta.histogramDirtyFlag == true && this.searchObj.data.queryResults.hits.length > 0){
+      if (
+        newVal == true &&
+        oldVal == false &&
+        this.searchObj.meta.histogramDirtyFlag == true &&
+        this.searchObj.data.queryResults.hits.length > 0
+      ) {
         this.searchObj.meta.resetPlotChart = true;
         this.searchObj.data.queryResults.aggs = [];
       }
