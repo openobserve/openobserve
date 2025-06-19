@@ -16,10 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <!-- loading: {{ variableItem.isLoading }} values:
-    {{ variableItem.value }} isVariableLoadingPending:
-    {{ variableItem.isVariableLoadingPending }} options:
-    {{ variableItem.options.map((it) => it.label) }} -->
     <q-select
       style="min-width: 150px"
       filled
@@ -46,17 +42,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @popup-show="onPopupShow"
       @popup-hide="onPopupHide"
       @update:model-value="onUpdateValue"
+      @keydown="handleKeydown"
       ref="selectRef"
     >
-      <!-- transition-show="scale"
-      transition-hide="scale" -->
       <template v-slot:no-option>
-        <q-item>
+        <template v-if="filterText && !variableItem.multiSelect">
+          <q-item clickable @click="handleCustomValue(filterText)">
+            <q-item-section>
+              <q-item-label>
+                {{ filterText }}
+                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic"
+                  >(Custom)</span
+                >
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-separator />
+        </template>
+        <q-item v-else>
           <q-item-section class="text-italic text-grey">
             No Data Found
           </q-item-section>
         </q-item>
       </template>
+
       <template v-if="filteredOptions.length > 0" v-slot:before-options>
         <q-item>
           <q-item-section v-if="variableItem.multiSelect" side>
@@ -69,10 +78,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-item-section>
           <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
-            <q-item-label>{{ variableItem.multiSelect ? 'Select All' : 'All' }}</q-item-label>
+            <q-item-label>{{
+              variableItem.multiSelect ? "Select All" : "All"
+            }}</q-item-label>
           </q-item-section>
         </q-item>
         <q-separator />
+        <template v-if="filterText && !variableItem.multiSelect">
+          <q-item clickable @click="handleCustomValue(filterText)">
+            <q-item-section>
+              <q-item-label>
+                {{ filterText }}
+                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic"
+                  >(Custom)</span
+                >
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-separator />
+        </template>
       </template>
       <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
         <q-item v-bind="itemProps">
@@ -85,7 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-item-section>
           <q-item-section>
-            <q-item-label v-html="opt.label" />
+            <q-item-label>
+              <span v-html="opt.label"></span>
+            </q-item-label>
           </q-item-section>
         </q-item>
       </template>
@@ -106,6 +132,7 @@ export default defineComponent({
     const filterText = ref("");
     const selectRef = ref(null);
     const isOpen = ref(false);
+    const suppressLoadOnNextPopup = ref(false); // added this because on click of enter, we need to skip the API load
 
     const availableOptions = computed(() => props.variableItem?.options || []);
 
@@ -116,7 +143,6 @@ export default defineComponent({
         opt.label.toLowerCase().includes(searchText),
       );
     });
-
     const filterOptions = (val: string, update: Function) => {
       filterText.value = val;
       update();
@@ -124,33 +150,49 @@ export default defineComponent({
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
+        return (
+          Array.isArray(selectedValue.value) &&
+          selectedValue.value?.[0] === SELECT_ALL_VALUE
+        );
       }
       return selectedValue.value === SELECT_ALL_VALUE;
-    });    const toggleSelectAll = () => {
+    });
+    const toggleSelectAll = () => {
       const newValue = props.variableItem.multiSelect
-        ? isAllSelected.value ? [] : [SELECT_ALL_VALUE]
+        ? isAllSelected.value
+          ? []
+          : [SELECT_ALL_VALUE]
         : SELECT_ALL_VALUE;
-      
+
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
     };
 
     const onUpdateValue = (val: any) => {
       // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
-      if (props.variableItem.multiSelect && Array.isArray(val) && val.length > 0) {
+      if (
+        props.variableItem.multiSelect &&
+        Array.isArray(val) &&
+        val.length > 0
+      ) {
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
-          val = val.filter(v => v !== SELECT_ALL_VALUE);
+          val = val.filter((v) => v !== SELECT_ALL_VALUE);
         }
       }
       selectedValue.value = val;
-      if(!props.variableItem.multiSelect) {
+      if (!props.variableItem.multiSelect) {
         emit("update:modelValue", val);
       }
     };
 
     const onPopupShow = () => {
       isOpen.value = true;
+
+      if (suppressLoadOnNextPopup.value) {
+        suppressLoadOnNextPopup.value = false;
+        return;
+      }
+
       if (props.loadOptions) {
         props.loadOptions(props.variableItem);
       }
@@ -158,6 +200,7 @@ export default defineComponent({
 
     const onPopupHide = () => {
       isOpen.value = false;
+      filterText.value = "";
       if (props.variableItem.multiSelect) {
         emit("update:modelValue", selectedValue.value);
       }
@@ -173,9 +216,12 @@ export default defineComponent({
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
-          } else if (props.variableItem.options.length === 0 && selectedValue.value.length === 0) {
+          } else if (
+            props.variableItem.options.length === 0 &&
+            selectedValue.value.length === 0
+          ) {
             return "(No Data Found)";
-          } else {            
+          } else {
             return selectedValue.value
               .map((it: any) => {
                 if (it === "") return "<blank>";
@@ -233,6 +279,32 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    const handleCustomValue = (value: string) => {
+      if (!value?.trim() || props.variableItem.multiSelect) return;
+
+      const newValue = value.trim();
+      selectedValue.value = newValue;
+      emit("update:modelValue", newValue);
+      filterText.value = ""; // Clear the filter text after setting the value
+
+      suppressLoadOnNextPopup.value = true;
+
+      if (selectRef.value) {
+        (selectRef.value as any).hidePopup();
+      }
+    };
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Enter" &&
+        !props.variableItem.multiSelect &&
+        filterText.value?.trim()
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleCustomValue(filterText.value);
+      }
+    };
 
     return {
       selectedValue,
@@ -245,6 +317,9 @@ export default defineComponent({
       onPopupShow,
       onPopupHide,
       selectRef,
+      handleKeydown,
+      handleCustomValue,
+      filterText,
     };
   },
 });
