@@ -707,6 +707,7 @@ pub async fn do_partitioned_search(
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
                 streaming_aggs: is_streaming_aggs,
+                streaming_id: partition_resp.streaming_id.clone(),
                 time_offset: TimeOffset {
                     start_time,
                     end_time,
@@ -1180,6 +1181,7 @@ async fn process_delta(
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
                 streaming_aggs: is_streaming_aggs,
+                streaming_id: partition_resp.streaming_id.clone(),
                 time_offset: TimeOffset {
                     start_time,
                     end_time,
@@ -1292,6 +1294,7 @@ async fn send_partial_search_resp(
     let response = StreamResponses::SearchResponse {
         results: s_resp,
         streaming_aggs: is_streaming_aggs,
+        streaming_id: None,
         time_offset: TimeOffset {
             start_time: new_start_time,
             end_time: new_end_time,
@@ -1376,6 +1379,7 @@ async fn send_cached_responses(
     let response = StreamResponses::SearchResponse {
         results: cached.cached_response.clone(),
         streaming_aggs: false,
+        streaming_id: None,
         time_offset: TimeOffset {
             start_time: cached.response_start_time,
             end_time: cached.response_end_time,

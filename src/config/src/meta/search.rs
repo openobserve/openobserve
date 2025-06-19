@@ -1469,12 +1469,16 @@ pub enum StreamResponses {
     SearchResponse {
         results: Response,
         streaming_aggs: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        streaming_id: Option<String>,
         time_offset: TimeOffset,
     },
     // New focused variants
     SearchResponseMetadata {
         results: Response,
         streaming_aggs: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        streaming_id: Option<String>,
         time_offset: TimeOffset,
     },
     SearchResponseHits {
@@ -1529,6 +1533,7 @@ impl StreamResponses {
                 results,
                 streaming_aggs,
                 time_offset,
+                streaming_id,
             } => {
                 log::info!(
                     "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
@@ -1550,6 +1555,7 @@ impl StreamResponses {
                 // Capture needed values for the closure
                 let streaming_aggs = *streaming_aggs;
                 let time_offset = time_offset.clone();
+                let streaming_id = streaming_id.clone();
 
                 // Create an iterator that maps each chunk to a formatted BytesImpl
                 let chunks_iter = iterator.map(move |chunk| {
@@ -1559,6 +1565,7 @@ impl StreamResponses {
                             let metadata = StreamResponses::SearchResponseMetadata {
                                 results: *response,
                                 streaming_aggs,
+                                streaming_id: streaming_id.clone(),
                                 time_offset: time_offset.clone(),
                             };
                             let data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
