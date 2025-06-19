@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:no-option>
         <template v-if="filterText && !variableItem.multiSelect">
-          <q-item>
+          <q-item clickable @click="handleCustomValue(filterText)">
             <q-item-section>
               <q-item-label>
                 {{ filterText }}
@@ -131,7 +131,6 @@ export default defineComponent({
         opt.label.toLowerCase().includes(searchText),
       );
     });
-
     const filterOptions = (val: string, update: Function) => {
       filterText.value = val;
       update();
@@ -189,6 +188,7 @@ export default defineComponent({
 
     const onPopupHide = () => {
       isOpen.value = false;
+      filterText.value = "";
       if (props.variableItem.multiSelect) {
         emit("update:modelValue", selectedValue.value);
       }
@@ -267,6 +267,19 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    const handleCustomValue = (value: string) => {
+      if (!value.trim() || props.variableItem.multiSelect) return;
+
+      const newValue = value.trim();
+      selectedValue.value = newValue;
+      emit("update:modelValue", newValue);
+
+      suppressLoadOnNextPopup.value = true;
+
+      if (selectRef.value) {
+        (selectRef.value as any).hidePopup();
+      }
+    };
 
     const handleKeydown = (event: KeyboardEvent) => {
       if (
@@ -276,17 +289,7 @@ export default defineComponent({
       ) {
         event.preventDefault();
         event.stopPropagation();
-        if (!filterText.value.trim() || props.variableItem.multiSelect) return;
-
-        const newValue = filterText.value.trim();
-        selectedValue.value = newValue;
-        emit("update:modelValue", newValue);
-
-        suppressLoadOnNextPopup.value = true;
-
-        if (selectRef.value) {
-          (selectRef.value as any).hidePopup();
-        }
+        handleCustomValue(filterText.value);
       }
     };
 
@@ -302,6 +305,7 @@ export default defineComponent({
       onPopupHide,
       selectRef,
       handleKeydown,
+      handleCustomValue,
       filterText,
     };
   },
