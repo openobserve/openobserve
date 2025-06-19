@@ -137,7 +137,7 @@ export default defineComponent({
   components: {
     DateTime,
     QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue"),
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
     AppTabs,

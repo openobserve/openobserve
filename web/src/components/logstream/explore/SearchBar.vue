@@ -111,7 +111,7 @@ export default defineComponent({
   components: {
     DateTime,
     QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue")
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
   },
   emits: ["searchdata", "update-query", "change:date-time"],
