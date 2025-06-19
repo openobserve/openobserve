@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section>
               <q-item-label>
                 {{ filterText }}
-                <span class="text-grey-6 q-ml-xs">(Custom)</span>
+                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic">(Custom)</span>
               </q-item-label>
             </q-item-section>
           </q-item>
@@ -82,6 +82,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
         <q-separator />
+        <template v-if="filterText && !variableItem.multiSelect">
+          <q-item clickable @click="handleCustomValue(filterText)">
+            <q-item-section>
+              <q-item-label>
+                {{ filterText }}
+                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic">(Custom)</span>
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-separator />
+        </template>
       </template>
       <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
         <q-item v-bind="itemProps">
@@ -96,9 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item-section>
             <q-item-label>
               <span v-html="opt.label"></span>
-              <span v-if="opt.isCustomOption" class="text-grey-6 q-ml-xs"
-                >(Custom)</span
-              >
             </q-item-label>
           </q-item-section>
         </q-item>

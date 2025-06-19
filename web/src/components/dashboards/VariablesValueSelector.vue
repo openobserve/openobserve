@@ -464,7 +464,6 @@ export default defineComponent({
                     newOptions.push({
                       label: val,
                       value: val,
-                      isCustomOption: true,
                     });
                   }
                 });
@@ -481,7 +480,6 @@ export default defineComponent({
                   newOptions.push({
                     label: variableObject.value,
                     value: variableObject.value,
-                    isCustomOption: true,
                   });
                 }
               }
