@@ -24,6 +24,7 @@ import {
   onBeforeMount,
   watch,
   computed,
+  onBeforeUnmount
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -261,7 +262,7 @@ const searchReconnectDelay = 1000; // 1 second
 // useQueryProcessing for query-related functions
 // useDataVisualization for histogram and data display functions
 
-const searchObj = reactive(Object.assign({}, defaultObject));
+let searchObj: any = reactive(Object.assign({}, defaultObject));
 const searchObjDebug = reactive({
   queryDataStartTime: 0,
   queryDataEndTime: 0,
@@ -340,6 +341,10 @@ const useLogs = () => {
     }
     await importSqlParser();
     extractValueQuery();
+  });
+
+  onBeforeUnmount(() => {
+    parser = null;
   });
 
   const importSqlParser = async () => {

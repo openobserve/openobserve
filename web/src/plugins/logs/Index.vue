@@ -656,6 +656,8 @@ export default defineComponent({
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
       searchBarRef.value = null;
+      searchObj = null;
+      parser = null;
     });
 
     onActivated(() => {
@@ -1085,8 +1087,6 @@ export default defineComponent({
           searchObj.data.editorValue = searchObj.data.query;
 
           searchBarRef.value.updateQuery();
-
-          searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
         } else {
           searchObj.data.query = "";
           searchBarRef.value.updateQuery();
@@ -1200,7 +1200,6 @@ export default defineComponent({
       searchObj.data.query = newQuery;
       searchObj.data.editorValue = newQuery;
       searchBarRef.value.updateQuery();
-      searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
     };
 
     const processInterestingFiledInSQLQuery = (

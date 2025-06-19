@@ -693,7 +693,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="row query-editor-container" v-show="searchObj.meta.showQuery">
+    <div class="row query-editor-container">
       <div
         class="col"
         style="border-top: 1px solid #dbdbdb; height: 100%"
@@ -1186,6 +1186,7 @@ import {
   onDeactivated,
   defineAsyncComponent,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1221,7 +1222,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -1243,7 +1243,6 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
-    QueryEditor,
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
@@ -1610,6 +1609,12 @@ export default defineComponent({
       await importSqlParser();
     });
 
+    onBeforeUnmount(() => {
+      queryEditorRef.value = null;
+      fnEditorRef.value = null;
+      parser = null;
+    });
+
     const importSqlParser = async () => {
       const useSqlParser: any = await import("@/composables/useParser");
       const { sqlParser }: any = useSqlParser.default();
@@ -1697,7 +1702,6 @@ export default defineComponent({
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
-
       searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
@@ -1774,13 +1778,18 @@ export default defineComponent({
       updateAutoComplete(value);
       try {
         if (searchObj.meta.sqlMode === true) {
-          searchObj.data.parsedQuery = parser.astify(value);
-          if (searchObj.data.parsedQuery?.from?.length > 0) {
+          let parsedQuery = null;
+          try {
+            parsedQuery = parser.astify(value);
+          } catch (e) {
+            console.log(e, "Logs: Error while parsing query");
+          }
+          if (parsedQuery?.from?.length > 0) {
             //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array
             //the table which is there in from array is the temporary array
-            const tableName: string = !searchObj.data.parsedQuery.with
-              ? searchObj.data.parsedQuery.from[0].table ||
-                searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table
+            const tableName: string = !parsedQuery.with
+              ? parsedQuery.from[0].table ||
+                parsedQuery.from[0].expr?.ast?.from?.[0]?.table
               : "";
             if (
               !searchObj.data.stream.selectedStream.includes(tableName) &&
@@ -2693,7 +2702,9 @@ export default defineComponent({
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
 
-        delete savedSearchObj.data.parsedQuery;
+        if (savedSearchObj.data.parsedQuery) {
+          delete savedSearchObj.data.parsedQuery;
+        }
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
