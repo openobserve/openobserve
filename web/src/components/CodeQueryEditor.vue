@@ -41,6 +41,9 @@ import {
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { sql } from "@codemirror/lang-sql";
+import { json } from "@codemirror/lang-json";
+import { javascript } from "@codemirror/lang-javascript";
+import { markdown } from "@codemirror/lang-markdown";
 import {
   autocompletion,
   CompletionContext,
@@ -118,15 +121,20 @@ export default defineComponent({
 
     // Get language support based on props.language
     const getLanguageSupport = () => {
-      return sql();
-      // switch (props.language) {
-      //   case "sql":
-      //     return sql();
-      //   case "vrl":
-      //     return createVrlLanguage();
-      //   default:
-      //     return sql();
-      // }
+      switch (props.language) {
+        case "sql":
+          return sql();
+        case "vrl":
+          return sql();
+        case "json":
+          return json();
+        case "javascript":
+          return javascript();
+        case "markdown":
+          return markdown();
+        default:
+          return sql();
+      }
     };
 
     // Create autocompletion function
