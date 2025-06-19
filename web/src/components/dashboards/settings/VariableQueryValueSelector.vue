@@ -81,7 +81,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-item-section>
           <q-item-section>
-            <q-item-label v-html="opt.label" />
+            <q-item-label>
+              <span v-html="opt.label"></span>
+              <span v-if="opt.isCustomOption" class="text-grey-6 q-ml-xs">(Custom)</span>
+            </q-item-label>
           </q-item-section>
         </q-item>
       </template>
@@ -128,6 +131,7 @@ export default defineComponent({
         props.variableItem.options.push({
           label: val.trim(),
           value: val.trim(),
+          isCustomOption: true,
         });
       }
       update();
@@ -267,6 +271,7 @@ export default defineComponent({
           props.variableItem.options.push({
             label: newValue,
             value: newValue,
+            isCustomOption: true,
           });
         }
 
