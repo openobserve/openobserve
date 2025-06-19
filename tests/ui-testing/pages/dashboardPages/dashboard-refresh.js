@@ -27,12 +27,13 @@ export default class DashboardTimeRefresh {
   async setRelative(date, time) {
     await this.timeTab.waitFor({ state: "attached" });
     await this.timeTab.click();
-  
+
     await this.relativeTime.click();
     await this.page
-      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`).waitFor({
-      state: "visible",
-    });
+      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
+      .waitFor({
+        state: "visible",
+      });
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
       .click();
@@ -40,12 +41,41 @@ export default class DashboardTimeRefresh {
   }
 
   // Absolute time selection
-  async setAbsolute(date) {
+  // async setAbsolute(date) {
+  //   await this.timeTab.click();
+  //   await this.absTime.click();
+  //   await this.page
+  //     .locator(`[data-test="date-time-absolute-${date}-btn"]`)
+  //     .dblclick();
+  //   await this.applyBtn.click();
+  // }
+
+  // Set absolute time selection with dynamic start and end days
+  async selectAbsolutetime(startDay, endDay) {
+    // Open the date-time picker
     await this.timeTab.click();
+
+    // Switch to the absolute tab
     await this.absTime.click();
+
+    // Click the left chevron button (if needed)
     await this.page
-      .locator(`[data-test="date-time-absolute-${date}-btn"]`)
-      .dblclick();
+      .locator("button")
+      .filter({ hasText: "chevron_left" })
+      .first()
+      .click();
+
+    // Select the start and end days dynamically
+    await this.page
+      .getByRole("button", { name: String(startDay) })
+      .last()
+      .click();
+    await this.page
+      .getByRole("button", { name: String(endDay) })
+      .last()
+      .click();
+
+    // Optionally, click the apply button to confirm the selection
     await this.applyBtn.click();
   }
 
