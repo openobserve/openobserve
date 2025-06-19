@@ -36,10 +36,10 @@ import {
   watch,
 } from "vue";
 
-// import "monaco-editor/esm/vs/editor/editor.all.js";
-// import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
-// import "monaco-editor/esm/vs/basic-languages/markdown/markdown.js";
-// import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import "monaco-editor/esm/vs/editor/editor.all.js";
+import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
+import "monaco-editor/esm/vs/basic-languages/markdown/markdown.js";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
