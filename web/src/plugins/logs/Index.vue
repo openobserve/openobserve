@@ -565,6 +565,7 @@ export default defineComponent({
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
+      getStream,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1043,44 +1044,50 @@ export default defineComponent({
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
 
-            if (searchObj.data.stream.selectedStreamFields.length == 0) {
+            if (
+              !searchObj.data.stream?.selectedStreamFields?.length &&
+              searchObj.data?.stream?.selectedStream?.[0]
+            ) {
               const streamData: any = getStream(
                 searchObj.data.stream.selectedStream[0],
                 searchObj.data.stream.streamType || "logs",
                 true,
               );
-              searchObj.data.stream.selectedStreamFields = streamData.schema;
+              if (streamData.schema)
+                searchObj.data.stream.selectedStreamFields = streamData.schema;
             }
 
-            const streamFieldNames: any =
-              searchObj.data.stream.selectedStreamFields.map(
-                (item: any) => item.name,
-              );
+            if (searchObj.data.stream?.selectedStreamFields?.length > 0) {
+              const streamFieldNames: any =
+                searchObj.data.stream.selectedStreamFields.map(
+                  (item: any) => item.name,
+                );
 
-            for (
-              let i = searchObj.data.stream.interestingFieldList.length - 1;
-              i >= 0;
-              i--
-            ) {
-              const fieldName = searchObj.data.stream.interestingFieldList[i];
-              if (!streamFieldNames.includes(fieldName)) {
-                searchObj.data.stream.interestingFieldList.splice(i, 1);
+              for (
+                let i = searchObj.data.stream.interestingFieldList.length - 1;
+                i >= 0;
+                i--
+              ) {
+                const fieldName = searchObj.data.stream.interestingFieldList[i];
+                if (!streamFieldNames.includes(fieldName)) {
+                  searchObj.data.stream.interestingFieldList.splice(i, 1);
+                }
               }
-            }
 
-            if (
-              searchObj.data.stream.interestingFieldList.length > 0 &&
-              searchObj.meta.quickMode
-            ) {
-              searchObj.data.query = searchObj.data.query.replace(
-                /\[FIELD_LIST\]/g,
-                searchObj.data.stream.interestingFieldList.join(","),
-              );
-            } else {
-              searchObj.data.query = searchObj.data.query.replace(
-                /\[FIELD_LIST\]/g,
-                "*",
-              );
+              if (
+                searchObj.data.stream.interestingFieldList.length > 0 &&
+                searchObj.meta.quickMode
+              ) {
+                searchObj.data.query = searchObj.data.query.replace(
+                  /\[FIELD_LIST\]/g,
+                  searchObj.data.stream.interestingFieldList.join(","),
+                );
+              } else {
+                searchObj.data.query = searchObj.data.query.replace(
+                  /\[FIELD_LIST\]/g,
+                  "*",
+                );
+              }
             }
           }
 
@@ -1092,7 +1099,7 @@ export default defineComponent({
           searchBarRef.value.updateQuery();
         }
       } catch (e) {
-        console.log("Logs : Error in setQuery");
+        console.log("Logs : Error in setQuery ", e);
       }
     };
 
