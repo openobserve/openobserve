@@ -261,7 +261,6 @@ export default defineComponent({
               }
             }),
             EditorView.focusChangeEffect.of((state, focusing) => {
-              console.log("focusing", state, focusing);
               if (focusing) {
                 emit("focus");
               } else {
@@ -338,6 +337,7 @@ export default defineComponent({
         }
         editorView = null;
       }
+      editorRef.value = null;
     };
 
     onMounted(async () => {
