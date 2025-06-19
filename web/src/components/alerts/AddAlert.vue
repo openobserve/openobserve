@@ -481,9 +481,9 @@ import {
   onBeforeMount,
 } from "vue";
 
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
+// import "monaco-editor/esm/vs/editor/editor.all.js";
+// import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
+// import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
 
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
