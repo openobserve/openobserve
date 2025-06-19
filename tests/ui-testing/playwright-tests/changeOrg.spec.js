@@ -10,7 +10,7 @@ import { PipelinesPage } from "../pages/pipelinesPage.js";
 import { DashboardPage } from "../pages/dashboardPage.js";
 import { StreamsPage } from "../pages/streamsPage.js";
 import { ReportsPage } from "../pages/reportsPage.js";
-import { AlertsPage } from "../pages/alertsPage.js";
+import { AlertsPage } from "../pages/alertsPages/alertsPage.js";
 import { DataPage } from "../pages/dataPage.js";
 import { IamPage } from "../pages/iamPage.js";
 import { ManagementPage } from "../pages/managementPage.js";
