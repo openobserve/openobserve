@@ -16,10 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <!-- loading: {{ variableItem.isLoading }} values:
-    {{ variableItem.value }} isVariableLoadingPending:
-    {{ variableItem.isVariableLoadingPending }} options:
-    {{ variableItem.options.map((it) => it.label) }} -->
     <q-select
       style="min-width: 150px"
       filled
@@ -46,10 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @popup-show="onPopupShow"
       @popup-hide="onPopupHide"
       @update:model-value="onUpdateValue"
+      @keydown="handleKeydown"
       ref="selectRef"
     >
-      <!-- transition-show="scale"
-      transition-hide="scale" -->
       <template v-slot:no-option>
         <q-item>
           <q-item-section class="text-italic text-grey">
@@ -57,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
+
       <template v-if="filteredOptions.length > 0" v-slot:before-options>
         <q-item>
           <q-item-section v-if="variableItem.multiSelect" side>
@@ -106,6 +102,7 @@ export default defineComponent({
     const filterText = ref("");
     const selectRef = ref(null);
     const isOpen = ref(false);
+    const suppressLoadOnNextPopup = ref(false); // added this because on click of enter, we need to skip the API load
 
     const availableOptions = computed(() => props.variableItem?.options || []);
 
@@ -119,6 +116,20 @@ export default defineComponent({
 
     const filterOptions = (val: string, update: Function) => {
       filterText.value = val;
+      if (
+        val?.trim() &&
+        !props.variableItem.multiSelect &&
+        !availableOptions.value.some(
+          (opt: any) =>
+            opt.value === val.trim() ||
+            opt.label.toLowerCase() === val.trim().toLowerCase(),
+        )
+      ) {
+        props.variableItem.options.push({
+          label: val.trim(),
+          value: val.trim(),
+        });
+      }
       update();
     };
 
@@ -151,6 +162,12 @@ export default defineComponent({
 
     const onPopupShow = () => {
       isOpen.value = true;
+
+      if (suppressLoadOnNextPopup.value) {
+        suppressLoadOnNextPopup.value = false;
+        return;
+      }
+
       if (props.loadOptions) {
         props.loadOptions(props.variableItem);
       }
@@ -234,6 +251,36 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Enter" &&
+        !props.variableItem.multiSelect &&
+        filterText.value.trim()
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const newValue = filterText.value.trim();
+        if (
+          !availableOptions.value.some((opt: any) => opt.value === newValue)
+        ) {
+          props.variableItem.options.push({
+            label: newValue,
+            value: newValue,
+          });
+        }
+
+        selectedValue.value = newValue;
+        emit("update:modelValue", newValue);
+
+        suppressLoadOnNextPopup.value = true;
+
+        if (selectRef.value) {
+          (selectRef.value as any).hidePopup();
+        }
+      }
+    };
+
     return {
       selectedValue,
       filteredOptions,
@@ -245,6 +292,7 @@ export default defineComponent({
       onPopupShow,
       onPopupHide,
       selectRef,
+      handleKeydown,
     };
   },
 });
