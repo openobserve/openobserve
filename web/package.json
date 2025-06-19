@@ -45,6 +45,7 @@
     "@quasar/extras": "^1.16.16",
     "@tanstack/vue-table": "^8.20.5",
     "@tanstack/vue-virtual": "^3.11.2",
+    "@types/codemirror": "^5.60.16",
     "@vue-flow/background": "^1.3.2",
     "@vue-flow/controls": "^1.1.2",
     "@vue-flow/core": "^1.42.1",
