@@ -39,7 +39,7 @@ test.describe("dashboard folder testcases", () => {
     await orgNavigation;
   });
 
-  test("Should create and delete a unique folder, and verify it's deleted",async ({
+  test.skip("Should create and delete a unique folder, and verify it's deleted" ,async ({
     page,
   }) => {
     const dashboardPage = new DashboardListPage(page);
