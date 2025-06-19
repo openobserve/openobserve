@@ -708,7 +708,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <query-editor
+            <code-query-editor
               v-if="router.currentRoute.value.name === 'logs'"
               data-test="logs-search-bar-query-editor"
               editor-id="logsQueryEditor"
@@ -738,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
-                <query-editor
+                <code-query-editor
                   v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
@@ -758,7 +758,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
-                <query-editor
+                <code-query-editor
                   v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
@@ -1201,6 +1201,7 @@ import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1248,6 +1249,7 @@ export default defineComponent({
     ConfirmDialog,
     TransformSelector,
     FunctionSelector,
+    CodeQueryEditor,
   },
   emits: [
     "searchdata",
@@ -1505,6 +1507,17 @@ export default defineComponent({
       return [];
     });
 
+    // const toggleHistogram = ref(false);
+
+    const toggleHistogram = computed({
+      get: () => {
+        return searchObj.meta.showHistogram;
+      },
+      set: (value) => {
+        searchObj.meta.showHistogram = value;
+      },
+    });
+
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
 
@@ -1526,7 +1539,7 @@ export default defineComponent({
       () => searchObj.data.transforms,
       (newVal) => {
         functionOptions.value = newVal;
-      }
+      },
     );
 
     watch(
@@ -1632,6 +1645,7 @@ export default defineComponent({
     });
 
     const updateAutoComplete = (value) => {
+      return;
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex =
         queryEditorRef?.value?.getCursorIndex();
@@ -3499,6 +3513,7 @@ export default defineComponent({
       customRangeIcon,
       createScheduledSearchIcon,
       listScheduledSearchIcon,
+      toggleHistogram,
     };
   },
   computed: {
