@@ -46,7 +46,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="selectRef"
     >
       <template v-slot:no-option>
-        <q-item>
+        <template v-if="filterText && !variableItem.multiSelect">
+          <q-item>
+            <q-item-section>
+              <q-item-label>
+                {{ filterText }}
+                <span class="text-grey-6 q-ml-xs">(Custom)</span>
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-separator />
+        </template>
+        <q-item v-else>
           <q-item-section class="text-italic text-grey">
             No Data Found
           </q-item-section>
@@ -65,7 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </q-item-section>
           <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
-            <q-item-label>{{ variableItem.multiSelect ? 'Select All' : 'All' }}</q-item-label>
+            <q-item-label>{{
+              variableItem.multiSelect ? "Select All" : "All"
+            }}</q-item-label>
           </q-item-section>
         </q-item>
         <q-separator />
@@ -83,7 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item-section>
             <q-item-label>
               <span v-html="opt.label"></span>
-              <span v-if="opt.isCustomOption" class="text-grey-6 q-ml-xs">(Custom)</span>
+              <span v-if="opt.isCustomOption" class="text-grey-6 q-ml-xs"
+                >(Custom)</span
+              >
             </q-item-label>
           </q-item-section>
         </q-item>
@@ -119,47 +134,42 @@ export default defineComponent({
 
     const filterOptions = (val: string, update: Function) => {
       filterText.value = val;
-      if (
-        val?.trim() &&
-        !props.variableItem.multiSelect &&
-        !availableOptions.value.some(
-          (opt: any) =>
-            opt.value === val.trim() ||
-            opt.label.toLowerCase() === val.trim().toLowerCase(),
-        )
-      ) {
-        props.variableItem.options.push({
-          label: val.trim(),
-          value: val.trim(),
-          isCustomOption: true,
-        });
-      }
       update();
     };
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
+        return (
+          Array.isArray(selectedValue.value) &&
+          selectedValue.value?.[0] === SELECT_ALL_VALUE
+        );
       }
       return selectedValue.value === SELECT_ALL_VALUE;
-    });    const toggleSelectAll = () => {
+    });
+    const toggleSelectAll = () => {
       const newValue = props.variableItem.multiSelect
-        ? isAllSelected.value ? [] : [SELECT_ALL_VALUE]
+        ? isAllSelected.value
+          ? []
+          : [SELECT_ALL_VALUE]
         : SELECT_ALL_VALUE;
-      
+
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
     };
 
     const onUpdateValue = (val: any) => {
       // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
-      if (props.variableItem.multiSelect && Array.isArray(val) && val.length > 0) {
+      if (
+        props.variableItem.multiSelect &&
+        Array.isArray(val) &&
+        val.length > 0
+      ) {
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
-          val = val.filter(v => v !== SELECT_ALL_VALUE);
+          val = val.filter((v) => v !== SELECT_ALL_VALUE);
         }
       }
       selectedValue.value = val;
-      if(!props.variableItem.multiSelect) {
+      if (!props.variableItem.multiSelect) {
         emit("update:modelValue", val);
       }
     };
@@ -194,9 +204,12 @@ export default defineComponent({
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
-          } else if (props.variableItem.options.length === 0 && selectedValue.value.length === 0) {
+          } else if (
+            props.variableItem.options.length === 0 &&
+            selectedValue.value.length === 0
+          ) {
             return "(No Data Found)";
-          } else {            
+          } else {
             return selectedValue.value
               .map((it: any) => {
                 if (it === "") return "<blank>";
@@ -263,18 +276,9 @@ export default defineComponent({
       ) {
         event.preventDefault();
         event.stopPropagation();
+        if (!filterText.value.trim() || props.variableItem.multiSelect) return;
 
         const newValue = filterText.value.trim();
-        if (
-          !availableOptions.value.some((opt: any) => opt.value === newValue)
-        ) {
-          props.variableItem.options.push({
-            label: newValue,
-            value: newValue,
-            isCustomOption: true,
-          });
-        }
-
         selectedValue.value = newValue;
         emit("update:modelValue", newValue);
 
@@ -298,6 +302,7 @@ export default defineComponent({
       onPopupHide,
       selectRef,
       handleKeydown,
+      filterText,
     };
   },
 });
