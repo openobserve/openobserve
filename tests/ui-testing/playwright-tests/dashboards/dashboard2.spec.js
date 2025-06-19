@@ -325,10 +325,13 @@ test.describe("dashboard UI testcases", () => {
     // Set relative date-time and timezone
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardTimeRefresh.setRelative("6", "w");
+
     await dashboardActions.applyDashboardBtn();
 
     // Set absolute date-time and timezone
-    await dashboardTimeRefresh.setRelative("2", "w");
+    await waitForDateTimeButtonToBeEnabled(page);
+    await dashboardTimeRefresh.selectAbsolutetime("8", "16");
+
     await dashboardActions.applyDashboardBtn();
 
     // Save the dashboard panel
