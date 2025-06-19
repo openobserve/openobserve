@@ -51,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section>
               <q-item-label>
                 {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic">(Custom)</span>
+                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic"
+                  >(Custom)</span
+                >
               </q-item-label>
             </q-item-section>
           </q-item>
@@ -87,7 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section>
               <q-item-label>
                 {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic">(Custom)</span>
+                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic"
+                  >(Custom)</span
+                >
               </q-item-label>
             </q-item-section>
           </q-item>
@@ -276,11 +280,12 @@ export default defineComponent({
       { immediate: true },
     );
     const handleCustomValue = (value: string) => {
-      if (!value.trim() || props.variableItem.multiSelect) return;
+      if (!value?.trim() || props.variableItem.multiSelect) return;
 
       const newValue = value.trim();
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
+      filterText.value = ""; // Clear the filter text after setting the value
 
       suppressLoadOnNextPopup.value = true;
 
@@ -293,7 +298,7 @@ export default defineComponent({
       if (
         event.key === "Enter" &&
         !props.variableItem.multiSelect &&
-        filterText.value.trim()
+        filterText.value?.trim()
       ) {
         event.preventDefault();
         event.stopPropagation();
