@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column logs-index-menu full-height">
+  <div
+    class="column logs-index-menu full-height"
+    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
+  >
     <div>
       <!-- <select v-model="selectedStream">
         <option
@@ -29,19 +32,633 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </select> -->
       <q-select
         data-test="log-search-index-list-select-stream"
-        v-model="selectedStream"
+        v-model="searchObj.data.stream.selectedStream"
         :options="streamOptions"
         data-cy="index-dropdown"
+        :placeholder="placeHolderText"
         input-debounce="0"
         behavior="menu"
-        emit-value
         filled
         borderless
         dense
+        use-input
         multiple
         map-options
+        @filter="filterStreamFn"
+        @update:model-value="handleMultiStreamSelection"
+        :title="searchObj.data.stream.selectedStream.join(',')"
       >
+        <template #no-option>
+          <q-item>
+            <q-item-section> {{ t("search.noResult") }}</q-item-section>
+          </q-item>
+        </template>
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item style="cursor: pointer">
+            <q-item-section @click="handleSingleStreamSelect(opt)">
+              <q-item-label v-html="opt.label" />
+            </q-item-section>
+            <q-item-section side>
+              <q-toggle
+                :data-test="`log-search-index-list-stream-toggle-${opt.label}`"
+                :model-value="selected"
+                size="20px"
+                @update:model-value="toggleOption(opt.value)"
+              />
+            </q-item-section>
+          </q-item>
+        </template>
       </q-select>
+    </div>
+    <div
+      v-if="
+        (!searchObj.data.stream.selectedStreamFields ||
+          searchObj.data.stream.selectedStreamFields.length == 0) &&
+        searchObj.loading == false
+      "
+      class="index-table q-mt-xs"
+    >
+      <h3
+        data-test="logs-search-no-field-found-text"
+        class="text-center col-10 q-mx-none"
+      >
+        <q-icon name="info" color="primary" size="xs" /> No field found in
+        selected stream.
+      </h3>
+    </div>
+    <div v-else class="index-table q-mt-xs">
+      <q-table
+        data-test="log-search-index-list-fields-table"
+        v-model="sortedStreamFields"
+        :visible-columns="['name']"
+        :rows="streamFieldsRows"
+        :row-key="
+          (row: any) => searchObj.data.stream.selectedStream[0] + row.name
+        "
+        :filter="searchObj.data.stream.filterField"
+        :filter-method="filterFieldFn"
+        v-model:pagination="pagination"
+        hide-header
+        :wrap-cells="searchObj.meta.resultGrid.wrapCells"
+        class="field-table full-height"
+        id="fieldList"
+        :rows-per-page-options="[]"
+        :hide-bottom="
+          (!store.state.zoConfig.user_defined_schemas_enabled ||
+            !searchObj.meta.hasUserDefinedSchemas) &&
+          streamFieldsRows != undefined &&
+          (streamFieldsRows.length <= pagination.rowsPerPage ||
+            streamFieldsRows.length == 0)
+        "
+      >
+        <template #body-cell-name="props">
+          <q-tr
+            :props="props"
+            v-if="props.row.label"
+            @click="
+              searchObj.data.stream.expandGroupRows[props.row.group] =
+                !searchObj.data.stream.expandGroupRows[props.row.group]
+            "
+            class="cursor-pointer text-bold"
+          >
+            <q-td
+              class="field_list"
+              style="line-height: 28px; padding-left: 10px"
+              :class="
+                store.state.theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'
+              "
+            >
+              {{ props.row.name }} ({{
+                searchObj.data.stream.expandGroupRowsFieldCount[
+                  props.row.group
+                ]
+              }})
+              <q-icon
+                v-if="
+                  searchObj.data.stream.expandGroupRowsFieldCount[
+                    props.row.group
+                  ] > 0
+                "
+                :name="
+                  searchObj.data.stream.expandGroupRows[props.row.group]
+                    ? 'expand_less'
+                    : 'expand_more'
+                "
+                size="20px"
+                class="float-right q-mt-xs"
+              ></q-icon>
+            </q-td>
+          </q-tr>
+          <q-tr
+            :props="props"
+            v-else
+            v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
+          >
+            <q-td
+              :props="props"
+              class="field_list"
+              :class="
+                searchObj.data.stream.selectedFields.includes(props.row.name)
+                  ? 'selected'
+                  : ''
+              "
+            >
+              <!-- TODO OK : Repeated code make separate component to display field  -->
+              <div
+                v-if="
+                  props.row.ftsKey ||
+                  !props.row.isSchemaField ||
+                  !props.row.showValues
+                "
+                class="field-container flex content-center ellipsis q-pl-lg full-width"
+                :title="props.row.name"
+              >
+                <div
+                  class="field_label full-width"
+                  :data-test="`logs-field-list-item-${props.row.name}`"
+                >
+                  <div
+                    class="ellipsis"
+                    style="max-width: 90% !important; display: inline-block"
+                  >
+                    {{ props.row.name }}
+                  </div>
+                  <span class="float-right">
+                    <q-icon
+                      :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                      v-if="searchObj.meta.quickMode"
+                      :name="
+                        props.row.isInterestingField ? 'info' : 'info_outline'
+                      "
+                      :class="
+                        store.state.theme === 'dark' ? '' : 'light-dimmed'
+                      "
+                      style="margin-right: 0.375rem"
+                      size="1.1rem"
+                      :title="
+                        props.row.isInterestingField
+                          ? 'Remove from interesting fields'
+                          : 'Add to interesting fields'
+                      "
+                    />
+                  </span>
+                </div>
+                <div class="field_overlay">
+                  <q-btn
+                    v-if="
+                      props.row.isSchemaField &&
+                      props.row.name != store.state.zoConfig.timestamp_column
+                    "
+                    :icon="outlinedAdd"
+                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
+                    style="margin-right: 0.375rem"
+                    size="0.4rem"
+                    class="q-mr-sm"
+                    @click.stop="addToFilter(`${props.row.name}=''`)"
+                    round
+                  />
+                  <q-icon
+                    :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
+                    v-if="
+                      !searchObj.data.stream.selectedFields.includes(
+                        props.row.name,
+                      )
+                    "
+                    :name="outlinedVisibility"
+                    style="margin-right: 0.375rem"
+                    size="1.1rem"
+                    title="Add field to table"
+                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                  />
+                  <q-icon
+                    :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
+                    v-if="
+                      searchObj.data.stream.selectedFields.includes(
+                        props.row.name,
+                      )
+                    "
+                    :name="outlinedVisibilityOff"
+                    style="margin-right: 0.375rem"
+                    size="1.1rem"
+                    title="Remove field from table"
+                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                  />
+                  <q-icon
+                    :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                    v-if="searchObj.meta.quickMode"
+                    :name="
+                      props.row.isInterestingField ? 'info' : 'info_outline'
+                    "
+                    size="1.1rem"
+                    :title="
+                      props.row.isInterestingField
+                        ? 'Remove from interesting fields'
+                        : 'Add to interesting fields'
+                    "
+                    @click.stop="
+                      addToInterestingFieldList(
+                        props.row,
+                        props.row.isInterestingField,
+                      )
+                    "
+                  />
+                </div>
+              </div>
+              <q-expansion-item
+                v-else
+                dense
+                switch-toggle-side
+                :label="props.row.name"
+                expand-icon-class="field-expansion-icon"
+                expand-icon="
+                  expand_more
+                "
+                expanded-icon="
+                  expand_less
+                "
+                @before-show="
+                  (event: any) => openFilterCreator(event, props.row)
+                "
+                @before-hide="(event: any) => cancelFilterCreator(props.row)"
+              >
+                <template v-slot:header>
+                  <div
+                    class="flex content-center ellipsis full-width"
+                    :title="props.row.name"
+                    :data-test="`log-search-expand-${props.row.name}-field-btn`"
+                  >
+                    <div
+                      class="field_label full-width"
+                      :data-test="`logs-field-list-item-${props.row.name}`"
+                    >
+                      <div
+                        class="ellipsis"
+                        style="max-width: 90% !important; display: inline-block"
+                      >
+                        {{ props.row.name }}
+                      </div>
+                      <span class="float-right">
+                        <q-icon
+                          :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                          v-if="searchObj.meta.quickMode"
+                          :name="
+                            props.row.isInterestingField
+                              ? 'info'
+                              : 'info_outline'
+                          "
+                          :class="
+                            store.state.theme === 'dark' ? '' : 'light-dimmed'
+                          "
+                          style="margin-right: 0.375rem"
+                          size="1.1rem"
+                          :title="
+                            props.row.isInterestingField
+                              ? 'Remove from interesting fields'
+                              : 'Add to interesting fields'
+                          "
+                        />
+                      </span>
+                    </div>
+                    <div class="field_overlay">
+                      <q-btn
+                        v-if="props.row.isSchemaField"
+                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
+                        :icon="outlinedAdd"
+                        style="margin-right: 0.375rem"
+                        size="0.4rem"
+                        class="q-mr-sm"
+                        @click.stop="addToFilter(`${props.row.name}=''`)"
+                        round
+                      />
+                      <q-icon
+                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
+                        v-if="
+                          !searchObj.data.stream.selectedFields.includes(
+                            props.row.name,
+                          )
+                        "
+                        :name="outlinedVisibility"
+                        style="margin-right: 0.375rem"
+                        size="1.1rem"
+                        title="Add field to table"
+                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                      />
+                      <q-icon
+                        :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
+                        v-if="
+                          searchObj.data.stream.selectedFields.includes(
+                            props.row.name,
+                          )
+                        "
+                        :name="outlinedVisibilityOff"
+                        style="margin-right: 0.375rem"
+                        title="Remove field from table"
+                        size="1.1rem"
+                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                      />
+                      <q-icon
+                        :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                        v-if="searchObj.meta.quickMode"
+                        :name="
+                          props.row.isInterestingField ? 'info' : 'info_outline'
+                        "
+                        size="1.1rem"
+                        :title="
+                          props.row.isInterestingField
+                            ? 'Remove from interesting fields'
+                            : 'Add to interesting fields'
+                        "
+                        @click.stop="
+                          addToInterestingFieldList(
+                            props.row,
+                            props.row.isInterestingField,
+                          )
+                        "
+                      />
+                    </div>
+                  </div>
+                </template>
+                <q-card>
+                  <q-card-section class="q-pl-md q-pr-xs q-py-xs">
+                    <div class="filter-values-container">
+                      <div
+                        v-show="fieldValues[props.row.name]?.isLoading"
+                        class="q-pl-md q-py-xs"
+                        style="height: 60px"
+                      >
+                        <q-inner-loading
+                          size="xs"
+                          :showing="fieldValues[props.row.name]?.isLoading"
+                          label="Fetching values..."
+                          label-style="font-size: 1.1em"
+                        />
+                      </div>
+                      <div
+                        v-show="
+                          !fieldValues[props.row.name]?.values?.length &&
+                          !fieldValues[props.row.name]?.isLoading
+                        "
+                        class="q-pl-md q-py-xs text-subtitle2"
+                      >
+                        {{
+                          fieldValues[props.row.name]?.errMsg ||
+                          "No values found"
+                        }}
+                      </div>
+                      <div
+                        v-for="value in fieldValues[props.row.name]?.values ||
+                        []"
+                        :key="value.key"
+                      >
+                        <q-list dense>
+                          <q-item
+                            tag="label"
+                            class="q-pr-none"
+                            :data-test="`logs-search-subfield-add-${props.row.name}-${value.key}`"
+                          >
+                            <div
+                              class="flex row wrap justify-between"
+                              :style="
+                                searchObj.data.stream.selectedStream.length ==
+                                props.row.streams.length
+                                  ? 'width: calc(100% - 42px)'
+                                  : 'width: calc(100% - 0px)'
+                              "
+                            >
+                              <div
+                                :title="value.key"
+                                class="ellipsis q-pr-xs"
+                                style="width: calc(100% - 50px)"
+                              >
+                                {{ value.key }}
+                              </div>
+                              <div
+                                :title="value.count.toString()"
+                                class="ellipsis text-right q-pr-sm"
+                                style="display: contents"
+                                :style="
+                                  searchObj.data.stream.selectedStream.length ==
+                                  props.row.streams.length
+                                    ? 'width: 50px'
+                                    : ''
+                                "
+                              >
+                                {{ formatLargeNumber(value.count) }}
+                              </div>
+                            </div>
+                            <div
+                              v-if="
+                                searchObj.data.stream.selectedStream.length ==
+                                props.row.streams.length
+                              "
+                              class="flex row"
+                              :class="
+                                store.state.theme === 'dark'
+                                  ? 'text-white'
+                                  : 'text-black'
+                              "
+                            >
+                              <q-btn
+                                class="q-mr-xs"
+                                size="6px"
+                                @click="
+                                  addSearchTerm(
+                                    props.row.name,
+                                    value.key,
+                                    'include',
+                                  )
+                                "
+                                title="Include Term"
+                                round
+                                :data-test="`log-search-subfield-list-equal-${props.row.name}-field-btn`"
+                              >
+                                <q-icon>
+                                  <EqualIcon></EqualIcon>
+                                </q-icon>
+                              </q-btn>
+                              <q-btn
+                                size="6px"
+                                @click="
+                                  addSearchTerm(
+                                    props.row.name,
+                                    value.key,
+                                    'exclude',
+                                  )
+                                "
+                                title="Exclude Term"
+                                round
+                                :data-test="`log-search-subfield-list-not-equal-${props.row.name}-field-btn`"
+                              >
+                                <q-icon>
+                                  <NotEqualIcon></NotEqualIcon>
+                                </q-icon>
+                              </q-btn>
+                            </div>
+                          </q-item>
+                        </q-list>
+                      </div>
+                    </div>
+                  </q-card-section>
+                </q-card>
+              </q-expansion-item>
+            </q-td>
+          </q-tr>
+        </template>
+        <template #top-right>
+          <q-input
+            data-test="log-search-index-list-field-search-input"
+            v-model="searchObj.data.stream.filterField"
+            data-cy="index-field-search-input"
+            filled
+            borderless
+            dense
+            clearable
+            debounce="1"
+            :placeholder="t('search.searchField')"
+          >
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+          <q-tr v-if="searchObj.loadingStream == true">
+            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+              <div class="text-subtitle2 text-weight-bold">
+                <q-spinner-hourglass size="20px" />
+                {{ t("confirmDialog.loading") }}
+              </div>
+            </q-td>
+          </q-tr>
+        </template>
+        <template v-slot:pagination="scope">
+          <div
+            v-if="
+              store.state.zoConfig.user_defined_schemas_enabled &&
+              searchObj.meta.hasUserDefinedSchemas
+            "
+          >
+            <q-btn-toggle
+              no-caps
+              v-model="searchObj.meta.useUserDefinedSchemas"
+              data-test="logs-page-field-list-user-defined-schema-toggle"
+              class="schema-field-toggle q-mr-xs"
+              toggle-color="primary"
+              bordered
+              size="8px"
+              color="white"
+              text-color="primary"
+              @update:model-value="toggleSchema"
+              :options="userDefinedSchemaBtnGroupOption"
+            >
+              <template v-slot:user_defined_slot>
+                <div data-test="logs-user-defined-fields-btn">
+                  <q-icon name="person"></q-icon>
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.userDefinedSchemaLabel")
+                    }}</span>
+                  </q-tooltip>
+                </div>
+              </template>
+              <template v-slot:all_fields_slot>
+                <div data-test="logs-all-fields-btn">
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.allFieldsLabel")
+                    }}</span>
+                    <q-separator color="white" class="q-mt-xs q-mb-xs" />
+                    {{ t("search.allFieldsWarningMsg") }}
+                  </q-tooltip>
+                </div>
+              </template>
+            </q-btn-toggle>
+          </div>
+          <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
+            <q-tooltip
+              data-test="logs-page-fields-list-pagination-tooltip"
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              class="text-body2"
+            >
+              Total Fields:
+              {{
+                searchObj.data.stream.selectedStream.length > 1
+                  ? searchObj.data.stream.selectedStreamFields.length -
+                    (searchObj.data.stream.selectedStream.length + 1)
+                  : searchObj.data.stream.selectedStreamFields.length
+              }}
+            </q-tooltip>
+            <q-btn
+              data-test="logs-page-fields-list-pagination-firstpage-button"
+              v-if="scope.pagesNumber > 2"
+              icon="skip_previous"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.firstPage"
+            />
+
+            <q-btn
+              data-test="logs-page-fields-list-pagination-previouspage-button"
+              icon="fast_rewind"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.prevPage"
+            />
+
+            <q-btn
+              round
+              data-test="logs-page-fields-list-pagination-message-button"
+              dense
+              flat
+              class="text text-caption text-regular"
+              >{{ scope.pagination.page }}/{{ scope.pagesNumber }}</q-btn
+            >
+
+            <q-btn
+              data-test="logs-page-fields-list-pagination-nextpage-button"
+              icon="fast_forward"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.nextPage"
+            />
+
+            <q-btn
+              data-test="logs-page-fields-list-pagination-lastpage-button"
+              v-if="scope.pagesNumber > 2"
+              icon="skip_next"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.lastPage"
+            />
+          </div>
+        </template>
+      </q-table>
     </div>
   </div>
 </template>
@@ -147,16 +764,7 @@ export default defineComponent({
         slot: "all_fields_slot",
       },
     ];
-    const streamOptions: any = ref([
-      {
-        label: "All Streams",
-        value: "all_streams",
-      },
-      {
-        label: "Default",
-        value: "default",
-      },
-    ]);
+    const streamOptions: any = ref([]);
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
@@ -181,9 +789,25 @@ export default defineComponent({
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
 
+    const streamList = computed(() => {
+      return searchObj.data.stream.streamLists;
+    });
+
+    watch(
+      () => streamList.value,
+      () => {
+        if (streamOptions.value.length === 0) {
+          streamOptions.value = streamList.value;
+        }
+      },
+      {
+        deep: true,
+      },
+    );
+
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
-        streamOptions.value = searchObj.data.stream.streamLists;
+        streamOptions.value = streamList.value;
         const needle = val.toLowerCase();
         streamOptions.value = streamOptions.value.filter(
           (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
@@ -1259,7 +1883,114 @@ $streamSelectorHeight: 44px;
 }
 </style>
 
-<style scoped lang="scss">
+<style lang="scss">
+.logs-index-menu {
+  .index-table {
+    .q-table {
+      width: 100%;
+      table-layout: fixed;
+
+      .q-expansion-item {
+        .q-item {
+          display: flex;
+          align-items: center;
+          padding: 0;
+          height: 25px !important;
+          min-height: 25px !important;
+        }
+
+        .q-item__section--avatar {
+          min-width: 12px;
+          max-width: 12px;
+          margin-right: 8px;
+        }
+
+        .filter-values-container {
+          .q-item {
+            padding-left: 4px;
+
+            .q-focus-helper {
+              background: none !important;
+            }
+          }
+        }
+
+        .q-item-type {
+          &:hover {
+            .field_overlay {
+              visibility: visible;
+
+              .q-icon {
+                opacity: 1;
+              }
+            }
+          }
+        }
+
+        .field-expansion-icon {
+          img {
+            width: 12px;
+            height: 12px;
+          }
+
+          .q-icon {
+            font-size: 18px;
+            color: #808080;
+          }
+        }
+      }
+
+      .field-container {
+        &:hover {
+          .field_overlay {
+            visibility: visible;
+
+            .q-icon {
+              opacity: 1;
+            }
+          }
+        }
+      }
+
+      .field_list {
+        &.selected {
+          background-color: rgba(89, 96, 178, 0.3);
+
+          .field_overlay {
+            // background-color: #ffffff;
+          }
+        }
+      }
+    }
+
+    .schema-field-toggle {
+      border: 1px solid light-grey;
+      border-radius: 5px;
+      line-height: 10px;
+    }
+
+    .q-table__bottom {
+      padding: 0px !important;
+    }
+
+    .pagination-field-count {
+      line-height: 32px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+  }
+
+  .field-table {
+    .q-table__bottom {
+      padding: 5px !important;
+    }
+
+    .schema-field-toggle .q-btn {
+      padding: 5px !important;
+    }
+  }
+}
+
 // .q-field--auto-height.q-field--dense .q-field__control,
 // .q-field--auto-height.q-field--dense .q-field__native,
 // .q-field--auto-height.q-field--dense .q-field__native span {

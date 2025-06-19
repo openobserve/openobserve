@@ -239,7 +239,7 @@ export default defineComponent({
                 emit("focus");
               } else {
                 // Handle blur with trimming
-                const value = state.state.doc.toString();
+                const value = state.doc.toString();
                 const trimmedValue = value.trim();
 
                 if (value !== trimmedValue) {
