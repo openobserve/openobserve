@@ -37,8 +37,8 @@ export class CommonActions {
     async scrollAndFindOption(optionName, optionType) {
         const dropdown = this.page.locator('.q-menu');
         let optionFound = false;
-        let maxScrolls = 20;
-        let scrollAmount = 300;
+        let maxScrolls = 50;
+        let scrollAmount = 1000;
         let totalScrolled = 0;
 
         while (!optionFound && maxScrolls > 0) {

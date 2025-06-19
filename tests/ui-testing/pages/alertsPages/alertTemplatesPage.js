@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { test as base } from '@playwright/test';
+import fs from 'fs';
 
 export class AlertTemplatesPage {
     constructor(page) {
@@ -24,6 +25,16 @@ export class AlertTemplatesPage {
         this.confirmButton = '[data-test="confirm-button"]';
         this.templateDeletedMessage = 'Template %s deleted successfully';
         this.templateInUseMessage = 'Template is in use for destination {destinationName}';
+        
+        // Template import locators
+        this.templateImportButton = '[data-test="template-import"]';
+        this.importUrlTab = '[data-test="tab-import_json_url"]';
+        this.importUrlInput = '[data-test="template-import-url-input"]';
+        this.importJsonButton = '[data-test="template-import-json-btn"]';
+        this.importNameInput = '[data-test="template-import-name-input"]';
+        this.importFileInput = '[data-test="template-import-json-file-input"]';
+        this.templateImportSuccessMessage = 'Successfully imported';
+        this.templateImportErrorText = 'Template - 1: "email template" creation failed --> Reason: Template name cannot contain \':\', \'#\', \'?\', \'&\', \'%\', \'/\', quotes and space characters';
     }
 
     async navigateToTemplates(retryCount = 0) {
@@ -250,6 +261,66 @@ export class AlertTemplatesPage {
             console.log('Successfully verified template exists:', templateName);
         } catch (error) {
             throw new Error(`Template ${templateName} not found in the list`);
+        }
+    }
+
+    /**
+     * Import template from URL
+     * @param {string} url - URL to import template from
+     * @param {string} templateName - Name for the imported template
+     * @param {string} importType - Type of import: 'valid' or 'invalid'
+     */
+    async importTemplateFromUrl(url, templateName, importType = 'valid') {
+        await this.navigateToTemplates();
+        await this.page.waitForTimeout(2000);
+        
+        await this.page.locator(this.templateImportButton).click();
+        await this.page.locator(this.importUrlTab).click();
+        await this.page.locator(this.importUrlInput).click();
+        await this.page.locator(this.importUrlInput).fill(url);
+        await this.page.waitForTimeout(1000); // Small delay after filling URL
+        await this.page.locator(this.importJsonButton).click();
+        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        await this.page.locator(this.importNameInput).click();
+        await this.page.locator(this.importNameInput).fill(templateName);
+        await this.page.locator(this.importJsonButton).click();
+        
+        if (importType === 'invalid') {
+            await expect(this.page.locator('pre')).toContainText(this.templateImportErrorText);
+        } else {
+            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
+        }
+    }
+
+    /**
+     * Verify imported template exists
+     * @param {string} templateName - Name of the imported template
+     */
+    async verifyImportedTemplateExists(templateName) {
+        await this.page.locator(this.templateSearchInput).click();
+        await this.page.locator(this.templateSearchInput).fill(templateName);
+        await expect(this.page.getByRole('cell', { name: templateName })).toBeVisible();
+    }
+
+    /**
+     * Create template from JSON file
+     * @param {string} filePath - Path to the JSON file
+     * @param {string} templateName - Name for the template (will override the name in file)
+     * @param {string} importType - Type of import: 'valid' or 'invalid'
+     */
+    async createTemplateFromFile(filePath, templateName, importType = 'valid') {
+        await this.navigateToTemplates();
+        await this.page.locator(this.templateImportButton).click();
+        await this.page.locator(this.importFileInput).setInputFiles(filePath);
+        await this.page.locator(this.importJsonButton).click();
+        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        await this.page.locator(this.importNameInput).fill(templateName);
+        await this.page.locator(this.importJsonButton).click();
+        
+        if (importType === 'invalid') {
+            await expect(this.page.locator('pre')).toContainText(this.templateImportErrorText);
+        } else {
+            await expect(this.page.getByText(this.templateImportSuccessMessage)).toBeVisible();
         }
     }
 } 
