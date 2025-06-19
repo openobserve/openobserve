@@ -334,7 +334,7 @@ const props = defineProps({
 const emit = defineEmits(["function-error"]);
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
+  () => import("@/components/QueryEditor.vue"),
 );
 
 const inputQuery = ref<string>("");

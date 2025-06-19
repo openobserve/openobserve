@@ -4487,14 +4487,14 @@ const useLogs = () => {
       );
       if (searchObj.data.stream.selectedFields.length > 0) {
         searchObj.data.stream.selectedFields =
-          searchObj.data.stream.selectedFields.filter((fieldName) =>
+          searchObj.data.stream.selectedFields.filter((fieldName: string) =>
             streamFieldNames.has(fieldName),
           );
       }
 
       // Update interesting fields list
       searchObj.data.stream.interestingFieldList =
-        searchObj.data.stream.interestingFieldList.filter((fieldName) =>
+        searchObj.data.stream.interestingFieldList.filter((fieldName: string) =>
           streamFieldNames.has(fieldName),
         );
 
@@ -4601,7 +4601,7 @@ const useLogs = () => {
     } else {
       searchObj.data.searchWebSocketTraceIds =
         searchObj.data.searchWebSocketTraceIds.filter(
-          (_traceId) => _traceId !== traceId,
+          (_traceId: string) => _traceId !== traceId,
         );
     }
   };
