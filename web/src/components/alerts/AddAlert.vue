@@ -1574,7 +1574,10 @@ export default defineComponent({
       retransformBEToFE,
       validateFormAndNavigateToErrorField,
       navigateToErrorField,
-      realTimeAlertRef
+      realTimeAlertRef,
+      originalStreamFields,
+      generateSqlQuery,
+      generateWhereClause
     };
   },
 
