@@ -59,18 +59,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #before>
                 <div class="relative-position full-height">
-                  <!-- <index-list
+                  <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    :key="
-                      searchObj.data.stream.selectedStream.join(',') ||
-                      'default'
-                    "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
                     "
-                  /> -->
+                  />
                   <q-btn
                     data-test="logs-search-field-list-collapse-btn"
                     :icon="
