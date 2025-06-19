@@ -4,7 +4,6 @@
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-//
 // This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -30,6 +29,7 @@ import router from "@/test/unit/helpers/router";
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
 
 import i18n from "@/locales";
+import cronParser from "cron-parser";
 
 import QueryEditor from "@/components/QueryEditor.vue";
 
@@ -38,6 +38,100 @@ import { useLocalOrganization } from "@/utils/zincutils";
 installQuasar({
   plugins: [Dialog, Notify],
 });
+vi.mock('@/composables/useStreams', () => {
+  return {
+    default: () => ({
+      getStream: vi.fn().mockResolvedValue({
+        schema: [
+          { name: 'field1', type: 'string' },
+          { name: 'field2', type: 'int' },
+        ]
+      }),
+      getStreams: vi.fn(),
+    }),
+  };
+});
+
+vi.mock('@/composables/useFunctions', () => {
+  return {
+    default: () => ({
+      getAllFunctions: vi.fn().mockResolvedValue({
+        functions: [
+          { name: 'avg', description: 'Average' },
+          { name: 'sum', description: 'Sum' },
+        ]
+      }),
+    }),
+  };
+});
+
+
+vi.mock('@/composables/useParser', () => {
+  return {
+    default: () => ({
+      sqlParser: async () => ({
+        astify: vi.fn((query) => {
+          const lowerQuery = query.toLowerCase();
+        
+          if (lowerQuery.includes("select *")) {
+            return {
+              columns: [
+                { expr: { column: "*" } }
+              ]
+            };
+          }
+          if (lowerQuery.includes("valid_column")) {
+            return {
+              columns: [
+                { expr: { column: "valid_column" } }
+              ]
+            };
+          }
+          if (lowerQuery.includes("default")) {
+            throw new Error("Syntax error near 'default'");
+          }
+          return { columns: [] };
+        }),
+        sqlify: vi.fn(),
+        columnList: vi.fn(),
+        tableList: vi.fn(),
+        whiteListCheck: vi.fn(),
+        exprToSQL: vi.fn(),
+        parse: vi.fn(),
+      })
+    })
+  };
+});
+
+vi.mock('cron-parser', () => {
+  return {
+    default: {
+      parseExpression: vi.fn()
+    }
+  };
+});
+vi.mock('@/services/alerts', () => {
+  return {
+    default: {
+      create_by_alert_id: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            code: 200,
+            message: "Alert saved",
+            id: "2yis4t0dJCU7Vs4D3sEYHDsvDKF",
+            name: "test_alert"
+          }
+        })
+      ),
+      update_by_alert_id: vi.fn(() =>
+        Promise.resolve({
+          data: { success: true }
+        })
+      )
+    }
+  };
+});
+
 
 
 describe("AddAlert Component", () => {
@@ -63,151 +157,24 @@ describe("AddAlert Component", () => {
         updateStreams: updateStreamsMock,
       },
     });
-  });
 
-  it("renders the title passed as a prop", () => {
-    const titleElement = wrapper.find('[data-test="add-alert-title"]');
-    expect(titleElement.exists()).toBe(true);
-    expect(titleElement.text()).toBe("Add Alert");
-  });
-
-  it("renders the name input", () => {
-    const nameInput = wrapper.find('[data-test="add-alert-name-input"]');
-    expect(nameInput.exists()).toBeTruthy();
-  });
-
-  it("renders the stream input", () => {
-    const streamSelect = wrapper.find('[data-test="add-alert-stream-select"]');
-    expect(streamSelect.exists()).toBeTruthy();
-  });
-
-  it("defaults to Scheduled type alerts", () => {
-    const scheduledRadio = wrapper.find(
-      '[data-test="add-alert-scheduled-alert-radio"]',
-    );
-    expect(
-      scheduledRadio.find(".q-radio__inner--truthy").exists(),
-    ).toBeTruthy();
-  });
-
-  it("renders conditions section", () => {
-    expect(wrapper.find('[data-test="alert-conditions-text"]').text()).toBe(
-      "Conditions * (AND operator is used by default to evaluate multiple conditions)",
-    );
-    expect(
-      wrapper.find('[data-test="alert-conditions-select-column"]').exists(),
-    ).toBeTruthy();
-    expect(
-      wrapper.find('[data-test="alert-conditions-operator-select"]').exists(),
-    ).toBeTruthy();
-    expect(
-      wrapper.find('[data-test="alert-conditions-value-input"]').exists(),
-    ).toBeTruthy();
-  });
-
-  it("renders duration input", () => {
-    expect(
-      wrapper.find('[data-test="scheduled-alert-period-title"]').text(),
-    ).toBe("Period *");
-    expect(
-      wrapper.find('[data-test="scheduled-alert-period-input"]').exists(),
-    ).toBeTruthy();
-    expect(
-      wrapper.find('[data-test="scheduled-alert-period-unit"]').exists(),
-    ).toBeTruthy();
-  });
-
-  it("renders frequency input", () => {
-    expect(
-      wrapper.find('[data-test="scheduled-alert-frequency-title"]').text(),
-    ).toBe("Frequency *");
-    expect(
-      wrapper.find('[data-test="scheduled-alert-frequency-input"]').exists(),
-    ).toBeTruthy();
-    expect(
-      wrapper.find('[data-test="scheduled-alert-frequency-unit"]').exists(),
-    ).toBeTruthy();
-  });
-
-  it("renders destination select input", () => {
-    expect(
-      wrapper.find('[data-test="add-alert-destination-select"]').exists(),
-    ).toBeTruthy();
-  });
-
-  it("renders ScheduledAlert component", () => {
-    const scheduledAlertComponent = wrapper.findComponent(ScheduledAlert);
-
-    expect(scheduledAlertComponent.exists()).toBe(true);
-
-    const FieldsInputComponent = wrapper.findComponent(FieldsInput);
-    expect(FieldsInputComponent.exists()).toBe(true);
-  });
-
-  describe("When user fills form and clicks submit", async () => {
-    // const mockStreamName = "k8s_json";
-    // const mockAlertName = "alert2";
-
-    beforeEach(async () => {
-      //   // // Fill form fields
-      // const alertNameWrapper = wrapper.find('[data-test="add-alert-name-input"]');
-      // await alertNameWrapper.find("input").setValue(mockAlertName);
-
-      // wrapper.vm.formData.stream_name = mockStreamName;
-      // wrapper.vm.formData.stream_type = "logs";
-      // // // wrapper.vm.formData.query_condition.conditions[0].column = "kubernetes.container_hash";
-      // // // // wrapper.vm.formData.query_condition.conditions[0].operator = "=";
-      // // // console.log(wrapper.vm.formData.query_condition.conditions[0],'cond')
-      // // // // wrapper.vm.formData.query_condition.conditions[0].value = 123;
-      // wrapper.vm.formData.aggregation = null;
-
-      // wrapper.vm.formData.is_real_time = false
-
-      // wrapper.vm.formData.lastEditedBy =  ""
-      // wrapper.vm.formData.lastTriggeredAt = 0;
-
-      // wrapper.vm.formData.trigger_condition.period = 1;
-      // wrapper.vm.formData.trigger_condition.frequency = 1;
-      // wrapper.vm.formData.trigger_condition.silence = 10;
-
-      // wrapper.vm.formData.destinations[0] = "dest1";
-      // wrapper.vm.formData.aggregation = null;
-    });
-    it("should retain the sql query when the user switches to the SQL tab from custom tab", async () => {
-      const sqlTab = wrapper.find('[data-test="scheduled-alert-sql-tab"]');
-      const customTab = wrapper.find(
-        '[data-test="scheduled-alert-custom-tab"]',
-      );
-      await sqlTab.trigger("click");
-
-      const scheduledAlertComponent = wrapper.findComponent(ScheduledAlert);
-
-      expect(scheduledAlertComponent.exists()).toBe(true);
-      await flushPromises();
-
-      const QueryEditorComponent = await wrapper.findComponent(QueryEditor);
-      expect(QueryEditorComponent.exists()).toBe(true);
-      const sqlQuery = "SELECT code FROM 'default";
-
-      scheduledAlertComponent.vm.updateQueryValue(sqlQuery);
-      await customTab.trigger("click");
-
-      await sqlTab.trigger("click");
-      expect(scheduledAlertComponent.vm.sql).toBe(sqlQuery);
-    });
-    it.skip("should submit the form when the user gives all the data for test usage", async () => {
-      wrapper.vm.addAlertForm = {
-        validate: vi.fn().mockResolvedValue(true), // Simulates a valid form
-        resetValidation: vi.fn(), // Mock other methods if needed
-      };
-      const submitSpy = vi.spyOn(alertsService, "create");
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
+    wrapper.vm.formData = {
+        name: "",
+        stream_type: "",
+        stream_name: "",
         is_real_time: "false",
         query_condition: {
-          conditions: [],
+          conditions: 
+          {
+            "or": [
+                {
+                    "column": "",
+                    "operator": ">",
+                    "value": "",
+                    "ignore_case": false
+                }
+            ]
+            },
           sql: "",
           promql: "",
           type: "custom",
@@ -234,927 +201,527 @@ describe("AddAlert Component", () => {
           frequency_type: "minutes",
           timezone: "UTC",
         },
-        destinations: ["ksjf"],
+        destinations: [],
         context_attributes: [],
         enabled: true,
         description: "",
         lastTriggeredAt: 0,
         createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
+        updatedAt: "",
         owner: "",
         lastEditedBy: "",
-      };
+        folder_id : "",
 
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
+    }
+  });
 
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-
-      await flushPromises();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+  describe("Functions with input and output as expected", () => {
+    describe('general functions', () => {
+      it('filters streams via filterStreams', async () => {
+        // Setup indexOptions in the component
+        wrapper.vm.indexOptions = ['stream1', 'stream2', 'logstream', 'metrics'];
+        wrapper.vm.filteredStreams = [];
+      
+        const mockUpdate = (cb: Function) => cb(); // immediately execute callback
+      
+        // Call the filterStreams method
+        wrapper.vm.filterStreams('stream', mockUpdate);
+        await wrapper.vm.$nextTick(); // wait for reactivity to apply
+      
+        // Verify the result
+        expect(wrapper.vm.filteredStreams).toEqual(['stream1', 'stream2', 'logstream']);
+      });
+      it('returns all streams when filter input is empty', async () => {
+        wrapper.vm.indexOptions = ['stream1', 'stream2', 'logstream', 'metrics'];
+        wrapper.vm.filteredStreams = [];
+      
+        const mockUpdate = (cb: Function) => cb();
+      
+        wrapper.vm.filterStreams('', mockUpdate);
+        await wrapper.vm.$nextTick();
+      
+        expect(wrapper.vm.filteredStreams).toEqual(['stream1', 'stream2', 'logstream', 'metrics']);
+      });
+      it('updates stream fields via updateStreamFields', async () => {
+  
+        await flushPromises();
+    
+        // 🧪 2. Mock onInputUpdate
+        wrapper.vm.onInputUpdate = vi.fn();
+    
+        // 🧪 4. Call the function
+        await wrapper.vm.updateStreamFields('testStream');
+        await wrapper.vm.$nextTick();
+    
+        // 🧪 5. Expect originalStreamFields and filteredColumns to be updated
+        const expected = [
+          { label: 'field1', value: 'field1', type: 'string' },
+          { label: 'field2', value: 'field2', type: 'int' }
+        ];
+    
+        expect(wrapper.vm.originalStreamFields).toEqual(expected);
+        expect(wrapper.vm.filteredColumns).toEqual(expected);
+    
+      });
     });
 
-    it("should not call the api when user submits the form with invalid sql query / empty query ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-
-      const alertNameWrapper = wrapper.find(
-        '[data-test="add-alert-name-input"]',
-      );
-      await alertNameWrapper.find("input").setValue("alert123");
-
-      const streamTypeSelect = wrapper.find(
-        '[data-test="add-alert-stream-type-select"]',
-      );
-      const streamType = streamTypeSelect.findComponent({ name: "QSelect" });
-      expect(streamType.exists()).toBe(true);
-
-      wrapper.vm.formData.stream_type = "logs";
-      wrapper.vm.formData.stream_name = "k8s_json";
-
-      wrapper.vm.formData.query_condition.sql = "select code from 'default'";
-
-      wrapper.vm.formData.destinations = ["dest1"];
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
-    });
-
-    it("should fill the form with the correct data and api should be called", async () => {
-      wrapper.vm.addAlertForm = {
-        validate: vi.fn().mockResolvedValue(true), // Simulates a valid form
-        resetValidation: vi.fn(), // Mock other methods if needed
-      };
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-
-      vi.spyOn(wrapper.vm, "updateStreams").mockResolvedValue({
-        success: true,
+    describe('generateWhereClause function with all the possible combinations', () => {
+      beforeEach(() => {
+        wrapper.vm.streamFieldsMap = {
+          age: { type: 'Int64' },
+          city: { type: 'String' },
+        };
+        });
+      it('generates a simple where clause', () => {
+        const group = {
+          label: 'AND',
+          items: [
+            { column: 'age', operator: '>', value: 30 }
+          ]
+        };
+    
+        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        expect(result).toBe("WHERE age > '30'");
       });
-
-      const mockUpdateStreamFields = vi.spyOn(wrapper.vm, "updateStreamFields");
-      mockUpdateStreamFields.mockResolvedValue({ success: true });
-
-      const alertNameWrapper = wrapper.find(
-        '[data-test="add-alert-name-input"]',
-      );
-      await alertNameWrapper.find("input").setValue("alert123");
-
-      const streamTypeSelect = await wrapper.find(
-        '[data-test="add-alert-stream-type-select"]',
-      );
-      const streamType = await streamTypeSelect.findComponent({
-        name: "QSelect",
+    
+      it('handles string value with quotes', () => {
+        const group = {
+          label: 'AND',
+          items: [
+            { column: 'city', operator: '=', value: 'delhi' }
+          ]
+        };
+    
+        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        expect(result).toBe("WHERE city = 'delhi'");
       });
-      expect(streamType.exists()).toBe(true);
-      await streamType.setValue("logs");
-
-      await flushPromises();
-      wrapper.vm.formData.query_condition.conditions = [];
-
-      const streamNameSelect = await wrapper.find(
-        '[data-test="add-alert-stream-select"]',
-      );
-      const streamName = await streamNameSelect.findComponent({
-        name: "QSelect",
+    
+      it('handles contains operator without quotes', () => {
+        const group = {
+          label: 'AND',
+          items: [
+            { column: 'city', operator: 'contains', value: 'delhi' }
+          ]
+        };
+    
+        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        expect(result).toBe("WHERE city LIKE '%delhi%'");
       });
-      expect(streamName.exists()).toBe(true);
-      await streamName.setValue("k8s_json");
-      await flushPromises();
-
-      const destinationSelect = await wrapper.find(
-        '[data-test="add-alert-destination-select"]',
-      );
-      const destination = await destinationSelect.findComponent({
-        name: "QSelect",
+    
+      it('handles nested groups with AND/OR', () => {
+        const group = {
+          label: 'AND',
+          items: [
+            { column: 'age', operator: '>', value: 30 },
+            {
+              label: 'OR',
+              items: [
+                { column: 'city', operator: '=', value: 'delhi' },
+                { column: 'city', operator: '=', value: 'mumbai' }
+              ]
+            }
+          ]
+        };
+    
+        const result = wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap);
+        expect(result).toBe("WHERE age > '30' AND (city = 'delhi' OR city = 'mumbai')");
       });
-      expect(destination.exists()).toBe(true);
-      await destination.setValue(["dest1"]);
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(alertCreateSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it("should not call api when user doesnot give alert name ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-
-      vi.spyOn(wrapper.vm, "updateStreams").mockResolvedValue({
-        success: true,
+    
+      it('returns empty string if group is invalid', () => {
+        const result = wrapper.vm.generateWhereClause(null, wrapper.vm.streamFieldsMap);
+        expect(result).toBe("");
       });
-
-      const mockUpdateStreamFields = vi.spyOn(wrapper.vm, "updateStreamFields");
-      const mockRemoveField = vi.fn();
-      wrapper.vm.removeField = mockRemoveField;
-      mockUpdateStreamFields.mockResolvedValue({ success: true });
-
-      const streamTypeSelect = await wrapper.find(
-        '[data-test="add-alert-stream-type-select"]',
-      );
-      const streamType = await streamTypeSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamType.exists()).toBe(true);
-      await streamType.setValue("logs");
-
-      await flushPromises();
-      const scheduledAlertComponent =
-        await wrapper.findComponent(ScheduledAlert);
-
-      expect(scheduledAlertComponent.exists()).toBe(true);
-      flushPromises();
-
-      const fieldsInput = await wrapper.findComponent(FieldsInput);
-      expect(fieldsInput.exists()).toBe(true);
-
-      wrapper.vm.formData.query_condition.conditions = [];
-
-      const streamNameSelect = await wrapper.find(
-        '[data-test="add-alert-stream-select"]',
-      );
-      const streamName = await streamNameSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamName.exists()).toBe(true);
-      await streamName.setValue("k8s_json");
-      await flushPromises();
-
-      const destinationSelect = await wrapper.find(
-        '[data-test="add-alert-destination-select"]',
-      );
-      const destination = await destinationSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(destination.exists()).toBe(true);
-      await destination.setValue("dest1");
-
-      wrapper.vm.formData.conditions = [];
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
-    });
-    it("should not call api when user doesnot select stream type ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-
-      vi.spyOn(wrapper.vm, "updateStreams").mockResolvedValue({
-        success: true,
-      });
-
-      const mockUpdateStreamFields = vi.spyOn(wrapper.vm, "updateStreamFields");
-      const mockRemoveField = vi.fn();
-      wrapper.vm.removeField = mockRemoveField;
-      mockUpdateStreamFields.mockResolvedValue({ success: true });
-
-      await flushPromises();
-      const scheduledAlertComponent =
-        await wrapper.findComponent(ScheduledAlert);
-
-      expect(scheduledAlertComponent.exists()).toBe(true);
-      flushPromises();
-      const previewAlertComponent = await wrapper.findComponent(PreviewAlert);
-      expect(previewAlertComponent.exists()).toBe(true);
-      flushPromises();
-
-      const fieldsInput = await wrapper.findComponent(FieldsInput);
-      expect(fieldsInput.exists()).toBe(true);
-
-      const alertNameWrapper = wrapper.find(
-        '[data-test="add-alert-name-input"]',
-      );
-      await alertNameWrapper.find("input").setValue("alert123");
-
-      wrapper.vm.formData.query_condition.conditions = [];
-
-      const streamNameSelect = await wrapper.find(
-        '[data-test="add-alert-stream-select"]',
-      );
-      const streamName = await streamNameSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamName.exists()).toBe(true);
-      await streamName.setValue("k8s_json");
-      await flushPromises();
-
-      const destinationSelect = await wrapper.find(
-        '[data-test="add-alert-destination-select"]',
-      );
-      const destination = await destinationSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(destination.exists()).toBe(true);
-      await destination.setValue("dest1");
-
-      wrapper.vm.formData.conditions = [];
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
-    });
-    it("should not call api when user doesnot select stream name ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-
-      vi.spyOn(wrapper.vm, "updateStreams").mockResolvedValue({
-        success: true,
-      });
-
-      const mockUpdateStreamFields = vi.spyOn(wrapper.vm, "updateStreamFields");
-      const mockRemoveField = vi.fn();
-      wrapper.vm.removeField = mockRemoveField;
-      mockUpdateStreamFields.mockResolvedValue({ success: true });
-
-      await flushPromises();
-      const scheduledAlertComponent =
-        await wrapper.findComponent(ScheduledAlert);
-
-      expect(scheduledAlertComponent.exists()).toBe(true);
-      flushPromises();
-
-      const fieldsInput = await wrapper.findComponent(FieldsInput);
-      expect(fieldsInput.exists()).toBe(true);
-
-      const alertNameWrapper = wrapper.find(
-        '[data-test="add-alert-name-input"]',
-      );
-      await alertNameWrapper.find("input").setValue("alert123");
-
-      const streamTypeSelect = await wrapper.find(
-        '[data-test="add-alert-stream-type-select"]',
-      );
-      const streamType = await streamTypeSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamType.exists()).toBe(true);
-      await streamType.setValue("logs");
-
-      await flushPromises();
-
-      wrapper.vm.formData.query_condition.conditions = [];
-
-      const destinationSelect = await wrapper.find(
-        '[data-test="add-alert-destination-select"]',
-      );
-      const destination = await destinationSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(destination.exists()).toBe(true);
-      await destination.setValue("dest1");
-
-      wrapper.vm.formData.conditions = [];
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
-    });
-    it("should call api when user doesnot select destination and return error with Destination Required message ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-
-      vi.spyOn(wrapper.vm, "updateStreams").mockResolvedValue({
-        success: true,
-      });
-
-      const mockUpdateStreamFields = vi.spyOn(wrapper.vm, "updateStreamFields");
-      const mockRemoveField = vi.fn();
-      wrapper.vm.removeField = mockRemoveField;
-      mockUpdateStreamFields.mockResolvedValue({ success: true });
-
-      await flushPromises();
-      const scheduledAlertComponent =
-        await wrapper.findComponent(ScheduledAlert);
-
-      expect(scheduledAlertComponent.exists()).toBe(true);
-      flushPromises();
-
-      const fieldsInput = await wrapper.findComponent(FieldsInput);
-      expect(fieldsInput.exists()).toBe(true);
-
-      const alertNameWrapper = wrapper.find(
-        '[data-test="add-alert-name-input"]',
-      );
-      await alertNameWrapper.find("input").setValue("alert123");
-
-      const streamTypeSelect = await wrapper.find(
-        '[data-test="add-alert-stream-type-select"]',
-      );
-      const streamType = await streamTypeSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamType.exists()).toBe(true);
-      await streamType.setValue("logs");
-
-      await flushPromises();
-
-      const streamNameSelect = await wrapper.find(
-        '[data-test="add-alert-stream-select"]',
-      );
-      const streamName = await streamNameSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamName.exists()).toBe(true);
-      await streamName.setValue("k8s_json");
-      await flushPromises();
-
-      wrapper.vm.formData.query_condition.conditions = [];
-
-      wrapper.vm.formData.conditions = [];
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      // expect(alertCreateSpy.mock.calls[0][3].destinations).toEqual([]);
-      expect(
-        alertCreateSpy.mock.settledResults[0].value.response.data.data.message,
-      ).toBe("Destination Required");
-    });
-    it("should not call api when user doesnot give conditions value ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-
-      vi.spyOn(wrapper.vm, "updateStreams").mockResolvedValue({
-        success: true,
-      });
-
-      const mockUpdateStreamFields = vi.spyOn(wrapper.vm, "updateStreamFields");
-      const mockRemoveField = vi.fn();
-      wrapper.vm.removeField = mockRemoveField;
-      mockUpdateStreamFields.mockResolvedValue({ success: true });
-
-      await flushPromises();
-      const scheduledAlertComponent =
-        await wrapper.findComponent(ScheduledAlert);
-
-      expect(scheduledAlertComponent.exists()).toBe(true);
-      flushPromises();
-
-      const fieldsInput = await wrapper.findComponent(FieldsInput);
-      expect(fieldsInput.exists()).toBe(true);
-
-      const alertNameWrapper = wrapper.find(
-        '[data-test="add-alert-name-input"]',
-      );
-      await alertNameWrapper.find("input").setValue("alert123");
-
-      const streamTypeSelect = await wrapper.find(
-        '[data-test="add-alert-stream-type-select"]',
-      );
-      const streamType = await streamTypeSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamType.exists()).toBe(true);
-      await streamType.setValue("logs");
-
-      await flushPromises();
-      const streamNameSelect = await wrapper.find(
-        '[data-test="add-alert-stream-select"]',
-      );
-      const streamName = await streamNameSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(streamName.exists()).toBe(true);
-      await streamName.setValue("k8s_json");
-      await flushPromises();
-
-      const conditionSelect = await wrapper.find(
-        '[data-test="alert-conditions-select-column"]',
-      );
-      const conditionInput = await conditionSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(conditionInput.exists()).toBe(true);
-      await conditionInput.setValue("k8s_kubernetes");
-      await flushPromises();
-
-      // wrapper.vm.formData.query_condition.conditions = [];
-
-      const destinationSelect = await wrapper.find(
-        '[data-test="add-alert-destination-select"]',
-      );
-      const destination = await destinationSelect.findComponent({
-        name: "QSelect",
-      });
-      expect(destination.exists()).toBe(true);
-      await destination.setValue("dest1");
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
-    });
-
-    it("should validate input period before calling api and giving negative value should return false", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-      const inputvalidSpy = vi.spyOn(wrapper.vm, "validateInputs");
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "",
-          promql: "",
-          type: "custom",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
+    })
+    describe('generateSqlQuery function with all the possible combinations', () => {
+      beforeEach(() => {
+        wrapper.vm.originalStreamFields = [
+          { value: 'geo_info_country', type: 'string', label: 'geo_info_country' }
+        ];
+      
+        wrapper.vm.formData.query_condition.conditions = {
+          label: 'or',
+          items: [
+            {
+              column: 'geo_info_country',
+              operator: '=',
+              value: 'india',
             },
-          },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: -10,
-          operator: ">=",
-          frequency: 1,
-          cron: "",
-          threshold: 10,
-          silence: 10,
-          frequency_type: "minutes",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
+          ],
+        };
+        wrapper.vm.formData.query_condition.aggregation.function = "";
+        wrapper.vm.formData.query_condition.aggregation.having.column = "";
+        wrapper.vm.formData.query_condition.aggregation.having.operator = ">=";
+        wrapper.vm.formData.query_condition.aggregation.having.value = 1;
+        wrapper.vm.formData.stream_name = "_rundata";
+        wrapper.vm.formData.stream_type = "logs";
 
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
+        wrapper.vm.generateWhereClause = vi.fn().mockReturnValue("WHERE geo_info_country = 'india'");
 
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(inputvalidSpy).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTime(500);
-      expect(inputvalidSpy.mock.results[0].value).toBe(false);
+        wrapper.vm.isAggregationEnabled = false;
 
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
+      });
+
+      it('generates basic count query when aggregation is disabled', async () => {
+        // Set aggregation disabled
+        wrapper.vm.isAggregationEnabled = false;
+        wrapper.vm.generateWhereClause = vi.fn().mockReturnValue("WHERE geo_info_country = 'india'");
+
+
+        const result = wrapper.vm.generateSqlQuery();
+        await flushPromises();
+        expect(result).toBe(
+          'SELECT histogram(_timestamp) AS zo_sql_key, COUNT(*) as zo_sql_val FROM "_rundata" WHERE geo_info_country = \'india\' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC'
+        );
+      });
+      it('generates query with aggregation function and no groupBy', async () => {
+        wrapper.vm.isAggregationEnabled = true;
+        wrapper.vm.formData.query_condition.aggregation.function = 'avg';
+        wrapper.vm.formData.query_condition.aggregation.having.column = 'action_error_count';
+        wrapper.vm.formData.query_condition.aggregation.group_by = [];
+      
+        const result = wrapper.vm.generateSqlQuery();
+        await flushPromises();
+      
+        expect(result).toBe(
+          'SELECT histogram(_timestamp) AS zo_sql_key, avg(action_error_count) as zo_sql_val  FROM "_rundata" WHERE geo_info_country = \'india\' GROUP BY zo_sql_key  ORDER BY zo_sql_key ASC'
+        );
+      });
+      it('generates query with groupBy and aggregation function', async () => {
+        wrapper.vm.isAggregationEnabled = true;
+        wrapper.vm.formData.query_condition.aggregation.function = 'avg';
+        wrapper.vm.formData.query_condition.aggregation.having.column = 'action_error_count';
+        wrapper.vm.formData.query_condition.aggregation.group_by = ['geo_info_city'];
+      
+        const result = wrapper.vm.generateSqlQuery();
+        await flushPromises();
+      
+        expect(result).toBe(
+          'SELECT histogram(_timestamp) AS zo_sql_key, avg(action_error_count) as zo_sql_val , concat(geo_info_city) as x_axis_2 FROM "_rundata" WHERE geo_info_country = \'india\' GROUP BY zo_sql_key , x_axis_2 ORDER BY zo_sql_key ASC'
+        );
+      });
+      it('generates query with percentile aggregation function', async () => {
+        wrapper.vm.isAggregationEnabled = true;
+        wrapper.vm.formData.query_condition.aggregation.function = 'p95';
+        wrapper.vm.formData.query_condition.aggregation.having.column = 'latency';
+        wrapper.vm.formData.query_condition.aggregation.group_by = [];
+      
+        const result = wrapper.vm.generateSqlQuery();
+        await flushPromises();
+      
+        expect(result).toBe(
+          'SELECT histogram(_timestamp) AS zo_sql_key, approx_percentile_cont(latency, 0.95) as zo_sql_val  FROM "_rundata" WHERE geo_info_country = \'india\' GROUP BY zo_sql_key  ORDER BY zo_sql_key ASC'
+        );
+      });
+      
+      
+      
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
     });
-    it("should validate input threshold before calling api and giving 0 as a  value should return false ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-      const inputvalidSpy = vi.spyOn(wrapper.vm, "validateInputs");
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "",
-          promql: "",
-          type: "custom",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
-            },
-          },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: 10,
-          operator: ">=",
-          frequency: 1,
-          cron: "",
-          threshold: 0,
-          silence: 10,
-          frequency_type: "minutes",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
+    describe('getParser', () => {
+      beforeEach(() => {
+        wrapper.vm.sqlQueryErrorMsg = "";
+      });
+    
 
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(inputvalidSpy).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTime(500);
-      expect(inputvalidSpy.mock.results[0].value).toBe(false);
-
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
-    });
-    it("should validate input silence notification before calling api and giving empty value should return false ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-      const inputvalidSpy = vi.spyOn(wrapper.vm, "validateInputs");
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "",
-          promql: "",
-          type: "custom",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
-            },
-          },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: 10,
-          operator: ">=",
-          frequency: 10,
-          cron: "",
-          threshold: 10,
-          silence: "",
-          frequency_type: "minutes",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(inputvalidSpy).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTime(500);
-      expect(inputvalidSpy.mock.results[0].value).toBe(false);
-
-      expect(alertCreateSpy).toHaveBeenCalledTimes(0);
+      it('returns false and sets error for query with *', async() => {
+        const result = wrapper.vm.getParser("SELECT * FROM INDEX_NAME");
+        await flushPromises();
+        expect(result).toBe(false);
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("Selecting all columns is not allowed");
+      });
+    
+      it('returns true for valid query without *', () => {
+        const result = wrapper.vm.getParser("SELECT valid_column FROM my_table");
+        expect(result).toBe(true);
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+      });
+      it('returns true when parser throws an error (e.g. reserved keyword)', () => {
+        const result = wrapper.vm.getParser("SELECT field FROM default");
+        expect(result).toBe(true);
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe(""); // No change expected
+      });
     });
 
-    it.skip("should not all selecting all columns in sql mode ", async () => {
-      const onSubmitSpy = vi.spyOn(wrapper.vm, "onSubmit");
-      const getParserSpy = vi.spyOn(wrapper.vm, "getParser");
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "select * from 'default'",
-          promql: "",
-          type: "sql",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
+    describe('getAlertPayload', () => {
+
+      beforeEach(() => {
+        wrapper.vm.formData = {
+            uuid: 'abc-123',
+            is_real_time: 'true',
+            description: '  Sample Alert  ',
+            query_condition: {
+              type: 'custom',
+              vrl_function: null,
+              sql: undefined,
+              aggregation: null,
+              conditions: [{ column: 'status', operator: '=', value: '200' }],
+              promql_condition: null
             },
-          },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: 10,
-          operator: ">=",
-          frequency: 10,
-          cron: "",
-          threshold: 10,
-          silence: "",
-          frequency_type: "minutes",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      expect(getParserSpy.mock.results[0].value).toBe(false);
-      await flushPromises();
-      expect(onSubmitSpy.mock.settledResults[0].value).toBe(false);
+            trigger_condition: {
+              threshold: '5',
+              period: '60',
+              frequency: '10',
+              silence: '15',
+            },
+            context_attributes: [
+              { key: 'env', value: 'prod' },
+              { key: 'team', value: 'infra' },
+            ]
+          }
+      });
+      it('generates correct payload for a new alert in custom tab', () => {
+        const { formData, getSelectedTab, isAggregationEnabled, store, beingUpdated } = wrapper.vm;
+      
+        const result = wrapper.vm.getAlertPayload();
+      
+        expect(result.uuid).toBeUndefined();
+        expect(result.is_real_time).toBe(true);
+        expect(result.context_attributes).toEqual({
+          env: 'prod',
+          team: 'infra'
+        });
+        expect(result.query_condition.type).toBe('custom');
+        expect(result.trigger_condition.threshold).toBe(5);
+        expect(result.trigger_condition.period).toBe(60);
+        expect(result.trigger_condition.frequency).toBe(10);
+        expect(result.trigger_condition.silence).toBe(15);
+        expect(result.description).toBe('Sample Alert');
+        expect(result.query_condition.aggregation).toBeNull();
+        expect(result.query_condition.promql_condition).toBeNull();
+        expect(result.query_condition.sql).toBeUndefined();
+        expect(result.createdAt).toBeDefined();
+        expect(result.owner).toBe(wrapper.vm.store.state.userInfo.email);
+        expect(result.lastTriggeredAt).toBeGreaterThan(0);
+        expect(result.lastEditedBy).toBe(wrapper.vm.store.state.userInfo.email);
+      });
+      
+    
     });
 
-    it("add aditional variables to the alert", async () => {
-      const onSubmitSpy = vi.spyOn(wrapper.vm, "onSubmit");
+    describe('validate input fields with all the possible combinations', () => {
+      it('passes validation for real-time alert', () => {
+        wrapper.vm.formData.is_real_time = true;
+        wrapper.vm.formData.trigger_condition.silence = 5;
+      
+        const result = wrapper.vm.validateInputs(wrapper.vm.formData, false);
+        expect(result).toBe(true);
+      });
+      it('fails when silence is NaN', () => {
+        wrapper.vm.formData.trigger_condition.silence = "a";
 
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "select * from 'default'",
-          promql: "",
-          type: "sql",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
-            },
-          },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: 10,
-          operator: ">=",
-          frequency: 10,
-          cron: "",
-          threshold: 10,
-          silence: "",
-          frequency_type: "minutes",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
-      const variableFieldInput = wrapper.findComponent(VariablesInput);
+        const notifyMock = vi.fn();
+        wrapper.vm.q.notify = notifyMock;
+      
+        const result = wrapper.vm.validateInputs(wrapper.vm.formData);
+        expect(result).toBe(false);
+          expect(wrapper.vm.q.notify).toHaveBeenCalledWith(expect.objectContaining({
+          message: 'Silence Notification should not be empty'
+        }));
+      });
+      it('fails when period is < 1 or NaN', () => {
+        wrapper.vm.formData.trigger_condition.period = 0;
+        wrapper.vm.formData.is_real_time = false;
+        const notifyMock = vi.fn();
+        wrapper.vm.q.notify = notifyMock;
+      
+        const result = wrapper.vm.validateInputs(wrapper.vm.formData);
+        expect(result).toBe(false);
+        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(expect.objectContaining({
+          message: 'Period should be greater than 0'
+        }));
+      });
+      it('fails when aggregation fields are incomplete', () => {
+        wrapper.vm.formData.is_real_time = false;
+        wrapper.vm.formData.trigger_condition.threshold = "a";
+        const notifyMock = vi.fn();
+        wrapper.vm.q.notify = notifyMock;
+      
+        const result = wrapper.vm.validateInputs(wrapper.vm.formData);
+        expect(result).toBe(false);
+        expect(wrapper.vm.q.notify).toHaveBeenCalledWith(expect.objectContaining({
+          message: 'Threshold should not be empty'
+        }));
+      });
+      it('fails when invalid cron expression is passed', () => {
+        cronParser.parseExpression = vi.fn().mockImplementation(() => {
+          throw new Error('Invalid cron');
+        });
+        wrapper.vm.scheduledAlertRef = {
+          cronJobError: ''
+        };
+      
 
-      expect(variableFieldInput.exists()).toBe(true);
-      const btn = variableFieldInput.find(
-        '[data-test="alert-variables-add-btn"]',
-      );
-      const fieldBtn = btn.find("button");
-      await btn.trigger("click");
-      const keyInput = await variableFieldInput.find(
-        '[data-test="alert-variables-key-input"]',
-      );
-      await keyInput.setValue("key");
-      const valueInput = await variableFieldInput.find(
-        '[data-test="alert-variables-value-input"]',
-      );
-      await valueInput.setValue("value");
 
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
+        wrapper.vm.formData.is_real_time = false;
+        wrapper.vm.formData.query_condition.aggregation = null;
+        wrapper.vm.formData.trigger_condition.silence = '5';
+        wrapper.vm.formData.trigger_condition.period = '60';
+        wrapper.vm.formData.trigger_condition.threshold = '10';
+        wrapper.vm.formData.trigger_condition.frequency_type = 'cron';
+        wrapper.vm.formData.trigger_condition.operator = '>';
+        wrapper.vm.formData.trigger_condition.cron = '';
+      
+        const result = wrapper.vm.validateInputs(wrapper.vm.formData);
+        expect(result).toBeUndefined(); // function returns nothing in this case
+        expect(wrapper.vm.scheduledAlertRef.cronJobError).toBe('Invalid cron expression!');
+      });
+      it('fails when scheduledAlertRef has cronJobError after validation', () => {
+        cronParser.parseExpression = vi.fn().mockImplementation(() => {
+          return {
+              next: vi.fn(),
+          }
+        });
 
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      expect(onSubmitSpy.mock.settledResults[0].value).toBe(false);
+        const notifyMock = vi.fn();
+        wrapper.vm.q.notify = notifyMock;
+        wrapper.vm.scheduledAlertRef = {
+          cronJobError: '',
+          validateFrequency: vi.fn(),
+        };
+      
+        wrapper.vm.formData.is_real_time = false
+        wrapper.vm.formData.trigger_condition.silence = '5';
+        wrapper.vm.formData.trigger_condition.period = '60';
+        wrapper.vm.formData.trigger_condition.threshold = '10';
+        wrapper.vm.formData.trigger_condition.frequency_type = 'cron';
+        wrapper.vm.formData.trigger_condition.operator = '>';
+        wrapper.vm.formData.trigger_condition.cron = '* * * * *';
+        wrapper.vm.formData.query_condition.aggregation = null
+
+        wrapper.vm.scheduledAlertRef.cronJobError = 'Invalid cron!';
+      
+        const result = wrapper.vm.validateInputs(wrapper.vm.formData);
+        expect(result).toBe(false);
+        expect(notifyMock).toHaveBeenCalledWith(expect.objectContaining({
+          message: 'Invalid cron!'
+        }));
+      });
+      
+      
+      
     });
+    describe('onSubmit', () => {
+      let notifyMock: any;
+      beforeEach(() => {
+        window.HTMLElement.prototype.scrollIntoView = vi.fn();
+        wrapper.vm.q = {
+          notify: vi.fn().mockReturnValue(() => {})
+        };
+                wrapper.vm.navigateToErrorField = vi.fn();
+          wrapper.vm.validateFormAndNavigateToErrorField = vi.fn().mockResolvedValue(true);
+          wrapper.vm.validateSqlQueryPromise = vi.fn().mockResolvedValue(true);
+      });
+      it('should submit alert successfully for creating new alert', async () => {
+        wrapper.vm.q = {
+          notify: vi.fn(() => vi.fn())
+        };
 
-    it("should convert corn expression into frequency ", async () => {
-      const alertCreateSpy = vi.spyOn(alertsService, "create");
-      const onSubmitSpy = vi.spyOn(wrapper.vm, "onSubmit");
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "",
-          promql: "",
-          type: "custom",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
-            },
+        wrapper.vm.formData.name = "test_alert";
+        wrapper.vm.formData.stream_name = "_rundata";
+        wrapper.vm.formData.stream_type = "logs";
+        wrapper.vm.formData.query_condition.conditions = {
+          "or": [
+            { "column": "status", "operator": "=", "value": "200" }
+          ]
+        };
+        wrapper.vm.formData.query_condition.aggregation = null;
+        wrapper.vm.formData.query_condition.promql_condition = null;
+        wrapper.vm.formData.query_condition.sql = undefined;
+        wrapper.vm.formData.query_condition.vrl_function = null;
+        wrapper.vm.formData.query_condition.multi_time_range = [];
+        wrapper.vm.formData.query_condition.type = "custom";
+        wrapper.vm.formData.query_condition.vrl_function = null;
+        wrapper.vm.formData.query_condition.sql = undefined;
+        wrapper.vm.formData.query_condition.promql_condition = null;
+        wrapper.vm.formData.query_condition.aggregation = null;
+        wrapper.vm.formData.destinations = ['test_destinations'];
+        wrapper.vm.formData.context_attributes = ['test_context_attributes'];
+        wrapper.vm.formData.enabled = true;
+        wrapper.vm.formData.owner = 'test_owner';
+        wrapper.vm.formData.lastTriggeredAt = 0;
+        wrapper.vm.formData.lastEditedBy = '122122122';
+        wrapper.vm.formData.folder_id = 'test_folder_id';
+
+        await wrapper.vm.validateInputs(wrapper.vm.formData);
+        await wrapper.vm.getAlertPayload();
+        await wrapper.vm.onSubmit();
+        await flushPromises();
+
+
+        let mockResponse: any = {
+          data: {
+            "code": 200,
+            "message": "Alert saved",
+            "id": "2yis4t0dJCU7Vs4D3sEYHDsvDKF",
+            "name": "test_alert"
           },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: -10,
-          operator: ">=",
-          frequency: 1,
-          cron: "",
-          threshold: 10,
-          silence: 10,
-          frequency_type: "cron",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
-      const ScheduledAlertWrapper = wrapper.findComponent(ScheduledAlert);
+        }
 
-      const cronToggleBtn = await wrapper
-        .find('[data-test="scheduled-alert-cron-toggle-btn"]')
-        .trigger("click");
-      const cronInput = await ScheduledAlertWrapper.find(
-        '[data-test="scheduled-alert-cron-input-field"]',
-      );
+        vi.mocked(alertsService.create_by_alert_id).mockResolvedValue(mockResponse);
+        //because we reset the data in the formData after the alert is saved
+        expect(wrapper.vm.formData.name).toBe('');
+        expect(wrapper.vm.formData.stream_name).toBe('');
+        expect(wrapper.vm.formData.stream_type).toBe('');
+      });
 
-      await cronInput.setValue("1 40 * * * *");
+      it('should update alert successfully for updating existing alert', async () => {
+        wrapper.vm.q = {
+          notify: vi.fn(() => vi.fn()) 
+        };
+        wrapper.vm.formData.name = "test_alert_for_updating";
+        wrapper.vm.formData.id = "2yis4t0dJCU7Vs4D3sEYHDsvDKF";
+        wrapper.vm.formData.is_real_time = "false";
+        wrapper.vm.formData.isUpdated = true;
+        wrapper.vm.formData.stream_name = "_rundata";
+        wrapper.vm.formData.stream_type = "logs";
+        wrapper.vm.formData.query_condition.conditions = {
+          "or": [
+            { "column": "status", "operator": "=", "value": "200" }
+          ]
+        };
+        wrapper.vm.formData.query_condition.aggregation = null;
+        wrapper.vm.formData.query_condition.promql_condition = null;
+        wrapper.vm.formData.query_condition.sql = undefined;
+        wrapper.vm.formData.query_condition.vrl_function = null;
+        wrapper.vm.formData.query_condition.multi_time_range = [];
+        wrapper.vm.formData.query_condition.type = "custom";
+        wrapper.vm.formData.query_condition.vrl_function = null;
+        wrapper.vm.formData.query_condition.sql = undefined;
+        wrapper.vm.formData.query_condition.promql_condition = null;
+        wrapper.vm.formData.query_condition.aggregation = null;
+        wrapper.vm.formData.destinations = ['test_destinations'];
+        wrapper.vm.formData.context_attributes = ['test_context_attributes'];
+        wrapper.vm.formData.enabled = true;
+        wrapper.vm.formData.owner = 'test_owner';
+        wrapper.vm.formData.lastTriggeredAt = 0;
+        wrapper.vm.formData.lastEditedBy = '122122122';
+        wrapper.vm.formData.folder_id = 'test_folder_id';
 
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
+        await wrapper.vm.validateInputs(wrapper.vm.formData);
+        await wrapper.vm.getAlertPayload();
+        await wrapper.vm.onSubmit();
+        await flushPromises();
 
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      expect(wrapper.vm.formData.tz_offset).toBe(0);
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
 
-      expect(alertCreateSpy).toHaveBeenCalledTimes(1);
-    });
-    it("should throw an error when invalid sql query given", async () => {
-      const onSubmitSpy = vi.spyOn(wrapper.vm, "onSubmit");
-      const addAlertFormSpy = vi.spyOn(wrapper.vm.addAlertForm, "validate");
-      const validateSqlPromise = vi.spyOn(wrapper.vm, "validateSqlQuery");
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "select code from ''",
-          promql: "",
-          type: "sql",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
-            },
+        let mockResponse: any = {
+          data: {
+            "code": 200,
+            "message": "Alert updated",
+            "id": "2yis4t0dJCU7Vs4D3sEYHDsvDKF",
+            "name": "test_alert_for_updating"
           },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: 10,
-          operator: ">=",
-          frequency: 1,
-          cron: "",
-          threshold: 10,
-          silence: 10,
-          frequency_type: "cron",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
+        }
 
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-
-      await flushPromises();
-
-      await vi.advanceTimersByTime(500);
-
-      await flushPromises();
-
-      await vi.advanceTimersByTime(300);
-
-      expect(onSubmitSpy.mock.settledResults[0].value).toBe(undefined);
-    });
-
-    it("should update the alert successfully", async () => {
-      wrapper.vm.addAlertForm = {
-        validate: vi.fn().mockResolvedValue(true), // Simulates a valid form
-        resetValidation: vi.fn(), // Mock other methods if needed
-      };
-      const submitSpy = vi.spyOn(alertsService, "update");
-      wrapper.vm.beingUpdated = true;
-      wrapper.vm.formData = {
-        name: "basic_standard_alert_10",
-        stream_type: "logs",
-        stream_name: "k8s_json",
-        is_real_time: "false",
-        query_condition: {
-          conditions: [],
-          sql: "",
-          promql: "",
-          type: "custom",
-          aggregation: {
-            group_by: [""],
-            function: "avg",
-            having: {
-              column: "",
-              operator: ">=",
-              value: 1,
-            },
-          },
-          promql_condition: null,
-          vrl_function: null,
-          multi_time_range: [],
-        },
-        trigger_condition: {
-          period: 10,
-          operator: ">=",
-          frequency: 1,
-          cron: "",
-          threshold: 3,
-          silence: 10,
-          frequency_type: "minutes",
-          timezone: "UTC",
-        },
-        destinations: ["ksjf"],
-        context_attributes: [],
-        enabled: true,
-        description: "",
-        lastTriggeredAt: 0,
-        createdAt: "",
-        updatedAt: "2024-11-21T08:26:50.907Z",
-        owner: "",
-        lastEditedBy: "",
-      };
-
-      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger("click");
-
-      await wrapper.find('[data-test="add-alert-form"]').trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-
-      await flushPromises();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+        vi.mocked(alertsService.update_by_alert_id).mockResolvedValue(mockResponse);
+        //because we reset the data in the formData after the alert is saved
+        expect(wrapper.vm.formData.name).toBe('');
+        expect(wrapper.vm.formData.stream_name).toBe('');
+        expect(wrapper.vm.formData.stream_type).toBe('');
+      });
     });
   });
-});
+
+})

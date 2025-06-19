@@ -1770,7 +1770,10 @@ export default defineComponent({
       openJsonEditor,
       showJsonEditorDialog,
       saveAlertJson,
-      validationErrors
+      validationErrors,
+      originalStreamFields,
+      generateSqlQuery,
+      generateWhereClause
     };
   },
 
