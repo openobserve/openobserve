@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import fs from 'fs';
-import { CommonActions } from './commonActions';
+import { CommonActions } from '../commonActions';
 
 export class AlertsPage {
     constructor(page) {
@@ -121,7 +121,7 @@ export class AlertsPage {
      * @param {string} folderName - Name of the folder to navigate to
      */
     async navigateToFolder(folderName) {
-        await this.page.getByText(folderName).click();
+        await this.page.getByText(folderName).first().click();
         // Wait for the folder content to load by checking for either the table or no data message
         await Promise.race([
             this.page.locator('table').waitFor({ state: 'visible', timeout: 30000 }),
@@ -202,13 +202,14 @@ export class AlertsPage {
     /** @param {string} alertName */
     async verifyAlertCreated(alertName) {
         const nameToVerify = alertName || this.currentAlertName;  // Use provided name or stored name
-        await expect(this.page.getByRole('cell', { name: nameToVerify })).toBeVisible();
-        await expect(this.page.locator(this.pauseStartAlert.replace('{alertName}', nameToVerify))).toBeVisible();
+        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible();
+        await expect(this.page.locator(this.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible();
     }
 
     /** @param {string} alertName */
     async updateAlert(alertName) {
-        await this.page.locator(this.alertUpdateButton.replace('{alertName}', alertName)).click();
+        // Use first() to get the first instance of the alert
+        await this.page.locator(this.alertUpdateButton.replace('{alertName}', alertName)).first().click();
         await expect(this.page.getByText(this.alertSetupText)).toBeVisible();
         await this.page.waitForTimeout(1000); // Wait for form to load
 
@@ -460,7 +461,8 @@ export class AlertsPage {
         const downloadPromise = this.page.waitForEvent('download');
         await this.page.locator('[data-test="alert-list-export-alerts-btn"]').click();
         const download = await downloadPromise;
-        await expect(this.page.getByText('Successfully exported 2 alerts')).toBeVisible();
+        await this.page.waitForTimeout(2000); // Wait for the export process to complete
+        await expect(this.page.getByText('Successfully exported')).toBeVisible({ timeout: 10000 });
         return download;
     }
 

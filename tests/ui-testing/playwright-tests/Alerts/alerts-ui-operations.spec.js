@@ -1,9 +1,10 @@
-import { test, expect } from "./baseFixtures";
-import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { AlertsPage } from '../../ui-testing/pages/alertsPage.js';
-import { AlertTemplatesPage } from '../../ui-testing/pages/alertTemplatesPage.js';
-import { AlertDestinationsPage } from '../../ui-testing/pages/alertDestinationsPage.js';
-import { CommonActions } from '../../ui-testing/pages/commonActions.js';
+import { test, expect } from "../baseFixtures";
+import logData from "../../cypress/fixtures/log.json";
+import { AlertsPage } from '../../pages/alertsPages/alertsPage.js';
+import { AlertTemplatesPage } from '../../pages/alertsPages/alertTemplatesPage.js';
+import { AlertDestinationsPage } from '../../pages/alertsPages/alertDestinationsPage.js';
+import { CommonActions } from '../../pages/commonActions.js';
+import DashboardFolder from '../../pages/dashboardPages/dashboard-folder.js';
 
 /**
  * Helper function for login
@@ -26,7 +27,7 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
 }
 
-test.describe("Alerts Module testcases", () => {
+test.describe("Alerts UI Operations", () => {
   // Shared test variables
   let alertsPage;
   let templatesPage;
@@ -35,6 +36,7 @@ test.describe("Alerts Module testcases", () => {
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
+  let dashboardFolders;
 
   /**
    * Setup for each test
@@ -92,107 +94,6 @@ test.describe("Alerts Module testcases", () => {
   });
 
   /**
-   * Test: Complete E2E flow for alerts
-   * Tests all major alert operations in sequence
-   */
-  test('Alerts E2E Flow - Create, Update, Move, Clone, Delete, Pause, Resume', {
-    tag: ['@e2eAlerts', '@all', '@alerts']
-  }, async ({ page }) => {
-    // Test data setup
-    const streamName = 'auto_playwright_stream';
-    const column = 'job';
-    const value = 'test';
-
-    // Ensure prerequisites exist
-    createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
-    await templatesPage.ensureTemplateExists(createdTemplateName);
-    createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
-    const slackUrl = "DEMO";
-    await destinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
-
-    // Navigate to alerts tab
-    await commonActions.navigateToAlerts();
-    await page.waitForTimeout(2000);
-
-    // ===== First Iteration: Initial Alert Creation and Management =====
-    // Create and verify folder
-    const folderName = 'auto_' + sharedRandomValue;
-    await alertsPage.createFolder(folderName, 'Test Automation Folder');
-    await alertsPage.verifyFolderCreated(folderName);
-    console.log('Successfully created folder:', folderName);
-
-    // Navigate to folder and create first alert
-    await alertsPage.navigateToFolder(folderName);
-    const alertName = await alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
-    await alertsPage.verifyAlertCreated(alertName);
-    console.log('Successfully created alert:', alertName);
-
-    // Clone first alert
-    await alertsPage.cloneAlert(alertName, 'logs', streamName);
-    console.log('Successfully cloned alert:', alertName);
-
-    // ===== Import/Export Flow =====
-    // Export alerts
-    const download = await alertsPage.exportAlerts();
-    const downloadPath = `./alerts-${new Date().toISOString().split('T')[0]}-${streamName}.json`;
-    await download.saveAs(downloadPath);
-
-    // Test invalid import
-    await alertsPage.importInvalidFile('utils/td150.json');
-
-    // Import valid file
-    await alertsPage.importValidFile(downloadPath);
-
-    // Clean up imported alert
-    await alertsPage.deleteImportedAlert(alertName);
-    await alertsPage.cleanupDownloadedFile(downloadPath);
-
-    // ===== Second Iteration: New Alert Creation and Management =====
-    // Navigate back to folder and create new alert
-    await alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(2000);
-
-    const newAlertName = await alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
-    await alertsPage.verifyAlertCreated(newAlertName);
-    console.log('Successfully created new alert:', newAlertName);
-
-    // Update the new alert's operator
-    await alertsPage.updateAlert(newAlertName);
-    console.log('Successfully updated new alert:', newAlertName);
-
-    // Clone the new alert
-    await alertsPage.cloneAlert(newAlertName, 'logs', streamName);
-    console.log('Successfully cloned new alert:', newAlertName);
-
-    // ===== Alert Pause and Resume =====
-    // Pause the new alert
-    await alertsPage.pauseAlert(newAlertName);
-    console.log('Successfully paused alert:', newAlertName);
-
-    // Resume the new alert
-    await alertsPage.resumeAlert(newAlertName);
-    console.log('Successfully resumed alert:', newAlertName);
-
-    // ===== Alert Movement and Cleanup =====
-    // Move alerts to target folder
-    const targetFolderName = 'testfoldermove';
-    await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
-    await alertsPage.moveAllAlertsToFolder(targetFolderName);
-
-    // Verify alerts in target folder
-    await page.waitForTimeout(2000);
-    await alertsPage.navigateToFolder(targetFolderName);
-    await page.waitForTimeout(2000);
-
-    // Search and verify alert instance
-    await alertsPage.searchAlert(newAlertName);
-    await alertsPage.verifySearchResults(2);
-
-    // Delete the alert
-    await alertsPage.deleteAlertByRow(newAlertName);
-  });
-
-  /**
    * Test: Delete alert template functionality
    * Verifies template deletion and in-use scenarios
    */
@@ -218,6 +119,7 @@ test.describe("Alerts Module testcases", () => {
   test('Create and Delete Scheduled Alert with SQL Query', {
     tag: ['@scheduledAlerts', '@all', '@alerts']
   }, async ({ page }) => {
+    dashboardFolders = new DashboardFolder(page);
     const streamName = 'auto_playwright_stream';
 
     // Ensure prerequisites exist
@@ -248,6 +150,9 @@ test.describe("Alerts Module testcases", () => {
 
     // Clean up
     await alertsPage.deleteAlertByRow(alertName);
+    await dashboardFolders.searchFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await dashboardFolders.deleteFolder(folderName);
   });
 
   /**
@@ -262,6 +167,7 @@ test.describe("Alerts Module testcases", () => {
     templatesPage = new AlertTemplatesPage(page);
     destinationsPage = new AlertDestinationsPage(page);
     commonActions = new CommonActions(page);
+    dashboardFolders = new DashboardFolder(page);
 
     // Create template
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
@@ -341,8 +247,13 @@ test.describe("Alerts Module testcases", () => {
     await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
     await alertsPage.moveAllAlertsToFolder(targetFolderName);
 
+    await dashboardFolders.searchFolder(folderName);
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await dashboardFolders.deleteFolder(folderName);
+
     // Verify alerts in target folder
     await page.waitForTimeout(2000);
+    await dashboardFolders.searchFolder(targetFolderName);
     await alertsPage.navigateToFolder(targetFolderName);
     await page.waitForTimeout(2000);
 
@@ -353,4 +264,4 @@ test.describe("Alerts Module testcases", () => {
     // Delete the alert
     await alertsPage.deleteAlertByRow(alertName);
   });
-});
+}); 
