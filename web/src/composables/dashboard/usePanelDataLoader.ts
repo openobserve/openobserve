@@ -345,12 +345,18 @@ export const usePanelDataLoader = (
       isStreamingEnabled(store.state) &&
       state.searchRequestTraceIds?.length > 0
     ) {
-      state.searchRequestTraceIds.forEach((traceId) => {
-        cancelStreamQueryBasedOnRequestId({
-          trace_id: traceId,
-          org_id: store?.state?.selectedOrganization?.identifier,
+      try {
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelStreamQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
         });
-      });
+      } catch (error) {
+        console.error("Error during Stream cleanup:", error);
+      } finally {
+        state.searchRequestTraceIds = [];
+      }
     }
 
     if (
