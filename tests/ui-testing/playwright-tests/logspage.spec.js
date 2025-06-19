@@ -537,4 +537,46 @@ test.describe("Logs UI testcases", () => {
     expect(isVisible).toBeTruthy();
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
+
+  test("should not display pagination for limit query", async ({ page }) => {
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+    await page.click('[data-test="logs-search-bar-query-editor"]')
+    await page.keyboard.type("match_all('code') limit 5");
+    await page.waitForTimeout(2000);
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
+    const fastRewindElement = page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
+    await expect(fastRewindElement).not.toBeVisible();
+
+  });
+
+  test("should not display pagination for SQL limit query", async ({ page }) => {
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+    await page.click('[data-test="logs-search-bar-query-editor"]');
+    await page.keyboard.type('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
+    const fastRewindElement = page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
+    await expect(fastRewindElement).not.toBeVisible();
+  });
+
+  test("should not display pagination for SQL group/order/limit query", async ({ page }) => {
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+    await page.click('[data-test="logs-search-bar-query-editor"]');
+    await page.keyboard.type('SELECT * FROM "e2e_automate" WHERE code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5');
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
+    const fastRewindElement = page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
+    await expect(fastRewindElement).not.toBeVisible();
+  });
 });
