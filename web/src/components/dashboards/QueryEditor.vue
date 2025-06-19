@@ -37,10 +37,10 @@ import {
   nextTick,
 } from "vue";
 
-// import "monaco-editor/esm/vs/editor/editor.all.js";
-// import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
-// import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
-// import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import "monaco-editor/esm/vs/editor/editor.all.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import { useStore } from "vuex";
 

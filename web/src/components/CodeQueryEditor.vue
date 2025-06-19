@@ -234,7 +234,7 @@ export default defineComponent({
                 debouncedEmit(update.state.doc.toString());
               }
             }),
-            EditorView.focusChangeEffect.of((state, focusing) => {
+            EditorView.focusChangeEffect.of((state: any, focusing: any) => {
               if (focusing) {
                 emit("focus");
               } else {
@@ -244,10 +244,10 @@ export default defineComponent({
 
                 if (value !== trimmedValue) {
                   // Apply trim by replacing content
-                  const transaction = state.state.update({
+                  const transaction = state.update({
                     changes: {
                       from: 0,
-                      to: state.state.doc.length,
+                      to: state.doc.length,
                       insert: trimmedValue,
                     },
                   });
