@@ -652,7 +652,7 @@ export const localTimeSelectedTimezoneUTCTime = async (
   // Convert the moment object to a Unix timestamp (in seconds)
   const unixTimestamp = convertedDate.unix() * 1000000;
 
-  console.log(unixTimestamp);
+  moment = null;
   return unixTimestamp;
 };
 
@@ -944,10 +944,13 @@ export const getTimezonesByOffset = async (offsetMinutes: number) => {
   await importMoment();
   const offsetHours = offsetMinutes / 60;
   const timezones = moment.tz.names();
-  return timezones.filter((zone: string) => {
+  const filteredTimezones = timezones.filter((zone: string) => {
     const zoneOffset = moment.tz(zone).utcOffset() / 60;
     return zoneOffset === offsetHours;
   });
+
+  moment = null;
+  return filteredTimezones;
 };
 
 export const convertTimeFromNsToMs = (time: number) => {
