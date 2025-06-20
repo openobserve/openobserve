@@ -1661,6 +1661,10 @@ export default defineComponent({
       placeHolderText,
       cancelTraceId,
       cancelFilterCreator,
+      getFilterExpressionByFieldType,
+      addTraceId,
+      removeTraceId,
+      traceIdMapper,
     };
   },
 });
