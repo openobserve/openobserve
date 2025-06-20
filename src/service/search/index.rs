@@ -351,8 +351,7 @@ impl Condition {
             }
             Condition::StrMatch(field, value, case_sensitive) => {
                 let field = schema.get_field(field)?;
-                let value = format!(".*{}.*", value);
-                Box::new(ContainsQuery::new(&value, field, *case_sensitive)?)
+                Box::new(ContainsQuery::new(value, field, *case_sensitive)?)
             }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
