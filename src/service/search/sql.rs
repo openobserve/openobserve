@@ -58,6 +58,7 @@ use super::{
     request::Request,
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
+use crate::service::search::{datafusion::udf::STR_MATCH_UDF_NAME, index::get_arg_name};
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -750,6 +751,8 @@ impl VisitorMut for ColumnVisitor<'_> {
                         let index_fields = get_stream_setting_index_fields(&stream_settings);
                         let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
                             .collect::<HashSet<_>>();
+                        println!("\nindex_fields: {:?}\n", index_fields);
+                        println!("\nexpr: {:?}\n", expr);
                         self.use_inverted_index =
                             checking_inverted_index_inner(&index_fields, expr);
                     }
@@ -1636,9 +1639,21 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             escape_char: _,
             any: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => {
-            let f = f.name.to_string().to_lowercase();
-            f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME
+        Expr::Function(func) => {
+            let f = func.name.to_string().to_lowercase();
+
+            if f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME {
+                return true;
+            }
+
+            if f == STR_MATCH_UDF_NAME {
+                if let FunctionArguments::List(list) = &func.args {
+                    return list.args.len() == 2
+                        && index_fields.contains(&get_arg_name(&list.args[0]));
+                }
+            }
+
+            false
         }
         _ => false,
     }
@@ -2195,6 +2210,61 @@ mod tests {
             expected
         );
         assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    // test index_visitor for str_match
+    #[test]
+    fn test_index_visitor_str_match() {
+        let sql = "SELECT * FROM t WHERE str_match(name, 'value%')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match(name, 'value%')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_index_visitor_str_match_prefix() {
+        let sql = "SELECT * FROM t WHERE str_match(name, 'value%')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match(name, 'value%')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_index_visitor_str_match_regex() {
+        let sql = "SELECT * FROM t WHERE str_match(name, 're:value%')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match(name, 're:value%')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
     }
 
     #[test]

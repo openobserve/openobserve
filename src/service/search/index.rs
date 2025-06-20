@@ -31,7 +31,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
-use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
+use sqlparser::ast::{BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments};
 use tantivy::{
     Term,
     query::{
@@ -45,6 +45,7 @@ use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
+use crate::service::search::datafusion::udf::str_match_udf;
 
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
@@ -100,6 +101,8 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    // field, value
+    StrMatch(String, String),
     In(String, Vec<String>),
     Regex(String, String),
     MatchAll(String),
@@ -199,6 +202,7 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::StrMatch(field, value) => format!("str_match({}, '{}')", field, value),
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::Regex(field, value) => format!("{}=~{}", field, value),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
@@ -263,6 +267,17 @@ impl Condition {
                     } else {
                         unreachable!()
                     }
+                } else if fn_name == "str_match" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let field = get_arg_name(&list.args[0]);
+                        let value = trim_quotes(list.args[1].to_string().as_str());
+                        Condition::StrMatch(field, value)
+                    } else {
+                        unreachable!()
+                    }
                 } else {
                     unreachable!()
                 }
@@ -313,6 +328,25 @@ impl Condition {
             Condition::Regex(field, value) => {
                 let field = schema.get_field(field)?;
                 Box::new(RegexQuery::from_pattern(value, field)?)
+            }
+            // Three cases:
+            // 1. str_match(field, 'value') -> contains
+            // 2. str_match(field, 'value%') -> prefix
+            // 3. str_match(field, 're:value') -> regex
+            Condition::StrMatch(field, value) => {
+                let field = schema.get_field(field)?;
+                if value.ends_with("%") {
+                    let value = value.trim_matches('%');
+                    let term = Term::from_field_text(field, value);
+                    Box::new(PhrasePrefixQuery::new_with_offset(vec![(0, term)]))
+                } else if let Some(strip) = value.strip_prefix("re:") {
+                    let value = strip.trim();
+                    Box::new(RegexQuery::from_pattern(value, field)?)
+                } else {
+                    // contains
+                    let value = format!(".*{}.*", value);
+                    Box::new(RegexQuery::from_pattern(&value, field)?)
+                }
             }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
@@ -394,6 +428,7 @@ impl Condition {
 
     pub fn need_all_term_fields(&self) -> Vec<String> {
         match self {
+            Condition::StrMatch(field, _) => vec![field.clone()],
             Condition::Regex(field, _) => vec![field.clone()],
             Condition::MatchAll(value) => {
                 if (value.len() > 1 && (value.starts_with("*") || value.ends_with("*")))
@@ -413,6 +448,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::StrMatch(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -440,6 +478,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::StrMatch(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -475,6 +516,20 @@ impl Condition {
                 let field = schema.field(index);
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
+            }
+            Condition::StrMatch(name, value) => {
+                let index = schema.index_of(name).unwrap();
+                let left = Arc::new(Column::new(name, index));
+                let field = schema.field(index);
+                let right = get_scalar_value(value, field.data_type())?;
+                let str_match_udf = Arc::new(str_match_udf::STR_MATCH_UDF.clone());
+                let str_match_udf_expr = Arc::new(ScalarFunctionExpr::new(
+                    str_match_udf.name(),
+                    str_match_udf.clone(),
+                    vec![left, right],
+                    DataType::Boolean,
+                ));
+                Ok(str_match_udf_expr)
             }
             Condition::In(name, values) => {
                 let index = schema.index_of(name).unwrap();
@@ -557,6 +612,7 @@ impl Condition {
     pub fn can_remove_filter(&self) -> bool {
         match self {
             Condition::Equal(..) => true,
+            Condition::StrMatch(..) => true,
             Condition::In(..) => true,
             Condition::Regex(..) => false,
             Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
@@ -633,6 +689,17 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 } else {
                     return false;
                 }
+            } else if fn_name == "str_match" {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() != 2 {
+                        return false;
+                    }
+                    if !index_fields.contains(&get_arg_name(&list.args[0])) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -697,6 +764,17 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         )))),
         _ => unimplemented!(),
     })
+}
+
+pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
+    match args {
+        FunctionArg::Named { name, .. } => name.to_string(),
+        FunctionArg::ExprNamed { name, .. } => get_field_name(name),
+        FunctionArg::Unnamed(arg) => match arg {
+            FunctionArgExpr::Expr(expr) => get_field_name(expr),
+            _ => unimplemented!("str_match not support filed type: {:?}", arg),
+        },
+    }
 }
 
 fn is_blank_or_alphanumeric(s: &str) -> bool {
@@ -931,6 +1009,25 @@ mod tests {
         let fields = index_condition.get_tantivy_fields();
 
         // Should deduplicate the field names
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    // add some test for str_match
+    #[test]
+    fn test_str_match() {
+        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_str_match_prefix() {
+        let condition = Condition::StrMatch("field1".to_string(), "value%".to_string());
+        let fields = condition.get_tantivy_fields();
+
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
     }
