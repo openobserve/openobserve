@@ -130,7 +130,13 @@ const oneDarkTheme = EditorView.theme(
     ".cm-completionLabel": {
     color: "#e1e8ed"  // Set your unmatched text color here
     },
-    
+    ".cm-foldGutter .cm-gutterElement": {
+      "& span": {
+        fontSize: "18px !important",
+        cursor: "pointer !important",
+        display: "inline-block !important",
+      }
+    },
   },
   { dark: true }
 );

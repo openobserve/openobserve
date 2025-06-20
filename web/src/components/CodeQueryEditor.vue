@@ -604,4 +604,10 @@ export default defineComponent({
 .cm-focused {
   outline: none !important;
 }
+.cm-lineNumbers .cm-gutterElement{
+  min-width: 10px !important;
+  padding-right: 5px !important;
+  text-align: left;
+}
+
 </style>
