@@ -401,6 +401,7 @@ export default defineComponent({
     onUnmounted(async () => {
       // clear a few things
       resetDashboardPanelData();
+      parser = null;
     });
 
     onMounted(async () => {
