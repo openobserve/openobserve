@@ -582,6 +582,7 @@ export default defineComponent({
       drilldownPopUpRef.value = null;
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
+      parser = null;
       
     });
     watch(
