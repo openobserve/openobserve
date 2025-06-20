@@ -105,15 +105,11 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
             ));
         }
         // pre-compute the needle
-        let mut needle = if case_insensitive {
+        let needle = if case_insensitive {
             needle.as_ref().unwrap().to_lowercase()
         } else {
             needle.as_ref().unwrap().to_string()
         };
-
-        if needle.starts_with("re:") {
-            needle = needle[3..].to_string()
-        }
 
         let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 

@@ -2230,42 +2230,6 @@ mod tests {
     }
 
     #[test]
-    fn test_index_visitor_str_match_prefix() {
-        let sql = "SELECT * FROM t WHERE str_match(name, 'value%')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut index_fields = HashSet::new();
-        index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
-        let _ = statement.visit(&mut index_visitor);
-        let expected = "str_match(name, 'value%')";
-        assert_eq!(
-            index_visitor.index_condition.clone().unwrap().to_query(),
-            expected
-        );
-    }
-
-    #[test]
-    fn test_index_visitor_str_match_regex() {
-        let sql = "SELECT * FROM t WHERE str_match(name, 're:value%')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut index_fields = HashSet::new();
-        index_fields.insert("name".to_string());
-        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
-        let _ = statement.visit(&mut index_visitor);
-        let expected = "str_match(name, 're:value%')";
-        assert_eq!(
-            index_visitor.index_condition.clone().unwrap().to_query(),
-            expected
-        );
-    }
-
-    #[test]
     fn test_track_total_hits1() {
         let sql = "SELECT * FROM t WHERE name = 'a'";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)

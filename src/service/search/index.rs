@@ -329,24 +329,10 @@ impl Condition {
                 let field = schema.get_field(field)?;
                 Box::new(RegexQuery::from_pattern(value, field)?)
             }
-            // Three cases:
-            // 1. str_match(field, 'value') -> contains
-            // 2. str_match(field, 'value%') -> prefix
-            // 3. str_match(field, 're:value') -> regex
             Condition::StrMatch(field, value) => {
                 let field = schema.get_field(field)?;
-                if value.ends_with("%") {
-                    let value = value.trim_matches('%');
-                    let term = Term::from_field_text(field, value);
-                    Box::new(PhrasePrefixQuery::new_with_offset(vec![(0, term)]))
-                } else if let Some(strip) = value.strip_prefix("re:") {
-                    let value = strip.trim();
-                    Box::new(RegexQuery::from_pattern(value, field)?)
-                } else {
-                    // contains
-                    let value = format!(".*{}.*", value);
-                    Box::new(RegexQuery::from_pattern(&value, field)?)
-                }
+                let value = format!(".*{}.*", value);
+                Box::new(RegexQuery::from_pattern(&value, field)?)
             }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
@@ -357,9 +343,6 @@ impl Condition {
                 } else if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
                     Box::new(RegexQuery::from_pattern(&value, default_field)?)
-                } else if value.to_lowercase().starts_with("re:") {
-                    let value = value[3..].trim();
-                    Box::new(RegexQuery::from_pattern(value, default_field)?)
                 } else {
                     if value.is_empty() {
                         return Err(anyhow::anyhow!(
@@ -1017,15 +1000,6 @@ mod tests {
     #[test]
     fn test_str_match() {
         let condition = Condition::StrMatch("field1".to_string(), "value1".to_string());
-        let fields = condition.get_tantivy_fields();
-
-        assert_eq!(fields.len(), 1);
-        assert!(fields.contains("field1"));
-    }
-
-    #[test]
-    fn test_str_match_prefix() {
-        let condition = Condition::StrMatch("field1".to_string(), "value%".to_string());
         let fields = condition.get_tantivy_fields();
 
         assert_eq!(fields.len(), 1);
