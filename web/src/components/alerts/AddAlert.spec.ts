@@ -15,14 +15,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
-import ScheduledAlert from "@/components/alerts/ScheduledAlert.vue";
-import VariablesInput from "@/components/alerts/VariablesInput.vue";
-import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import alertsService from "@/services/alerts";
 import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
-import { createI18n } from "vue-i18n";
-import axios, { AxiosResponse } from "axios";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 
@@ -34,6 +29,8 @@ import cronParser from "cron-parser";
 import QueryEditor from "@/components/QueryEditor.vue";
 
 import { useLocalOrganization } from "@/utils/zincutils";
+
+import searchService from "@/services/search";
 
 installQuasar({
   plugins: [Dialog, Notify],
@@ -64,6 +61,12 @@ vi.mock('@/composables/useFunctions', () => {
     }),
   };
 });
+vi.mock('@/services/search', () => ({
+  default: {
+    search: vi.fn()
+  }
+}));
+
 
 
 vi.mock('@/composables/useParser', () => {
@@ -110,6 +113,14 @@ vi.mock('cron-parser', () => {
     }
   };
 });
+vi.mock('@/utils/zincutils', async (importOriginal) => {
+  const actual = await importOriginal();
+
+  return {
+    ...actual, // include all actual exports
+    getUUID: vi.fn(() => 'mock-uuid'), // override just getUUID
+  };
+});
 vi.mock('@/services/alerts', () => {
   return {
     default: {
@@ -131,7 +142,6 @@ vi.mock('@/services/alerts', () => {
     }
   };
 });
-
 
 
 describe("AddAlert Component", () => {
@@ -674,7 +684,7 @@ describe("AddAlert Component", () => {
         wrapper.vm.formData.name = "test_alert_for_updating";
         wrapper.vm.formData.id = "2yis4t0dJCU7Vs4D3sEYHDsvDKF";
         wrapper.vm.formData.is_real_time = "false";
-        wrapper.vm.formData.isUpdated = true;
+        wrapper.vm.beingUpdated = true;
         wrapper.vm.formData.stream_name = "_rundata";
         wrapper.vm.formData.stream_type = "logs";
         wrapper.vm.formData.query_condition.conditions = {
@@ -720,6 +730,207 @@ describe("AddAlert Component", () => {
         expect(wrapper.vm.formData.name).toBe('');
         expect(wrapper.vm.formData.stream_name).toBe('');
         expect(wrapper.vm.formData.stream_type).toBe('');
+      });
+
+      it('should wait for validateSqlQueryPromise to resolve successfully', async () => {
+        wrapper.vm.q = {
+          notify: vi.fn(() => vi.fn())
+        };
+      
+        // Required for triggering that SQL block
+        wrapper.vm.formData.is_real_time = "false";
+        wrapper.vm.formData.query_condition.type = "sql";
+        wrapper.vm.formData.query_condition.sql = "SELECT * FROM test_table";
+      
+        // Provide a fake resolve
+        wrapper.vm.validateSqlQueryPromise = Promise.resolve();
+      
+        // Return valid payload
+        wrapper.vm.getAlertPayload = vi.fn(() => ({
+          query_condition: {
+            type: "sql",
+            conditions: [],
+          },
+        }));
+      
+        // Mock alertsService.create_by_alert_id
+        vi.mocked(alertsService.create_by_alert_id).mockResolvedValue({
+          data: {
+            code: 200,
+            message: "Success",
+          }
+        });
+      
+        // Bypass validation
+        wrapper.vm.validateFormAndNavigateToErrorField = vi.fn().mockResolvedValue(true);
+        wrapper.vm.validateInputs = vi.fn().mockReturnValue(true);
+        wrapper.vm.transformFEToBE = vi.fn().mockReturnValue([]);
+      
+        await wrapper.vm.onSubmit();
+        await flushPromises();
+        expect(wrapper.vm.formData.name).toBe('');
+        expect(wrapper.vm.formData.stream_name).toBe('');
+        expect(wrapper.vm.formData.stream_type).toBe('');
+      });
+      it('should show error when validateSqlQueryPromise rejects', async () => {
+        const dismissMock = vi.fn();
+        wrapper.vm.q = {
+          notify: vi.fn(() => dismissMock)
+        };
+      
+        wrapper.vm.formData.is_real_time = "false";
+        wrapper.vm.formData.query_condition.type = "sql";
+        wrapper.vm.formData.query_condition.sql = "SELECT * FROM test_table";
+      
+        // Force rejection
+        wrapper.vm.validateSqlQueryPromise = Promise.reject("sql_error");
+      
+        wrapper.vm.getAlertPayload = vi.fn(() => ({
+          query_condition: {
+            type: "sql",
+            conditions: [],
+          },
+        }));
+      
+        // Bypass validation
+        wrapper.vm.validateFormAndNavigateToErrorField = vi.fn().mockResolvedValue(true);
+        wrapper.vm.validateInputs = vi.fn().mockReturnValue(true);
+        wrapper.vm.transformFEToBE = vi.fn().mockReturnValue([]);
+      
+        await wrapper.vm.onSubmit();
+        await flushPromises();
+
+          expect(wrapper.vm.q.notify).toHaveBeenCalledWith(
+          expect.objectContaining({
+            "message": "Selecting all Columns in SQL query is not allowed.",
+            "timeout": 1500,
+          })
+        );
+      });
+      
+      
+    });
+    describe('validateSqlQuery', () => {
+      beforeEach(() => {
+        wrapper.vm.q = { notify: vi.fn() };
+        wrapper.vm.getParser = vi.fn(() => true);
+    
+        wrapper.vm.formData.query_condition.vrl_function = '';
+        wrapper.vm.formData.query_condition.type = 'sql';
+        wrapper.vm.formData.stream_name = '_rundata';
+        wrapper.vm.formData.stream_type = 'logs';
+    
+        wrapper.vm.buildQueryPayload = vi.fn(() => ({
+          query: { start_time: 100000 },
+          aggs: {}
+        }));
+    
+        wrapper.vm.store = {
+          state: {
+            selectedOrganization: { identifier: 'org-123' }
+          }
+        };
+      });
+    
+      it('validates successfully when SQL is valid', async () => {
+        wrapper.vm.formData.query_condition.sql = 'SELECT * FROM "_rundata"';
+
+        searchService.search.mockResolvedValue({ data: {} });
+    
+        await wrapper.vm.validateSqlQuery();
+        await flushPromises();
+    
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe('Selecting all columns is not allowed');
+      });
+
+          
+      it('validates successfully when SQL is valid', async () => {
+        wrapper.vm.formData.query_condition.sql = 'SELECT job FROM "_rundata"';
+
+        searchService.search.mockResolvedValue({ data: {} });
+    
+        await wrapper.vm.validateSqlQuery();
+        await flushPromises();
+    
+        expect(wrapper.vm.sqlQueryErrorMsg).toBe('');
+      });
+
+    });
+    describe('retransformBEToFE', () => {
+      it('should return null if input is null or undefined', () => {
+        expect(wrapper.vm.retransformBEToFE(null)).toBeNull();
+        expect(wrapper.vm.retransformBEToFE(undefined)).toBeNull();
+      });
+    
+      it('should return null if input has multiple keys', () => {
+        const invalid = { and: [], or: [] };
+        expect(wrapper.vm.retransformBEToFE(invalid)).toBeNull();
+      });
+    
+      it('should transform a simple AND condition', () => {
+        const input = {
+          and: [
+            { column: 'name', operator: '=', value: 'John', ignore_case: false }
+          ]
+        };
+    
+        const result = wrapper.vm.retransformBEToFE(input);
+    
+        expect(result).toEqual({
+          groupId: 'mock-uuid',
+          label: 'and',
+          items: [
+            {
+              column: 'name',
+              operator: '=',
+              value: 'John',
+              ignore_case: false,
+              id: 'mock-uuid'
+            }
+          ]
+        });
+      });
+    
+      it('should transform nested condition groups', () => {
+        const input = {
+          or: [
+            {
+              and: [
+                { column: 'age', operator: '>', value: 30, ignore_case: false }
+              ]
+            },
+            { column: 'status', operator: '=', value: 'active', ignore_case: true }
+          ]
+        };
+    
+        const result = wrapper.vm.retransformBEToFE(input);
+    
+        expect(result).toEqual({
+          groupId: 'mock-uuid',
+          label: 'or',
+          items: [
+            {
+              groupId: 'mock-uuid',
+              label: 'and',
+              items: [
+                {
+                  column: 'age',
+                  operator: '>',
+                  value: 30,
+                  ignore_case: false,
+                  id: 'mock-uuid'
+                }
+              ]
+            },
+            {
+              column: 'status',
+              operator: '=',
+              value: 'active',
+              ignore_case: true,
+              id: 'mock-uuid'
+            }
+          ]
+        });
       });
     });
   });
