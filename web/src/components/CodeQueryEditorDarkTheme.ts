@@ -97,18 +97,29 @@ const oneDarkTheme = EditorView.theme(
       borderBottomColor: tooltipBackground,
     },
     ".cm-tooltip-autocomplete": {
-        scrollbarWidth: "thin",
-        scrollbarColor: "#3f3f46 #1e1e1e", // thumb and track for Firefox
+        scrollbarColor: "#4D4D4D #252525", // thumb and track for Firefox
+        borderRadius: "0px !important",
+
+        "&::-webkit-scrollbar": {
+          width: "8px",
+        },
+        "&::-webkit-scrollbar-track": {
+          backgroundColor: "#252525 !important",
+          borderRadius: "0px !important",
+        },
+        "&::-webkit-scrollbar-thumb": {
+          backgroundColor: "#4D4D4D",
+        },
+        "&::-webkit-scrollbar-thumb:hover": {
+          backgroundColor: "#4D4D4D",
+        },
 
         "& > ul > li": {
         fontSize:"12px !important",
-
         },
         "& > ul > li[aria-selected]": {
             backgroundColor: "#03395E !important",
             color: ivory,
-
-            
         },
     },
     ".cm-completionMatchedText": {
@@ -119,21 +130,6 @@ const oneDarkTheme = EditorView.theme(
     ".cm-completionLabel": {
     color: "#e1e8ed"  // Set your unmatched text color here
     },
-
-
-    ".cm-tooltip-autocomplete::-webkit-scrollbar": {
-    width: "8px"
-    },
-    ".cm-tooltip-autocomplete::-webkit-scrollbar-thumb": {
-    backgroundColor: "#3f3f46",  // scrollbar thumb
-    borderRadius: "4px"
-    },
-    ".cm-tooltip-autocomplete::-webkit-scrollbar-track": {
-    backgroundColor: "#1e1e1e"   // scrollbar track
-    },
-    ".cm-tooltip-autocomplete:hover::-webkit-scrollbar-thumb": {
-    backgroundColor: "#555"
-    }
     
   },
   { dark: true }
