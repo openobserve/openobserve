@@ -1816,12 +1816,12 @@ export default defineComponent({
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                $q.notify({
-                  message: "Stream not found",
-                  color: "negative",
-                  position: "top",
-                  timeout: 2000,
-                });
+                // $q.notify({
+                //   message: "Stream not found",
+                //   color: "info",
+                //   position: "bottom",
+                //   timeout: 2000,
+                // });
               }
             }
           }

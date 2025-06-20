@@ -693,7 +693,7 @@ const useLogs = () => {
 
   const validateFilterForMultiStream = () => {
     const filterCondition = searchObj.data.query;
-    const parsedSQL: any = parser.astify(
+    const parsedSQL: any = fnParsedSQL(
       "select * from stream where " + filterCondition,
     );
     searchObj.data.stream.filteredField = extractFilterColumns(
@@ -2189,14 +2189,22 @@ const useLogs = () => {
     return false; // No aggregation function or non-null groupby property found
   }
 
-  const fnParsedSQL = () => {
+  const fnParsedSQL = (queryString: string = "") => {
     try {
-      const filteredQuery = searchObj.data.query
+      queryString = queryString || searchObj.data.query;
+      const filteredQuery = queryString
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      return parser.astify(filteredQuery);
+      const parsedQuery: any = fnParsedSQL(filteredQuery);
+      return parsedQuery || {
+        columns: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
     } catch (e: any) {
@@ -2213,9 +2221,11 @@ const useLogs = () => {
   // TODO OK : Replace backticks with double quotes, as stream name from sqlify is coming with backticks
   const fnUnparsedSQL = (parsedObj: any) => {
     try {
-      return parser.sqlify(parsedObj);
+      const sql = parser.sqlify(parsedObj);
+      return sql || "";
     } catch (e: any) {
-      throw new Error(`Error while unparsing SQL : ${e.message}`);
+      console.info(`Error while unparsing SQL : ${e.message}`);
+      return "";
     }
   };
 
@@ -2426,7 +2436,7 @@ const useLogs = () => {
       // if (searchObj.meta.jobId != "") {
       //   searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
       // }
-      const parsedSQL: any = fnParsedSQL();
+      const parsedSQL: any = fnParsedSQL(searchObj.data.query);
 
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
@@ -3900,10 +3910,10 @@ const useLogs = () => {
       let query_context: any = "";
       const query = searchObj.data.query;
       if (searchObj.meta.sqlMode == true) {
-        const parsedSQL: any = parser.astify(query);
+        const parsedSQL: any = fnParsedSQL(query);
         parsedSQL.where = null;
         sqlContext.push(
-          b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
+          b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')),
         );
       } else {
         const parseQuery = [query];
@@ -4066,8 +4076,8 @@ const useLogs = () => {
             }
           }
 
-          const customMessage = logsErrorMessage(err.response.data.code);
-          searchObj.data.errorCode = err.response.data.code;
+          const customMessage = logsErrorMessage(err.response?.data?.code);
+          searchObj.data.errorCode = err.response?.data?.code;
           if (customMessage != "") {
             searchObj.data.errorMsg = customMessage;
           }
@@ -4779,9 +4789,10 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
-      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from.length === 0) {
-        console.error("Failed to parse SQL query:", value);
-        throw new Error("Invalid SQL syntax");
+      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from == null) {
+        console.info("Failed to parse SQL query:", value);
+        return;
+        // throw new Error("Invalid SQL syntax");
       }
 
       const newSelectedStreams: string[] = [];
@@ -4881,10 +4892,10 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
       const outputQueries: any = {};
-      const parsedSQL = parser.astify(orgQuery);
+      const parsedSQL = fnParsedSQL(orgQuery);
 
       let query = `select * from INDEX_NAME`;
-      const newParsedSQL = parser.astify(query);
+      const newParsedSQL = fnParsedSQL(query);
       if (
         Object.hasOwn(parsedSQL, "from") &&
         parsedSQL.from.length <= 1 &&
@@ -4892,7 +4903,7 @@ const useLogs = () => {
       ) {
         newParsedSQL.where = parsedSQL.where;
 
-        query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
+        query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
         outputQueries[parsedSQL.from[0].table] = query.replace(
           "INDEX_NAME",
           "[INDEX_NAME]",
@@ -4905,18 +4916,18 @@ const useLogs = () => {
           searchObj.data.stream.selectedStream.forEach((stream: string) => {
             newParsedSQL.where = null;
 
-            query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
+            query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
             outputQueries[stream] = query.replace("INDEX_NAME", "[INDEX_NAME]");
           });
         } else if (parsedSQL._next != null) {
           //parse union queries
           if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from) {
             let query = `select * from INDEX_NAME`;
-            const newParsedSQL = parser.astify(query);
+            const newParsedSQL = fnParsedSQL(query);
 
             newParsedSQL.where = parsedSQL.where;
 
-            query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
+            query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
             outputQueries[parsedSQL.from[0].table] = query.replace(
               "INDEX_NAME",
               "[INDEX_NAME]",
@@ -4930,11 +4941,11 @@ const useLogs = () => {
             // Map through each "from" array in the _next object, as it can contain multiple tables
             if (nextTable.from) {
               let query = "select * from INDEX_NAME";
-              const newParsedSQL = parser.astify(query);
+              const newParsedSQL = fnParsedSQL(query);
 
               newParsedSQL.where = nextTable.where;
 
-              query = parser.sqlify(newParsedSQL).replace(/`/g, '"');
+              query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
               outputQueries[nextTable.from[0].table] = query.replace(
                 "INDEX_NAME",
                 "[INDEX_NAME]",
