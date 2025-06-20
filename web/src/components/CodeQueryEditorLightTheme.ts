@@ -133,7 +133,13 @@ const oneLightTheme = EditorView.theme(
       ".cm-completionLabel": {
       color: "#000000"  // Set your unmatched text color here
       },
-      
+    ".cm-foldGutter .cm-gutterElement": {
+      "& span": {
+        fontSize: "18px !important",
+        cursor: "pointer !important",
+        display: "inline-block !important",
+      }
+    },
   },
   { dark: false }
 );
