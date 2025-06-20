@@ -2385,16 +2385,14 @@ const useLogs = () => {
       queryReq.query.from = 0;
       queryReq.query.size = -1;
       searchObj.data.queryResults.subpage++;
-      setTimeout(async () => {
-        processPostPaginationData();
-      }, 0);
-      await getPaginatedData(queryReq, true);
+      await getPaginatedData(queryReq, true, false);
     }
   }
 
   const getPaginatedData = async (
     queryReq: any,
     appendResult: boolean = false,
+    isInitialRequest: boolean = true
   ) => {
     return new Promise(async (resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
@@ -2421,6 +2419,11 @@ const useLogs = () => {
       //   searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
       // }
       const parsedSQL: any = fnParsedSQL();
+
+      if(isInitialRequest) {
+        searchObj.meta.resultGrid.showPagination = true;
+      }
+
 
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
@@ -2527,8 +2530,6 @@ const useLogs = () => {
 
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
-          searchObj.meta.resultGrid.showPagination = true;
-
 
           if (isAggregation) {
             if(queryReq.query?.streaming_output) {
@@ -2667,7 +2668,7 @@ const useLogs = () => {
               //   searchObj.data.functionError = res.data.function_error;
               // }
             }, 0);
-            await getPaginatedData(queryReq, true);
+            await getPaginatedData(queryReq, true, false);
           }
           if (searchObj.meta.jobId != "") {
             // searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
@@ -5379,8 +5380,8 @@ const useLogs = () => {
     // Scan-size and took time in histogram title
     // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
     // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-    if(isPagination || !appendResult){
       searchObj.data.queryResults.hits = response.content.results.hits;
+    if((isPagination && searchPartitionMap[payload.traceId] === 1) || !appendResult){
     } else if (appendResult) {
       searchObj.data.queryResults.hits.push(
         ...response.content.results.hits,
