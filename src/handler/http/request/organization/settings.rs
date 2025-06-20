@@ -95,11 +95,11 @@ async fn create(
         data.toggle_ingestion_logs = toggle_ingestion_logs;
     }
 
-    if let Some(enable_websocket_search) = settings.enable_websocket_search {
-        // allow only if websocket is enabled
-        if get_config().websocket.enabled {
+    if let Some(aggregation_cache_enabled) = settings.aggregation_cache_enabled {
+        #[cfg(feature = "enterprise")]
+        if get_config().disk_cache.aggregation_cache_enabled {
             field_found = true;
-            data.enable_websocket_search = enable_websocket_search;
+            data.aggregation_cache_enabled = aggregation_cache_enabled;
         }
     }
 

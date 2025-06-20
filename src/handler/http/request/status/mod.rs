@@ -129,7 +129,8 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     ingestion_url: String,
-    websocket_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    aggregation_cache_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
@@ -323,7 +324,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
-        websocket_enabled: cfg.websocket.enabled,
+        #[cfg(feature = "enterprise")]
+        aggregation_cache_enabled: cfg.disk_cache.aggregation_cache_enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
