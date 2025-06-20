@@ -58,7 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <q-toggle
-          v-model="config.isEnterprise == 'true'"
+          v-if="config.isEnterprise == 'true'"
+          v-model="enableAggregationCache"
           :label="t('settings.enableAggregationCache')"
           data-test="general-settings-enable-aggregation-cache"
           class="q-pb-lg showLabelOnTop"
@@ -80,7 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-    <div id="enterpriseFeature" v-if="config.isEnterprise == 'true'">
+    <div
+      id="enterpriseFeature"
+      v-if="
+        config.isEnterprise == 'true' &&
+        store.state.zoConfig.meta_org ==
+          store.state.selectedOrganization.identifier
+      "
+    >
       <div class="q-px-md q-py-md">
         <div class="text-body1 text-bold">
           {{ t("settings.enterpriseTitle") }}
