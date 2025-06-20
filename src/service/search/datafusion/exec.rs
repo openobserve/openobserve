@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{num::NonZero, str::FromStr, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Field;
@@ -38,7 +38,7 @@ use datafusion::{
     execution::{
         cache::cache_manager::{CacheManagerConfig, FileStatisticsCache},
         context::SessionConfig,
-        memory_pool::{FairSpillPool, GreedyMemoryPool},
+        memory_pool::{FairSpillPool, GreedyMemoryPool, TrackConsumersPool, UnboundedMemoryPool},
         runtime_env::{RuntimeEnv, RuntimeEnvBuilder},
         session_state::SessionStateBuilder,
     },
@@ -152,7 +152,7 @@ pub async fn merge_parquet_files(
     )
     .await?;
     // register union table
-    let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
+    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
 
     let plan = ctx.state().create_logical_plan(&sql).await?;
@@ -467,13 +467,21 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         })?;
     match mem_pool {
         super::MemoryPoolType::Greedy => {
-            builder = builder.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
+            let pool = GreedyMemoryPool::new(memory_size);
+            let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
+            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
         }
         super::MemoryPoolType::Fair => {
-            builder = builder.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
+            let pool = FairSpillPool::new(memory_size);
+            let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
+            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
         }
-        super::MemoryPoolType::None => {}
-    };
+        super::MemoryPoolType::None => {
+            let pool = UnboundedMemoryPool::default();
+            let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
+            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+        }
+    }
     builder.build()
 }
 
