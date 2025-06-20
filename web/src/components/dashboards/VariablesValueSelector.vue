@@ -1524,7 +1524,12 @@ export default defineComponent({
 
       // Add search filter if searchText is provided
       if (searchText && searchText.trim()) {
-        queryContext += ` WHERE "${variableObject.query_data.field}" LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
+        const searchCondition = `"${variableObject.query_data.field}" LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
+        if (/\bWHERE\b/i.test(queryContext)) {
+          queryContext += ` AND ${searchCondition}`;
+        } else {
+          queryContext += ` WHERE ${searchCondition}`;
+        }
       }
 
       // Base64 encode the query context
@@ -2139,7 +2144,6 @@ export default defineComponent({
       }
 
       if (!filterText) {
-        
         // Clear search results and reset loading states when filterText is empty
         variableItem._searchResults = [];
         variableItem.isLoading = false;
@@ -2162,19 +2166,14 @@ export default defineComponent({
         searchControllers[variableName] = controller;
 
         try {
-      
-
           // Initialize search results property to indicate this is a search request
           variableItem._searchResults = [];
           variableItem.isLoading = true;
 
           // Use the unified approach to load variable data with search text
           await loadSingleVariableDataByName(variableItem, false, filterText);
-
-        
         } catch (e: any) {
           if (e.name !== "AbortError") {
-           
             // Only clear search results on error, don't reset loading states
             // to preserve filter text for user to continue typing
             if (variablesData.values[index]) {
