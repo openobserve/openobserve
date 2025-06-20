@@ -105,7 +105,7 @@ const oneDarkTheme = EditorView.theme(
 
         },
         "& > ul > li[aria-selected]": {
-            backgroundColor: "#0065a9 !important",
+            backgroundColor: "#03395E !important",
             color: ivory,
 
             
@@ -114,7 +114,7 @@ const oneDarkTheme = EditorView.theme(
     ".cm-completionMatchedText": {
     textDecoration: "none",          // removes underline
     fontWeight: "bold",              // or use italic, or any other style
-    color: "#0098ff"                 // optional: VSCode yellowish match color
+    color: "#2AAAFF"                 // optional: VSCode yellowish match color
     },
     ".cm-completionLabel": {
     color: "#e1e8ed"  // Set your unmatched text color here
