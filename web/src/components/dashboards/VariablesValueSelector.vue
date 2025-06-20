@@ -346,8 +346,8 @@ export default defineComponent({
       };
 
       if (
-        queryReq.queryReq.hasOwnProperty("regions") &&
-        queryReq.queryReq.hasOwnProperty("clusters")
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
       ) {
         payload.content.payload["regions"] = queryReq.queryReq.regions;
         payload.content.payload["clusters"] = queryReq.queryReq.clusters;
@@ -2079,9 +2079,9 @@ export default defineComponent({
     // 3. Uses the unified handleVariableType function to handle both REST and WebSocket/Streaming
     // 4. Updates the search results in the variable object
     // The search results are displayed in the child component when filterText is active
-    let searchControllers: Record<string, AbortController> = {};
-    let searchDebounceTimeouts: Record<string, NodeJS.Timeout> = {};
-    let currentSearchText: Record<string, string> = {}; // Track current search text for each variable
+    let searchControllers: any = {};
+    let searchDebounceTimeouts: any = {};
+    let currentSearchText: any = {}; 
 
     /**
      * Comprehensive cancellation function that cancels all ongoing operations for a variable
