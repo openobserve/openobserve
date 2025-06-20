@@ -419,7 +419,7 @@ class="padding-none" />
         />
       </q-list>
     </q-drawer>
-    <q-page-container>
+    <q-page-container :key="store.state.selectedOrganization.identifier">
       <router-view v-slot="{ Component }">
         <component :is="Component" />
       </router-view>
