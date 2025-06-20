@@ -1103,7 +1103,8 @@
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
     "cipherKeys": "Cipher Keys",
     "nodes": "Nodes",
-    "enableStreamingSearch": "Enable Streaming Search"
+    "enableStreamingSearch": "Enable Streaming Search",
+    "enableAggregationCache": "Enable Aggregation Cache"
   },
   "reports": {
     "header": "Reports",

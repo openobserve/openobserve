@@ -31,6 +31,7 @@ pub struct Request {
     pub streaming_id: Option<String>,
     pub local_mode: Option<bool>,
     pub use_cache: bool,
+    pub histogram_interval: i64,
 }
 
 impl Default for Request {
@@ -49,6 +50,7 @@ impl Default for Request {
             streaming_id: None,
             local_mode: None,
             use_cache: default_use_cache(),
+            histogram_interval: 0,
         }
     }
 }
@@ -63,6 +65,7 @@ impl Request {
         user_id: Option<String>,
         time_range: Option<(i64, i64)>,
         search_event_type: Option<String>,
+        histogram_interval: i64,
     ) -> Self {
         Self {
             trace_id,
@@ -78,6 +81,7 @@ impl Request {
             streaming_id: None,
             local_mode: None,
             use_cache: default_use_cache(),
+            histogram_interval,
         }
     }
 
@@ -130,6 +134,7 @@ impl From<FlightSearchRequest> for Request {
             streaming_id: None,
             local_mode: req.super_cluster_info.local_mode,
             use_cache: req.search_info.use_cache,
+            histogram_interval: req.search_info.histogram_interval,
         }
     }
 }

@@ -269,6 +269,7 @@ pub async fn get_latest_traces(
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

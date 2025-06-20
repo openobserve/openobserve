@@ -79,7 +79,6 @@ import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
-import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -2448,12 +2447,8 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      if(isAggregation && !queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
-        const interval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval + ' seconds' : null;
-        let query = await changeHistogramInterval(queryReq.query.sql, interval);
-        if(query) {
-          queryReq.query.sql = query;
-        }
+      if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
 
       const { traceparent, traceId } = generateTraceContext();
