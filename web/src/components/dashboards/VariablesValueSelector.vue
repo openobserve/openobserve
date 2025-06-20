@@ -305,6 +305,31 @@ export default defineComponent({
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);
       });
+
+      // Clean up all search operations
+      Object.keys(searchControllers).forEach((variableName) => {
+        if (searchControllers[variableName]) {
+          searchControllers[variableName].abort();
+        }
+      });
+
+      // Clear all debounce timeouts
+      Object.keys(searchDebounceTimeouts).forEach((variableName) => {
+        if (searchDebounceTimeouts[variableName]) {
+          clearTimeout(searchDebounceTimeouts[variableName]);
+        }
+      });
+
+      // Clear current search text tracking
+      Object.keys(currentSearchText).forEach((variableName) => {
+        currentSearchText[variableName] = "";
+      });
+
+      // Clean up any in-flight promises to prevent memory leaks
+      rejectAllPromises();
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
+        currentlyExecutingPromises[key] = null;
+      });
     });
 
     const sendSearchMessage = (queryReq: any) => {
@@ -390,6 +415,12 @@ export default defineComponent({
       variableLog(variableObject.name, `Received response...`);
 
       if (!variableObject) {
+        return;
+      }
+
+      // Check if this operation was cancelled before processing
+      if (currentlyExecutingPromises[variableObject.name] === null) {
+        removeTraceId(variableObject.name, payload.traceId);
         return;
       }
 
@@ -629,6 +660,12 @@ export default defineComponent({
         // console.error("Invalid time range");
         return;
       }
+
+      // Check if this operation was cancelled before proceeding
+      if (currentlyExecutingPromises[variableObject.name] === null) {
+        return;
+      }
+
       // Set loading state before initiating WebSocket
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
@@ -1190,11 +1227,17 @@ export default defineComponent({
           return;
         }
 
-        // If the variable is already being processed, cancel the previous request
-        if (currentlyExecutingPromises[name]) {
-          variableLog(name, "Canceling previous request");
-          currentlyExecutingPromises[name](false);
+        // For search operations, use comprehensive cancellation
+        if (searchText) {
+          cancelAllVariableOperations(name);
+        } else {
+          // If the variable is already being processed, cancel the previous request
+          if (currentlyExecutingPromises[name]) {
+            variableLog(name, "Canceling previous request");
+            currentlyExecutingPromises[name](false);
+          }
         }
+
         currentlyExecutingPromises[name] = reject;
 
         // Check if this variable has any dependencies
@@ -1326,7 +1369,11 @@ export default defineComponent({
               (!Array.isArray(variableObject.value) ||
                 variableObject.value.length > 0)
             ) {
-              finalizePartialVariableLoading(variableObject, true, isInitialLoad);
+              finalizePartialVariableLoading(
+                variableObject,
+                true,
+                isInitialLoad,
+              );
               finalizeVariableLoading(variableObject, true);
               emitVariablesData();
               return true;
@@ -2002,7 +2049,7 @@ export default defineComponent({
 
       if (fieldHit) {
         // Extract the values for the specified field from the result
-        const searchResults = fieldHit.values
+        let searchResults = fieldHit.values
           .filter((value: any) => value.zo_sql_key !== undefined)
           .map((value: any) => ({
             // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
@@ -2011,7 +2058,6 @@ export default defineComponent({
             // Use the zo_sql_key as the value
             value: value.zo_sql_key.toString(),
           }));
-
         // Update search results
         variableObject._searchResults = searchResults;
       } else {
@@ -2030,6 +2076,49 @@ export default defineComponent({
     // The search results are displayed in the child component when filterText is active
     let searchControllers: Record<string, AbortController> = {};
     let searchDebounceTimeouts: Record<string, NodeJS.Timeout> = {};
+    let currentSearchText: Record<string, string> = {}; // Track current search text for each variable
+
+    /**
+     * Comprehensive cancellation function that cancels all ongoing operations for a variable
+     * @param {string} variableName - The name of the variable to cancel operations for
+     */
+    const cancelAllVariableOperations = (variableName: string) => {
+      // 1. Cancel any ongoing promise-based operations
+      if (currentlyExecutingPromises[variableName]) {
+        variableLog(variableName, "Canceling currently executing promise");
+        currentlyExecutingPromises[variableName](false);
+        currentlyExecutingPromises[variableName] = null;
+      }
+
+      // 2. Cancel any ongoing WebSocket/Streaming operations
+      cancelTraceId(variableName);
+
+      // 3. Cancel any ongoing search operations
+      if (searchControllers[variableName]) {
+        variableLog(variableName, "Canceling search controller");
+        searchControllers[variableName].abort();
+        searchControllers[variableName] = null;
+      }
+
+      // 4. Clear any pending debounce timeouts
+      if (searchDebounceTimeouts[variableName]) {
+        variableLog(variableName, "Clearing search debounce timeout");
+        clearTimeout(searchDebounceTimeouts[variableName]);
+        searchDebounceTimeouts[variableName] = null;
+      }
+
+      // 5. Reset loading states for the variable only if not in search mode
+      const variableObject = variablesData.values.find(
+        (v: any) => v.name === variableName,
+      );
+      if (variableObject && !variableObject._searchResults) {
+        variableObject.isLoading = false;
+        variableObject.isVariableLoadingPending = false;
+      }
+
+      // 6. Clear current search text tracking
+      currentSearchText[variableName] = "";
+    };
 
     const onVariableSearch = async (
       index: number,
@@ -2042,53 +2131,63 @@ export default defineComponent({
       )
         return;
 
-      // Clear previous debounce timeout
-      if (searchDebounceTimeouts[variableItem.name]) {
-        clearTimeout(searchDebounceTimeouts[variableItem.name]);
-      }
+      const variableName = variableItem.name;
 
-      // Cancel previous search if any
-      if (searchControllers[variableItem.name]) {
-        searchControllers[variableItem.name].abort();
+      // Only cancel ongoing operations if filterText is not empty (i.e., a real search)
+      if (filterText) {
+        cancelAllVariableOperations(variableName);
       }
 
       if (!filterText) {
-        console.debug(
-          `onVariableSearch: Clearing search results for ${variableItem.name}`,
-        );
+        
+        // Clear search results and reset loading states when filterText is empty
+        variableItem._searchResults = [];
+        variableItem.isLoading = false;
+        variableItem.isVariableLoadingPending = false;
+        currentSearchText[variableName] = "";
         return;
       }
 
       // Set debounce timeout for search
-      searchDebounceTimeouts[variableItem.name] = setTimeout(async () => {
+      searchDebounceTimeouts[variableName] = setTimeout(async () => {
+        // Double-check cancellation before starting new search
+        if (searchDebounceTimeouts[variableName] === null) {
+          return; // Search was cancelled
+        }
+
+        // Store the current search text to prevent race conditions
+        currentSearchText[variableName] = filterText;
+
         const controller = new AbortController();
-        searchControllers[variableItem.name] = controller;
+        searchControllers[variableName] = controller;
 
         try {
-          console.debug(
-            `onVariableSearch: Searching for ${filterText} in ${variableItem.name}`,
-          );
+      
 
           // Initialize search results property to indicate this is a search request
           variableItem._searchResults = [];
+          variableItem.isLoading = true;
 
           // Use the unified approach to load variable data with search text
           await loadSingleVariableDataByName(variableItem, false, filterText);
 
-          console.debug(
-            `onVariableSearch: Search completed for ${variableItem.name}`,
-          );
+        
         } catch (e: any) {
           if (e.name !== "AbortError") {
-            console.error(
-              `onVariableSearch: Error searching for ${filterText} in ${variableItem.name}`,
-              e,
-            );
-            variablesData.values[index]._searchResults = [];
+           
+            // Only clear search results on error, don't reset loading states
+            // to preserve filter text for user to continue typing
+            if (variablesData.values[index]) {
+              variablesData.values[index]._searchResults = [];
+            }
           }
-          // Reset loading states on error
-          variableItem.isLoading = false;
-          variableItem.isVariableLoadingPending = false;
+          // Don't reset loading states on error to preserve filter text
+          // The loading states will be reset when the user clears the filter or closes the popup
+        } finally {
+          // Clean up the controller reference
+          if (searchControllers[variableName] === controller) {
+            searchControllers[variableName] = null;
+          }
         }
       }, 1000); // 1000ms debounce to match child component
     };
@@ -2100,6 +2199,7 @@ export default defineComponent({
       onVariablesValueUpdated,
       loadVariableOptions,
       onVariableSearch,
+      cancelAllVariableOperations,
     };
   },
 });

@@ -165,7 +165,7 @@ export default defineComponent({
     // 1. Clears any existing debounce timeout
     // 2. If filterText is empty, clears search results
     // 3. If filterText has value, sets searching state and debounces the search
-    // 4. After 300ms delay, emits search event to parent component
+    // 4. After 1000ms delay, emits search event to parent component
     // The parent component handles the actual API call and updates search results
     watch(
       () => filterText.value,
@@ -173,17 +173,26 @@ export default defineComponent({
         if (searchDebounceTimeout) clearTimeout(searchDebounceTimeout);
         if (!newVal) {
           searching.value = false;
+          // Reset loading states when filter text is cleared
+          if (props.variableItem) {
+            props.variableItem.isLoading = false;
+            props.variableItem.isVariableLoadingPending = false;
+            props.variableItem._searchResults = [];
+          }
           emit("search", { variableItem: props.variableItem, filterText: "" });
           return;
         }
         searching.value = true;
         searchDebounceTimeout = setTimeout(() => {
-          emit("search", {
-            variableItem: props.variableItem,
-            filterText: newVal,
-          });
+          // Only emit search if filterText hasn't changed during the debounce period
+          if (filterText.value === newVal) {
+            emit("search", {
+              variableItem: props.variableItem,
+              filterText: newVal,
+            });
+          }
           searching.value = false;
-        }, 1000); // Reduced to 1000ms for better responsiveness
+        }, 1000); // 1000ms debounce to match parent component
       },
     );
 
@@ -243,6 +252,12 @@ export default defineComponent({
       searching.value = false;
       // Clear search results when popup is hidden
       emit("search", { variableItem: props.variableItem, filterText: "" });
+      // Reset loading states when popup is closed
+      if (props.variableItem) {
+        props.variableItem.isLoading = false;
+        props.variableItem.isVariableLoadingPending = false;
+        props.variableItem._searchResults = [];
+      }
       if (props.variableItem.multiSelect) {
         emit("update:modelValue", selectedValue.value);
       }
