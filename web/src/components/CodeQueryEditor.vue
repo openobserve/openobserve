@@ -38,7 +38,7 @@ import {
   onBeforeUnmount,
 } from "vue";
 
-import { EditorView, basicSetup } from "codemirror";
+import { EditorView, basicSetup, minimalSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
@@ -49,13 +49,17 @@ import {
   CompletionContext,
   Completion,
 } from "@codemirror/autocomplete";
-import { keymap } from "@codemirror/view";
+import { keymap, lineNumbers } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
-import { oneDark } from "@codemirror/theme-one-dark";
+  import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
+  import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
+import { foldGutter, foldKeymap } from "@codemirror/language";
+
 
 export default defineComponent({
   props: {
@@ -186,11 +190,76 @@ export default defineComponent({
         ],
       });
     };
+    
 
-    // Create theme based on store state
-    const createTheme = () => {
-      return store.state.theme === "dark" ? oneDark : [];
-    };
+
+    const customDarkTheme = EditorView.theme({
+        ".cm-editor": {
+          backgroundColor: "#1e1e1e !important", // Custom dark background
+        },
+        ".cm-scroller": {
+          backgroundColor: "#1e1e1e !important",
+          fontFamily: "Menlo, Monaco, 'Courier New', monospace !important",
+          fontWeight: "normal !important",
+          fontSize: "12px !important",
+          fontFeatureSettings: "liga 0, calt 0 !important",
+          fontVariationSettings: "normal !important",
+          lineHeight: "18px !important",
+          letterSpacing: "0px !important",
+        },
+        ".cm-cursor": {
+          borderLeft: "2px solid #d4d4d4 !important", // bright pink for visibility
+        },
+        ".cm-gutters": {
+          backgroundColor: "transparent !important",
+          borderRight: "none !important",
+        },
+        ".cm-activeLineGutter": {
+          backgroundColor: "transparent !important",
+        },
+        ".cm-line": {
+          paddingLeft: "0px !important",
+        },
+
+      }, { dark: true });
+      const customLightTheme = EditorView.theme({
+        ".cm-editor": {
+          backgroundColor: "#fafafa !important", // Your light mode background
+        },
+        ".cm-scroller": {
+          backgroundColor: "#fafafa !important",
+          fontFamily: "Menlo, Monaco, 'Courier New', monospace !important",
+          fontWeight: "normal !important",
+          fontSize: "12px !important",
+          fontFeatureSettings: "liga 0, calt 0 !important",
+          fontVariationSettings: "normal !important",
+          lineHeight: "18px !important",
+          letterSpacing: "0px !important",
+        },
+        ".cm-cursor": {
+          borderLeft: "2px solid #000000 !important", // bright pink for visibility
+        },
+        ".cm-gutters": {
+          backgroundColor: "transparent !important",
+          borderRight: "none !important",
+          marginRight: "0px !important",
+        },
+        ".cm-gutter": {
+          marginRight: "0px !important",
+        },
+        ".cm-activeLineGutter": {
+          backgroundColor: "transparent !important",
+        },
+        ".cm-line": {
+          paddingLeft: "0px !important",
+        },
+        
+      });
+
+
+      const createTheme = () => {
+        return store.state.theme === "dark" ? [o2QueryEditorDarkTheme, customDarkTheme] : [o2QueryEditorLightTheme, customLightTheme];
+      };
 
     // Create keymap with Ctrl+Enter support
     const createKeymap = () => {
@@ -246,11 +315,17 @@ export default defineComponent({
         const state = EditorState.create({
           doc: props.query?.trim() || "",
           extensions: [
-            basicSetup,
+            minimalSetup,
+
+            ...(enableCodeFolding.value
+              ? [foldGutter(), keymap.of(foldKeymap)]
+              : []),
+            lineNumbers(),
             getLanguageSupport(),
             createAutocompletion(),
-            createTheme(),
+            ...createTheme(),
             createKeymap(),
+
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
                 const debouncedEmit = debounce((value: string) => {
@@ -260,22 +335,16 @@ export default defineComponent({
                 debouncedEmit(update.state.doc.toString());
               }
             }),
+
             EditorView.focusChangeEffect.of((state, focusing) => {
               if (focusing) {
                 emit("focus");
               } else {
-                // Handle blur with trimming
                 const value = state.doc.toString();
                 const trimmedValue = value.trim();
-
                 if (value !== trimmedValue) {
-                  // Apply trim by replacing content
                   const transaction = state.update({
-                    changes: {
-                      from: 0,
-                      to: state.doc.length,
-                      insert: trimmedValue,
-                    },
+                    changes: { from: 0, to: state.doc.length, insert: trimmedValue },
                   });
                   editorView?.dispatch(transaction);
                 }
@@ -283,6 +352,7 @@ export default defineComponent({
               }
               return null;
             }),
+
             EditorView.theme({
               "&": {
                 fontSize: "14px",
@@ -525,4 +595,13 @@ export default defineComponent({
   height: 78%;
   border-radius: 5px;
 }
+
+
+</style>
+
+
+<style lang="scss">
+.cm-focused{
+    outline: none !important
+  }
 </style>
