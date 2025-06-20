@@ -326,7 +326,7 @@ const useLogs = () => {
   const { getAllActions } = useActions();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams, getStream, getMultiStreams } = useStreams();
+  const { getStreams, getStream, getMultiStreams, isStreamExists, isStreamFetched } = useStreams();
   const router = useRouter();
   let parser: any;
   const fieldValues = ref();
@@ -4845,7 +4845,9 @@ const useLogs = () => {
       }
 
       if (
-        !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams)
+        !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams) &&
+        isStreamFetched(searchObj.data.stream.streamType) &&
+        isStreamExists(newSelectedStreams, searchObj.data.stream.streamType)
       ) {
         searchObj.data.stream.selectedStream = newSelectedStreams;
         onStreamChange(value);

@@ -712,6 +712,13 @@ const useStreams = () => {
     }
   };
 
+  const isStreamExists = (streamName: string, streamType: string) => {
+    return Object.prototype.hasOwnProperty.call(
+      store.state.streams.streamsIndexMapping[streamType],
+      streamName,
+    )
+  }
+
   return {
     getStreams,
     getStream,
@@ -723,6 +730,8 @@ const useStreams = () => {
     getUpdatedSettings,
     resetStreamType,
     getPaginatedStreams,
+    isStreamExists,
+    isStreamFetched,
   };
 };
 
