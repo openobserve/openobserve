@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stack-label
       @filter="filterOptions"
       class="textbox col no-case"
-      :loading="variableItem.isLoading"
+      :loading="variableItem.isLoading || searching"
       data-test="dashboard-variable-query-value-selector"
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
@@ -125,8 +125,8 @@ import { defineComponent, ref, watch, computed, nextTick } from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  props: ["modelValue", "variableItem", "loadOptions"],
-  emits: ["update:modelValue"],
+  props: ["modelValue", "variableItem", "loadOptions", "searchResults"],
+  emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
     const selectedValue = ref(props.variableItem?.value);
     const filterText = ref("");
@@ -134,9 +134,20 @@ export default defineComponent({
     const isOpen = ref(false);
     const suppressLoadOnNextPopup = ref(false); // added this because on click of enter, we need to skip the API load
 
+    const searching = ref(false); // loading state for search
+    let searchDebounceTimeout: any = null;
+
     const availableOptions = computed(() => props.variableItem?.options || []);
 
+    // Show searchResults if filterText is active, else normal options
     const filteredOptions = computed(() => {
+      if (
+        filterText.value &&
+        props.searchResults &&
+        props.searchResults.length > 0
+      ) {
+        return props.searchResults;
+      }
       if (!filterText.value) return availableOptions.value;
       const searchText = filterText.value.toLowerCase();
       return availableOptions.value.filter((opt: any) =>
@@ -147,6 +158,34 @@ export default defineComponent({
       filterText.value = val;
       update();
     };
+
+    // --- Typeahead debounce and emit search event ---
+    // This watch function implements debounced search for the variable selector.
+    // When filterText changes:
+    // 1. Clears any existing debounce timeout
+    // 2. If filterText is empty, clears search results
+    // 3. If filterText has value, sets searching state and debounces the search
+    // 4. After 300ms delay, emits search event to parent component
+    // The parent component handles the actual API call and updates search results
+    watch(
+      () => filterText.value,
+      (newVal) => {
+        if (searchDebounceTimeout) clearTimeout(searchDebounceTimeout);
+        if (!newVal) {
+          searching.value = false;
+          emit("search", { variableItem: props.variableItem, filterText: "" });
+          return;
+        }
+        searching.value = true;
+        searchDebounceTimeout = setTimeout(() => {
+          emit("search", {
+            variableItem: props.variableItem,
+            filterText: newVal,
+          });
+          searching.value = false;
+        }, 1000); // Reduced to 1000ms for better responsiveness
+      },
+    );
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
@@ -201,6 +240,9 @@ export default defineComponent({
     const onPopupHide = () => {
       isOpen.value = false;
       filterText.value = "";
+      searching.value = false;
+      // Clear search results when popup is hidden
+      emit("search", { variableItem: props.variableItem, filterText: "" });
       if (props.variableItem.multiSelect) {
         emit("update:modelValue", selectedValue.value);
       }
@@ -320,6 +362,7 @@ export default defineComponent({
       handleKeydown,
       handleCustomValue,
       filterText,
+      searching,
     };
   },
 });

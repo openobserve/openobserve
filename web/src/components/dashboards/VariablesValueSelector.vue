@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
           :loadOptions="loadVariableOptions"
+          :searchResults="item._searchResults || []"
+          @search="onVariableSearch(index, $event)"
         />
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -319,8 +321,8 @@ export default defineComponent({
       };
 
       if (
-        Object.hasOwn(queryReq.queryReq, "regions") &&
-        Object.hasOwn(queryReq.queryReq, "clusters")
+        queryReq.queryReq.hasOwnProperty("regions") &&
+        queryReq.queryReq.hasOwnProperty("clusters")
       ) {
         payload.content.payload["regions"] = queryReq.queryReq.regions;
         payload.content.payload["clusters"] = queryReq.queryReq.clusters;
@@ -1177,6 +1179,7 @@ export default defineComponent({
     const loadSingleVariableDataByName = async (
       variableObject: any,
       isInitialLoad: boolean = false,
+      searchText?: string,
     ) => {
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
@@ -1280,6 +1283,7 @@ export default defineComponent({
           const success = await handleVariableType(
             variableObject,
             isInitialLoad,
+            searchText,
           );
           // await finalizeVariableLoading(variableObject, success);
           resolve(success);
@@ -1299,6 +1303,7 @@ export default defineComponent({
     const handleVariableType = async (
       variableObject: any,
       isInitialLoad: boolean = false,
+      searchText?: string,
     ) => {
       variableLog(
         variableObject.name,
@@ -1308,7 +1313,7 @@ export default defineComponent({
         case "query_values": {
           // for initial loading check if the value is already available,
           // do not load the values
-          if (isInitialLoad) {
+          if (isInitialLoad && !searchText) {
             variableLog(
               variableObject.name,
               `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
@@ -1329,7 +1334,10 @@ export default defineComponent({
           }
 
           try {
-            const queryContext: any = await buildQueryContext(variableObject);
+            const queryContext: any = await buildQueryContext(
+              variableObject,
+              searchText,
+            );
 
             if (
               isWebSocketEnabled(store.state) ||
@@ -1346,12 +1354,21 @@ export default defineComponent({
                   variableObject,
                   queryContext,
                 );
+
                 if (response?.data?.hits) {
                   const originalValue = JSON.parse(
                     JSON.stringify(variableObject.value),
                   );
 
-                  updateVariableOptions(variableObject, response.data.hits);
+                  // If this is a search request, update search results instead of options
+                  if (searchText) {
+                    updateVariableSearchResults(
+                      variableObject,
+                      response.data.hits,
+                    );
+                  } else {
+                    updateVariableOptions(variableObject, response.data.hits);
+                  }
 
                   const hasValueChanged =
                     Array.isArray(originalValue) &&
@@ -1408,10 +1425,13 @@ export default defineComponent({
      * @param variableObject The variable object containing the query data.
      * @returns The query context as a string.
      */
-    const buildQueryContext = async (variableObject: any) => {
+    const buildQueryContext = async (
+      variableObject: any,
+      searchText?: string,
+    ) => {
       variableLog(
         variableObject.name,
-        `Building query context for variable: ${variableObject.name}`,
+        `Building query context for variable: ${variableObject.name}${searchText ? ` with search: ${searchText}` : ""}`,
       );
 
       const timestamp_column =
@@ -1453,6 +1473,11 @@ export default defineComponent({
             );
           }
         }
+      }
+
+      // Add search filter if searchText is provided
+      if (searchText && searchText.trim()) {
+        queryContext += ` WHERE "${variableObject.query_data.field}" LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
       }
 
       // Base64 encode the query context
@@ -1965,12 +1990,117 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Updates the search results for a variable based on the result of a query to fetch field values.
+     * @param variableObject - The variable object containing query data.
+     * @param hits - The result from the stream service containing field values.
+     */
+    const updateVariableSearchResults = (variableObject: any, hits: any[]) => {
+      const fieldHit = hits.find(
+        (field: any) => field.field === variableObject.query_data.field,
+      );
+
+      if (fieldHit) {
+        // Extract the values for the specified field from the result
+        const searchResults = fieldHit.values
+          .filter((value: any) => value.zo_sql_key !== undefined)
+          .map((value: any) => ({
+            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
+            label:
+              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
+            // Use the zo_sql_key as the value
+            value: value.zo_sql_key.toString(),
+          }));
+
+        // Update search results
+        variableObject._searchResults = searchResults;
+      } else {
+        // Reset search results if no field values are available
+        variableObject._searchResults = [];
+      }
+    };
+
+    // --- Typeahead search logic for query_values variables ---
+    // This function implements debounced search functionality for variable query value selectors.
+    // When a user types in the filter text, it:
+    // 1. Debounces the search to avoid excessive API calls (1000ms)
+    // 2. Cancels previous search requests to prevent race conditions
+    // 3. Uses the unified handleVariableType function to handle both REST and WebSocket/Streaming
+    // 4. Updates the search results in the variable object
+    // The search results are displayed in the child component when filterText is active
+    let searchControllers: Record<string, AbortController> = {};
+    let searchDebounceTimeouts: Record<string, NodeJS.Timeout> = {};
+
+    const onVariableSearch = async (
+      index: number,
+      { variableItem, filterText }: any,
+    ) => {
+      if (
+        typeof index !== "number" ||
+        !variableItem ||
+        variableItem.type !== "query_values"
+      )
+        return;
+
+      // Clear previous debounce timeout
+      if (searchDebounceTimeouts[variableItem.name]) {
+        clearTimeout(searchDebounceTimeouts[variableItem.name]);
+      }
+
+      // Cancel previous search if any
+      if (searchControllers[variableItem.name]) {
+        searchControllers[variableItem.name].abort();
+      }
+
+      if (!filterText) {
+        console.debug(
+          `onVariableSearch: Clearing search results for ${variableItem.name}`,
+        );
+        variablesData.value[index]._searchResults = [];
+        return;
+      }
+
+      // Set debounce timeout for search
+      searchDebounceTimeouts[variableItem.name] = setTimeout(async () => {
+        const controller = new AbortController();
+        searchControllers[variableItem.name] = controller;
+
+        try {
+          console.debug(
+            `onVariableSearch: Searching for ${filterText} in ${variableItem.name}`,
+          );
+
+          // Initialize search results property to indicate this is a search request
+          variableItem._searchResults = [];
+
+          // Use the unified approach to load variable data with search text
+          await loadSingleVariableDataByName(variableItem, false, filterText);
+
+          console.debug(
+            `onVariableSearch: Search completed for ${variableItem.name}`,
+          );
+        } catch (e: any) {
+          if (e.name !== "AbortError") {
+            console.error(
+              `onVariableSearch: Error searching for ${filterText} in ${variableItem.name}`,
+              e,
+            );
+            variablesData.values[index]._searchResults = [];
+          }
+          // Reset loading states on error
+          variableItem.isLoading = false;
+          variableItem.isVariableLoadingPending = false;
+        }
+      }, 1000); // 1000ms debounce to match child component
+    };
+
     return {
       props,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
       loadVariableOptions,
+      onVariableSearch,
     };
   },
 });
