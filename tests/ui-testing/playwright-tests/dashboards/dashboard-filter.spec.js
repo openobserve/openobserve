@@ -44,6 +44,7 @@ test.describe("dashboard filter testcases", () => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardVariables = new DashboardVariables(page);
     const dashboardSetting = new DashboardSetting(page);
+    const dashboardFilter = new Dashboardfilter(page);
 
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -109,7 +110,7 @@ test.describe("dashboard filter testcases", () => {
     );
 
     // Add filter conditions
-    await chartTypeSelector.addFilterCondition(
+    await dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
@@ -117,7 +118,7 @@ test.describe("dashboard filter testcases", () => {
       "$variablename"
     );
 
-    await chartTypeSelector.addFilterCondition(
+    await dashboardFilter.addFilterCondition(
       1,
       "kubernetes_container_image",
       "",
@@ -184,6 +185,7 @@ test.describe("dashboard filter testcases", () => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardSetting = new DashboardSetting(page);
     const variableName = new DashboardVariables(page);
+    const dashboardFilter = new Dashboardfilter(page);
 
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -231,7 +233,7 @@ test.describe("dashboard filter testcases", () => {
     await variableName.selectValueFromVariableDropDown("variablename", "ziox");
 
     // Add filter conditions
-    await chartTypeSelector.addFilterCondition(
+    await dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
@@ -330,7 +332,7 @@ test.describe("dashboard filter testcases", () => {
 
     await page.getByText("Add Group").click();
 
-    await dashboardFilter.addFilterCondition11(
+    await dashboardFilter.addGroupFilterCondition(
       0,
       "kubernetes_container_name",
       "=",
@@ -384,12 +386,11 @@ test.describe("dashboard filter testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-
     const chartTypeSelector = new ChartTypeSelector(page);
-
     const dashboardSetting = new DashboardSetting(page);
     const variableName = new DashboardVariables(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
+    const dashboardFilter = new Dashboardfilter(page);
 
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -437,7 +438,7 @@ test.describe("dashboard filter testcases", () => {
 
     await dashboardActions.waitForChartToRender();
 
-    await chartTypeSelector.selectListFilterItems(
+    await dashboardFilter.selectListFilterItems(
       0,
       "kubernetes_namespace_name",
       ["ingress-nginx", "kube-system"]
@@ -551,6 +552,7 @@ test.describe("dashboard filter testcases", () => {
     const dashboardActions = new DashboardactionPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
+    const dashboardFilter = new Dashboardfilter(page);
 
     // Go to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -593,7 +595,7 @@ test.describe("dashboard filter testcases", () => {
     );
 
     // Add invalid filter condition (IN operator with only one value)
-    await chartTypeSelector.addFilterCondition(
+    await dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
