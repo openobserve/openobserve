@@ -282,7 +282,7 @@ const columns: any = ref<QTableProps["columns"]>([
   },
   {
     name: "last_triggered_at",
-    field: "lastTriggeredAt",
+    field: "last_triggered_at",
     label: t("alerts.lastTriggered"),
     align: "left",
     sortable: true,
@@ -312,8 +312,8 @@ onBeforeMount(() => {
       reportsTableRows.value = res.data.map((report: any, index: number) => ({
         "#": index + 1,
         ...report,
-        lastTriggeredAt: report.lastTriggeredAt
-          ? convertUnixToQuasarFormat(report.lastTriggeredAt)
+        lastTriggeredAt: report.last_triggered_at
+          ? convertUnixToQuasarFormat(report.last_triggered_at)
           : "-",
       }));
       resultTotal.value = reportsTableRows.value.length;
