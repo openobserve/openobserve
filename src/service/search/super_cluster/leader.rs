@@ -223,10 +223,8 @@ async fn run_datafusion(
     };
     req.add_work_group(Some(work_group));
 
-    let histogram_interval = req.histogram_interval;
-
     // construct physical plan
-    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num, histogram_interval).await {
+    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
         Ok(v) => v,
         Err(e) => {
             return Err(e);

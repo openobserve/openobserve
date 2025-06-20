@@ -405,8 +405,7 @@ pub async fn run_datafusion(
     idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
-    let histogram_interval = req.histogram_interval;
-    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num, histogram_interval).await?;
+    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
     log::info!(
         "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
         ctx.state().config().target_partitions(),
@@ -861,10 +860,9 @@ pub async fn generate_context(
     req: &Request,
     sql: &Arc<Sql>,
     target_partitions: usize,
-    histogram_interval: i64,
 ) -> Result<SessionContext> {
     let analyzer_rules = generate_analyzer_rules(sql);
-    let optimizer_rules = generate_optimizer_rules(sql, histogram_interval);
+    let optimizer_rules = generate_optimizer_rules(sql);
     let mut ctx = prepare_datafusion_context(
         &req.trace_id,
         req.work_group.clone(),
