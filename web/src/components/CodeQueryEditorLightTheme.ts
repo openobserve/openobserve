@@ -84,7 +84,7 @@ const oneLightTheme = EditorView.theme(
     },
     ".cm-tooltip": {
       border: "none",
-      backgroundColor: tooltipBackground,
+      backgroundColor: "#F0F0F0",
     },
     ".cm-tooltip .cm-tooltip-arrow:before": {
       borderTopColor: "transparent",
@@ -95,10 +95,50 @@ const oneLightTheme = EditorView.theme(
       borderBottomColor: tooltipBackground,
     },
     ".cm-tooltip-autocomplete": {
-      "& > ul > li[aria-selected]": {
-        backgroundColor: highlightBackground,
-        color: ivory,
+      scrollbarColor: "#8f8f8f #F0F0F0", // thumb and track for Firefox
+      borderRadius: "0px !important",
+
+      "&::-webkit-scrollbar": {
+        width: "8px",
       },
+      "&::-webkit-scrollbar-track": {
+        backgroundColor: "#f0f0f0 !important",
+        borderRadius: "0px !important",
+      },
+      "&::-webkit-scrollbar-thumb": {
+        backgroundColor: "#89f88f",
+      },
+      "&::-webkit-scrollbar-thumb:hover": {
+        backgroundColor: "#8f8f8f",
+      },
+      "& > ul > li": {
+        fontSize:"12px !important",
+        },
+      "& > ul > li[aria-selected]": {
+        backgroundColor: '#035FC0',
+        color: ivory,
+        "& .cm-completionMatchedText": {
+          color: "#BBE7FE"
+        },
+        "& .cm-completionLabel": {
+          color: "#F4F7FC !important"
+        }
+      },
+    },
+    ".cm-completionMatchedText": {
+      textDecoration: "none",          // removes underline
+      fontWeight: "bold",
+      color: "#0065BF"                 //: VSCode blue match color
+      },
+      ".cm-completionLabel": {
+      color: "#000000"  // Set your unmatched text color here
+      },
+    ".cm-foldGutter .cm-gutterElement": {
+      "& span": {
+        fontSize: "18px !important",
+        cursor: "pointer !important",
+        display: "inline-block !important",
+      }
     },
   },
   { dark: false }
