@@ -26,7 +26,7 @@ export class MetricsPage {
     async metricsPageDefaultOrg() {
 
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-        await this.page.getByText('default', { exact: true }).click();
+        await this.page.getByText('default', { exact: true }).first().click();
 
 
     }
