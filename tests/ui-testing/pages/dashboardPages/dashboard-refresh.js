@@ -40,16 +40,6 @@ export default class DashboardTimeRefresh {
     await this.applyBtn.click();
   }
 
-  // Absolute time selection
-  // async setAbsolute(date) {
-  //   await this.timeTab.click();
-  //   await this.absTime.click();
-  //   await this.page
-  //     .locator(`[data-test="date-time-absolute-${date}-btn"]`)
-  //     .dblclick();
-  //   await this.applyBtn.click();
-  // }
-
   // Set absolute time selection with dynamic start and end days
   async selectAbsolutetime(startDay, endDay) {
     // Open the date-time picker

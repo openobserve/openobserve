@@ -13,6 +13,7 @@ import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 import Dashboardvariables from "../../pages/dashboardPages/dashboard-variables.js";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs.js";
+import Dashboardfilter from "../../pages/dashboardPages/dashboard-filter.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -38,6 +39,7 @@ test.describe("dashboard maps testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardPageActions = new DashboardactionPage(page);
     const dashboardVariables = new Dashboardvariables(page);
+    const dashboardFilter = new Dashboardfilter(page);
 
     // select dashboard
     await dashboardPage.menuItem("dashboards-item");
@@ -80,7 +82,7 @@ test.describe("dashboard maps testcases", () => {
 
     // selct the variable and enter the value
 
-    await chartTypeSelector.addFilterCondition(
+    await dashboardFilter.addFilterCondition(
       "country",
       "country",
       ">=",
