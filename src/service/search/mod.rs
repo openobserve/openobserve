@@ -35,7 +35,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
+        sql::{is_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -55,6 +55,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::make_grpc_search_client,
+    config::utils::sql::is_simple_aggregate_query,
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::TaskStatus,
     o2_enterprise::enterprise::search::WorkGroup,
@@ -620,6 +621,7 @@ pub async fn search_partition(
     let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
 
+    #[cfg(feature = "enterprise")]
     let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
 
     #[cfg(feature = "enterprise")]
@@ -631,6 +633,7 @@ pub async fn search_partition(
         }
     }
 
+    #[cfg(feature = "enterprise")]
     let is_streaming_aggregate =
         ts_column.is_none() && is_cachable_aggs && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
@@ -638,7 +641,12 @@ pub async fn search_partition(
     let is_http_distinct = is_simple_distinct && is_http_req;
 
     // if need streaming output and is simple query, we shouldn't skip file list
-    if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
+    if skip_get_file_list && req.streaming_output {
+        skip_get_file_list = false;
+    }
+
+    #[cfg(feature = "enterprise")]
+    if is_streaming_aggregate {
         skip_get_file_list = false;
     }
 
@@ -647,6 +655,7 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
+    #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
     let streaming_id = if req.streaming_output && is_streaming_aggregate {
         Some(ider::uuid())
@@ -805,6 +814,9 @@ pub async fn search_partition(
         (records + f.records, original_size + f.original_size)
     });
 
+    #[cfg(feature = "enterprise")]
+    let streaming_aggs = is_streaming_aggregate && req.streaming_output;
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -816,8 +828,19 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        streaming_output: req.streaming_output && is_streaming_aggregate,
-        streaming_aggs: req.streaming_output && is_streaming_aggregate,
+        // non enterprise - diabled
+        #[cfg(not(feature = "enterprise"))]
+        streaming_output: false,
+        #[cfg(not(feature = "enterprise"))]
+        streaming_aggs: false,
+        #[cfg(not(feature = "enterprise"))]
+        streaming_id: None,
+        // enterprise
+        #[cfg(feature = "enterprise")]
+        streaming_output: streaming_aggs,
+        #[cfg(feature = "enterprise")]
+        streaming_aggs,
+        #[cfg(feature = "enterprise")]
         streaming_id: streaming_id.clone(),
     };
 
@@ -913,6 +936,7 @@ pub async fn search_partition(
         req.end_time,
         step,
         sql_order_by,
+        #[cfg(feature = "enterprise")]
         is_streaming_aggregate,
     );
 
