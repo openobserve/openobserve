@@ -184,7 +184,7 @@ pub async fn search(
         Ok(Err(err)) => Err(err),
         Err(err) => Err(err),
     };
-    let (data, mut scan_stats, partial_err, custom_histogram_interval) = match data {
+    let (data, mut scan_stats, partial_err, histogram_interval) = match data {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
@@ -204,7 +204,7 @@ pub async fn search(
         0,
         !partial_err.is_empty(),
         partial_err,
-        custom_histogram_interval,
+        histogram_interval,
     ))
 }
 
@@ -223,11 +223,10 @@ async fn run_datafusion(
     };
     req.add_work_group(Some(work_group));
 
-    let custom_histogram_interval = req.custom_histogram_interval;
+    let histogram_interval = req.histogram_interval;
 
     // construct physical plan
-    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num, custom_histogram_interval).await
-    {
+    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num, histogram_interval).await {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
@@ -367,7 +366,7 @@ async fn run_datafusion(
                 data,
                 visit.scan_stats,
                 visit.partial_err,
-                custom_histogram_interval,
+                histogram_interval,
             )
         })
         .map_err(|e| e.into())

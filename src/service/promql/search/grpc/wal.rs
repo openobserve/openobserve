@@ -180,7 +180,7 @@ async fn get_wal_batches(
             end_time: time_range.1,
             timeout: cfg.limit.query_timeout as u64,
             use_cache: false,
-            custom_histogram_interval: 0, // not needed for wal
+            histogram_interval: 0, // not needed for wal
         },
         index_info: IndexInfo::default(), // not needed for wal
         super_cluster_info: cluster_rpc::SuperClusterInfo::default(), // current not needed for wal

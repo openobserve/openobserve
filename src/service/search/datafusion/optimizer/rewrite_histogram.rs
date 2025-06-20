@@ -126,9 +126,7 @@ impl TreeNodeRewriter for HistogramToDatebin {
                     // construct interval
                     let arg1 = if args.len() == 1 {
                         let interval = if self.histogram_interval > 0 {
-                            // self.histogram_interval
-                            // TODO: convert seconds to interval string 
-                            "1 hour".to_string()
+                            format!("{} second", self.histogram_interval)
                         } else {
                             generate_histogram_interval(Some((self.start_time, self.end_time)), 0)
                         };

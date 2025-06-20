@@ -375,7 +375,7 @@ pub async fn search(
     drop(_defer);
 
     // 9. get data from datafusion
-    let (data, mut scan_stats, partial_err, custom_histogram_interval): (
+    let (data, mut scan_stats, partial_err, histogram_interval): (
         Vec<RecordBatch>,
         ScanStats,
         String,
@@ -397,7 +397,7 @@ pub async fn search(
         took_wait,
         !partial_err.is_empty(),
         partial_err,
-        custom_histogram_interval,
+        histogram_interval,
     ))
 }
 
@@ -411,8 +411,8 @@ pub async fn run_datafusion(
     idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String, i64)> {
     let cfg = get_config();
-    let custom_histogram_interval = req.custom_histogram_interval;
-    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num, custom_histogram_interval).await?;
+    let histogram_interval = req.histogram_interval;
+    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num, histogram_interval).await?;
     log::info!(
         "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
         ctx.state().config().target_partitions(),
@@ -558,15 +558,8 @@ pub async fn run_datafusion(
         let mut scan_stats = visit.scan_stats;
         // Update scan stats to include aggregation cache ratio
         scan_stats.aggs_cache_ratio = aggs_cache_ratio;
-        ret.map(|data| {
-            (
-                data,
-                scan_stats,
-                visit.partial_err,
-                custom_histogram_interval,
-            )
-        })
-        .map_err(|e| e.into())
+        ret.map(|data| (data, scan_stats, visit.partial_err, histogram_interval))
+            .map_err(|e| e.into())
     }
 }
 
@@ -874,10 +867,10 @@ pub async fn generate_context(
     req: &Request,
     sql: &Arc<Sql>,
     target_partitions: usize,
-    custom_histogram_interval: i64,
+    histogram_interval: i64,
 ) -> Result<SessionContext> {
     let analyzer_rules = generate_analyzer_rules(sql);
-    let optimizer_rules = generate_optimizer_rules(sql, custom_histogram_interval);
+    let optimizer_rules = generate_optimizer_rules(sql, histogram_interval);
     let mut ctx = prepare_datafusion_context(
         &req.trace_id,
         req.work_group.clone(),

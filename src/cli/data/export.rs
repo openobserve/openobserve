@@ -65,7 +65,7 @@ impl Context for Export {
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
-            custom_histogram_interval: None,
+            histogram_interval: None,
         };
 
         let req = search::Request {

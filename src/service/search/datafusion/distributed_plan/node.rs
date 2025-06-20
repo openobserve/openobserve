@@ -92,7 +92,7 @@ impl RemoteScanNodes {
             end_time: self.req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
             timeout: self.req.timeout as u64,
             use_cache: self.req.use_cache,
-            custom_histogram_interval: self.req.custom_histogram_interval,
+            histogram_interval: self.req.histogram_interval,
         };
 
         let index_condition = match &self.index_condition {
@@ -197,7 +197,7 @@ pub struct SearchInfos {
     pub end_time: i64,
     pub timeout: u64,
     pub use_cache: bool,
-    pub custom_histogram_interval: i64,
+    pub histogram_interval: i64,
 }
 
 impl SearchInfos {
@@ -226,7 +226,7 @@ impl SearchInfos {
             end_time: self.end_time,
             timeout: self.timeout as i64,
             use_cache: self.use_cache,
-            custom_histogram_interval: self.custom_histogram_interval,
+            histogram_interval: self.histogram_interval,
         }
     }
 }

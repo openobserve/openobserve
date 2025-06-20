@@ -393,7 +393,7 @@ impl QueryConditionExt for QueryCondition {
                     skip_wal: false,
                     streaming_output: false,
                     streaming_id: None,
-                    custom_histogram_interval: None,
+                    histogram_interval: None,
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],

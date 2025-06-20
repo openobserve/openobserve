@@ -296,7 +296,7 @@ pub async fn search(
         end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
         timeout: req.timeout as u64,
         use_cache: req.use_cache,
-        custom_histogram_interval: req.custom_histogram_interval,
+        histogram_interval: req.histogram_interval,
     };
 
     let context = tracing::Span::current().context();
