@@ -24,8 +24,6 @@ use {
     o2_openfga::authorizer::roles::{
         check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
     },
-    once_cell::sync::Lazy,
-    regex::Regex,
     std::str::FromStr,
 };
 #[cfg(feature = "enterprise")]
@@ -35,6 +33,8 @@ use {
     jsonwebtoken::TokenData,
     o2_openfga::authorizer::authz::{get_user_org_tuple, update_tuples},
     o2_openfga::config::get_config as get_openfga_config,
+    once_cell::sync::Lazy,
+    regex::Regex,
     serde_json::Value,
     std::collections::HashMap,
 };
@@ -49,7 +49,7 @@ use crate::{
     service::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
 };
 
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[cfg(feature = "enterprise")]
 static RE_ROLE_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 #[cfg(feature = "enterprise")]
