@@ -2196,9 +2196,10 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      const parsedQuery: any = fnParsedSQL(filteredQuery);
+      const parsedQuery: any = parser.astify(filteredQuery);
       return parsedQuery || {
         columns: [],
+        from: [],
         orderby: null,
         limit: null,
         groupby: null,
@@ -2209,6 +2210,7 @@ const useLogs = () => {
     } catch (e: any) {
       return {
         columns: [],
+        from: [],
         orderby: null,
         limit: null,
         groupby: null,
@@ -4543,7 +4545,7 @@ const useLogs = () => {
         extractFields();
       }
     } catch (e: any) {
-      console.error("Error while getting stream data:", e);
+      console.info("Error while getting stream data:", e);
     } finally {
       searchObj.loadingStream = false;
     }
@@ -4784,7 +4786,7 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
-      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from == null) {
+      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from == null || parsedSQL?.from?.length == 0) {
         console.info("Failed to parse SQL query:", value);
         return;
         // throw new Error("Invalid SQL syntax");

@@ -102,8 +102,8 @@ const useStreams = () => {
             getStreamsPromise.value
               .then((results: any) => {
                 results.forEach((result: any, index: number) => {
-                  if (result.status === "fulfilled") {
-                    setStreams(streamsToFetch[index], result.value.data.list);
+                  if (result.status === "fulfilled" && Object.hasOwn(result, "value") && result?.value?.data?.list.length > 0) {
+                    setStreams(streamsToFetch[index], result?.value?.data?.list);
                   }
                 });
 
