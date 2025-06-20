@@ -16,7 +16,6 @@
 use std::io::Error as StdErr;
 
 use actix_web::{HttpResponse, delete, get, post, web};
-use config::get_config;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
@@ -95,9 +94,9 @@ async fn create(
         data.toggle_ingestion_logs = toggle_ingestion_logs;
     }
 
+    #[cfg(feature = "enterprise")]
     if let Some(aggregation_cache_enabled) = settings.aggregation_cache_enabled {
-        #[cfg(feature = "enterprise")]
-        if get_config().disk_cache.aggregation_cache_enabled {
+        if config::get_config().disk_cache.aggregation_cache_enabled {
             field_found = true;
             data.aggregation_cache_enabled = aggregation_cache_enabled;
         }
