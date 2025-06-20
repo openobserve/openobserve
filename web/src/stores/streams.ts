@@ -8,7 +8,7 @@ export default {
       index: {},
       metadata: {},
       streamsIndexMapping: {},
-      areStreamsFetched: false,
+      areAllStreamsFetched: false,
     },
     getters: {
       getAllStreams(state: any) {
