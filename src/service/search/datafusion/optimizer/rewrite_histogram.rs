@@ -40,14 +40,16 @@ use crate::service::search::{
 pub struct RewriteHistogram {
     start_time: i64,
     end_time: i64,
+    histogram_interval: i64,
 }
 
 impl RewriteHistogram {
     #[allow(missing_docs)]
-    pub fn new(start_time: i64, end_time: i64) -> Self {
+    pub fn new(start_time: i64, end_time: i64, histogram_interval: i64) -> Self {
         Self {
             start_time,
             end_time,
+            histogram_interval,
         }
     }
 }
@@ -75,7 +77,8 @@ impl OptimizerRule for RewriteHistogram {
             .iter()
             .any(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
         {
-            let mut expr_rewriter = HistogramToDatebin::new(self.start_time, self.end_time);
+            let mut expr_rewriter =
+                HistogramToDatebin::new(self.start_time, self.end_time, self.histogram_interval);
 
             let name_preserver = NamePreserver::new(&plan);
             plan.map_expressions(|expr| {
@@ -98,13 +101,15 @@ fn is_histogram(expr: &Expr) -> bool {
 pub struct HistogramToDatebin {
     start_time: i64,
     end_time: i64,
+    histogram_interval: i64,
 }
 
 impl HistogramToDatebin {
-    pub fn new(start_time: i64, end_time: i64) -> Self {
+    pub fn new(start_time: i64, end_time: i64, histogram_interval: i64) -> Self {
         Self {
             start_time,
             end_time,
+            histogram_interval,
         }
     }
 }
@@ -120,8 +125,13 @@ impl TreeNodeRewriter for HistogramToDatebin {
                     let new_func = Arc::new(ScalarUDF::from(DateBinFunc::new()));
                     // construct interval
                     let arg1 = if args.len() == 1 {
-                        let interval =
-                            generate_histogram_interval(Some((self.start_time, self.end_time)), 0);
+                        let interval = if self.histogram_interval > 0 {
+                            // self.histogram_interval
+                            // TODO: convert seconds to interval string 
+                            "1 hour".to_string()
+                        } else {
+                            generate_histogram_interval(Some((self.start_time, self.end_time)), 0)
+                        };
                         cast(
                             Expr::Literal(ScalarValue::from(interval)),
                             DataType::Interval(IntervalUnit::MonthDayNano),

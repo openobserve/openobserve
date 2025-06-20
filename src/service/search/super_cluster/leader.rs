@@ -83,7 +83,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
+        return Ok((vec![], ScanStats::new(), 0, false, "".to_string(), 0));
     }
 
     let (use_inverted_index, _) = super::super::is_use_inverted_index(&sql);
@@ -184,7 +184,7 @@ pub async fn search(
         Ok(Err(err)) => Err(err),
         Err(err) => Err(err),
     };
-    let (data, mut scan_stats, partial_err) = match data {
+    let (data, mut scan_stats, partial_err, custom_histogram_interval) = match data {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
@@ -198,7 +198,14 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
     scan_stats.format_to_mb();
-    Ok((data, scan_stats, 0, !partial_err.is_empty(), partial_err))
+    Ok((
+        data,
+        scan_stats,
+        0,
+        !partial_err.is_empty(),
+        partial_err,
+        custom_histogram_interval,
+    ))
 }
 
 async fn run_datafusion(
@@ -206,7 +213,7 @@ async fn run_datafusion(
     mut req: Request,
     sql: Arc<Sql>,
     nodes: Vec<Arc<dyn NodeInfo>>,
-) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, String, i64)> {
     let cfg = get_config();
     // set work group
     let work_group = if sql.is_complex {
@@ -216,8 +223,11 @@ async fn run_datafusion(
     };
     req.add_work_group(Some(work_group));
 
+    let custom_histogram_interval = req.custom_histogram_interval;
+
     // construct physical plan
-    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
+    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num, custom_histogram_interval).await
+    {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
@@ -352,7 +362,14 @@ async fn run_datafusion(
             )
         );
         visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
-        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
-            .map_err(|e| e.into())
+        ret.map(|data| {
+            (
+                data,
+                visit.scan_stats,
+                visit.partial_err,
+                custom_histogram_interval,
+            )
+        })
+        .map_err(|e| e.into())
     }
 }

@@ -99,8 +99,15 @@ pub(crate) mod tantivy;
 pub(crate) mod utils;
 
 /// The result of search in cluster
-/// data, scan_stats, wait_in_queue, is_partial, partial_err
-type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
+/// data, scan_stats, wait_in_queue, is_partial, partial_err, histogram_interval
+type SearchResult = (
+    Vec<RecordBatch>,
+    search::ScanStats,
+    usize,
+    bool,
+    String,
+    i64,
+);
 
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
@@ -186,6 +193,7 @@ pub async fn search(
         user_id.clone(),
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
+        in_req.query.custom_histogram_interval.unwrap_or_default(),
     );
     if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());

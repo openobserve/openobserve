@@ -101,13 +101,14 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let ret = flight::search(&trace_id, sql.clone(), req, query).await;
 
-    let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
-            return Err(e);
-        }
-    };
+    let (merge_batches, scan_stats, took_wait, is_partial, partial_err, custom_histogram_interval) =
+        match ret {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
+                return Err(e);
+            }
+        };
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);
@@ -267,8 +268,16 @@ pub async fn search(
 
     let took_time = start.elapsed().as_millis() as usize;
 
+    // Get the interval from the respose if custom_histogram_interval is set, otherwise use the sql
+    // histogram interval
+    let histogram_interval = if custom_histogram_interval > 0 {
+        Some(custom_histogram_interval)
+    } else {
+        sql.histogram_interval
+    };
+
     result.set_total(total);
-    result.set_histogram_interval(sql.histogram_interval);
+    result.set_histogram_interval(histogram_interval);
     result.set_partial(is_partial, partial_err);
     result.set_took(took_time);
     result.set_wait_in_queue(took_wait);

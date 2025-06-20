@@ -98,7 +98,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
+        return Ok((vec![], ScanStats::new(), 0, false, "".to_string(), 0));
     }
 
     // 1. get file id list
@@ -375,7 +375,12 @@ pub async fn search(
     drop(_defer);
 
     // 9. get data from datafusion
-    let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
+    let (data, mut scan_stats, partial_err, custom_histogram_interval): (
+        Vec<RecordBatch>,
+        ScanStats,
+        String,
+        i64,
+    ) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
         Err(err) => Err(err),
@@ -392,6 +397,7 @@ pub async fn search(
         took_wait,
         !partial_err.is_empty(),
         partial_err,
+        custom_histogram_interval,
     ))
 }
 
@@ -403,9 +409,10 @@ pub async fn run_datafusion(
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     idx_file_list: Vec<FileKey>,
-) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, String, i64)> {
     let cfg = get_config();
-    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+    let custom_histogram_interval = req.custom_histogram_interval;
+    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num, custom_histogram_interval).await?;
     log::info!(
         "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
         ctx.state().config().target_partitions(),
@@ -519,7 +526,7 @@ pub async fn run_datafusion(
             ));
         }
         if visitor.get_data().is_some() {
-            return Ok((vec![], ScanStats::default(), "".to_string()));
+            return Ok((vec![], ScanStats::default(), "".to_string(), 0));
         }
     }
 
@@ -551,8 +558,15 @@ pub async fn run_datafusion(
         let mut scan_stats = visit.scan_stats;
         // Update scan stats to include aggregation cache ratio
         scan_stats.aggs_cache_ratio = aggs_cache_ratio;
-        ret.map(|data| (data, scan_stats, visit.partial_err))
-            .map_err(|e| e.into())
+        ret.map(|data| {
+            (
+                data,
+                scan_stats,
+                visit.partial_err,
+                custom_histogram_interval,
+            )
+        })
+        .map_err(|e| e.into())
     }
 }
 
@@ -860,9 +874,10 @@ pub async fn generate_context(
     req: &Request,
     sql: &Arc<Sql>,
     target_partitions: usize,
+    custom_histogram_interval: i64,
 ) -> Result<SessionContext> {
     let analyzer_rules = generate_analyzer_rules(sql);
-    let optimizer_rules = generate_optimizer_rules(sql);
+    let optimizer_rules = generate_optimizer_rules(sql, custom_histogram_interval);
     let mut ctx = prepare_datafusion_context(
         &req.trace_id,
         req.work_group.clone(),

@@ -136,6 +136,8 @@ pub struct Query {
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub custom_histogram_interval: Option<i64>,
 }
 
 fn default_size() -> i64 {
@@ -159,6 +161,7 @@ impl Default for Query {
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            custom_histogram_interval: None,
         }
     }
 }
@@ -614,6 +617,7 @@ impl SearchHistoryRequest {
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
+                custom_histogram_interval: None,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -1162,6 +1166,7 @@ impl MultiStreamRequest {
                     skip_wal: self.skip_wal,
                     streaming_output: false,
                     streaming_id: None,
+                    custom_histogram_interval: None,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),

@@ -65,7 +65,10 @@ pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + S
     ))]
 }
 
-pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
+pub fn generate_optimizer_rules(
+    sql: &Sql,
+    custom_histogram_interval: i64,
+) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let cfg = config::get_config();
     let limit = if sql.limit > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
@@ -123,7 +126,11 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(EliminateOuterJoin::new()));
 
     // *********** custom rules ***********
-    rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
+    rules.push(Arc::new(RewriteHistogram::new(
+        start_time,
+        end_time,
+        custom_histogram_interval,
+    )));
     if let Some(limit) = limit {
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
