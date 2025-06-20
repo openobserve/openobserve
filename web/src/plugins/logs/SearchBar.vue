@@ -722,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @run-query="handleRunQueryFn"
               @keydown="handleKeyDown"
               :class="
-                searchObj.data.editorValue == '' &&
+                searchObj.data.editorValue == '' && 
                 searchObj.meta.queryEditorPlaceholderFlag
                   ? 'empty-query'
                   : ''
@@ -3748,17 +3748,29 @@ export default defineComponent({
     height: 100%; /* or any other height you want to set */
   }
 
-  .empty-query .monaco-editor-background {
+  .empty-query .cm-scroller  {
     background-image: url("../../assets/images/common/query-editor.png");
     background-repeat: no-repeat;
     background-size: 115px;
+    background-position: 5px 5px;
+  }
+  .empty-query .cm-gutters{
+    display: none;
   }
 
-  .empty-function .monaco-editor-background {
+
+  .empty-function .cm-scroller {
     background-image: url("../../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
     background-size: 170px;
+    background-position: 5px 5px;
+
   }
+
+  .empty-function .cm-gutters{
+    display: none;
+  }
+
 
   .function-dropdown {
     width: 205px;
