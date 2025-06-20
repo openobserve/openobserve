@@ -57,6 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-pb-lg showLabelOnTop"
         />
 
+        <q-toggle
+          v-model="config.isEnterprise == 'true'"
+          :label="t('settings.enableAggregationCache')"
+          data-test="general-settings-enable-aggregation-cache"
+          class="q-pb-lg showLabelOnTop"
+        />
+
         <span>&nbsp;</span>
 
         <div class="flex justify-start">
@@ -270,6 +277,11 @@ export default defineComponent({
         ?.enable_streaming_search ?? false,
     );
 
+    const enableAggregationCache = ref(
+      store.state?.organizationData?.organizationSettings
+        ?.aggregation_cache_enabled ?? false,
+    );
+
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
@@ -289,6 +301,10 @@ export default defineComponent({
       enableStreamingSearch.value =
         store.state?.organizationData?.organizationSettings
           ?.enable_streaming_search ?? false;
+
+      enableAggregationCache.value =
+        store.state?.organizationData?.organizationSettings
+          ?.aggregation_cache_enabled ?? false;
     });
 
     watch(
@@ -309,6 +325,7 @@ export default defineComponent({
           scrape_interval: scrapeIntereval.value,
           enable_websocket_search: enableWebsocketSearch.value,
           enable_streaming_search: enableStreamingSearch.value,
+          aggregation_cache_enabled: enableAggregationCache.value,
         });
 
         //update settings in backend
@@ -534,6 +551,7 @@ export default defineComponent({
       confirmDeleteImage: ref(false),
       sanitizeInput,
       enableStreamingSearch,
+      enableAggregationCache,
     };
   },
 });
