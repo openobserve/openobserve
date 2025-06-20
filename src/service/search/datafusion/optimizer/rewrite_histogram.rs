@@ -276,7 +276,7 @@ mod tests {
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
         ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
-        ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(0, 5)));
+        ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(0, 5, 0)));
 
         for item in sqls {
             let df = ctx.sql(item.0).await.unwrap();

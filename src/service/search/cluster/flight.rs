@@ -98,7 +98,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, "".to_string(), 0));
+        return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
 
     // 1. get file id list
@@ -375,12 +375,7 @@ pub async fn search(
     drop(_defer);
 
     // 9. get data from datafusion
-    let (data, mut scan_stats, partial_err, histogram_interval): (
-        Vec<RecordBatch>,
-        ScanStats,
-        String,
-        i64,
-    ) = match task {
+    let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
         Err(err) => Err(err),
@@ -397,7 +392,6 @@ pub async fn search(
         took_wait,
         !partial_err.is_empty(),
         partial_err,
-        histogram_interval,
     ))
 }
 
@@ -409,7 +403,7 @@ pub async fn run_datafusion(
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     idx_file_list: Vec<FileKey>,
-) -> Result<(Vec<RecordBatch>, ScanStats, String, i64)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let histogram_interval = req.histogram_interval;
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num, histogram_interval).await?;
@@ -526,7 +520,7 @@ pub async fn run_datafusion(
             ));
         }
         if visitor.get_data().is_some() {
-            return Ok((vec![], ScanStats::default(), "".to_string(), 0));
+            return Ok((vec![], ScanStats::default(), "".to_string()));
         }
     }
 
@@ -558,7 +552,7 @@ pub async fn run_datafusion(
         let mut scan_stats = visit.scan_stats;
         // Update scan stats to include aggregation cache ratio
         scan_stats.aggs_cache_ratio = aggs_cache_ratio;
-        ret.map(|data| (data, scan_stats, visit.partial_err, histogram_interval))
+        ret.map(|data| (data, scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
 }
