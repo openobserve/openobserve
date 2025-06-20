@@ -83,7 +83,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, "".to_string(), 0));
+        return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
 
     let (use_inverted_index, _) = super::super::is_use_inverted_index(&sql);
@@ -198,14 +198,7 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
     scan_stats.format_to_mb();
-    Ok((
-        data,
-        scan_stats,
-        0,
-        !partial_err.is_empty(),
-        partial_err,
-        histogram_interval,
-    ))
+    Ok((data, scan_stats, 0, !partial_err.is_empty(), partial_err))
 }
 
 async fn run_datafusion(
@@ -213,7 +206,7 @@ async fn run_datafusion(
     mut req: Request,
     sql: Arc<Sql>,
     nodes: Vec<Arc<dyn NodeInfo>>,
-) -> Result<(Vec<RecordBatch>, ScanStats, String, i64)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     // set work group
     let work_group = if sql.is_complex {
@@ -359,14 +352,7 @@ async fn run_datafusion(
             )
         );
         visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
-        ret.map(|data| {
-            (
-                data,
-                visit.scan_stats,
-                visit.partial_err,
-                histogram_interval,
-            )
-        })
-        .map_err(|e| e.into())
+        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
+            .map_err(|e| e.into())
     }
 }
