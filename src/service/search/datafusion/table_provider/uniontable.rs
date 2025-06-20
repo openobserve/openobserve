@@ -33,8 +33,8 @@ pub(crate) struct NewUnionTable {
 
 impl NewUnionTable {
     /// Create a new in-memory table from the provided schema and record batches
-    pub fn try_new(schema: SchemaRef, tables: Vec<Arc<dyn TableProvider>>) -> Result<Self> {
-        Ok(Self { schema, tables })
+    pub fn new(schema: SchemaRef, tables: Vec<Arc<dyn TableProvider>>) -> Self {
+        Self { schema, tables }
     }
 }
 
