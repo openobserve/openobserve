@@ -1195,6 +1195,7 @@ import { useQuasar, copyToClipboard, is } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
+import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
@@ -1405,6 +1406,8 @@ export default defineComponent({
       routeToSearchSchedule,
       isActionsEnabled,
     } = useLogs();
+
+    const { isStreamExists, isStreamFetched } = useStreams();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -1707,7 +1710,9 @@ export default defineComponent({
         const parsedSQL = fnParsedSQL();
         if (
           searchObj.meta.sqlMode === true &&
-          Object.hasOwn(parsedSQL, "from")
+          Object.hasOwn(parsedSQL, "from")  &&
+          isStreamFetched(searchObj.data.stream.streamType) &&
+          isStreamExists(value, searchObj.data.stream.streamType)
         ) {
           setSelectedStreams(value);
           // onStreamChange(value);
@@ -1767,8 +1772,10 @@ export default defineComponent({
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
-          Object.hasOwn(parsedSQL, "from") ||
-          Object.hasOwn(parsedSQL, "select")
+          (Object.hasOwn(parsedSQL, "from") ||
+          Object.hasOwn(parsedSQL, "select"))  &&
+          isStreamFetched(searchObj.data.stream.streamType) &&
+          isStreamExists(value, searchObj.data.stream.streamType)
         ) {
           setSelectedStreams(value);
           // onStreamChange(value);
@@ -1780,10 +1787,11 @@ export default defineComponent({
         if (searchObj.meta.sqlMode === true) {
           let parsedQuery = null;
           try {
-            parsedQuery = parser.astify(value);
+            parsedQuery = fnParsedSQL(value);
           } catch (e) {
             console.log(e, "Logs: Error while parsing query");
           }
+
           if (parsedQuery?.from?.length > 0) {
             //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array
             //the table which is there in from array is the temporary array
