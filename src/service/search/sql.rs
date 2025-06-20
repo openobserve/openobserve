@@ -2213,7 +2213,7 @@ mod tests {
     // test index_visitor for str_match
     #[test]
     fn test_index_visitor_str_match() {
-        let sql = "SELECT * FROM t WHERE str_match(name, 'value%')";
+        let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
@@ -2222,7 +2222,26 @@ mod tests {
         index_fields.insert("name".to_string());
         let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
         let _ = statement.visit(&mut index_visitor);
-        let expected = "str_match(name, 'value%')";
+        let expected = "str_match(name, 'value')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+    }
+
+    // test index_visitor for str_match_ignore_case
+    #[test]
+    fn test_index_visitor_str_match_ignore_case() {
+        let sql = "SELECT * FROM t WHERE str_match_ignore_case(name, 'value')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match_ignore_case(name, 'value')";
         assert_eq!(
             index_visitor.index_condition.clone().unwrap().to_query(),
             expected

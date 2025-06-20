@@ -18,7 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use config::{INDEX_FIELD_NAME_FOR_ALL, utils::tantivy::tokenizer::o2_collect_tokens};
+use config::{
+    INDEX_FIELD_NAME_FOR_ALL,
+    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
+};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
@@ -101,8 +104,8 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
-    // field, value
-    StrMatch(String, String),
+    // field, value, case_sensitive
+    StrMatch(String, String, bool),
     In(String, Vec<String>),
     Regex(String, String),
     MatchAll(String),
@@ -202,7 +205,13 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
-            Condition::StrMatch(field, value) => format!("str_match({}, '{}')", field, value),
+            Condition::StrMatch(field, value, case_sensitive) => {
+                if *case_sensitive {
+                    format!("str_match({}, '{}')", field, value)
+                } else {
+                    format!("str_match_ignore_case({}, '{}')", field, value)
+                }
+            }
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::Regex(field, value) => format!("{}=~{}", field, value),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
@@ -274,7 +283,18 @@ impl Condition {
                         }
                         let field = get_arg_name(&list.args[0]);
                         let value = trim_quotes(list.args[1].to_string().as_str());
-                        Condition::StrMatch(field, value)
+                        Condition::StrMatch(field, value, true)
+                    } else {
+                        unreachable!()
+                    }
+                } else if fn_name == "str_match_ignore_case" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let field = get_arg_name(&list.args[0]);
+                        let value = trim_quotes(list.args[1].to_string().as_str());
+                        Condition::StrMatch(field, value, false)
                     } else {
                         unreachable!()
                     }
@@ -329,10 +349,10 @@ impl Condition {
                 let field = schema.get_field(field)?;
                 Box::new(RegexQuery::from_pattern(value, field)?)
             }
-            Condition::StrMatch(field, value) => {
+            Condition::StrMatch(field, value, case_sensitive) => {
                 let field = schema.get_field(field)?;
                 let value = format!(".*{}.*", value);
-                Box::new(RegexQuery::from_pattern(&value, field)?)
+                Box::new(ContainsQuery::new(&value, field, *case_sensitive)?)
             }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
@@ -411,7 +431,7 @@ impl Condition {
 
     pub fn need_all_term_fields(&self) -> Vec<String> {
         match self {
-            Condition::StrMatch(field, _) => vec![field.clone()],
+            Condition::StrMatch(field, ..) => vec![field.clone()],
             Condition::Regex(field, _) => vec![field.clone()],
             Condition::MatchAll(value) => {
                 if (value.len() > 1 && (value.starts_with("*") || value.ends_with("*")))
@@ -433,7 +453,7 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
-            Condition::StrMatch(field, _) => {
+            Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -463,7 +483,7 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
-            Condition::StrMatch(field, _) => {
+            Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -500,19 +520,23 @@ impl Condition {
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
             }
-            Condition::StrMatch(name, value) => {
+            Condition::StrMatch(name, value, case_sensitive) => {
                 let index = schema.index_of(name).unwrap();
                 let left = Arc::new(Column::new(name, index));
                 let field = schema.field(index);
                 let right = get_scalar_value(value, field.data_type())?;
-                let str_match_udf = Arc::new(str_match_udf::STR_MATCH_UDF.clone());
-                let str_match_udf_expr = Arc::new(ScalarFunctionExpr::new(
-                    str_match_udf.name(),
-                    str_match_udf.clone(),
+                let udf = if *case_sensitive {
+                    Arc::new(str_match_udf::STR_MATCH_UDF.clone())
+                } else {
+                    Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
+                };
+                let udf_expr = Arc::new(ScalarFunctionExpr::new(
+                    udf.name(),
+                    udf.clone(),
                     vec![left, right],
                     DataType::Boolean,
                 ));
-                Ok(str_match_udf_expr)
+                Ok(udf_expr)
             }
             Condition::In(name, values) => {
                 let index = schema.index_of(name).unwrap();
@@ -672,7 +696,7 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 } else {
                     return false;
                 }
-            } else if fn_name == "str_match" {
+            } else if fn_name == "str_match" || fn_name == "str_match_ignore_case" {
                 if let FunctionArguments::List(list) = &func.args {
                     if list.args.len() != 2 {
                         return false;
@@ -999,7 +1023,7 @@ mod tests {
     // add some test for str_match
     #[test]
     fn test_str_match() {
-        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string());
+        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string(), true);
         let fields = condition.get_tantivy_fields();
 
         assert_eq!(fields.len(), 1);
