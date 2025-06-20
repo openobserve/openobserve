@@ -79,7 +79,6 @@ import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
-import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 
 const defaultObject = {
   organizationIdentifier: "",
