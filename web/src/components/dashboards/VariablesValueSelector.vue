@@ -2056,7 +2056,6 @@ export default defineComponent({
         console.debug(
           `onVariableSearch: Clearing search results for ${variableItem.name}`,
         );
-        variablesData.value[index]._searchResults = [];
         return;
       }
 
