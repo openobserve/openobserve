@@ -4847,7 +4847,7 @@ const useLogs = () => {
       if (
         !arraysMatch(searchObj.data.stream.selectedStream, newSelectedStreams) &&
         isStreamFetched(searchObj.data.stream.streamType) &&
-        isStreamExists(newSelectedStreams, searchObj.data.stream.streamType)
+        isStreamExists(newSelectedStreams[newSelectedStreams.length - 1], searchObj.data.stream.streamType)
       ) {
         searchObj.data.stream.selectedStream = newSelectedStreams;
         onStreamChange(value);

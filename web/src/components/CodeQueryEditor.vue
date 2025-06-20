@@ -372,8 +372,7 @@ export default defineComponent({
 
         editorView = new EditorView({
           state,
-          parent: editorElement as HTMLElement,
-          lineWrapping: true,
+          parent: editorElement as HTMLElement
         });
 
         // Set readonly if needed
