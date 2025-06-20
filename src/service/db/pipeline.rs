@@ -52,6 +52,8 @@ pub enum PipelineError {
     InvalidPipeline(String),
     #[error("Invalid DerivedStream config: {0}")]
     InvalidDerivedStream(String),
+    #[error("Reset only applied to scheduled pipelines")]
+    PipelineDoesNotApply,
     #[error("Error deleting previous DerivedStream: {0}")]
     DeleteDerivedStream(String),
 }
