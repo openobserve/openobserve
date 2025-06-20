@@ -410,17 +410,6 @@ mod reports_table_ser {
     pub enum ReportDestination {
         Email(String),
     }
-
-    #[derive(Serialize)]
-    #[serde(rename_all = "snake_case")]
-    pub enum ReportFrequency {
-        Once,
-        HourlyInterval(u32),
-        DailyInterval(u32),
-        WeeklyInterval(u32),
-        MonthlyInterval(u32),
-        Cron(String),
-    }
 }
 
 /// Defines the string and JSON serialization schemas used to store various child structures in the
@@ -455,7 +444,11 @@ mod report_dashboards_table_ser {
 mod meta_table_reports {
 
     use chrono::{DateTime, FixedOffset, Utc};
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
+
+    pub fn default_align_time() -> bool {
+        true
+    }
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -531,11 +524,12 @@ mod meta_table_reports {
                 interval: 1,
                 cron: "".to_string(),
                 frequency_type: Default::default(),
+                align_time: true,
             }
         }
     }
 
-    #[derive(Default, Deserialize, PartialEq)]
+    #[derive(Default, Deserialize, Serialize, PartialEq)]
     pub enum ReportFrequencyType {
         #[serde(rename = "once")]
         Once,
@@ -614,7 +608,7 @@ mod meta_table_reports {
         Absolute,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     pub struct ReportFrequency {
         /// Frequency interval in the `frequency_type` unit
         #[serde(default)]
@@ -625,6 +619,8 @@ mod meta_table_reports {
         #[serde(rename = "type")]
         #[serde(default)]
         pub frequency_type: ReportFrequencyType,
+        #[serde(default = "default_align_time")]
+        pub align_time: bool,
     }
 
     pub fn datetime_now() -> DateTime<FixedOffset> {
@@ -656,8 +652,8 @@ impl TryFrom<(Ksuid, &meta_table_reports::Report)> for reports_table::ActiveMode
         let id = report_ksuid_from_hash(report_json, folder_id).to_string();
         let folder_id = folder_id.to_string();
 
-        let frequency: reports_table_ser::ReportFrequency = (&report_json.frequency).try_into()?;
-        let frequency_json = serde_json::to_value(&frequency).map_err(|e| e.to_string())?;
+        let frequency_json =
+            serde_json::to_value(&report_json.frequency).map_err(|e| e.to_string())?;
 
         let destinations: reports_table_ser::ReportDestinations =
             report_json.destinations.as_slice().into();
@@ -682,45 +678,6 @@ impl TryFrom<(Ksuid, &meta_table_reports::Report)> for reports_table::ActiveMode
             updated_at: Set(report_json.updated_at.map(|t| t.timestamp_micros())),
             start_at: Set(report_json.start),
         })
-    }
-}
-
-impl TryFrom<&meta_table_reports::ReportFrequency> for reports_table_ser::ReportFrequency {
-    type Error = String;
-
-    fn try_from(value: &meta_table_reports::ReportFrequency) -> Result<Self, Self::Error> {
-        match value.frequency_type {
-            meta_table_reports::ReportFrequencyType::Once => Ok(Self::Once),
-            meta_table_reports::ReportFrequencyType::Hours => {
-                let interval = value
-                    .interval
-                    .try_into()
-                    .or(Err("interval is negative".to_owned()))?;
-                Ok(Self::HourlyInterval(interval))
-            }
-            meta_table_reports::ReportFrequencyType::Days => {
-                let interval = value
-                    .interval
-                    .try_into()
-                    .or(Err("interval is negative".to_owned()))?;
-                Ok(Self::DailyInterval(interval))
-            }
-            meta_table_reports::ReportFrequencyType::Weeks => {
-                let interval = value
-                    .interval
-                    .try_into()
-                    .or(Err("interval is negative".to_owned()))?;
-                Ok(Self::WeeklyInterval(interval))
-            }
-            meta_table_reports::ReportFrequencyType::Months => {
-                let interval = value
-                    .interval
-                    .try_into()
-                    .or(Err("interval is negative".to_owned()))?;
-                Ok(Self::MonthlyInterval(interval))
-            }
-            meta_table_reports::ReportFrequencyType::Cron => Ok(Self::Cron(value.cron.clone())),
-        }
     }
 }
 
