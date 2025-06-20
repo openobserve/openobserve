@@ -1,6 +1,5 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
 import { login } from "../utils/dashLogin.js";
 import { ingestion } from "../utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
@@ -12,12 +11,7 @@ import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import {
-  applyQueryButton,
-  waitForDashboardPage,
-} from "../utils/dashCreation.js";
-import { DashboardPage } from "../../pages/dashboardPage.js";
-import DashboardShareExportPage from "../../pages/dashboardPages/dashboard-share-export.js";
+import { waitForDashboardPage } from "../utils/dashCreation.js";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
 import DashboardVariables from "../../pages/dashboardPages/dashboard-variables.js";
 import Dashboardfilter from "../../pages/dashboardPages/dashboard-filter.js";
@@ -30,18 +24,6 @@ test.describe.configure({ mode: "parallel" });
 // Refactored test cases using Page Object Model
 
 test.describe("dashboard filter testcases", () => {
-  let dashboardCreate;
-  let dashboardList;
-  let dashboardActions;
-  let dashboardDrilldown;
-  let dashboardRefresh;
-  let chartTypeSelector;
-  let dashboardPanel;
-  let dashboardPanelConfigs;
-  let dashboardShareExport;
-  let dashboardSetting;
-  let dashboardVariables;
-
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(1000);
@@ -62,7 +44,6 @@ test.describe("dashboard filter testcases", () => {
     const chartTypeSelector = new ChartTypeSelector(page);
     const dashboardVariables = new DashboardVariables(page);
     const dashboardSetting = new DashboardSetting(page);
-    // const dashboardDrilldown = new DashboardactionPage(page);
 
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -200,16 +181,11 @@ test.describe("dashboard filter testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const dashboardPanel = new DashboardPanel(page);
     const dashboardSetting = new DashboardSetting(page);
+    const variableName = new DashboardVariables(page);
 
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
-
-    const variableName = new DashboardVariables(page);
 
     // Navigate to dashboards
     await dashboardList.menuItem("dashboards-item");
@@ -294,11 +270,7 @@ test.describe("dashboard filter testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const dashboardPanel = new DashboardPanel(page);
     const dashboardSetting = new DashboardSetting(page);
     const variableName = new DashboardVariables(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
@@ -412,11 +384,9 @@ test.describe("dashboard filter testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
+
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const dashboardPanel = new DashboardPanel(page);
+
     const dashboardSetting = new DashboardSetting(page);
     const variableName = new DashboardVariables(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
@@ -505,11 +475,7 @@ test.describe("dashboard filter testcases", () => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
     const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const dashboardTimeRefresh = new DashboardTimeRefresh(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardDrilldown = new DashboardDrilldownPage(page);
-    const dashboardPanel = new DashboardPanel(page);
     const dashboardSetting = new DashboardSetting(page);
     const variableName = new DashboardVariables(page);
     const dashboardRefresh = new DashboardTimeRefresh(page);
@@ -570,6 +536,94 @@ test.describe("dashboard filter testcases", () => {
     await dashboardActions.savePanel();
 
     // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await dashboardCreate.searchDashboard(randomDashboardName);
+    await dashboardCreate.deleteDashboard(randomDashboardName);
+  });
+  test("Should display an error message if added the invalid operator", async ({
+    page,
+  }) => {
+    // Page object instances
+    const dashboardList = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardSetting = new DashboardSetting(page);
+    const dashboardVariables = new DashboardVariables(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardRefresh = new DashboardTimeRefresh(page);
+
+    // Go to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create dashboard
+    await dashboardCreate.createDashboard(randomDashboardName);
+
+    // Open settings and add variable
+    await page.waitForTimeout(3000);
+    await dashboardSetting.openSetting();
+    await dashboardVariables.addDashboardVariable(
+      "variablename",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name"
+    );
+    // await dashboardSetting.closeSettingDashboard();
+
+    // Add panel
+    await dashboardCreate.addPanel();
+
+    // Select stream and add Y field
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.waitForChartToRender();
+
+    // Set date range
+    await waitForDateTimeButtonToBeEnabled(page);
+    await dashboardRefresh.setRelative("6", "w");
+    await dashboardActions.waitForChartToRender();
+
+    // Add filter field
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "filter"
+    );
+
+    // Add invalid filter condition (IN operator with only one value)
+    await chartTypeSelector.addFilterCondition(
+      0,
+      "kubernetes_container_name",
+      "",
+      "IN",
+      "$variablename"
+    );
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.waitForChartToRender();
+
+    // Expect error message
+    await expect(
+      page.getByText("sql parser error: Expected:").first()
+    ).toBeVisible();
+
+    // Fix filter condition (change to "=" operator)
+    await chartTypeSelector.addFilterCondition(
+      0,
+      "kubernetes_container_name",
+      "",
+      "=",
+      "$variablename"
+    );
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.waitForChartToRender();
+
+    // Save panel
+    await dashboardActions.addPanelName("Dashbaord_test");
+    await dashboardActions.savePanel();
+
+    // Delete dashboard
     await dashboardCreate.backToDashboardList();
     await dashboardCreate.searchDashboard(randomDashboardName);
     await dashboardCreate.deleteDashboard(randomDashboardName);
