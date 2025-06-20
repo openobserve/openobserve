@@ -740,6 +740,8 @@ export default defineComponent({
       reorderSelectedFields,
       getFilterExpressionByFieldType,
       extractValueQuery,
+      fnParsedSQL,
+      fnUnparsedSQL,
     } = useLogs();
 
     const {
@@ -783,8 +785,6 @@ export default defineComponent({
       };
     }> = ref({});
 
-    let parser: any;
-
     const streamTypes = [
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
@@ -816,35 +816,7 @@ export default defineComponent({
       });
     };
 
-    onBeforeMount(async () => {
-      await importSqlParser();
-    });
-
-    onBeforeUnmount(() => {
-      parser = null;
-    });
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
     const selectedStream = ref("");
-
-    //removed this watcher as search stream not working
-    // watch(
-    //   () => {
-    //     searchObj.data.stream.streamLists.length;
-    //     store.state.organizationData.streams;
-    //   },
-    //   () => {
-
-    //     streamOptions.value =
-    //       searchObj.data.stream.streamLists ||
-    //       store.state.organizationData.streams;
-    //   }
-    // );
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -953,9 +925,9 @@ export default defineComponent({
         searchObj.data.missingStreamMessage = "";
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
         if (searchObj.meta.sqlMode == true && query.trim().length) {
-          const parsedSQL: any = parser.astify(query);
+          const parsedSQL: any = fnParsedSQL(query);
           //hack add time stamp column to parsedSQL if not already added
-          query_context = parser.sqlify(parsedSQL).replace(/`/g, '"') || "";
+          query_context = fnUnparsedSQL(parsedSQL).replace(/`/g, '"') || "";
 
           if (searchObj.data.stream.selectedStream.length > 1) {
             queries = extractValueQuery();

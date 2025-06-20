@@ -1440,7 +1440,6 @@ export default defineComponent({
     let confirmCallback;
     let streamName = "";
 
-    let parser: any;
     const dateTimeRef = ref(null);
     const saveViewLoader = ref(false);
     const favoriteViews = ref([]);
@@ -1608,21 +1607,10 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
-    onBeforeMount(async () => {
-      await importSqlParser();
-    });
-
     onBeforeUnmount(() => {
       queryEditorRef.value = null;
       fnEditorRef.value = null;
-      parser = null;
     });
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
 
     const transformsLabel = computed(() => {
       if (
