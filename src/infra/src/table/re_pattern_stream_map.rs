@@ -166,6 +166,7 @@ pub async fn batch_process(
             .filter(Column::Stream.eq(r.stream))
             .filter(Column::StreamType.eq(r.stream_type.to_string()))
             .filter(Column::Field.eq(r.field))
+            .filter(Column::PatternId.eq(r.pattern_id))
             .exec(&txn)
             .await
         {
@@ -177,22 +178,24 @@ pub async fn batch_process(
         }
     }
 
-    let models = added.into_iter().map(|a| ActiveModel {
-        org: Set(a.org),
-        stream: Set(a.stream),
-        stream_type: Set(a.stream_type.to_string()),
-        field: Set(a.field),
-        pattern_id: Set(a.pattern_id),
-        policy: Set(a.policy.to_string()),
-        apply_at_search: Set(a.apply_at_search),
-        ..Default::default()
-    });
+    if !added.is_empty() {
+        let models = added.into_iter().map(|a| ActiveModel {
+            org: Set(a.org),
+            stream: Set(a.stream),
+            stream_type: Set(a.stream_type.to_string()),
+            field: Set(a.field),
+            pattern_id: Set(a.pattern_id),
+            policy: Set(a.policy.to_string()),
+            apply_at_search: Set(a.apply_at_search),
+            ..Default::default()
+        });
 
-    match Entity::insert_many(models).exec(&txn).await {
-        Ok(_) => {}
-        Err(e) => {
-            txn.rollback().await?;
-            return Err(e.into());
+        match Entity::insert_many(models).exec(&txn).await {
+            Ok(_) => {}
+            Err(e) => {
+                txn.rollback().await?;
+                return Err(e.into());
+            }
         }
     }
     txn.commit().await?;

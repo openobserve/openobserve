@@ -266,7 +266,11 @@ pub async fn watch_patterns() -> Result<(), anyhow::Error> {
                     }
                 };
                 let mgr = get_pattern_manager().await;
-                mgr.update_pattern(new_pattern.id, new_pattern.pattern);
+                if mgr.check_pattern_exists(&new_pattern.id) {
+                    mgr.update_pattern(new_pattern.id, new_pattern.pattern);
+                } else {
+                    mgr.insert_pattern(new_pattern);
+                }
             }
             Event::Delete(ev) => {
                 let pattern_id = ev.key.strip_prefix(prefix).unwrap();

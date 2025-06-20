@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::ider;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
+use sea_orm::{ActiveValue::Unchanged, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
 use super::{entity::re_patterns::*, get_lock};
@@ -23,7 +23,7 @@ use crate::{
     errors,
 };
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PatternEntry {
     pub id: String,
     pub org: String,
@@ -95,6 +95,7 @@ pub async fn add(entry: PatternEntry) -> Result<(), errors::Error> {
 pub async fn update_pattern(id: &str, new_pattern: &str) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     let record = ActiveModel {
+        id: Unchanged(id.to_string()),
         updated_at: Set(now),
         pattern: Set(new_pattern.to_string()),
         ..Default::default()

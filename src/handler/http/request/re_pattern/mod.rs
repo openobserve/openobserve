@@ -232,7 +232,7 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
     ),
     tag = "RePattern"
 )]
-#[delete("/{org_id}/re_pattern/{id}")]
+#[delete("/{org_id}/re_patterns/{id}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -288,7 +288,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     ),
     tag = "RePattern"
 )]
-#[put("/{org_id}/re_pattern/id")]
+#[put("/{org_id}/re_patterns/{id}")]
 pub async fn update(
     path: web::Path<(String, String)>,
     body: web::Bytes,
