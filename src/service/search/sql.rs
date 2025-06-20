@@ -751,8 +751,6 @@ impl VisitorMut for ColumnVisitor<'_> {
                         let index_fields = get_stream_setting_index_fields(&stream_settings);
                         let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
                             .collect::<HashSet<_>>();
-                        println!("\nindex_fields: {:?}\n", index_fields);
-                        println!("\nexpr: {:?}\n", expr);
                         self.use_inverted_index =
                             checking_inverted_index_inner(&index_fields, expr);
                     }
