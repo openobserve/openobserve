@@ -25,11 +25,7 @@ import {
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import {
-  addLabelsToSQlQuery,
-  changeHistogramInterval,
-  convertQueryIntoSingleLine,
-} from "@/utils/query/sqlUtils";
+import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
@@ -370,7 +366,7 @@ export const usePanelDataLoader = (
     histogramInterval: string | null,
   ) => {
     return {
-      sql: await changeHistogramInterval(query, histogramInterval ?? null),
+      sql: query,
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -379,6 +375,7 @@ export const usePanelDataLoader = (
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
       size: -1,
+      histogram_interval: histogramInterval,
     };
   };
 
@@ -1467,8 +1464,7 @@ export const usePanelDataLoader = (
                   panelSchema.value.queryType,
                 );
 
-              // convert query into single line
-              const query = await convertQueryIntoSingleLine(query2);
+              const query = query2;
 
               const metadata: any = {
                 originalQuery: it.query,
