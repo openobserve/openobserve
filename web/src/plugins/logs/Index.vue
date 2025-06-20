@@ -566,13 +566,13 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       getStream,
+      fnUnparsedSQL,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
-    let parser: any;
 
     const isLogsMounted = ref(false);
 
@@ -658,7 +658,6 @@ export default defineComponent({
       cancelOnGoingSearchQueries();
       searchBarRef.value = null;
       searchObj = null;
-      parser = null;
     });
 
     onActivated(() => {
@@ -777,12 +776,6 @@ export default defineComponent({
       },
     );
 
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
@@ -799,8 +792,6 @@ export default defineComponent({
     async function handleBeforeMount() {
       if (isLogsTab()) {
         await setupLogsTab();
-      } else {
-        await importSqlParser();
       }
     }
 
@@ -824,8 +815,6 @@ export default defineComponent({
         resetStreamData();
 
         restoreUrlQueryParams();
-
-        await importSqlParser();
 
         if (isEnterpriseClusterEnabled()) {
           await getRegionInfo();
@@ -1196,8 +1185,7 @@ export default defineComponent({
         /[.*+?^${}()|[\]\\]/g,
         "\\$&",
       );
-      const newQuery = parser
-        .sqlify(parsedSQL)
+      const newQuery = fnUnparsedSQL(parsedSQL)
         .replace(/`/g, "")
         .replace(
           new RegExp(`\\b${streamName}\\b`, "g"),
@@ -1551,7 +1539,6 @@ export default defineComponent({
       t,
       store,
       router,
-      parser,
       searchObj,
       searchBarRef,
       splitterModel,
