@@ -99,7 +99,7 @@ pub(crate) mod tantivy;
 pub(crate) mod utils;
 
 /// The result of search in cluster
-/// data, scan_stats, wait_in_queue, is_partial, partial_err, histogram_interval
+/// data, scan_stats, wait_in_queue, is_partial, partial_err
 type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
 
 // search manager

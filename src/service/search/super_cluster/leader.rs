@@ -184,7 +184,7 @@ pub async fn search(
         Ok(Err(err)) => Err(err),
         Err(err) => Err(err),
     };
-    let (data, mut scan_stats, partial_err, histogram_interval) = match data {
+    let (data, mut scan_stats, partial_err) = match data {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
