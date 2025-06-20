@@ -346,7 +346,7 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator("div").filter({ hasText: "Add Group" }).nth(3).click();
 
-    await dashboardFilter.addFilterCondition11(
+    await dashboardFilter.addGroupFilterCondition(
       0,
       "kubernetes_container_image",
       "<>",
