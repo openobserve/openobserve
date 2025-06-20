@@ -130,7 +130,8 @@ pub async fn search(
     let cfg = get_config();
     #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
-    let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
+    let use_inverted_index =
+        query.use_inverted_index && inverted_index_type == "tantivy" && index_condition.is_some();
     if use_inverted_index {
         log::info!(
             "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
@@ -882,8 +883,7 @@ pub async fn filter_file_list_by_tantivy_index(
     file_list.extend(file_list_map.into_values());
     Ok((
         start.elapsed().as_millis() as usize,
-        // only need add filter back if the feature is enabled
-        is_add_filter_back && cfg.common.feature_query_remove_filter_with_index,
+        is_add_filter_back,
         total_hits,
         final_histogram_hits,
     ))
@@ -1029,7 +1029,7 @@ async fn search_tantivy_index(
 
     // search the index
     let file_in_range =
-        parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
+        parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
     let idx_optimize_rule_clone = idx_optimize_rule.clone();
     // TODO(taiming): refactor the return type throughout the tantivy index search
     let matched_docs =

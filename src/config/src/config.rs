@@ -1109,8 +1109,8 @@ pub struct Common {
     pub es_version: String,
     #[env_config(
         name = "ZO_CREATE_ORG_THROUGH_INGESTION",
-        default = false,
-        help = "If true (default false), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
+        default = true,
+        help = "If true (default true), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
     )]
     pub create_org_through_ingestion: bool,
     #[env_config(
@@ -1887,6 +1887,7 @@ pub struct Encryption {
     #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
     pub master_key: String,
 }
+
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]

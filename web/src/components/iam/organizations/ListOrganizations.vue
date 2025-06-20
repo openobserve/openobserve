@@ -70,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-3">
             <q-btn
-              v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
               class="q-ml-md q-mb-xs text-bold no-border float-right"
               padding="sm lg"
               color="secondary"

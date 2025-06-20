@@ -1352,6 +1352,14 @@ export default defineComponent({
       await this.getOrganizationSettings();
 
       this.isLoading = true;
+      // Find the matching organization from orgOptions
+      const matchingOrg = this.orgOptions.find(org => 
+        org.identifier === this.store.state.selectedOrganization.identifier
+      );
+      
+      if (matchingOrg) {
+        this.selectedOrg = matchingOrg;
+      }
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {

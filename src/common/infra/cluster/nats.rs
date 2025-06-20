@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use core::cmp::min;
 use std::sync::atomic::Ordering;
 
 use config::{
@@ -57,7 +56,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let ttl_keep_alive = min(5, (get_config().limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {

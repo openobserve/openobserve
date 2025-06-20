@@ -157,7 +157,7 @@ function setTabs() {
 
   const rbac = ["groups", "roles"];
 
-  const os = ["users", "serviceAccounts"];
+  const os = ["users", "serviceAccounts", "organizations"];
 
 
   const isEnterprise =
