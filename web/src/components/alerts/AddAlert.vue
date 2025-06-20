@@ -225,8 +225,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="realTimeAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
-                @field:add="addField"
-                @field:remove="removeField"
                 @input:update="onInputUpdate"
                 :expandState = expandState
                 @update:expandState="updateExpandState"
@@ -237,7 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:destinations="updateDestinations"
                 @update:group="updateGroup"
                 @remove:group="removeConditionGroup"
-                @field:addConditionGroup="addConditionGroup"
 
               />
             </div>
@@ -270,9 +267,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
-                @field:add="addField"
-                @field:addConditionGroup="addConditionGroup"
-                @field:remove="removeField"
                 @update:group="updateGroup"
                 @remove:group="removeConditionGroup"
                 @input:update="onInputUpdate"
@@ -835,33 +829,6 @@ export default defineComponent({
       filteredStreams.value = filterColumns(indexOptions.value, val, update);
     };
 
-    const addField = (groupId: string) => {
-      console.log(groupId);
-    };
-
-
-      const addConditionGroup = (groupId: string) => {
-        console.log(groupId);
-      };
-      const findTargetGroup = (list: any[], depth: number, index: number = 0): any[] | null => {
-          let target = list;
-
-          for (let i = 0; i < depth; i++) {
-            if (target[index]?.children) {
-              target = target[index].children;
-            } else {
-              return null;
-            }
-          }
-          return target;
-        };
-
-    const removeField = (field: any) => {
-      formData.value.query_condition.conditions =
-        formData.value.query_condition.conditions.filter(
-          (_field: any) => _field.id !== field.id,
-        );
-    };
 
     const addVariable = () => {
       formData.value.context_attributes.push({
@@ -1428,7 +1395,7 @@ export default defineComponent({
   // {
   //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-    function transformFEToBE(node:any) {
+    const transformFEToBE = (node:any) => {
     if (!node || !node.items || !Array.isArray(node.items)) return {};
 
     const groupLabel = node.label?.toLowerCase(); // 'or' or 'and'
@@ -1468,7 +1435,7 @@ export default defineComponent({
   //   label: 'and',
   //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-  function retransformBEToFE(data:any) {
+  const retransformBEToFE = (data:any) => {
     if(!data) return null;
     const keys = Object.keys(data);
     if (keys.length !== 1) return null;
@@ -1717,9 +1684,6 @@ export default defineComponent({
       isFetchingStreams,
       filteredStreams,
       filterStreams,
-      addField,
-      addConditionGroup,
-      removeField,
       removeVariable,
       addVariable,
       selectedDestinations,
