@@ -78,7 +78,8 @@ struct PatternListResponse {
 pub async fn save(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        use infra::table::re_pattern::PatternEntry;
+        use infra::table::{re_pattern::PatternEntry, re_pattern_stream_map::PatternPolicy};
+        use o2_enterprise::enterprise::re_patterns::PatternManager;
 
         let req: PatternCreateRequest = match serde_json::from_slice(&body) {
             Ok(v) => v,
@@ -91,7 +92,14 @@ pub async fn save(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
             ));
         }
 
-        // TODO @YJDoc2: check the pattern is valid re_pattern
+        match PatternManager::test_pattern(
+            req.pattern.clone(),
+            "".to_string(),
+            PatternPolicy::Redact,
+        ) {
+            Ok(_) => {}
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        }
 
         match crate::service::db::re_pattern::add(PatternEntry::new(
             &org_id,
@@ -239,7 +247,17 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
         let (org_id, id) = path.into_inner();
-        let mgr = get_pattern_manager().await;
+        let mgr = match get_pattern_manager().await {
+            Ok(m) => m,
+            Err(e) => {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("cannot get pattern manager : {:?}", e),
+                    )),
+                );
+            }
+        };
         let pattern_usage = mgr.get_pattern_usage(&id);
         if !pattern_usage.is_empty() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(

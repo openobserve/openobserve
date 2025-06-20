@@ -32,7 +32,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 RePatternsMessage::Delete { id } => {
                     log::info!("[SUPER_CLUSTER:DB] deleting pattern with id {id}");
                     infra::table::re_pattern::remove(&id).await?;
-                    let mgr = get_pattern_manager().await;
+                    let mgr = get_pattern_manager().await?;
                     mgr.remove_pattern(&id);
 
                     let cluster_coordinator = get_coordinator().await;
@@ -49,7 +49,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     );
                     let id = entry.id.clone();
 
-                    let mgr = get_pattern_manager().await;
+                    let mgr = get_pattern_manager().await?;
                     mgr.insert_pattern(entry.clone());
 
                     match infra::table::re_pattern::add(entry).await {
@@ -76,8 +76,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     log::info!("[SUPER_CLUSTER:DB] updating pattern {id}",);
                     infra::table::re_pattern::update_pattern(&id, &pattern).await?;
 
-                    let mgr = get_pattern_manager().await;
-                    mgr.update_pattern(id.clone(), pattern);
+                    let mgr = get_pattern_manager().await?;
+                    mgr.update_pattern(id.clone(), pattern)?;
 
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
@@ -137,10 +137,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         })
                         .collect();
 
+                    let mgr = get_pattern_manager().await?;
+                    mgr.update_associations(&org, stype, &stream, update.remove, update.add)?;
                     infra::table::re_pattern_stream_map::batch_process(added, removed).await?;
-
-                    let mgr = get_pattern_manager().await;
-                    mgr.update_associations(&org, stype, &stream, update.remove, update.add);
 
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator

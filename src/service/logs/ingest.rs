@@ -72,7 +72,7 @@ pub async fn ingest(
     let cfg = config::get_config();
     let mut need_usage_report = true;
     let log_ingestion_errors = ingestion_log_enabled().await;
-    let pattern_manager = get_pattern_manager().await;
+    let pattern_manager = get_pattern_manager().await?;
 
     // check stream
     let stream_name = if cfg.common.skip_formatting_stream_name {
@@ -194,7 +194,13 @@ pub async fn ingest(
         }
 
         // TODO @YJDoc2 : also handle pipeline
-        pattern_manager.process_record(org_id, StreamType::Logs, in_stream_name, &mut item);
+        // we do not drop the record here, just log error and continue process
+        match pattern_manager.process_record(org_id, StreamType::Logs, in_stream_name, &mut item) {
+            Ok(_) => {}
+            Err(e) => {
+                log::error!("error in processing record for patterns : {e}");
+            }
+        }
 
         // store a copy of original data before it's being transformed and/or flattened, when
         // 1. original data is an object

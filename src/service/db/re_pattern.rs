@@ -265,16 +265,16 @@ pub async fn watch_patterns() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                let mgr = get_pattern_manager().await;
+                let mgr = get_pattern_manager().await?;
                 if mgr.check_pattern_exists(&new_pattern.id) {
-                    mgr.update_pattern(new_pattern.id, new_pattern.pattern);
+                    mgr.update_pattern(new_pattern.id, new_pattern.pattern)?;
                 } else {
                     mgr.insert_pattern(new_pattern);
                 }
             }
             Event::Delete(ev) => {
                 let pattern_id = ev.key.strip_prefix(prefix).unwrap();
-                let mgr = get_pattern_manager().await;
+                let mgr = get_pattern_manager().await?;
                 mgr.remove_pattern(&pattern_id);
             }
             Event::Empty => {}
@@ -309,8 +309,8 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                 let updates: UpdateSettingsWrapper<PatternAssociation> =
                     serde_json::from_slice(&ev.value.unwrap()).unwrap();
 
-                let mgr = get_pattern_manager().await;
-                mgr.update_associations(org, stype, stream, updates.remove, updates.add);
+                let mgr = get_pattern_manager().await?;
+                mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;
             }
 
             _ => {}
