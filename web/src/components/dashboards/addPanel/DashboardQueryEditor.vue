@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ].query
                 "
                 data-test="dashboard-panel-query-editor"
-                editor-id="editor"
+                editor-id="dashboard-query-editor"
                 :keywords="
                   dashboardPanelData.data.queryType === 'promql'
                     ? promqlAutoCompleteKeywords
