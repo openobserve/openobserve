@@ -1093,6 +1093,8 @@ pub struct Common {
         help = "Enable to use stream settings for partitions. This will apply for all streams"
     )]
     pub use_stream_settings_for_partitions_enabled: bool,
+    #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
+    pub dashboard_placeholder: String,
 }
 
 #[derive(EnvConfig)]
@@ -2460,18 +2462,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
-        if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
-            cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
-        }
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10% 
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
     if cfg.disk_cache.aggregation_max_size == 0 {
-        cfg.disk_cache.aggregation_max_size = cfg.limit.disk_free / 10; // 10%
-        if cfg.disk_cache.aggregation_max_size > 1024 * 1024 * 1024 * 20 {
-            cfg.disk_cache.aggregation_max_size = 1024 * 1024 * 1024 * 20; // 20GB
-        }
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10% 
     } else {
         cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
     }

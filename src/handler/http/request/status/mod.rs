@@ -138,6 +138,7 @@ struct ConfigResponse<'a> {
     streaming_enabled: bool,
     max_query_range: i64,
     histogram_enabled: bool,
+    dashboard_placeholder: String,
 }
 
 #[derive(Serialize)]
@@ -333,6 +334,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         streaming_enabled: cfg.websocket.streaming_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         histogram_enabled: cfg.limit.histogram_enabled,
+        dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
     }))
 }
 

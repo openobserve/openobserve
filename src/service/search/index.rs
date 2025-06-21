@@ -18,7 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use config::{INDEX_FIELD_NAME_FOR_ALL, utils::tantivy::tokenizer::o2_collect_tokens};
+use config::{
+    INDEX_FIELD_NAME_FOR_ALL,
+    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
+};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
@@ -31,7 +34,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
-use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
+use sqlparser::ast::{BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments};
 use tantivy::{
     Term,
     query::{
@@ -45,6 +48,7 @@ use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
+use crate::service::search::datafusion::udf::str_match_udf;
 
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
@@ -100,6 +104,8 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    // field, value, case_sensitive
+    StrMatch(String, String, bool),
     In(String, Vec<String>),
     Regex(String, String),
     MatchAll(String),
@@ -198,6 +204,13 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::StrMatch(field, value, case_sensitive) => {
+                if *case_sensitive {
+                    format!("str_match({}, '{}')", field, value)
+                } else {
+                    format!("str_match_ignore_case({}, '{}')", field, value)
+                }
+            }
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::Regex(field, value) => format!("{}=~{}", field, value),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
@@ -261,6 +274,28 @@ impl Condition {
                     } else {
                         unreachable!()
                     }
+                } else if fn_name == "str_match" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let field = get_arg_name(&list.args[0]);
+                        let value = trim_quotes(list.args[1].to_string().as_str());
+                        Condition::StrMatch(field, value, true)
+                    } else {
+                        unreachable!()
+                    }
+                } else if fn_name == "str_match_ignore_case" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let field = get_arg_name(&list.args[0]);
+                        let value = trim_quotes(list.args[1].to_string().as_str());
+                        Condition::StrMatch(field, value, false)
+                    } else {
+                        unreachable!()
+                    }
                 } else {
                     unreachable!()
                 }
@@ -312,6 +347,10 @@ impl Condition {
                 let field = schema.get_field(field)?;
                 Box::new(RegexQuery::from_pattern(value, field)?)
             }
+            Condition::StrMatch(field, value, case_sensitive) => {
+                let field = schema.get_field(field)?;
+                Box::new(ContainsQuery::new(value, field, *case_sensitive)?)
+            }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
                     anyhow::anyhow!("There's no FullTextSearch field for match_all() function")
@@ -321,9 +360,6 @@ impl Condition {
                 } else if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
                     Box::new(RegexQuery::from_pattern(&value, default_field)?)
-                } else if value.to_lowercase().starts_with("re:") {
-                    let value = value[3..].trim();
-                    Box::new(RegexQuery::from_pattern(value, default_field)?)
                 } else {
                     let mut tokens = o2_collect_tokens(value);
                     let last_prefix = if value.ends_with("*") {
@@ -386,6 +422,7 @@ impl Condition {
 
     pub fn need_all_term_fields(&self) -> Vec<String> {
         match self {
+            Condition::StrMatch(field, ..) => vec![field.clone()],
             Condition::Regex(field, _) => vec![field.clone()],
             Condition::MatchAll(value) => {
                 if (value.len() > 1 && (value.starts_with("*") || value.ends_with("*")))
@@ -405,6 +442,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -431,6 +471,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -465,6 +508,24 @@ impl Condition {
                 let field = schema.field(index);
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
+            }
+            Condition::StrMatch(name, value, case_sensitive) => {
+                let index = schema.index_of(name).unwrap();
+                let left = Arc::new(Column::new(name, index));
+                let field = schema.field(index);
+                let right = get_scalar_value(value, field.data_type())?;
+                let udf = if *case_sensitive {
+                    Arc::new(str_match_udf::STR_MATCH_UDF.clone())
+                } else {
+                    Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
+                };
+                let udf_expr = Arc::new(ScalarFunctionExpr::new(
+                    udf.name(),
+                    udf.clone(),
+                    vec![left, right],
+                    DataType::Boolean,
+                ));
+                Ok(udf_expr)
             }
             Condition::In(name, values) => {
                 let index = schema.index_of(name).unwrap();
@@ -546,6 +607,7 @@ impl Condition {
     pub fn can_remove_filter(&self) -> bool {
         match self {
             Condition::Equal(..) => true,
+            Condition::StrMatch(..) => true,
             Condition::In(..) => true,
             Condition::Regex(..) => false,
             Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
@@ -621,6 +683,17 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 } else {
                     return false;
                 }
+            } else if fn_name == "str_match" || fn_name == "str_match_ignore_case" {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() != 2 {
+                        return false;
+                    }
+                    if !index_fields.contains(&get_arg_name(&list.args[0])) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -687,7 +760,215 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
     })
 }
 
+pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
+    match args {
+        FunctionArg::Named { name, .. } => name.to_string(),
+        FunctionArg::ExprNamed { name, .. } => get_field_name(name),
+        FunctionArg::Unnamed(arg) => match arg {
+            FunctionArgExpr::Expr(expr) => get_field_name(expr),
+            _ => unimplemented!("str_match not support filed type: {:?}", arg),
+        },
+    }
+}
+
 fn is_blank_or_alphanumeric(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_condition_get_tantivy_fields_equal() {
+        let condition = Condition::Equal("field1".to_string(), "value1".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_in() {
+        let condition = Condition::In(
+            "field2".to_string(),
+            vec![
+                "value1".to_string(),
+                "value2".to_string(),
+                "value3".to_string(),
+            ],
+        );
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_regex() {
+        let condition = Condition::Regex("field3".to_string(), "pattern.*".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field3"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_match_all() {
+        let condition = Condition::MatchAll("search_term".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_fuzzy_match_all() {
+        let condition = Condition::FuzzyMatchAll("search_term".to_string(), 2);
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_or_simple() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Equal("field2".to_string(), "value2".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_and_simple() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::In("field2".to_string(), vec!["value1".to_string()]);
+        let condition = Condition::And(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_or_with_overlap() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Equal("field1".to_string(), "value2".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        // Should only have one field since both conditions use the same field
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_and_with_overlap() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Regex("field1".to_string(), "pattern.*".to_string());
+        let condition = Condition::And(Box::new(left), Box::new(right));
+        let fields = condition.get_tantivy_fields();
+
+        // Should only have one field since both conditions use the same field
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_nested_complex() {
+        // Create a complex nested condition: (field1 = value1 OR field2 = value2) AND (field3 =
+        // value3 OR match_all(term))
+        let left_or = Condition::Or(
+            Box::new(Condition::Equal("field1".to_string(), "value1".to_string())),
+            Box::new(Condition::Equal("field2".to_string(), "value2".to_string())),
+        );
+        let right_or = Condition::Or(
+            Box::new(Condition::Equal("field3".to_string(), "value3".to_string())),
+            Box::new(Condition::MatchAll("search_term".to_string())),
+        );
+        let condition = Condition::And(Box::new(left_or), Box::new(right_or));
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 4);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+        assert!(fields.contains("field3"));
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_empty_field_names() {
+        let condition = Condition::Equal("".to_string(), "value".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(""));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_special_characters() {
+        let condition = Condition::Equal("field.with.dots".to_string(), "value".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field.with.dots"));
+    }
+
+    #[test]
+    fn test_condition_get_tantivy_fields_unicode_field_names() {
+        let condition = Condition::Equal("поле".to_string(), "значение".to_string());
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("поле"));
+    }
+
+    #[test]
+    fn test_index_condition_get_tantivy_fields() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        index_condition.add_condition(Condition::MatchAll("search_term".to_string()));
+        index_condition.add_condition(Condition::In(
+            "field2".to_string(),
+            vec!["val1".to_string()],
+        ));
+
+        let fields = index_condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 3);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_index_condition_get_tantivy_fields_empty() {
+        let index_condition = IndexCondition::new();
+        let fields = index_condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 0);
+    }
+
+    #[test]
+    fn test_index_condition_get_tantivy_fields_duplicate_fields() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value2".to_string()));
+        index_condition.add_condition(Condition::Regex(
+            "field1".to_string(),
+            "pattern.*".to_string(),
+        ));
+
+        let fields = index_condition.get_tantivy_fields();
+
+        // Should deduplicate the field names
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
 }

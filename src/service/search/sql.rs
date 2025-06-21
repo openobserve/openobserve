@@ -61,6 +61,10 @@ use super::{
     request::Request,
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
+use crate::service::search::{
+    datafusion::udf::{STR_MATCH_UDF_IGNORE_CASE_NAME, STR_MATCH_UDF_NAME},
+    index::get_arg_name,
+};
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -68,8 +72,6 @@ pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").u
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-
-const DASHBOARD_ALL: &str = "_o2_all_";
 
 #[derive(Clone, Debug)]
 pub struct Sql {
@@ -1569,9 +1571,21 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             escape_char: _,
             any: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => {
-            let f = f.name.to_string().to_lowercase();
-            f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME
+        Expr::Function(func) => {
+            let f = func.name.to_string().to_lowercase();
+
+            if f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME {
+                return true;
+            }
+
+            if f == STR_MATCH_UDF_NAME || f == STR_MATCH_UDF_IGNORE_CASE_NAME {
+                if let FunctionArguments::List(list) = &func.args {
+                    return list.args.len() == 2
+                        && index_fields.contains(&get_arg_name(&list.args[0]));
+                }
+            }
+
+            false
         }
         _ => false,
     }
@@ -1920,6 +1934,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
         match expr {
             Expr::BinaryOp {
                 left,
@@ -1932,11 +1947,11 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 right,
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(true));
                     }
                 } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(true));
                     }
                 }
@@ -1948,11 +1963,11 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 right,
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(false));
                     }
                 } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(false));
                     }
                 }
@@ -1969,7 +1984,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 ..
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(true));
                     }
                 }
@@ -1986,7 +2001,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 ..
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(false));
                     }
                 }
@@ -1995,7 +2010,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             Expr::InList { list, negated, .. } if !(*negated) => {
                 for item in list.iter() {
                     if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if value == DASHBOARD_ALL {
+                        if *value == placeholder {
                             *expr = Expr::Value(Value::Boolean(true));
                             break;
                         }
@@ -2006,9 +2021,22 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             Expr::InList { list, negated, .. } if *negated => {
                 for item in list.iter() {
                     if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if value == DASHBOARD_ALL {
+                        if *value == placeholder {
                             *expr = Expr::Value(Value::Boolean(false));
                             break;
+                        }
+                    }
+                }
+            }
+            Expr::Function(func) => {
+                let f = func.name.to_string().to_lowercase();
+                if f == STR_MATCH_UDF_NAME || f == STR_MATCH_UDF_IGNORE_CASE_NAME {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() == 2 {
+                            let value = trim_quotes(list.args[1].to_string().as_str());
+                            if *value == placeholder {
+                                *expr = Expr::Value(Value::Boolean(true));
+                            }
                         }
                     }
                 }
@@ -2131,6 +2159,44 @@ mod tests {
             expected
         );
         assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    // test index_visitor for str_match
+    #[test]
+    fn test_index_visitor_str_match() {
+        let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match(name, 'value')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+    }
+
+    // test index_visitor for str_match_ignore_case
+    #[test]
+    fn test_index_visitor_str_match_ignore_case() {
+        let sql = "SELECT * FROM t WHERE str_match_ignore_case(name, 'value')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match_ignore_case(name, 'value')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
     }
 
     #[test]
@@ -2740,6 +2806,19 @@ mod tests {
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
         statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND false AND field3 = 'value3'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
+        let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
     }
 }
