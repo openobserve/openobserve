@@ -323,7 +323,7 @@ export default defineComponent({
             createAutocompletion(),
             ...createTheme(),
             createKeymap(),
-
+            EditorView.editable.of(!props.readOnly),
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
                 const debouncedEmit = debounce((value: string) => {

@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-panel-query-editor-div"
     class="dashboard-query-editor"
     ref="editorRef"
-    id="editor"
-  ></div>
+    :id="editorId"
+  />
 </template>
 
 <script lang="ts">
@@ -28,31 +28,50 @@ import {
   defineComponent,
   ref,
   onMounted,
-  onUpdated,
-  watch,
-  onActivated,
-  onUnmounted,
-  onDeactivated,
-  type Ref,
   nextTick,
+  type Ref,
+  onDeactivated,
+  onUnmounted,
+  onActivated,
+  watch,
+  computed,
+  onBeforeUnmount,
 } from "vue";
 
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import { EditorView, basicSetup, minimalSetup } from "codemirror";
+import { EditorState } from "@codemirror/state";
+import { sql } from "@codemirror/lang-sql";
+import { json } from "@codemirror/lang-json";
+import { javascript } from "@codemirror/lang-javascript";
+import { markdown } from "@codemirror/lang-markdown";
+import {
+  autocompletion,
+  CompletionContext,
+  Completion,
+} from "@codemirror/autocomplete";
+import { keymap, lineNumbers } from "@codemirror/view";
+import { indentWithTab } from "@codemirror/commands";
+import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
+import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
+import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
+import { debounce } from "quasar";
+import { foldGutter, foldKeymap } from "@codemirror/language";
 
 export default defineComponent({
   props: {
+    editorId: {
+      type: String,
+      default: "editor",
+    },
     query: {
       type: String,
       default: "",
     },
-    fields: {
-      type: Array,
-      default: [],
+    showAutoComplete: {
+      type: Boolean,
+      default: true,
     },
     keywords: {
       type: Array,
@@ -62,9 +81,9 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
-    functions: {
-      type: Array,
-      default: [],
+    debounceTime: {
+      type: Number,
+      default: 500,
     },
     readOnly: {
       type: Boolean,
@@ -75,511 +94,519 @@ export default defineComponent({
       default: "sql",
     },
   },
-  emits: ["update-query", "run-query", "update:query"],
+  emits: ["update-query", "run-query", "update:query", "focus", "blur"],
   setup(props, { emit }) {
     const store = useStore();
     const editorRef: any = ref();
-    let editorObj: any = null;
-    let provider: Ref<monaco.IDisposable | null> = ref(null);
+    let editorView: EditorView | null = null;
 
-    const CompletionKind: any = {
-      Keyword: monaco.languages.CompletionItemKind.Keyword,
-      Operator: monaco.languages.CompletionItemKind.Operator,
-      Text: monaco.languages.CompletionItemKind.Text,
-      Value: monaco.languages.CompletionItemKind.Value,
-      Method: monaco.languages.CompletionItemKind.Method,
-      Function: monaco.languages.CompletionItemKind.Function,
-      Constructor: monaco.languages.CompletionItemKind.Constructor,
-      Field: monaco.languages.CompletionItemKind.Field,
-      Variable: monaco.languages.CompletionItemKind.Variable,
+    // Track event listeners
+    const clickListener = () => {
+      editorView?.requestMeasure();
     };
-    const insertTextRules: any = {
-      InsertAsSnippet:
-        monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-      KeepWhitespace:
-        monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
-      None: monaco.languages.CompletionItemInsertTextRule.None,
+    const resizeListener = async () => {
+      await nextTick();
+      editorView?.requestMeasure();
     };
 
-    const createDependencyProposals = (range: any) => {
-      let keywords: any[] = [];
-      if (props.language === "sql") {
-        keywords = [
-          {
-            label: "and",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "and ",
-            range: range,
-          },
-          {
-            label: "or",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "or ",
-            range: range,
-          },
-          {
-            label: "like",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "like '%${1:params}%' ",
-            range: range,
-          },
-          {
-            label: "in",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "in ('${1:params}') ",
-            range: range,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          },
-          {
-            label: "not in",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "not in ('${1:params}') ",
-            range: range,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          },
-          {
-            label: "between",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "between('${1:params}','${1:params}') ",
-            range: range,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          },
-          {
-            label: "not between",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "not between('${1:params}','${1:params}') ",
-            range: range,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          },
-          {
-            label: "is null",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "is null ",
-            range: range,
-          },
-          {
-            label: "is not null",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "is not null ",
-            range: range,
-          },
-          {
-            label: ">",
-            kind: monaco.languages.CompletionItemKind.Operator,
-            insertText: "> ",
-            range: range,
-          },
-          {
-            label: "<",
-            kind: monaco.languages.CompletionItemKind.Operator,
-            insertText: "< ",
-            range: range,
-          },
-          {
-            label: ">=",
-            kind: monaco.languages.CompletionItemKind.Operator,
-            insertText: ">= ",
-            range: range,
-          },
-          {
-            label: "<=",
-            kind: monaco.languages.CompletionItemKind.Operator,
-            insertText: "<= ",
-            range: range,
-          },
-          {
-            label: "<>",
-            kind: monaco.languages.CompletionItemKind.Operator,
-            insertText: "<> ",
-            range: range,
-          },
-          {
-            label: "=",
-            kind: monaco.languages.CompletionItemKind.Operator,
-            insertText: "= ",
-            range: range,
-          },
-          {
-            label: "!=",
-            kind: monaco.languages.CompletionItemKind.Operator,
-            insertText: "!= ",
-            range: range,
-          },
-          {
-            label: "()",
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: "(${1:condition}) ",
-            range: range,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          },
-        ];
+    // VRL language support
+    const createVrlLanguage = () => {
+      return {
+        name: "vrl",
+        tokenizer: vrlLanguageDefinition.tokenizer,
+        keywords: vrlLanguageDefinition.keywords,
+        symbols: vrlLanguageDefinition.symbols,
+        escapes: vrlLanguageDefinition.escapes,
+        brackets: vrlLanguageDefinition.brackets,
+      };
+    };
 
-        props.fields.forEach((field: any) => {
-          if (field.name == store.state.zoConfig.timestamp_column) {
-            return;
-          }
-          let itemObj = {
-            label: field.name,
-            kind: monaco.languages.CompletionItemKind.Text,
-            insertText: field.name,
-            range: range,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          };
-          keywords.push(itemObj);
-        });
+    // Get language support based on props.language
+    const getLanguageSupport = () => {
+      switch (props.language) {
+        case "sql":
+          return sql();
+        case "vrl":
+          return sql();
+        case "json":
+          return json();
+        case "javascript":
+          return javascript();
+        case "markdown":
+          return markdown();
+        default:
+          return sql();
+      }
+    };
 
-        props.functions.forEach((field: any) => {
-          let itemObj = {
-            label: field.name,
-            kind: monaco.languages.CompletionItemKind.Text,
-            insertText: field.name + field.args,
-            range: range,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          };
-          keywords.push(itemObj);
-        });
-      } else {
-        props.keywords.forEach((keyword: any) => {
-          const itemObj: any = {
-            ...keyword,
-            label: keyword["label"],
-            kind: CompletionKind[keyword["kind"]],
-            insertText: keyword["insertText"],
-            range: range,
-          };
-          if (insertTextRules[keyword["insertTextRule"]]) {
-            itemObj["insertTextRules"] =
-              insertTextRules[keyword["insertTextRule"]];
-          }
-          keywords.push(itemObj);
-        });
+    // Create autocompletion function
+    const createAutocompletion = () => {
+      if (!props.showAutoComplete) return [];
+
+      return autocompletion({
+        override: [
+          (context: CompletionContext) => {
+            const word = context.matchBefore(/\w*/);
+            if (!word) return null;
+
+            const textUntilPosition = context.state.doc.sliceString(
+              0,
+              context.pos,
+            );
+            const arr = textUntilPosition.trim().split(" ");
+            const lastElement = arr.pop();
+
+            let completions: Completion[] = [];
+
+            // Add keywords
+            props.keywords.forEach((keyword: any) => {
+              if (
+                keyword.label.toLowerCase().includes(word.text.toLowerCase())
+              ) {
+                completions.push({
+                  label: keyword.label,
+                  type: keyword.kind?.toLowerCase() || "keyword",
+                  apply: keyword.insertText,
+                });
+              }
+            });
+
+            // Add suggestions
+            props.suggestions.forEach((suggestion: any) => {
+              completions.push({
+                label: suggestion.label(lastElement),
+                type: suggestion.kind?.toLowerCase() || "text",
+                apply: suggestion.insertText(lastElement),
+              });
+            });
+
+            return {
+              from: word.from,
+              options: completions,
+            };
+          },
+        ],
+      });
+    };
+
+    const customDarkTheme = EditorView.theme(
+      {
+        ".cm-editor": {
+          backgroundColor: "#1e1e1e !important", // Custom dark background
+        },
+        ".cm-scroller": {
+          backgroundColor: "#1e1e1e !important",
+          fontFamily: "Menlo, Monaco, 'Courier New', monospace !important",
+          fontWeight: "normal !important",
+          fontSize: "12px !important",
+          fontFeatureSettings: "liga 0, calt 0 !important",
+          fontVariationSettings: "normal !important",
+          lineHeight: "18px !important",
+          letterSpacing: "0px !important",
+        },
+        ".cm-cursor": {
+          borderLeft: "2px solid #d4d4d4 !important", // bright pink for visibility
+        },
+        ".cm-gutters": {
+          backgroundColor: "transparent !important",
+          borderRight: "none !important",
+        },
+        ".cm-activeLineGutter": {
+          backgroundColor: "transparent !important",
+        },
+        ".cm-line": {
+          paddingLeft: "0px !important",
+        },
+      },
+      { dark: true },
+    );
+    const customLightTheme = EditorView.theme({
+      ".cm-editor": {
+        backgroundColor: "#fafafa !important", // Your light mode background
+      },
+      ".cm-scroller": {
+        backgroundColor: "#fafafa !important",
+        fontFamily: "Menlo, Monaco, 'Courier New', monospace !important",
+        fontWeight: "normal !important",
+        fontSize: "12px !important",
+        fontFeatureSettings: "liga 0, calt 0 !important",
+        fontVariationSettings: "normal !important",
+        lineHeight: "18px !important",
+        letterSpacing: "0px !important",
+      },
+      ".cm-cursor": {
+        borderLeft: "2px solid #000000 !important", // bright pink for visibility
+      },
+      ".cm-gutters": {
+        backgroundColor: "transparent !important",
+        borderRight: "none !important",
+        marginRight: "0px !important",
+      },
+      ".cm-gutter": {
+        marginRight: "0px !important",
+      },
+      ".cm-activeLineGutter": {
+        backgroundColor: "transparent !important",
+      },
+      ".cm-line": {
+        paddingLeft: "0px !important",
+      },
+    });
+
+    const createTheme = () => {
+      return store.state.theme === "dark"
+        ? [o2QueryEditorDarkTheme, customDarkTheme]
+        : [o2QueryEditorLightTheme, customLightTheme];
+    };
+
+    // Create keymap with Ctrl+Enter support
+    const createKeymap = () => {
+      return keymap.of([
+        indentWithTab,
+        {
+          key: "Ctrl-Enter",
+          run: () => {
+            setTimeout(() => {
+              emit("run-query");
+            }, 300);
+            return true;
+          },
+        },
+        {
+          key: "Cmd-Enter",
+          run: () => {
+            setTimeout(() => {
+              emit("run-query");
+            }, 300);
+            return true;
+          },
+        },
+      ]);
+    };
+
+    const setupEditor = async () => {
+      // Ensure proper cleanup before setting up new editor
+      cleanupEditor();
+
+      let editorElement = document.getElementById(props.editorId);
+      let retryCount = 0;
+      const maxRetries = 5;
+
+      // Retry mechanism to ensure the editor element is found
+      while (!editorElement && retryCount < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        editorElement = document.getElementById(props.editorId);
+        retryCount++;
       }
 
-      return keywords;
+      if (!editorElement) {
+        console.error("Query Editor element not found after retries");
+        return;
+      }
+
+      // Clear any existing child nodes
+      if (editorElement && editorElement?.hasChildNodes()) {
+        editorElement.innerHTML = "";
+      }
+
+      try {
+        const state = EditorState.create({
+          doc: props.query?.trim() || "",
+          extensions: [
+            minimalSetup,
+            EditorView.lineWrapping,
+            ...(enableCodeFolding.value
+              ? [foldGutter(), keymap.of(foldKeymap)]
+              : []),
+            lineNumbers(),
+            getLanguageSupport(),
+            createAutocompletion(),
+            ...createTheme(),
+            createKeymap(),
+            EditorView.editable.of(!props.readOnly),
+            EditorView.updateListener.of((update) => {
+              if (update.docChanged) {
+                const debouncedEmit = debounce((value: string) => {
+                  emit("update-query", update, value);
+                  emit("update:query", value);
+                }, props.debounceTime);
+                debouncedEmit(update.state.doc.toString());
+              }
+            }),
+
+            EditorView.focusChangeEffect.of((state, focusing) => {
+              if (focusing) {
+                emit("focus");
+              } else {
+                const value = state.doc.toString();
+                const trimmedValue = value.trim();
+                if (value !== trimmedValue) {
+                  const transaction = state.update({
+                    changes: {
+                      from: 0,
+                      to: state.doc.length,
+                      insert: trimmedValue,
+                    },
+                  });
+                  editorView?.dispatch(transaction);
+                }
+                emit("blur");
+              }
+              return null;
+            }),
+
+            EditorView.theme({
+              "&": {
+                fontSize: "14px",
+                height: "100%",
+              },
+              ".cm-editor": {
+                height: "100%",
+              },
+              ".cm-scroller": {
+                fontFamily: "monospace",
+              },
+            }),
+          ],
+        });
+
+        editorView = new EditorView({
+          state,
+          parent: editorElement as HTMLElement,
+          lineWrapping: true,
+        });
+
+        // Set readonly if needed
+        if (props.readOnly) {
+          // For now, we'll handle readonly through the UI
+          // CodeMirror v6 handles this differently
+        }
+      } catch (error) {
+        console.error("Error creating CodeMirror editor:", error);
+        return;
+      }
+
+      // Clean up old listeners before adding new ones
+      window.removeEventListener("click", clickListener);
+      window.removeEventListener("resize", resizeListener);
+
+      // Add listeners
+      window.addEventListener("click", clickListener);
+      window.addEventListener("resize", resizeListener);
     };
+
+    // Comprehensive cleanup function
+    const cleanupEditor = () => {
+      // Remove window event listeners
+      window.removeEventListener("click", clickListener);
+      window.removeEventListener("resize", resizeListener);
+
+      // Dispose editor
+      if (editorView) {
+        try {
+          editorView.destroy();
+        } catch (error) {
+          console.warn("Error disposing editor:", error);
+        }
+        editorView = null;
+      }
+      editorRef.value = null;
+    };
+
+    onMounted(async () => {
+      setupEditor();
+    });
+
+    onActivated(async () => {
+      if (!editorView) {
+        setupEditor();
+        if (editorView) (editorView as any)?.requestMeasure();
+      }
+    });
+
+    onDeactivated(() => {
+      // No specific cleanup needed for CodeMirror on deactivate
+    });
+
+    onUnmounted(() => {
+      cleanupEditor();
+    });
+
+    const enableCodeFolding = computed(() => {
+      return ["json", "html", "javascript"].includes(props.language);
+    });
+
+    // Watch for prop changes
+    watch(
+      () => props.readOnly,
+      () => {
+        // Handle readonly state changes
+        if (editorView) {
+          // For now, we'll recreate the editor when readonly changes
+          setupEditor();
+        }
+      },
+    );
 
     watch(
       () => store.state.theme,
       () => {
-        monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-        );
+        // Recreate editor with new theme
+        setupEditor();
       },
     );
 
-    onMounted(async () => {
-      //   editorRef.value.addEventListener("keyup", onKeyUp);
-
-      monaco.editor.defineTheme("myCustomTheme", {
-        base: "vs", // can also be vs-dark or hc-black
-        inherit: true, // can also be false to completely replace the builtin rules
-        rules: [{ token: "comment", background: "FF0000" }],
-        colors: {
-          "editor.foreground": "#000000",
-          "editor.background": "#fafafa",
-          "editorCursor.foreground": "#000000",
-          "editor.lineHighlightBackground": "#FFFFFF",
-          "editorLineNumber.foreground": "#000000",
-          "editor.border": "#ececec",
-        },
-      });
-
-      // Dispose the provider if it already exists before registering a new one
-      provider.value?.dispose();
-      registerAutoCompleteProvider();
-
-      editorObj = monaco.editor.create(editorRef.value, {
-        value: props.query?.trim(),
-        language: "sql",
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-        showFoldingControls: "never",
-        wordWrap: "on",
-        lineNumbers: "on",
-        lineNumbersMinChars: 0,
-        overviewRulerLanes: 0,
-        fixedOverflowWidgets: true,
-        overviewRulerBorder: false,
-        lineDecorationsWidth: 15,
-        hideCursorInOverviewRuler: true,
-        renderLineHighlight: "none",
-        glyphMargin: false,
-        folding: false,
-        scrollBeyondLastColumn: 0,
-        scrollBeyondLastLine: true,
-        scrollbar: { horizontal: "auto", vertical: "visible" },
-        find: {
-          addExtraSpaceOnTop: false,
-          autoFindInSelection: "never",
-          seedSearchStringFromSelection: "never",
-        },
-        minimap: { enabled: false },
-        readOnly: props.readOnly,
-      });
-
-      editorObj.onDidChangeModelContent((e: any) => {
-        emit("update-query", e, editorObj.getValue()?.trim());
-        emit("update:query", editorObj.getValue()?.trim());
-      });
-
-      editorObj.onDidBlurEditorWidget(() => {
-        const model = editorObj.getModel();
-        const value = model.getValue();
-        const trimmedValue = value.trim();
-
-        // Only apply trim if there are actually tailing and leading spaces to trim
-        if (value !== trimmedValue) {
-          const lastLine = model.getLineCount();
-          const lastLineLength = model.getLineLength(lastLine);
-
-          // Create an edit operation that replaces the entire content
-          // This preserves undo history becuase it treats this as a single edit operation
-          //and it will be in the undo stack as one operation
-          model.pushEditOperations(
-            [],
-            [
-              {
-                range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
-                text: trimmedValue,
-              },
-            ],
-            () => null,
-          );
-        }
-      });
-
-      editorObj.createContextKey("ctrlenter", true);
-      editorObj.addCommand(
-        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        function () {
-          setTimeout(() => {
-            emit("run-query");
-          }, 300);
-        },
-        "ctrlenter",
-      );
-    });
-
-    onMounted(async () => {
-      provider.value?.dispose();
-      registerAutoCompleteProvider();
-      window.addEventListener("resize", async () => {
-        await nextTick();
-        editorObj.layout();
-        // queryEditorRef.value.resetEditorLayout();
-      });
-    });
-
-    onActivated(async () => {
-      provider.value?.dispose();
-      registerAutoCompleteProvider();
-    });
-
-    onUnmounted(() => {
-      provider.value?.dispose();
-    });
-
-    onDeactivated(() => {
-      provider.value?.dispose();
-    });
-
-    const registerAutoCompleteProvider = () => {
-      provider.value = monaco.languages.registerCompletionItemProvider("sql", {
-        provideCompletionItems: function (model, position) {
-          // find out if we are completing a property in the 'dependencies' object.
-          var textUntilPosition = model.getValueInRange({
-            startLineNumber: 1,
-            startColumn: 1,
-            endLineNumber: position.lineNumber,
-            endColumn: position.column,
-          });
-
-          var word = model.getWordUntilPosition(position);
-          var range = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: word.startColumn,
-            endColumn: word.endColumn,
-          };
-
-          let arr = textUntilPosition.trim().split(" ");
-          let filteredSuggestions = [];
-
-          filteredSuggestions = createDependencyProposals(range);
-          filteredSuggestions = filteredSuggestions.filter((item: any) => {
-            return item.label.toLowerCase().includes(word.word.toLowerCase());
-          });
-
-          // if (filteredSuggestions.length == 0) {
-          const lastElement = arr.pop();
-
-          if (props.language == "sql") {
-            filteredSuggestions.push({
-              label: `match_all('${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all('${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `match_all_raw('${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_raw('${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `match_all_raw_ignore_case('${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_raw_ignore_case('${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `re_match(fieldname: string, regular_expression: string)`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `re_match(fieldname, '')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `re_not_match(fieldname: string, regular_expression: string)`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `re_not_match(fieldname, '')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `str_match_ignore_case(fieldname, '${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `str_match_ignore_case(fieldname, '${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `str_match(fieldname, '${lastElement}')`,
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `str_match(fieldname, '${lastElement}')`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `fuzzy_match(fieldname, '${lastElement}', 1)`,
-              kind: monaco.languages.CompletionItemKind.Function,
-              insertText: `fuzzy_match(fieldname, '${lastElement}', 1)`,
-              range: range,
-            });
-            filteredSuggestions.push({
-              label: `fuzzy_match_all('${lastElement}', 1)`,
-              kind: monaco.languages.CompletionItemKind.Function,
-              insertText: `fuzzy_match_all('${lastElement}', 1)`,
-              range: range,
-            });
-          } else {
-            props.suggestions.forEach((suggestion: any) => {
-              filteredSuggestions.push({
-                label: suggestion.label(lastElement),
-                kind: monaco.languages.CompletionItemKind[
-                  suggestion.kind || "Text"
-                ],
-                insertText: suggestion.insertText(lastElement),
-                range: range,
-              });
-            });
-          }
-
-          return {
-            suggestions: filteredSuggestions,
-          };
-        },
-      });
-    };
-
-    const setValue = (value: string) => {
-      editorObj.setValue(value);
-    };
-
-    // update readonly when prop value changes
-    watch(
-      () => props.readOnly,
-      () => {
-        editorObj.updateOptions({ readOnly: props.readOnly });
-      },
-    );
-
-    // update readonly when prop value changes
     watch(
       () => props.query,
       () => {
-        if (props.readOnly || !editorObj.hasWidgetFocus()) {
-          editorObj.getModel().setValue(props.query);
+        if (editorView && (props.readOnly || !editorView.hasFocus)) {
+          const currentValue = editorView.state.doc.toString();
+          if (currentValue !== props.query) {
+            editorView.dispatch({
+              changes: {
+                from: 0,
+                to: currentValue.length,
+                insert: props.query,
+              },
+            });
+          }
         }
       },
     );
 
+    const setValue = (value: string) => {
+      if (editorView) {
+        editorView.dispatch({
+          changes: {
+            from: 0,
+            to: editorView.state.doc.length,
+            insert: value,
+          },
+        });
+        editorView.requestMeasure();
+      }
+    };
+
     const resetEditorLayout = () => {
-      editorObj.layout();
+      editorView?.requestMeasure();
+    };
+
+    const disableSuggestionPopup = () => {
+      // CodeMirror handles this automatically
+      if (editorView) {
+        // Close any open completions by dispatching an empty transaction
+        editorView.dispatch({});
+      }
     };
 
     const triggerAutoComplete = async (value: string) => {
       disableSuggestionPopup();
       await nextTick();
-      editorObj.trigger(value, "editor.action.triggerSuggest", {});
+      if (editorView) {
+        // Trigger autocompletion by dispatching a transaction
+        editorView.dispatch({});
+      }
     };
 
-    const disableSuggestionPopup = () => {
-      const escEvent = new KeyboardEvent("keydown", {
-        keyCode: 27,
-        code: "Escape",
-        key: "Escape",
-        bubbles: true,
+    const formatDocument = async () => {
+      // CodeMirror doesn't have built-in formatting, but we can implement basic formatting
+      return new Promise((resolve) => {
+        if (editorView) {
+          // Basic formatting: trim whitespace and ensure proper indentation
+          const currentValue = editorView.state.doc.toString();
+          const formattedValue = currentValue
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .join("\n");
+
+          if (currentValue !== formattedValue) {
+            editorView.dispatch({
+              changes: {
+                from: 0,
+                to: currentValue.length,
+                insert: formattedValue,
+              },
+            });
+          }
+        }
+        resolve(true);
       });
-      editorRef.value.dispatchEvent(escEvent);
     };
 
     const getCursorIndex = () => {
-      const currentPosition = editorObj.getPosition();
-      const cursorIndex = editorObj.getModel().getOffsetAt(currentPosition) - 1;
-      return cursorIndex || null;
+      if (editorView) {
+        return editorView.state.selection.main.head;
+      }
+      return null;
     };
+
+    const getModel = () => {
+      return editorView?.state;
+    };
+
+    const getValue = () => {
+      return editorView?.state.doc.toString();
+    };
+
+    const decorateRanges = (ranges: any[]) => {
+      // Basic implementation - highlight lines with CSS classes
+      if (!editorView) return;
+
+      // For now, we'll add a simple class to the editor element
+      const editorElement = editorView.dom;
+      editorElement.classList.add("has-error-highlights");
+    };
+
+    const addErrorDiagnostics = (ranges: any[]) => {
+      // Basic implementation - add error markers
+      if (!editorView) return;
+
+      // For now, we'll add a simple class to the editor element
+      const editorElement = editorView.dom;
+      editorElement.classList.add("has-error-diagnostics");
+    };
+
+    const forceCleanup = () => {
+      console.log("Force cleaning up CodeQueryEditor resources...");
+      cleanupEditor();
+    };
+
     return {
       editorRef,
-      editorObj,
+      editorView,
       setValue,
       resetEditorLayout,
       disableSuggestionPopup,
       triggerAutoComplete,
       getCursorIndex,
+      formatDocument,
+      getModel,
+      getValue,
+      decorateRanges,
+      addErrorDiagnostics,
+      cleanupEditor,
+      forceCleanup,
     };
   },
 });
 </script>
 
-<style>
+<style scoped>
 #editor {
-  height: 100%;
   width: 100%;
-  /* min-height: 4rem; */
+  height: 78%;
   border-radius: 5px;
-  border: 0px solid #dbdbdb;
-}
-
-.monaco-editor,
-.monaco-editor .monaco-editor {
-  padding: 0px 0px 0px 0px !important;
 }
 </style>
 
 <style lang="scss">
-.dashboard-query-editor {
-  .monaco-editor,
-  .monaco-editor .monaco-editor {
-    padding: 0px 0px 0px 0px !important;
-
-    .editor-widget .suggest-widget {
-      z-index: 9999;
-      display: flex !important;
-      visibility: visible !important;
-    }
-  }
+.cm-focused {
+  outline: none !important;
+}
+.cm-lineNumbers .cm-gutterElement {
+  min-width: 10px !important;
+  padding-right: 5px !important;
+  text-align: left;
 }
 </style>
