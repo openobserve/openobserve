@@ -76,6 +76,12 @@ const organizations = {
   post_organization_settings: (orgIdentifier: string, data: any) => {
     return http().post(`/api/${orgIdentifier}/settings`, data);
   },
+  get_admin_org: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/organizations`);
+  },
+  extend_trial_period: (orgIdentifier: string, data: any) => {
+    return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
+  }
 };
 
 export default organizations;

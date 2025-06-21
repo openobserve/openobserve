@@ -25,7 +25,7 @@ import Login from "@/components/login/Login.vue";
 import config from "@/aws-exports";
 import configService from "@/services/config";
 import { useStore } from "vuex";
-import { getUserInfo, getDecodedUserInfo } from "@/utils/zincutils";
+import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
@@ -118,7 +118,12 @@ export default defineComponent({
           useLocalOrganization(tempDefaultOrg);
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
         }
+        //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
+        if(config.isCloud == 'true' && checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"){
+          localStorage.setItem("isFirstTimeLogin", "true");
+        }
         redirectUser();
+        
       });
     };
 

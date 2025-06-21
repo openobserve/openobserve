@@ -279,9 +279,9 @@ export default defineComponent({
         resultTotal.value = res.data.data.length;
         let counter = 1;
         const billingPlans = {
-          0: "Free Forever",
-          1: "Pay As You Go",
-          2: "Enterprise",
+          "0": "Free",
+          "1": "Pay as you go",
+          "2": "Enterprise"
         };
         organizations.value = res.data.data.map((data) => {
           // Common fields for all configurations

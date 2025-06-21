@@ -62,7 +62,7 @@ pub async fn ingest(
     let started_at = Utc::now().timestamp_micros();
 
     // check system resource
-    check_ingestion_allowed(org_id, StreamType::Logs, None)?;
+    check_ingestion_allowed(org_id, StreamType::Logs, None).await?;
 
     // let mut errors = false;
     let mut bulk_res = BulkResponse {

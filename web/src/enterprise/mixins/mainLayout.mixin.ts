@@ -87,90 +87,6 @@ const MainLayoutCloudMixin = {
     };
 
     /**
-     * Get organization plan
-     * if plan is free, get the threshold and extract search and ingest threshold
-     * if one of the threshold exceed the threshold, show the warning message else show error message
-     */
-    const getOrganizationThreshold = async (store: any) => {
-      const organization: {
-        identifier: string;
-        subscription_type: string;
-      } = store.state.selectedOrganization;
-      if (
-        organization.subscription_type == config.freePlan ||
-        organization.subscription_type == ""
-      ) {
-        await billingService
-          .get_quota_threshold(organization.identifier)
-          .then((res: any) => {
-            const searchData: number = res.data.data.search;
-            const ingestData: number = res.data.data.ingest;
-            // res.data.data.forEach((element: any) => {
-            //   if (element.event == "search") {
-            //     searchData += element.size;
-            //   } else if (element.event == "multi" || element.event == "bulk") {
-            //     ingestData += element.size;
-            //   }
-            // });
-            const searchNearThreshold = Math.floor(
-              (store.state.selectedOrganization.search_threshold *
-                parseInt(config.zincQuotaThreshold)) /
-                100
-            );
-
-            const ingestNearThreshold = Math.floor(
-              (store.state.selectedOrganization.ingest_threshold *
-                parseInt(config.zincQuotaThreshold)) /
-                100
-            );
-            let usageMessage = "";
-            if (
-              searchData > searchNearThreshold ||
-              ingestData > ingestNearThreshold
-            ) {
-              if (searchNearThreshold >= 100 || ingestNearThreshold >= 100) {
-                usageMessage =
-                  "You’ve exceeded monthly free limit. Search: [SEARCH_USAGE]%, Ingestion: [INGEST_USAGE]%";
-              } else {
-                usageMessage =
-                  "You’re approaching monthly free limit. Search: [SEARCH_USAGE]%, Ingestion: [INGEST_USAGE]%";
-              }
-
-              const percentageSearchQuota: any =
-                store.state.selectedOrganization.search_threshold > 0
-                  ? (
-                      (searchData /
-                        store.state.selectedOrganization.search_threshold) *
-                      100
-                    ).toFixed(2)
-                  : 0;
-
-              const percentageIngestQuota: any =
-                store.state.selectedOrganization.ingest_threshold > 0
-                  ? (
-                      (ingestData /
-                        store.state.selectedOrganization.ingest_threshold) *
-                      100
-                    ).toFixed(2)
-                  : 0;
-
-              usageMessage = usageMessage.replace(
-                "[SEARCH_USAGE]",
-                percentageSearchQuota <= 100 ? percentageSearchQuota : 100
-              );
-              usageMessage = usageMessage.replace(
-                "[INGEST_USAGE]",
-                percentageIngestQuota <= 100 ? percentageIngestQuota : 100
-              );
-            }
-            // quotaThresholdMsg.value = usageMessage;
-            store.dispatch("setQuotaThresholdMsg", usageMessage);
-          })
-          .catch((error: any) => console.log(error));
-      }
-    };
-
-    /**
      * Get refresh token
      */
     const getRefreshToken = () => {
@@ -203,7 +119,6 @@ const MainLayoutCloudMixin = {
       leftNavigationLinks,
       getRefreshToken,
       getDefaultOrganization,
-      getOrganizationThreshold,
     };
   },
 };

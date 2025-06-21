@@ -15,18 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-lg">
+  <q-page>
     <div
       v-if="!no_data_ingest"
-      class="q-pa-md row items-start q-gutter-md"
+      class="q-pa-md row items-start"
       style="margin: 0 auto; justify-content: center"
       :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
-      <div :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" class="my-card-wide my-card card-container">
+      <TrialPeriod></TrialPeriod>
+      <div :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" class="my-card-wide my-card card-container q-mt-lg q-mb-lg">
         <div align="center" flat
         :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" bordered class=" my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
-          <q-separator class="q-ma-md" />
+          <q-separator class="q-ma-md " />
           <div class="row justify-center" v-if="isCloud == 'false'">
             <div class="col">
               <div class="text-subtitle1">
@@ -247,6 +248,7 @@ flat
       class="q-pa-md row items-start q-gutter-md"
       style="margin: 0 auto; justify-content: center"
     >
+    <TrialPeriod></TrialPeriod>
       <div class="my-card card-container">
         <div align="center" flat
 bordered class="my-card q-py-md">
@@ -280,10 +282,11 @@ import config from "../aws-exports";
 import { formatSizeFromMB, addCommasToNumber } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
+import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 
 export default defineComponent({
   name: "PageHome",
-
+  components: {TrialPeriod},
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -397,7 +400,7 @@ export default defineComponent({
 }
 
 .my-card-wide {
-  width: 88.6vw;
+  width: 100%;
 }
 .my-card-narrow{
   width: 66.6vw;
