@@ -275,6 +275,8 @@ export default defineComponent({
         indentWithTab,
         {
           key: "Ctrl-Enter",
+          preventDefault: true,
+          stopPropagation: true,
           run: () => {
             setTimeout(() => {
               emit("run-query");
@@ -284,6 +286,8 @@ export default defineComponent({
         },
         {
           key: "Cmd-Enter",
+          preventDefault: true,
+          stopPropagation: true,
           run: () => {
             setTimeout(() => {
               emit("run-query");
@@ -291,6 +295,8 @@ export default defineComponent({
             return true;
           },
         },
+        ...closeBracketsKeymap, // Auto close brackets
+        ...searchKeymap, // ⌘F / Ctrl+F and other search-related key bindings
       ]);
     };
 
@@ -325,7 +331,6 @@ export default defineComponent({
           extensions: [
             minimalSetup,
             closeBrackets(),
-            keymap.of(closeBracketsKeymap),
             EditorView.lineWrapping,
             ...(enableCodeFolding.value
               ? [foldGutter(), keymap.of(foldKeymap)]
@@ -335,9 +340,6 @@ export default defineComponent({
             lineNumbers(),
             getLanguageSupport(),
             createAutocompletion(),
-            keymap.of([
-              ...searchKeymap, // ⌘F / Ctrl+F and other search-related key bindings
-            ]),
             ...createTheme(),
             createKeymap(),
             EditorView.editable.of(!props.readOnly),
@@ -350,7 +352,6 @@ export default defineComponent({
                 debouncedEmit(update.state.doc.toString());
               }
             }),
-
             EditorView.focusChangeEffect.of((state, focusing) => {
               if (focusing) {
                 emit("focus");
@@ -384,6 +385,7 @@ export default defineComponent({
                 fontFamily: "monospace",
               },
             }),
+            basicSetup,
           ],
         });
 
