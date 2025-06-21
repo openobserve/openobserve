@@ -156,13 +156,6 @@ export default defineComponent({
     }, 500);
 
     // --- Typeahead debounce and emit search event ---
-    // This watch function implements debounced search for the variable selector.
-    // When filterText changes:
-    // 1. Clears any existing debounce timeout
-    // 2. If filterText is empty, clears search results
-    // 3. If filterText has value, sets searching state and debounces the search
-    // 4. After 1000ms delay, emits search event to parent component
-    // The parent component handles the actual API call and updates search results
     watch(
       () => filterText.value,
       (newVal) => {
