@@ -21,6 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        function::RESULT_ARRAY_SKIP_VRL,
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
@@ -45,6 +46,7 @@ use crate::{
         search::{
             self as SearchService,
             cache::cacher::check_cache,
+            init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
@@ -95,6 +97,15 @@ pub async fn search(
             Ok(v) => v,
             Err(_) => v.to_string(),
         });
+    let backup_query_fn = query_fn.clone();
+    let is_result_array_skip_vrl = query_fn
+        .as_ref()
+        .map(|v| is_result_array_skip_vrl(v))
+        .unwrap_or(false);
+    if is_result_array_skip_vrl {
+        query_fn = None;
+    }
+
     let action = req
         .query
         .action_id
@@ -340,6 +351,10 @@ pub async fn search(
         &search_type,
         &search_group,
     );
+
+    // Create a deep copy for caching BEFORE any modifications
+    // let cache_res = deep_copy_response(&res);
+
     res.set_trace_id(trace_id.to_string());
     res.set_took(took_time as usize);
     res.set_cache_took(cache_took);
@@ -414,6 +429,12 @@ pub async fn search(
         res.new_end_time = Some(req.query.end_time);
     }
 
+    let write_res = deep_copy_response(&res);
+    let mut local_res = deep_copy_response(&res);
+
+    println!("local_res: {:?}", local_res.hits);
+    println!("c_resp: {:?}", c_resp.cached_response);
+
     // There are 3 types of partial responses:
     // 1. VRL error
     // 2. Super cluster error
@@ -448,7 +469,7 @@ pub async fn search(
             &c_resp.ts_column,
             req.query.start_time,
             req.query.end_time,
-            &res,
+            &write_res,
             file_path,
             is_aggregate,
             c_resp.is_descending,
@@ -456,6 +477,17 @@ pub async fn search(
         .await;
     }
     // result cache save changes Ends
+
+    if is_result_array_skip_vrl {
+        local_res.hits = apply_vrl_to_response(
+            backup_query_fn,
+            &mut local_res,
+            org_id,
+            &stream_name,
+            trace_id,
+        );
+        return Ok(local_res);
+    }
 
     Ok(res)
 }
@@ -612,7 +644,7 @@ pub async fn _write_results(
     // disable write_results_v1
     // return;
     // #[allow(unreachable_code)]
-    let mut local_resp = res.clone();
+    let mut local_resp = deep_copy_response(res);
     let remove_hit = if is_descending {
         local_resp.hits.last()
     } else {
@@ -746,6 +778,7 @@ pub async fn write_results_v2(
     is_descending: bool,
 ) {
     let mut local_resp = res.clone();
+
     let remove_hit = if is_descending {
         local_resp.hits.last()
     } else {
@@ -855,6 +888,92 @@ pub async fn write_results_v2(
             }
         }
     });
+}
+
+pub fn apply_vrl_to_response(
+    backup_query_fn: Option<String>,
+    res: &mut config::meta::search::Response,
+    org_id: &str,
+    stream_name: &str,
+    trace_id: &str,
+) -> Vec<serde_json::Value> {
+    let query_fn = backup_query_fn.clone();
+    let mut local_res = res.clone();
+
+    local_res.hits = if query_fn.is_some() && !local_res.hits.is_empty() && !local_res.is_partial {
+        // compile vrl function & apply the same before returning the response
+        let mut input_fn = query_fn.unwrap().trim().to_string();
+
+        let apply_over_hits = RESULT_ARRAY_SKIP_VRL.is_match(&input_fn);
+        if apply_over_hits {
+            input_fn = RESULT_ARRAY_SKIP_VRL.replace(&input_fn, "").to_string();
+        }
+        let mut runtime = init_vrl_runtime();
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+            Ok(program) => {
+                let registry = program
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                Some(program)
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                local_res.function_error.push(err.to_string());
+                local_res.is_partial = true;
+                None
+            }
+        };
+        match program {
+            Some(program) => {
+                if apply_over_hits {
+                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &config::meta::function::VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        json::Value::Array(local_res.hits.clone()),
+                        org_id,
+                        &[stream_name.to_string()],
+                    );
+                    ret_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| {
+                            (!v.is_null())
+                                .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                        })
+                        .collect()
+                } else {
+                    local_res
+                        .hits
+                        .into_iter()
+                        .filter_map(|hit| {
+                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &config::meta::function::VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                hit,
+                                org_id,
+                                &[stream_name.to_string()],
+                            );
+                            (!ret_val.is_null())
+                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                        })
+                        .collect()
+                }
+            }
+            None => local_res.hits,
+        }
+    } else {
+        local_res.hits
+    };
+    local_res.hits
 }
 
 #[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all)]
@@ -967,4 +1086,14 @@ fn convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::
         }
         _ => None,
     }
+}
+
+pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
+    RESULT_ARRAY_SKIP_VRL.is_match(vrl_fn)
+}
+
+// Helper function to create a deep copy of a Response
+fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::search::Response {
+    let serialized = serde_json::to_string(res).expect("Failed to serialize response");
+    serde_json::from_str(&serialized).expect("Failed to deserialize response")
 }

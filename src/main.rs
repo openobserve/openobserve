@@ -260,7 +260,7 @@ async fn main() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
-                panic!("enerprise init failed: {}", e);
+                panic!("enterprise init failed: {}", e);
             }
 
             // check version upgrade
