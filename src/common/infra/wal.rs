@@ -77,7 +77,7 @@ impl SearchingFileLocker {
     }
 
     pub fn exist(&self, file: &str) -> bool {
-        self.inner.get(file).is_some()
+        self.inner.contains_key(file)
     }
 
     pub fn clean(&mut self) {
@@ -159,12 +159,8 @@ impl Manager {
         );
         let locker = self.data.get(thread_id)?;
         let manager = locker.read().await;
-        let file = match manager.get(&full_key) {
-            Some(file) => file.clone(),
-            None => {
-                return None;
-            }
-        };
+        let file = manager.get(&full_key)?.clone();
+
         drop(manager);
 
         // check size & ttl
@@ -220,19 +216,19 @@ impl Manager {
     }
 
     pub async fn check_in_use(&self, stream: StreamParams, file_name: &str) -> bool {
-        let columns = file_name.split('/').collect::<Vec<&str>>();
+        let mut columns = file_name.split('/');
         let thread_id: usize = columns
-            .first()
+            .next()
             .unwrap()
             .parse()
             .unwrap_or_else(|_| panic!("need a thread id, but the file is: {file_name}"));
-        let key = columns[1..columns.len() - 1].join("/");
-        if let Some(file) = self.get(thread_id, stream, &key).await {
-            if file.name() == file_name {
-                return true;
-            }
-        }
-        false
+        // Remove the last element which is the file name
+        // and join the rest to form the key
+        columns.next_back();
+        let key = itertools::Itertools::join(&mut columns, "/");
+        self.get(thread_id, stream, &key)
+            .await
+            .is_some_and(|file| file.name() == file_name)
     }
 }
 

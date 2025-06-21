@@ -201,7 +201,7 @@ mod tests {
         };
 
         assert_eq!(schema_records.schema_key, "test_key");
-        assert_eq!(Arc::ptr_eq(&schema_records.schema, &schema), true);
+        assert!(Arc::ptr_eq(&schema_records.schema, &schema));
         assert_eq!(schema_records.records.len(), 1);
         assert_eq!(schema_records.records_size, 1);
     }
