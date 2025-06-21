@@ -167,7 +167,7 @@ export default defineConfig({
           "codemirror": ["codemirror", "@codemirror/state", "@codemirror/lang-sql", "@codemirror/lang-json", "@codemirror/lang-javascript", "@codemirror/lang-markdown", "@codemirror/autocomplete", "@codemirror/view", "@codemirror/commands", "@codemirror/language"],
           "moment": ["moment", "moment-timezone"],
           "lodash": ["lodash-es"],
-          "echarts": ["echarts/core", "echarts/renderers", "echarts/components", "echarts/features", "echarts/charts"],
+          "echarts": ["echarts/core", "echarts/renderers", "echarts/components", "echarts/features", "echarts/charts", "@codemirror/search"],
           "luxon": ["luxon"],
           "marked": ["marked"],
           "jszip": ["jszip"],

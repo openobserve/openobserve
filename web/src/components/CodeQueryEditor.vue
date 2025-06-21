@@ -51,11 +51,19 @@ import {
   closeBrackets,
   closeBracketsKeymap,
 } from "@codemirror/autocomplete";
+
 import { keymap, lineNumbers } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+
+import {
+  searchKeymap,
+  highlightSelectionMatches,
+  search,
+  openSearchPanel,
+} from '@codemirror/search';
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
@@ -322,9 +330,14 @@ export default defineComponent({
             ...(enableCodeFolding.value
               ? [foldGutter(), keymap.of(foldKeymap)]
               : []),
+            search(),
+            highlightSelectionMatches(), // ✨ Highlights all matches
             lineNumbers(),
             getLanguageSupport(),
             createAutocompletion(),
+            keymap.of([
+              ...searchKeymap, // ⌘F / Ctrl+F and other search-related key bindings
+            ]),
             ...createTheme(),
             createKeymap(),
             EditorView.editable.of(!props.readOnly),
