@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { defineComponent, ref, watch, computed, nextTick } from "vue";
+import { defineComponent, ref, watch, computed, nextTick, onUnmounted } from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -196,6 +196,14 @@ export default defineComponent({
       },
     );
 
+    // Cleanup debounce timeout when component is unmounted
+    onUnmounted(() => {
+      if (searchDebounceTimeout) {
+        clearTimeout(searchDebounceTimeout);
+        searchDebounceTimeout = null;
+      }
+    });
+
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
         return (
@@ -244,10 +252,15 @@ export default defineComponent({
       if (props.loadOptions) {
         props.loadOptions(props.variableItem);
       }
-    };
-
-    const onPopupHide = () => {
+    };    const onPopupHide = () => {
       isOpen.value = false;
+      
+      // Clear any pending debounce timeout to prevent unwanted API calls
+      if (searchDebounceTimeout) {
+        clearTimeout(searchDebounceTimeout);
+        searchDebounceTimeout = null;
+      }
+      
       filterText.value = "";
       searching.value = false;
       // Clear search results when popup is hidden

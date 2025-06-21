@@ -313,13 +313,6 @@ export default defineComponent({
         }
       });
 
-      // Clear all debounce timeouts
-      Object.keys(searchDebounceTimeouts).forEach((variableName) => {
-        if (searchDebounceTimeouts[variableName]) {
-          clearTimeout(searchDebounceTimeouts[variableName]);
-        }
-      });
-
       // Clear current search text tracking
       Object.keys(currentSearchText).forEach((variableName) => {
         currentSearchText[variableName] = "";
@@ -2077,11 +2070,9 @@ export default defineComponent({
     // 1. Debounces the search to avoid excessive API calls (1000ms)
     // 2. Cancels previous search requests to prevent race conditions
     // 3. Uses the unified handleVariableType function to handle both REST and WebSocket/Streaming
-    // 4. Updates the search results in the variable object
-    // The search results are displayed in the child component when filterText is active
+    // 4. Updates the search results in the variable object    // The search results are displayed in the child component when filterText is active
     let searchControllers: any = {};
-    let searchDebounceTimeouts: any = {};
-    let currentSearchText: any = {}; 
+    let currentSearchText: any = {};
 
     /**
      * Comprehensive cancellation function that cancels all ongoing operations for a variable
@@ -2096,8 +2087,7 @@ export default defineComponent({
       }
 
       // 2. Cancel any ongoing WebSocket/Streaming operations
-      cancelTraceId(variableName);
-
+      cancelTraceId(variableName);      
       // 3. Cancel any ongoing search operations
       if (searchControllers[variableName]) {
         variableLog(variableName, "Canceling search controller");
@@ -2105,23 +2095,15 @@ export default defineComponent({
         searchControllers[variableName] = null;
       }
 
-      // 4. Clear any pending debounce timeouts
-      if (searchDebounceTimeouts[variableName]) {
-        variableLog(variableName, "Clearing search debounce timeout");
-        clearTimeout(searchDebounceTimeouts[variableName]);
-        searchDebounceTimeouts[variableName] = null;
-      }
-
-      // 5. Reset loading states for the variable only if not in search mode
+      // 4. Reset loading states for the variable only if not in search mode
       const variableObject = variablesData.values.find(
         (v: any) => v.name === variableName,
       );
       if (variableObject && !variableObject._searchResults) {
-        variableObject.isLoading = false;
-        variableObject.isVariableLoadingPending = false;
+        variableObject.isLoading = false;        variableObject.isVariableLoadingPending = false;
       }
 
-      // 6. Clear current search text tracking
+      // 5. Clear current search text tracking
       currentSearchText[variableName] = "";
     };
 
@@ -2138,10 +2120,8 @@ export default defineComponent({
 
       const variableName = variableItem.name;
 
-      // Only cancel ongoing operations if filterText is not empty (i.e., a real search)
-      if (filterText) {
-        cancelAllVariableOperations(variableName);
-      }
+      // Cancel any previous API calls for this variable immediately
+      cancelAllVariableOperations(variableName);
 
       if (!filterText) {
         // Clear search results and reset loading states when filterText is empty
@@ -2152,43 +2132,35 @@ export default defineComponent({
         return;
       }
 
-      // Set debounce timeout for search
-      searchDebounceTimeouts[variableName] = setTimeout(async () => {
-        // Double-check cancellation before starting new search
-        if (searchDebounceTimeouts[variableName] === null) {
-          return; // Search was cancelled
-        }
+      // Store the current search text to prevent race conditions
+      currentSearchText[variableName] = filterText;
 
-        // Store the current search text to prevent race conditions
-        currentSearchText[variableName] = filterText;
+      const controller = new AbortController();
+      searchControllers[variableName] = controller;
 
-        const controller = new AbortController();
-        searchControllers[variableName] = controller;
+      try {
+        // Initialize search results property to indicate this is a search request
+        variableItem._searchResults = [];
+        variableItem.isLoading = true;
 
-        try {
-          // Initialize search results property to indicate this is a search request
-          variableItem._searchResults = [];
-          variableItem.isLoading = true;
-
-          // Use the unified approach to load variable data with search text
-          await loadSingleVariableDataByName(variableItem, false, filterText);
-        } catch (e: any) {
-          if (e.name !== "AbortError") {
-            // Only clear search results on error, don't reset loading states
-            // to preserve filter text for user to continue typing
-            if (variablesData.values[index]) {
-              variablesData.values[index]._searchResults = [];
-            }
-          }
-          // Don't reset loading states on error to preserve filter text
-          // The loading states will be reset when the user clears the filter or closes the popup
-        } finally {
-          // Clean up the controller reference
-          if (searchControllers[variableName] === controller) {
-            searchControllers[variableName] = null;
+        // Use the unified approach to load variable data with search text
+        await loadSingleVariableDataByName(variableItem, false, filterText);
+      } catch (e: any) {
+        if (e.name !== "AbortError") {
+          // Only clear search results on error, don't reset loading states
+          // to preserve filter text for user to continue typing
+          if (variablesData.values[index]) {
+            variablesData.values[index]._searchResults = [];
           }
         }
-      }, 1000); // 1000ms debounce to match child component
+        // Don't reset loading states on error to preserve filter text
+        // The loading states will be reset when the user clears the filter or closes the popup
+      } finally {
+        // Clean up the controller reference
+        if (searchControllers[variableName] === controller) {
+          searchControllers[variableName] = null;
+        }
+      }
     };
 
     return {
