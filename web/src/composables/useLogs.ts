@@ -5385,8 +5385,8 @@ const useLogs = () => {
     // Scan-size and took time in histogram title
     // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
     // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-      searchObj.data.queryResults.hits = response.content.results.hits;
     if((isPagination && searchPartitionMap[payload.traceId] === 1) || !appendResult){
+      searchObj.data.queryResults.hits = response.content.results.hits;
     } else if (appendResult) {
       searchObj.data.queryResults.hits.push(
         ...response.content.results.hits,
