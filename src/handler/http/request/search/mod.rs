@@ -769,7 +769,7 @@ pub async fn build_search_request_per_field(
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
         from: 0,
-        size: config::meta::sql::MAX_LIMIT,
+        size: req.size.unwrap_or(config::meta::sql::MAX_LIMIT),
         start_time,
         end_time,
         query_fn: query_fn.clone(),
