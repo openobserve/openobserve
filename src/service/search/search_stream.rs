@@ -561,6 +561,7 @@ pub async fn do_partitioned_search(
 
     // check if `streaming_aggs` is supported
     let is_streaming_aggs = partition_resp.streaming_aggs;
+    let streaming_id = partition_resp.streaming_id.clone();
     let mut use_cache = false;
     if is_streaming_aggs {
         req.query.streaming_output = true;
@@ -617,7 +618,17 @@ pub async fn do_partitioned_search(
             format!("{}-{}", trace_id, idx)
         };
         let mut search_res =
-            do_search(&trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
+            match do_search(&trace_id, org_id, stream_type, &req, user_id, use_cache).await {
+                Ok(res) => res,
+                Err(e) => {
+                    // Remove the streaming_aggs cache
+                    if is_streaming_aggs && streaming_id.is_some() {
+                        #[cfg(feature = "enterprise")]
+                        streaming_aggs_exec::remove_cache(&streaming_id.unwrap())
+                    }
+                    return Err(e);
+                }
+            };
 
         let mut total_hits = search_res.total as i64;
 
@@ -1069,6 +1080,7 @@ async fn process_delta(
 
     // check if `streaming_aggs` is supported
     let is_streaming_aggs = partition_resp.streaming_aggs;
+    let streaming_id = partition_resp.streaming_id.clone();
     if is_streaming_aggs {
         req.query.streaming_output = true;
         req.query.streaming_id = partition_resp.streaming_id.clone();
@@ -1098,7 +1110,18 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res =
+            match do_search(&trace_id, org_id, stream_type, &req, user_id, true).await {
+                Ok(res) => res,
+                Err(e) => {
+                    // Remove the streaming_aggs cache
+                    if is_streaming_aggs && streaming_id.is_some() {
+                        #[cfg(feature = "enterprise")]
+                        streaming_aggs_exec::remove_cache(&streaming_id.unwrap())
+                    }
+                    return Err(e);
+                }
+            };
 
         let total_hits = search_res.total as i64;
 

@@ -32,6 +32,8 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -278,7 +280,17 @@ pub async fn search(
         }
 
         for task in tasks {
-            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
+            let search_res = match task.await {
+                Ok(res) => res,
+                Err(e) => {
+                    #[cfg(feature = "enterprise")]
+                    if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
+                        streaming_aggs_exec::remove_cache(streaming_id)
+                    }
+                    return Err(Error::Message(e.to_string()));
+                }
+            }?;
+            results.push(search_res);
         }
         for res in &results {
             work_group_set.push(res.work_group.clone());
