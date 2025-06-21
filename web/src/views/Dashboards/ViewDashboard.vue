@@ -477,11 +477,6 @@ export default defineComponent({
             end_time: endTime,
           },
         };
-
-        console.log(
-          "Time updated for variables:",
-          currentTimeObjPerPanel.value,
-        );
       }
     };
 
