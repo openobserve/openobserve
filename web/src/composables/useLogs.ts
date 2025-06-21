@@ -29,6 +29,7 @@ import {
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, startCase } from "lodash-es";
+import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import {
   SearchRequestPayload,
   WebSocketSearchResponse,
@@ -327,10 +328,11 @@ const useLogs = () => {
   const { getAllFunctions } = useFunctions();
   const { getAllActions } = useActions();
 
+  let parser: null | Parser = new Parser();
+
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream, getMultiStreams, isStreamExists, isStreamFetched } = useStreams();
   const router = useRouter();
-  let parser: any;
   const fieldValues = ref();
 
   const notificationMsg = ref("");
@@ -341,7 +343,6 @@ const useLogs = () => {
     if (router.currentRoute.value.query?.quick_mode == "true") {
       searchObj.meta.quickMode = true;
     }
-    await importSqlParser();
     extractValueQuery();
   });
 
@@ -392,12 +393,6 @@ const useLogs = () => {
       }
     }
   }
-
-  const importSqlParser = async () => {
-    const useSqlParser: any = await import("@/composables/useParser");
-    const { sqlParser }: any = useSqlParser.default();
-    parser = await sqlParser();
-  };
 
   searchObj.organizationIdentifier =
     store.state.selectedOrganization.identifier;
@@ -2244,7 +2239,7 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      const parsedQuery: any = parser.astify(filteredQuery);
+      const parsedQuery: any = parser?.astify(filteredQuery);
       return parsedQuery || {
         columns: [],
         from: [],
@@ -2270,7 +2265,7 @@ const useLogs = () => {
   // TODO OK : Replace backticks with double quotes, as stream name from sqlify is coming with backticks
   const fnUnparsedSQL = (parsedObj: any) => {
     try {
-      const sql = parser.sqlify(parsedObj);
+      const sql = parser?.sqlify(parsedObj);
       return sql || "";
     } catch (e: any) {
       console.info(`Error while unparsing SQL : ${e.message}`);
@@ -2284,7 +2279,7 @@ const useLogs = () => {
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
-      return parser.astify(filteredQuery);
+      return parser?.astify(filteredQuery);
       // return convertPostgreToMySql(parser.astify(filteredQuery));
     } catch (e: any) {
       return {
