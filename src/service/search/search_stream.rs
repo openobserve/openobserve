@@ -123,6 +123,27 @@ pub async fn process_search_stream_request(
     let end_time = req.query.end_time;
     let all_streams = stream_names.join(",");
 
+    // HACK to avoid writing to results of vrl to cache for values search
+
+    let mut query_fn =
+        req.query
+            .query_fn
+            .as_ref()
+            .map(|v| match config::utils::base64::decode_url(v) {
+                Ok(v) => v,
+                Err(_) => v.to_string(),
+            });
+    let backup_query_fn = query_fn.clone();
+    let is_result_array_skip_vrl = query_fn
+        .as_ref()
+        .map(|v| crate::service::search::cache::is_result_array_skip_vrl(v))
+        .unwrap_or(false);
+    if is_result_array_skip_vrl {
+        query_fn = None;
+    }
+
+    req.query.query_fn = query_fn.clone();
+
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
     // HACK: always search from the first partition, this is becuase to support pagination in http2
@@ -248,6 +269,8 @@ pub async fn process_search_stream_request(
                 values_ctx,
                 &all_streams,
                 started_at,
+                is_result_array_skip_vrl,
+                backup_query_fn,
             )
             .instrument(search_span.clone())
             .await
@@ -313,6 +336,9 @@ pub async fn process_search_stream_request(
                 values_ctx,
                 fallback_order_by_col,
                 &mut hits_to_skip,
+                is_result_array_skip_vrl,
+                backup_query_fn,
+                &all_streams,
             )
             .instrument(search_span.clone())
             .await
@@ -427,6 +453,9 @@ pub async fn process_search_stream_request(
             values_ctx,
             fallback_order_by_col,
             &mut hits_to_skip,
+            is_result_array_skip_vrl,
+            backup_query_fn,
+            &all_streams,
         )
         .instrument(search_span.clone())
         .await
@@ -530,6 +559,9 @@ pub async fn do_partitioned_search(
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
     hits_to_skip: &mut i64,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
+    stream_name: &str,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -703,6 +735,16 @@ pub async fn do_partitioned_search(
                 log::debug!("Top k values for partition {idx} took {:?}", duration);
             }
 
+            if is_result_array_skip_vrl {
+                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                    backup_query_fn.clone(),
+                    &mut search_res,
+                    org_id,
+                    stream_name,
+                    &trace_id,
+                );
+            }
+
             // Send the cached response
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
@@ -865,6 +907,8 @@ pub async fn handle_cache_responses_and_deltas(
     values_ctx: Option<ValuesEventContext>,
     all_streams: &str,
     started_at: i64,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -955,6 +999,9 @@ pub async fn handle_cache_responses_and_deltas(
                     cache_order_by,
                     sender.clone(),
                     values_ctx.clone(),
+                    is_result_array_skip_vrl,
+                    backup_query_fn.clone(),
+                    all_streams,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -976,6 +1023,8 @@ pub async fn handle_cache_responses_and_deltas(
                     all_streams,
                     stream_type,
                     started_at,
+                    is_result_array_skip_vrl,
+                    backup_query_fn.clone(),
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -1002,6 +1051,9 @@ pub async fn handle_cache_responses_and_deltas(
                 cache_order_by,
                 sender.clone(),
                 values_ctx.clone(),
+                is_result_array_skip_vrl,
+                backup_query_fn.clone(),
+                all_streams,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -1023,6 +1075,8 @@ pub async fn handle_cache_responses_and_deltas(
                 all_streams,
                 stream_type,
                 started_at,
+                is_result_array_skip_vrl,
+                backup_query_fn.clone(),
             )
             .await?;
         }
@@ -1059,6 +1113,9 @@ async fn process_delta(
     cache_order_by: &OrderBy,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
+    stream_name: &str,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
@@ -1188,6 +1245,15 @@ async fn process_delta(
                 search_res.total = hit_count as usize;
                 search_res.hits = top_k_values;
             }
+            if is_result_array_skip_vrl {
+                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                    backup_query_fn.clone(),
+                    &mut search_res,
+                    org_id,
+                    stream_name,
+                    trace_id,
+                );
+            }
 
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
@@ -1210,6 +1276,7 @@ async fn process_delta(
                 search_res.hits.len(),
                 result_cache_ratio,
             );
+
             if let Err(e) = sender.send(Ok(response)).await {
                 log::error!("Error sending search response: {}", e);
                 return Err(infra::errors::Error::Message(
@@ -1237,6 +1304,10 @@ async fn process_delta(
                 search_res.order_by,
                 is_streaming_aggs,
                 sender,
+                is_result_array_skip_vrl,
+                backup_query_fn.clone(),
+                org_id,
+                stream_name,
             )
             .await;
             break;
@@ -1278,6 +1349,7 @@ async fn process_delta(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
     trace_id: &str,
     error: &str,
@@ -1286,13 +1358,17 @@ async fn send_partial_search_resp(
     order_by: Option<OrderBy>,
     is_streaming_aggs: bool,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
+    org_id: &str,
+    stream_name: &str,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
     } else {
         format!("{} \n {}", PARTIAL_ERROR_RESPONSE_MESSAGE, error)
     };
-    let s_resp = Response {
+    let mut s_resp = Response {
         is_partial: true,
         function_error: vec![error],
         new_start_time: Some(new_start_time),
@@ -1301,6 +1377,15 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
+    if is_result_array_skip_vrl {
+        s_resp.hits = crate::service::search::cache::apply_vrl_to_response(
+            backup_query_fn.clone(),
+            &mut s_resp,
+            org_id,
+            stream_name,
+            trace_id,
+        );
+    }
 
     let response = StreamResponses::SearchResponse {
         results: s_resp,
@@ -1343,6 +1428,8 @@ async fn send_cached_responses(
     all_streams: &str,
     stream_type: StreamType,
     started_at: i64,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
@@ -1387,6 +1474,17 @@ async fn send_cached_responses(
         cached.cached_response.hits.len(),
         cached.cached_response.result_cache_ratio,
     );
+
+    if is_result_array_skip_vrl {
+        cached.cached_response.hits = crate::service::search::cache::apply_vrl_to_response(
+            backup_query_fn.clone(),
+            &mut cached.cached_response,
+            org_id,
+            all_streams,
+            trace_id,
+        );
+    }
+
     let response = StreamResponses::SearchResponse {
         results: cached.cached_response.clone(),
         streaming_aggs: false,
@@ -1396,6 +1494,7 @@ async fn send_cached_responses(
             end_time: cached.response_end_time,
         },
     };
+
     if let Err(e) = sender.send(Ok(response)).await {
         log::error!("Error sending cached search response: {}", e);
         return Err(infra::errors::Error::Message(
