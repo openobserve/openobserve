@@ -205,13 +205,13 @@ const formatReports = () => {
       tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
       time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
       frequency: getFrequencyValue(report.frequency),
-      last_triggered_at: report.lastTriggeredAt
-        ? convertUnixToQuasarFormat(report.lastTriggeredAt)
+      last_triggered_at: report.last_triggered_at
+        ? convertUnixToQuasarFormat(report.last_triggered_at)
         : "-",
       created_at: convertUnixToQuasarFormat(
-        new Date(report.createdAt).getTime() * 1000,
+        new Date(report.created_at).getTime() * 1000,
       ),
-      orgId: report.orgId,
+      orgId: report.org_id,
       isCached: !report.destinations.length,
     });
   });
@@ -287,14 +287,14 @@ const columns: any = [
   {
     name: "last_triggered_at",
     field: "last_triggered_at",
-    label: t("reports.lastTriggeredAt"),
+    label: t("reports.last_triggered_at"),
     align: "left",
     sortable: false,
   },
   {
     name: "created_at",
     field: "created_at",
-    label: t("reports.createdAt"),
+    label: t("reports.created_at"),
     align: "left",
     sortable: false,
   },
