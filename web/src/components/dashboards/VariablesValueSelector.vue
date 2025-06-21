@@ -1462,8 +1462,18 @@ export default defineComponent({
         store.state.zoConfig.timestamp_column || "_timestamp";
       let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
 
+      const filters = JSON.parse(JSON.stringify(variableObject.query_data.filter)) || [];
+
+      if(searchText) {
+        filters.push({
+          name: variableObject.query_data.field,
+          operator: "LIKE",
+          value: `%${escapeSingleQuotes(searchText.trim())}%`,
+        });
+      }
+
       // Construct the filter from the query data
-      const constructedFilter = (variableObject.query_data.filter || []).map(
+      const constructedFilter = filters.map(
         (condition: any) => ({
           name: condition.name,
           operator: condition.operator,
@@ -1496,16 +1506,6 @@ export default defineComponent({
               escapeSingleQuotes(variable.value),
             );
           }
-        }
-      }
-
-      // Add search filter if searchText is provided
-      if (searchText && searchText.trim()) {
-        const searchCondition = `"${variableObject.query_data.field}" LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
-        if (/\bWHERE\b/i.test(queryContext)) {
-          queryContext += ` AND ${searchCondition}`;
-        } else {
-          queryContext += ` WHERE ${searchCondition}`;
         }
       }
 
