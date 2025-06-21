@@ -88,7 +88,7 @@ const usePromlqSuggestions = () => {
     const hasCurlyBraces = curlyBracesRegex.exec(query);
     if (hasCurlyBraces) {
       labelMeta.hasLabels = true;
-      labelMeta.isEmpty = !!hasCurlyBraces[1].length;
+      labelMeta.isEmpty = !hasCurlyBraces[1].length;
       labelMeta.isFocused =
         hasCurlyBraces.index <= cursorIndex &&
         hasCurlyBraces.index + hasCurlyBraces[1].length >= cursorIndex;
@@ -98,21 +98,14 @@ const usePromlqSuggestions = () => {
       const start = hasCurlyBraces.index;
       const end = start + hasCurlyBraces[0].length;
       if (start <= cursorIndex && cursorIndex <= end) {
-        const value = hasCurlyBraces[0][cursorIndex - start];
+        const value = hasCurlyBraces[0][cursorIndex - start - 1];
+     
         // Check is value
-        if (
-          (value === '"' &&
-            hasCurlyBraces[0][cursorIndex - start + 1] === '"') ||
-          value === "="
-        ) {
+        if (value === '"' || value === "=") {
           labelMeta["focusOn"] = "value";
         }
 
-        if (
-          (value === "{" &&
-            hasCurlyBraces[0][cursorIndex - start + 1] === "}") ||
-          (value === "," && hasCurlyBraces[0][cursorIndex - start - 1] === '"')
-        ) {
+        if (value === "{" || value === ",") {
           labelMeta["focusOn"] = "label";
         }
       }

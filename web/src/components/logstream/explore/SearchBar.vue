@@ -62,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row query-editor-container">
       <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
         <b>Query Editor:</b>
-        <query-editor
+        <code-query-editor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
           class="monaco-editor"
           v-model:query="query"
           @update:query="updateQueryValue"
           @run-query="searchData"
-        ></query-editor>
+        ></code-query-editor>
       </div>
     </div>
   </div>
@@ -110,8 +110,8 @@ export default defineComponent({
   },
   components: {
     DateTime,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue")
+    CodeQueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
   },
   emits: ["searchdata", "update-query", "change:date-time"],

@@ -120,16 +120,16 @@ export default defineComponent({
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
           emit("update:modelValue", editorObj.getValue());
-        }, props.debounceTime)
+        }, props.debounceTime),
       );
 
       watch(
         () => store.state.theme,
         () => {
           monaco.editor.setTheme(
-            store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+            store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
           );
-        }
+        },
       );
 
       onActivated(async () => {
@@ -146,12 +146,12 @@ export default defineComponent({
           editorObj.dispose();
           editorObj = null;
         }
-        
+
         if (provider.value) {
           provider.value.dispose();
           provider.value = null;
         }
-        
+
         // Clear refs to prevent memory leaks
         editorRef.value = null;
       });

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="dashboard-panel-query-editor-div"
-    class="dashboard-query-editor"
+    data-test="query-editor"
+    class="logs-query-editor"
     ref="editorRef"
     :id="editorId"
   />
@@ -48,12 +48,22 @@ import {
   autocompletion,
   CompletionContext,
   Completion,
+  closeBrackets,
+  closeBracketsKeymap,
 } from "@codemirror/autocomplete";
+
 import { keymap, lineNumbers } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+
+import {
+  searchKeymap,
+  highlightSelectionMatches,
+  search,
+  openSearchPanel,
+} from '@codemirror/search';
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
@@ -265,6 +275,8 @@ export default defineComponent({
         indentWithTab,
         {
           key: "Ctrl-Enter",
+          preventDefault: true,
+          stopPropagation: true,
           run: () => {
             setTimeout(() => {
               emit("run-query");
@@ -274,6 +286,8 @@ export default defineComponent({
         },
         {
           key: "Cmd-Enter",
+          preventDefault: true,
+          stopPropagation: true,
           run: () => {
             setTimeout(() => {
               emit("run-query");
@@ -281,8 +295,16 @@ export default defineComponent({
             return true;
           },
         },
+        ...closeBracketsKeymap, // Auto close brackets
+        ...searchKeymap, // ⌘F / Ctrl+F and other search-related key bindings
       ]);
     };
+
+    // Debounced emit for document changes
+    const debouncedEmit = debounce((value: string, update: any) => {
+      emit("update-query", update, value);
+      emit("update:query", value);
+    }, props.debounceTime);
 
     const setupEditor = async () => {
       // Ensure proper cleanup before setting up new editor
@@ -314,9 +336,10 @@ export default defineComponent({
           doc: props.query?.trim() || "",
           extensions: [
             minimalSetup,
-            ...(enableCodeFolding.value
-              ? [foldGutter(), keymap.of(foldKeymap)]
-              : []),
+            closeBrackets(),
+            EditorView.lineWrapping,
+            search(),
+            highlightSelectionMatches(), // ✨ Highlights all matches
             lineNumbers(),
             getLanguageSupport(),
             createAutocompletion(),
@@ -325,14 +348,9 @@ export default defineComponent({
             EditorView.editable.of(!props.readOnly),
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
-                const debouncedEmit = debounce((value: string) => {
-                  emit("update-query", update, value);
-                  emit("update:query", value);
-                }, props.debounceTime);
-                debouncedEmit(update.state.doc.toString());
+                debouncedEmit(update.state.doc.toString(), update);
               }
             }),
-
             EditorView.focusChangeEffect.of((state, focusing) => {
               if (focusing) {
                 emit("focus");
@@ -365,7 +383,18 @@ export default defineComponent({
               ".cm-scroller": {
                 fontFamily: "monospace",
               },
+              ".cm-line": {
+                lineHeight: "17px",
+                padding: "0px !important",
+              },
+              ".cm-foldGutter": {
+                display: "none !important",
+              },
+              ".cm-lineNumbers .cm-gutterElement": {
+                padding: "0px 2px !important",
+              },
             }),
+            basicSetup,
           ],
         });
 
@@ -458,15 +487,15 @@ export default defineComponent({
 
     watch(
       () => props.query,
-      () => {
+      (value) => {
         if (editorView && (props.readOnly || !editorView.hasFocus)) {
           const currentValue = editorView.state.doc.toString();
-          if (currentValue !== props.query) {
+          if (currentValue !== value) {
             editorView.dispatch({
               changes: {
                 from: 0,
                 to: currentValue.length,
-                insert: props.query,
+                insert: value,
               },
             });
           }
@@ -608,5 +637,8 @@ export default defineComponent({
   min-width: 10px !important;
   padding-right: 5px !important;
   text-align: left;
+}
+.cm-gutter .cm-foldGutter {
+  display: none !important;
 }
 </style>

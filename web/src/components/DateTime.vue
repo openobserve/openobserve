@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="justify-between date-time-container" key="date-time-container">
+  <div icon="info" class="justify-between date-time-container">
     <q-btn
       :data-test="dataTestName"
       id="date-time-button"

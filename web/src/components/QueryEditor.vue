@@ -38,13 +38,12 @@ import {
   onBeforeUnmount,
 } from "vue";
 
-import "monaco-editor/esm/vs/editor/editor.all.js";
+// import "monaco-editor/esm/vs/editor/editor.all.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
-import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   props: {
@@ -87,7 +86,6 @@ export default defineComponent({
     const editorRef: any = ref();
     // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
-    const { searchObj } = useLogs();
 
     let provider: Ref<monaco.IDisposable | null> = ref(null);
 
@@ -139,6 +137,9 @@ export default defineComponent({
     };
 
     const setupEditor = async () => {
+      // Ensure proper cleanup before setting up new editor
+      cleanupEditor();
+
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
@@ -155,7 +156,11 @@ export default defineComponent({
 
       // Dispose the provider if it already exists before registering a new one
       if (provider.value) {
-        provider.value.dispose();
+        try {
+          provider.value.dispose();
+        } catch (error) {
+          console.warn("Error disposing provider in setupEditor:", error);
+        }
         provider.value = null;
       }
       registerAutoCompleteProvider();
@@ -176,46 +181,62 @@ export default defineComponent({
         return;
       }
 
-      if (editorElement && editorElement?.hasChildNodes()) return;
+      // Clear any existing child nodes to prevent detached DOM
+      if (editorElement && editorElement?.hasChildNodes()) {
+        editorElement.innerHTML = "";
+      }
 
       // Dispose previous editor instance if it exists
       if (editorObj) {
-        editorObj.dispose();
+        try {
+          const model = editorObj.getModel();
+          if (model) {
+            model.dispose();
+          }
+          editorObj.dispose();
+        } catch (error) {
+          console.warn("Error disposing previous editor:", error);
+        }
         editorObj = null;
       }
 
-      editorObj = monaco.editor.create(editorElement as HTMLElement, {
-        value: props.query?.trim(),
-        language: props.language,
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-        showFoldingControls: enableCodeFolding.value ? "always" : "never",
-        folding: enableCodeFolding.value,
-        wordWrap: "on",
-        automaticLayout: true,
-        lineNumbers: "on",
-        lineNumbersMinChars: 0,
-        overviewRulerLanes: 0,
-        fixedOverflowWidgets: false,
-        overviewRulerBorder: false,
-        lineDecorationsWidth: 3,
-        hideCursorInOverviewRuler: true,
-        renderLineHighlight: "none",
-        glyphMargin: false,
-        scrollBeyondLastColumn: 0,
-        scrollBeyondLastLine: false,
-        smoothScrolling: true,
-        mouseWheelScrollSensitivity: 1,
-        fastScrollSensitivity: 1,
-        scrollbar: { horizontal: "auto", vertical: "visible" },
-        find: {
-          addExtraSpaceOnTop: false,
-          autoFindInSelection: "never",
-          seedSearchStringFromSelection: "never",
-        },
-        minimap: { enabled: false },
-        readOnly: props.readOnly,
-        renderValidationDecorations: "on",
-      });
+      try {
+        editorObj = monaco.editor.create(editorElement as HTMLElement, {
+          value: props.query?.trim(),
+          language: props.language,
+          theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+          showFoldingControls: enableCodeFolding.value ? "always" : "never",
+          folding: enableCodeFolding.value,
+          wordWrap: "on",
+          automaticLayout: true,
+          lineNumbers: "on",
+          lineNumbersMinChars: 0,
+          overviewRulerLanes: 0,
+          fixedOverflowWidgets: false,
+          overviewRulerBorder: false,
+          lineDecorationsWidth: 3,
+          hideCursorInOverviewRuler: true,
+          renderLineHighlight: "none",
+          glyphMargin: false,
+          scrollBeyondLastColumn: 0,
+          scrollBeyondLastLine: false,
+          smoothScrolling: true,
+          mouseWheelScrollSensitivity: 1,
+          fastScrollSensitivity: 1,
+          scrollbar: { horizontal: "auto", vertical: "visible" },
+          find: {
+            addExtraSpaceOnTop: false,
+            autoFindInSelection: "never",
+            seedSearchStringFromSelection: "never",
+          },
+          minimap: { enabled: false },
+          readOnly: props.readOnly,
+          renderValidationDecorations: "on",
+        });
+      } catch (error) {
+        console.error("Error creating Monaco editor:", error);
+        return;
+      }
 
       // Track editor model content change
       const contentChangeDisposable = editorObj.onDidChangeModelContent(
@@ -247,22 +268,24 @@ export default defineComponent({
         const model = editorObj.getModel();
         const value = model.getValue();
         const trimmedValue = value.trim();
-        
+
         // Only apply trim if there are actually tailing and leading spaces to trim
         if (value !== trimmedValue) {
           const lastLine = model.getLineCount();
           const lastLineLength = model.getLineLength(lastLine);
-          
+
           // Create an edit operation that replaces the entire content
           // This preserves undo history becuase it treats this as a single edit operation
-          //and it will be in the undo stack as one operation 
+          //and it will be in the undo stack as one operation
           model.pushEditOperations(
             [],
-            [{
-              range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
-              text: trimmedValue
-            }],
-            () => null
+            [
+              {
+                range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
+                text: trimmedValue,
+              },
+            ],
+            () => null,
           );
         }
         emit("blur");
@@ -283,19 +306,54 @@ export default defineComponent({
       // Remove window event listeners
       window.removeEventListener("click", clickListener);
       window.removeEventListener("resize", resizeListener);
+
       // Dispose all tracked disposables
-      disposables.forEach((d) => d.dispose());
+      disposables.forEach((d) => {
+        try {
+          d.dispose();
+        } catch (error) {
+          console.warn("Error disposing disposable:", error);
+        }
+      });
       disposables.length = 0;
+
       // Dispose provider
       if (provider.value) {
-        provider.value.dispose();
+        try {
+          provider.value.dispose();
+        } catch (error) {
+          console.warn("Error disposing provider:", error);
+        }
         provider.value = null;
       }
 
-      // Dispose editor
+      // Dispose editor and its model
       if (editorObj) {
-        editorObj.dispose();
+        try {
+          // Get and dispose the model first
+          const model = editorObj.getModel();
+          if (model) {
+            model.dispose();
+          }
+
+          // Dispose the editor
+          editorObj.dispose();
+        } catch (error) {
+          console.warn("Error disposing editor:", error);
+        }
         editorObj = null;
+      }
+
+      // Clear any remaining Monaco markers
+      try {
+        const model = monaco.editor.getModel(
+          monaco.Uri.parse(`inmemory://model/${props.editorId}`),
+        );
+        if (model) {
+          monaco.editor.setModelMarkers(model, "owner", []);
+        }
+      } catch (error) {
+        // Ignore errors for model cleanup
       }
     };
 
@@ -354,15 +412,27 @@ export default defineComponent({
         setupEditor();
         editorObj?.layout();
       } else {
-        provider.value?.dispose();
+        // Ensure provider is properly disposed and recreated
+        if (provider.value) {
+          try {
+            provider.value.dispose();
+          } catch (error) {
+            console.warn("Error disposing provider in onActivated:", error);
+          }
+          provider.value = null;
+        }
         registerAutoCompleteProvider();
       }
     });
 
     onDeactivated(() => {
-      // Just dispose the provider on deactivate, full cleanup on unmount
+      // Dispose provider on deactivate to prevent memory leaks
       if (provider.value) {
-        provider.value.dispose();
+        try {
+          provider.value.dispose();
+        } catch (error) {
+          console.warn("Error disposing provider in onDeactivated:", error);
+        }
         provider.value = null;
       }
     });
@@ -372,12 +442,8 @@ export default defineComponent({
       cleanupEditor();
     });
 
-    onBeforeUnmount(() => {
-      cleanupEditor();
-    });
-
     const enableCodeFolding = computed(() => {
-      return ["json", "html","javascript"].includes(props.language);
+      return ["json", "html", "javascript"].includes(props.language);
     });
 
     // update readonly when prop value changes
@@ -419,59 +485,72 @@ export default defineComponent({
 
       // Dispose existing provider
       if (provider.value) {
-        provider.value.dispose();
+        try {
+          provider.value.dispose();
+        } catch (error) {
+          console.warn(
+            "Error disposing provider in registerAutoCompleteProvider:",
+            error,
+          );
+        }
         provider.value = null;
       }
 
-      provider.value = monaco.languages.registerCompletionItemProvider(
-        props.language,
-        {
-          provideCompletionItems: function (model, position) {
-            // find out if we are completing a property in the 'dependencies' object.
-            var textUntilPosition = model.getValueInRange({
-              startLineNumber: 1,
-              startColumn: 1,
-              endLineNumber: position.lineNumber,
-              endColumn: position.column,
-            });
-
-            var word = model.getWordUntilPosition(position);
-            var range = {
-              startLineNumber: position.lineNumber,
-              endLineNumber: position.lineNumber,
-              startColumn: word.startColumn,
-              endColumn: word.endColumn,
-            };
-
-            let arr = textUntilPosition.trim().split(" ");
-            let filteredSuggestions = [];
-            filteredSuggestions = createDependencyProposals(range);
-            filteredSuggestions = filteredSuggestions.filter((item) => {
-              return item.label.toLowerCase().includes(word.word.toLowerCase());
-            });
-
-            const lastElement = arr.pop();
-            props.suggestions.forEach((suggestion: any) => {
-              filteredSuggestions.push({
-                label: suggestion.label(lastElement),
-                kind: monaco.languages.CompletionItemKind[
-                  suggestion.kind || "Text"
-                ],
-                insertText: suggestion.insertText(lastElement),
-                range: range,
+      try {
+        provider.value = monaco.languages.registerCompletionItemProvider(
+          props.language,
+          {
+            provideCompletionItems: function (model, position) {
+              // find out if we are completing a property in the 'dependencies' object.
+              var textUntilPosition = model.getValueInRange({
+                startLineNumber: 1,
+                startColumn: 1,
+                endLineNumber: position.lineNumber,
+                endColumn: position.column,
               });
-            });
 
-            return {
-              suggestions: filteredSuggestions,
-            };
+              var word = model.getWordUntilPosition(position);
+              var range = {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: word.startColumn,
+                endColumn: word.endColumn,
+              };
+
+              let arr = textUntilPosition.trim().split(" ");
+              let filteredSuggestions = [];
+              filteredSuggestions = createDependencyProposals(range);
+              filteredSuggestions = filteredSuggestions.filter((item) => {
+                return item.label
+                  .toLowerCase()
+                  .includes(word.word.toLowerCase());
+              });
+
+              const lastElement = arr.pop();
+              props.suggestions.forEach((suggestion: any) => {
+                filteredSuggestions.push({
+                  label: suggestion.label(lastElement),
+                  kind: monaco.languages.CompletionItemKind[
+                    suggestion.kind || "Text"
+                  ],
+                  insertText: suggestion.insertText(lastElement),
+                  range: range,
+                });
+              });
+
+              return {
+                suggestions: filteredSuggestions,
+              };
+            },
           },
-        },
-      );
+        );
 
-      // Track provider in disposables
-      if (provider.value) {
-        disposables.push(provider.value);
+        // Track provider in disposables
+        if (provider.value) {
+          disposables.push(provider.value);
+        }
+      } catch (error) {
+        console.error("Error registering auto complete provider:", error);
       }
     };
 
@@ -601,6 +680,31 @@ export default defineComponent({
       monaco.editor.setModelMarkers(getModel(), "owner", markers);
     }
 
+    // Method to help debug and clean up detached DOM elements
+    const forceCleanup = () => {
+      console.log("Force cleaning up QueryEditor resources...");
+
+      // Force cleanup of any remaining Monaco elements
+      try {
+        // Clear all Monaco models
+        monaco.editor.getModels().forEach((model) => {
+          if (model.uri && model.uri.toString().includes(props.editorId)) {
+            model.dispose();
+          }
+        });
+
+        // Clear all markers
+        monaco.editor.getModels().forEach((model) => {
+          monaco.editor.setModelMarkers(model, "owner", []);
+        });
+      } catch (error) {
+        console.warn("Error in force cleanup:", error);
+      }
+
+      // Call regular cleanup
+      cleanupEditor();
+    };
+
     return {
       editorRef,
       editorObj,
@@ -609,13 +713,13 @@ export default defineComponent({
       disableSuggestionPopup,
       triggerAutoComplete,
       getCursorIndex,
-      searchObj,
       formatDocument,
       getModel,
       getValue,
       decorateRanges,
       addErrorDiagnostics,
       cleanupEditor, // Expose cleanup method for parent components
+      forceCleanup, // Expose force cleanup method for parent components
     };
   },
 });
@@ -641,11 +745,28 @@ export default defineComponent({
       visibility: visible !important;
     }
   }
+
+  // Ensure Monaco editor elements are properly contained
+  .monaco-editor .overflow-guard {
+    position: relative !important;
+  }
+
+  // Clean up any detached Monaco elements
+  .monaco-editor .monaco-editor-background,
+  .monaco-editor .margin,
+  .monaco-editor .monaco-editor-background {
+    position: absolute !important;
+  }
 }
 
 .highlight-error {
   background-color: rgba(255, 0, 0, 0.1);
   text-decoration: underline;
   text-decoration-color: red;
+}
+
+// Ensure Monaco editor is properly disposed
+.logs-query-editor:empty {
+  display: none;
 }
 </style>

@@ -322,7 +322,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="error-section" v-if="tempalteCreators.length > 0">
-                <div class="section-title text-primary" data-test="template-import-creation-title">Template Creation</div>
+                <div
+                  class="section-title text-primary"
+                  data-test="template-import-creation-title"
+                >
+                  Template Creation
+                </div>
                 <div
                   class="error-list"
                   v-for="(val, index) in tempalteCreators"
@@ -357,6 +362,7 @@ import {
   reactive,
   computed,
   watch,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -366,7 +372,6 @@ import router from "@/router";
 import { useQuasar } from "quasar";
 import alertsService from "../../services/alerts";
 
-import QueryEditor from "../QueryEditor.vue";
 import { json } from "stream/consumers";
 import useStreams from "@/composables/useStreams";
 import templateService from "@/services/alert_templates";
@@ -472,12 +477,12 @@ export default defineComponent({
     watch(jsonFiles, async (newVal: any, oldVal: any) => {
       if (newVal) {
         let combinedJson: any[] = [];
-        
+
         for (const file of newVal) {
           try {
             const content = await readFileContent(file);
             const parsedContent = JSON.parse(content);
-            
+
             // Handle both array and single object cases
             if (Array.isArray(parsedContent)) {
               combinedJson = [...combinedJson, ...parsedContent];
@@ -494,7 +499,7 @@ export default defineComponent({
             return;
           }
         }
-        
+
         jsonStr.value = JSON.stringify(combinedJson, null, 2);
       }
     });
@@ -577,7 +582,9 @@ export default defineComponent({
           throw new Error("JSON string is empty");
         } else {
           const parsedJson = JSON.parse(jsonStr.value);
-          jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+          jsonArrayOfObj.value = Array.isArray(parsedJson)
+            ? parsedJson
+            : [parsedJson];
         }
       } catch (e: any) {
         q.notify({
@@ -646,12 +653,18 @@ export default defineComponent({
       let templateErrors: (string | { message: string; field: string })[] = [];
 
       // Validate name using the updated props.templates
-      if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
+      if (
+        !input.name ||
+        typeof input.name !== "string" ||
+        input.name.trim() === ""
+      ) {
         templateErrors.push({
           message: `Template - ${index}: The "name" field is required and should be a valid string.`,
           field: "template_name",
         });
-      } else if (props.templates.some((template: any) => template.name === input.name)) {
+      } else if (
+        props.templates.some((template: any) => template.name === input.name)
+      ) {
         templateErrors.push({
           message: `Template - ${index}: "${input.name}" already exists`,
           field: "template_name",
@@ -667,7 +680,11 @@ export default defineComponent({
       }
 
       // Validate body
-      if (!input.body || typeof input.body !== "string" || input.body.trim() === "") {
+      if (
+        !input.body ||
+        typeof input.body !== "string" ||
+        input.body.trim() === ""
+      ) {
         templateErrors.push({
           message: `Template - ${index}: The "body" field is required and should be a valid JSON string.`,
           field: "body",
@@ -685,7 +702,11 @@ export default defineComponent({
 
       // Validate title for email type
       if (input.type === "email") {
-        if (!input.title || typeof input.title !== "string" || input.title.trim() === "") {
+        if (
+          !input.title ||
+          typeof input.title !== "string" ||
+          input.title.trim() === ""
+        ) {
           templateErrors.push({
             message: `Template - ${index}: The "title" field is required for email type templates.`,
             field: "title",
@@ -726,7 +747,7 @@ export default defineComponent({
 
         // Emit update after each successful creation
         emit("update:templates");
-        
+
         return true;
       } catch (error: any) {
         tempalteCreators.value.push({
@@ -786,7 +807,9 @@ export default defineComponent({
     };
   },
   components: {
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
+    ),
     AppTabs,
   },
 });

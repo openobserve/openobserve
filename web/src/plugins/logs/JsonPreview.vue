@@ -102,14 +102,14 @@
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
       <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
       <div v-if="!loading">
-      <query-editor
-        v-model:query="unflattendData"
-        ref="queryEditorRef"
-        :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-        class="monaco-editor"
-        :class="mode"
-        language="json"
-      />
+        <code-query-editor
+          v-model:query="unflattendData"
+          ref="queryEditorRef"
+          :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
+          class="monaco-editor"
+          :class="mode"
+          language="json"
+        />
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
@@ -199,7 +199,7 @@
                     round
                     class="q-mr-sm pointer"
                   ></q-btn
-                  >{{addOrRemoveLabel(key)}}</q-item-label
+                  >{{ addOrRemoveLabel(key) }}</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -241,8 +241,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
-import { is, useQuasar } from "quasar";
-import { load } from "rudder-sdk-js";
+import { useQuasar } from "quasar";
 
 export default {
   name: "JsonPreview",
@@ -270,8 +269,8 @@ export default {
     NotEqualIcon,
     EqualIcon,
     AppTabs,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue"),
+    CodeQueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
   },
   emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
@@ -384,70 +383,74 @@ export default {
     onMounted(async () => {});
 
     const getOriginalData = async () => {
-        setViewTraceBtn();
+      setViewTraceBtn();
 
-        if (
-          !props.value._o2_id ||
-          searchAggData.hasAggregation ||
-          searchObj.data.stream.selectedStream.length > 1
-        ) {
-          return;
-        }
-        // Check if data exists in searchObj cache
-        const cacheKey = `${props.value._o2_id}_${props.value._timestamp}`;
-        if (searchObj.data.originalDataCache?.has(cacheKey)) {
-          unflattendData.value = searchObj.data.originalDataCache.get(cacheKey);
-          return;
-        }
+      if (
+        !props.value._o2_id ||
+        searchAggData.hasAggregation ||
+        searchObj.data.stream.selectedStream.length > 1
+      ) {
+        return;
+      }
+      // Check if data exists in searchObj cache
+      const cacheKey = `${props.value._o2_id}_${props.value._timestamp}`;
+      if (searchObj.data.originalDataCache?.has(cacheKey)) {
+        unflattendData.value = searchObj.data.originalDataCache.get(cacheKey);
+        return;
+      }
 
-        loading.value = true;
+      loading.value = true;
 
-        try {
-          const { traceparent, traceId } = generateTraceContext();
+      try {
+        const { traceparent, traceId } = generateTraceContext();
 
-          const res = await searchService.search(
-            {
-              org_identifier: searchObj.organizationIdentifier,
+        const res = await searchService.search(
+          {
+            org_identifier: searchObj.organizationIdentifier,
+            query: {
               query: {
-                query: {
-                  start_time: props.value._timestamp - 10 * 60 * 1000,
-                  sql: `SELECT _original FROM "${props.streamName ?  props.streamName : searchObj.data.stream.selectedStream }" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
-                  end_time: props.value._timestamp + 10 * 60 * 1000,
-                  sql_mode: "full",
-                  size: 1,
-                  from: 0,
-                  quick_mode: false,
-                },
+                start_time: props.value._timestamp - 10 * 60 * 1000,
+                sql: `SELECT _original FROM "${props.streamName ? props.streamName : searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                end_time: props.value._timestamp + 10 * 60 * 1000,
+                sql_mode: "full",
+                size: 1,
+                from: 0,
+                quick_mode: false,
               },
-              page_type: searchObj.data.stream.streamType,
-              traceparent,
             },
-            "ui",
-          );
-          const formattedData = JSON.stringify(JSON.parse(res.data.hits[0]._original), null, 2);
-          unflattendData.value = formattedData;
-          //store the data in cache of searchObj
-          searchObj.data.originalDataCache.set(cacheKey, formattedData);
-        } catch (err: any) {
-          loading.value = false;
-          $q.notify({
-            message:
-              err.response?.data?.message || "Failed to get the Original data",
-            color: "negative",
-            position: "bottom",
-            timeout: 1500,
-          });
-        } finally {
-          loading.value = false;
-        }
-      };
+            page_type: searchObj.data.stream.streamType,
+            traceparent,
+          },
+          "ui",
+        );
+        const formattedData = JSON.stringify(
+          JSON.parse(res.data.hits[0]._original),
+          null,
+          2,
+        );
+        unflattendData.value = formattedData;
+        //store the data in cache of searchObj
+        searchObj.data.originalDataCache.set(cacheKey, formattedData);
+      } catch (err: any) {
+        loading.value = false;
+        $q.notify({
+          message:
+            err.response?.data?.message || "Failed to get the Original data",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+      } finally {
+        loading.value = false;
+      }
+    };
 
-      watch(activeTab, async () => {
-        if (activeTab.value === "unflattened") {
-          unflattendData.value = "";
-          await getOriginalData();
-        }
-      });
+    watch(activeTab, async () => {
+      if (activeTab.value === "unflattened") {
+        unflattendData.value = "";
+        await getOriginalData();
+      }
+    });
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -464,7 +467,7 @@ export default {
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
         await nextTick();
-        if(!loading.value) {
+        if (!loading.value) {
           queryEditorRef.value.formatDocument();
         }
       }
@@ -483,7 +486,7 @@ export default {
       });
     });
     const addOrRemoveLabel = (key: string) => {
-      if(searchObj.data.stream.selectedFields.includes(key)) {
+      if (searchObj.data.stream.selectedFields.includes(key)) {
         return t("common.removeFieldFromTable");
       }
       return t("common.addFieldToTable");

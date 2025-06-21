@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage" :key="store.state.selectedOrganization?.identifier">
+  <q-page class="logPage q-my-xs" id="logPage">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -62,10 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    :key="
-                      searchObj.data.stream.selectedStream.join(',') ||
-                      'default'
-                    "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
@@ -569,13 +565,15 @@ export default defineComponent({
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
+      getStream,
+      fnUnparsedSQL,
+      initialLogsState,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
-    let parser: any;
 
     const isLogsMounted = ref(false);
 
@@ -656,9 +654,19 @@ export default defineComponent({
       }
     });
 
-    onBeforeUnmount(() => {
+    onBeforeUnmount(async () => {
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
+
+      if (searchObj)
+        await store.dispatch(
+          "logs/setLogs",
+          JSON.parse(JSON.stringify(searchObj)),
+        );
+
+      searchBarRef.value = null;
+      searchObj = null;
+      searchResultRef.value = null;
     });
 
     onActivated(() => {
@@ -777,12 +785,6 @@ export default defineComponent({
       },
     );
 
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
@@ -799,8 +801,6 @@ export default defineComponent({
     async function handleBeforeMount() {
       if (isLogsTab()) {
         await setupLogsTab();
-      } else {
-        await importSqlParser();
       }
     }
 
@@ -812,26 +812,33 @@ export default defineComponent({
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
-        searchObj.organizationIdentifier =
-          store.state.selectedOrganization.identifier;
+        const isOrganizationChanged =
+          store.state.selectedOrganization.identifier !==
+          store.state.logs.organizationIdentifier;
+        if (!store.state.logs.isInitialized) {
+          searchObj.organizationIdentifier =
+            store.state.selectedOrganization.identifier;
 
-        searchObj.meta.pageType = "logs";
-        searchObj.meta.refreshHistogram = true;
-        searchObj.loading = true;
+          searchObj.meta.pageType = "logs";
+          searchObj.meta.refreshHistogram = true;
+          searchObj.loading = true;
 
-        resetSearchObj();
+          resetSearchObj();
 
-        resetStreamData();
+          resetStreamData();
 
-        restoreUrlQueryParams();
+          restoreUrlQueryParams();
 
-        await importSqlParser();
+          if (isEnterpriseClusterEnabled()) {
+            await getRegionInfo();
+          }
 
-        if (isEnterpriseClusterEnabled()) {
-          await getRegionInfo();
+          loadLogsData();
+
+          store.dispatch("logs/setIsInitialized", true);
+        } else {
+          await initialLogsState();
         }
-
-        loadLogsData();
 
         if (isCloudEnvironment()) {
           setupCloudSpecificThreshold();
@@ -1044,58 +1051,62 @@ export default defineComponent({
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
 
-            if (searchObj.data.stream.selectedStreamFields.length == 0) {
+            if (
+              !searchObj.data.stream?.selectedStreamFields?.length &&
+              searchObj.data?.stream?.selectedStream?.[0]
+            ) {
               const streamData: any = getStream(
                 searchObj.data.stream.selectedStream[0],
                 searchObj.data.stream.streamType || "logs",
                 true,
               );
-              searchObj.data.stream.selectedStreamFields = streamData.schema;
+              if (streamData.schema)
+                searchObj.data.stream.selectedStreamFields = streamData.schema;
             }
 
-            const streamFieldNames: any =
-              searchObj.data.stream.selectedStreamFields.map(
-                (item: any) => item.name,
-              );
+            if (searchObj.data.stream?.selectedStreamFields?.length > 0) {
+              const streamFieldNames: any =
+                searchObj.data.stream.selectedStreamFields.map(
+                  (item: any) => item.name,
+                );
 
-            for (
-              let i = searchObj.data.stream.interestingFieldList.length - 1;
-              i >= 0;
-              i--
-            ) {
-              const fieldName = searchObj.data.stream.interestingFieldList[i];
-              if (!streamFieldNames.includes(fieldName)) {
-                searchObj.data.stream.interestingFieldList.splice(i, 1);
+              for (
+                let i = searchObj.data.stream.interestingFieldList.length - 1;
+                i >= 0;
+                i--
+              ) {
+                const fieldName = searchObj.data.stream.interestingFieldList[i];
+                if (!streamFieldNames.includes(fieldName)) {
+                  searchObj.data.stream.interestingFieldList.splice(i, 1);
+                }
               }
-            }
 
-            if (
-              searchObj.data.stream.interestingFieldList.length > 0 &&
-              searchObj.meta.quickMode
-            ) {
-              searchObj.data.query = searchObj.data.query.replace(
-                /\[FIELD_LIST\]/g,
-                searchObj.data.stream.interestingFieldList.join(","),
-              );
-            } else {
-              searchObj.data.query = searchObj.data.query.replace(
-                /\[FIELD_LIST\]/g,
-                "*",
-              );
+              if (
+                searchObj.data.stream.interestingFieldList.length > 0 &&
+                searchObj.meta.quickMode
+              ) {
+                searchObj.data.query = searchObj.data.query.replace(
+                  /\[FIELD_LIST\]/g,
+                  searchObj.data.stream.interestingFieldList.join(","),
+                );
+              } else {
+                searchObj.data.query = searchObj.data.query.replace(
+                  /\[FIELD_LIST\]/g,
+                  "*",
+                );
+              }
             }
           }
 
           searchObj.data.editorValue = searchObj.data.query;
 
           searchBarRef.value.updateQuery();
-
-          searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
         } else {
           searchObj.data.query = "";
           searchBarRef.value.updateQuery();
         }
       } catch (e) {
-        console.log("Logs : Error in setQuery");
+        console.log("Logs : Error in setQuery ", e);
       }
     };
 
@@ -1192,8 +1203,7 @@ export default defineComponent({
         /[.*+?^${}()|[\]\\]/g,
         "\\$&",
       );
-      const newQuery = parser
-        .sqlify(parsedSQL)
+      const newQuery = fnUnparsedSQL(parsedSQL)
         .replace(/`/g, "")
         .replace(
           new RegExp(`\\b${streamName}\\b`, "g"),
@@ -1203,7 +1213,6 @@ export default defineComponent({
       searchObj.data.query = newQuery;
       searchObj.data.editorValue = newQuery;
       searchBarRef.value.updateQuery();
-      searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
     };
 
     const processInterestingFiledInSQLQuery = (
@@ -1332,8 +1341,8 @@ export default defineComponent({
 
     watch(
       () => [
-        searchObj.data.tempFunctionContent,
-        searchObj.meta.logsVisualizeToggle,
+        searchObj?.data?.tempFunctionContent,
+        searchObj?.meta?.logsVisualizeToggle,
       ],
       () => {
         if (
@@ -1441,7 +1450,7 @@ export default defineComponent({
     // watch for changes in the visualize toggle
     // if it is in visualize mode, then set the query and stream name in the dashboard panel
     watch(
-      () => [searchObj.meta.logsVisualizeToggle],
+      () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         // emit resize event
         // this will rerender/call resize method of already rendered chart to resize
@@ -1548,7 +1557,6 @@ export default defineComponent({
       t,
       store,
       router,
-      parser,
       searchObj,
       searchBarRef,
       splitterModel,
@@ -1667,7 +1675,12 @@ export default defineComponent({
         : 0;
     },
     async showHistogram(newVal, oldVal) {
-      if(newVal == true && oldVal == false && this.searchObj.meta.histogramDirtyFlag == true && this.searchObj.data.queryResults.hits.length > 0){
+      if (
+        newVal == true &&
+        oldVal == false &&
+        this.searchObj.meta.histogramDirtyFlag == true &&
+        this.searchObj.data.queryResults.hits.length > 0
+      ) {
         this.searchObj.meta.resetPlotChart = true;
         this.searchObj.data.queryResults.aggs = [];
       }
