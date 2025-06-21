@@ -110,6 +110,7 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
         } else {
             needle.as_ref().unwrap().to_string()
         };
+
         let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 
         // 2. perform the computation
