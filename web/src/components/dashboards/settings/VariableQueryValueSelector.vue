@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stack-label
       @filter="filterOptions"
       class="textbox col no-case"
-      :loading="variableItem.isLoading || searching"
+      :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
@@ -121,11 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { debounce } from "lodash-es";
 import { defineComponent, ref, watch, computed, nextTick, onUnmounted } from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  props: ["modelValue", "variableItem", "loadOptions", "searchResults"],
+  props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
     const selectedValue = ref(props.variableItem?.value);
@@ -134,30 +135,25 @@ export default defineComponent({
     const isOpen = ref(false);
     const suppressLoadOnNextPopup = ref(false); // added this because on click of enter, we need to skip the API load
 
-    const searching = ref(false); // loading state for search
-    let searchDebounceTimeout: any = null;
-
     const availableOptions = computed(() => props.variableItem?.options || []);
 
     // Show searchResults if filterText is active, else normal options
     const filteredOptions = computed(() => {
-      if (
-        filterText.value &&
-        props.searchResults &&
-        props.searchResults.length > 0
-      ) {
-        return props.searchResults;
-      }
       if (!filterText.value) return availableOptions.value;
-      const searchText = filterText.value.toLowerCase();
       return availableOptions.value.filter((opt: any) =>
-        opt.label.toLowerCase().includes(searchText),
+        opt.label.toLowerCase().includes(filterText.value.toLowerCase()),
       );
     });
     const filterOptions = (val: string, update: Function) => {
       filterText.value = val;
       update();
     };
+
+    // set debouced filterText value that can trigger search
+    const searchText = ref("");
+    const updateSearch = debounce((val: string) => {
+        searchText.value = val;
+    }, 500);
 
     // --- Typeahead debounce and emit search event ---
     // This watch function implements debounced search for the variable selector.
@@ -170,38 +166,34 @@ export default defineComponent({
     watch(
       () => filterText.value,
       (newVal) => {
-        if (searchDebounceTimeout) clearTimeout(searchDebounceTimeout);
-        if (!newVal) {
-          searching.value = false;
-          // Reset loading states when filter text is cleared
-          if (props.variableItem) {
-            props.variableItem.isLoading = false;
-            props.variableItem.isVariableLoadingPending = false;
-            props.variableItem._searchResults = [];
-          }
-          emit("search", { variableItem: props.variableItem, filterText: "" });
-          return;
-        }
-        searching.value = true;
-        searchDebounceTimeout = setTimeout(() => {
-          // Only emit search if filterText hasn't changed during the debounce period
-          if (filterText.value === newVal) {
-            emit("search", {
-              variableItem: props.variableItem,
-              filterText: newVal,
-            });
-          }
-          searching.value = false;
-        }, 1000); // 1000ms debounce to match parent component
+        // set search text
+        updateSearch(newVal);
       },
     );
 
+    // emit when searchText changes
+    watch(
+      () => searchText.value,
+      (newVal) => {
+        if(newVal == null || newVal == undefined) {
+          return
+        }
+
+        // no need to update results if the menu is hidden
+        if (!isOpen.value) {
+          return;
+        }
+
+        emit("search", {
+          variableItem: props.variableItem,
+          filterText: newVal,
+        });
+      }
+    )
+
     // Cleanup debounce timeout when component is unmounted
     onUnmounted(() => {
-      if (searchDebounceTimeout) {
-        clearTimeout(searchDebounceTimeout);
-        searchDebounceTimeout = null;
-      }
+      updateSearch.cancel();
     });
 
     const isAllSelected = computed(() => {
@@ -252,25 +244,12 @@ export default defineComponent({
       if (props.loadOptions) {
         props.loadOptions(props.variableItem);
       }
-    };    const onPopupHide = () => {
+    };
+
+    const onPopupHide = () => {
       isOpen.value = false;
       
-      // Clear any pending debounce timeout to prevent unwanted API calls
-      if (searchDebounceTimeout) {
-        clearTimeout(searchDebounceTimeout);
-        searchDebounceTimeout = null;
-      }
-      
       filterText.value = "";
-      searching.value = false;
-      // Clear search results when popup is hidden
-      emit("search", { variableItem: props.variableItem, filterText: "" });
-      // Reset loading states when popup is closed
-      if (props.variableItem) {
-        props.variableItem.isLoading = false;
-        props.variableItem.isVariableLoadingPending = false;
-        props.variableItem._searchResults = [];
-      }
       if (props.variableItem.multiSelect) {
         emit("update:modelValue", selectedValue.value);
       }
@@ -349,7 +328,7 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const handleCustomValue = (value: string) => {
+    const handleCustomValue = async (value: string) => {
       if (!value?.trim() || props.variableItem.multiSelect) return;
 
       const newValue = value.trim();
@@ -390,7 +369,6 @@ export default defineComponent({
       handleKeydown,
       handleCustomValue,
       filterText,
-      searching,
     };
   },
 });

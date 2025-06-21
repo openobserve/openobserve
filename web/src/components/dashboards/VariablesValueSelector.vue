@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
           :loadOptions="loadVariableOptions"
-          :searchResults="item._searchResults || []"
           @search="onVariableSearch(index, $event)"
         />
       </div>
@@ -304,13 +303,6 @@ export default defineComponent({
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);
-      });
-
-      // Clean up all search operations
-      Object.keys(searchControllers).forEach((variableName) => {
-        if (searchControllers[variableName]) {
-          searchControllers[variableName].abort();
-        }
       });
 
       // Clear current search text tracking
@@ -1400,15 +1392,7 @@ export default defineComponent({
                     JSON.stringify(variableObject.value),
                   );
 
-                  // If this is a search request, update search results instead of options
-                  if (searchText) {
-                    updateVariableSearchResults(
-                      variableObject,
-                      response.data.hits,
-                    );
-                  } else {
-                    updateVariableOptions(variableObject, response.data.hits);
-                  }
+                  updateVariableOptions(variableObject, response.data.hits);
 
                   const hasValueChanged =
                     Array.isArray(originalValue) &&
@@ -2036,45 +2020,6 @@ export default defineComponent({
     };
 
     /**
-     * Updates the search results for a variable based on the result of a query to fetch field values.
-     * @param variableObject - The variable object containing query data.
-     * @param hits - The result from the stream service containing field values.
-     */
-    const updateVariableSearchResults = (variableObject: any, hits: any[]) => {
-      const fieldHit = hits.find(
-        (field: any) => field.field === variableObject.query_data.field,
-      );
-
-      if (fieldHit) {
-        // Extract the values for the specified field from the result
-        let searchResults = fieldHit.values
-          .filter((value: any) => value.zo_sql_key !== undefined)
-          .map((value: any) => ({
-            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
-            label:
-              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
-            // Use the zo_sql_key as the value
-            value: value.zo_sql_key.toString(),
-          }));
-        // Update search results
-        variableObject._searchResults = searchResults;
-      } else {
-        // Reset search results if no field values are available
-        variableObject._searchResults = [];
-      }
-    };
-
-    // --- Typeahead search logic for query_values variables ---
-    // This function implements debounced search functionality for variable query value selectors.
-    // When a user types in the filter text, it:
-    // 1. Debounces the search to avoid excessive API calls (1000ms)
-    // 2. Cancels previous search requests to prevent race conditions
-    // 3. Uses the unified handleVariableType function to handle both REST and WebSocket/Streaming
-    // 4. Updates the search results in the variable object    // The search results are displayed in the child component when filterText is active
-    let searchControllers: any = {};
-    let currentSearchText: any = {};
-
-    /**
      * Comprehensive cancellation function that cancels all ongoing operations for a variable
      * @param {string} variableName - The name of the variable to cancel operations for
      */
@@ -2088,23 +2033,16 @@ export default defineComponent({
 
       // 2. Cancel any ongoing WebSocket/Streaming operations
       cancelTraceId(variableName);      
-      // 3. Cancel any ongoing search operations
-      if (searchControllers[variableName]) {
-        variableLog(variableName, "Canceling search controller");
-        searchControllers[variableName].abort();
-        searchControllers[variableName] = null;
-      }
 
-      // 4. Reset loading states for the variable only if not in search mode
+      // 3. Reset loading states for the variable only if not in search mode
       const variableObject = variablesData.values.find(
         (v: any) => v.name === variableName,
       );
-      if (variableObject && !variableObject._searchResults) {
-        variableObject.isLoading = false;        variableObject.isVariableLoadingPending = false;
-      }
 
-      // 5. Clear current search text tracking
-      currentSearchText[variableName] = "";
+      if (variableObject) {
+        variableObject.isLoading = false;        
+        variableObject.isVariableLoadingPending = false;
+      }
     };
 
     const onVariableSearch = async (
@@ -2123,44 +2061,7 @@ export default defineComponent({
       // Cancel any previous API calls for this variable immediately
       cancelAllVariableOperations(variableName);
 
-      if (!filterText) {
-        // Clear search results and reset loading states when filterText is empty
-        variableItem._searchResults = [];
-        variableItem.isLoading = false;
-        variableItem.isVariableLoadingPending = false;
-        currentSearchText[variableName] = "";
-        return;
-      }
-
-      // Store the current search text to prevent race conditions
-      currentSearchText[variableName] = filterText;
-
-      const controller = new AbortController();
-      searchControllers[variableName] = controller;
-
-      try {
-        // Initialize search results property to indicate this is a search request
-        variableItem._searchResults = [];
-        variableItem.isLoading = true;
-
-        // Use the unified approach to load variable data with search text
-        await loadSingleVariableDataByName(variableItem, false, filterText);
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
-          // Only clear search results on error, don't reset loading states
-          // to preserve filter text for user to continue typing
-          if (variablesData.values[index]) {
-            variablesData.values[index]._searchResults = [];
-          }
-        }
-        // Don't reset loading states on error to preserve filter text
-        // The loading states will be reset when the user clears the filter or closes the popup
-      } finally {
-        // Clean up the controller reference
-        if (searchControllers[variableName] === controller) {
-          searchControllers[variableName] = null;
-        }
-      }
+      await loadSingleVariableDataByName(variableItem, false, filterText);
     };
 
     return {
