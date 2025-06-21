@@ -48,6 +48,8 @@ import {
   autocompletion,
   CompletionContext,
   Completion,
+  closeBrackets,
+  closeBracketsKeymap,
 } from "@codemirror/autocomplete";
 import { keymap, lineNumbers } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
@@ -314,6 +316,8 @@ export default defineComponent({
           doc: props.query?.trim() || "",
           extensions: [
             minimalSetup,
+            closeBrackets(),
+            keymap.of(closeBracketsKeymap),
             EditorView.lineWrapping,
             ...(enableCodeFolding.value
               ? [foldGutter(), keymap.of(foldKeymap)]
