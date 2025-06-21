@@ -1098,7 +1098,7 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(&trace_id, org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
 
         let total_hits = search_res.total as i64;
 
