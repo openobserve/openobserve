@@ -319,7 +319,7 @@ async fn run_datafusion(
         let mut rewriter = StreamingAggsRewriter::new(
             streaming_id,
             start_time,
-            end_time, 
+            end_time,
             use_cache,
             target_partitions,
         )

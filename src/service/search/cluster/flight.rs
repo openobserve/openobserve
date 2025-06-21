@@ -496,7 +496,7 @@ pub async fn run_datafusion(
             return Err(Error::Message(
                 "streaming_id is required for streaming aggregation query".to_string(),
             ));
-        }; 
+        };
 
         // NOTE: temporary check
         let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
