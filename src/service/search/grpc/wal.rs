@@ -469,7 +469,13 @@ pub async fn search_memtable(
         }
         let record_batches = merge_groupes
             .into_iter()
-            .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
+            .map(|mut group| {
+                if group.len() == 1 {
+                    group.remove(0)
+                } else {
+                    concat_batches(group[0].schema().clone(), group).unwrap()
+                }
+            })
             .collect::<Vec<_>>();
 
         tokio::task::coop::consume_budget().await;

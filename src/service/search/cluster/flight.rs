@@ -496,14 +496,15 @@ pub async fn run_datafusion(
             return Err(Error::Message(
                 "streaming_id is required for streaming aggregation query".to_string(),
             ));
-        };
+        }; 
 
         // NOTE: temporary check
         let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
-        let aggregation_cache_enabled = org_settings.aggregation_cache_enabled && use_cache;
-
+        let use_cache = use_cache && org_settings.aggregation_cache_enabled;
+        let target_partitions = ctx.state().config().target_partitions();
         let mut rewriter =
-            o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter::new(streaming_id, start_time, end_time, aggregation_cache_enabled).await;
+            o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache, target_partitions).await;
+
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
         // Check for aggs cache hit
         if rewriter.is_complete_cache_hit {
