@@ -415,9 +415,35 @@ export default defineComponent({
       dashboardPanelData.layout.currentQueryIndex =
         dashboardPanelData.data.queries.length - 1;
     };
+
+    const updatePromQLQuery = async (event, value) => {
+      promqlAutoCompleteData.value.query = value;
+      // promqlAutoCompleteData.value.text = event.changes[0].text;
+
+      // set the start and end time
+      if (
+        dashboardPanelData.meta.dateTime.start_time &&
+        dashboardPanelData.meta.dateTime.end_time
+      ) {
+        promqlAutoCompleteData.value.dateTime = {
+          startTime: dashboardPanelData.meta.dateTime.start_time?.getTime(),
+          endTime: dashboardPanelData.meta.dateTime.end_time?.getTime(),
+        };
+      }
+
+      promqlAutoCompleteData.value.position.cursorIndex =
+        queryEditorRef.value.getCursorIndex();
+      promqlAutoCompleteData.value.popup.open =
+        queryEditorRef.value.triggerAutoComplete;
+      promqlAutoCompleteData.value.popup.close =
+        queryEditorRef.value.disableSuggestionPopup;
+
+      promqlGetSuggestions();
+    };
+
     const updateQuery = (query, fields) => {
       if (dashboardPanelData.data.queryType === "promql") {
-        promqlGetSuggestions();
+        updatePromQLQuery(query, fields);
       } else {
         sqlGetSuggestions();
         sqlUpdateFieldKeywords(
