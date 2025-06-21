@@ -1,3 +1,5 @@
+//Dahboard time refresh
+// Methods: Set relative time selection, Set absolute time selection, Auto refresh interval, Refresh dashboard manual
 export default class DashboardTimeRefresh {
   constructor(page) {
     this.page = page;
@@ -23,25 +25,51 @@ export default class DashboardTimeRefresh {
 
   //relative time selection
   async setRelative(date, time) {
+    await this.timeTab.waitFor({ state: "attached" });
     await this.timeTab.click();
+
     await this.relativeTime.click();
+    await this.page
+      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
+      .waitFor({
+        state: "visible",
+      });
     await this.page
       .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
       .click();
     await this.applyBtn.click();
   }
 
-  // Absolute time selection
-  async setAbsolute(date) {
+  // Set absolute time selection with dynamic start and end days
+  async selectAbsolutetime(startDay, endDay) {
+    // Open the date-time picker
     await this.timeTab.click();
+
+    // Switch to the absolute tab
     await this.absTime.click();
+
+    // Click the left chevron button (if needed)
     await this.page
-      .locator(`[data-test="date-time-absolute-${date}-btn"]`)
-      .dblclick();
+      .locator("button")
+      .filter({ hasText: "chevron_left" })
+      .first()
+      .click();
+
+    // Select the start and end days dynamically
+    await this.page
+      .getByRole("button", { name: String(startDay) })
+      .last()
+      .click();
+    await this.page
+      .getByRole("button", { name: String(endDay) })
+      .last()
+      .click();
+
+    // Optionally, click the apply button to confirm the selection
     await this.applyBtn.click();
   }
 
-  //Refresh Button with time selection manuall
+  //Refresh Button with time selection manual
   async autoRefreshInterval(time) {
     await this.refreshBtnManual.waitFor({ state: "visible" });
     await this.refreshBtnManual.click();
