@@ -58,7 +58,10 @@ use super::{
     request::Request,
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
-use crate::service::search::{datafusion::udf::STR_MATCH_UDF_NAME, index::get_arg_name};
+use crate::service::search::{
+    datafusion::udf::{STR_MATCH_UDF_IGNORE_CASE_NAME, STR_MATCH_UDF_NAME},
+    index::get_arg_name,
+};
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -1644,7 +1647,7 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
                 return true;
             }
 
-            if f == STR_MATCH_UDF_NAME {
+            if f == STR_MATCH_UDF_NAME || f == STR_MATCH_UDF_IGNORE_CASE_NAME {
                 if let FunctionArguments::List(list) = &func.args {
                     return list.args.len() == 2
                         && index_fields.contains(&get_arg_name(&list.args[0]));
