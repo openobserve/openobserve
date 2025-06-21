@@ -332,9 +332,6 @@ export default defineComponent({
             minimalSetup,
             closeBrackets(),
             EditorView.lineWrapping,
-            ...(enableCodeFolding.value
-              ? [foldGutter(), keymap.of(foldKeymap)]
-              : []),
             search(),
             highlightSelectionMatches(), // ✨ Highlights all matches
             lineNumbers(),
@@ -383,6 +380,16 @@ export default defineComponent({
               },
               ".cm-scroller": {
                 fontFamily: "monospace",
+              },
+              ".cm-line": {
+                lineHeight: "17px",
+                padding: "0px !important",
+              },
+              ".cm-foldGutter": {
+                display: "none !important",
+              },
+              ".cm-lineNumbers .cm-gutterElement": {
+                padding: "0px 2px !important",
               },
             }),
             basicSetup,
@@ -637,5 +644,8 @@ export default defineComponent({
   min-width: 10px !important;
   padding-right: 5px !important;
   text-align: left;
+}
+.cm-gutter .cm-foldGutter {
+  display: none !important;
 }
 </style>
