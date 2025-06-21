@@ -2460,18 +2460,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
-        if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
-            cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
-        }
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10% 
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
     if cfg.disk_cache.aggregation_max_size == 0 {
-        cfg.disk_cache.aggregation_max_size = cfg.limit.disk_free / 10; // 10%
-        if cfg.disk_cache.aggregation_max_size > 1024 * 1024 * 1024 * 20 {
-            cfg.disk_cache.aggregation_max_size = 1024 * 1024 * 1024 * 20; // 20GB
-        }
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10% 
     } else {
         cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
     }
