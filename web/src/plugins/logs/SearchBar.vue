@@ -1641,7 +1641,6 @@ export default defineComponent({
     });
 
     const updateAutoComplete = (value) => {
-      return;
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex =
         queryEditorRef?.value?.getCursorIndex();
