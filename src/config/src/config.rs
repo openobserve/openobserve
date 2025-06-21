@@ -1885,6 +1885,7 @@ pub struct Encryption {
     #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
     pub master_key: String,
 }
+
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
