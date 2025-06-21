@@ -815,8 +815,7 @@ pub async fn filter_file_list_by_tantivy_index(
     file_list.extend(file_list_map.into_values());
     Ok((
         start.elapsed().as_millis() as usize,
-        // only need add filter back if the feature is enabled
-        is_add_filter_back && cfg.common.feature_query_remove_filter_with_index,
+        is_add_filter_back,
         total_hits,
     ))
 }
