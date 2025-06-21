@@ -263,6 +263,8 @@ const searchReconnectDelay = 1000; // 1 second
 // useDataVisualization for histogram and data display functions
 
 let searchObj: any = reactive(Object.assign({}, defaultObject));
+
+
 const searchObjDebug = reactive({
   queryDataStartTime: 0,
   queryDataEndTime: 0,
@@ -346,6 +348,50 @@ const useLogs = () => {
   onBeforeUnmount(() => {
     parser = null;
   });
+
+  const initialLogsState = async () => {
+    if (store.state.logs.isInitialized) {
+      try {
+        const state = store.getters["logs/getLogs"];
+        searchObj.loading = true;
+        searchObj.loadingHistogram = true;
+        searchObj.organizationIdentifier = state.organizationIdentifier;
+        searchObj.config = JSON.parse(JSON.stringify(state.config));
+        await nextTick();
+        searchObj.meta = JSON.parse(JSON.stringify(state.meta));
+        searchObj.data = JSON.parse(JSON.stringify({
+          ...JSON.parse(JSON.stringify(state.data)),
+          queryResults: {},
+          sortedQueryResults: [],
+          histogram: {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorMsg: "",
+            errorCode: 0,
+            errorDetail: "",
+          },
+        }));
+        await nextTick();
+        searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
+        searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
+        searchObj.data.histogram = JSON.parse(JSON.stringify(state.data.histogram));
+        updateGridColumns();
+        await nextTick();
+        searchObj.loading = false;
+        searchObj.loadingHistogram = false;
+      } catch (e) {
+        console.error("Error while initializing logs state", e);
+        resetSearchObj();
+      } finally {
+        return Promise.resolve(true);
+      }
+    }
+  }
 
   const importSqlParser = async () => {
     const useSqlParser: any = await import("@/composables/useParser");
@@ -505,7 +551,7 @@ const useLogs = () => {
           label: string;
           value: string;
         };
-        // searchObj.data.streamResults.list.forEach((item: any) => {
+        
         for (const item of searchObj.data.streamResults.list) {
           itemObj = {
             label: item.name,
@@ -570,7 +616,9 @@ const useLogs = () => {
       // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData: any = await getStreams(streamType, false);
-      searchObj.data.streamResults["list"] = streamData.list;
+      searchObj.data.streamResults = {
+        ...streamData,
+      };
       await nextTick();
       await loadStreamLists();
       return;
@@ -4400,6 +4448,7 @@ const useLogs = () => {
       const streamType = searchObj.data.stream.streamType || "logs";
       const streams: any = await getStreams(streamType, false);
       searchObj.data.streamResults["list"] = streams.list;
+
       searchObj.data.stream.streamLists = [];
       streams.list.map((item: any) => {
         const itemObj = {
@@ -4408,6 +4457,7 @@ const useLogs = () => {
         };
         searchObj.data.stream.streamLists.push(itemObj);
       });
+
     } else {
       searchObj.loading = true;
       loadLogsData();
@@ -6543,7 +6593,8 @@ const useLogs = () => {
     sendCancelSearchMessage,
     isDistinctQuery,
     isWithQuery,
-    getStream
+    getStream,
+    initialLogsState
   };
 };
 

@@ -567,6 +567,7 @@ export default defineComponent({
       isWithQuery,
       getStream,
       fnUnparsedSQL,
+      initialLogsState,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -653,11 +654,19 @@ export default defineComponent({
       }
     });
 
-    onBeforeUnmount(() => {
+    onBeforeUnmount(async () => {
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
+
+      if (searchObj)
+        await store.dispatch(
+          "logs/setLogs",
+          JSON.parse(JSON.stringify(searchObj)),
+        );
+
       searchBarRef.value = null;
       searchObj = null;
+      searchResultRef.value = null;
     });
 
     onActivated(() => {
@@ -803,24 +812,33 @@ export default defineComponent({
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
-        searchObj.organizationIdentifier =
-          store.state.selectedOrganization.identifier;
+        const isOrganizationChanged =
+          store.state.selectedOrganization.identifier !==
+          store.state.logs.organizationIdentifier;
+        if (!store.state.logs.isInitialized) {
+          searchObj.organizationIdentifier =
+            store.state.selectedOrganization.identifier;
 
-        searchObj.meta.pageType = "logs";
-        searchObj.meta.refreshHistogram = true;
-        searchObj.loading = true;
+          searchObj.meta.pageType = "logs";
+          searchObj.meta.refreshHistogram = true;
+          searchObj.loading = true;
 
-        resetSearchObj();
+          resetSearchObj();
 
-        resetStreamData();
+          resetStreamData();
 
-        restoreUrlQueryParams();
+          restoreUrlQueryParams();
 
-        if (isEnterpriseClusterEnabled()) {
-          await getRegionInfo();
+          if (isEnterpriseClusterEnabled()) {
+            await getRegionInfo();
+          }
+
+          loadLogsData();
+
+          store.dispatch("logs/setIsInitialized", true);
+        } else {
+          await initialLogsState();
         }
-
-        loadLogsData();
 
         if (isCloudEnvironment()) {
           setupCloudSpecificThreshold();
@@ -1323,8 +1341,8 @@ export default defineComponent({
 
     watch(
       () => [
-        searchObj.data.tempFunctionContent,
-        searchObj.meta.logsVisualizeToggle,
+        searchObj?.data?.tempFunctionContent,
+        searchObj?.meta?.logsVisualizeToggle,
       ],
       () => {
         if (
@@ -1432,7 +1450,7 @@ export default defineComponent({
     // watch for changes in the visualize toggle
     // if it is in visualize mode, then set the query and stream name in the dashboard panel
     watch(
-      () => [searchObj.meta.logsVisualizeToggle],
+      () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         // emit resize event
         // this will rerender/call resize method of already rendered chart to resize

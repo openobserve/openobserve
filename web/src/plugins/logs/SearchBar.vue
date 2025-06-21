@@ -722,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @run-query="handleRunQueryFn"
               @keydown="handleKeyDown"
               :class="
-                searchObj.data.editorValue == '' && 
+                searchObj.data.editorValue == '' &&
                 searchObj.meta.queryEditorPlaceholderFlag
                   ? 'empty-query'
                   : ''
@@ -1697,7 +1697,7 @@ export default defineComponent({
         const parsedSQL = fnParsedSQL();
         if (
           searchObj.meta.sqlMode === true &&
-          Object.hasOwn(parsedSQL, "from")  &&
+          Object.hasOwn(parsedSQL, "from") &&
           isStreamFetched(searchObj.data.stream.streamType) &&
           isStreamExists(value, searchObj.data.stream.streamType)
         ) {
@@ -1760,7 +1760,7 @@ export default defineComponent({
         const parsedSQL = fnParsedSQL();
         if (
           (Object.hasOwn(parsedSQL, "from") ||
-          Object.hasOwn(parsedSQL, "select"))  &&
+            Object.hasOwn(parsedSQL, "select")) &&
           isStreamFetched(searchObj.data.stream.streamType) &&
           isStreamExists(value, searchObj.data.stream.streamType)
         ) {
@@ -1807,6 +1807,11 @@ export default defineComponent({
                   onStreamChange(searchObj.data.query);
                 }
               });
+              console.log(
+                "searchObj.data.streamResults.list",
+                JSON.parse(JSON.stringify(searchObj.data.streamResults.list)),
+              );
+
               if (streamFound == false) {
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
@@ -3743,29 +3748,26 @@ export default defineComponent({
     height: 100%; /* or any other height you want to set */
   }
 
-  .empty-query .cm-scroller  {
+  .empty-query .cm-scroller {
     background-image: url("../../assets/images/common/query-editor.png");
     background-repeat: no-repeat;
     background-size: 115px;
     background-position: 5px 5px;
   }
-  .empty-query .cm-gutters{
+  .empty-query .cm-gutters {
     display: none;
   }
-
 
   .empty-function .cm-scroller {
     background-image: url("../../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
     background-size: 170px;
     background-position: 5px 5px;
-
   }
 
-  .empty-function .cm-gutters{
+  .empty-function .cm-gutters {
     display: none;
   }
-
 
   .function-dropdown {
     width: 205px;

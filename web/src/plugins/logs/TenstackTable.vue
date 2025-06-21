@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
     <table
+      v-if="table"
       data-test="logs-search-result-logs-table"
       class="tw-w-full tw-table-auto"
       :style="{
@@ -252,10 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
                 ?.isExpandedRow &&
-                handleDataRowClick(
-                  tableRows[virtualRow.index],
-                  virtualRow.index,
-                )
+              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
             "
           >
             <td
@@ -277,7 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add-search-term="addSearchTerm"
                 @view-trace="
                   viewTrace(formattedRows[virtualRow.index]?.original)
-                
                 "
                 :streamName="jsonpreviewStreamName"
               />
@@ -350,7 +347,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, watch, nextTick, onMounted } from "vue";
+import {
+  ref,
+  computed,
+  defineEmits,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   FlexRender,
@@ -408,11 +413,11 @@ const props = defineProps({
     type: Boolean,
     default: () => true,
   },
-  jsonpreviewStreamName:{
+  jsonpreviewStreamName: {
     type: String,
     default: "",
     required: false,
-  }
+  },
 });
 
 const { t } = useI18n();
@@ -497,7 +502,7 @@ watch(
   },
 );
 
-const table = useVueTable({
+let table: any = useVueTable({
   get data() {
     return tableRows.value || [];
   },
@@ -525,7 +530,7 @@ const table = useVueTable({
 });
 
 const columnSizeVars = computed(() => {
-  const headers = table.getFlatHeaders();
+  const headers = table?.getFlatHeaders();
   const colSizes: { [key: string]: number } = {};
   for (let i = 0; i < headers.length; i++) {
     const header = headers[i]!;
@@ -541,6 +546,14 @@ watch(columnSizeVars, (newColSizes) => {
 
 onMounted(() => {
   setExpandedRows();
+});
+
+onBeforeUnmount(() => {
+  tableRows.value.length = 0;
+  tableRows.value = [];
+  tableBodyRef.value = null;
+  parentRef.value = null;
+  table = null;
 });
 
 const hasDefaultSourceColumn = computed(
@@ -587,19 +600,19 @@ const debouncedUpdate = debounce((newColSizes) => {
 }, 500);
 
 const formattedRows = computed(() => {
-  return table.getRowModel().rows;
+  return table?.getRowModel().rows;
 });
 
 const isResizingHeader = ref(false);
 
-const headerGroups = computed(() => table.getHeaderGroups()[0]);
+const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 
 const headers = computed(() => headerGroups.value.headers);
 
 watch(
   () => headers.value,
   (newVal) => {
-    isResizingHeader.value = newVal.some((header) =>
+    isResizingHeader.value = newVal.some((header: any) =>
       header.column.getIsResizing(),
     );
   },
@@ -622,16 +635,14 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 20, 
+    estimateSize: () => 20,
     overscan: 80,
     measureElement:
-      typeof window !== "undefined" &&
-      !isFirefox.value
+      typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => element?.getBoundingClientRect().height
         : undefined,
   };
 });
-
 
 const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
@@ -796,6 +807,7 @@ const viewTrace = (row: any) => {
 
 defineExpose({
   parentRef,
+  virtualRows,
 });
 </script>
 <style scoped lang="scss">

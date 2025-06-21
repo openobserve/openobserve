@@ -20,16 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div>
-      <!-- <select v-model="selectedStream">
-        <option
-          v-for="stream in streamOptions"
-          :key="stream.value"
-          :value="stream.value"
-        >
-          <q-icon size="sm" name="search" />
-          {{ stream.label }}
-        </option>
-      </select> -->
       <q-select
         data-test="log-search-index-list-select-stream"
         v-model="searchObj.data.stream.selectedStream"
