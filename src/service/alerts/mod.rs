@@ -200,12 +200,10 @@ impl QueryConditionExt for QueryCondition {
                             .iter()
                             .map(|v| {
                                 let mut val = Map::with_capacity(v.labels.len() + 2);
-                                for label in v.labels.iter() {
-                                    val.insert(
-                                        label.name.to_string(),
-                                        label.value.to_string().into(),
-                                    );
-                                }
+                                val.extend(v.labels.iter().map(|label| {
+                                    (label.name.to_string(), label.value.to_string().into())
+                                }));
+
                                 let last_sample = v.samples.last().unwrap();
                                 val.insert("_timestamp".to_string(), last_sample.timestamp.into());
                                 val.insert("value".to_string(), last_sample.value.into());
@@ -218,14 +216,8 @@ impl QueryConditionExt for QueryCondition {
             }
         };
 
-        let stream_names = match resolve_stream_names(&sql) {
-            Ok(stream_names) => stream_names,
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "Error resolving stream names in SQL query: {e}"
-                ));
-            }
-        };
+        let stream_names = resolve_stream_names(&sql)
+            .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
 
         // SQL may contain multiple stream names, check for each stream
         // if the query period is greater than the max query range
@@ -257,8 +249,10 @@ impl QueryConditionExt for QueryCondition {
         };
 
         let req_start = std::time::Instant::now();
-        let resp = if self.multi_time_range.is_some()
-            && !self.multi_time_range.as_ref().unwrap().is_empty()
+        let resp = if self
+            .multi_time_range
+            .as_ref()
+            .is_some_and(|mtr| !mtr.is_empty())
         {
             let req = config::meta::search::MultiStreamRequest {
                 sql: {

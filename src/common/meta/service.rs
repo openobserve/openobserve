@@ -30,7 +30,7 @@ mod tests {
 
     #[test]
     fn test_service_constants_are_unique() {
-        let services = vec![LOGS, METRICS, TRACES];
+        let services = [LOGS, METRICS, TRACES];
         for i in 0..services.len() {
             for j in (i + 1)..services.len() {
                 assert_ne!(
