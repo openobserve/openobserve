@@ -300,6 +300,12 @@ export default defineComponent({
       ]);
     };
 
+    // Debounced emit for document changes
+    const debouncedEmit = debounce((value: string, update: any) => {
+      emit("update-query", update, value);
+      emit("update:query", value);
+    }, props.debounceTime);
+
     const setupEditor = async () => {
       // Ensure proper cleanup before setting up new editor
       cleanupEditor();
@@ -342,11 +348,7 @@ export default defineComponent({
             EditorView.editable.of(!props.readOnly),
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
-                const debouncedEmit = debounce((value: string) => {
-                  emit("update-query", update, value);
-                  emit("update:query", value);
-                }, props.debounceTime);
-                debouncedEmit(update.state.doc.toString());
+                debouncedEmit(update.state.doc.toString(), update);
               }
             }),
             EditorView.focusChangeEffect.of((state, focusing) => {
@@ -485,24 +487,15 @@ export default defineComponent({
 
     watch(
       () => props.query,
-      async () => {
-        // Don't remove this await nextTick()
-        await nextTick();
-        await nextTick();
-        await nextTick();
-        await nextTick();
-        await nextTick();
-        await nextTick();
-        // Don't remove this await nextTick()
-
+      (value) => {
         if (editorView && (props.readOnly || !editorView.hasFocus)) {
           const currentValue = editorView.state.doc.toString();
-          if (currentValue !== props.query) {
+          if (currentValue !== value) {
             editorView.dispatch({
               changes: {
                 from: 0,
                 to: currentValue.length,
-                insert: props.query,
+                insert: value,
               },
             });
           }
