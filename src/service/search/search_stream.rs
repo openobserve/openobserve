@@ -738,6 +738,17 @@ pub async fn do_partitioned_search(
                 ));
             }
         }
+        let stop_values_search = req_size != -1
+            && req_size != 0
+            && req.search_type == Some(SearchEventType::Values)
+            && curr_res_size >= req_size;
+        if stop_values_search {
+            log::info!(
+                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
+                req_size
+            );
+            break;
+        }
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
