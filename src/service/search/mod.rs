@@ -634,12 +634,14 @@ pub async fn search_partition(
         }
     }
 
-    #[cfg(feature = "enterprise")]
-    let is_streaming_aggregate =
-        ts_column.is_none() && is_cachable_aggs && cfg.common.feature_query_streaming_aggs;
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
     let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct && is_http_req;
+    #[cfg(feature = "enterprise")]
+    let is_streaming_aggregate = ts_column.is_none()
+        && is_cachable_aggs
+        && cfg.common.feature_query_streaming_aggs
+        && !is_http_distinct;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output {
