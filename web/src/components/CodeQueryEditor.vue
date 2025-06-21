@@ -98,7 +98,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const editorRef: any = ref();
-    let editorView: EditorView | null = null;
+    let editorView: any = null;
 
     // Track event listeners
     const clickListener = () => {
@@ -375,6 +375,8 @@ export default defineComponent({
           parent: editorElement as HTMLElement
         });
 
+        editorView.docView["lineWrapping"] = true;
+
         // Set readonly if needed
         if (props.readOnly) {
           // For now, we'll handle readonly through the UI
@@ -515,8 +517,8 @@ export default defineComponent({
           const currentValue = editorView.state.doc.toString();
           const formattedValue = currentValue
             .split("\n")
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0)
+            .map((line: any) => line.trim())
+            .filter((line: any) => line.length > 0)
             .join("\n");
 
           if (currentValue !== formattedValue) {

@@ -98,7 +98,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const editorRef: any = ref();
-    let editorView: EditorView | null = null;
+    let editorView: any = null;
 
     // Track event listeners
     const clickListener = () => {
@@ -314,7 +314,6 @@ export default defineComponent({
           doc: props.query?.trim() || "",
           extensions: [
             minimalSetup,
-            EditorView.lineWrapping,
             ...(enableCodeFolding.value
               ? [foldGutter(), keymap.of(foldKeymap)]
               : []),
@@ -373,8 +372,9 @@ export default defineComponent({
         editorView = new EditorView({
           state,
           parent: editorElement as HTMLElement,
-          lineWrapping: true,
         });
+
+        editorView.docView["lineWrapping"] = true;
 
         // Set readonly if needed
         if (props.readOnly) {
@@ -516,8 +516,8 @@ export default defineComponent({
           const currentValue = editorView.state.doc.toString();
           const formattedValue = currentValue
             .split("\n")
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0)
+            .map((line: any) => line.trim())
+            .filter((line: any) => line.length > 0)
             .join("\n");
 
           if (currentValue !== formattedValue) {
