@@ -305,11 +305,6 @@ export default defineComponent({
         cancelTraceId(field);
       });
 
-      // Clear current search text tracking
-      Object.keys(currentSearchText).forEach((variableName) => {
-        currentSearchText[variableName] = "";
-      });
-
       // Clean up any in-flight promises to prevent memory leaks
       rejectAllPromises();
       Object.keys(currentlyExecutingPromises).forEach((key) => {
