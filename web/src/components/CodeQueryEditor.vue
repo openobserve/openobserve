@@ -372,7 +372,7 @@ export default defineComponent({
 
         editorView = new EditorView({
           state,
-          parent: editorElement as HTMLElement
+          parent: editorElement as HTMLElement,
         });
 
         editorView.docView["lineWrapping"] = true;
@@ -459,7 +459,16 @@ export default defineComponent({
 
     watch(
       () => props.query,
-      () => {
+      async () => {
+        // Don't remove this await nextTick()
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        // Don't remove this await nextTick()
+
         if (editorView && (props.readOnly || !editorView.hasFocus)) {
           const currentValue = editorView.state.doc.toString();
           if (currentValue !== props.query) {
@@ -605,10 +614,9 @@ export default defineComponent({
 .cm-focused {
   outline: none !important;
 }
-.cm-lineNumbers .cm-gutterElement{
+.cm-lineNumbers .cm-gutterElement {
   min-width: 10px !important;
   padding-right: 5px !important;
   text-align: left;
 }
-
 </style>
