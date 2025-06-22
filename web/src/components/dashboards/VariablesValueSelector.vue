@@ -1455,7 +1455,7 @@ export default defineComponent({
 
       if(searchText) {
         filters.push({
-          name: variableObject.query_data.field,
+          name: `CAST(${variableObject.query_data.field} AS TEXT)`,
           operator: "LIKE",
           value: `%${escapeSingleQuotes(searchText.trim())}%`,
         });
