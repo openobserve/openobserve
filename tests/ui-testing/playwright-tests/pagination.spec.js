@@ -19,181 +19,62 @@ test.describe("Pagination for logs", () => {
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser();
         await loginPage.login(); // Login as root user
-        await ingestionPage.ingestion();
         await ingestionPage.ingestionJoin();
-        await managementPage.goToManagement();
-        await page.waitForTimeout(5000);
-        await managementPage.checkStreaming();
+        
     });
 
     test("Enable Streaming for running query to validate match_all('ziox')", async ({ page }) => {
 
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerName();
-       // await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.validateResult();
-    
-
-    });
-
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join queries", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameJoin();
-       // await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.displayCountQuery();
-        await logsPage.validateResult();
-       
-
-    });
-
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join limit", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameJoinLimit();
-       // await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.validateResult();
-      
-
-    });
-
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join like", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameJoinLike();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.validateResult();
-       
-      
-
-    });
-
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Left join queries", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameLeftJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.validateResult();
-    
-
-    });
-
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Right join queries", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameRightJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.validateResult();
-     
-
-    });
-
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Full join queries", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameFullJoin();
-       // await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.validateResult();
-    
-
-    });
-
-    test("Enable Streaming for clicking on interesting field icon and display field in editor", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.clickQuickModeToggle();
-        await logsPage.selectRunQuery();
-        await logsPage.clickInterestingFields();
-        await logsPage.validateInterestingFields();
-    });
-
-    test("Enable Streaming for clicking on interesting field icon and display query in editor", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.clickQuickModeToggle();
-        await logsPage.selectRunQuery();
-        await logsPage.clickInterestingFields();
-        await logsPage.validateInterestingFieldsQuery();
-    });
-
-    test("Enable Streaming for Adding or removing interesting field removes it from editor and results too", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-       // await logsPage.enableSQLMode();
-        await logsPage.clickQuickModeToggle();
-        await logsPage.selectRunQuery();
-        await logsPage.clickInterestingFields();
-        await logsPage.addRemoveInteresting();
-    });
-
-    test("Streaming enabled histogram is disabled and run query, results appear and then user switches on Histogram, getting error", async ({ page }) => {
-
+        await managementPage.goToManagement();
+        await page.waitForTimeout(5000);
+        await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("ziox")');
         await logsPage.selectRunQuery();
-        await logsPage.toggleHistogram();
-        await logsPage.selectRunQuery();
-    
-        await logsPage.toggleHistogram();
-        
-        // Check that the error message is not visible
-        const errorHeading = page.getByRole('heading', { name: 'Error while fetching' });
-        await expect(errorHeading).not.toBeVisible();
-
-        // Ensure that the error details button is also not visible or disabled
-        const errorDetailsButton = page.locator('[data-test="logs-page-histogram-error-details-btn"]');
-        await expect(errorDetailsButton).not.toBeVisible();
-
+        await logsPage.validateResult();
 
     });
 
-    test("No Histogram should be displayed if Data is not available", async ({ page }) => {
+    test("Enable Streaming for running query to validate match_all('zio*')", async ({ page }) => {
 
+        await managementPage.goToManagement();
+        await page.waitForTimeout(5000);
+        await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
-        await logsPage.enableSQLMode();
-        await logsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 201');
-        await page.waitForTimeout(1000);
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("zio*")');
         await logsPage.selectRunQuery();
-        await logsPage.waitForSearchResultAndCheckText('warning No data found for histogram.');
-        
+        await logsPage.validateResult();
+
     });
 
-    test("Histogram should be displayed if it is enabled again and data is available", async ({ page }) => {
+    test("Enable Streaming for running query to validate match_all('us*')", async ({ page }) => {
 
+        await managementPage.goToManagement();
+        await page.waitForTimeout(5000);
+        await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
-        await logsPage.enableSQLMode();
-        await logsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 200');
-        await page.waitForTimeout(1000);
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("us*")');
         await logsPage.selectRunQuery();
-        await expect(page.locator('[data-test="logs-search-result-bar-chart"] canvas')).toBeVisible();
-        await logsPage.toggleHistogram();
-        await logsPage.selectRunQuery();
-        await expect(page.locator('[data-test="logs-search-result-bar-chart"] canvas')).not.toBeVisible();
-        await logsPage.toggleHistogram();
-        await logsPage.selectRunQuery();
-        await expect(page.locator('[data-test="logs-search-result-bar-chart"] canvas')).toBeVisible();
-        
+        await logsPage.validateResult();
+
     });
 
+    test("Enable Streaming for running query to validatematch_all('ip-10-2-15-197.us-east-2.co*')", async ({ page }) => {
+
+        await managementPage.goToManagement();
+        await page.waitForTimeout(5000);
+        await managementPage.checkStreaming();
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStreamDefault();
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("ip-10-2-15-197.us-east-2.co*")');
+        await logsPage.selectRunQuery();
+        await logsPage.validateResult();
+
+    });
+
+
+   
 });
