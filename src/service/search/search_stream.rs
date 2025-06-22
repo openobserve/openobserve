@@ -1199,7 +1199,9 @@ async fn process_delta(
             );
             let excess_hits = *curr_res_size - req_size;
             if total_hits > excess_hits && excess_hits > 0 {
-                search_res.hits.truncate(excess_hits as usize);
+                search_res
+                    .hits
+                    .truncate((total_hits - excess_hits) as usize);
             }
         }
 
