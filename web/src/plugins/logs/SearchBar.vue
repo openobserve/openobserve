@@ -718,6 +718,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:query="searchObj.data.query"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
+              :debounceTime="100"
               @update:query="updateQueryValue"
               @run-query="handleRunQueryFn"
               @keydown="handleKeyDown"

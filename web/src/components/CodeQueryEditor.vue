@@ -348,11 +348,7 @@ export default defineComponent({
             EditorView.editable.of(!props.readOnly),
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
-                const debouncedEmit = debounce((value: string) => {
-                  emit("update-query", update, value);
-                  emit("update:query", value);
-                }, props.debounceTime);
-                debouncedEmit(update.state.doc.toString());
+                debouncedEmit(update.state.doc.toString(), update);
               }
             }),
             EditorView.focusChangeEffect.of((state, focusing) => {

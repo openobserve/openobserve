@@ -809,12 +809,17 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
+    // const isRouteChanged = computed(() => {
+    //   if(!Object.hasOwn(router.currentRoute.value.query, "stream") && !Object.hasOwn(router.currentRoute.value.query, "org_identifier")) {
+    //     return false;
+    //   } else {
+    //     return !(!store.state.logs.logs.data.stream.selectedStream.includes(router.currentRoute.value.query.stream) || router.currentRoute.value.query.org_identifier !== store.state.logs.logs.organizationIdentifier);
+    //   }
+    // });
+
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
-        const isOrganizationChanged =
-          store.state.selectedOrganization.identifier !==
-          store.state.logs.organizationIdentifier;
         if (!store.state.logs.isInitialized) {
           searchObj.organizationIdentifier =
             store.state.selectedOrganization.identifier;
