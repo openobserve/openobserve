@@ -348,7 +348,11 @@ export default defineComponent({
             EditorView.editable.of(!props.readOnly),
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
-                debouncedEmit(update.state.doc.toString(), update);
+                const debouncedEmit = debounce((value: string) => {
+                  emit("update-query", update, value);
+                  emit("update:query", value);
+                }, props.debounceTime);
+                debouncedEmit(update.state.doc.toString());
               }
             }),
             EditorView.focusChangeEffect.of((state, focusing) => {
@@ -640,5 +644,9 @@ export default defineComponent({
 }
 .cm-gutter .cm-foldGutter {
   display: none !important;
+}
+
+.cm-activeLine {
+  background-color: transparent !important;
 }
 </style>
