@@ -40,9 +40,11 @@ use serde_json::Map;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::search::MultiCachedQueryResponse;
 use crate::{
     common::{
-        meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
+        meta::search::{CachedQueryResponse, QueryDelta},
         utils::{stream::get_max_query_range, websocket::calc_queried_range},
     },
     service::{
