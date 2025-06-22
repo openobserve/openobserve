@@ -3139,6 +3139,7 @@ mod tests {
                 min_auto_refresh_interval: u32::default(),
                 feature_ingester_none_compression: bool::default(),
                 ingestion_url: String::default(),
+                dashboard_placeholder: String::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
