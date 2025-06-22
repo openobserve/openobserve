@@ -1451,7 +1451,7 @@ export default defineComponent({
         store.state.zoConfig.timestamp_column || "_timestamp";
       let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
 
-      const filters = JSON.parse(JSON.stringify(variableObject.query_data.filter)) || [];
+      const filters = JSON.parse(JSON.stringify(variableObject.query_data?.filter || []));
 
       if(searchText) {
         filters.push({
