@@ -140,6 +140,16 @@ pub async fn ingest(
             UsageType::Multi,
             IngestionData::Multi(req),
         ),
+        IngestionRequest::Hec(logs) => (
+            "/api/org/ingest/logs/_hec",
+            UsageType::Hec,
+            IngestionData::JSON(logs),
+        ),
+        IngestionRequest::Loki(logs) => (
+            "/api/org/ingest/logs/_loki",
+            UsageType::Loki,
+            IngestionData::JSON(logs),
+        ),
         IngestionRequest::GCP(req) => (
             "/api/org/ingest/logs/_gcs",
             UsageType::GCPSubscription,
@@ -168,11 +178,6 @@ pub async fn ingest(
                 IngestionData::JSON(&json_req),
             )
         }
-        IngestionRequest::Hec(logs) => (
-            "/api/org/ingest/logs/_hec",
-            UsageType::Hec,
-            IngestionData::JSON(logs),
-        ),
     };
 
     let mut stream_status = StreamStatus::new(&stream_name);
