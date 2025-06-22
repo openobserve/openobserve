@@ -1410,6 +1410,7 @@ export default defineComponent({
             if (drilldownData.targetBlank) {
               window.open(logsUrl.toString(), "_blank");
             } else {
+              await store.dispatch("logs/setIsInitialized", false);
               await router.push({
                 path: "/logs",
                 query: Object.fromEntries(logsUrl.searchParams.entries()),
