@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
           :loadOptions="loadVariableOptions"
+          @search="onVariableSearch(index, $event)"
         />
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -303,6 +304,12 @@ export default defineComponent({
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);
       });
+
+      // Clean up any in-flight promises to prevent memory leaks
+      rejectAllPromises();
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
+        currentlyExecutingPromises[key] = null;
+      });
     });
 
     const sendSearchMessage = (queryReq: any) => {
@@ -388,6 +395,12 @@ export default defineComponent({
       variableLog(variableObject.name, `Received response...`);
 
       if (!variableObject) {
+        return;
+      }
+
+      // Check if this operation was cancelled before processing
+      if (currentlyExecutingPromises[variableObject.name] === null) {
+        removeTraceId(variableObject.name, payload.traceId);
         return;
       }
 
@@ -627,6 +640,12 @@ export default defineComponent({
         // console.error("Invalid time range");
         return;
       }
+
+      // Check if this operation was cancelled before proceeding
+      if (currentlyExecutingPromises[variableObject.name] === null) {
+        return;
+      }
+
       // Set loading state before initiating WebSocket
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
@@ -1177,6 +1196,7 @@ export default defineComponent({
     const loadSingleVariableDataByName = async (
       variableObject: any,
       isInitialLoad: boolean = false,
+      searchText?: string,
     ) => {
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
@@ -1187,11 +1207,17 @@ export default defineComponent({
           return;
         }
 
-        // If the variable is already being processed, cancel the previous request
-        if (currentlyExecutingPromises[name]) {
-          variableLog(name, "Canceling previous request");
-          currentlyExecutingPromises[name](false);
+        // For search operations, use comprehensive cancellation
+        if (searchText) {
+          cancelAllVariableOperations(name);
+        } else {
+          // If the variable is already being processed, cancel the previous request
+          if (currentlyExecutingPromises[name]) {
+            variableLog(name, "Canceling previous request");
+            currentlyExecutingPromises[name](false);
+          }
         }
+
         currentlyExecutingPromises[name] = reject;
 
         // Check if this variable has any dependencies
@@ -1280,6 +1306,7 @@ export default defineComponent({
           const success = await handleVariableType(
             variableObject,
             isInitialLoad,
+            searchText,
           );
           // await finalizeVariableLoading(variableObject, success);
           resolve(success);
@@ -1299,6 +1326,7 @@ export default defineComponent({
     const handleVariableType = async (
       variableObject: any,
       isInitialLoad: boolean = false,
+      searchText?: string,
     ) => {
       variableLog(
         variableObject.name,
@@ -1308,7 +1336,7 @@ export default defineComponent({
         case "query_values": {
           // for initial loading check if the value is already available,
           // do not load the values
-          if (isInitialLoad) {
+          if (isInitialLoad && !searchText) {
             variableLog(
               variableObject.name,
               `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
@@ -1321,7 +1349,11 @@ export default defineComponent({
               (!Array.isArray(variableObject.value) ||
                 variableObject.value.length > 0)
             ) {
-              finalizePartialVariableLoading(variableObject, true, isInitialLoad);
+              finalizePartialVariableLoading(
+                variableObject,
+                true,
+                isInitialLoad,
+              );
               finalizeVariableLoading(variableObject, true);
               emitVariablesData();
               return true;
@@ -1329,7 +1361,10 @@ export default defineComponent({
           }
 
           try {
-            const queryContext: any = await buildQueryContext(variableObject);
+            const queryContext: any = await buildQueryContext(
+              variableObject,
+              searchText,
+            );
 
             if (
               isWebSocketEnabled(store.state) ||
@@ -1346,6 +1381,7 @@ export default defineComponent({
                   variableObject,
                   queryContext,
                 );
+
                 if (response?.data?.hits) {
                   const originalValue = JSON.parse(
                     JSON.stringify(variableObject.value),
@@ -1408,18 +1444,31 @@ export default defineComponent({
      * @param variableObject The variable object containing the query data.
      * @returns The query context as a string.
      */
-    const buildQueryContext = async (variableObject: any) => {
+    const buildQueryContext = async (
+      variableObject: any,
+      searchText?: string,
+    ) => {
       variableLog(
         variableObject.name,
-        `Building query context for variable: ${variableObject.name}`,
+        `Building query context for variable: ${variableObject.name}${searchText ? ` with search: ${searchText}` : ""}`,
       );
 
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
       let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
 
+      const filters = JSON.parse(JSON.stringify(variableObject.query_data?.filter || []));
+
+      if(searchText) {
+        filters.push({
+          name: variableObject.query_data.field,
+          operator: "LIKE",
+          value: `%${escapeSingleQuotes(searchText.trim())}%`,
+        });
+      }
+
       // Construct the filter from the query data
-      const constructedFilter = (variableObject.query_data.filter || []).map(
+      const constructedFilter = filters.map(
         (condition: any) => ({
           name: condition.name,
           operator: condition.operator,
@@ -1965,12 +2014,59 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Comprehensive cancellation function that cancels all ongoing operations for a variable
+     * @param {string} variableName - The name of the variable to cancel operations for
+     */
+    const cancelAllVariableOperations = (variableName: string) => {
+      // 1. Cancel any ongoing promise-based operations
+      if (currentlyExecutingPromises[variableName]) {
+        variableLog(variableName, "Canceling currently executing promise");
+        currentlyExecutingPromises[variableName](false);
+        currentlyExecutingPromises[variableName] = null;
+      }
+
+      // 2. Cancel any ongoing WebSocket/Streaming operations
+      cancelTraceId(variableName);      
+
+      // 3. Reset loading states for the variable only if not in search mode
+      const variableObject = variablesData.values.find(
+        (v: any) => v.name === variableName,
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = false;        
+        variableObject.isVariableLoadingPending = false;
+      }
+    };
+
+    const onVariableSearch = async (
+      index: number,
+      { variableItem, filterText }: any,
+    ) => {
+      if (
+        typeof index !== "number" ||
+        !variableItem ||
+        variableItem.type !== "query_values"
+      )
+        return;
+
+      const variableName = variableItem.name;
+
+      // Cancel any previous API calls for this variable immediately
+      cancelAllVariableOperations(variableName);
+
+      await loadSingleVariableDataByName(variableItem, false, filterText);
+    };
+
     return {
       props,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
       loadVariableOptions,
+      onVariableSearch,
+      cancelAllVariableOperations,
     };
   },
 });

@@ -87,8 +87,6 @@ pub async fn handle_request(
             ))
         })?;
     }
-
-    log::info!("[Loki] Successfully processed streams for org '{}'", org_id);
     Ok(IngestionResponse::new(200, vec![]))
 }
 

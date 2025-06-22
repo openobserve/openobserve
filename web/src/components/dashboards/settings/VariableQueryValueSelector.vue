@@ -121,32 +121,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { defineComponent, ref, watch, computed, nextTick } from "vue";
+import { debounce } from "lodash-es";
+import { defineComponent, ref, watch, computed, nextTick, onUnmounted } from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
   props: ["modelValue", "variableItem", "loadOptions"],
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
     const selectedValue = ref(props.variableItem?.value);
     const filterText = ref("");
     const selectRef = ref(null);
     const isOpen = ref(false);
-    const suppressLoadOnNextPopup = ref(false); // added this because on click of enter, we need to skip the API load
 
     const availableOptions = computed(() => props.variableItem?.options || []);
 
+    // Show searchResults if filterText is active, else normal options
     const filteredOptions = computed(() => {
       if (!filterText.value) return availableOptions.value;
-      const searchText = filterText.value.toLowerCase();
       return availableOptions.value.filter((opt: any) =>
-        opt.label.toLowerCase().includes(searchText),
+        opt.label.toLowerCase().includes(filterText.value.toLowerCase()),
       );
     });
     const filterOptions = (val: string, update: Function) => {
       filterText.value = val;
       update();
     };
+
+    // set debouced filterText value that can trigger search
+    const searchText = ref("");
+    const updateSearch = debounce((val: string) => {
+        searchText.value = val;
+    }, 500);
+
+    // --- Typeahead debounce and emit search event ---
+    watch(
+      () => filterText.value,
+      (newVal) => {
+        // set search text
+        updateSearch(newVal);
+      },
+    );
+
+    // emit when searchText changes
+    watch(
+      () => searchText.value,
+      (newVal) => {
+        if(newVal == null || newVal == undefined) {
+          return
+        }
+
+        // no need to update results if the menu is hidden
+        if (!isOpen.value) {
+          return;
+        }
+
+        emit("search", {
+          variableItem: props.variableItem,
+          filterText: newVal,
+        });
+      }
+    )
+
+    // Cleanup debounce timeout when component is unmounted
+    onUnmounted(() => {
+      updateSearch.cancel();
+    });
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
@@ -157,7 +197,18 @@ export default defineComponent({
       }
       return selectedValue.value === SELECT_ALL_VALUE;
     });
-    const toggleSelectAll = () => {
+    
+    const closePopUpWhenValueIsSet = async () => {
+      filterText.value = "";
+      if (selectRef.value) {
+        (selectRef.value as any).updateInputValue("");
+        (selectRef.value as any).blur();
+        await nextTick();
+        (selectRef.value as any).hidePopup();
+      }
+    };
+
+    const toggleSelectAll = async () => {
       const newValue = props.variableItem.multiSelect
         ? isAllSelected.value
           ? []
@@ -166,6 +217,7 @@ export default defineComponent({
 
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
+      await closePopUpWhenValueIsSet();
     };
 
     const onUpdateValue = (val: any) => {
@@ -188,11 +240,6 @@ export default defineComponent({
     const onPopupShow = () => {
       isOpen.value = true;
 
-      if (suppressLoadOnNextPopup.value) {
-        suppressLoadOnNextPopup.value = false;
-        return;
-      }
-
       if (props.loadOptions) {
         props.loadOptions(props.variableItem);
       }
@@ -200,6 +247,7 @@ export default defineComponent({
 
     const onPopupHide = () => {
       isOpen.value = false;
+
       filterText.value = "";
       if (props.variableItem.multiSelect) {
         emit("update:modelValue", selectedValue.value);
@@ -279,19 +327,13 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const handleCustomValue = (value: string) => {
+    const handleCustomValue = async (value: string) => {
       if (!value?.trim() || props.variableItem.multiSelect) return;
 
       const newValue = value.trim();
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
-      filterText.value = ""; // Clear the filter text after setting the value
-
-      suppressLoadOnNextPopup.value = true;
-
-      if (selectRef.value) {
-        (selectRef.value as any).hidePopup();
-      }
+      await closePopUpWhenValueIsSet();
     };
 
     const handleKeydown = (event: KeyboardEvent) => {
