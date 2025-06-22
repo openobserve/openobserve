@@ -1411,6 +1411,7 @@ export default defineComponent({
               window.open(logsUrl.toString(), "_blank");
             } else {
               await store.dispatch("logs/setIsInitialized", false);
+              await nextTick();
               await router.push({
                 path: "/logs",
                 query: Object.fromEntries(logsUrl.searchParams.entries()),
