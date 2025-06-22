@@ -133,7 +133,6 @@ export default defineComponent({
     const filterText = ref("");
     const selectRef = ref(null);
     const isOpen = ref(false);
-    const suppressLoadOnNextPopup = ref(false); // added this because on click of enter, we need to skip the API load
 
     const availableOptions = computed(() => props.variableItem?.options || []);
 
@@ -228,11 +227,6 @@ export default defineComponent({
 
     const onPopupShow = () => {
       isOpen.value = true;
-
-      if (suppressLoadOnNextPopup.value) {
-        suppressLoadOnNextPopup.value = false;
-        return;
-      }
 
       if (props.loadOptions) {
         props.loadOptions(props.variableItem);
@@ -329,9 +323,10 @@ export default defineComponent({
       emit("update:modelValue", newValue);
       filterText.value = ""; // Clear the filter text after setting the value
 
-      suppressLoadOnNextPopup.value = true;
-
       if (selectRef.value) {
+        (selectRef.value as any).updateInputValue("");
+        (selectRef.value as any).blur();
+        await nextTick();
         (selectRef.value as any).hidePopup();
       }
     };
