@@ -48,7 +48,12 @@ use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
-use crate::service::search::datafusion::udf::str_match_udf;
+use crate::service::search::datafusion::udf::{
+    MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+    STR_MATCH_UDF_NAME,
+    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    str_match_udf,
+};
 
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
@@ -254,7 +259,7 @@ impl Condition {
             }
             Expr::Function(func) => {
                 let fn_name = func.name.to_string().to_lowercase();
-                if fn_name == "match_all" {
+                if fn_name == MATCH_ALL_UDF_NAME {
                     if let FunctionArguments::List(list) = &func.args {
                         if list.args.len() != 1 {
                             unreachable!()
@@ -263,7 +268,7 @@ impl Condition {
                     } else {
                         unreachable!()
                     }
-                } else if fn_name == "fuzzy_match_all" {
+                } else if fn_name == FUZZY_MATCH_ALL_UDF_NAME {
                     if let FunctionArguments::List(list) = &func.args {
                         if list.args.len() != 2 {
                             unreachable!()
@@ -276,7 +281,7 @@ impl Condition {
                     } else {
                         unreachable!()
                     }
-                } else if fn_name == "str_match" {
+                } else if fn_name == STR_MATCH_UDF_NAME || fn_name == MATCH_FIELD_UDF_NAME {
                     if let FunctionArguments::List(list) = &func.args {
                         if list.args.len() != 2 {
                             unreachable!()
@@ -287,7 +292,9 @@ impl Condition {
                     } else {
                         unreachable!()
                     }
-                } else if fn_name == "str_match_ignore_case" {
+                } else if fn_name == STR_MATCH_UDF_IGNORE_CASE_NAME
+                    || fn_name == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+                {
                     if let FunctionArguments::List(list) = &func.args {
                         if list.args.len() != 2 {
                             unreachable!()
@@ -679,7 +686,7 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         }
         Expr::Function(func) => {
             let fn_name = func.name.to_string().to_lowercase();
-            if fn_name == "match_all" {
+            if fn_name == MATCH_ALL_UDF_NAME {
                 if let FunctionArguments::List(list) = &func.args {
                     if list.args.len() != 1 {
                         return false;
@@ -687,7 +694,7 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 } else {
                     return false;
                 }
-            } else if fn_name == "fuzzy_match_all" {
+            } else if fn_name == FUZZY_MATCH_ALL_UDF_NAME {
                 if let FunctionArguments::List(list) = &func.args {
                     if list.args.len() != 2 {
                         return false;
@@ -695,7 +702,11 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 } else {
                     return false;
                 }
-            } else if fn_name == "str_match" || fn_name == "str_match_ignore_case" {
+            } else if fn_name == STR_MATCH_UDF_NAME
+                || fn_name == STR_MATCH_UDF_IGNORE_CASE_NAME
+                || fn_name == MATCH_FIELD_UDF_NAME
+                || fn_name == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+            {
                 if let FunctionArguments::List(list) = &func.args {
                     if list.args.len() != 2 {
                         return false;

@@ -59,7 +59,10 @@ use super::{
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 use crate::service::search::{
-    datafusion::udf::{STR_MATCH_UDF_IGNORE_CASE_NAME, STR_MATCH_UDF_NAME},
+    datafusion::udf::{
+        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+        STR_MATCH_UDF_NAME,
+    },
     index::get_arg_name,
 };
 
@@ -1645,7 +1648,11 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
                 return true;
             }
 
-            if f == STR_MATCH_UDF_NAME || f == STR_MATCH_UDF_IGNORE_CASE_NAME {
+            if f == STR_MATCH_UDF_NAME
+                || f == STR_MATCH_UDF_IGNORE_CASE_NAME
+                || f == MATCH_FIELD_UDF_NAME
+                || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+            {
                 if let FunctionArguments::List(list) = &func.args {
                     return list.args.len() == 2
                         && index_fields.contains(&get_arg_name(&list.args[0]));
@@ -2093,7 +2100,11 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             }
             Expr::Function(func) => {
                 let f = func.name.to_string().to_lowercase();
-                if f == STR_MATCH_UDF_NAME || f == STR_MATCH_UDF_IGNORE_CASE_NAME {
+                if f == STR_MATCH_UDF_NAME
+                    || f == STR_MATCH_UDF_IGNORE_CASE_NAME
+                    || f == MATCH_FIELD_UDF_NAME
+                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+                {
                     if let FunctionArguments::List(list) = &func.args {
                         if list.args.len() == 2 {
                             let value = trim_quotes(list.args[1].to_string().as_str());
@@ -2953,6 +2964,19 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
         let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
+        let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
