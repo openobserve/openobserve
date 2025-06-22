@@ -45,7 +45,7 @@ use crate::{
         organization::{DEFAULT_ORG, Organization, USER_DEFAULT},
         telemetry,
     },
-    service::organization::list_orgs_by_user,
+    service::organization::list_org_users_by_user,
     service::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
 };
 
@@ -603,13 +603,16 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
     }
 
     // Check if the user is part of any organization
-    let orgs = list_orgs_by_user(user_email).await;
-    if orgs.is_err() {
+    let org_users = list_org_users_by_user(user_email).await;
+    if org_users.is_err() {
         log::error!("Error fetching orgs for user: {}", user_email);
     }
 
-    let org_name = match orgs {
-        Ok(existing_orgs) if !existing_orgs.is_empty() => existing_orgs[0].name.to_owned(),
+    let (org_name, role) = match org_users {
+        Ok(existing_orgs) if !existing_orgs.is_empty() => (
+            existing_orgs[0].org_name.to_owned(),
+            existing_orgs[0].role.to_string(),
+        ),
         _ => {
             // Create a default org for the user
             let org = Organization {
@@ -646,7 +649,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
                     );
                 }
             };
-            org.name
+            (org.name, "admin".to_string()) /* default to Admin when self signup */
         }
     };
 
@@ -665,7 +668,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
 
     if is_new_user {
         // Send new user info to ActiveCampaign via segment proxy
-        log::warn!("sending track event to segment");
+        log::info!("sending track event to segment");
         let segment_event_data = HashMap::from([
             (
                 "first_name".to_string(),
@@ -684,6 +687,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
                 "created_at".to_string(),
                 json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
             ),
+            ("role".to_string(), json::Value::String(role)),
         ]);
         telemetry::Telemetry::new()
             .send_track_event(

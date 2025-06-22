@@ -24,7 +24,7 @@ use config::{
     },
     utils::rand::generate_random_string,
 };
-use infra::table;
+use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "cloud")]
@@ -229,6 +229,12 @@ pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, an
             org_type: record.org_type.to_string(),
         })
         .collect())
+}
+
+pub async fn list_org_users_by_user(
+    user_email: &str,
+) -> Result<Vec<UserOrgExpandedRecord>, anyhow::Error> {
+    db::org_users::list_orgs_by_user(user_email).await
 }
 
 /// Always creates a new org. Also, makes the user an admin of the org
@@ -553,7 +559,6 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     {
         log::error!("Error updating the invite status in the db: {e}");
     }
-    #[cfg(feature = "cloud")]
     enqueue_cloud_event(CloudEvent {
         org_id: org.identifier.clone(),
         org_name: org.name.clone(),
