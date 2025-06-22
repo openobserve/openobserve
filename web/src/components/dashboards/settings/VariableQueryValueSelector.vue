@@ -197,7 +197,18 @@ export default defineComponent({
       }
       return selectedValue.value === SELECT_ALL_VALUE;
     });
-    const toggleSelectAll = () => {
+    
+    const closePopUpWhenValueIsSet = async () => {
+      filterText.value = "";
+      if (selectRef.value) {
+        (selectRef.value as any).updateInputValue("");
+        (selectRef.value as any).blur();
+        await nextTick();
+        (selectRef.value as any).hidePopup();
+      }
+    };
+
+    const toggleSelectAll = async () => {
       const newValue = props.variableItem.multiSelect
         ? isAllSelected.value
           ? []
@@ -206,6 +217,7 @@ export default defineComponent({
 
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
+      await closePopUpWhenValueIsSet();
     };
 
     const onUpdateValue = (val: any) => {
@@ -235,7 +247,7 @@ export default defineComponent({
 
     const onPopupHide = () => {
       isOpen.value = false;
-      
+
       filterText.value = "";
       if (props.variableItem.multiSelect) {
         emit("update:modelValue", selectedValue.value);
@@ -321,14 +333,7 @@ export default defineComponent({
       const newValue = value.trim();
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
-      filterText.value = ""; // Clear the filter text after setting the value
-
-      if (selectRef.value) {
-        (selectRef.value as any).updateInputValue("");
-        (selectRef.value as any).blur();
-        await nextTick();
-        (selectRef.value as any).hidePopup();
-      }
+      await closePopUpWhenValueIsSet();
     };
 
     const handleKeydown = (event: KeyboardEvent) => {
