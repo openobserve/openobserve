@@ -40,6 +40,8 @@ use serde_json::Map;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::search::MultiCachedQueryResponse;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, QueryDelta},
@@ -304,6 +306,18 @@ pub async fn process_search_stream_request(
                     }
                 }
 
+                // write the partial results to cache if search is cancelled
+                #[cfg(feature = "enterprise")]
+                write_partial_results_to_cache(
+                    &e,
+                    &trace_id,
+                    c_resp,
+                    start_time,
+                    end_time,
+                    &mut accumulated_results,
+                )
+                .await;
+
                 if let Err(e) = sender.send(Err(e)).await {
                     log::error!(
                         "[HTTP2_STREAM] Error sending error message to client: {}",
@@ -371,6 +385,18 @@ pub async fn process_search_stream_request(
                         .await;
                     }
                 }
+
+                // write the partial results to cache if search is cancelled
+                #[cfg(feature = "enterprise")]
+                write_partial_results_to_cache(
+                    &e,
+                    &trace_id,
+                    c_resp,
+                    start_time,
+                    end_time,
+                    &mut accumulated_results,
+                )
+                .await;
 
                 if let Err(e) = sender.send(Err(e)).await {
                     log::error!(
@@ -670,16 +696,14 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req_size > 0 && total_hits > req_size {
+        curr_res_size += total_hits;
+        if req_size > 0 && curr_res_size >= req_size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
                 req_size
             );
             search_res.hits.truncate(req_size as usize);
-            curr_res_size += req_size;
-        } else {
-            curr_res_size += total_hits;
         }
 
         if !search_res.hits.is_empty() {
@@ -1170,16 +1194,19 @@ async fn process_delta(
 
         let total_hits = search_res.total as i64;
 
-        if req.query.size > 0 && total_hits > req.query.size {
+        *curr_res_size += total_hits;
+        if req.query.size > 0 && *curr_res_size >= req.query.size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
                 req.query.size
             );
-            search_res.hits.truncate(req.query.size as usize);
-            *curr_res_size += req.query.size;
-        } else {
-            *curr_res_size += total_hits;
+            let excess_hits = *curr_res_size - req_size;
+            if total_hits > excess_hits && excess_hits > 0 {
+                search_res
+                    .hits
+                    .truncate((total_hits - excess_hits) as usize);
+            }
         }
 
         log::info!(
@@ -1442,7 +1469,7 @@ async fn send_cached_responses(
     *curr_res_size += cached.cached_response.hits.len() as i64;
 
     // truncate hits if `curr_res_size` is greater than `req_size`
-    if req_size != -1 && *curr_res_size > req_size {
+    if req_size != -1 && *curr_res_size >= req_size {
         let excess_hits = *curr_res_size - req_size;
         let total_hits = cached.cached_response.hits.len() as i64;
         if total_hits > excess_hits {
@@ -1640,4 +1667,37 @@ pub fn get_top_k_values(
     }
 
     Ok((top_k_values, result_count as u64))
+}
+
+#[cfg(feature = "enterprise")]
+async fn write_partial_results_to_cache(
+    error: &infra::errors::Error,
+    trace_id: &str,
+    c_resp: MultiCachedQueryResponse,
+    start_time: i64,
+    end_time: i64,
+    accumulated_results: &mut Vec<SearchResultType>,
+) {
+    // write the partial results to cache if search is cancelled
+    match error {
+        #[cfg(feature = "enterprise")]
+        infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(_)) => {
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {} Search cancelled, writing results to cache",
+                trace_id
+            );
+            // write the result to cache
+            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
+                        trace_id,
+                        e
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
 }
