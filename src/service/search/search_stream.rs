@@ -42,7 +42,7 @@ use tracing::Instrument;
 
 use crate::{
     common::{
-        meta::search::{CachedQueryResponse, QueryDelta},
+        meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
         utils::{stream::get_max_query_range, websocket::calc_queried_range},
     },
     service::{
@@ -304,6 +304,17 @@ pub async fn process_search_stream_request(
                     }
                 }
 
+                // write the partial results to cache if search is cancelled
+                write_partial_results_to_cache(
+                    &e,
+                    &trace_id,
+                    c_resp,
+                    start_time,
+                    end_time,
+                    &mut accumulated_results,
+                )
+                .await;
+
                 if let Err(e) = sender.send(Err(e)).await {
                     log::error!(
                         "[HTTP2_STREAM] Error sending error message to client: {}",
@@ -371,6 +382,17 @@ pub async fn process_search_stream_request(
                         .await;
                     }
                 }
+
+                // write the partial results to cache if search is cancelled
+                write_partial_results_to_cache(
+                    &e,
+                    &trace_id,
+                    c_resp,
+                    start_time,
+                    end_time,
+                    &mut accumulated_results,
+                )
+                .await;
 
                 if let Err(e) = sender.send(Err(e)).await {
                     log::error!(
@@ -1639,4 +1661,36 @@ pub fn get_top_k_values(
     }
 
     Ok((top_k_values, result_count as u64))
+}
+
+async fn write_partial_results_to_cache(
+    error: &infra::errors::Error,
+    trace_id: &str,
+    c_resp: MultiCachedQueryResponse,
+    start_time: i64,
+    end_time: i64,
+    accumulated_results: &mut Vec<SearchResultType>,
+) {
+    // write the partial results to cache if search is cancelled
+    match error {
+        #[cfg(feature = "enterprise")]
+        infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(_)) => {
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {} Search cancelled, writing results to cache",
+                trace_id
+            );
+            // write the result to cache
+            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
+                        trace_id,
+                        e
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
 }
