@@ -670,16 +670,14 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req_size > 0 && total_hits > req_size {
+        curr_res_size += total_hits;
+        if req_size > 0 && curr_res_size >= req_size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
                 req_size
             );
             search_res.hits.truncate(req_size as usize);
-            curr_res_size += req_size;
-        } else {
-            curr_res_size += total_hits;
         }
 
         if !search_res.hits.is_empty() {
@@ -1170,16 +1168,17 @@ async fn process_delta(
 
         let total_hits = search_res.total as i64;
 
-        if req.query.size > 0 && total_hits > req.query.size {
+        *curr_res_size += total_hits;
+        if req.query.size > 0 && *curr_res_size >= req.query.size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
                 req.query.size
             );
-            search_res.hits.truncate(req.query.size as usize);
-            *curr_res_size += req.query.size;
-        } else {
-            *curr_res_size += total_hits;
+            let excess_hits = *curr_res_size - req_size;
+            if total_hits > excess_hits && excess_hits > 0 {
+                search_res.hits.truncate(excess_hits as usize);
+            }
         }
 
         log::info!(
@@ -1442,7 +1441,7 @@ async fn send_cached_responses(
     *curr_res_size += cached.cached_response.hits.len() as i64;
 
     // truncate hits if `curr_res_size` is greater than `req_size`
-    if req_size != -1 && *curr_res_size > req_size {
+    if req_size != -1 && *curr_res_size >= req_size {
         let excess_hits = *curr_res_size - req_size;
         let total_hits = cached.cached_response.hits.len() as i64;
         if total_hits > excess_hits {
