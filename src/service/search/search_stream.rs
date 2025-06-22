@@ -305,6 +305,7 @@ pub async fn process_search_stream_request(
                 }
 
                 // write the partial results to cache if search is cancelled
+                #[cfg(feature = "enterprise")]
                 write_partial_results_to_cache(
                     &e,
                     &trace_id,
@@ -384,6 +385,7 @@ pub async fn process_search_stream_request(
                 }
 
                 // write the partial results to cache if search is cancelled
+                #[cfg(feature = "enterprise")]
                 write_partial_results_to_cache(
                     &e,
                     &trace_id,
@@ -1665,6 +1667,7 @@ pub fn get_top_k_values(
     Ok((top_k_values, result_count as u64))
 }
 
+#[cfg(feature = "enterprise")]
 async fn write_partial_results_to_cache(
     error: &infra::errors::Error,
     trace_id: &str,
