@@ -47,7 +47,7 @@ import { defineAsyncComponent, defineComponent, onMounted, ref, watch } from "vu
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 
 import DashboardQueryEditor from "./DashboardQueryEditor.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
+import QueryEditor from "@/components/CodeQueryEditor.vue";
 import ChartRenderer from "../panels/ChartRenderer.vue";
 import CustomChartRenderer from "../panels/CustomChartRenderer.vue";
 import { useStore } from "vuex";
