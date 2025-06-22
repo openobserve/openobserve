@@ -334,7 +334,7 @@ const props = defineProps({
 const emit = defineEmits(["function-error"]);
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const inputQuery = ref<string>("");
@@ -433,8 +433,13 @@ onMounted(() => {
 
 const setEventsEditor = () => {
   setTimeout(() => {
-    inputEvents.value = `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`;
-    eventsEditorRef?.value?.formatDocument();
+    inputEvents.value = JSON.stringify(
+      JSON.parse(
+        `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
+      ),
+      null,
+      2,
+    );
   }, 300);
 };
 
@@ -546,7 +551,11 @@ const getResults = async () => {
       expandState.value.stream = false;
       expandState.value.query = false;
       expandState.value.events = true;
-      inputEvents.value = JSON.stringify(res.data.hits, null, 2);
+      inputEvents.value = JSON.stringify(
+        JSON.parse(JSON.stringify(res.data.hits)),
+        null,
+        2,
+      );
       sqlQueryErrorMsg.value = "";
     })
     .catch((err: any) => {
@@ -590,11 +599,11 @@ const processTestResults = async (results: any) => {
     results?.data?.results.map((event: any) => event.event || event.events) ||
     [];
 
-  outputEvents.value = JSON.stringify(processedEvents);
-  await Promise.all([
-    eventsEditorRef.value?.formatDocument(),
-    outputEventsEditorRef.value?.formatDocument(),
-  ]);
+  outputEvents.value = JSON.stringify(
+    JSON.parse(JSON.stringify(processedEvents)),
+    null,
+    2,
+  );
 
   await nextTick();
   setTimeout(() => {
@@ -603,7 +612,6 @@ const processTestResults = async (results: any) => {
 };
 
 const handleTestError = (err: any) => {
-  console.error("Error in testing function:", err);
   const errMsg = err.response?.data?.message || "Error in testing function";
   outputEventsErrorMsg.value = "Error while transforming results";
 
@@ -651,8 +659,6 @@ function getLineRanges(object: any) {
     // Convert object to JSON string for comparison
     const serializedObject = JSON.stringify(object.event, null, 4);
     const serializedLines = serializedObject.split("\n");
-
-    console.log("Serialized Lines:", serializedLines);
 
     let startLine = -1;
 
