@@ -42,7 +42,7 @@ pub(crate) mod transform_udf;
 pub(crate) const STR_MATCH_UDF_NAME: &str = "str_match";
 /// The name of the str_match_ignore_case UDF given to DataFusion.
 pub(crate) const STR_MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
-/// The name of the str_match UDF given to DataFusion.
+/// The name of the match_field UDF given to DataFusion.
 pub(crate) const MATCH_FIELD_UDF_NAME: &str = "match_field";
 /// The name of the match_field_ignore_case UDF given to DataFusion.
 pub(crate) const MATCH_FIELD_IGNORE_CASE_UDF_NAME: &str = "match_field_ignore_case";
