@@ -179,8 +179,12 @@ impl FileData {
         self.data.contains_key(file)
     }
 
+    fn get_file_path(&self, file: &str) -> String {
+        format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
+    }
+
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
-        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
+        let file_path = self.get_file_path(file);
         tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
             Err(_) => None,
@@ -191,7 +195,7 @@ impl FileData {
     }
 
     async fn get_size(&self, file: &str) -> Option<usize> {
-        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
+        let file_path = self.get_file_path(file);
         match get_file_size(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
@@ -202,8 +206,7 @@ impl FileData {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[CacheType:{}] File disk cache {} is full, can't cache extra {}  bytes",
-                trace_id,
+                "[CacheType:{} trace_id: {trace_id}] File disk cache is full, can't cache extra {} bytes",
                 self.file_type,
                 data_size
             );
@@ -215,13 +218,20 @@ impl FileData {
             self.gc(trace_id, need_release_size).await?;
         }
 
-        self.cur_size += data_size;
-        self.data.insert(file.to_string(), data_size);
         // write file into local disk
-        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
+        let file_path = self.get_file_path(file);
         fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
         put_file_contents(&file_path, &data)?;
-        // metrics
+
+        // set size
+        self.set_size(file, data_size).await
+    }
+
+    async fn set_size(&mut self, file: &str, data_size: usize) -> Result<(), anyhow::Error> {
+        // update size
+        self.cur_size += data_size;
+        self.data.insert(file.to_string(), data_size);
+        // update metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::QUERY_DISK_CACHE_FILES
@@ -249,7 +259,7 @@ impl FileData {
     async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
+            "[CacheType:{} trace_id: {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
             self.cur_size,
             self.max_size,
@@ -261,26 +271,22 @@ impl FileData {
             let item = self.data.remove();
             if item.is_none() {
                 log::warn!(
-                    "[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none"
+                    "[CacheType:{} trace_id: {trace_id}] File disk cache is corrupt, it shouldn't be none",
+                    self.file_type,
                 );
                 break;
             }
             let (key, data_size) = item.unwrap();
             // delete file from local disk
-            let file_path = format!(
-                "{}{}{}",
-                self.root_dir,
-                self.choose_multi_dir(key.as_str()),
-                key
-            );
+            let file_path = self.get_file_path(key.as_str());
             log::debug!(
-                "[CacheType:{} trace_id {trace_id}] File disk cache gc remove file: {}",
+                "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}",
                 self.file_type,
                 key
             );
             if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
-                    "[CacheType:{} trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                    "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}, error: {}",
                     self.file_type,
                     file_path,
                     e
@@ -294,7 +300,7 @@ impl FileData {
                 let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
                 if let Err(e) = fs::remove_dir_all(&file_path) {
                     log::error!(
-                        "[CacheType:{} trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                        "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}, error: {}",
                         self.file_type,
                         file_path,
                         e
@@ -348,7 +354,7 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes",
+            "[CacheType:{} trace_id: {trace_id}] File disk cache gc done, released {} bytes",
             self.file_type,
             release_size
         );
@@ -358,7 +364,7 @@ impl FileData {
 
     async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         log::debug!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache remove file {}",
+            "[CacheType:{} trace_id: {trace_id}] File disk cache remove file {}",
             self.file_type,
             file
         );
@@ -369,15 +375,10 @@ impl FileData {
         self.cur_size -= data_size;
 
         // delete file from local disk
-        let file_path = format!(
-            "{}{}{}",
-            self.root_dir,
-            self.choose_multi_dir(key.as_str()),
-            key
-        );
+        let file_path = self.get_file_path(key.as_str());
         if let Err(e) = fs::remove_file(&file_path) {
             log::error!(
-                "[CacheType:{} trace_id {trace_id}] File disk cache remove file: {}, error: {}",
+                "[CacheType:{} trace_id: {trace_id}] File disk cache remove file: {}, error: {}",
                 self.file_type,
                 file_path,
                 e
@@ -480,7 +481,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+fn get_file_reader(file: &str) -> Option<&FileData> {
     if !get_config().disk_cache.enabled {
         return None;
     }
@@ -494,25 +495,25 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     } else {
         RESULT_FILES_READER.get(idx).unwrap()
     };
+    Some(files)
+}
+
+#[inline]
+pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    let files = get_file_reader(file)?;
     files.get(file, range).await
 }
 
 #[inline]
 pub async fn get_size(file: &str) -> Option<usize> {
-    if !get_config().disk_cache.enabled {
-        return None;
-    }
-    let idx = get_bucket_idx(file);
-    let files = if file.starts_with("files") {
-        FILES_READER.get(idx).unwrap()
-    } else if file.starts_with("results") {
-        RESULT_FILES_READER.get(idx).unwrap()
-    } else if file.starts_with("aggregations") {
-        AGGREGATION_FILES_READER.get(idx).unwrap()
-    } else {
-        RESULT_FILES_READER.get(idx).unwrap()
-    };
+    let files = get_file_reader(file)?;
     files.get_size(file).await
+}
+
+#[inline]
+pub fn get_file_path(file: &str) -> Option<String> {
+    let files = get_file_reader(file)?;
+    Some(files.get_file_path(file))
 }
 
 #[inline]
@@ -574,6 +575,31 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
 }
 
 #[inline]
+pub async fn set_size(file: &str, data_size: usize) -> Result<(), anyhow::Error> {
+    if !get_config().disk_cache.enabled {
+        return Ok(());
+    }
+
+    // hash the file name and get the bucket index
+    let idx = get_bucket_idx(file);
+
+    // get all the files from the bucket
+    let mut files = if file.starts_with("files") {
+        FILES[idx].write().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].write().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].write().await
+    } else {
+        RESULT_FILES[idx].write().await
+    };
+    if files.exist(file).await {
+        return Ok(());
+    }
+    files.set_size(file, data_size).await
+}
+
+#[inline]
 pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
@@ -621,7 +647,9 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                 } else {
                     // check file is tmp file
-                    if fp.extension().is_some_and(|ext| ext == "tmp") {
+                    if fp.extension().is_some_and(|ext| ext == "tmp")
+                        || fp.to_str().unwrap().ends_with("_tmp.arrow")
+                    {
                         log::debug!(
                             "Removing temporary file during cache load: {}",
                             fp.display()

@@ -3139,6 +3139,8 @@ mod tests {
                 min_auto_refresh_interval: u32::default(),
                 feature_ingester_none_compression: bool::default(),
                 ingestion_url: String::default(),
+                dashboard_placeholder: String::default(),
+                aggregation_cache_enabled: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3305,7 +3307,6 @@ mod tests {
                 gc_size: usize::default(),
                 gc_interval: u64::default(),
                 multi_dir: String::default(),
-                aggregation_cache_enabled: bool::default(),
                 aggregation_max_size: usize::default(),
                 delay_window_mins: i64::default(),
             },
