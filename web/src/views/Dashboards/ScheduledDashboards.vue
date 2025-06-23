@@ -209,10 +209,10 @@ const formatReports = () => {
         ? convertUnixToQuasarFormat(report.last_triggered_at)
         : "-",
       created_at: convertUnixToQuasarFormat(
-        new Date(report.created_at).getTime() * 1000,
+        report.created_at,
       ),
       orgId: report.org_id,
-      isCached: !report.destinations.length,
+      isCached: !report?.destinations?.length,
     });
   });
 
@@ -287,14 +287,14 @@ const columns: any = [
   {
     name: "last_triggered_at",
     field: "last_triggered_at",
-    label: t("reports.last_triggered_at"),
+    label: t("reports.lastTriggeredAt"),
     align: "left",
     sortable: false,
   },
   {
     name: "created_at",
     field: "created_at",
-    label: t("reports.created_at"),
+    label: t("reports.createdAt"),
     align: "left",
     sortable: false,
   },

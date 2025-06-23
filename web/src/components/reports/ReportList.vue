@@ -312,7 +312,7 @@ onBeforeMount(() => {
       reportsTableRows.value = res.data.map((report: any, index: number) => ({
         "#": index + 1,
         ...report,
-        lastTriggeredAt: report.last_triggered_at
+        last_triggered_at: report.last_triggered_at
           ? convertUnixToQuasarFormat(report.last_triggered_at)
           : "-",
       }));
