@@ -39,7 +39,7 @@ import {
 } from "vue";
 
 import { EditorView, basicSetup, minimalSetup } from "codemirror";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment, StateEffect, StateField } from "@codemirror/state";
 import { sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
@@ -54,7 +54,7 @@ import {
   closeBracketsKeymap,
 } from "@codemirror/autocomplete";
 
-import { keymap, lineNumbers } from "@codemirror/view";
+import { keymap, lineNumbers, showTooltip, Tooltip } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
@@ -465,6 +465,45 @@ export default defineComponent({
       ]);
     };
 
+    const setTooltip = StateEffect.define<Tooltip | null>();
+
+    const tooltipField = StateField.define<Tooltip | null>({
+      create: () => null,
+      update(value, tr) {
+        for (const e of tr.effects) {
+          if (e.is(setTooltip)) return e.value;
+        }
+        return value;
+      },
+      provide: f => showTooltip.from(f)
+    });
+
+    function showTooltipAtCursor(view, message) {
+      const pos = view.state.selection.main.head;
+
+      const tooltip = {
+        pos,
+        above: true,
+        strictSide: true,
+        create() {
+          const dom = document.createElement("div");
+          dom.textContent = message;
+          dom.className = "cm-tooltip-readonly";
+          return { dom };
+        }
+      };
+
+      view.dispatch({ effects: setTooltip.of(tooltip) });
+    }
+
+    const onFocusExtension = EditorView.domEventHandlers({
+      focus(event, view) {
+        if (view.state.readOnly) {
+          showTooltipAtCursor(view, "Can not edit in read-only mode.");
+        }
+      }
+    })
+
     // Debounced emit for document changes
     const debouncedEmit = debounce((value: string, update: any) => {
       emit("update-query", update, value);
@@ -496,10 +535,16 @@ export default defineComponent({
         editorElement.innerHTML = "";
       }
 
+      // below line is used to set read only mode
+      // readOnlyCompartment.of(EditorState.readOnly.of(true)),
       try {
+        const readOnlyCompartment = new Compartment()
         const state = EditorState.create({
           doc: props.query?.trim() || "",
           extensions: [
+            readOnlyCompartment.of(EditorState.readOnly.of(props.readOnly)),
+            tooltipField,
+            onFocusExtension,
             minimalSetup,
             closeBrackets(),
             EditorView.lineWrapping,
@@ -510,7 +555,6 @@ export default defineComponent({
             createAutocompletion(),
             ...createTheme(),
             createKeymap(),
-            EditorView.editable.of(!props.readOnly),
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
                 debouncedEmit(update.state.doc.toString(), update);
@@ -809,5 +853,14 @@ export default defineComponent({
 
 .cm-activeLine {
   background-color: transparent !important;
+}
+
+.cm-tooltip-readonly {
+  background: #444;
+  color: white;
+  padding: 4px 8px;
+  font-size: 13px;
+  border-radius: 4px;
+  z-index: 100;
 }
 </style>
