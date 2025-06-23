@@ -814,11 +814,13 @@ export default defineComponent({
         return;
       }
 
-      if(
-        !store.state.logs.logs.data.stream.selectedStream.includes(router.currentRoute.value.query.stream)
-        || router.currentRoute.value.query.org_identifier !== store.state.logs.logs.organizationIdentifier) {
+      if(Object.hasOwn(router.currentRoute.value.query, "stream") && Object.hasOwn(router.currentRoute.value.query, "org_identifier") && store.state.logs.logs.data != undefined &&
+        Object.hasOwn(store.state.logs.logs.data, "stream") && Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
+        (!store.state.logs.logs.data.stream.selectedStream.includes(router.currentRoute.value.query.stream)
+        || router.currentRoute.value.query.org_identifier !== store.state.logs.logs.organizationIdentifier)) {
           store.dispatch("logs/setIsInitialized", false);
       }
+      return;
     };
 
     // Setup logic for the logs tab
