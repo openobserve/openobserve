@@ -647,7 +647,9 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                 } else {
                     // check file is tmp file
-                    if fp.extension().is_some_and(|ext| ext == "tmp") {
+                    if fp.extension().is_some_and(|ext| ext == "tmp")
+                        || fp.to_str().unwrap().ends_with("_tmp.arrow")
+                    {
                         log::debug!(
                             "Removing temporary file during cache load: {}",
                             fp.display()
