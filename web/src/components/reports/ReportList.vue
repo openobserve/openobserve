@@ -21,7 +21,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
   >
-    <div class="full-width">
+  <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4"
+    :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    >
+      <div class="q-table__title" data-test="report-list-title">
+        {{ t("reports.header") }}
+      </div>
+
+      <div class="tw-flex tw-items-center report-list-tabs">
+        <app-tabs
+          class="q-mr-md"
+          :tabs="tabs"
+          v-model:active-tab="activeTab"
+          @update:active-tab="filterReports"
+        />
+        <q-input
+          data-test="report-list-search-input"
+          v-model="filterQuery"
+          borderless
+          filled
+          dense
+          class="q-ml-auto no-border"
+          :placeholder="t('reports.search')"
+        >
+          <template #prepend>
+            <q-icon name="search" class="cursor-pointer" />
+          </template>
+        </q-input>
+        <q-btn
+          data-test="report-list-add-report-btn"
+          class="q-ml-md text-bold no-border"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          :label="t(`reports.add`)"
+          @click="createNewReport"
+        />
+      </div>
+    </div>
+    <div class="full-width o2-quasar-table"
+    style="height: calc(100vh - 112px) ; overflow-y: auto;"
+    :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+    >
       <q-table
         data-test="report-list-table"
         ref="reportListTableRef"
@@ -105,44 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #top="scope">
-          <div class="tw-flex tw-justify-between tw-w-full">
-            <div class="q-table__title" data-test="report-list-title">
-              {{ t("reports.header") }}
-            </div>
-
-            <div class="tw-flex tw-items-center report-list-tabs">
-              <app-tabs
-                class="q-mr-md"
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="filterReports"
-              />
-              <q-input
-                data-test="report-list-search-input"
-                v-model="filterQuery"
-                borderless
-                filled
-                dense
-                class="q-ml-auto q-mb-xs no-border"
-                :placeholder="t('reports.search')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-              <q-btn
-                data-test="report-list-add-report-btn"
-                class="q-ml-md q-mb-xs text-bold no-border"
-                padding="sm lg"
-                color="secondary"
-                no-caps
-                :label="t(`reports.add`)"
-                @click="createNewReport"
-              />
-            </div>
-          </div>
-
           <QTablePagination
+            style="padding: 0px !important;"
             :scope="scope"
             :pageTitle="t('reports.header')"
             :position="'top'"
@@ -161,6 +166,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:changeRecordPerPage="changePagination"
           />
         </template>
+
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Rendering the of the columns -->
+               <!-- here we can add the classes class so that the head will be sticky -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
 
@@ -294,6 +315,7 @@ const columns: any = ref<QTableProps["columns"]>([
     align: "center",
     style: "width: 300px",
     sortable: false,
+    classes: "actions-column",
   },
 ]);
 

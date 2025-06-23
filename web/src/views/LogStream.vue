@@ -169,33 +169,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="q-table__control tw-font-[600]" v-if="scope.pagination.rowsNumber > 0">
             Showing {{ ((scope.pagination.page - 1) * scope.pagination.rowsPerPage) + 1 }} - {{((scope.pagination.page * scope.pagination.rowsPerPage) > scope.pagination.rowsNumber) ? scope.pagination.rowsNumber : scope.pagination.page * scope.pagination.rowsPerPage}} of {{scope.pagination.rowsNumber}}
-            <div class="q-btn-group row no-wrap inline tw-ml-4">
-              <q-btn
-                icon="chevron_left"
-                color="grey-8"
-                round
-                dense
-                flat
-                size="sm"
-                class="q-px-sm"
-                :disable="scope.isFirstPage"
-                @click="scope.prevPage"
-              />
-              <hr
-                class="q-separator q-separator--vertical"
-                aria-orientation="vertical"
-              />
-              <q-btn
-                icon="chevron_right"
-                color="grey-8"
-                round
-                dense
-                flat
-                size="sm"
-                class="q-px-sm"
-                :disable="scope.isLastPage"
-                @click="scope.nextPage"
-              />
+            <div class=" row no-wrap inline tw-ml-4">
+              <q-btn-group>
+                <q-btn
+                  icon="chevron_left"
+                  :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
+                  class="pageNav"
+                  color="#FAFBFD"
+                  size="sm"
+                  flat
+                  :disable="scope.isFirstPage"
+                  @click="scope.prevPage"
+                />
+                <q-separator vertical />
+                <q-btn
+                  icon="chevron_right"
+                  :text-color="scope.isLastPage ? '$light-text2' : '$dark'"
+                  class="pageNav"
+                  color="#FAFBFD"
+                  size="sm"
+                  flat
+                  :disable="scope.isLastPage"
+                  @click="scope.nextPage"
+                />
+              </q-btn-group>
             </div>
           </div>
         </div>
