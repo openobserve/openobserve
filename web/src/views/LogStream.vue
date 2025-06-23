@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #top="scope">
-        <div class="flex justify-between items-center full-width q-mt-sm" style="font-size: 12px">
+        <div class="flex justify-between items-center full-width" style="font-size: 12px">
           <div class="q-table__separator col text-bold tw-text-[14px]">
             {{scope.pagination.rowsNumber}} Stream(s)
           </div>
