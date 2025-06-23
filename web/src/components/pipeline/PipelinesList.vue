@@ -234,6 +234,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:changeRecordPerPage="changePagination"
             />
           </template>
+          <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Rendering the of the columns -->
+               <!-- here we can add the classes class so that the head will be sticky -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
         </q-table>
       </div>
     </div>
@@ -468,6 +483,7 @@ const getColumnsForActiveTab = (tab : any) => {
     label: t("alerts.actions"),
     align: "center",
     sortable: false,
+    classes: "actions-column",
   };
 if(tab === "all"){
 
