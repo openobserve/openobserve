@@ -15,234 +15,242 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="currentRouteName === 'pipelines'">
-    <div
-      :class="store.state.theme === 'dark' ? 'dark-mode dark-theme' : 'light-theme light-mode'"
-     class="full-wdith pipeline-list-table">
-      <q-table
-        data-test="pipeline-list-table"
-        ref="qTableRef"
-        :rows="filteredPipelines"
-        :columns="columns"
-        row-key="name"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        style="width: 100%"
-        dense
+
+    <div v-if="currentRouteName === 'pipelines'">
+
+      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4"
+      :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      style="position: sticky; top: 0; z-index: 1000 ;"
       >
-      <template v-slot:body="props">
-        <q-tr
-          :data-test="`pipeline-list-table-${props.row.pipeline_id}-row`"
-          :props="props"
-          style="cursor: pointer"
-          @click="triggerExpand(props)"
-        >
-          <q-td v-if="activeTab == 'scheduled' "  >
-            
-            <q-btn
+        <div class="q-table__title" data-test="pipeline-list-title">
+              {{ t("pipeline.header") }}
+              
+            </div>
+            <div class="tw-flex tw-items-center report-list-tabs q-ml-auto">
+
+            <app-tabs
+                  data-test="pipeline-list-tabs"
+                  class="q-mr-md "
+                  :tabs="tabs"
+                  v-model:active-tab="activeTab"
+                  @update:active-tab="updateActiveTab"
+                />
+            <q-input
+              data-test="pipeline-list-search-input"
+              v-model="filterQuery"
+              borderless
+              filled
               dense
-              flat
-              size="xs"
-              :icon="
-                expandedRow != props.row.pipeline_id
-                  ? 'expand_more'
-                  : 'expand_less'
-              "
-            />
-          </q-td>
-          <q-td v-for="col in filterColumns()" :key="col.name " :props="props">
-
-          <template v-if="col.name  !== 'actions'">
-            {{ props.row[col.field] }}
-          </template>
-          <template v-else>
-            <!-- Actions Buttons -->
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click.stop="toggleAlertState(props.row)"
-            />
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('pipeline.edit')"
-              @click.stop="editPipeline(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
-              icon="download"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('pipeline.export')"
-              @click.stop="exportPipeline(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('pipeline.delete')"
-              @click.stop="openDeleteDialog(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
-              :icon="outlinedVisibility"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('pipeline.view')"
+              class=" no-border"
+              :placeholder="t('pipeline.search')"
             >
-            <q-tooltip position="bottom">
-              <PipelineView :pipeline="props.row" />
-            </q-tooltip>
-          </q-btn>
-          </template>
-        </q-td>
-
-      
-        </q-tr>
-        <q-tr data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.pipeline_id" :props="props" >
-         
-          <q-td v-if="props.row?.sql_query"  colspan="100%">
-
-            <div data-test="scheduled-pipeline-expanded-content" class="text-left tw-px-2 q-mb-sm  expanded-content">
-            <div class="tw-flex tw-items-center q-py-sm  ">
-              <strong >SQL Query : <span></span></strong>
-            </div>
-              <div class="tw-flex tw-items-start  tw-justify-center" >
-            
-              <div data-test="scheduled-pipeline-expanded-sql" class="scrollable-content  expanded-sql ">
-                <pre style="text-wrap: wrap;">{{ props.row?.sql_query  }} </pre>
-
-              </div>
-              
-              
-              </div>
-            </div>
-
-          </q-td>
-        </q-tr>
-      </template>
-        <template #no-data>
-          <no-data />
-        </template>
- 
-        <template v-slot:body-cell-function="props">
-          <q-td :props="props">
-            <q-tooltip>
-              <pre data-test="scheduled-pipeline-expanded-tooltip-sql">{{ props.row.sql }}</pre>
-            </q-tooltip>
-            <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-          </q-td>
-        </template>
-        <template #top="scope">
-          <div class="q-table__title" data-test="pipeline-list-title">
-            {{ t("pipeline.header") }}
-            
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+            <q-btn
+                data-test="pipeline-list-import-pipeline-btn"
+                class="q-ml-md text-bold"
+                padding="sm lg"
+                no-caps
+                :label="t(`pipeline.import`)"
+                @click="routeToImportPipeline"
+            />
+            <q-btn
+                data-test="pipeline-list-add-pipeline-btn"
+                class="q-ml-md text-bold no-border"
+                padding="sm lg"
+                color="secondary"
+                no-caps
+                :label="t(`pipeline.addPipeline`)"
+                @click="routeToAddPipeline"
+            />
           </div>
-          <div class="tw-flex tw-items-center report-list-tabs q-ml-auto">
-
-          <app-tabs
-                data-test="pipeline-list-tabs"
-                class="q-mr-md "
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="updateActiveTab"
-              />
-          <q-input
-            data-test="pipeline-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class=" q-mb-xs no-border"
-            :placeholder="t('pipeline.search')"
+      </div>
+      <div
+        :class="store.state.theme === 'dark' ? 'dark-mode dark-theme' : 'light-theme light-mode'"
+      class="full-wdith"
+      >
+        <q-table
+          data-test="pipeline-list-table"
+          ref="qTableRef"
+          :rows="filteredPipelines"
+          :columns="columns"
+          row-key="name"
+          :pagination="pagination"
+          :filter="filterQuery"
+          :filter-method="filterData"
+          style="width: 100%;"
+          class="o2-quasar-table"
+          :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'light-o2-quasar-table-dark'"
+        >
+        <template v-slot:body="props">
+          <q-tr
+            :data-test="`pipeline-list-table-${props.row.pipeline_id}-row`"
+            :props="props"
+            style="cursor: pointer"
+            @click="triggerExpand(props)"
           >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+            <q-td v-if="activeTab == 'scheduled' "  >
+              
+              <q-btn
+                dense
+                flat
+                size="xs"
+                :icon="
+                  expandedRow != props.row.pipeline_id
+                    ? 'expand_more'
+                    : 'expand_less'
+                "
+              />
+            </q-td>
+            <q-td v-for="col in filterColumns()" :key="col.name " :props="props">
+
+            <template v-if="col.name  !== 'actions'">
+              {{ props.row[col.field] }}
             </template>
-          </q-input>
-          <q-btn
-              data-test="pipeline-list-import-pipeline-btn"
-              class="q-ml-md q-mb-xs text-bold"
-              padding="sm lg"
-              no-caps
-              :label="t(`pipeline.import`)"
-              @click="routeToImportPipeline"
-          />
-          <q-btn
-              data-test="pipeline-list-add-pipeline-btn"
-              class="q-ml-md q-mb-xs text-bold no-border"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              :label="t(`pipeline.addPipeline`)"
-              @click="routeToAddPipeline"
-          />
-        </div>
+            <template v-else>
+              <!-- Actions Buttons -->
+              <q-btn
+                :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
+                :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+                class="q-ml-xs material-symbols-outlined"
+                padding="sm"
+                unelevated
+                size="sm"
+                :color="props.row.enabled ? 'negative' : 'positive'"
+                round
+                flat
+                :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+                @click.stop="toggleAlertState(props.row)"
+              />
+              <q-btn
+                :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
+                icon="edit"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('pipeline.edit')"
+                @click.stop="editPipeline(props.row)"
+              ></q-btn>
+              <q-btn
+                :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
+                icon="download"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('pipeline.export')"
+                @click.stop="exportPipeline(props.row)"
+              ></q-btn>
+              <q-btn
+                :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
+                :icon="outlinedDelete"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('pipeline.delete')"
+                @click.stop="openDeleteDialog(props.row)"
+              ></q-btn>
+              <q-btn
+                :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
+                :icon="outlinedVisibility"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('pipeline.view')"
+              >
+              <q-tooltip position="bottom">
+                <PipelineView :pipeline="props.row" />
+              </q-tooltip>
+            </q-btn>
+            </template>
+          </q-td>
 
-          <q-table-pagination
-            :scope="scope"
-            :pageTitle="t('pipeline.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
+        
+          </q-tr>
+          <q-tr data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.pipeline_id" :props="props" >
+          
+            <q-td v-if="props.row?.sql_query"  colspan="100%">
 
-        <template #bottom="scope">
-          <q-table-pagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+              <div data-test="scheduled-pipeline-expanded-content" class="text-left tw-px-2 q-mb-sm  expanded-content">
+              <div class="tw-flex tw-items-center q-py-sm  ">
+                <strong >SQL Query : <span></span></strong>
+              </div>
+                <div class="tw-flex tw-items-start  tw-justify-center" >
+              
+                <div data-test="scheduled-pipeline-expanded-sql" class="scrollable-content  expanded-sql ">
+                  <pre style="text-wrap: wrap;">{{ props.row?.sql_query  }} </pre>
+
+                </div>
+                
+                
+                </div>
+              </div>
+
+            </q-td>
+          </q-tr>
         </template>
-      </q-table>
+          <template #no-data>
+            <no-data />
+          </template>
+  
+          <template v-slot:body-cell-function="props">
+            <q-td :props="props">
+              <q-tooltip>
+                <pre data-test="scheduled-pipeline-expanded-tooltip-sql">{{ props.row.sql }}</pre>
+              </q-tooltip>
+              <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
+            </q-td>
+          </template>
+          <template #top="scope">
+            <q-table-pagination
+              :scope="scope"
+              :pageTitle="t('pipeline.header')"
+              :position="'top'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </template>
+
+          <template #bottom="scope">
+            <q-table-pagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </template>
+        </q-table>
+      </div>
     </div>
-  </div>
 
-  <router-view v-else />
+    <router-view v-else />
 
-  <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
-    <stream-selection @save="savePipeline" />
-  </q-dialog>
+    <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
+      <stream-selection @save="savePipeline" />
+    </q-dialog>
 
-  <confirm-dialog
-    :title="confirmDialogMeta.title"
-    :message="confirmDialogMeta.message"
-    @update:ok="confirmDialogMeta.onConfirm()"
-    @update:cancel="resetConfirmDialog"
-    v-model="confirmDialogMeta.show"
-  />
+    <confirm-dialog
+      :title="confirmDialogMeta.title"
+      :message="confirmDialogMeta.message"
+      @update:ok="confirmDialogMeta.onConfirm()"
+      @update:cancel="resetConfirmDialog"
+      v-model="confirmDialogMeta.show"
+    />
 </template>
 <script setup lang="ts">
 import { ref, onBeforeMount, computed, watch, reactive, onActivated, onMounted } from "vue";
@@ -798,20 +806,6 @@ const routeToImportPipeline = () =>{
 }
 
 
-:deep(.pipeline-list-table thead th:last-child) {
-  position: sticky;
-  right: 0;
-    z-index: 1;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-    width: 100px;
-}
-
-:deep(.dark-theme.pipeline-list-table thead th:last-child) {
-  background: var(--q-dark);
-}
-:deep(.light-theme.pipeline-list-table thead th:last-child) {
-  background: #ffffff;
-}
 
 
 
