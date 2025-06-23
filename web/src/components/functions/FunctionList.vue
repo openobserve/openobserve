@@ -19,6 +19,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <div v-if="!showAddJSTransformDialog">
+      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4" 
+      :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      >
+        <div class="q-table__title">
+            {{ t("function.header") }}
+          </div>
+          <div class="q-ml-auto" data-test="functions-list-search-input">
+            <q-input
+              v-model="filterQuery"
+              borderless
+              filled
+              dense
+              class="q-ml-auto no-border"
+              :placeholder="t('function.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+          </div>
+          <q-btn
+            class="q-ml-md text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t(`function.add`)"
+            @click="showAddUpdateFn({})"
+          />
+      </div>
       <q-table
         ref="qTable"
         :rows="jsTransforms"
@@ -28,7 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
-        dense
+        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+        class="o2-quasar-table"
       >
         <template #no-data>
           <NoData />
@@ -82,32 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title">
-            {{ t("function.header") }}
-          </div>
-          <div class="q-ml-auto" data-test="functions-list-search-input">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              filled
-              dense
-              class="q-ml-auto q-mb-xs no-border"
-              :placeholder="t('function.search')"
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
-          </div>
-          <q-btn
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t(`function.add`)"
-            @click="showAddUpdateFn({})"
-          />
-
           <QTablePagination
             :scope="scope"
             :pageTitle="t('function.header')"
@@ -620,12 +624,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
 .pipeline-list-container {
   max-height: 200px; /* Adjust based on item height to fit 5 items */
   overflow-y: auto;

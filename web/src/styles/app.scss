@@ -210,7 +210,9 @@
     background: #ffffff;
   }
 }
-
+//this is for in some of pages we are having a header for eg: pipelines ,functions ,enrichments listing pages
+//there to maintain consistency of the page name and add buttons to be at the top while scrolling the table 
+//we need to have this because here it is a embededded in q-splitter
 .o2-table-header-dark{
   background-color: #181A1B;
   position: sticky;
