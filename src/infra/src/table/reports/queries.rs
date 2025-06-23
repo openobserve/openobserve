@@ -305,7 +305,7 @@ pub struct ListReportsQueryResult {
     pub report_name: String,
     pub report_owner: Option<String>,
     pub report_description: Option<String>,
-    pub report_created_at: DateTime<FixedOffset>,
+    pub report_created_at: i64,
     pub report_frequency: Json,
     /// KSUID primary key of the dashboard.
     pub report_dashboard_id: String,
@@ -327,6 +327,7 @@ impl ListReportsQueryResult {
         params: &ListReportsParams,
     ) -> Result<Vec<Self>, sea_orm::DbErr> {
         let rslts = Self::select(params).all(conn).await?;
+        log::info!("rslts: {:?}", rslts);
         Ok(rslts)
     }
 
@@ -359,6 +360,7 @@ impl ListReportsQueryResult {
                 "report_dashboard_timerange",
             )
             .column_as(dashboards::Column::DashboardId, "dashboard_snowflake_id")
+            .column_as(folders::Column::Org, "org_id")
             .join(
                 sea_orm::JoinType::InnerJoin,
                 reports::Relation::Folders.def(),

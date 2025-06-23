@@ -18,14 +18,17 @@
 
 use std::num::TryFromIntError;
 
-use config::meta::{
-    alerts::default_align_time,
-    dashboards::reports::{
-        ReportDashboardVariable as MetaReportDashboardVariable,
-        ReportDestination as MetaReportDestination, ReportFrequency as MetaReportFrequency,
-        ReportFrequencyType as MetaReportFrequencyType, ReportTimerange as MetaReportTimeRange,
-        ReportTimerangeType as MetaReportTimeRangeType,
+use config::{
+    meta::{
+        alerts::default_align_time,
+        dashboards::reports::{
+            ReportDashboardVariable as MetaReportDashboardVariable,
+            ReportDestination as MetaReportDestination, ReportFrequency as MetaReportFrequency,
+            ReportFrequencyType as MetaReportFrequencyType, ReportTimerange as MetaReportTimeRange,
+            ReportTimerangeType as MetaReportTimeRangeType,
+        },
     },
+    utils::json,
 };
 use serde::{Deserialize, Serialize};
 
@@ -88,6 +91,7 @@ pub struct ReportFrequency {
     #[serde(default)]
     pub cron: String,
     #[serde(default)]
+    #[serde(rename = "type")]
     pub frequency_type: ReportFrequencyType,
     #[serde(default = "default_align_time")]
     pub align_time: bool,
@@ -259,4 +263,12 @@ impl From<MetaReportTimeRange> for ReportTimerange {
             },
         }
     }
+}
+
+pub fn convert_str_to_meta_report_timerange(
+    value: serde_json::Value,
+) -> Result<MetaReportTimeRange, anyhow::Error> {
+    let timerange: ReportTimerange = json::from_value(value).map_err(|e| anyhow::anyhow!(e))?;
+    let timerange: MetaReportTimeRange = timerange.into();
+    Ok(timerange)
 }

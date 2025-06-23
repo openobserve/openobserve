@@ -15,11 +15,11 @@
 
 use std::str::FromStr;
 
-use chrono::{DateTime, FixedOffset};
 use config::{
     meta::dashboards::reports::{ReportFrequency, ReportTimerange},
     utils::json,
 };
+use infra::table::reports::convert_str_to_meta_report_timerange;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
@@ -38,7 +38,7 @@ pub struct ListReportsResponseBodyItem {
     pub name: String,
     pub owner: Option<String>,
     pub description: Option<String>,
-    pub created_at: DateTime<FixedOffset>,
+    pub created_at: i64,
     pub dashboards: Vec<ReportDashboard>,
     pub frequency: ReportFrequency,
     pub enabled: bool,
@@ -78,8 +78,7 @@ impl TryFrom<infra::table::reports::ListReportsQueryResult> for ListReportsRespo
                 folder: value.folder_id,
                 tabs: json::from_value(value.report_dashboard_tab_names)
                     .map_err(|e| anyhow::anyhow!(e))?,
-                timerange: json::from_value(value.report_dashboard_timerange)
-                    .map_err(|e| anyhow::anyhow!(e))?,
+                timerange: convert_str_to_meta_report_timerange(value.report_dashboard_timerange)?,
             }],
             frequency: json::from_value(value.report_frequency).map_err(|e| anyhow::anyhow!(e))?,
             enabled: value.report_enabled,
