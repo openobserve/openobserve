@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div style="height: 100%; width: 100%">
                 <div style="height: calc(100% - 40px); width: 100%">
                   <QueryEditor
-                    v-if="!promqlMode"
+                    v-if="!promqlMode && dashboardPanelData.layout.vrlFunctionToggle"
                     data-test="dashboard-vrl-function-editor"
                     style="width: 100%; height: 100%"
                     ref="vrlFnEditorRef"
