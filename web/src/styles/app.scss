@@ -196,7 +196,7 @@
 }
 //here we have dark theme styling for the table
 //`. we are changing the background color of the actions column
-.dark-o2-quasar-table{
+.o2-quasar-table-dark{
   th:last-child.actions-column,
   td:last-child.actions-column {
     background: var(--q-dark);
@@ -204,9 +204,24 @@
   }
 }
 
-.light-o2-quasar-table{
+.o2-quasar-table-light{
   th:last-child.actions-column,
   td:last-child.actions-column {
     background: #ffffff;
   }
 }
+
+.o2-table-header-dark{
+  background-color: #181A1B;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.o2-table-header-light{
+  background-color: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
