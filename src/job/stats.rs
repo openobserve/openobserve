@@ -19,7 +19,7 @@ use tokio::time;
 use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    // tokio::task::spawn(async move { usage_report_stats().await });
+    tokio::task::spawn(async move { update_node_memory_usage().await });
     tokio::task::spawn(async move { file_list_update_stats().await });
     tokio::task::spawn(async move { cache_stream_stats().await });
     Ok(())
@@ -86,5 +86,16 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
         } else {
             log::debug!("[STATS] run cached stream stats success");
         }
+    }
+}
+
+// update node memory usage metrics every second
+async fn update_node_memory_usage() -> Result<(), anyhow::Error> {
+    loop {
+        let mem_usage = config::utils::sysinfo::get_memory_usage();
+        config::metrics::NODE_MEMORY_USAGE
+            .with_label_values(&[])
+            .set(mem_usage as i64);
+        tokio::time::sleep(time::Duration::from_secs(1)).await;
     }
 }
