@@ -22,8 +22,7 @@ test.describe("Pagination for logs", () => {
         await ingestionPage.ingestionJoin();
         
     });
-
-    test("Enable Streaming for running query to validate match_all('ziox')", async ({ page }) => {
+    test("Enable Streaming for running query to validate WHERE match_all('[2022-12-27T14:11:27Z INFO  zinc_enl')", {tag: ['@shyam']}, async ({ page }) => {
 
         await managementPage.goToManagement();
         await page.waitForTimeout(5000);
@@ -31,6 +30,10 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
         await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("[2022-12-27T14:11:27Z INFO  zinc_enl")');
+        await page.keyboard.press('Backspace');
+        await page.keyboard.press('Backspace');
+        await page.waitForTimeout(2000);
+
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
 
