@@ -41,7 +41,7 @@ const useStreams = () => {
     logs: computed(() => store.state.streams.logs),
     metrics: computed(() => store.state.streams.metrics),
     traces: computed(() => store.state.streams.traces),
-    enrichmentTables: computed(() => store.state.streams.enrichmentTables),
+    enrichment_tables: computed(() => store.state.streams.enrichment_tables),
     index: computed(() => store.state.streams.index),
     metadata: computed(() => store.state.streams.metadata),
   };
@@ -52,6 +52,7 @@ const useStreams = () => {
     _streamName: string = "",
     schema: boolean,
     notify: boolean = true,
+    force: boolean = false, 
   ) => {
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
@@ -63,7 +64,7 @@ const useStreams = () => {
         await getStreamsPromise.value;
       }
       try {
-        if (!isStreamFetched(streamName || "all")) {
+        if (!isStreamFetched(streamName || "all") || force) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
             ? q.notify({

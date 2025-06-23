@@ -4,7 +4,7 @@ export default {
       logs: {},
       metrics: {},
       traces: {},
-      enrichmentTables: {},
+      enrichment_tables: {},
       index: {},
       metadata: {},
       streamsIndexMapping: {},
@@ -16,7 +16,7 @@ export default {
           logs: state.logs,
           metrics: state.metrics,
           traces: state.traces,
-          enrichmentTables: state.enrichmentTables,
+          enrichment_tables: state.enrichment_tables,
           index: state.index,
           metadata: state.metadata,
         };
@@ -45,7 +45,7 @@ export default {
         state.traces = traces;
       },
       updateEnrichmentTables(state: any, enrichmentTables: any) {
-        state.enrichmentTables = enrichmentTables;
+        state.enrichment_tables = enrichmentTables;
       },
       updateIndex(state: any, index: any) {
         state.index = index;
@@ -89,7 +89,7 @@ export default {
           context.commit('updateMetrics', payload.streams);
         } else if (payload.streamType === 'traces') {
           context.commit('updateTraces', payload.streams);
-        } else if (payload.streamType === 'enrichmentTables') {
+        } else if (payload.streamType === 'enrichment_tables') {
           context.commit('updateEnrichmentTables', payload.streams);
         } else if (payload.streamType === 'index') {
           context.commit('updateIndex', payload.streams);
