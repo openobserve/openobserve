@@ -177,6 +177,8 @@
 //to apply this style to a table , we need to add a class o2-quasar-table to the table
 //add if we want to apply dark theme to the table , we need to add a class dark-o2-quasar-table to the table
 //add if we want to apply light theme to the table , we need to add a class light-o2-quasar-table to the table
+//if there are actions in the table , we need to add a class actions-column to the last column
+
 .o2-quasar-table{
   th,td {
     padding: 0px 16px !important;
