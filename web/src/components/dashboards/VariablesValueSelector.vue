@@ -1464,12 +1464,8 @@ export default defineComponent({
         dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
       }
 
-      const filters = JSON.parse(
-        JSON.stringify(variableObject.query_data?.filter || []),
-      );
-
       // Construct the filter from the query data
-      const constructedFilter = filters.map(
+      const constructedFilter = (variableObject.query_data?.filter || []).map(
         (condition: any) => ({
           name: condition.name,
           operator: condition.operator,
@@ -1477,14 +1473,11 @@ export default defineComponent({
         }),
       );
 
-      if (!constructedFilter || constructedFilter.length === 0) {
-        return b64EncodeUnicode(dummyQuery);
-      }
       // Add labels to the dummy query
-      let queryContext = await addLabelsToSQlQuery(
+      let queryContext = constructedFilter.length ? await addLabelsToSQlQuery(
         dummyQuery,
         constructedFilter,
-      );
+      ) : dummyQuery;
 
       // Replace variable placeholders with actual values
       for (const variable of variablesData.values) {
