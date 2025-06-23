@@ -1143,6 +1143,8 @@ pub struct Common {
         help = "Enable to use stream settings for partitions. This will apply for all streams"
     )]
     pub use_stream_settings_for_partitions_enabled: bool,
+    #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
+    pub dashboard_placeholder: String,
 }
 
 #[derive(EnvConfig)]
