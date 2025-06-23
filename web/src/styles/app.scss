@@ -173,3 +173,40 @@
     background-color: #212121;
   } 
 }
+// this is the default table style for all tables in the app
+//to apply this style to a table , we need to add a class o2-quasar-table to the table
+//add if we want to apply dark theme to the table , we need to add a class dark-o2-quasar-table to the table
+//add if we want to apply light theme to the table , we need to add a class light-o2-quasar-table to the table
+.o2-quasar-table{
+  th,td {
+    padding: 0px 16px !important;
+    height: 32px !important;
+  };
+
+
+  th:last-child.actions-column,
+  td:last-child.actions-column {
+    //the fixed width as we have moved some actions to the menu so lot of space is occupied by actions section so remvoed that
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: #ffffff;
+    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+  }
+}
+//here we have dark theme styling for the table
+//`. we are changing the background color of the actions column
+.dark-o2-quasar-table{
+  th:last-child.actions-column,
+  td:last-child.actions-column {
+    background: var(--q-dark);
+    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
+  }
+}
+
+.light-o2-quasar-table{
+  th:last-child.actions-column,
+  td:last-child.actions-column {
+    background: #ffffff;
+  }
+}
