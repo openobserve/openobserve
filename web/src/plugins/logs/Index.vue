@@ -842,10 +842,6 @@ export default defineComponent({
 
         loadLogsData();
 
-        if (isCloudEnvironment()) {
-          setupCloudSpecificThreshold();
-        }
-
         searchObj.meta.quickMode = isQuickModeEnabled();
         searchObj.meta.showHistogram = isHistogramEnabled();
 
@@ -867,11 +863,6 @@ export default defineComponent({
     // Helper function to check if the environment is cloud
     function isCloudEnvironment() {
       return config.isCloud === "true";
-    }
-
-    // Setup cloud-specific organization threshold
-    function setupCloudSpecificThreshold() {
-      MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
     }
 
     // Helper function to check if quick mode is enabled
