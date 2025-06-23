@@ -1439,62 +1439,6 @@ export default defineComponent({
       }
     };
 
-    let parser: any;
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
-    /**
-     * Builds a typeahead query for the given variable object and search text.
-     * This function constructs a SQL query to search for the given text
-     * within a specified field of a data stream.
-     *
-     * @param variableObject The variable object containing query data.
-     * @param searchText The text to search for within the field.
-     * @returns A base64 encoded SQL query string or null if input is invalid.
-     */
-    const buildVariablesTypeAheadQuery = async (
-      variableObject: any,
-      searchText: string,
-    ) => {
-      // Return null if search text or field is not provided
-      if (!searchText || !variableObject?.query_data?.field) return null;
-
-      // Dynamically import the SQL parser
-      await importSqlParser();
-
-      // Get the timestamp column from the store or use a default value
-      const timestamp_column =
-        store.state.zoConfig.timestamp_column || "_timestamp";
-
-      // Build the base query string for typeahead search
-      let baseQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE CAST(${variableObject.query_data.field} AS TEXT) LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
-
-      // Add any existing filters to the query
-      const filters = variableObject.query_data?.filter || [];
-      if (filters.length > 0) {
-        const filterConditions = filters
-          .map(
-            (filter: any) =>
-              `${filter.name} ${filter.operator} '${escapeSingleQuotes(filter.value)}'`,
-          )
-          .join(" AND ");
-        baseQuery += ` AND ${filterConditions}`;
-      }
-
-      // Parse the SQL query into an abstract syntax tree (AST)
-      const ast = parser.astify(baseQuery);
-
-      // Convert the AST back into a SQL string, replacing backticks with double quotes
-      let queryContext = parser.sqlify(ast).replace(/`/g, '"');
-
-      // Encode the query string in base64
-      return b64EncodeUnicode(queryContext);
-    };
-
     /**
      * Builds the query context for the given variable object.
      * @param variableObject The variable object containing the query data.
@@ -1509,14 +1453,16 @@ export default defineComponent({
         `Building query context for variable: ${variableObject.name}${searchText ? ` with search: ${searchText}` : ""}`,
       );
 
-      // If searchText is provided, use the typeahead query builder
-      if (searchText) {
-        return await buildVariablesTypeAheadQuery(variableObject, searchText);
-      }
-
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
-      let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
+
+      let dummyQuery: string;
+
+      if (searchText) {
+        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE CAST(${variableObject.query_data.field} AS TEXT) LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
+      } else {
+        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
+      }
 
       const filters = JSON.parse(
         JSON.stringify(variableObject.query_data?.filter || []),
@@ -1531,6 +1477,9 @@ export default defineComponent({
         }),
       );
 
+      if (!constructedFilter || constructedFilter.length === 0) {
+        return b64EncodeUnicode(dummyQuery);
+      }
       // Add labels to the dummy query
       let queryContext = await addLabelsToSQlQuery(
         dummyQuery,
