@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="query-editor"
     class="logs-query-editor"
+    :class="[store.state.theme === 'dark' ? 'theme-dark' : 'theme-light']"
     ref="editorRef"
     :id="editorId"
   />
@@ -825,6 +826,7 @@ export default defineComponent({
       addErrorDiagnostics,
       cleanupEditor,
       forceCleanup,
+      store,
     };
   },
 });
@@ -856,11 +858,19 @@ export default defineComponent({
 }
 
 .cm-tooltip-readonly {
-  background: #444;
-  color: white;
   padding: 4px 8px;
   font-size: 13px;
   border-radius: 4px;
   z-index: 100;
+}
+
+.theme-dark .cm-tooltip-readonly {
+  background: #444;
+  color: white;
+}
+
+.theme-light .cm-tooltip-readonly {
+  background: #f5f5f5;
+  color: #333;
 }
 </style>
