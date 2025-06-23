@@ -572,6 +572,7 @@ export default defineComponent({
     PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
     SelectFolderDropDown,
     AlertsContainer,
+    JsonEditor,
   },
   setup(props, { emit }) {
     const store: any = useStore();
