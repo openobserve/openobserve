@@ -409,6 +409,9 @@ const refreshFunctionList = () => {
 };
 const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
 const functionOptions = ref<string[]>([]);
+const pipelineDestinationsList = ref<any[]>([]);
+const usedStreamsListResponse = ref<any[]>([]);
+
 
 const streamRoutes = ref<{ [key: string]: any }>({});
 
@@ -468,6 +471,8 @@ onBeforeMount(() => {
 
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
+  pipelineDestinationsList.value = await getPipelineDestinations();
+  usedStreamsListResponse.value = await getUsedStreamsList();
   const { path, query } = router.currentRoute.value; 
     if (path.includes("edit") && !query.id) {
       router.push({
@@ -979,27 +984,22 @@ const savePipelineJson = async (json: string) => {
     const parsedPipeline = JSON.parse(json);
     let streamList: any = [];
     let usedStreamsList: any = [];
-    let pipelineDestinationsList: any = [];
     if(pipelineObj.currentSelectedPipeline.source.source_type === "realtime"){
       try{
-        //why fetching stream list and usedstream list here??
         //there are couple of scenarios that we need to take care of 
-        //1. these changes are coming from the user very lately right by the time user remaining pipelines may create some new streams so user predicts this streams got created and let me use those 
         //if user gets error that this stream is not there 
         //2. we dont know if user selects scheduled or realtime right so we need to do this check at the time of saving only 
-        //3. plan to store these list in the store so that unnecessary api calls will be avoided.
+        //3. TODO: store these list in the store so that unnecessary api calls will be avoided.
         const streamsListResponse: any = await getStreams(parsedPipeline.source.stream_type || "logs", false);
-        const usedStreamsListResponse: any = await getUsedStreamsList();
-        pipelineDestinationsList = await getPipelineDestinations();
         streamList = streamsListResponse.list.map((stream: any) => stream.name);
-        usedStreamsList = usedStreamsListResponse.filter((stream: any) => stream.stream_type == parsedPipeline.source.stream_type).map((stream: any) => stream.stream_name);
+        usedStreamsList = usedStreamsListResponse.value.filter((stream: any) => stream.stream_type == parsedPipeline.source.stream_type).map((stream: any) => stream.stream_name);
       }
       catch(error){
         console.log(error,'error')
       }
     }
 
-    const validationResult = validatePipelineUtil(parsedPipeline, { streamList: streamList, usedStreamsList: usedStreamsList, originalPipeline: pipelineObj.currentSelectedPipeline, pipelineDestinations: pipelineDestinationsList, functionsList: functionOptions.value, selectedOrgId: store.state.selectedOrganization.identifier });
+    const validationResult = validatePipelineUtil(parsedPipeline, { streamList: streamList, usedStreamsList: usedStreamsList, originalPipeline: pipelineObj.currentSelectedPipeline, pipelineDestinations: pipelineDestinationsList.value, functionsList: functionOptions.value, selectedOrgId: store.state.selectedOrganization.identifier });
     
     if (!validationResult.isValid) {
       // Set validation errors to be displayed in the JsonEditor
