@@ -39,7 +39,12 @@ import {
 } from "vue";
 
 import { EditorView, basicSetup, minimalSetup } from "codemirror";
-import { EditorState, Compartment, StateEffect, StateField } from "@codemirror/state";
+import {
+  EditorState,
+  Compartment,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import { sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
@@ -318,7 +323,9 @@ export default defineComponent({
           (context: CompletionContext) => {
             const word = context.matchBefore(/\w*/);
 
-            if (!word.text && !props.autoComplete.showEmpty) return null;
+            if (!word) return null;
+
+            if (!word?.text && !props.autoComplete.showEmpty) return null;
 
             const textUntilPosition = context.state.doc.sliceString(
               0,
@@ -332,7 +339,9 @@ export default defineComponent({
             // Add keywords
             keywords.value.forEach((keyword: any) => {
               if (
-                keyword.label.toLowerCase().includes(word.text.toLowerCase())
+                keyword.label
+                  .toLowerCase()
+                  .includes(word?.text?.toLowerCase() || "")
               ) {
                 completions.push({
                   label: keyword.label,
@@ -351,7 +360,7 @@ export default defineComponent({
             });
 
             return {
-              from: word.from,
+              from: word?.from,
               options: completions,
               filter: props.autoComplete.filter,
             };
@@ -487,7 +496,7 @@ export default defineComponent({
         }
         return value;
       },
-      provide: f => showTooltip.from(f)
+      provide: (f) => showTooltip.from(f),
     });
 
     function showTooltipAtCursor(view: EditorView, message: string) {
@@ -502,7 +511,7 @@ export default defineComponent({
           dom.textContent = message;
           dom.className = "cm-tooltip-readonly";
           return { dom };
-        }
+        },
       };
 
       view.dispatch({ effects: setTooltip.of(tooltip) });
@@ -513,8 +522,8 @@ export default defineComponent({
         if (view.state.readOnly) {
           showTooltipAtCursor(view, "Can not edit in read-only mode.");
         }
-      }
-    })
+      },
+    });
 
     // Debounced emit for document changes
     const debouncedEmit = debounce((value: string, update: any) => {
@@ -550,7 +559,7 @@ export default defineComponent({
       // below line is used to set read only mode
       // readOnlyCompartment.of(EditorState.readOnly.of(true)),
       try {
-        const readOnlyCompartment = new Compartment()
+        const readOnlyCompartment = new Compartment();
         const state = EditorState.create({
           doc: props.query?.trim() || "",
           extensions: [
