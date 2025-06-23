@@ -30,7 +30,7 @@ test.describe("Pagination for logs", () => {
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
-        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("ziox")');
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("[2022-12-27T14:11:27Z INFO  zinc_enl")');
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
 
@@ -43,7 +43,7 @@ test.describe("Pagination for logs", () => {
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
-        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("zio*")');
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("[2022-12-27T14:11:27*")');
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
 
@@ -56,7 +56,7 @@ test.describe("Pagination for logs", () => {
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
-        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("us*")');
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("parque*")');
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
 
@@ -69,12 +69,24 @@ test.describe("Pagination for logs", () => {
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStreamDefault();
-        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("ip-10-2-15-197.us-east-2.co*")');
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("2022-12-27T14:1*")');
         await logsPage.selectRunQuery();
         await logsPage.validateResult();
 
     });
 
+    test("Enable Streaming for running query to validate match_all('[2022-12-27T14:11:27Z INFO  zinc_enl') limit 10", async ({ page }) => {
+
+        await managementPage.goToManagement();
+        await page.waitForTimeout(5000);
+        await managementPage.checkStreaming();
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStreamDefault();
+        await logsPage.clearAndFillQueryEditor('SELECT * FROM "default" WHERE match_all("[2022-12-27T14:11:27Z INFO  zinc_enl") limit 10');
+        await logsPage.selectRunQuery();
+        await logsPage.validateResult();
+
+    });
 
    
 });
