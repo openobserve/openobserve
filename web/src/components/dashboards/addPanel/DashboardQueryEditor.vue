@@ -161,15 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : sqlAutoCompleteSuggestions
                 "
                 :autoComplete="
-                  dashboardPanelData.data.queryType === 'promql'
-                    ? {
-                        showEmpty: true,
-                        selectOnOpen: true,
-                      }
-                    : {
-                        showEmpty: false,
-                        selectOnOpen: false,
-                      }
+                  dashboardPanelData.data.queryType === 'promql' && {
+                    showEmpty: true,
+                    selectOnOpen: true,
+                    filter: true,
+                    filterStrict: true,
+                  }
                 "
                 @update-query="updateQuery"
                 @run-query="searchData"
@@ -409,6 +406,7 @@ export default defineComponent({
       autoCompleteData: promqlAutoCompleteData,
       autoCompletePromqlKeywords: promqlAutoCompleteKeywords,
       getSuggestions: promqlGetSuggestions,
+      updateMetricKeywords,
     } = usePromqlSuggestions();
 
     const {

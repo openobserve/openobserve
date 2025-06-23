@@ -90,18 +90,20 @@ const usePromlqSuggestions = () => {
       labelMeta.hasLabels = true;
       labelMeta.isEmpty = !hasCurlyBraces[1].length;
       labelMeta.isFocused =
-        hasCurlyBraces.index <= cursorIndex &&
-        hasCurlyBraces.index + hasCurlyBraces[1].length >= cursorIndex;
+        hasCurlyBraces.index <= (cursorIndex) &&
+        hasCurlyBraces.index + hasCurlyBraces[1].length >= (cursorIndex);
     }
 
     if (hasCurlyBraces) {
       const start = hasCurlyBraces.index;
       const end = start + hasCurlyBraces[0].length;
       if (start <= cursorIndex && cursorIndex <= end) {
-        const value = hasCurlyBraces[0][cursorIndex - start - 1];
-     
+        const value = hasCurlyBraces[0][cursorIndex - start];
+        const nextValue = hasCurlyBraces[0][cursorIndex - start + 1];
+
+        console.log("value", value);
         // Check is value
-        if (value === '"' || value === "=") {
+        if ((value === '"' && nextValue !== "}") || value === "=") {
           labelMeta["focusOn"] = "value";
         }
 
@@ -168,6 +170,7 @@ const usePromlqSuggestions = () => {
         updatePromqlKeywords([]);
         return;
       }
+
 
       if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label"))
         return;
