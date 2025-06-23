@@ -206,8 +206,7 @@ impl FileData {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[CacheType:{}] File disk cache {} is full, can't cache extra {}  bytes",
-                trace_id,
+                "[CacheType:{} trace_id: {trace_id}] File disk cache is full, can't cache extra {} bytes",
                 self.file_type,
                 data_size
             );
@@ -260,7 +259,7 @@ impl FileData {
     async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
+            "[CacheType:{} trace_id: {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
             self.cur_size,
             self.max_size,
@@ -272,7 +271,8 @@ impl FileData {
             let item = self.data.remove();
             if item.is_none() {
                 log::warn!(
-                    "[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none"
+                    "[CacheType:{} trace_id: {trace_id}] File disk cache is corrupt, it shouldn't be none",
+                    self.file_type,
                 );
                 break;
             }
@@ -280,13 +280,13 @@ impl FileData {
             // delete file from local disk
             let file_path = self.get_file_path(key.as_str());
             log::debug!(
-                "[CacheType:{} trace_id {trace_id}] File disk cache gc remove file: {}",
+                "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}",
                 self.file_type,
                 key
             );
             if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
-                    "[CacheType:{} trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                    "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}, error: {}",
                     self.file_type,
                     file_path,
                     e
@@ -300,7 +300,7 @@ impl FileData {
                 let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
                 if let Err(e) = fs::remove_dir_all(&file_path) {
                     log::error!(
-                        "[CacheType:{} trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                        "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}, error: {}",
                         self.file_type,
                         file_path,
                         e
@@ -354,7 +354,7 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes",
+            "[CacheType:{} trace_id: {trace_id}] File disk cache gc done, released {} bytes",
             self.file_type,
             release_size
         );
@@ -364,7 +364,7 @@ impl FileData {
 
     async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         log::debug!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache remove file {}",
+            "[CacheType:{} trace_id: {trace_id}] File disk cache remove file {}",
             self.file_type,
             file
         );
@@ -378,7 +378,7 @@ impl FileData {
         let file_path = self.get_file_path(key.as_str());
         if let Err(e) = fs::remove_file(&file_path) {
             log::error!(
-                "[CacheType:{} trace_id {trace_id}] File disk cache remove file: {}, error: {}",
+                "[CacheType:{} trace_id: {trace_id}] File disk cache remove file: {}, error: {}",
                 self.file_type,
                 file_path,
                 e
