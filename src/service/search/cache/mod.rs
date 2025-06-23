@@ -432,9 +432,6 @@ pub async fn search(
     let write_res = deep_copy_response(&res);
     let mut local_res = deep_copy_response(&res);
 
-    println!("local_res: {:?}", local_res.hits);
-    println!("c_resp: {:?}", c_resp.cached_response);
-
     // There are 3 types of partial responses:
     // 1. VRL error
     // 2. Super cluster error

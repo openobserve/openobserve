@@ -1095,6 +1095,8 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1567,8 +1569,6 @@ pub struct DiskCache {
     pub multi_dir: String,
     #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
     pub aggregation_max_size: usize,
-    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
-    pub aggregation_cache_enabled: bool,
     #[env_config(
         name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
         default = 10,
@@ -2432,6 +2432,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
         && !cfg.common.metrics_cache_enabled
+        && !cfg.common.aggregation_cache_enabled
     {
         cfg.disk_cache.enabled = false;
     }
@@ -2440,6 +2441,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
+        cfg.common.aggregation_cache_enabled = false;
         cfg.cache_latest_files.enabled = false;
         cfg.cache_latest_files.delete_merge_files = false;
     }

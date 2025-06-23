@@ -219,13 +219,20 @@ impl FileData {
             self.gc(trace_id, need_release_size).await?;
         }
 
-        self.cur_size += data_size;
-        self.data.insert(file.to_string(), data_size);
         // write file into local disk
         let file_path = self.get_file_path(file);
         fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
         put_file_contents(&file_path, &data)?;
-        // metrics
+
+        // set size
+        self.set_size(file, data_size).await
+    }
+
+    async fn set_size(&mut self, file: &str, data_size: usize) -> Result<(), anyhow::Error> {
+        // update size
+        self.cur_size += data_size;
+        self.data.insert(file.to_string(), data_size);
+        // update metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::QUERY_DISK_CACHE_FILES
@@ -565,6 +572,31 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
         return Ok(());
     }
     files.set(trace_id, file, data).await
+}
+
+#[inline]
+pub async fn set_size(file: &str, data_size: usize) -> Result<(), anyhow::Error> {
+    if !get_config().disk_cache.enabled {
+        return Ok(());
+    }
+
+    // hash the file name and get the bucket index
+    let idx = get_bucket_idx(file);
+
+    // get all the files from the bucket
+    let mut files = if file.starts_with("files") {
+        FILES[idx].write().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].write().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].write().await
+    } else {
+        RESULT_FILES[idx].write().await
+    };
+    if files.exist(file).await {
+        return Ok(());
+    }
+    files.set_size(file, data_size).await
 }
 
 #[inline]
