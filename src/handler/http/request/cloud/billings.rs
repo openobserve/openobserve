@@ -22,7 +22,7 @@ use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
 use super::IntoHttpResponse;
 use crate::{
     common::{
-        meta::http::HttpResponse as MetaHttpResponse,
+        meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::{auth::UserEmail, redirect_response::RedirectResponseBuilder},
     },
     handler::http::models::billings::{
@@ -130,9 +130,11 @@ pub async fn create_checkout_session(
 #[get("/{org_id}/billings/checkout_session_detail")]
 pub async fn process_session_detail(
     path: web::Path<String>,
+    user_email: UserEmail,
     query: web::Query<CheckoutSessionDetailRequestQuery>,
 ) -> impl Responder {
     let org_id = path.into_inner();
+    let email = user_email.user_id.as_str();
     if query.status != "success" {
         return o2_cloud_billings::BillingError::InvalidStatus.into_http_response();
     }
@@ -157,6 +159,22 @@ pub async fn process_session_detail(
                 &get_config().common.web_url,
                 &org_id
             );
+            // Send event to ActiveCampaign
+            let segment_event_data = HashMap::from([
+                ("email".to_string(), json::Value::String(email.to_string())),
+                (
+                    "plan".to_string(),
+                    json::Value::String(query.plan.to_string()),
+                ),
+            ]);
+            telemetry::Telemetry::new()
+                .send_track_event(
+                    "OpenObserve - New subscription started",
+                    Some(segment_event_data),
+                    false,
+                    false,
+                )
+                .await;
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
                 org_name: org.name.clone(),
