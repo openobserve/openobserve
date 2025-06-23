@@ -43,37 +43,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, onMounted, ref, watch } from "vue";
-import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
-
-import DashboardQueryEditor from "./DashboardQueryEditor.vue";
+import {
+  defineComponent,
+  ref,
+} from "vue";
 import QueryEditor from "@/components/CodeQueryEditor.vue";
-import ChartRenderer from "../panels/ChartRenderer.vue";
-import CustomChartRenderer from "../panels/CustomChartRenderer.vue";
 import { useStore } from "vuex";
-import { on } from "events";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-
-
-
 
 export default defineComponent({
   components: {
-    MonacoMarkdownEditor: defineAsyncComponent(
-      () => import("./MonacoMarkdownEditor.vue"),
-    ),
-    MarkdownRenderer,
     QueryEditor,
-    ChartRenderer,
-    CustomChartRenderer,
-    DashboardQueryEditor,
   },
   name: "CustomChartEditor",
   props: {
     modelValue: {
       type: String,
       default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
-  `
+  `,
     },
   },
   setup(props, { emit }): any {
@@ -95,7 +82,6 @@ export default defineComponent({
         console.error("Error processing newVal:", error);
       }
     };
-
 
     return {
       javascriptCodeContent,
@@ -137,7 +123,6 @@ export default defineComponent({
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
 }
-.javascript-query-editor{
-
+.javascript-query-editor {
 }
 </style>
