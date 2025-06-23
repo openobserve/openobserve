@@ -19,6 +19,10 @@ export default {
     setIsInitialized(state: any, isInitialized: boolean) {
       state.isInitialized = isInitialized;
     },
+    resetLogs(state: any) {
+      state.logs = {};
+      state.isInitialized = false;
+    },
   },
   actions: {
     setLogs(context: any, logs: any) {
@@ -26,6 +30,9 @@ export default {
     },
     setIsInitialized(context: any, isInitialized: boolean) {
       context.commit('setIsInitialized', isInitialized);
+    },
+    resetLogs(context: any) {
+      context.commit('resetLogs');
     },
   },
 };
