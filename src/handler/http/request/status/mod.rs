@@ -134,6 +134,7 @@ struct ConfigResponse<'a> {
     histogram_enabled: bool,
     max_query_range: i64,
     ai_enabled: bool,
+    dashboard_placeholder: String,
 }
 
 #[derive(Serialize)]
@@ -334,6 +335,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         histogram_enabled: cfg.limit.histogram_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
+        dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
     }))
 }
 

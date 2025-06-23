@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
 use datafusion::{
     arrow::{
@@ -21,122 +21,182 @@ use datafusion::{
         datatypes::DataType,
     },
     common::cast::as_string_array,
-    error::DataFusionError,
-    logical_expr::{ColumnarValue, ScalarFunctionImplementation, ScalarUDF, Volatility},
-    prelude::create_udf,
+    error::{DataFusionError, Result},
+    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
     scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
 
 /// Implementation of str_match
-pub(crate) static STR_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
-    create_udf(
-        super::STR_MATCH_UDF_NAME,
-        // expects two string
-        vec![DataType::Utf8, DataType::Utf8],
-        // returns boolean
-        DataType::Boolean,
-        Volatility::Stable,
-        str_match_expr_impl(false),
-    )
-});
+pub(crate) static STR_MATCH_UDF: Lazy<ScalarUDF> =
+    Lazy::new(|| ScalarUDF::from(StrMatchUdf::new()));
 
 /// Implementation of str_match_ignore_case
-pub(crate) static STR_MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
-    create_udf(
-        super::STR_MATCH_UDF_IGNORE_CASE_NAME,
-        // expects two string
-        vec![DataType::Utf8, DataType::Utf8],
-        // returns boolean
-        DataType::Boolean,
-        Volatility::Stable,
-        str_match_expr_impl(true),
-    )
-});
+pub(crate) static STR_MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> =
+    Lazy::new(|| ScalarUDF::from(StrMatchIgnoreCaseUdf::new()));
 
-/// str_match function for datafusion
-pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
-    Arc::new(move |args: &[ColumnarValue]| {
-        if args.len() != 2 {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError("str_match UDF expects two string".to_string()),
-                None,
-            ));
+#[derive(Debug, Clone)]
+struct StrMatchUdf {
+    signature: Signature,
+}
+
+impl StrMatchUdf {
+    fn new() -> Self {
+        Self {
+            signature: Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Stable),
         }
+    }
+}
 
-        // 1. cast both arguments to be aligned with the signature
-        let ColumnarValue::Array(haystack) = &args[0] else {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError(
-                    "Invalid argument types[haystack] to str_match function".to_string(),
-                ),
-                None,
-            ));
-        };
-        let haystack = as_string_array(&haystack)?;
-        let ColumnarValue::Scalar(needle) = &args[1] else {
+impl ScalarUDFImpl for StrMatchUdf {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        super::STR_MATCH_UDF_NAME
+    }
+
+    fn aliases(&self) -> &[String] {
+        static ALIASES: Lazy<Vec<String>> =
+            Lazy::new(|| vec![super::MATCH_FIELD_UDF_NAME.to_string()]);
+        &ALIASES
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
+        Ok(DataType::Boolean)
+    }
+
+    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
+        str_match_impl(args, false)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StrMatchIgnoreCaseUdf {
+    signature: Signature,
+}
+
+impl StrMatchIgnoreCaseUdf {
+    fn new() -> Self {
+        Self {
+            signature: Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Stable),
+        }
+    }
+}
+
+impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        super::STR_MATCH_UDF_IGNORE_CASE_NAME
+    }
+
+    fn aliases(&self) -> &[String] {
+        static ALIASES: Lazy<Vec<String>> =
+            Lazy::new(|| vec![super::MATCH_FIELD_IGNORE_CASE_UDF_NAME.to_string()]);
+        &ALIASES
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
+        Ok(DataType::Boolean)
+    }
+
+    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
+        str_match_impl(args, true)
+    }
+}
+
+fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<ColumnarValue> {
+    if args.len() != 2 {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError("str_match UDF expects two string".to_string()),
+            None,
+        ));
+    }
+
+    // 1. cast both arguments to be aligned with the signature
+    let ColumnarValue::Array(haystack) = &args[0] else {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "Invalid argument types[haystack] to str_match function".to_string(),
+            ),
+            None,
+        ));
+    };
+    let haystack = as_string_array(&haystack)?;
+    let ColumnarValue::Scalar(needle) = &args[1] else {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "Invalid argument types[needle] to str_match function".to_string(),
+            ),
+            None,
+        ));
+    };
+    let needle = match needle {
+        ScalarValue::Utf8(v) => v,
+        ScalarValue::Utf8View(v) => v,
+        ScalarValue::LargeUtf8(v) => v,
+        _ => {
             return Err(DataFusionError::SQL(
                 ParserError::ParserError(
                     "Invalid argument types[needle] to str_match function".to_string(),
                 ),
                 None,
             ));
-        };
-        let needle = match needle {
-            ScalarValue::Utf8(v) => v,
-            ScalarValue::Utf8View(v) => v,
-            ScalarValue::LargeUtf8(v) => v,
-            _ => {
-                return Err(DataFusionError::SQL(
-                    ParserError::ParserError(
-                        "Invalid argument types[needle] to str_match function".to_string(),
+        }
+    };
+    if needle.is_none() {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "Invalid argument types[needle] to str_match function".to_string(),
+            ),
+            None,
+        ));
+    }
+    // pre-compute the needle
+    let needle = if case_insensitive {
+        needle.as_ref().unwrap().to_lowercase()
+    } else {
+        needle.as_ref().unwrap().to_string()
+    };
+
+    let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
+
+    // 2. perform the computation
+    let array = haystack
+        .iter()
+        .map(|haystack| {
+            match haystack {
+                // in arrow, any value can be null.
+                // Here we decide to make our UDF to return null when haystack is null.
+                Some(haystack) => match case_insensitive {
+                    true => Some(
+                        mem_finder
+                            .find(haystack.to_lowercase().as_bytes())
+                            .is_some(),
                     ),
-                    None,
-                ));
+                    false => Some(mem_finder.find(haystack.as_bytes()).is_some()),
+                },
+                _ => None,
             }
-        };
-        if needle.is_none() {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError(
-                    "Invalid argument types[needle] to str_match function".to_string(),
-                ),
-                None,
-            ));
-        }
-        // pre-compute the needle
-        let needle = if case_insensitive {
-            needle.as_ref().unwrap().to_lowercase()
-        } else {
-            needle.as_ref().unwrap().to_string()
-        };
+        })
+        .collect::<BooleanArray>();
 
-        let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
-
-        // 2. perform the computation
-        let array = haystack
-            .iter()
-            .map(|haystack| {
-                match haystack {
-                    // in arrow, any value can be null.
-                    // Here we decide to make our UDF to return null when haystack is null.
-                    Some(haystack) => match case_insensitive {
-                        true => Some(
-                            mem_finder
-                                .find(haystack.to_lowercase().as_bytes())
-                                .is_some(),
-                        ),
-                        false => Some(mem_finder.find(haystack.as_bytes()).is_some()),
-                    },
-                    _ => None,
-                }
-            })
-            .collect::<BooleanArray>();
-
-        // `Ok` because no error occurred during the calculation
-        // `Arc` because arrays are immutable, thread-safe, trait objects.
-        Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
-    })
+    // `Ok` because no error occurred during the calculation
+    // `Arc` because arrays are immutable, thread-safe, trait objects.
+    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
 }
 
 #[cfg(test)]
@@ -160,6 +220,9 @@ mod tests {
             "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'be')",
             "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'BE')",
             "select * from t where str_match(log, 'es') and str_match_ignore_case(city, '')",
+            "select * from t where match_field(log, 'es') and match_field_ignore_case(city, 'be')",
+            "select * from t where match_field(log, 'es') and match_field_ignore_case(city, 'BE')",
+            "select * from t where match_field(log, 'es') and match_field_ignore_case(city, '')",
         ];
 
         // define a schema.
