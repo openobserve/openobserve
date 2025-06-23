@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :type="'pipelines'"
           :validation-errors="validationErrors"
           @close="showJsonEditorDialog = false"
+          :isEditing="pipelineObj.isEditPipeline"
           @saveJson="savePipelineJson"
         />
       </q-dialog>
