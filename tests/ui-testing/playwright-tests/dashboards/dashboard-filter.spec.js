@@ -479,7 +479,6 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(1000);
     await button.click();
-    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -532,11 +531,13 @@ test.describe("dashboard filter testcases", () => {
           .map((node) => node.textContent.trim()) // Trim whitespace
           .join("");
       });
-    console.log(textContent, "Text content");
-    console.log(`[data-test="dashboard-add-condition-label-0-${textContent}"]`);
+
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-      .click({ force: true });
+      .waitFor({ state: "visible" });
+    await page
+      .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
+      .click();
 
     await page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
@@ -567,26 +568,14 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-    // await page.waitForTimeout(3000);
-    await page
+
+    const lastInput = page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
-      .click();
+      .last();
+    await lastInput.click();
+    lastInput.fill("kubernetes_container_image");
 
-    await page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
-      .fill("kubernetes_container_image");
-
-    await page
-      .getByRole("option", { name: "kubernetes_container_image" })
-      .first()
-      .click({ force: true });
-    // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
-
-    // await option.waitFor({ state: "visible", timeout: 10000 });
-
-    // await option.click();
+    await page.getByText("kubernetes_container_image", { exact: true }).click();
 
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
