@@ -180,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ref="vrlFnEditorRef"
                     editor-id="fnEditor"
                     class="monaco-editor"
+                    language="vrl"
                     v-model:query="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -585,7 +586,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .sql-bar {
   height: 40px !important;
   // overflow: hidden;
@@ -597,16 +598,13 @@ export default defineComponent({
   border-radius: 50%;
 }
 
-.empty-function .cm-scroller {
+.empty-function .cm-content {
   background-image: url("../../../assets/images/common/vrl-function.png");
   background-repeat: no-repeat;
   background-size: 170px;
   background-position: 5px 5px;
 }
 
-.empty-function .cm-gutters {
-  display: none;
-}
 
 // .query-tabs-container {
 //   width: 100%;
