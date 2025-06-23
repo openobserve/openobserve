@@ -478,7 +478,7 @@ export default defineComponent({
       provide: f => showTooltip.from(f)
     });
 
-    function showTooltipAtCursor(view, message) {
+    function showTooltipAtCursor(view: EditorView, message: string) {
       const pos = view.state.selection.main.head;
 
       const tooltip = {
