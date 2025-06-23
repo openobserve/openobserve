@@ -555,7 +555,7 @@ pub struct PatternAssociation {
     pub pattern_name: String,
     pub pattern_id: String,
     pub policy: String,
-    pub apply_at_search: bool,
+    pub apply_at: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]

@@ -79,10 +79,9 @@ fn create_re_stream_map_table_statement() -> TableCreateStatement {
         )
         .col(ColumnDef::new(RePatternStreamMap::Policy).text().not_null())
         .col(
-            ColumnDef::new(RePatternStreamMap::ApplyAtSearch)
-                .boolean()
+            ColumnDef::new(RePatternStreamMap::ApplyAt)
                 .not_null()
-                .default(false),
+                .string_len(100),
         )
         .foreign_key(
             ForeignKey::create()
@@ -104,7 +103,7 @@ enum RePatternStreamMap {
     Field,
     PatternId,
     Policy,
-    ApplyAtSearch,
+    ApplyAt,
 }
 
 #[cfg(test)]

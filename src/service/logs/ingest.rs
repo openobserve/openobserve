@@ -195,7 +195,12 @@ pub async fn ingest(
 
         // TODO @YJDoc2 : also handle pipeline
         // we do not drop the record here, just log error and continue process
-        match pattern_manager.process_record(org_id, StreamType::Logs, in_stream_name, &mut item) {
+        match pattern_manager.process_at_ingestion(
+            org_id,
+            StreamType::Logs,
+            in_stream_name,
+            &mut item,
+        ) {
             Ok(_) => {}
             Err(e) => {
                 log::error!("error in processing record for patterns : {e}");

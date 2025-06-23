@@ -29,6 +29,13 @@ pub enum PatternPolicy {
     Redact,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ApplyPolicy {
+    AtIngestion,
+    AtSearch,
+    Both,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PatternAssociationEntry {
     pub id: i64,
@@ -38,24 +45,15 @@ pub struct PatternAssociationEntry {
     pub field: String,
     pub pattern_id: String,
     pub policy: PatternPolicy,
-    pub apply_at_search: bool,
+    pub apply_at: ApplyPolicy,
 }
 
-// TODO @YJDoc2 : check if we can user AsRef<&str> or something here
-
-impl From<String> for PatternPolicy {
-    fn from(value: String) -> Self {
-        match value.as_str() {
-            "DropField" => Self::DropField,
-            "Redact" => Self::Redact,
-            _ => Self::Redact,
-        }
-    }
-}
-
-impl From<&String> for PatternPolicy {
-    fn from(value: &String) -> Self {
-        match value.as_str() {
+impl<T> From<T> for PatternPolicy
+where
+    T: AsRef<str>,
+{
+    fn from(value: T) -> Self {
+        match value.as_ref() {
             "DropField" => Self::DropField,
             "Redact" => Self::Redact,
             _ => Self::Redact,
@@ -72,6 +70,30 @@ impl std::fmt::Display for PatternPolicy {
     }
 }
 
+impl<T> From<T> for ApplyPolicy
+where
+    T: AsRef<str>,
+{
+    fn from(value: T) -> Self {
+        match value.as_ref() {
+            "AtIngestion" => Self::AtIngestion,
+            "AtSearch" => Self::AtSearch,
+            "Both" => Self::Both,
+            _ => Self::AtIngestion,
+        }
+    }
+}
+
+impl std::fmt::Display for ApplyPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AtIngestion => write!(f, "AtIngestion"),
+            Self::AtSearch => write!(f, "AtSearch"),
+            Self::Both => write!(f, "Both"),
+        }
+    }
+}
+
 impl From<Model> for PatternAssociationEntry {
     fn from(value: Model) -> Self {
         Self {
@@ -82,7 +104,7 @@ impl From<Model> for PatternAssociationEntry {
             field: value.field,
             pattern_id: value.pattern_id,
             policy: PatternPolicy::from(value.policy),
-            apply_at_search: value.apply_at_search,
+            apply_at: ApplyPolicy::from(value.apply_at),
         }
     }
 }
@@ -95,7 +117,7 @@ pub async fn add(entry: PatternAssociationEntry) -> Result<(), errors::Error> {
         field: Set(entry.field),
         pattern_id: Set(entry.pattern_id),
         policy: Set(entry.policy.to_string()),
-        apply_at_search: Set(entry.apply_at_search),
+        apply_at: Set(entry.apply_at.to_string()),
         ..Default::default()
     };
 
@@ -186,7 +208,7 @@ pub async fn batch_process(
             field: Set(a.field),
             pattern_id: Set(a.pattern_id),
             policy: Set(a.policy.to_string()),
-            apply_at_search: Set(a.apply_at_search),
+            apply_at: Set(a.apply_at.to_string()),
             ..Default::default()
         });
 

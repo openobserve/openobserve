@@ -22,7 +22,7 @@ use infra::{
     errors::{self, DbError},
     table::{
         re_pattern::PatternEntry,
-        re_pattern_stream_map::{PatternAssociationEntry, PatternPolicy},
+        re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
     },
 };
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -179,7 +179,7 @@ pub async fn process_association_changes(
             field: item.field,
             pattern_id: item.pattern_id,
             policy: PatternPolicy::from(item.policy),
-            apply_at_search: item.apply_at_search,
+            apply_at: ApplyPolicy::from(item.apply_at),
         })
         .collect();
     let removed = update
@@ -193,7 +193,7 @@ pub async fn process_association_changes(
             field: item.field,
             pattern_id: item.pattern_id,
             policy: PatternPolicy::from(item.policy),
-            apply_at_search: item.apply_at_search,
+            apply_at: ApplyPolicy::from(item.apply_at),
         })
         .collect();
 

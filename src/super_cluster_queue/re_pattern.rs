@@ -17,7 +17,7 @@ use config::meta::stream::{PatternAssociation, UpdateSettingsWrapper};
 use infra::{
     cluster_coordinator::get_coordinator,
     errors::{DbError, Error, Result},
-    table::re_pattern_stream_map::{PatternAssociationEntry, PatternPolicy},
+    table::re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
 };
 use o2_enterprise::enterprise::{
     re_patterns::get_pattern_manager,
@@ -118,7 +118,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                             field: item.field,
                             pattern_id: item.pattern_id,
                             policy: PatternPolicy::from(item.policy),
-                            apply_at_search: item.apply_at_search,
+                            apply_at: ApplyPolicy::from(item.apply_at),
                         })
                         .collect();
                     let removed = update
@@ -133,7 +133,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                             field: item.field,
                             pattern_id: item.pattern_id,
                             policy: PatternPolicy::from(item.policy),
-                            apply_at_search: item.apply_at_search,
+                            apply_at: ApplyPolicy::from(item.apply_at),
                         })
                         .collect();
 

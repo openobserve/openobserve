@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpResponse, delete, get, http, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -75,7 +75,11 @@ struct PatternListResponse {
     tag = "RePattern"
 )]
 #[post("/{org_id}/re_patterns")]
-pub async fn save(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
+pub async fn save(
+    org_id: web::Path<String>,
+    body: web::Bytes,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use infra::table::{re_pattern::PatternEntry, re_pattern_stream_map::PatternPolicy};
@@ -92,6 +96,15 @@ pub async fn save(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
             ));
         }
 
+        let user_id = match in_req
+            .headers()
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+        {
+            Some(id) => id,
+            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
+        };
+
         match PatternManager::test_pattern(
             req.pattern.clone(),
             "".to_string(),
@@ -105,6 +118,7 @@ pub async fn save(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
             &org_id,
             &req.name,
             &req.pattern,
+            &user_id,
         ))
         .await
         {
