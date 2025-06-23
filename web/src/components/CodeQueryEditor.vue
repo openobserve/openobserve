@@ -36,7 +36,6 @@ import {
   onActivated,
   watch,
   computed,
-  onBeforeUnmount,
 } from "vue";
 
 import { EditorView, basicSetup, minimalSetup } from "codemirror";
@@ -53,6 +52,8 @@ import {
   Completion,
   closeBrackets,
   closeBracketsKeymap,
+  startCompletion,
+  closeCompletion,
 } from "@codemirror/autocomplete";
 
 import { keymap, lineNumbers, showTooltip, Tooltip } from "@codemirror/view";
@@ -65,12 +66,10 @@ import {
   searchKeymap,
   highlightSelectionMatches,
   search,
-  openSearchPanel,
 } from "@codemirror/search";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
-import { foldGutter, foldKeymap } from "@codemirror/language";
 
 export default defineComponent({
   props: {
@@ -96,7 +95,7 @@ export default defineComponent({
     },
     debounceTime: {
       type: Number,
-      default: 500,
+      default: 300,
     },
     readOnly: {
       type: Boolean,
@@ -105,6 +104,15 @@ export default defineComponent({
     language: {
       type: String,
       default: "sql",
+    },
+    autoComplete: {
+      type: Object,
+      default: () => ({
+        showEmpty: false,
+        selectOnOpen: false,
+        filterStrict: false,
+        filter: false,
+      }),
     },
   },
   emits: ["update-query", "run-query", "update:query", "focus", "blur"],
@@ -309,7 +317,8 @@ export default defineComponent({
         override: [
           (context: CompletionContext) => {
             const word = context.matchBefore(/\w*/);
-            if (!word) return null;
+
+            if (!word.text && !props.autoComplete.showEmpty) return null;
 
             const textUntilPosition = context.state.doc.sliceString(
               0,
@@ -332,7 +341,6 @@ export default defineComponent({
                 });
               }
             });
-
             // Add suggestions
             suggestions.value.forEach((suggestion: any) => {
               completions.push({
@@ -345,9 +353,12 @@ export default defineComponent({
             return {
               from: word.from,
               options: completions,
+              filter: props.autoComplete.filter,
             };
           },
         ],
+        filterStrict: props.autoComplete.filterStrict,
+        selectOnOpen: props.autoComplete.selectOnOpen,
       });
     };
 
@@ -553,7 +564,7 @@ export default defineComponent({
             highlightSelectionMatches(), // ✨ Highlights all matches
             lineNumbers(),
             getLanguageSupport(),
-            createAutocompletion(),
+            props.showAutoComplete ? createAutocompletion() : [],
             ...createTheme(),
             createKeymap(),
             EditorView.updateListener.of((update) => {
@@ -734,7 +745,7 @@ export default defineComponent({
       // CodeMirror handles this automatically
       if (editorView) {
         // Close any open completions by dispatching an empty transaction
-        editorView.dispatch({});
+        closeCompletion(editorView);
       }
     };
 
@@ -743,7 +754,7 @@ export default defineComponent({
       await nextTick();
       if (editorView) {
         // Trigger autocompletion by dispatching a transaction
-        editorView.dispatch({});
+        startCompletion(editorView);
       }
     };
 
@@ -775,7 +786,7 @@ export default defineComponent({
 
     const getCursorIndex = () => {
       if (editorView) {
-        return editorView.state.selection.main.head;
+        return editorView.state.selection.main.head - 1;
       }
       return null;
     };
@@ -807,7 +818,6 @@ export default defineComponent({
     };
 
     const forceCleanup = () => {
-      console.log("Force cleaning up CodeQueryEditor resources...");
       cleanupEditor();
     };
 
