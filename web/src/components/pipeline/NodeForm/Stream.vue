@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             fill-input
             @filter="filterStreams"
             behavior="menu"
-            @input-debounce="100"
+            @input-debounce="500"
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
             @input-value="handleDynamicStreamName"
@@ -178,6 +178,7 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
+import { sanitizeStreamName } from "../utils/pipelineCommonValidation";
 
 import AddStream from "@/components/logstream/AddStream.vue";
 
@@ -233,8 +234,28 @@ watch(
     getStreamList();
   }
 );
-  function sanitizeStreamName(input: string): string {
-    if(input.length > 100){
+
+watch(() => dynamic_stream_name.value, () => {
+  if (
+    dynamic_stream_name.value !== null &&
+    dynamic_stream_name.value !== "" &&
+    selectedNodeType.value === "output"
+  ) {
+    //this early return is to avoid unnecessary sanitization when user is typing and the value is empty
+    if(typeof dynamic_stream_name.value === 'object' && dynamic_stream_name.value.hasOwnProperty('value') && dynamic_stream_name.value.value == ""){
+      return;
+    }
+    else if(dynamic_stream_name.value == ''){
+      return;
+    }
+    const rawValue =
+      typeof dynamic_stream_name.value === 'object' &&
+      dynamic_stream_name.value.hasOwnProperty('value')
+        ? dynamic_stream_name.value.value
+        : dynamic_stream_name.value;
+
+    const sanitized = sanitizeStreamName(rawValue as string);
+    if (sanitized === "") {
       $q.notify({
         message: "Stream name should be less than 100 characters",
         color: "negative",
@@ -245,55 +266,6 @@ watch(
       //will be able to add another stream name
       return "";
     }
-    const regex = /\{[^{}]+\}/g;
-    const parts: string[] = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = regex.exec(input)) !== null) {
-      // Sanitize and add the static part before the dynamic part
-      if (match.index > lastIndex) {
-        const staticPart = input.slice(lastIndex, match.index);
-        parts.push(...sanitizeStaticPart(staticPart));
-      }
-
-      // Push the dynamic part as-is
-      parts.push(match[0]);
-
-      lastIndex = regex.lastIndex;
-    }
-
-    // Sanitize and add the remaining static part (after the last dynamic part)
-    if (lastIndex < input.length) {
-      const staticPart = input.slice(lastIndex);
-      parts.push(...sanitizeStaticPart(staticPart));
-    }
-
-    return parts.join('');
-  }
-
-  // Only sanitize non-dynamic parts
-  //this will convert all the characters that are not allowed in stream name to _
-  function sanitizeStaticPart(str: string): string[] {
-    return str.split('').map(char => /[a-zA-Z0-9]/.test(char) ? char : '_');
-  }
-
-
-
-
-watch(() => dynamic_stream_name.value, () => {
-  if (
-    dynamic_stream_name.value !== null &&
-    dynamic_stream_name.value !== "" &&
-    selectedNodeType.value === "output"
-  ) {
-    const rawValue =
-      typeof dynamic_stream_name.value === 'object' &&
-      dynamic_stream_name.value.hasOwnProperty('value')
-        ? dynamic_stream_name.value.value
-        : dynamic_stream_name.value;
-
-    const sanitized = sanitizeStreamName(rawValue as string);
 
     dynamic_stream_name.value = sanitized;
     saveDynamicStream();
