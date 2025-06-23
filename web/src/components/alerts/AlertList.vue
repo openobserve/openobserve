@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :pagination="pagination"
             style="width: 100%"
             class="o2-quasar-table"
-            :class="store.state.theme === 'dark' ? 'dark-o2-quasar-table' : 'light-o2-quasar-table'"
+            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
           >
           <template v-slot:header="props">
             <q-tr :props="props">
