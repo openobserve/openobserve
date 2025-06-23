@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #before>
           <div class="col" style="height: 100%">
             <CodeQueryEditor
-              language="sql"
+              language="html"
               v-model:query="htmlContent"
               :debounceTime="500"
               @update:query="onEditorValueChange"
