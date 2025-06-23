@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounceTime="500"
               @update:query="onEditorValueChange"
               data-test="dashboard-html-editor"
+              class="!tw-h-full"
             />
           </div>
         </template>

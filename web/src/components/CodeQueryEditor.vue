@@ -347,14 +347,14 @@ export default defineComponent({
     };
 
     const keywords = computed(() => {
-      if (props.language === "sql" && !props.keywords.length) {
+      if (props.language === "sql" && !props.keywords?.length) {
         return defaultKeywords;
       }
       return props.keywords;
     });
 
     const suggestions = computed(() => {
-      if (props.language === "sql" && !props.suggestions.length) {
+      if (props.language === "sql" && !props.suggestions?.length) {
         return defaultSuggestions;
       }
       return props.suggestions;
