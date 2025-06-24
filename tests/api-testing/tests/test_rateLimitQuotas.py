@@ -143,6 +143,36 @@ def test_update_module_list_org(create_session, base_url):
         resp_module_list_update.status_code == 200
     ), f"Updated Module List for specific org expected 200, but got {resp_module_list_update.status_code} {resp_module_list_update.content}"
 
-    
+
+def test_partition_search(create_session, base_url):
+    """Fixture to retrieve partition search"""
+
+    session = create_session
+    url = base_url
+    URL = f"{url}api/{org_id}/_search_partition?type=logs"
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    # Define the payload
+    payload = {
+        "sql": "SELECT * FROM \"stream_pytest_data\"",
+        "start_time": ten_min_ago,
+        "end_time": end_time,
+        "sql_mode": "full",
+        "streaming_output": True
+}
+    # Send the POST request
+    response = session.post(URL, json=payload)
+
+    # Assert the response status code
+    assert response.status_code == 200, f"Expected status code 200 but got {response.status_code}"
+
+    # Optionally, you can add more assertions based on the expected response content
+    # For example, check if the response contains expected keys
+    response_json = response.json()
+    assert 'data' in response_json, "Response JSON does not contain 'data' key"
+    assert isinstance(response_json['data'], list), "'data' should be a list"
 
     
