@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("iam.basicUsers") }}
         </div>
-        <div class="full-width row items-start">
+        <div class="full-width tw-flex tw-justify-end">
           <q-input
             v-model="filterQuery"
             filled
