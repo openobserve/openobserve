@@ -747,23 +747,7 @@ async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
   // Introduce a short delay to ensure options are rendered
   await this.page.waitForTimeout(500); // Adjust the timeout as needed
 
-  // Log the inner HTML of the dropdown
-  const dropdownHtml = await this.page.locator(dropdownSelector).innerHTML();
-  console.log('Dropdown inner HTML:', dropdownHtml);
-
-  // Selector for options
-  const optionsSelector = `${dropdownSelector} .ellipsis`;
-  const options = await this.page.locator(optionsSelector).allTextContents();
-  console.log('Available options:', options);
-
-  // Check if the expected option is available
-  if (!options.includes(resultsPerPage.toString())) {
-    throw new Error(`Expected option "${resultsPerPage}" not found in dropdown. Available options: ${options}`);
-  }
-
-  // Select the specific option for results per page
-  await this.page.locator(`${optionsSelector}:has-text("${resultsPerPage}")`).click();
-
+  await this.page.getByText(resultsPerPage, { exact: true }).click();
   // Wait for results to update
   await this.page.waitForSelector(this.resultText, { state: 'visible' });
 
