@@ -751,5 +751,11 @@ async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
   await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedText);
 }
 
+async pageNotVisible() {
+  
+  const fastRewindElement = this.page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
+  await expect(fastRewindElement).not.toBeVisible();
+}
+
 
 }

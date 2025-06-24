@@ -34,6 +34,65 @@ test.describe("Pagination for logs", () => {
         await ingestionPage.ingestionMultiOrgStream(orgId, streamName);
         
     });
+    test("HTTP Pagination for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", {tag: ['@shyam']}, async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStream(streamName);
+        console.log(streamName);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
+        await page.waitForTimeout(2000);
+        await logsPage.selectRunQuery();
+        await page.waitForTimeout(2000); 
+        await logsPage.clickResultsPerPage();
+        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of 39');
+        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of 39');
+        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 39 out of 39');
+    });
+
+    test("HTTP Pagination for running query to validate WHERE match_all('zin*')", {tag: ['@shyam']}, async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStream(streamName);
+        console.log(streamName);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("zin*")`);
+        await page.waitForTimeout(2000);
+        await logsPage.selectRunQuery();
+        await page.waitForTimeout(2000); 
+        await logsPage.clickResultsPerPage();
+        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
+        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
+        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
+    });
+
+    test("HTTP Pagination for running query to validate WHERE match_all('2022-12-27T1*')", {tag: ['@shyam']}, async ({ page }) => {
+
+        
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStream(streamName);
+        console.log(streamName);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T1*")`);
+        await page.waitForTimeout(2000);
+        await logsPage.selectRunQuery();
+        await page.waitForTimeout(2000); 
+        await logsPage.clickResultsPerPage();
+        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
+        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
+        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
+    });
+
+    test("HTTP for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", {tag: ['@shyam']}, async ({ page }) => {
+
+    
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStream(streamName);
+        console.log(streamName);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl") limit 10`);
+        await page.waitForTimeout(2000);
+        await logsPage.selectRunQuery();
+        await page.waitForTimeout(2000); 
+        await logsPage.pageNotVisible();
+    });
+
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", {tag: ['@shyam']}, async ({ page }) => {
 
         await managementPage.goToManagement();
@@ -88,7 +147,6 @@ test.describe("Pagination for logs", () => {
         await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
     });
 
-
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:2*')", {tag: ['@shyam']}, async ({ page }) => {
 
         await managementPage.goToManagement();
@@ -107,7 +165,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
     });
 
-    test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", {tag: ['@shyam']}, async ({ page }) => {
+    test("Enable Streaming for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", {tag: ['@shyam']}, async ({ page }) => {
 
         await managementPage.goToManagement();
         await page.waitForTimeout(5000);
@@ -119,11 +177,9 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
-        await logsPage.clickResultsPerPage();
-        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of 39');
-        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of 39');
-        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 39 out of 39');
+        await logsPage.pageNotVisible();
     });
+    
     
     
 
