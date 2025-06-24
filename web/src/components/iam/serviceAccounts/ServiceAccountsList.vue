@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none "  :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'" style="min-height: inherit">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width"
     :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
     >
 
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("serviceAccounts.header") }}
         </div>
-        <div class="full-width row items-start">
+        <div class="full-width tw-flex tw-justify-end">
           <q-input
             v-model="filterQuery"
             filled
@@ -42,19 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
-
-          <div class="col-6">
             <q-btn
               class="q-ml-md text-bold no-border"
-              style="float: right; cursor: pointer !important"
               padding="sm lg"
+              style="float: right; cursor: pointer !important"
               color="secondary"
               no-caps
               dense
               :label="t(`serviceAccounts.add`)"
               @click="addRoutePush({})"
             />
-          </div>
         </div>
     </div>
     <q-table
