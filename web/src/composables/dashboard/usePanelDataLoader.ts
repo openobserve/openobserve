@@ -839,12 +839,12 @@ export const usePanelDataLoader = (
               payload.queryReq.endISOTimestamp,
               null,
             )),
+          },
           // pass encodig if enabled,
           // make sure that `encoding: null` is not being passed, that's why used object extraction logic
           ...(store.state.zoConfig.sql_base64_enabled
             ? { encoding: "base64" }
             : {}),
-          },
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
