@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="selectRef"
     >
       <template v-slot:no-option>
-        <template v-if="filterText && !variableItem.multiSelect">
+        <template v-if="filterText">
           <q-item clickable @click="handleCustomValue(filterText)">
             <q-item-section>
               <q-item-label>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
         <q-separator />
-        <template v-if="filterText && !variableItem.multiSelect">
+        <template v-if="filterText">
           <q-item clickable @click="handleCustomValue(filterText)">
             <q-item-section>
               <q-item-label>
@@ -328,20 +328,28 @@ export default defineComponent({
       { immediate: true },
     );
     const handleCustomValue = async (value: string) => {
-      if (!value?.trim() || props.variableItem.multiSelect) return;
-
+      if (!value?.trim()) return;
       const newValue = value.trim();
-      selectedValue.value = newValue;
-      emit("update:modelValue", newValue);
-      await closePopUpWhenValueIsSet();
+      if (props.variableItem.multiSelect) {
+        let arr = Array.isArray(selectedValue.value)
+          ? [...selectedValue.value]
+          : [];
+        if (!arr.includes(newValue)) {
+          arr.push(newValue);
+        }
+
+        selectedValue.value = arr;
+        emit("update:modelValue", arr);
+        await closePopUpWhenValueIsSet();
+      } else {
+        selectedValue.value = newValue;
+        emit("update:modelValue", newValue);
+        await closePopUpWhenValueIsSet();
+      }
     };
 
     const handleKeydown = (event: KeyboardEvent) => {
-      if (
-        event.key === "Enter" &&
-        !props.variableItem.multiSelect &&
-        filterText.value?.trim()
-      ) {
+      if (event.key === "Enter" && filterText.value?.trim()) {
         event.preventDefault();
         event.stopPropagation();
         handleCustomValue(filterText.value);
