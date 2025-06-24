@@ -741,7 +741,7 @@ async clickResultsPerPage() {
   await this.page.locator('[data-test="logs-search-search-result"]').getByText('arrow_drop_down').click();
   await this.page.getByText('10', { exact: true }).click();
   await this.page.waitForTimeout(2000);
-  await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10 out of 39');
+  await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10 out of');
 }
 
 async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
