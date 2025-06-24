@@ -3152,6 +3152,7 @@ mod tests {
                 file_list_dump_min_hour: Default::default(),
                 file_list_dump_debug_check: Default::default(),
                 use_stream_settings_for_partitions_enabled: Default::default(),
+                dashboard_placeholder: Default::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),

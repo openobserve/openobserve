@@ -582,9 +582,10 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     #[cfg(feature = "enterprise")]
-    if _folder_info.is_some() && get_openfga_config().enabled {
+    if let Some((curr_folder_id, dst_folder_id)) = _folder_info
+        && get_openfga_config().enabled
+    {
         let alert_id = alert.id.unwrap().to_string();
-        let (curr_folder_id, dst_folder_id) = _folder_info.unwrap();
         set_parent_relation(
             &alert_id,
             &get_ofga_type("alerts"),

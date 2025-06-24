@@ -1847,7 +1847,7 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
         .pop()
         .unwrap();
     let mut visitor = ExtractKeyNamesVisitor::new();
-    statement.visit(&mut visitor);
+    let _ = statement.visit(&mut visitor);
     if let Some(e) = visitor.error {
         Err(e)
     } else {

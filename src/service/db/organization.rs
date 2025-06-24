@@ -250,7 +250,7 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
     #[cfg(feature = "enterprise")]
-    super_cluster::organization_delete(&format!("{}{}", ORG_KEY_PREFIX, org_id)).await?;
+    super_cluster::organization_delete(&format!("{ORG_KEY_PREFIX}{org_id}")).await?;
     Ok(())
 }
 

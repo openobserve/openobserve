@@ -667,7 +667,7 @@ pub async fn check_work_group(
 
     let work_group_str = work_group.as_ref().unwrap().to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     // 2. get a cluster search queue lock
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
@@ -723,10 +723,7 @@ pub async fn check_work_group(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] search: wait in queue took: {} ms",
-                took_wait
-            ),
+            format!("[trace_id {trace_id}] search: wait in queue took: {took_wait} ms"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())

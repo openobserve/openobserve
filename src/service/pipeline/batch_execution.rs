@@ -784,7 +784,7 @@ async fn process_node(
                     ) {
                         Ok(flattened) => flattened,
                         Err(e) => {
-                            let err_msg = format!("DestinationNode error with flattening: {}", e);
+                            let err_msg = format!("DestinationNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
                                 .send((node.id.to_string(), node.node_type(), err_msg))
                                 .await
@@ -802,7 +802,7 @@ async fn process_node(
                 if let Err(e) =
                     crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
                 {
-                    let err_msg = format!("DestinationNode error handling timestamp: {}", e);
+                    let err_msg = format!("DestinationNode error handling timestamp: {e}");
                     if let Err(send_err) = error_sender
                         .send((node.id.to_string(), node.node_type(), err_msg))
                         .await
@@ -825,8 +825,7 @@ async fn process_node(
                 let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
                 if let Err(e) = writer.write_wal(records).await {
                     let err_msg = format!(
-                        "DestinationNode error persisting data to be ingested externally: {}",
-                        e
+                        "DestinationNode error persisting data to be ingested externally: {e}"
                     );
                     if let Err(send_err) = error_sender
                         .send((node.id.to_string(), node.node_type(), err_msg))

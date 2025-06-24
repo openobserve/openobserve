@@ -230,13 +230,13 @@ pub async fn search(
     let mut _work_group = None;
     #[cfg(feature = "enterprise")]
     {
-        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
-            if let Some((_, stat)) = status.first() {
-                match stat.work_group.as_ref() {
-                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                    None => _work_group = None,
-                }
+        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
+            && let Some((_, stat)) = status.first()
+        {
+            match stat.work_group.as_ref() {
+                Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                None => _work_group = None,
             }
         };
     }

@@ -222,7 +222,7 @@ pub async fn get_search_profile(
                 if !is_root_user(&user_id) {
                     let user =
                         match USERS
-                            .get(&format!("{org_id}/{}", user_id))
+                            .get(&format!("{org_id}/{user_id}"))
                             .and_then(|user_record| {
                                 DBUser::from(&(user_record.clone())).get_user(org_id.clone())
                             }) {
