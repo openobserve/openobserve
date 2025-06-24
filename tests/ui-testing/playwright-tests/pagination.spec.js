@@ -5,6 +5,15 @@ import { IngestionPage } from '../pages/ingestionPage.js';
 import { ManagementPage } from '../pages/managementPage.js';
 
 
+// Function to generate a random 5-character alphabetic name
+function generateRandomStreamName() {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+    let randomName = '';
+    for (let i = 0; i < 9; i++) {
+        randomName += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+    }
+    return randomName;
+}
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -12,7 +21,7 @@ test.describe("Pagination for logs", () => {
     let loginPage, logsPage, ingestionPage, managementPage;
 
     const orgId = "default";
-    const streamName = "e2e_automate";
+    const streamName = generateRandomStreamName();
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -31,7 +40,8 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(5000);
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamDefault();
+        await logsPage.selectIndexStream(streamName);
+        console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();

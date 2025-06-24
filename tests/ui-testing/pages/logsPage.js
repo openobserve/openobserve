@@ -474,6 +474,13 @@ async selectIndexStreamDefault() {
 
 }
 
+async selectIndexStream(streamName) {
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(3000);
+  await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first().click();
+
+}
+
 async clearAndFillQueryEditor(query) {
   const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').locator(".inputarea");
   await editor.fill(''); // Clear the editor
