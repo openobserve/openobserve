@@ -151,7 +151,7 @@ impl Sql {
 
         // 3. rewrite all filter that include DASHBOARD_ALL with true
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         //********************Change the sql here*********************************//
 
         // 4. get column name, alias, group by, order by
@@ -183,10 +183,10 @@ impl Sql {
         let use_inverted_index = column_visitor.use_inverted_index;
 
         // check if need exact limit and offset
-        if limit == -1 || limit == 0 {
-            if let Some(n) = column_visitor.limit {
-                limit = n;
-            }
+        if (limit == -1 || limit == 0)
+            && let Some(n) = column_visitor.limit
+        {
+            limit = n;
         }
 
         // 5. get match_all() value
@@ -524,31 +524,31 @@ fn generate_quick_mode_fields(
     }
 
     // check _timestamp column
-    if !fields_name.contains(TIMESTAMP_COL_NAME) {
-        if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
-            fields.push(Arc::new(field.clone()));
-            fields_name.insert(TIMESTAMP_COL_NAME.to_string());
-        }
+    if !fields_name.contains(TIMESTAMP_COL_NAME)
+        && let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME)
+    {
+        fields.push(Arc::new(field.clone()));
+        fields_name.insert(TIMESTAMP_COL_NAME.to_string());
     }
     // add the selected columns
     if let Some(columns) = columns {
         for column in columns {
-            if !fields_name.contains(&column) {
-                if let Ok(field) = schema.field_with_name(&column) {
-                    fields.push(Arc::new(field.clone()));
-                    fields_name.insert(column.to_string());
-                }
+            if !fields_name.contains(&column)
+                && let Ok(field) = schema.field_with_name(&column)
+            {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(column.to_string());
             }
         }
     }
     // check fts fields
     if need_fst_fields {
         for field in fts_fields {
-            if !fields_name.contains(field) {
-                if let Ok(field) = schema.field_with_name(field) {
-                    fields.push(Arc::new(field.clone()));
-                    fields_name.insert(field.to_string());
-                }
+            if !fields_name.contains(field)
+                && let Ok(field) = schema.field_with_name(field)
+            {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(field.to_string());
             }
         }
     } else if fields_name.contains(ALL_VALUES_COL_NAME) {
@@ -557,11 +557,11 @@ fn generate_quick_mode_fields(
 
     // check quick mode fields
     for field in config::QUICK_MODEL_FIELDS.iter() {
-        if !fields_name.contains(field) {
-            if let Ok(field) = schema.field_with_name(field) {
-                fields.push(Arc::new(field.clone()));
-                fields_name.insert(field.to_string());
-            }
+        if !fields_name.contains(field)
+            && let Ok(field) = schema.field_with_name(field)
+        {
+            fields.push(Arc::new(field.clone()));
+            fields_name.insert(field.to_string());
         }
     }
     if !need_fst_fields && skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
@@ -776,17 +776,16 @@ impl VisitorMut for ColumnVisitor<'_> {
                 }
             }
         }
-        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref() {
-            if let Ok(num) = n.to_string().parse::<i64>() {
-                self.limit = Some(num);
-            }
+        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref()
+            && let Ok(num) = n.to_string().parse::<i64>()
+        {
+            self.limit = Some(num);
         }
-        if let Some(offset) = query.offset.as_ref() {
-            if let Expr::Value(Value::Number(n, _)) = &offset.value {
-                if let Ok(num) = n.to_string().parse::<i64>() {
-                    self.offset = Some(num);
-                }
-            }
+        if let Some(offset) = query.offset.as_ref()
+            && let Expr::Value(Value::Number(n, _)) = &offset.value
+            && let Ok(num) = n.to_string().parse::<i64>()
+        {
+            self.offset = Some(num);
         }
         ControlFlow::Continue(())
     }
@@ -890,106 +889,106 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if let Some(expr) = select.selection.as_ref() {
-                let exprs = split_conjunction(expr);
-                for e in exprs {
-                    match e {
-                        Expr::BinaryOp {
-                            left,
-                            op: BinaryOperator::Eq,
-                            right,
-                        } => {
-                            let (left, right) = if is_value(left) && is_field(right) {
-                                (right, left)
-                            } else if is_value(right) && is_field(left) {
-                                (left, right)
-                            } else {
-                                continue;
-                            };
-                            match left.as_ref() {
-                                Expr::Identifier(ident) => {
-                                    let mut count = 0;
-                                    let field_name = ident.value.clone();
-                                    let mut table_name = "".to_string();
-                                    for (name, schema) in self.schemas.iter() {
-                                        if schema.contains_field(&field_name) {
-                                            count += 1;
-                                            table_name = name.to_string();
-                                        }
-                                    }
-                                    if count == 1 {
-                                        self.equal_items
-                                            .entry(TableReference::from(table_name))
-                                            .or_default()
-                                            .push((
-                                                field_name,
-                                                trim_quotes(right.to_string().as_str()),
-                                            ));
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
+            && let Some(expr) = select.selection.as_ref()
+        {
+            let exprs = split_conjunction(expr);
+            for e in exprs {
+                match e {
+                    Expr::BinaryOp {
+                        left,
+                        op: BinaryOperator::Eq,
+                        right,
+                    } => {
+                        let (left, right) = if is_value(left) && is_field(right) {
+                            (right, left)
+                        } else if is_value(right) && is_field(left) {
+                            (left, right)
+                        } else {
+                            continue;
+                        };
+                        match left.as_ref() {
+                            Expr::Identifier(ident) => {
+                                let mut count = 0;
+                                let field_name = ident.value.clone();
+                                let mut table_name = "".to_string();
+                                for (name, schema) in self.schemas.iter() {
+                                    if schema.contains_field(&field_name) {
+                                        count += 1;
+                                        table_name = name.to_string();
                                     }
                                 }
-                                Expr::CompoundIdentifier(idents) => {
-                                    let (table_name, field_name) = generate_table_reference(idents);
-                                    // check if table_name is in schemas, otherwise the table_name
-                                    // maybe is a alias
-                                    if self.schemas.contains_key(&table_name) {
-                                        self.equal_items.entry(table_name).or_default().push((
+                                if count == 1 {
+                                    self.equal_items
+                                        .entry(TableReference::from(table_name))
+                                        .or_default()
+                                        .push((
                                             field_name,
                                             trim_quotes(right.to_string().as_str()),
                                         ));
-                                    }
                                 }
-                                _ => {}
                             }
-                        }
-                        Expr::InList {
-                            expr,
-                            list,
-                            negated: false,
-                        } => {
-                            match expr.as_ref() {
-                                Expr::Identifier(ident) => {
-                                    let mut count = 0;
-                                    let field_name = ident.value.clone();
-                                    let mut table_name = "".to_string();
-                                    for (name, schema) in self.schemas.iter() {
-                                        if schema.contains_field(&field_name) {
-                                            count += 1;
-                                            table_name = name.to_string();
-                                        }
-                                    }
-                                    if count == 1 {
-                                        let entry = self
-                                            .equal_items
-                                            .entry(TableReference::from(table_name))
-                                            .or_default();
-                                        for val in list.iter() {
-                                            entry.push((
-                                                field_name.clone(),
-                                                trim_quotes(val.to_string().as_str()),
-                                            ));
-                                        }
-                                    }
+                            Expr::CompoundIdentifier(idents) => {
+                                let (table_name, field_name) = generate_table_reference(idents);
+                                // check if table_name is in schemas, otherwise the table_name
+                                // maybe is a alias
+                                if self.schemas.contains_key(&table_name) {
+                                    self.equal_items.entry(table_name).or_default().push((
+                                        field_name,
+                                        trim_quotes(right.to_string().as_str()),
+                                    ));
                                 }
-                                Expr::CompoundIdentifier(idents) => {
-                                    let (table_name, field_name) = generate_table_reference(idents);
-                                    // check if table_name is in schemas, otherwise the table_name
-                                    // maybe is a alias
-                                    if self.schemas.contains_key(&table_name) {
-                                        let entry = self.equal_items.entry(table_name).or_default();
-                                        for val in list.iter() {
-                                            entry.push((
-                                                field_name.clone(),
-                                                trim_quotes(val.to_string().as_str()),
-                                            ));
-                                        }
-                                    }
-                                }
-                                _ => {}
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
+                    Expr::InList {
+                        expr,
+                        list,
+                        negated: false,
+                    } => {
+                        match expr.as_ref() {
+                            Expr::Identifier(ident) => {
+                                let mut count = 0;
+                                let field_name = ident.value.clone();
+                                let mut table_name = "".to_string();
+                                for (name, schema) in self.schemas.iter() {
+                                    if schema.contains_field(&field_name) {
+                                        count += 1;
+                                        table_name = name.to_string();
+                                    }
+                                }
+                                if count == 1 {
+                                    let entry = self
+                                        .equal_items
+                                        .entry(TableReference::from(table_name))
+                                        .or_default();
+                                    for val in list.iter() {
+                                        entry.push((
+                                            field_name.clone(),
+                                            trim_quotes(val.to_string().as_str()),
+                                        ));
+                                    }
+                                }
+                            }
+                            Expr::CompoundIdentifier(idents) => {
+                                let (table_name, field_name) = generate_table_reference(idents);
+                                // check if table_name is in schemas, otherwise the table_name
+                                // maybe is a alias
+                                if self.schemas.contains_key(&table_name) {
+                                    let entry = self.equal_items.entry(table_name).or_default();
+                                    for val in list.iter() {
+                                        entry.push((
+                                            field_name.clone(),
+                                            trim_quotes(val.to_string().as_str()),
+                                        ));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1016,58 +1015,58 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if let Some(expr) = select.selection.as_ref() {
-                let exprs = split_conjunction(expr);
-                for e in exprs {
-                    if let Expr::Like {
-                        negated: false,
-                        expr,
-                        pattern,
-                        escape_char: _,
-                        any: _,
-                    } = e
-                    {
-                        match expr.as_ref() {
-                            Expr::Identifier(ident) => {
-                                let mut count = 0;
-                                let field_name = ident.value.clone();
-                                let mut table_name = "".to_string();
-                                for (name, schema) in self.schemas.iter() {
-                                    if schema.contains_field(&field_name) {
-                                        count += 1;
-                                        table_name = name.to_string();
-                                    }
-                                }
-                                if count == 1 {
-                                    let pattern = trim_quotes(pattern.to_string().as_str());
-                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
-                                        self.prefix_items
-                                            .entry(TableReference::from(table_name))
-                                            .or_default()
-                                            .push((
-                                                field_name,
-                                                pattern.trim_end_matches('%').to_string(),
-                                            ));
-                                    }
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
+            && let Some(expr) = select.selection.as_ref()
+        {
+            let exprs = split_conjunction(expr);
+            for e in exprs {
+                if let Expr::Like {
+                    negated: false,
+                    expr,
+                    pattern,
+                    escape_char: _,
+                    any: _,
+                } = e
+                {
+                    match expr.as_ref() {
+                        Expr::Identifier(ident) => {
+                            let mut count = 0;
+                            let field_name = ident.value.clone();
+                            let mut table_name = "".to_string();
+                            for (name, schema) in self.schemas.iter() {
+                                if schema.contains_field(&field_name) {
+                                    count += 1;
+                                    table_name = name.to_string();
                                 }
                             }
-                            Expr::CompoundIdentifier(idents) => {
-                                let (table_name, field_name) = generate_table_reference(idents);
-                                // check if table_name is in schemas, otherwise the table_name
-                                // maybe is a alias
-                                if self.schemas.contains_key(&table_name) {
-                                    let pattern = trim_quotes(pattern.to_string().as_str());
-                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
-                                        self.prefix_items.entry(table_name).or_default().push((
+                            if count == 1 {
+                                let pattern = trim_quotes(pattern.to_string().as_str());
+                                if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                    self.prefix_items
+                                        .entry(TableReference::from(table_name))
+                                        .or_default()
+                                        .push((
                                             field_name,
                                             pattern.trim_end_matches('%').to_string(),
                                         ));
-                                    }
                                 }
                             }
-                            _ => {}
                         }
+                        Expr::CompoundIdentifier(idents) => {
+                            let (table_name, field_name) = generate_table_reference(idents);
+                            // check if table_name is in schemas, otherwise the table_name
+                            // maybe is a alias
+                            if self.schemas.contains_key(&table_name) {
+                                let pattern = trim_quotes(pattern.to_string().as_str());
+                                if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                    self.prefix_items.entry(table_name).or_default().push((
+                                        field_name,
+                                        pattern.trim_end_matches('%').to_string(),
+                                    ));
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -1093,15 +1092,14 @@ impl VisitorMut for MatchVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
-            if name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME {
-                if let FunctionArguments::List(list) = &func.args {
-                    if !list.args.is_empty() {
-                        let value = trim_quotes(list.args[0].to_string().as_str());
-                        match &mut self.match_items {
-                            Some(items) => items.push(value),
-                            None => self.match_items = Some(vec![value]),
-                        }
-                    }
+            if (name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME)
+                && let FunctionArguments::List(list) = &func.args
+                && !list.args.is_empty()
+            {
+                let value = trim_quotes(list.args[0].to_string().as_str());
+                match &mut self.match_items {
+                    Some(items) => items.push(value),
+                    None => self.match_items = Some(vec![value]),
                 }
             }
         }
@@ -1451,30 +1449,30 @@ impl VisitorMut for HistogramIntervalVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(func) = expr {
-            if func.name.to_string().to_lowercase() == "histogram" {
-                if let FunctionArguments::List(list) = &func.args {
-                    let mut args = list.args.iter();
-                    // first is field
-                    let _ = args.next();
-                    // second is interval
-                    let interval = if let Some(interval) = args.next() {
-                        let interval = interval
-                            .to_string()
-                            .trim_matches(|v| v == '\'' || v == '"')
-                            .to_string();
-                        match interval.parse::<u16>() {
-                            Ok(v) => generate_histogram_interval(self.time_range, v),
-                            Err(_) => interval,
-                        }
-                    } else {
-                        generate_histogram_interval(self.time_range, 0)
-                    };
-                    self.interval =
-                        Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
-                }
-                return ControlFlow::Break(());
+        if let Expr::Function(func) = expr
+            && func.name.to_string().to_lowercase() == "histogram"
+        {
+            if let FunctionArguments::List(list) = &func.args {
+                let mut args = list.args.iter();
+                // first is field
+                let _ = args.next();
+                // second is interval
+                let interval = if let Some(interval) = args.next() {
+                    let interval = interval
+                        .to_string()
+                        .trim_matches(|v| v == '\'' || v == '"')
+                        .to_string();
+                    match interval.parse::<u16>() {
+                        Ok(v) => generate_histogram_interval(self.time_range, v),
+                        Err(_) => interval,
+                    }
+                } else {
+                    generate_histogram_interval(self.time_range, 0)
+                };
+                self.interval =
+                    Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
             }
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -1648,15 +1646,13 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
                 return true;
             }
 
-            if f == STR_MATCH_UDF_NAME
+            if (f == STR_MATCH_UDF_NAME
                 || f == STR_MATCH_UDF_IGNORE_CASE_NAME
                 || f == MATCH_FIELD_UDF_NAME
-                || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+                || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
+                && let FunctionArguments::List(list) = &func.args
             {
-                if let FunctionArguments::List(list) = &func.args {
-                    return list.args.len() == 2
-                        && index_fields.contains(&get_arg_name(&list.args[0]));
-                }
+                return list.args.len() == 2 && index_fields.contains(&get_arg_name(&list.args[0]));
             }
 
             false
@@ -2016,14 +2012,14 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                     | BinaryOperator::Lt,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
-                    }
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
-                    }
+                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref()
+                    && *value == placeholder
+                {
+                    *expr = Expr::Value(Value::Boolean(true));
+                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref()
+                    && *value == placeholder
+                {
+                    *expr = Expr::Value(Value::Boolean(true));
                 }
             }
             // Not equal
@@ -2032,14 +2028,14 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 op: BinaryOperator::NotEq,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(false));
-                    }
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(false));
-                    }
+                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref()
+                    && *value == placeholder
+                {
+                    *expr = Expr::Value(Value::Boolean(false));
+                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref()
+                    && *value == placeholder
+                {
+                    *expr = Expr::Value(Value::Boolean(false));
                 }
             }
             // Like
@@ -2053,10 +2049,10 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: false,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
-                    }
+                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref()
+                    && *value == placeholder
+                {
+                    *expr = Expr::Value(Value::Boolean(true));
                 }
             }
             // Not Like
@@ -2070,48 +2066,46 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: true,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(false));
-                    }
+                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref()
+                    && *value == placeholder
+                {
+                    *expr = Expr::Value(Value::Boolean(false));
                 }
             }
             // In list
             Expr::InList { list, negated, .. } if !(*negated) => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if *value == placeholder {
-                            *expr = Expr::Value(Value::Boolean(true));
-                            break;
-                        }
+                    if let Expr::Value(Value::SingleQuotedString(value)) = item
+                        && *value == placeholder
+                    {
+                        *expr = Expr::Value(Value::Boolean(true));
+                        break;
                     }
                 }
             }
             // Not in list
             Expr::InList { list, negated, .. } if *negated => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if *value == placeholder {
-                            *expr = Expr::Value(Value::Boolean(false));
-                            break;
-                        }
+                    if let Expr::Value(Value::SingleQuotedString(value)) = item
+                        && *value == placeholder
+                    {
+                        *expr = Expr::Value(Value::Boolean(false));
+                        break;
                     }
                 }
             }
             Expr::Function(func) => {
                 let f = func.name.to_string().to_lowercase();
-                if f == STR_MATCH_UDF_NAME
+                if (f == STR_MATCH_UDF_NAME
                     || f == STR_MATCH_UDF_IGNORE_CASE_NAME
                     || f == MATCH_FIELD_UDF_NAME
-                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
+                    && let FunctionArguments::List(list) = &func.args
+                    && list.args.len() == 2
                 {
-                    if let FunctionArguments::List(list) = &func.args {
-                        if list.args.len() == 2 {
-                            let value = trim_quotes(list.args[1].to_string().as_str());
-                            if *value == placeholder {
-                                *expr = Expr::Value(Value::Boolean(true));
-                            }
-                        }
+                    let value = trim_quotes(list.args[1].to_string().as_str());
+                    if *value == placeholder {
+                        *expr = Expr::Value(Value::Boolean(true));
                     }
                 }
             }
@@ -2875,7 +2869,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2888,7 +2882,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2901,7 +2895,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE false";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2914,7 +2908,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE false AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2928,7 +2922,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND (true OR true)";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2942,7 +2936,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND false";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2956,7 +2950,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND false AND field3 = 'value3'";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2969,7 +2963,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
     }
@@ -2982,7 +2976,7 @@ mod tests {
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
     }

@@ -38,7 +38,7 @@ pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 pub const ORG_KEY_PREFIX: &str = "/organization/org/";
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
-    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_name}");
     db::put(
         &key,
         json::to_vec(&setting).unwrap().into(),
@@ -57,7 +57,7 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
 }
 
 pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error> {
-    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
         return Ok(v.clone());
     }
@@ -211,7 +211,7 @@ pub async fn rename_org(org_id: &str, new_name: &str) -> Result<Organization, an
         return Err(anyhow::anyhow!("Error updating org: {}", e));
     }
     let org = get_org(org_id).await?;
-    let key = format!("{}{}", ORG_KEY_PREFIX, org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
     let _ = put_into_db_coordinator(&key, json::to_vec(&org).unwrap().into(), true, None).await;
 
     #[cfg(feature = "enterprise")]

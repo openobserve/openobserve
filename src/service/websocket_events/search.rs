@@ -926,8 +926,7 @@ pub async fn do_partitioned_search(
             req.payload.query.start_time
         );
         range_error = format!(
-            "Query duration is modified due to query range restriction of {} hours",
-            max_query_range
+            "Query duration is modified due to query range restriction of {max_query_range} hours"
         );
     }
     // for new_start_time & new_end_time
@@ -1091,7 +1090,7 @@ async fn send_partial_search_resp(
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
     } else {
-        format!("{} \n {}", PARTIAL_ERROR_RESPONSE_MESSAGE, error)
+        format!("{PARTIAL_ERROR_RESPONSE_MESSAGE} \n {error}")
     };
     let s_resp = Response {
         is_partial: true,

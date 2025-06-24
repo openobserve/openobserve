@@ -110,7 +110,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     table::destinations::delete(org_id, name).await?;
 
     // trigger watch event to update in-memory cache
-    let event_key = format!("{DESTINATION_WATCHER_PREFIX}{}/{}", org_id, name);
+    let event_key = format!("{DESTINATION_WATCHER_PREFIX}{org_id}/{name}");
     // in-cluster
     infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
     // super cluster

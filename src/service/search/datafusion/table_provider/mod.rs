@@ -276,10 +276,10 @@ impl NewListingTable {
         // If enable pruning then combine the filters to build the predicate.
         // If disable pruning then set the predicate to None, thus readers
         // will not prune data based on the statistics.
-        if parquet.enable_pruning() {
-            if let Some(pred) = filters.cloned() {
-                predicate = Some(pred);
-            }
+        if parquet.enable_pruning()
+            && let Some(pred) = filters.cloned()
+        {
+            predicate = Some(pred);
         }
         if let Some(metadata) = parquet.metadata_size_hint() {
             metadata_size_hint = Some(metadata);

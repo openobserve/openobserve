@@ -228,7 +228,7 @@ pub async fn get_latest_traces(
     }
 
     let max_query_range = crate::common::utils::stream::get_max_query_range(
-        &[stream_name.clone()],
+        std::slice::from_ref(&stream_name),
         org_id.as_str(),
         &user_id,
         StreamType::Traces,
@@ -238,8 +238,7 @@ pub async fn get_latest_traces(
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
         range_error = format!(
-            "Query duration is modified due to query range restriction of {} hours",
-            max_query_range
+            "Query duration is modified due to query range restriction of {max_query_range} hours"
         );
     }
 
@@ -249,8 +248,7 @@ pub async fn get_latest_traces(
 
     // search
     let query_sql = format!(
-        "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
-        TIMESTAMP_COL_NAME
+        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}"
     );
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
@@ -372,8 +370,7 @@ pub async fn get_latest_traces(
         .collect::<Vec<String>>()
         .join("','");
     let query_sql = format!(
-        "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{}') ORDER BY {} ASC",
-        TIMESTAMP_COL_NAME, trace_ids, TIMESTAMP_COL_NAME,
+        "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{trace_ids}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
     );
     req.query.from = 0;
     req.query.size = 9999;

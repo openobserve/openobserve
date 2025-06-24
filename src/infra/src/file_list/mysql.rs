@@ -379,10 +379,11 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -438,10 +439,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         date_range: Option<(String, String)>,
     ) -> Result<Vec<FileKey>> {
-        if let Some((start, end)) = date_range.as_ref() {
-            if start.is_empty() && end.is_empty() {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = date_range.as_ref()
+            && start.is_empty()
+            && end.is_empty()
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -517,10 +519,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<super::FileId>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -633,10 +636,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<String>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -694,7 +698,7 @@ SELECT date
             lock_id,
             config::get_config().limit.meta_transaction_lock_timeout
         );
-        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{lock_id}')");
         let mut lock_tx = lock_pool.begin().await?;
         DB_QUERY_NUMS.with_label_values(&["get_lock", "", ""]).inc();
         match sqlx::query_scalar::<_, i64>(&lock_sql)
@@ -954,16 +958,16 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
             "#,
         );
         if deleted {
-            sql = format!("{} AND deleted IS TRUE", sql);
+            sql = format!("{sql} AND deleted IS TRUE");
         }
         let sql = match pk_value {
-            None => format!("{} GROUP BY stream", sql),
-            Some((0, 0)) => format!("{} GROUP BY stream", sql),
+            None => format!("{sql} GROUP BY stream"),
+            Some((0, 0)) => format!("{sql} GROUP BY stream"),
             Some((min, max)) => {
                 if deleted {
-                    format!("{} AND id <= {} GROUP BY stream", sql, max)
+                    format!("{sql} AND id <= {max} GROUP BY stream")
                 } else {
-                    format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                    format!("{sql} AND id > {min} AND id <= {max} GROUP BY stream")
                 }
             }
         };
@@ -994,13 +998,12 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
     ) -> Result<Vec<(String, StreamStats)>> {
         let sql = if stream_type.is_some() && stream_name.is_some() {
             format!(
-                "SELECT * FROM stream_stats WHERE stream = '{}/{}/{}';",
-                org_id,
+                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{}/{}';",
                 stream_type.unwrap(),
                 stream_name.unwrap()
             )
         } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{}';", org_id)
+            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
         };
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -1022,8 +1025,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         stream_name: &str,
     ) -> Result<()> {
         let sql = format!(
-            "DELETE FROM stream_stats WHERE stream = '{}/{}/{}';",
-            org_id, stream_type, stream_name
+            "DELETE FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';"
         );
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
@@ -1075,13 +1077,13 @@ INSERT INTO stream_stats
             .await
             {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback insert stream stats error: {}", e);
+                    log::error!("[MYSQL] rollback insert stream stats error: {e}");
                 }
                 return Err(e.into());
             }
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit set stream stats error: {}", e);
+            log::error!("[MYSQL] commit set stream stats error: {e}");
             return Err(e.into());
         }
 
@@ -1110,7 +1112,7 @@ UPDATE stream_stats
             .await
             {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback set stream stats error: {}", e);
+                    log::error!("[MYSQL] rollback set stream stats error: {e}");
                 }
                 return Err(e.into());
             }
@@ -1140,8 +1142,7 @@ UPDATE stream_stats
                     Err(e) => {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
-                                "[MYSQL] rollback set stream stats error for delete file list: {}",
-                                e
+                                "[MYSQL] rollback set stream stats error for delete file list: {e}"
                             );
                         }
                         return Err(e.into());
@@ -1156,7 +1157,7 @@ UPDATE stream_stats
 
         // commit
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit set stream stats error: {}", e);
+            log::error!("[MYSQL] commit set stream stats error: {e}");
             return Err(e.into());
         }
 
@@ -1212,7 +1213,7 @@ UPDATE stream_stats
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[MYSQL] get file list len error: {}", e);
+                log::error!("[MYSQL] get file list len error: {e}");
                 return 0;
             }
         };
@@ -1278,11 +1279,10 @@ UPDATE stream_stats
         let lock_key = "file_list_jobs:get_pending_jobs";
         let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
         let lock_sql = format!(
-            "SELECT GET_LOCK('{}', {})",
-            lock_id,
+            "SELECT GET_LOCK('{lock_id}', {})",
             config::get_config().limit.meta_transaction_lock_timeout
         );
-        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{lock_id}')");
         let mut lock_tx = lock_pool.begin().await?;
         DB_QUERY_NUMS.with_label_values(&["get_lock", "", ""]).inc();
         match sqlx::query_scalar::<_, i64>(&lock_sql)
@@ -1292,7 +1292,7 @@ UPDATE stream_stats
             Ok(v) => {
                 if v != 1 {
                     if let Err(e) = lock_tx.rollback().await {
-                        log::error!("[MYSQL] rollback lock for get_pending_jobs error: {}", e);
+                        log::error!("[MYSQL] rollback lock for get_pending_jobs error: {e}");
                     }
                     return Err(Error::from(DbError::DBOperError(
                         "LockTimeout".to_string(),
@@ -1302,7 +1302,7 @@ UPDATE stream_stats
             }
             Err(e) => {
                 if let Err(e) = lock_tx.rollback().await {
-                    log::error!("[MYSQL] rollback lock for get_pending_jobs error: {}", e);
+                    log::error!("[MYSQL] rollback lock for get_pending_jobs error: {e}");
                 }
                 return Err(e.into());
             }
@@ -1313,10 +1313,10 @@ UPDATE stream_stats
             Ok(tx) => tx,
             Err(e) => {
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {e}");
                 }
                 return Err(e.into());
             }
@@ -1350,10 +1350,10 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {e}");
                 }
                 return Err(e.into());
             }
@@ -2150,15 +2150,15 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
 
     let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
     let mut tx = pool.begin().await?;
-    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
-        if !e.to_string().contains("Duplicate column name") {
-            // Check for the specific MySQL error code for duplicate column
-            log::error!("[MYSQL] Unexpected error in adding column {column}: {}", e);
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-            }
-            return Err(e.into());
+    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await
+        && !e.to_string().contains("Duplicate column name")
+    {
+        // Check for the specific MySQL error code for duplicate column
+        log::error!("[MYSQL] Unexpected error in adding column {column}: {}", e);
+        if let Err(e) = tx.rollback().await {
+            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
         }
+        return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
         log::info!("[MYSQL] Error in committing transaction: {}", e);

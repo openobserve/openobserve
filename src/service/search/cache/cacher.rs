@@ -48,8 +48,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     let components: Vec<&str> = file_path.split('/').collect();
     if components.len() < 3 {
         return Err(format!(
-            "File path does not contain sufficient components: {}",
-            file_path
+            "File path does not contain sufficient components: {file_path}"
         ));
     }
 
@@ -130,7 +129,7 @@ pub async fn check_cache(
         let cap_str = caps.get(1).unwrap().as_str();
         if !cap_str.contains(TIMESTAMP_COL_NAME) {
             *origin_sql =
-                origin_sql.replacen(cap_str, &format!("{}, {}", TIMESTAMP_COL_NAME, cap_str), 1);
+                origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME},{cap_str}"), 1);
         }
         req.query.sql = origin_sql.clone();
         result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
@@ -142,7 +141,7 @@ pub async fn check_cache(
     let result_ts_col = result_ts_col.unwrap();
     let mut discard_interval = -1;
     if let Some(interval) = sql.histogram_interval {
-        *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
+        *file_path = format!("{file_path}_{interval}_{result_ts_col}");
 
         let mut req_time_range = (req.query.start_time, req.query.end_time);
         if req_time_range.1 == 0 {
@@ -568,22 +567,19 @@ pub async fn cache_results_to_disk(
     file_name: &str,
     data: String,
 ) -> std::io::Result<()> {
-    let file = format!("results/{}/{}", file_path, file_name);
+    let file = format!("results/{file_path}/{file_name}");
     match disk::set(&file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
             log::error!("Error caching results to disk: {e}");
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error caching results to disk",
-            ));
+            return Err(std::io::Error::other("Error caching results to disk"));
         }
     }
     Ok(())
 }
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
-    let file = format!("results/{}/{}", file_path, file_name);
+    let file = format!("results/{file_path}/{file_name}");
     match disk::get(&file, None).await {
         Some(v) => Ok(String::from_utf8(v.to_vec()).unwrap()),
         None => Err(std::io::Error::new(
@@ -650,8 +646,8 @@ pub fn get_ts_col_order_by(
 #[tracing::instrument]
 pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
-    let pattern = format!("{}/results/{}", root_dir, path);
-    let prefix = format!("{}/", root_dir);
+    let pattern = format!("{root_dir}/results/{path}");
+    let prefix = format!("{root_dir}/");
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
     for file in files {
@@ -659,10 +655,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
             Ok(_) => remove_files.push(file),
             Err(e) => {
                 log::error!("Error deleting cache: {e}");
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Error deleting cache",
-                ));
+                return Err(std::io::Error::other("Error deleting cache"));
             }
         }
     }
@@ -703,7 +696,7 @@ fn handle_histogram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
 
     *origin_sql = origin_sql.replace(
         caps.get(0).unwrap().as_str(),
-        &format!("histogram(_timestamp,'{}')", interval),
+        &format!("histogram(_timestamp,'{interval}')"),
     );
 }
 

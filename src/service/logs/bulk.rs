@@ -114,8 +114,8 @@ pub async fn ingest(
             (action, stream_name, doc_id) = ret.unwrap();
 
             if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
-                let err_msg = format!("Invalid stream name: {}", line);
-                log::warn!("{}", err_msg);
+                let err_msg = format!("Invalid stream name: {line}");
+                log::warn!("{err_msg}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.to_string(),
@@ -250,12 +250,9 @@ pub async fn ingest(
                 if streams_need_original_map
                     .get(&stream_name)
                     .is_some_and(|v| *v)
-                    && original_data.is_some()
+                    && let Some(original_data) = original_data
                 {
-                    local_val.insert(
-                        ORIGINAL_DATA_COL_NAME.to_string(),
-                        original_data.unwrap().into(),
-                    );
+                    local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
                     let record_id = crate::service::ingestion::generate_record_id(
                         org_id,
                         &stream_name,

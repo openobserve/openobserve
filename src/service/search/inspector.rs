@@ -131,12 +131,12 @@ pub fn search_inspector_fields(msg: String, kvs: SearchInspectorFields) -> Strin
 }
 
 pub fn extract_search_inspector_fields(msg: &str) -> Option<SearchInspectorFields> {
-    if let Some(start) = msg.find(" #{\"") {
-        if let Some(end) = msg[start..].find("}#") {
-            let json_str = &msg[start + 2..start + end + 1];
-            if let Ok(fields) = serde_json::from_str::<SearchInspectorFields>(json_str) {
-                return Some(fields);
-            }
+    if let Some(start) = msg.find(" #{\"")
+        && let Some(end) = msg[start..].find("}#")
+    {
+        let json_str = &msg[start + 2..start + end + 1];
+        if let Ok(fields) = serde_json::from_str::<SearchInspectorFields>(json_str) {
+            return Some(fields);
         }
     }
     None

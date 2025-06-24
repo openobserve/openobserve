@@ -538,8 +538,7 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
         session
     } else {
         return Err(Error::Message(format!(
-            "[req_id {}] session not found",
-            req_id
+            "[req_id {req_id}] session not found"
         )));
     };
 

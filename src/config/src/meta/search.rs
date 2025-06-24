@@ -1329,32 +1329,32 @@ mod search_history_utils {
 
         // Method to build the SQL query
         pub fn build(self, search_stream_name: &str) -> String {
-            let mut query = format!("SELECT * FROM {} WHERE event='Search'", search_stream_name);
+            let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
 
-            if let Some(org_id) = self.org_id {
-                if !org_id.is_empty() {
-                    query.push_str(&format!(" AND org_id = '{}'", org_id));
-                }
+            if let Some(org_id) = self.org_id
+                && !org_id.is_empty()
+            {
+                query.push_str(&format!(" AND org_id = '{org_id}'"));
             }
-            if let Some(stream_type) = self.stream_type {
-                if !stream_type.is_empty() {
-                    query.push_str(&format!(" AND stream_type = '{}'", stream_type));
-                }
+            if let Some(stream_type) = self.stream_type
+                && !stream_type.is_empty()
+            {
+                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
             }
-            if let Some(stream_name) = self.stream_name {
-                if !stream_name.is_empty() {
-                    query.push_str(&format!(" AND stream_name = '{}'", stream_name));
-                }
+            if let Some(stream_name) = self.stream_name
+                && !stream_name.is_empty()
+            {
+                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
             }
-            if let Some(user_email) = self.user_email {
-                if !user_email.is_empty() {
-                    query.push_str(&format!(" AND user_email = '{}'", user_email));
-                }
+            if let Some(user_email) = self.user_email
+                && !user_email.is_empty()
+            {
+                query.push_str(&format!(" AND user_email = '{user_email}'"));
             }
-            if let Some(trace_id) = self.trace_id {
-                if !trace_id.is_empty() {
-                    query.push_str(&format!(" AND trace_id = '{}'", trace_id));
-                }
+            if let Some(trace_id) = self.trace_id
+                && !trace_id.is_empty()
+            {
+                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
             }
 
             query
@@ -1520,7 +1520,7 @@ impl StreamResponses {
     pub fn to_chunks(&self) -> StreamResponseChunks {
         // Helper function to format event data
         let format_event = |event_type: &str, data: &str| -> BytesImpl {
-            let formatted = format!("event: {}\ndata: {}\n\n", event_type, data);
+            let formatted = format!("event: {event_type}\ndata: {data}\n\n");
             BytesImpl::from(formatted.into_bytes())
         };
 

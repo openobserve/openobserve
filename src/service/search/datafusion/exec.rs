@@ -116,8 +116,7 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let sql = if stream_type == StreamType::Index {
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
-            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {TIMESTAMP_COL_NAME} DESC) ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -131,16 +130,15 @@ pub async fn merge_parquet_files(
             .collect::<Vec<_>>();
         let fields_str = fields.join(", ");
         format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
-            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, fields_str, fields_str, TIMESTAMP_COL_NAME
+            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, SUM(count) as count, {fields_str} FROM tbl GROUP BY {fields_str} ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
         "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
-        format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
+        format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
     };
-    log::debug!("merge_parquet_files sql: {}", sql);
+    log::debug!("merge_parquet_files sql: {sql}");
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -171,7 +169,7 @@ pub async fn merge_parquet_files(
         println!("+---------------------------+--------------------------+");
         println!("merge_parquet_files");
         println!("+---------------------------+--------------------------+");
-        println!("{}", plan);
+        println!("{plan}");
     }
 
     // write result to parquet file
@@ -464,7 +462,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_limit);
     let mem_pool = super::MemoryPoolType::from_str(&cfg.memory_cache.datafusion_memory_pool)
         .map_err(|e| {
-            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
+            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {e}"))
         })?;
     match mem_pool {
         super::MemoryPoolType::Greedy => {

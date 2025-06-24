@@ -359,8 +359,8 @@ pub async fn process_search_stream_request(
         }
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
-        if req.query.from == 0 {
-            if let Err(e) =
+        if req.query.from == 0
+            && let Err(e) =
                 write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
                     .instrument(search_span.clone())
                     .await
@@ -372,44 +372,43 @@ pub async fn process_search_stream_request(
                         );
                         e
                     })
+        {
+            // send audit response first
+            #[cfg(feature = "enterprise")]
             {
-                // send audit response first
-                #[cfg(feature = "enterprise")]
-                {
-                    let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
-                        // Using spawn to handle the async call
-                        audit(AuditMessage {
-                            user_email: user_id,
-                            org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
-                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: _audit_ctx
-                                    .as_ref()
-                                    .unwrap()
-                                    .query_params
-                                    .to_string(),
-                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                                http_response_code: resp,
-                                error_msg: Some(e.to_string()),
-                                trace_id: Some(trace_id.to_string()),
-                            },
-                        })
-                        .await;
-                    }
+                let resp = map_error_to_http_response(&e, None).status().into();
+                if get_o2_config().common.audit_enabled {
+                    // Using spawn to handle the async call
+                    audit(AuditMessage {
+                        user_email: user_id,
+                        org_id,
+                        _timestamp: chrono::Utc::now().timestamp(),
+                        protocol: Protocol::Http,
+                        response_meta: ResponseMeta {
+                            http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                            http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                            http_query_params: _audit_ctx
+                                .as_ref()
+                                .unwrap()
+                                .query_params
+                                .to_string(),
+                            http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                            http_response_code: resp,
+                            error_msg: Some(e.to_string()),
+                            trace_id: Some(trace_id.to_string()),
+                        },
+                    })
+                    .await;
                 }
-
-                if let Err(e) = sender.send(Err(e)).await {
-                    log::error!(
-                        "[HTTP2_STREAM] Error sending error message to client: {}",
-                        e
-                    );
-                }
-                return;
             }
+
+            if let Err(e) = sender.send(Err(e)).await {
+                log::error!(
+                    "[HTTP2_STREAM] Error sending error message to client: {}",
+                    e
+                );
+            }
+            return;
         }
     } else {
         // Step 4: Search without cache for req with from > 0
@@ -545,8 +544,7 @@ pub async fn do_partitioned_search(
             req.query.start_time
         );
         range_error = format!(
-            "Query duration is modified due to query range restriction of {} hours",
-            max_query_range
+            "Query duration is modified due to query range restriction of {max_query_range} hours",
         );
     }
     // for new_start_time & new_end_time
@@ -1152,16 +1150,18 @@ async fn process_delta(
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
 
-            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+            if req.search_type == Some(SearchEventType::Values)
+                && let Some(ref values_ctx) = values_ctx
+            {
                 let search_stream_span = tracing::info_span!(
                     "src::handler::http::request::search::process_stream::process_delta::get_top_k_values",
                     org_id = %org_id,
                 );
 
                 log::debug!("Getting top k values for partition {idx}");
-                let field = values_ctx.as_ref().unwrap().field.clone();
-                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-                let no_count = values_ctx.as_ref().unwrap().no_count;
+                let field = values_ctx.field.clone();
+                let top_k = values_ctx.top_k.unwrap_or(10);
+                let no_count = values_ctx.no_count;
                 let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
                     get_top_k_values(&search_res.hits, &field, top_k, no_count)
                 })
@@ -1272,7 +1272,7 @@ async fn send_partial_search_resp(
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
     } else {
-        format!("{} \n {}", PARTIAL_ERROR_RESPONSE_MESSAGE, error)
+        format!("{PARTIAL_ERROR_RESPONSE_MESSAGE} \n {error}")
     };
     let s_resp = Response {
         is_partial: true,

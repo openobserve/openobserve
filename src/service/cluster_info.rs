@@ -46,8 +46,7 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
             Err(e) => {
                 log::error!("Failed to get pending jobs count: {e}");
                 return Err(Status::internal(format!(
-                    "Failed to get pending jobs count: {:?}",
-                    e
+                    "Failed to get pending jobs count: {e}"
                 )));
             }
         };

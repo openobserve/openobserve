@@ -130,21 +130,20 @@ pub async fn remote_write(
             need_update = true;
             break;
         }
-        if need_update {
-            if let Err(e) = db::schema::update_setting(
+        if need_update
+            && let Err(e) = db::schema::update_setting(
                 org_id,
                 &metric_name,
                 StreamType::Metrics,
                 extra_metadata,
             )
             .await
-            {
-                log::error!(
-                    "Error updating metadata for stream: {}, err: {}",
-                    metric_name,
-                    e
-                );
-            }
+        {
+            log::error!(
+                "Error updating metadata for stream: {}, err: {}",
+                metric_name,
+                e
+            );
         }
     }
 
@@ -644,9 +643,9 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
                 .collect::<Vec<_>>();
             let mut histogram_summary_sub = Vec::with_capacity(histogram_summary.len() * 3);
             for name in histogram_summary.iter() {
-                histogram_summary_sub.push(format!("{}_bucket", name));
-                histogram_summary_sub.push(format!("{}_count", name));
-                histogram_summary_sub.push(format!("{}_sum", name));
+                histogram_summary_sub.push(format!("{name}_bucket"));
+                histogram_summary_sub.push(format!("{name}_count"));
+                histogram_summary_sub.push(format!("{name}_sum"));
             }
             let metric_names = stream_schemas.into_iter().filter_map(|schema| {
                 if histogram_summary_sub.contains(&schema.stream_name) {
@@ -791,12 +790,12 @@ pub(crate) async fn get_labels(
     };
     let mut label_names = hashbrown::HashSet::new();
     for schema in stream_schemas {
-        if let Some(ref metric_name) = opt_metric_name {
-            if *metric_name != schema.stream_name {
-                // Client has requested a particular metric name, but this stream is
-                // not it.
-                continue;
-            }
+        if let Some(ref metric_name) = opt_metric_name
+            && *metric_name != schema.stream_name
+        {
+            // Client has requested a particular metric name, but this stream is
+            // not it.
+            continue;
         }
         let stats = stats::get_stream_stats(org_id, &schema.stream_name, StreamType::Metrics);
         if stats.time_range_intersects(start, end) {
@@ -835,12 +834,12 @@ pub(crate) async fn get_label_values(
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
         for schema in stream_schemas {
-            if let Some(ref metric_name) = opt_metric_name {
-                if *metric_name != schema.stream_name {
-                    // Client has requested a particular metric name, but this stream is
-                    // not it.
-                    continue;
-                }
+            if let Some(ref metric_name) = opt_metric_name
+                && *metric_name != schema.stream_name
+            {
+                // Client has requested a particular metric name, but this stream is
+                // not it.
+                continue;
             }
             let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
                 None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),

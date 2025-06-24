@@ -378,7 +378,7 @@ pub async fn otlp_logs_write(
                 log::error!("[LOGS:OTLP] Invalid proto: {}", e);
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST,
-                    format!("Invalid proto: {}", e),
+                    format!("Invalid proto: {e}"),
                 )));
             }
         },
@@ -389,7 +389,7 @@ pub async fn otlp_logs_write(
                     log::error!("[LOGS:OTLP] Invalid json: {}", e);
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                         http::StatusCode::BAD_REQUEST,
-                        format!("Invalid json: {}", e),
+                        format!("Invalid json: {e}"),
                     )));
                 }
             }
