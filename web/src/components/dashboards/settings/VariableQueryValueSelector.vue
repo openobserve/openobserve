@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
 import { debounce } from "lodash-es";
 import { defineComponent, ref, watch, computed, nextTick, onUnmounted } from "vue";
 
@@ -180,8 +180,8 @@ export default defineComponent({
           variableItem: props.variableItem,
           filterText: newVal,
         });
-      }
-    )
+      },
+    );
 
     // Cleanup debounce timeout when component is unmounted
     onUnmounted(() => {
@@ -190,14 +190,28 @@ export default defineComponent({
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
+        const hasCustomValue =
+          Array.isArray(selectedValue.value) &&
+          selectedValue.value.some((v: string) =>
+            v.includes(`::${CUSTOM_VALUE}`),
+          );
+
+        if (hasCustomValue) {
+          return false;
+        }
+
         return (
           Array.isArray(selectedValue.value) &&
           selectedValue.value?.[0] === SELECT_ALL_VALUE
         );
+      } else {
+        if (selectedValue.value.includes(`::${CUSTOM_VALUE}`)) {
+          return false;
+        }
+        return selectedValue.value === SELECT_ALL_VALUE;
       }
-      return selectedValue.value === SELECT_ALL_VALUE;
     });
-    
+
     const closePopUpWhenValueIsSet = async () => {
       filterText.value = "";
       if (selectRef.value) {
@@ -229,6 +243,21 @@ export default defineComponent({
       ) {
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
           val = val.filter((v) => v !== SELECT_ALL_VALUE);
+        }
+
+        // If user selects a regular option (not custom), remove any custom values
+        const hasRegularOptions = val.some(
+          (v: string) => !v.includes(`::${CUSTOM_VALUE}`),
+        );
+        if (hasRegularOptions) {
+          val = val.filter((v: string) => !v.includes(`::${CUSTOM_VALUE}`));
+        }
+      } else if (!props.variableItem.multiSelect) {
+        // For single select, if user selects a regular option, clear any custom value
+        if (!val.includes(`::${CUSTOM_VALUE}`)) {
+          // User selected a regular option, so we keep it as is
+        } else if (val.includes(`::${CUSTOM_VALUE}`)) {
+          // User selected a custom value, keep it as is
         }
       }
       selectedValue.value = val;
@@ -330,20 +359,15 @@ export default defineComponent({
     const handleCustomValue = async (value: string) => {
       if (!value?.trim()) return;
       const newValue = value.trim();
-      if (props.variableItem.multiSelect) {
-        let arr = Array.isArray(selectedValue.value)
-          ? [...selectedValue.value]
-          : [];
-        arr = arr.filter((v) => v !== SELECT_ALL_VALUE);
-        if (!arr.includes(newValue)) {
-          arr.push(newValue);
-        }
 
-        selectedValue.value = arr;
-        emit("update:modelValue", arr);
+      const customValue = `${newValue}::${CUSTOM_VALUE}`;
+
+      if (props.variableItem.multiSelect) {
+        selectedValue.value = [customValue];
+        emit("update:modelValue", [customValue]);
       } else {
-        selectedValue.value = newValue;
-        emit("update:modelValue", newValue);
+        selectedValue.value = customValue;
+        emit("update:modelValue", customValue);
       }
       await closePopUpWhenValueIsSet();
     };
