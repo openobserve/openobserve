@@ -566,7 +566,7 @@ class="indexDetailsContainer" style="height: 100vh">
           <!-- floating footer for the table -->
 
           <div
-            :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+            :class="store.state.theme === 'dark' ? 'dark-theme-floating-buttons' : 'light-theme-floating-buttons'"
             class="floating-buttons q-px-md q-py-xs"
           >
             <div
@@ -1978,11 +1978,11 @@ export default defineComponent({
   z-index: 1; /* Ensure it stays on top of table content */
   width: 100%;
 }
-.dark-theme {
+.dark-theme-floating-buttons {
   background-color: var(--q-light);
   backdrop-filter: blur(10px);
 }
-.light-theme {
+.light-theme-floating-buttons {
   background-color: var(--q-light);
   backdrop-filter: blur(10px);
 }
