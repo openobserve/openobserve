@@ -777,6 +777,7 @@ export default defineComponent({
           label: "#",
           field: "#",
           align: "left",
+          style: "width: 80px",
         },
         {
           name: "name",
