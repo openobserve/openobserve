@@ -193,7 +193,6 @@ pub async fn ingest(
             }
         }
 
-        // TODO @YJDoc2 : also handle pipeline
         // we do not drop the record here, just log error and continue process
         match pattern_manager.process_at_ingestion(
             org_id,

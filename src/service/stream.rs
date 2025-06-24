@@ -203,6 +203,9 @@ pub fn stream_res(
         stream_type,
     ));
 
+    #[cfg(not(feature = "enterprise"))]
+    let pattern_associations = vec![];
+    #[cfg(feature = "enterprise")]
     let pattern_associations = {
         loop {
             let mgr = match PATTERN_MANAGER.get() {
@@ -607,21 +610,25 @@ pub async fn update_stream_settings(
                 settings.partition_time_level = Some(partition_time_level);
             }
 
-            // TODO @YJDoc2 make this ent-only
-            if let Err(e) = process_association_changes(
-                org_id,
-                stream_name,
-                stream_type,
-                new_settings.pattern_associations,
-            )
-            .await
+            #[cfg(feature = "enterprise")]
             {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Internal server error while updating pattern associations {e}",),
-                    )),
-                );
+                if let Err(e) = process_association_changes(
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    new_settings.pattern_associations,
+                )
+                .await
+                {
+                    return Ok(
+                        HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                            format!(
+                                "Internal server error while updating pattern associations {e}",
+                            ),
+                        )),
+                    );
+                }
             }
 
             save_stream_settings(org_id, stream_name, stream_type, settings).await
