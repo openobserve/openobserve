@@ -244,7 +244,7 @@ impl Sql {
 
         // 10. pick up histogram interval
         let mut histogram_interval_visitor =
-            HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
+            HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
         let histogram_interval = if query.histogram_interval > 0 {
             Some(query.histogram_interval)
