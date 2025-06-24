@@ -123,7 +123,7 @@ pub async fn save(
         .await
         {
             Ok(entry) => {
-                set_ownership(&org_id, "re_pattern", Authz::new(&entry.id)).await;
+                set_ownership(&org_id, "re_patterns", Authz::new(&entry.id)).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK,
                     "Pattern created successfully",
