@@ -656,6 +656,7 @@ export default defineComponent({
 
     onBeforeUnmount(async () => {
       // Cancel all the search queries
+      clearInterval(store.state.refreshIntervalID);
       cancelOnGoingSearchQueries();
 
       if (searchObj)
@@ -810,15 +811,26 @@ export default defineComponent({
     }
 
     const isRouteChanged = () => {
-      if(!Object.hasOwn(router.currentRoute.value.query, "stream") || !Object.hasOwn(router.currentRoute.value.query, "org_identifier")) {
+      if (
+        !Object.hasOwn(router.currentRoute.value.query, "stream") ||
+        !Object.hasOwn(router.currentRoute.value.query, "org_identifier")
+      ) {
         return;
       }
 
-      if(Object.hasOwn(router.currentRoute.value.query, "stream") && Object.hasOwn(router.currentRoute.value.query, "org_identifier") && store.state.logs.logs.data != undefined &&
-        Object.hasOwn(store.state.logs.logs.data, "stream") && Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
-        (!store.state.logs.logs.data.stream.selectedStream.includes(router.currentRoute.value.query.stream)
-        || router.currentRoute.value.query.org_identifier !== store.state.logs.logs.organizationIdentifier)) {
-          store.dispatch("logs/setIsInitialized", false);
+      if (
+        Object.hasOwn(router.currentRoute.value.query, "stream") &&
+        Object.hasOwn(router.currentRoute.value.query, "org_identifier") &&
+        store.state.logs.logs.data != undefined &&
+        Object.hasOwn(store.state.logs.logs.data, "stream") &&
+        Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
+        (!store.state.logs.logs.data.stream.selectedStream.includes(
+          router.currentRoute.value.query.stream,
+        ) ||
+          router.currentRoute.value.query.org_identifier !==
+            store.state.logs.logs.organizationIdentifier)
+      ) {
+        store.dispatch("logs/setIsInitialized", false);
       }
       return;
     };
@@ -850,6 +862,13 @@ export default defineComponent({
           store.dispatch("logs/setIsInitialized", true);
         } else {
           await initialLogsState();
+          if (
+            enableRefreshInterval(store.state.logs.logs.meta.refreshInterval)
+          ) {
+            searchObj.meta.refreshInterval =
+              store.state.logs.logs.meta.refreshInterval;
+            onChangeInterval();
+          }
         }
 
         if (isCloudEnvironment()) {

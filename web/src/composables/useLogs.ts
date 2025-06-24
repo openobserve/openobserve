@@ -350,7 +350,13 @@ const useLogs = () => {
     parser = null;
   });
 
+  /**
+   * This function is used to initialize the logs state from the store which was cached in the store
+   * Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
+   * @returns Promise<boolean>,
+   */
   const initialLogsState = async () => {
+    // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
     if (store.state.logs.isInitialized) {
       try {
         const state = store.getters["logs/getLogs"];
@@ -359,7 +365,10 @@ const useLogs = () => {
         searchObj.organizationIdentifier = state.organizationIdentifier;
         searchObj.config = JSON.parse(JSON.stringify(state.config));
         await nextTick();
-        searchObj.meta = JSON.parse(JSON.stringify(state.meta));
+        searchObj.meta = JSON.parse(JSON.stringify({
+          ...state.meta,
+          refreshInterval: 0,
+        }));
         searchObj.data = JSON.parse(JSON.stringify({
           ...JSON.parse(JSON.stringify(state.data)),
           queryResults: {},
@@ -385,6 +394,8 @@ const useLogs = () => {
         await nextTick();
         searchObj.loading = false;
         searchObj.loadingHistogram = false;
+
+        // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
       } catch (e) {
         console.error("Error while initializing logs state", e);
         resetSearchObj();
