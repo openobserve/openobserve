@@ -456,21 +456,21 @@ const editingPipeline = ref<any | null>(null);
 
 const getColumnsForActiveTab = (tab : any) => {
   let realTimeColumns = [
-  { name: "#", label: "#", field: "#", align: "left" },
+  { name: "#", label: "#", field: "#", align: "left", style: "width: 67px" },
 
   { name: "name", field: "name", label: t("common.name"), align: "left", sortable: true },
-    { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true },
-    { name: "stream_type", field: "stream_type", label: t("alerts.streamType"), align: "left", sortable: true },
+    { name: "stream_name", field: "stream_name", label: t("alerts.stream_name"), align: "left", sortable: true, style: "width: 150px" },
+    { name: "stream_type", field: "stream_type", label: t("alerts.streamType"), align: "left", sortable: true, style: "width: 150px" },
   ];
 
   let scheduledColumns = [
-    { name: "#", label: "#", field: "#", align: "left" },
+    { name: "#", label: "#", field: "#", align: "left", style: "width: 67px" },
 
     { name: "name", field: "name", label: t("common.name"), align: "left", sortable: true },
-    { name: "stream_type", field: "stream_type", label: "Stream Type", align: "left", sortable: true },
-    { name: "frequency", field: "frequency", label: "Frequency", align: "left", sortable: true },
-    { name: "period", field: "period", label: "Period", align: "left", sortable: true },
-    { name: "cron", field: "cron", label: "Cron", align: "left", sortable: false },
+    { name: "stream_type", field: "stream_type", label: "Stream Type", align: "left", sortable: true, style: "width: 150px" },
+    { name: "frequency", field: "frequency", label: "Frequency", align: "left", sortable: true, style: "width: 150px" },
+    { name: "period", field: "period", label: "Period", align: "left", sortable: true, style: "width: 150px" },
+    { name: "cron", field: "cron", label: "Cron", align: "left", sortable: false, style: "width: 150px" },
     { name: "sql_query", field: "sql_query", label: "SQL Query", align: "left", sortable: false
       ,
       style: "white-space: no-wrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis;"
