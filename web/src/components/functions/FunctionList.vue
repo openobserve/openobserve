@@ -273,6 +273,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px",
       },
       {
         name: "name",
@@ -287,6 +288,7 @@ export default defineComponent({
         label: t("function.actions"),
         align: "center",
         sortable: false,
+        classes:'actions-column'
       },
     ]);
 

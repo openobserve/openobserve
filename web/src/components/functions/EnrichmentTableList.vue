@@ -232,6 +232,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px",
       },
       {
         name: "name",
@@ -249,6 +250,7 @@ export default defineComponent({
         sort: (a, b, rowA, rowB) => {
           return parseInt(rowA.doc_num) - parseInt(rowB.doc_num);
         },
+        style: "width: 150px",
       },
       {
         name: "storage_size",
@@ -259,6 +261,7 @@ export default defineComponent({
         sort: (a, b, rowA, rowB) => {
           return rowA.original_storage_size- rowB.original_storage_size
         },
+        style: "width: 150px",
       },
       {
         name: "compressed_size",
@@ -268,7 +271,9 @@ export default defineComponent({
         sortable: false,
         sort: (a, b, rowA, rowB) =>
           rowA.original_compressed_size- rowB.original_compressed_size,
+        style: "width: 150px",
       },
+
       {
         name: "actions",
         field: "actions",
