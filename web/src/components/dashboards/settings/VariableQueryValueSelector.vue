@@ -340,12 +340,11 @@ export default defineComponent({
 
         selectedValue.value = arr;
         emit("update:modelValue", arr);
-        await closePopUpWhenValueIsSet();
       } else {
         selectedValue.value = newValue;
         emit("update:modelValue", newValue);
-        await closePopUpWhenValueIsSet();
       }
+      await closePopUpWhenValueIsSet();
     };
 
     const handleKeydown = (event: KeyboardEvent) => {
