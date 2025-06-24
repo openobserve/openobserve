@@ -4160,7 +4160,6 @@ const useLogs = () => {
   };
 
   const refreshData = () => {
-    debugger;
     try {
       if (
         searchObj.meta.refreshInterval > 0 &&
