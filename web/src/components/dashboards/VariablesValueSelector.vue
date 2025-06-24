@@ -1940,14 +1940,25 @@ export default defineComponent({
           return;
         }
 
-        const filtered = currentVariable.value.filter((val: any) =>
-          currentVariable.options.some(
-            (opt: any) => opt.value === val || val == SELECT_ALL_VALUE,
-          ),
+        const optionValues = currentVariable.options.map(
+          (opt: any) => opt.value,
         );
 
-        if (filtered.length !== currentVariable.value.length) {
-          currentVariable.value = filtered;
+        const customTypedValues = currentVariable.value.filter(
+          (val: any) => !optionValues.includes(val) && val !== SELECT_ALL_VALUE,
+        );
+
+        const filtered = currentVariable.value.filter(
+          (val: any) => optionValues.includes(val) || val === SELECT_ALL_VALUE,
+        );
+
+        const merged = [
+          ...filtered,
+          ...customTypedValues.filter((v) => !filtered.includes(v)),
+        ];
+
+        if (merged.length !== currentVariable.value.length) {
+          currentVariable.value = merged;
         }
       }
 

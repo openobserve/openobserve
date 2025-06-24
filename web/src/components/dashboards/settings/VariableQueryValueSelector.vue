@@ -334,6 +334,7 @@ export default defineComponent({
         let arr = Array.isArray(selectedValue.value)
           ? [...selectedValue.value]
           : [];
+        arr = arr.filter((v) => v !== SELECT_ALL_VALUE);
         if (!arr.includes(newValue)) {
           arr.push(newValue);
         }
