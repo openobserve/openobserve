@@ -27,7 +27,7 @@ import {
   onBeforeUnmount
 } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
 import { cloneDeep, startCase } from "lodash-es";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import {
@@ -179,7 +179,7 @@ const defaultObject = {
     additionalErrorMsg: "",
     savedViewFilterFields: "",
     hasSearchDataTimestampField: false,
-    originalDataCache: new Map(),
+    originalDataCache: {},
     stream: {
       loading: false,
       streamLists: <object[]>[],
@@ -350,6 +350,10 @@ const useLogs = () => {
     parser = null;
   });
 
+  const clearSearchObj = () => {
+    searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(defaultObject))));
+  };
+
   /**
    * This function is used to initialize the logs state from the store which was cached in the store
    * Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
@@ -394,7 +398,6 @@ const useLogs = () => {
         await nextTick();
         searchObj.loading = false;
         searchObj.loadingHistogram = false;
-
         // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
       } catch (e) {
         console.error("Error while initializing logs state", e);
@@ -405,8 +408,6 @@ const useLogs = () => {
     }
   }
 
-  searchObj.organizationIdentifier =
-    store.state.selectedOrganization.identifier;
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
     searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -1683,8 +1684,8 @@ const useLogs = () => {
   const getQueryData = async (isPagination = false) => {
     try {
       //remove any data that has been cached 
-      if(searchObj.data.originalDataCache.size > 0){
-        searchObj.data.originalDataCache.clear();
+      if(Object.keys(searchObj.data.originalDataCache).length > 0){
+        searchObj.data.originalDataCache = {};
       }
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
@@ -4159,6 +4160,7 @@ const useLogs = () => {
   };
 
   const refreshData = () => {
+    debugger;
     try {
       if (
         searchObj.meta.refreshInterval > 0 &&
@@ -5209,7 +5211,7 @@ const useLogs = () => {
 
       if(!queryReq) return;
       
-      if(!isPagination) {
+      if(!isPagination && searchObj.meta.refreshInterval === 0) {
         resetQueryData();
         histogramResults = [];
         searchObj.data.queryResults.hits = [];
@@ -6601,7 +6603,8 @@ const useLogs = () => {
     isDistinctQuery,
     isWithQuery,
     getStream,
-    initialLogsState
+    initialLogsState,
+    clearSearchObj
   };
 };
 

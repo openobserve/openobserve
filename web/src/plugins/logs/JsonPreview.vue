@@ -394,8 +394,8 @@ export default {
       }
       // Check if data exists in searchObj cache
       const cacheKey = `${props.value._o2_id}_${props.value._timestamp}`;
-      if (searchObj.data.originalDataCache?.has(cacheKey)) {
-        unflattendData.value = searchObj.data.originalDataCache.get(cacheKey);
+      if (searchObj.data.originalDataCache[cacheKey]) {
+        unflattendData.value = searchObj.data.originalDataCache[cacheKey];
         return;
       }
 
@@ -430,7 +430,7 @@ export default {
         );
         unflattendData.value = formattedData;
         //store the data in cache of searchObj
-        searchObj.data.originalDataCache.set(cacheKey, formattedData);
+        searchObj.data.originalDataCache[cacheKey] = formattedData;
       } catch (err: any) {
         loading.value = false;
         $q.notify({
