@@ -53,42 +53,29 @@ pub async fn handle_request(
     };
 
     for (stream_name, records) in streams_data {
-        let json_bytes = serde_json::to_vec(&records).map_err(|e| {
-            log::error!(
-                "[Loki] JSON serialization error for stream '{}' in org '{}': {}",
-                stream_name,
-                org_id,
-                e
-            );
-            LokiError::JsonParse { source: e }
-        })?;
-        let json_bytes = actix_web::web::Bytes::from(json_bytes);
-
         logs::ingest::ingest(
             thread_id,
             org_id,
             &stream_name,
-            IngestionRequest::JSON(&json_bytes),
+            IngestionRequest::Loki(&records),
             user_email,
             None,
         )
         .await
         .map_err(|e| {
             log::error!(
-                "[Loki] Stream '{}' ingestion failed for org '{}': {}",
+                "[Loki] Stream {} ingestion failed for org {}: {}",
                 stream_name,
                 org_id,
                 e
             );
             LokiError::from(anyhow::anyhow!(
-                "Stream '{}' ingestion failed: {:?}",
+                "Stream {} ingestion failed: {:?}",
                 stream_name,
                 e
             ))
         })?;
     }
-
-    log::info!("[Loki] Successfully processed streams for org '{}'", org_id);
     Ok(IngestionResponse::new(200, vec![]))
 }
 

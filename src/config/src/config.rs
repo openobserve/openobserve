@@ -1141,6 +1141,8 @@ pub struct Common {
         help = "Enable to use stream settings for partitions. This will apply for all streams"
     )]
     pub use_stream_settings_for_partitions_enabled: bool,
+    #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
+    pub dashboard_placeholder: String,
 }
 
 #[derive(EnvConfig)]
@@ -1885,6 +1887,7 @@ pub struct Encryption {
     #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
     pub master_key: String,
 }
+
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]

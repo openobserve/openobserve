@@ -106,6 +106,7 @@ hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
 http-auth-basic = "0.3"
+tantivy-fst.workspace = true
 ipnetwork.workspace = true
 itertools.workspace = true
 jsonwebtoken = "9.3"
@@ -341,6 +342,7 @@ strum = { version = "0.26", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.33"
 tantivy = { version = "0.22.0", features = ["quickwit"] }
+tantivy-fst = "0.5"
 tempfile = "3"
 thiserror = "1.0"
 time = "0.3"

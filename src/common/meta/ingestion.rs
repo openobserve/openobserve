@@ -323,11 +323,12 @@ pub struct GCPIngestionResponse {
 pub enum IngestionRequest<'a> {
     JSON(&'a web::Bytes),
     Multi(&'a web::Bytes),
+    Hec(&'a Vec<json::Value>),
+    Loki(&'a Vec<json::Value>),
     GCP(&'a GCPIngestionRequest),
     KinesisFH(&'a KinesisFHRequest),
     RUM(&'a web::Bytes),
     Usage(&'a web::Bytes),
-    Hec(&'a Vec<json::Value>),
 }
 
 pub enum IngestionData<'a> {
