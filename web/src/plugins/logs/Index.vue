@@ -568,6 +568,7 @@ export default defineComponent({
       getStream,
       fnUnparsedSQL,
       initialLogsState,
+      clearSearchObj,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -656,7 +657,9 @@ export default defineComponent({
 
     onBeforeUnmount(async () => {
       // Cancel all the search queries
-      clearInterval(store.state.refreshIntervalID);
+      if (store.state.refreshIntervalID)
+        clearInterval(store.state.refreshIntervalID);
+
       cancelOnGoingSearchQueries();
 
       if (searchObj)
@@ -665,8 +668,8 @@ export default defineComponent({
           JSON.parse(JSON.stringify(searchObj)),
         );
 
+      clearSearchObj();
       searchBarRef.value = null;
-      searchObj = null;
       searchResultRef.value = null;
     });
 
@@ -862,13 +865,6 @@ export default defineComponent({
           store.dispatch("logs/setIsInitialized", true);
         } else {
           await initialLogsState();
-          if (
-            enableRefreshInterval(store.state.logs.logs.meta.refreshInterval)
-          ) {
-            searchObj.meta.refreshInterval =
-              store.state.logs.logs.meta.refreshInterval;
-            onChangeInterval();
-          }
         }
 
         if (isCloudEnvironment()) {

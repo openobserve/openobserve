@@ -50,6 +50,7 @@ import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
 import { markdown } from "@codemirror/lang-markdown";
 import { html } from "@codemirror/lang-html";
+import { syntaxTree } from "@codemirror/language";
 
 import {
   autocompletion,
@@ -116,7 +117,7 @@ export default defineComponent({
         showEmpty: false,
         selectOnOpen: true,
         filterStrict: false,
-        filter: false,
+        filter: true,
       }),
     },
   },
@@ -324,6 +325,19 @@ export default defineComponent({
             const word = context.matchBefore(/\w*/);
 
             if (!word) return null;
+
+            // Check if the cursor is inside a text token
+            const nodeBefore = syntaxTree(context.state).resolveInner(
+              context.pos,
+              -1,
+            );
+
+            if (
+              nodeBefore.type.name === "String" ||
+              nodeBefore?.type.name === "TextToken"
+            ) {
+              return null;
+            }
 
             if (!word?.text && !props.autoComplete.showEmpty) return null;
 
