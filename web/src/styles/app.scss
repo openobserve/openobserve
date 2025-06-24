@@ -203,6 +203,7 @@
   td:last-child.actions-column {
     background: var(--q-dark);
     box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
+    width: 150px;
   }
 }
 
@@ -210,6 +211,8 @@
   th:last-child.actions-column,
   td:last-child.actions-column {
     background: #ffffff;
+    width: 150px;
+    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
   }
 }
 //this is for in some of pages we are having a header for eg: pipelines ,functions ,enrichments listing pages
