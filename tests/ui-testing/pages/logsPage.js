@@ -736,27 +736,20 @@ async openTimestampMenu() {
   }
 }
 
-async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
+async clickResultsPerPage() {
   // Click the dropdown to open the options
-  await this.page.locator(this.resultText).getByText('arrow_drop_down').click();
-
-  // Wait for the dropdown options to be visible
-  const dropdownSelector = 'div[data-test="logs-search-result-records-per-page"]';
-  await this.page.waitForSelector(dropdownSelector, { state: 'visible' });
-
-  // Introduce a short delay to ensure options are rendered
-  await this.page.waitForTimeout(500); // Adjust the timeout as needed
-
-  await this.page.getByText(resultsPerPage, { exact: true }).click();
-  // Wait for results to update
-  await this.page.waitForSelector(this.resultText, { state: 'visible' });
-
-  // Assert that the result text contains the expected substring
-  const resultLocator = this.page.locator(this.resultText);
-  await expect(resultLocator).toContainText(expectedText);
+  await this.page.locator('[data-test="logs-search-search-result"]').getByText('arrow_drop_down').click();
+  await this.page.getByText('10', { exact: true }).click();
+  await this.page.waitForTimeout(2000);
+  await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10 out of 39');
 }
 
-
+async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
+  
+  await this.page.getByText(resultsPerPage, { exact: true }).click();
+  await this.page.waitForTimeout(2000);
+  await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedText);
+}
 
 
 }

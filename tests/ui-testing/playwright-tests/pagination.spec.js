@@ -45,11 +45,8 @@ test.describe("Pagination for logs", () => {
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
-        await page.waitForTimeout(2000);  
-
-        //await logsPage.selectResultsPerPageAndVerify(10, 'Showing 1 to 10 out of 39 events in');
-
-        // await page.waitForTimeout(20000);
+        await page.waitForTimeout(2000); 
+         
         await page.locator('[data-test="logs-search-search-result"]').getByText('arrow_drop_down').click();
         await page.getByText('10', { exact: true }).click();
         await page.waitForTimeout(2000);
@@ -63,10 +60,6 @@ test.describe("Pagination for logs", () => {
         await page.getByLabel('4').click();
         await page.waitForTimeout(2000);
         await expect(page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 31 to 39 out of 39');
-        await page.getByLabel('5').click();
-       
-     
-
     });
 
     test("Enable Streaming for running query to validate match_all('zio*')", async ({ page }) => {
