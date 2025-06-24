@@ -114,7 +114,7 @@ export default defineComponent({
       type: Object,
       default: () => ({
         showEmpty: false,
-        selectOnOpen: false,
+        selectOnOpen: true,
         filterStrict: false,
         filter: false,
       }),
