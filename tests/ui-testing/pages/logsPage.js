@@ -481,6 +481,17 @@ async clearAndFillQueryEditor(query) {
   await editor.fill(query); // Fill with the new query
 }
 
+async typeQuery(query) {
+  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await expect(queryEditor).toBeVisible();
+  await queryEditor.click();
+  await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content').fill(query);
+  await this.page.waitForTimeout(1000);
+  
+  
+
+}
+
 async waitForSearchResultAndCheckText(expectedText) {
   const locator = this.page.locator('[data-test="logs-search-search-result"]').getByRole('heading');
   await locator.waitFor(); // Wait for the element to be visible
