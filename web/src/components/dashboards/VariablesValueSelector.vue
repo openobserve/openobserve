@@ -990,22 +990,22 @@ export default defineComponent({
           ?.length > 0;
 
       // Check for URL values first
-      const urlValue = props.initialVariableValues?.value[currentVariable.name];
-      if (urlValue) {
-        // If URL value exists, use it
-        if (currentVariable.multiSelect) {
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue
-            : [urlValue];
-        } else {
-          // For single select, if coming from multiSelect, take first value
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue[0]
-            : urlValue;
-        }
-        currentVariable.isVariableLoadingPending = true;
-        return;
-      }
+      // const urlValue = props.initialVariableValues?.value[currentVariable.name];
+      // if (urlValue) {
+      //   // If URL value exists, use it
+      //   if (currentVariable.multiSelect) {
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue
+      //       : [urlValue];
+      //   } else {
+      //     // For single select, if coming from multiSelect, take first value
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue[0]
+      //       : urlValue;
+      //   }
+      //   currentVariable.isVariableLoadingPending = true;
+      //   return;
+      // }
 
       // Only apply custom values if no URL value exists
       if (
