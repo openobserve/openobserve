@@ -245,7 +245,12 @@ impl Sql {
         // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
-        let _ = statement.visit(&mut histogram_interval_visitor);
+        statement.visit(&mut histogram_interval_visitor);
+        let histogram_interval = if query.histogram_interval > 0 {
+            Some(query.histogram_interval)
+        } else {
+            histogram_interval_visitor.interval
+        };
 
         //********************Change the sql here*********************************//
         // 11. add _timestamp and _o2_id if need
@@ -339,7 +344,7 @@ impl Sql {
             time_range: Some((query.start_time, query.end_time)),
             group_by,
             order_by,
-            histogram_interval: histogram_interval_visitor.interval,
+            histogram_interval,
             sorted_by_time: need_sort_by_time,
             use_inverted_index,
             index_condition,

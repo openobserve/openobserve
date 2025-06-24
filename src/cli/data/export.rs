@@ -55,13 +55,7 @@ impl Context for Export {
             query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            action_id: None,
-            skip_wal: false,
-            streaming_output: false,
-            streaming_id: None,
+            ..Default::default()
         };
 
         let req = search::Request {
