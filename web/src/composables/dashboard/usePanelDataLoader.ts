@@ -385,11 +385,6 @@ export const usePanelDataLoader = (
     endISOTimestamp: string,
     histogramInterval: number | null | undefined,
   ) => {
-    const sql = store.state.zoConfig.sql_base64_enabled
-      ? b64EncodeUnicode(
-          await changeHistogramInterval(query, histogramInterval ?? null),
-        )
-      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
       sql: query,
       query_fn: it.vrlFunctionQuery
