@@ -279,6 +279,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: "#",
     field: "#",
     align: "left",
+    style: "width: 67px",
   },
   {
     name: "name",
@@ -293,6 +294,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alerts.owner"),
     align: "center",
     sortable: true,
+    style: "width: 150px",
   },
   {
     name: "description",
@@ -300,6 +302,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alerts.description"),
     align: "center",
     sortable: false,
+    style: "width: 300px",
   },
   {
     name: "last_triggered_at",
@@ -307,13 +310,13 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alerts.lastTriggered"),
     align: "left",
     sortable: true,
+    style: "width: 150px",
   },
   {
     name: "actions",
     field: "actions",
     label: t("alerts.actions"),
     align: "center",
-    style: "width: 300px",
     sortable: false,
     classes: "actions-column",
   },
