@@ -1029,7 +1029,7 @@ async fn handle_derived_stream_triggers(
         // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
         // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
         // period from 5:05pm to 5:15pm.
-        log::warn!(
+        log::debug!(
             "supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
             chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
                 .unwrap()
