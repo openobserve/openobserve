@@ -103,7 +103,7 @@ import {
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -1484,12 +1484,7 @@ export default defineComponent({
           // Replace array values
           if (Array.isArray(variable.value)) {
             const arrayValues = variable.value
-              .map((value: any) => {
-                if (value.includes(`::${CUSTOM_VALUE}`)) {
-                  return `'${escapeSingleQuotes(value.split(`::${CUSTOM_VALUE}`)[0])}'`;
-                }
-                return `'${escapeSingleQuotes(value)}'`;
-              })
+              .map((value: any) => `'${escapeSingleQuotes(value)}'`)
               .join(", ");
             queryContext = queryContext.replace(
               `'$${variable.name}'`,
@@ -1497,16 +1492,9 @@ export default defineComponent({
             );
           } else if (variable.value !== null && variable.value !== undefined) {
             // Replace single values
-            let valueToUse = variable.value;
-            if (
-              typeof variable.value === "string" &&
-              variable.value.includes(`::${CUSTOM_VALUE}`)
-            ) {
-              valueToUse = variable.value.split(`::${CUSTOM_VALUE}`)[0];
-            }
             queryContext = queryContext.replace(
               `$${variable.name}`,
-              escapeSingleQuotes(valueToUse),
+              escapeSingleQuotes(variable.value),
             );
           }
         }
@@ -1955,48 +1943,21 @@ export default defineComponent({
           (opt: any) => opt.value,
         );
 
-        const regularCustomTypedValues = currentVariable.value.filter(
-          (val: any) =>
-            !optionValues.includes(val) &&
-            val !== SELECT_ALL_VALUE &&
-            !val.includes(`::${CUSTOM_VALUE}`),
+        const customTypedValues = currentVariable.value.filter(
+          (val: any) => !optionValues.includes(val) && val !== SELECT_ALL_VALUE,
         );
 
         const filtered = currentVariable.value.filter(
-          (val: any) =>
-            optionValues.includes(val) ||
-            val === SELECT_ALL_VALUE ||
-            val.includes(`::${CUSTOM_VALUE}`),
+          (val: any) => optionValues.includes(val) || val === SELECT_ALL_VALUE,
         );
 
         const merged = [
           ...filtered,
-          ...regularCustomTypedValues.filter((v) => !filtered.includes(v)),
+          ...customTypedValues.filter((v) => !filtered.includes(v)),
         ];
 
         if (merged.length !== currentVariable.value.length) {
           currentVariable.value = merged;
-        }
-      } else if (
-        !currentVariable.multiSelect &&
-        typeof currentVariable.value === "string" &&
-        !currentVariable.isLoading &&
-        !currentVariable.isVariableLoadingPending
-      ) {
-        if (currentVariable.value.includes(`::${CUSTOM_VALUE}`)) {
-          return;
-        }
-
-        const optionValues = currentVariable.options.map(
-          (opt: any) => opt.value,
-        );
-
-        if (
-          !optionValues.includes(currentVariable.value) &&
-          currentVariable.value !== SELECT_ALL_VALUE
-        ) {
-          currentVariable.value =
-            optionValues.length > 0 ? optionValues[0] : null;
         }
       }
 

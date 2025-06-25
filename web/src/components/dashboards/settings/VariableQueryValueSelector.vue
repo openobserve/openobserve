@@ -110,7 +110,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
           <q-item-section>
             <q-item-label>
-              <span v-html="opt.label"></span>
+              <span
+                v-html="
+                  typeof opt.value === 'string' &&
+                  opt.value.endsWith(`::${CUSTOM_VALUE}`)
+                    ? `${opt.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), '')} (CUSTOM)`
+                    : opt.label
+                "
+              ></span>
             </q-item-label>
           </q-item-section>
         </q-item>
@@ -138,8 +145,18 @@ export default defineComponent({
 
     // Show searchResults if filterText is active, else normal options
     const filteredOptions = computed(() => {
-      if (!filterText.value) return availableOptions.value;
-      return availableOptions.value.filter((opt: any) =>
+      let opts = availableOptions.value.map((opt: any) => {
+        if (
+          typeof opt.value === "string" &&
+          opt.value.endsWith(`::${CUSTOM_VALUE}`)
+        ) {
+          const base = opt.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), "");
+          return { ...opt, label: `${base} (CUSTOM)` };
+        }
+        return opt;
+      });
+      if (!filterText.value) return opts;
+      return opts.filter((opt: any) =>
         opt.label.toLowerCase().includes(filterText.value.toLowerCase()),
       );
     });
@@ -190,26 +207,12 @@ export default defineComponent({
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        const hasCustomValue =
-          Array.isArray(selectedValue.value) &&
-          selectedValue.value.some((v: string) =>
-            v.includes(`::${CUSTOM_VALUE}`),
-          );
-
-        if (hasCustomValue) {
-          return false;
-        }
-
         return (
           Array.isArray(selectedValue.value) &&
           selectedValue.value?.[0] === SELECT_ALL_VALUE
         );
-      } else {
-        if (selectedValue.value.includes(`::${CUSTOM_VALUE}`)) {
-          return false;
-        }
-        return selectedValue.value === SELECT_ALL_VALUE;
       }
+      return selectedValue.value === SELECT_ALL_VALUE;
     });
 
     const closePopUpWhenValueIsSet = async () => {
@@ -241,23 +244,18 @@ export default defineComponent({
         Array.isArray(val) &&
         val.length > 0
       ) {
+        // Remove SELECT_ALL if other values are selected
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
           val = val.filter((v) => v !== SELECT_ALL_VALUE);
         }
-
-        // If user selects a regular option (not custom), remove any custom values
-        const hasRegularOptions = val.some(
-          (v: string) => !v.includes(`::${CUSTOM_VALUE}`),
+        // Remove custom value if any regular value is selected
+        const hasRegular = val.some(
+          (v) => typeof v === "string" && !v.endsWith(`::${CUSTOM_VALUE}`),
         );
-        if (hasRegularOptions) {
-          val = val.filter((v: string) => !v.includes(`::${CUSTOM_VALUE}`));
-        }
-      } else if (!props.variableItem.multiSelect) {
-        // For single select, if user selects a regular option, clear any custom value
-        if (!val.includes(`::${CUSTOM_VALUE}`)) {
-          // User selected a regular option, so we keep it as is
-        } else if (val.includes(`::${CUSTOM_VALUE}`)) {
-          // User selected a custom value, keep it as is
+        if (hasRegular) {
+          val = val.filter(
+            (v) => !(typeof v === "string" && v.endsWith(`::${CUSTOM_VALUE}`)),
+          );
         }
       }
       selectedValue.value = val;
@@ -289,7 +287,13 @@ export default defineComponent({
           if (selectedValue.value.length > 2) {
             const firstTwoValues = selectedValue.value
               .slice(0, 2)
-              .map((it: any) => (it === "" ? "<blank>" : it))
+              .map((it: any) => {
+                if (it === "") return "<blank>";
+                if (it === SELECT_ALL_VALUE) return "<ALL>";
+                if (typeof it === "string" && it.endsWith(`::${CUSTOM_VALUE}`))
+                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (CUSTOM)`;
+                return it;
+              })
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
@@ -303,6 +307,8 @@ export default defineComponent({
               .map((it: any) => {
                 if (it === "") return "<blank>";
                 if (it === SELECT_ALL_VALUE) return "<ALL>";
+                if (typeof it === "string" && it.endsWith(`::${CUSTOM_VALUE}`))
+                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (CUSTOM)`;
                 return it;
               })
               .join(", ");
@@ -311,6 +317,11 @@ export default defineComponent({
           return "<blank>";
         } else if (selectedValue.value === SELECT_ALL_VALUE) {
           return "<ALL>";
+        } else if (
+          typeof selectedValue.value === "string" &&
+          selectedValue.value.endsWith(`::${CUSTOM_VALUE}`)
+        ) {
+          return `${selectedValue.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (CUSTOM)`;
         } else {
           return selectedValue.value;
         }
@@ -358,10 +369,8 @@ export default defineComponent({
     );
     const handleCustomValue = async (value: string) => {
       if (!value?.trim()) return;
-      const newValue = value.trim();
-
-      const customValue = `${newValue}::${CUSTOM_VALUE}`;
-
+      const inputValue = value.trim();
+      const customValue = `${inputValue}::${CUSTOM_VALUE}`;
       if (props.variableItem.multiSelect) {
         selectedValue.value = [customValue];
         emit("update:modelValue", [customValue]);
@@ -394,6 +403,7 @@ export default defineComponent({
       handleKeydown,
       handleCustomValue,
       filterText,
+      CUSTOM_VALUE,
     };
   },
 });
