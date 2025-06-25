@@ -987,22 +987,22 @@ export default defineComponent({
           ?.length > 0;
 
       // Check for URL values first
-      const urlValue = props.initialVariableValues?.value[currentVariable.name];
-      if (urlValue) {
-        // If URL value exists, use it
-        if (currentVariable.multiSelect) {
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue
-            : [urlValue];
-        } else {
-          // For single select, if coming from multiSelect, take first value
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue[0]
-            : urlValue;
-        }
-        currentVariable.isVariableLoadingPending = true;
-        return;
-      }
+      // const urlValue = props.initialVariableValues?.value[currentVariable.name];
+      // if (urlValue) {
+      //   // If URL value exists, use it
+      //   if (currentVariable.multiSelect) {
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue
+      //       : [urlValue];
+      //   } else {
+      //     // For single select, if coming from multiSelect, take first value
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue[0]
+      //       : urlValue;
+      //   }
+      //   currentVariable.isVariableLoadingPending = true;
+      //   return;
+      // }
 
       // Only apply custom values if no URL value exists
       if (
@@ -1468,10 +1468,9 @@ export default defineComponent({
       );
 
       // Add labels to the dummy query
-      let queryContext = constructedFilter.length ? await addLabelsToSQlQuery(
-        dummyQuery,
-        constructedFilter,
-      ) : dummyQuery;
+      let queryContext = constructedFilter.length
+        ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
+        : dummyQuery;
 
       // Replace variable placeholders with actual values
       for (const variable of variablesData.values) {
@@ -1934,14 +1933,25 @@ export default defineComponent({
           return;
         }
 
-        const filtered = currentVariable.value.filter((val: any) =>
-          currentVariable.options.some(
-            (opt: any) => opt.value === val || val == SELECT_ALL_VALUE,
-          ),
+        const optionValues = currentVariable.options.map(
+          (opt: any) => opt.value,
         );
 
-        if (filtered.length !== currentVariable.value.length) {
-          currentVariable.value = filtered;
+        const customTypedValues = currentVariable.value.filter(
+          (val: any) => !optionValues.includes(val) && val !== SELECT_ALL_VALUE,
+        );
+
+        const filtered = currentVariable.value.filter(
+          (val: any) => optionValues.includes(val) || val === SELECT_ALL_VALUE,
+        );
+
+        const merged = [
+          ...filtered,
+          ...customTypedValues.filter((v) => !filtered.includes(v)),
+        ];
+
+        if (merged.length !== currentVariable.value.length) {
+          currentVariable.value = merged;
         }
       }
 
