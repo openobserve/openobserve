@@ -1234,5 +1234,18 @@
     "applyFilter": "Apply Filters",
     "searchCluster": "Search Cluster",
     "searchRegion": "Search Region"
+  },
+  "regex_patterns": {
+    "header": "Regex Pattern",
+    "create_pattern": "Create Pattern",
+    "search": "Search Regex Pattern",
+    "no_data": "No Patterns in the Library",
+    "name": "Name",
+    "pattern": "Pattern",
+    "created_at": "Created At",
+    "updated_at": "Updated At",
+    "actions": "Actions",
+    "edit": "Edit",
+    "delete": "Delete"
   }
 }
