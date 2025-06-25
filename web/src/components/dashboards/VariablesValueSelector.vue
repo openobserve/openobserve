@@ -1947,7 +1947,7 @@ export default defineComponent({
 
         const merged = [
           ...filtered,
-          ...customTypedValues.filter((v) => !filtered.includes(v)),
+          ...customTypedValues.filter((v: any) => !filtered.includes(v)),
         ];
 
         if (merged.length !== currentVariable.value.length) {
