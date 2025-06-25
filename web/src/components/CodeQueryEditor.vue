@@ -76,6 +76,8 @@ import {
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
+import { foldGutter } from "@codemirror/language";
+import { foldKeymap } from "@codemirror/language";
 
 export default defineComponent({
   props: {
@@ -587,6 +589,9 @@ export default defineComponent({
             highlightSelectionMatches(), // ✨ Highlights all matches
             lineNumbers(),
             getLanguageSupport(),
+            ...(enableCodeFolding.value
+              ? [foldGutter(), keymap.of(foldKeymap)]
+              : []),
             props.showAutoComplete ? createAutocompletion() : [],
             ...createTheme(),
             createKeymap(),
@@ -631,14 +636,10 @@ export default defineComponent({
                 lineHeight: "17px",
                 padding: "0px !important",
               },
-              ".cm-foldGutter": {
-                display: "none !important",
-              },
               ".cm-lineNumbers .cm-gutterElement": {
                 padding: "0px 2px !important",
               },
             }),
-            basicSetup,
           ],
         });
 
@@ -881,9 +882,6 @@ export default defineComponent({
   min-width: 10px !important;
   padding-right: 5px !important;
   text-align: left;
-}
-.cm-gutter .cm-foldGutter {
-  display: none !important;
 }
 
 .cm-activeLine {

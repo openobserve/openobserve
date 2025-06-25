@@ -728,6 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'empty-query'
                   : ''
               "
+              language="sql"
               @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
               @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
             />
