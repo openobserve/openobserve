@@ -385,6 +385,24 @@ async fn main() -> Result<(), anyhow::Error> {
         });
     }
 
+    // let node schedulable
+    let mut start_ok = false;
+    for _ in 0..10 {
+        match cluster::set_schedulable().await {
+            Ok(_) => {
+                start_ok = true;
+                break;
+            }
+            Err(e) => {
+                log::error!("set node schedulable failed: {}", e);
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+        }
+    }
+    if !start_ok {
+        return Err(anyhow::anyhow!("set node schedulable failed"));
+    }
+
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         if let Err(e) = init_http_server_without_tracing().await {
