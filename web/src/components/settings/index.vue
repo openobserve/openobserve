@@ -144,7 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div class="tw-flex tw-items-center tw-w-full">
             <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
-            <span class="tw-text-sm tw-font-medium tw-text-gray-700 tw-ml-2">{{ t('regex_patterns.header') }}</span>
+            <span class="tw-text-sm tw-font-medium tw-ml-2"
+            :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw-text-white' : 'tw-text-black'"
+            >{{ t('regex_patterns.header') }}</span>
           </div>
         </q-route-tab>
         </q-tabs>

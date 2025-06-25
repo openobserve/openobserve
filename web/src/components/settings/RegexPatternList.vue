@@ -4,7 +4,7 @@
     >
         <q-table
           data-test="regex-pattern-list-table"
-          ref="qTable"
+          ref="regexPatternListTableRef"
           :rows="regexPatterns"
           :columns="columns"
           row-key="id"
@@ -108,6 +108,15 @@
                       
         </q-tr>
         </template>
+        <template #bottom="scope">
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </template>
         </q-table>
         <ConfirmDialog
           v-model="deleteDialog.show"
@@ -147,17 +156,17 @@
         },
     setup() {
 
-    const qTable = ref(null);
+    const regexPatternListTableRef = ref(null);
     const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+        rowsPerPage: 20,
+      });
     const filterQuery = ref("");
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
 
 
-    const columns = ref([
+    const columns = ref<any>([
         {
           name: "#",
           label: "#",
@@ -217,6 +226,8 @@
     const $q = useQuasar();
 
     const listLoading = ref(false);
+    const selectedPerPage = ref<number>(20);
+
 
     const showAddRegexPatternDialog = ref({
       show: false,
@@ -237,8 +248,14 @@
       }
     });
 
-    const changePagination = (page: number) => {
-    }
+    const changePagination = (val: { label: string; value: any }) => { 
+      //this is done sometimes we are getting the value as an object and sometimes as a number
+      //so we need to handle both cases
+      let rowsPerPage = val.value ? val.value : val;
+      selectedPerPage.value = rowsPerPage;
+      pagination.value.rowsPerPage = rowsPerPage;
+      regexPatternListTableRef.value?.setPagination(pagination.value);
+    };
 
     watch(filterQuery, (newVal) => {
       if(newVal == ""){
@@ -329,7 +346,7 @@
         t,
         store,
         router,
-        qTable,
+        regexPatternListTableRef,
         pagination,
         filterQuery,
         columns,
@@ -346,7 +363,8 @@
         deleteDialog,
         confirmDeleteRegexPattern,
         showAddRegexPatternDialog,
-        getRegexPatterns
+        getRegexPatterns,
+        selectedPerPage
     }
     }
 })
