@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-html="
                   typeof opt.value === 'string' &&
                   opt.value.endsWith(`::${CUSTOM_VALUE}`)
-                    ? `${opt.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), '')} (CUSTOM)`
+                    ? `${opt.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), '')} (Custom)`
                     : opt.label
                 "
               ></span>
@@ -151,7 +151,7 @@ export default defineComponent({
           opt.value.endsWith(`::${CUSTOM_VALUE}`)
         ) {
           const base = opt.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), "");
-          return { ...opt, label: `${base} (CUSTOM)` };
+          return { ...opt, label: `${base} (Custom)` };
         }
         return opt;
       });
@@ -291,7 +291,7 @@ export default defineComponent({
                 if (it === "") return "<blank>";
                 if (it === SELECT_ALL_VALUE) return "<ALL>";
                 if (typeof it === "string" && it.endsWith(`::${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (CUSTOM)`;
+                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (Custom)`;
                 return it;
               })
               .join(", ");
@@ -308,7 +308,7 @@ export default defineComponent({
                 if (it === "") return "<blank>";
                 if (it === SELECT_ALL_VALUE) return "<ALL>";
                 if (typeof it === "string" && it.endsWith(`::${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (CUSTOM)`;
+                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (Custom)`;
                 return it;
               })
               .join(", ");
@@ -321,7 +321,7 @@ export default defineComponent({
           typeof selectedValue.value === "string" &&
           selectedValue.value.endsWith(`::${CUSTOM_VALUE}`)
         ) {
-          return `${selectedValue.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (CUSTOM)`;
+          return `${selectedValue.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (Custom)`;
         } else {
           return selectedValue.value;
         }
