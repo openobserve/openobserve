@@ -117,6 +117,10 @@ pub async fn process_search_stream_request(
         log::error!("[HTTP2_STREAM] Error sending progress event: {}", e);
     }
 
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
+        req.query.sql = sql;
+    };
+
     let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();

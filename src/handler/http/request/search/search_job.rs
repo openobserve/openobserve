@@ -119,6 +119,12 @@ pub async fn submit_job(
             return Ok(MetaHttpResponse::bad_request(e));
         }
 
+        if let Ok(sql) =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
+        {
+            req.query.sql = sql;
+        };
+
         req.use_cache = get_use_cache_from_request(&query);
 
         // update timeout
