@@ -2406,6 +2406,11 @@ const useLogs = () => {
         }
       }
 
+      const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
+
+      if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+      }
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
       const decideSearch = searchObj.meta.jobId

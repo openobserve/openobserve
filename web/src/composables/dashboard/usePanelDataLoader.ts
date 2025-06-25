@@ -25,11 +25,7 @@ import {
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import {
-  addLabelsToSQlQuery,
-  changeHistogramInterval,
-  convertQueryIntoSingleLine,
-} from "@/utils/query/sqlUtils";
+import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
@@ -387,15 +383,10 @@ export const usePanelDataLoader = (
     it: any,
     startISOTimestamp: string,
     endISOTimestamp: string,
-    histogramInterval: string | null,
+    histogramInterval: number | null | undefined,
   ) => {
-    const sql = store.state.zoConfig.sql_base64_enabled
-      ? b64EncodeUnicode(
-          await changeHistogramInterval(query, histogramInterval ?? null),
-        )
-      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
-      sql,
+      sql: query,
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -404,6 +395,7 @@ export const usePanelDataLoader = (
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
       size: -1,
+      histogram_interval: histogramInterval ?? undefined,
     };
   };
 
@@ -484,9 +476,7 @@ export const usePanelDataLoader = (
       const max_query_range = res?.data?.max_query_range ?? 0;
 
       // histogram_interval from partition api response
-      const histogramInterval = res?.data?.histogram_interval
-        ? `${res?.data?.histogram_interval} seconds`
-        : null;
+      const histogramInterval = res?.data?.histogram_interval ?? undefined;
 
       // Add empty objects to state.resultMetaData for the results of this query
       state.data.push([]);
@@ -841,13 +831,15 @@ export const usePanelDataLoader = (
       content: {
         trace_id: payload.traceId,
         payload: {
-          query: await getHistogramSearchRequest(
-            payload.queryReq.query,
-            payload.queryReq.it,
-            payload.queryReq.startISOTimestamp,
-            payload.queryReq.endISOTimestamp,
-            null,
-          ),
+          query: {
+            ...(await getHistogramSearchRequest(
+              payload.queryReq.query,
+              payload.queryReq.it,
+              payload.queryReq.startISOTimestamp,
+              payload.queryReq.endISOTimestamp,
+              null,
+            )),
+          },
           // pass encodig if enabled,
           // make sure that `encoding: null` is not being passed, that's why used object extraction logic
           ...(store.state.zoConfig.sql_base64_enabled
@@ -1034,13 +1026,15 @@ export const usePanelDataLoader = (
         meta: any;
       } = {
         queryReq: {
-          query: await getHistogramSearchRequest(
-            query,
-            it,
-            startISOTimestamp,
-            endISOTimestamp,
-            null,
-          ),
+          query: {
+            ...(await getHistogramSearchRequest(
+              query,
+              it,
+              startISOTimestamp,
+              endISOTimestamp,
+              null,
+            )),
+          },
         },
         type: "histogram",
         isPagination: false,
@@ -1513,8 +1507,7 @@ export const usePanelDataLoader = (
                   panelSchema.value.queryType,
                 );
 
-              // convert query into single line
-              const query = await convertQueryIntoSingleLine(query2);
+              const query = query2;
 
               const metadata: any = {
                 originalQuery: it.query,
