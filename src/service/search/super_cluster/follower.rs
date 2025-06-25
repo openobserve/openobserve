@@ -181,7 +181,7 @@ pub async fn search(
                 .ok()
                 .map(RoleGroup::from)
         })
-        .unwrap_or(None);
+        .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
