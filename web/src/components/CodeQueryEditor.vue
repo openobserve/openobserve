@@ -320,16 +320,16 @@ export default defineComponent({
     ];
 
     const functionCallHighlighter = ViewPlugin.fromClass(class {
-      decorations: DecorationSet;
-      constructor(view) {
+      decorations: any;
+      constructor(view: EditorView) {
         this.decorations = this.build(view);
       }
-      update(update) {
+      update(update: any) {
         if (update.docChanged || update.viewportChanged) {
           this.decorations = this.build(update.view);
         }
       }
-      build(view) {
+      build(view: EditorView) {
         const builder = new RangeSetBuilder();
         for (let { from, to } of view.visibleRanges) {
           const text = view.state.doc.sliceString(from, to);
