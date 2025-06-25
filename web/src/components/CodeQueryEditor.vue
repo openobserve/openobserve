@@ -36,6 +36,8 @@ import {
   onActivated,
   watch,
   computed,
+  PropType,
+  onBeforeUnmount,
 } from "vue";
 
 import { EditorView, basicSetup, minimalSetup } from "codemirror";
@@ -69,6 +71,14 @@ import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+import { format } from "sql-formatter";
+// @ts-ignore
+import { html as htmlBeautify } from 'js-beautify';
+// @ts-ignore
+import * as acorn from "acorn";
+// @ts-ignore
+import escodegen from "escodegen";
+
 
 import {
   searchKeymap,
@@ -112,7 +122,7 @@ export default defineComponent({
       default: false,
     },
     language: {
-      type: String,
+      type: String as PropType<"sql" | "json" | "javascript" | "markdown" | "html" | "vrl">,
       default: "sql",
     },
     autoComplete: {
@@ -318,6 +328,15 @@ export default defineComponent({
         insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
       },
     ];
+
+    let menu: any = null;
+
+    onBeforeUnmount(() => {
+      if (menu && menu.parentElement) {
+        menu.parentElement.removeChild(menu);
+        menu = null;
+      }
+    });
 
     const functionCallHighlighter = ViewPlugin.fromClass(class {
       decorations: any;
@@ -532,6 +551,13 @@ export default defineComponent({
         },
         ...closeBracketsKeymap, // Auto close brackets
         ...searchKeymap, // ⌘F / Ctrl+F and other search-related key bindings
+        {
+          key: "Mod-Shift-f",
+          run(view) {
+            formatDocument();
+            return true;
+          },
+        },
       ]);
     };
 
@@ -566,6 +592,74 @@ export default defineComponent({
       view.dispatch({ effects: setTooltip.of(tooltip) });
     }
 
+    function copyToClipboard(view: EditorView) {
+      const selectedText = view.state.sliceDoc(
+        view.state.selection.main.from,
+        view.state.selection.main.to
+      );
+
+      navigator.clipboard.writeText(selectedText).then(
+        (err) => console.error("Failed to copy:", err)
+      );
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (editorView) {
+          const { from, to } = editorView.state.selection.main;
+
+          editorView.dispatch({
+            changes: {
+              from,
+              to,
+              insert: text,
+            },
+            selection: { anchor: from + text.length }, // move cursor to end of pasted text
+            scrollIntoView: true,
+          });
+        }
+      } catch (err) {
+        console.error("Paste failed", err);
+        return "";
+      }
+    }
+
+    function showCustomMenu(x: number, y: number, view: EditorView) {
+      if (menu) {
+        menu.remove(); // remove old one if still there
+      }
+      menu = document.createElement("div");
+      menu.className = "cm-context-menu";
+      menu.style.top = `${y}px`;
+      menu.style.left = `${x}px`;
+      menu.style.zIndex = "100000000000000";
+
+      const options = [
+        { label: "Format Document", action: () => formatDocument() },
+        { label: "Copy", action: () => copyToClipboard(view) },
+        { label: "Paste", action: () => pasteFromClipboard() },
+      ];
+
+      options.forEach(opt => {
+        const item = document.createElement("div");
+        item.textContent = opt.label;
+        item.onclick = () => {
+          opt.action();
+          menu.remove();
+        };
+        menu.appendChild(item);
+      });
+
+      document.body.appendChild(menu);
+
+      const close = () => menu.remove();
+      setTimeout(() => {
+        document.addEventListener("click", close, { once: true });
+      });
+    }
+
+
     const onFocusExtension = EditorView.domEventHandlers({
       focus(event, view) {
         if (view.state.readOnly) {
@@ -578,6 +672,14 @@ export default defineComponent({
             effects: setTooltip.of(null) // ✅ correctly removes the tooltip
           });
         }
+      },
+      contextmenu(event, view) {
+        event.preventDefault();
+
+        const x = event.clientX;
+        const y = event.clientY;
+
+        showCustomMenu(x, y, view); // custom function
       }
     });
 
@@ -824,17 +926,51 @@ export default defineComponent({
       }
     };
 
+    const formatJavaScript = (code: string) => {
+      const ast = acorn.parse(code, { ecmaVersion: 2020 });
+      return escodegen.generate(ast, {
+        format: {
+          indent: {
+            style: "  ", // two spaces
+          },
+        },
+      });
+    };
+
     const formatDocument = async () => {
       // CodeMirror doesn't have built-in formatting, but we can implement basic formatting
       return new Promise((resolve) => {
         if (editorView) {
           // Basic formatting: trim whitespace and ensure proper indentation
           const currentValue = editorView.state.doc.toString();
-          const formattedValue = currentValue
-            .split("\n")
-            .map((line: any) => line.trim())
-            .filter((line: any) => line.length > 0)
-            .join("\n");
+          let formattedValue: any = null;
+          if(props.language == 'json') {
+            formattedValue = JSON.stringify(JSON.parse(currentValue), null, 2);
+          } else if(props.language == 'sql') {
+            formattedValue = format(currentValue, {
+              language: props.language as any,
+            });
+          } else if(props.language == 'markdown') {
+            // Basic markdown formatting - just trim and normalize spacing
+            formattedValue = currentValue
+              .split("\n")
+              .map((line: string) => line.trim())
+              .filter((line: string) => line.length > 0)
+              .join("\n");
+          } else if(props.language == 'html') {
+            formattedValue = htmlBeautify(currentValue, {
+              indent_size: 2,
+              preserve_newlines: false,   // prevent it from preserving empty lines
+              max_preserve_newlines: 0,   // do not allow multiple blank lines
+              unformatted: [],            // format all tags
+              content_unformatted: [],    // format inner content of tags
+              extra_liners: [],   
+            });
+          } else if(props.language == 'javascript' || props.language == 'vrl') {
+            formattedValue = formatJavaScript(currentValue);
+          } else {
+            formattedValue = currentValue;
+          }
 
           if (currentValue !== formattedValue) {
             editorView.dispatch({
@@ -945,5 +1081,21 @@ export default defineComponent({
 .theme-light .cm-tooltip-readonly {
   background: #f5f5f5;
   color: #333;
+}
+
+.cm-context-menu {
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+  font-size: 13px;
+}
+.cm-context-menu > div {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.cm-context-menu > div:hover {
+  background-color: #eee;
 }
 </style>
