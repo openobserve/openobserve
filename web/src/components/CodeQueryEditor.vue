@@ -540,6 +540,13 @@ export default defineComponent({
           showTooltipAtCursor(view, "Can not edit in read-only mode.");
         }
       },
+      blur(event, view) {
+        if (view.state.readOnly) {
+          view.dispatch({
+            effects: setTooltip.of(null) // ✅ correctly removes the tooltip
+          });
+        }
+      }
     });
 
     // Debounced emit for document changes
