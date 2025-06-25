@@ -1027,13 +1027,31 @@ async fn handle_derived_stream_triggers(
         // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
         // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
         // period from 5:05pm to 5:15pm.
+        log::debug!(
+            "supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
+                .unwrap()
+                .time(),
+            chrono::DateTime::from_timestamp_micros(t0 + period_num_microseconds)
+                .unwrap()
+                .time(),
+            supposed_to_be_run_at < t0 + period_num_microseconds,
+        );
         (
             Some(t0),
             if is_cron_frequency {
                 // For cron frequency, don't believe the period, the period can be dynamic for cron.
                 // For example, if cron expression evaluates to "run every weekend 12am", the period
                 // is dynamic here.
-                supposed_to_be_run_at
+                std::cmp::min(
+                    supposed_to_be_run_at,
+                    derived_stream.trigger_condition.get_next_trigger_time(
+                        false,
+                        derived_stream.tz_offset,
+                        false,
+                        Some(t0),
+                    )?,
+                )
             } else {
                 std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
             },
@@ -1343,20 +1361,31 @@ async fn handle_derived_stream_triggers(
     if !(trigger_data_stream.status == TriggerDataStatus::Failed
         && new_trigger.retries < max_retries)
     {
-        // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream
-            .trigger_condition
-            .get_next_trigger_time_non_aligned(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(trigger.next_run_at),
-            )?;
-
+        let need_to_catch_up = end < supposed_to_be_run_at;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
         if trigger_data_stream.status != TriggerDataStatus::Failed {
             new_trigger.retries = 0;
+        }
+
+        if trigger_data_stream.status != TriggerDataStatus::Failed && need_to_catch_up {
+            // Go to the next nun at, but use the same trigger start time
+            new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+                false,
+                derived_stream.tz_offset,
+                false,
+                Some(end),
+            )?;
+        } else {
+            // Go to the next nun at, but use the same trigger start time
+            new_trigger.next_run_at = derived_stream
+                .trigger_condition
+                .get_next_trigger_time_non_aligned(
+                    false,
+                    derived_stream.tz_offset,
+                    false,
+                    Some(trigger.next_run_at),
+                )?;
         }
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
