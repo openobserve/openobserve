@@ -248,15 +248,10 @@ export default defineComponent({
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
           val = val.filter((v) => v !== SELECT_ALL_VALUE);
         }
-        // Remove custom value if any regular value is selected
-        const hasRegular = val.some(
-          (v) => typeof v === "string" && !v.endsWith(`::${CUSTOM_VALUE}`),
+        // Remove custom value suffix if present
+        val = val.filter(
+          (v) => !(typeof v === "string" && v.endsWith(`::${CUSTOM_VALUE}`)),
         );
-        if (hasRegular) {
-          val = val.filter(
-            (v) => !(typeof v === "string" && v.endsWith(`::${CUSTOM_VALUE}`)),
-          );
-        }
       }
       selectedValue.value = val;
       if (!props.variableItem.multiSelect) {
