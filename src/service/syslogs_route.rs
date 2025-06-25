@@ -185,14 +185,15 @@ fn subnets_overlap(net1: &IpNetwork, net2: &IpNetwork) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ipnetwork::IpNetwork;
+
+    use super::*;
 
     #[test]
     fn test_subnets_overlap() {
         let net1: IpNetwork = "192.168.1.0/24".parse().unwrap();
         let net2: IpNetwork = "192.168.1.128/25".parse().unwrap();
-        
+
         assert!(subnets_overlap(&net1, &net2));
     }
 
@@ -200,7 +201,7 @@ mod tests {
     fn test_subnets_no_overlap() {
         let net1: IpNetwork = "192.168.1.0/24".parse().unwrap();
         let net2: IpNetwork = "192.168.2.0/24".parse().unwrap();
-        
+
         assert!(!subnets_overlap(&net1, &net2));
     }
 

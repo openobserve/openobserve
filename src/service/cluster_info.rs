@@ -88,8 +88,9 @@ pub async fn get_super_cluster_info(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use proto::cluster_rpc::CompactionInfo;
+
+    use super::*;
 
     #[test]
     fn test_convert_response_to_cluster_info() {
@@ -100,7 +101,7 @@ mod tests {
                 in_progress_jobs: 2,
             }),
         };
-        
+
         let cluster_info = convert_response_to_cluster_info(response);
         assert_eq!(cluster_info.pending_jobs, 5);
     }
@@ -110,7 +111,7 @@ mod tests {
         let response = GetClusterInfoResponse {
             compaction_info: None,
         };
-        
+
         let cluster_info = convert_response_to_cluster_info(response);
         assert_eq!(cluster_info.pending_jobs, 0);
     }

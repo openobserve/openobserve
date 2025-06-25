@@ -43,23 +43,24 @@ pub fn stddev(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Res
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::service::promql::value::{InstantValue, Labels, Sample, Value, Label};
     use std::sync::Arc;
+
+    use super::*;
+    use crate::service::promql::value::{InstantValue, Label, Labels, Sample, Value};
 
     #[test]
     fn test_stddev_function() {
         let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
-        
+
         // Create test data with multiple samples
         let mut labels1 = Labels::default();
         labels1.push(Arc::new(Label::new("instance", "server1")));
         labels1.push(Arc::new(Label::new("job", "node_exporter")));
-        
+
         let mut labels2 = Labels::default();
         labels2.push(Arc::new(Label::new("instance", "server2")));
         labels2.push(Arc::new(Label::new("job", "node_exporter")));
-        
+
         let data = Value::Vector(vec![
             InstantValue {
                 labels: labels1.clone(),
@@ -74,10 +75,10 @@ mod tests {
                 sample: Sample::new(timestamp, 30.0),
             },
         ]);
-        
+
         // Test stddev without label grouping - should return standard deviation
         let result = stddev(timestamp, &None, data.clone()).unwrap();
-        
+
         match result {
             Value::Vector(values) => {
                 assert_eq!(values.len(), 1);

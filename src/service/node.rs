@@ -235,8 +235,9 @@ pub async fn get_node_list(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use config::utils::sysinfo::NodeMetrics;
+
+    use super::*;
 
     #[test]
     fn test_config_node_to_proto() {
@@ -255,7 +256,7 @@ mod tests {
             version: "1.0.0".to_string(),
             metrics: NodeMetrics::default(),
         };
-        
+
         let proto_node = config_node_to_proto(config_node);
         assert_eq!(proto_node.id, 1);
         assert_eq!(proto_node.uuid, "test_uuid");
@@ -282,7 +283,7 @@ mod tests {
             version: "2.0.0".to_string(),
             metrics: Some(ProtoNodeMetrics::default()),
         };
-        
+
         let config_node = proto_node_to_config(proto_node);
         assert_eq!(config_node.id, 1);
         assert_eq!(config_node.uuid, "test_proto_uuid");
