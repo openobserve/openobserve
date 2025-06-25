@@ -148,8 +148,7 @@ def test_partition_search(create_session, base_url):
     """Fixture to retrieve partition search"""
 
     session = create_session
-    url = base_url
-    URL = f"{url}api/{org_id}/_search_partition?type=logs"
+    URL_PARTITION_SEARCH = f"{base_url}api/{org_id}/_search_partition?type=logs"
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
 
     now = datetime.now(timezone.utc)
@@ -164,15 +163,51 @@ def test_partition_search(create_session, base_url):
         "streaming_output": True
 }
     # Send the POST request
-    response = session.post(URL, json=payload)
+    response = session.post(URL_PARTITION_SEARCH, json=payload)
 
     # Assert the response status code
     assert response.status_code == 200, f"Expected status code 200 but got {response.status_code}"
 
-    # Optionally, you can add more assertions based on the expected response content
-    # For example, check if the response contains expected keys
+    # Check the response structure based on actual response format
     response_json = response.json()
-    assert 'data' in response_json, "Response JSON does not contain 'data' key"
-    assert isinstance(response_json['data'], list), "'data' should be a list"
+    print("Response JSON", response_json)
+    assert 'compressed_size' in response_json, "Response JSON does not contain 'compressed_size' key"
+    assert 'file_num' in response_json, "Response JSON does not contain 'file_num' key"
+    assert isinstance(response_json['compressed_size'], int), "'compressed_size' should be an integer"
+    assert isinstance(response_json['file_num'], int), "'file_num' should be an integer"
 
+
+def test_rate_limit(create_session, base_url):
+    """Fixture to test API rate limit"""
+    session = create_session
+    URL_RATE_LIMIT = f"{base_url}api/{org_id}/_search?type=logs&search_type=ui&use_cache=true"
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    # Define the payload
+    PAYLOAD = {
+            "query": {
+                "sql": "SELECT * FROM \"stream_pytest_data\"",
+                "start_time": ten_min_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 50,
+                "quick_mode": False,
+                "sql_mode": "full",
+                "streaming_output": False,
+                "streaming_id": None
+                    }
+                }
+    response = session.post(URL_RATE_LIMIT, json=PAYLOAD)
     
+    # Check the response status code
+    assert response.status_code == 429, f"Expected status code 429, but got {response.status_code}"
+    
+    # Check for rate limit error in the response
+    response_json = response.json()
+    assert "error" in response_json, "Expected 'error' key in response"
+    assert response_json["error"] == "rate_limit_exceeded", f"Expected error message 'rate_limit_exceeded', but got {response_json['error']}"
+    assert response_json["message"] == "Request limit reached for default/_search. Please try again in a few moments", \
+        f"Expected message 'Request limit reached for default/_search. Please try again in a few moments', but got {response_json['message']}"
+
