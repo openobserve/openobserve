@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.isAiChatEnabled ? isFullScreen ? 'tw-w-[85%] q-pl-sm' : 'tw-w-[65%] q-pl-sm' : 'tw-w-[100%] q-px-md'"
             >
             <q-form @submit="saveRegexPattern" class="tw-flex tw-flex-col tw-gap-4" style="overflow: auto; height: calc(100vh - 150px);">
-                <div class="tw-flex tw-flex-col tw-gap-4">
+                <div class="tw-flex tw-flex-col">
                     <div data-test="add-regex-pattern-name-input">
                 <q-input
                     v-bind:readonly="isEdit"
@@ -96,12 +96,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     filled
                     tabindex="0"
                     style="min-width: 480px;"
-                    placeholder="Enter Pattern Name"
+                    placeholder="Enter Pattern Name*"
                     class="add-regex-pattern-name-input"
                     @update:model-value='updatePatternInputs'
+                    :rules="[val => val !== '' || '* Name is required']"
                 />
                 </div>
-                <div data-test="add-regex-pattern-description-input">
+                <div data-test="add-regex-pattern-description-input" class="tw-mb-4">
                 <q-input
                     v-model="regexPatternInputs.description"
                     color="input-border"
@@ -125,11 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         name="query"
                         v-model:is-expanded="expandState.regexPattern"
-                        label="Regular Expression"
+                        label="Regular Expression*"
                         class="tw-mt-1 tw-py-md"
                         labelClass="tw-py-md"
                         :o2AIicon="true"
-                        @toggleO2Ai="toggleO2Ai"
+                        @toggleO2Ai="toggleAIChat"
                     />
                     <div v-if="expandState.regexPattern" class="regex-pattern-input">
                         <q-input
@@ -149,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         placeholder="Eg. \d....\d "
                         rows="5"
                         @update:model-value='updatePatternInputs'
+                        :rules="[val => val !== '' || '* Pattern is required']"
                         />
                     </div>
                 </div>
@@ -311,10 +313,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 window.dispatchEvent(new Event("resize"));
             };
 
-            const toggleO2Ai = () => {
-                console.log("toggleO2Ai");
-            };
-
             const updatePatternInputs = debounce(() => {
                 if (
                     regexPatternInputs.value.name === "" ||
@@ -384,7 +382,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 isFullScreen,
                 regexPatternInputs,
                 expandState,
-                toggleO2Ai,
                 testString,
                 isFormEmpty,
                 updatePatternInputs,
@@ -439,13 +436,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     height: 200px;
     }
 
-    .dark-mode-regex-pattern-input  > div > div  { 
+    .dark-mode-regex-pattern-input .q-field__control  { 
         background-color:#181A1B !important;
         border-left: 1px solid #212121 !important;
         border-right: 1px solid #212121 !important;
         border-bottom: 1px solid #212121 !important;
         }
-    .light-mode-regex-pattern-input > div > div  { 
+    .light-mode-regex-pattern-input .q-field__control  { 
     background-color:#ffffff !important;
     border-left: 1px solid #E6E6E6 !important;
     border-right: 1px solid #E6E6E6 !important;
@@ -456,13 +453,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     resize: none !important;
     }
 
-    .dark-mode-regex-test-string-input  > div > div  { 
+    .dark-mode-regex-test-string-input .q-field__control  { 
     background-color:#181A1B !important;
     border-left: 1px solid #212121 !important;
         border-right: 1px solid #212121 !important;
         border-bottom: 1px solid #212121 !important;
     }
-    .light-mode-regex-test-string-input > div > div  { 
+    .light-mode-regex-test-string-input .q-field__control  { 
     background-color:#ffffff !important;
     border-left: 1px solid #E6E6E6 !important;
     border-right: 1px solid #E6E6E6 !important;
