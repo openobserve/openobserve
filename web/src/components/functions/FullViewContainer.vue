@@ -33,11 +33,12 @@
       </div>
       <div>
         <slot name="right" />
-        <!-- <q-icon
-          name="fullscreen"
-          size="18px"
-          class="tw-mr-1 tw-cursor-pointer tw-transition-all tw-text-gray-500"
-        /> -->
+        <q-btn v-if="o2AIicon" class="tw-px-2 tw-py-1"
+        :class="store.state.theme === 'dark' ? 'tw-bg-[#529DFF80] ' : 'tw-bg-[#8369B61C]'"
+         style="border-radius: 4px;" dense no-caps flat  @click="tryO2AI">
+          <q-icon  :name="outlinedLightbulb" />
+              <span class="import-button-text">Try O2 AI to write expressions</span>
+            </q-btn>
       </div>
     </div>
     <slot v-if="expanded" />
@@ -46,6 +47,7 @@
 <script setup lang="ts">
 import { defineProps, ref, onMounted, computed, watch, defineEmits } from "vue";
 import { useStore } from "vuex";
+import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps({
   name: {
@@ -68,9 +70,14 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  o2AIicon: {
+    type: Boolean,
+    default: false,
+    required: false,
+  },
 });
 
-const emits = defineEmits(["update:isExpanded"]);
+const emits = defineEmits(["update:isExpanded", "toggleO2Ai"]);
 
 const store = useStore();
 
@@ -78,6 +85,9 @@ const expanded = computed({
   get: () => props.isExpanded,
   set: (value) => emits("update:isExpanded", value),
 });
+const tryO2AI = () => {
+  emits("toggleO2Ai");
+};
 </script>
 
 <style scoped lang="scss"></style>

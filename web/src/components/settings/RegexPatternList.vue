@@ -49,6 +49,7 @@
             @click="createRegexPattern"
           />
           <QTablePagination
+            data-test="regex-pattern-list-pagination"
             :scope="scope"
             :pageTitle="t('regex_patterns.header')"
             :position="'top'"
@@ -115,6 +116,9 @@
           @update:ok="deleteRegexPattern"
           @update:cancel="deleteDialog.show = false"
         />
+        <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
+          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="showAddRegexPatternDialog.show = false" />
+        </q-dialog>
     </q-page>
   </template>
 
@@ -131,15 +135,17 @@
     import NoRegexPatterns from "./NoRegexPatterns.vue";
     import regexPatternsService from "@/services/regex_pattern";
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+    import AddRegexPattern from "./AddRegexPattern.vue";
 
     export default defineComponent({
         name: "RegexPatternList",
         components: {
             QTablePagination,
             NoRegexPatterns,
-            ConfirmDialog
+            ConfirmDialog,
+            AddRegexPattern
         },
-        setup() {
+    setup() {
 
     const qTable = ref(null);
     const pagination: any = ref({
@@ -212,6 +218,12 @@
 
     const listLoading = ref(false);
 
+    const showAddRegexPatternDialog = ref({
+      show: false,
+      data: {} as any,
+      isEdit: false,
+    });
+
     onMounted(async () => {
       //if the regex patterns are not in the store, then we need to fetch them from the api
       //else we can use the regex patterns from the store
@@ -228,6 +240,12 @@
     const changePagination = (page: number) => {
     }
 
+    watch(filterQuery, (newVal) => {
+      if(newVal == ""){
+        resultTotal.value = regexPatterns.value.length;
+      }
+    })
+
     const filterData = (rows: any, terms: any) => {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -242,7 +260,7 @@
 
 
     const createRegexPattern = () => {
-      console.log("createRegexPattern");
+      showAddRegexPatternDialog.value.show = true;
     }
     //call this function only on mounted or any changes in the list like updating the existing regex pattern or deleting the existing regex pattern
     //we are storing the regex patterns in the store to avoid multiple api calls and it is stored in the organizationData.regexPatterns
@@ -273,7 +291,9 @@
     }
 
     const editRegexPattern = (row: any) => {
-      console.log("editRegexPattern", row);
+      showAddRegexPatternDialog.value.show = true;
+      showAddRegexPatternDialog.value.isEdit = true;
+      showAddRegexPatternDialog.value.data = row;
     }
 
     const confirmDeleteRegexPattern = (row: any) => {
@@ -324,7 +344,9 @@
         editRegexPattern,
         deleteRegexPattern,
         deleteDialog,
-        confirmDeleteRegexPattern
+        confirmDeleteRegexPattern,
+        showAddRegexPatternDialog,
+        getRegexPatterns
     }
     }
 })

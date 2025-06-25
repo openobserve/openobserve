@@ -25,29 +25,22 @@ const regexPatterns = {
   },
   create: (
     org_identifier: string,
-    name: string,
-    pattern: string,
+    payload: any
   ) => {
+    console.log(payload,'payload')
     return http().post(
       `/api/${org_identifier}/re_patterns`,
-      {
-        name,
-        pattern,
-      }
+      payload
     );
   },
   update: (
     org_identifier: string,
     id: string,
-    name: string,
-    pattern: string,
+    payload: any
   ) => {
     return http().put(
       `/api/${org_identifier}/re_patterns/${id}`,
-      {
-        name,
-        pattern,
-      }
+      payload
     );
   },
   delete: (

@@ -1255,6 +1255,9 @@
     "updated_at": "Updated At",
     "actions": "Actions",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "create_regex_pattern": "Create New Regex Pattern",
+    "create_close":"Create and Close",
+    "cancel":"Cancel"
   }
 }
