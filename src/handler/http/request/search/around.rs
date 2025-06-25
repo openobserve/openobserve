@@ -136,6 +136,11 @@ pub(crate) async fn around(
     // search forward
     let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, false)
         .unwrap_or(around_sql.to_string());
+    let fw_sql = match config::utils::query_select_utils::replace_o2_custom_patterns(&fw_sql) {
+        Ok(sql) => sql,
+        Err(_) => fw_sql,
+    };
+
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: fw_sql,
