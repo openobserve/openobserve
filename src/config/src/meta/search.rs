@@ -172,7 +172,18 @@ impl Request {
         match self.encoding {
             RequestEncoding::Base64 => {
                 self.query.sql = match base64::decode_url(&self.query.sql) {
-                    Ok(v) => v,
+                    Ok(v) => {
+                        match crate::utils::query_select_utils::replace_o2_custom_patterns(&v) {
+                            Ok(sql) => sql,
+                            Err(e) => {
+                                log::error!(
+                                    "Error replacing o2 custom patterns , returning original sql: {}",
+                                    e
+                                );
+                                v
+                            }
+                        }
+                    }
                     Err(e) => {
                         return Err(e);
                     }
@@ -1157,9 +1168,16 @@ impl MultiStreamRequest {
                     .as_ref()
                     .and_then(|v| base64::decode_url(v).ok())
             };
+            let sql = if let Ok(sql) =
+                crate::utils::query_select_utils::replace_o2_custom_patterns(&query.sql)
+            {
+                sql
+            } else {
+                query.sql.clone()
+            };
             res.push(Request {
                 query: Query {
-                    sql: query.sql.clone(),
+                    sql,
                     from: self.from,
                     size: self.size,
                     start_time: query.start_time.unwrap_or(self.start_time),
