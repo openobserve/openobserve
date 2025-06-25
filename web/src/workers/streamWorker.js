@@ -1,6 +1,12 @@
 // Worker to handle stream processing
 // This offloads decoding and parsing from the main thread
 let activeBuffers = {};
+
+// Helper function to extract data from message line
+function extractData(line) {
+  return line.startsWith('data:') ? line.slice(6) : line.slice(5);
+}
+
 // Handle messages from main thread
 self.onmessage = async (event) => {
   const { action, traceId, chunk } = event.data;
@@ -66,7 +72,7 @@ function processChunk(traceId, chunk) {
           //TODO: Logic is duplicated for event:search_response and event:search_response_hits
           // Create method to handle this
           if (msgLines[1]?.startsWith('data:') || msgLines[1]?.startsWith('data: ')) {
-            const data = msgLines[1]?.startsWith('data:') ? msgLines[1]?.slice(6) : msgLines[1]?.slice(5);
+            const data = extractData(msgLines[1]);
 
             try {
               // Try to parse as JSON
@@ -89,7 +95,7 @@ function processChunk(traceId, chunk) {
         }
 
         if (msgLines[0]?.startsWith('data:') || msgLines[0]?.startsWith('data: ')) {
-          const data = msgLines[0]?.startsWith('data:') ? msgLines[0]?.slice(6) : msgLines[0]?.slice(5);
+          const data = extractData(msgLines[0]);
           try {
             // Try to parse as JSON
             const json = JSON.parse(data);
