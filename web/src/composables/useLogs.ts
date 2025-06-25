@@ -1681,6 +1681,21 @@ const useLogs = () => {
     return Math.ceil(partitionTotal / searchObj.meta.resultGrid.rowsPerPage);
   }
 
+  const setCommunicationMethod = () => {
+    const shouldUseWebSocket = isWebSocketEnabled();
+    const shouldUseStreaming = isStreamingEnabled();
+
+    const isMultiStreamSearch = searchObj.data.stream.selectedStream.length > 1 && !searchObj.meta.sqlMode;
+
+    if (shouldUseStreaming && !isMultiStreamSearch) {
+      searchObj.communicationMethod = "streaming";
+    } else if (shouldUseWebSocket && !isMultiStreamSearch) {
+      searchObj.communicationMethod = "ws";
+    } else {
+      searchObj.communicationMethod = "http";
+    }
+  }
+
   const getQueryData = async (isPagination = false) => {
     try {
       //remove any data that has been cached 
@@ -1697,21 +1712,8 @@ const useLogs = () => {
       // if window has use_web_socket property then use that
       // else use organization settings
       searchObj.meta.jobId = "";
-      const shouldUseWebSocket = isWebSocketEnabled();
-      const shouldUseStreaming = isStreamingEnabled();
 
-      const isMultiStreamSearch =
-        searchObj.data.stream.selectedStream.length > 1 &&
-        !searchObj.meta.sqlMode;
-
-      // Determine communication method based on available options and constraints
-      if (shouldUseStreaming && !isMultiStreamSearch) {
-        searchObj.communicationMethod = "streaming";
-      } else if (shouldUseWebSocket && !isMultiStreamSearch) {
-        searchObj.communicationMethod = "ws";
-      } else {
-        searchObj.communicationMethod = "http";
-      }
+      setCommunicationMethod();
 
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
@@ -6603,7 +6605,8 @@ const useLogs = () => {
     isWithQuery,
     getStream,
     initialLogsState,
-    clearSearchObj
+    clearSearchObj,
+    setCommunicationMethod
   };
 };
 

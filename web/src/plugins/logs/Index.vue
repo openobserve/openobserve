@@ -569,6 +569,7 @@ export default defineComponent({
       fnUnparsedSQL,
       initialLogsState,
       clearSearchObj,
+      setCommunicationMethod,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -854,6 +855,10 @@ export default defineComponent({
 
           resetStreamData();
 
+          searchObj.meta.quickMode = isQuickModeEnabled();
+
+          searchObj.meta.showHistogram = isHistogramEnabled();
+
           restoreUrlQueryParams();
 
           if (isEnterpriseClusterEnabled()) {
@@ -870,9 +875,6 @@ export default defineComponent({
         if (isCloudEnvironment()) {
           setupCloudSpecificThreshold();
         }
-
-        searchObj.meta.quickMode = isQuickModeEnabled();
-        searchObj.meta.showHistogram = isHistogramEnabled();
 
         isLogsMounted.value = true;
       } catch (error) {
@@ -1636,6 +1638,7 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
+      setCommunicationMethod,
     };
   },
   computed: {
@@ -1749,12 +1752,15 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          const shouldUseWebSocket = this.isWebSocketEnabled();
-          const shouldUseStreaming = this.isStreamingEnabled();
+          this.setCommunicationMethod();
+
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (shouldUseWebSocket || shouldUseStreaming) {
+          if (
+            this.searchObj.communicationMethod === "ws" ||
+            this.searchObj.communicationMethod === "streaming"
+          ) {
             // Use WebSocket for histogram data
             const payload = this.buildWebSocketPayload(
               this.searchObj.data.histogramQuery,
