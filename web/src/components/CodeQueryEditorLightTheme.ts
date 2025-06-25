@@ -4,7 +4,7 @@ import { tags } from '@lezer/highlight';
 
 // Replaced One Light colors with VSCode Light colors
 const chalky = "#267f99",
-  coral = "#0070c1",
+  coral = "#000000",
   cyan = "#383a42",
   invalid = "#e45649",
   ivory = "#383a42",
@@ -146,6 +146,10 @@ const oneLightTheme = EditorView.theme(
 
 /** The highlighting style using VSCode Light colors. */
 const oneLightHighlightStyle = HighlightStyle.define([
+  {
+    tag: tags.name,
+    color: "#795E26", // fallback function color like Monaco
+  },
   { tag: tags.keyword, color: whiskey },
   {
     tag: [

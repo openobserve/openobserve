@@ -4,7 +4,7 @@ import { tags } from '@lezer/highlight';
 
 // Replaced One Dark colors with VSCode Dark colors
 const chalky = "#4ec9b0",
-  coral = "#9cdcfe",
+  coral = "#d4d4d4",
   cyan = "#d4d4d4",
   invalid = "#ff0000",
   ivory = "#9cdcfe",
