@@ -54,7 +54,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: false,
         local_mode: Some(true),
     };
     log::debug!(
@@ -124,7 +124,7 @@ pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
                 size.parse::<f64>().unwrap_or(0.0)
             }
             Err(_) => {
-                // log::error!("get_table_size error: {:?}", e);
+                // log::error!("get_table_size error: {e}");
                 stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
             }
         },
@@ -157,7 +157,7 @@ pub async fn get_meta_table_stats(
     {
         Ok(size) => size,
         Err(_) => {
-            // log::error!("get_table_size error: {:?}", e);
+            // log::error!("get_table_size error: {e}");
             return None;
         }
     };

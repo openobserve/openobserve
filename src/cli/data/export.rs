@@ -58,13 +58,7 @@ impl Context for Export {
             query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            action_id: None,
-            skip_wal: false,
-            streaming_output: false,
-            streaming_id: None,
+            ..Default::default()
         };
 
         let req = search::Request {
@@ -75,7 +69,7 @@ impl Context for Export {
             timeout: 0,
             search_type,
             search_event_context,
-            use_cache: None,
+            use_cache: false,
             local_mode: None,
         };
 
@@ -95,8 +89,8 @@ impl Context for Export {
                 serde_json::to_writer_pretty(file, &res.hits)?;
                 Ok(true)
             }
-            Err(err) => {
-                eprintln!("search error: {:?}", err);
+            Err(e) => {
+                eprintln!("search error: {:?}", e);
                 Ok(false)
             }
         }

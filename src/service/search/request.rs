@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::StreamType;
+use config::meta::{search::default_use_cache, stream::StreamType};
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
 #[derive(Debug, Clone)]
@@ -30,6 +30,8 @@ pub struct Request {
     pub streaming_output: bool,
     pub streaming_id: Option<String>,
     pub local_mode: Option<bool>,
+    pub use_cache: bool,
+    pub histogram_interval: i64,
 }
 
 impl Default for Request {
@@ -47,6 +49,8 @@ impl Default for Request {
             streaming_output: false,
             streaming_id: None,
             local_mode: None,
+            use_cache: default_use_cache(),
+            histogram_interval: 0,
         }
     }
 }
@@ -61,6 +65,7 @@ impl Request {
         user_id: Option<String>,
         time_range: Option<(i64, i64)>,
         search_event_type: Option<String>,
+        histogram_interval: i64,
     ) -> Self {
         Self {
             trace_id,
@@ -75,6 +80,8 @@ impl Request {
             streaming_output: false,
             streaming_id: None,
             local_mode: None,
+            use_cache: default_use_cache(),
+            histogram_interval,
         }
     }
 
@@ -106,6 +113,10 @@ impl Request {
     pub fn set_local_mode(&mut self, local_mode: Option<bool>) {
         self.local_mode = local_mode;
     }
+
+    pub fn set_use_cache(&mut self, use_cache: bool) {
+        self.use_cache = use_cache;
+    }
 }
 
 impl From<FlightSearchRequest> for Request {
@@ -123,6 +134,8 @@ impl From<FlightSearchRequest> for Request {
             streaming_output: false,
             streaming_id: None,
             local_mode: req.super_cluster_info.local_mode,
+            use_cache: req.search_info.use_cache,
+            histogram_interval: req.search_info.histogram_interval,
         }
     }
 }

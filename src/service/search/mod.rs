@@ -39,7 +39,6 @@ use config::{
         time::now_micros,
     },
 };
-use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
@@ -57,13 +56,26 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use {
     crate::service::grpc::make_grpc_search_client,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
-    std::collections::HashSet, tracing::info_span,
+    o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup,
+    o2_enterprise::enterprise::search::cache::streaming_agg::{
+        create_aggregation_cache_file_path, generate_aggregation_cache_interval,
+        get_aggregation_cache_key_from_request,
+    },
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
+    std::collections::HashSet,
+    tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
+    common::{
+        infra::cluster as infra_cluster,
+        utils::{
+            functions::{get_all_transform_keys, init_vrl_runtime},
+            stream::get_settings_max_query_range,
+        },
+    },
     handler::grpc::request::search::Searcher,
     service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
@@ -172,6 +184,7 @@ pub async fn search(
         user_id.clone(),
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
+        in_req.query.histogram_interval,
     );
     if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
@@ -179,6 +192,8 @@ pub async fn search(
     if let Some(v) = in_req.local_mode {
         request.set_local_mode(Some(v));
     }
+    request.set_use_cache(in_req.use_cache);
+
     let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
@@ -363,7 +378,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+            return Err(Error::Message(format!("decode sql error: {e}")));
         }
     }
     let queries_len = queries.len();
@@ -384,7 +399,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in common::utils::functions::get_all_transform_keys(org_id).await {
+        for fn_name in get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -425,7 +440,7 @@ pub async fn search_multi(
                 }
             }
             Err(e) => {
-                log::error!("search_multi: search error: {:?}", e);
+                log::error!("search_multi: search error: {e}");
                 if index == 0 {
                     // Error in the first query, return the error
                     return Err(e); // TODO: return partial results
@@ -449,7 +464,7 @@ pub async fn search_multi(
         if apply_over_hits {
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
-        let mut runtime = common::utils::functions::init_vrl_runtime();
+        let mut runtime = init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
@@ -631,11 +646,38 @@ pub async fn search_partition(
     } else {
         None
     };
+
+    #[cfg(feature = "enterprise")]
     if let Some(id) = &streaming_id {
         log::info!(
             "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
         );
-        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time);
+
+        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
+            // TODO: cache don't not support multiple stream names
+            Ok(v) => (v[0].clone(), v.join(",")),
+            Err(e) => {
+                return Err(Error::Message(e.to_string()));
+            }
+        };
+
+        let cache_interval =
+            generate_aggregation_cache_interval(query.start_time, query.end_time) as i64;
+        let hashed_query = get_aggregation_cache_key_from_request(req);
+        let cache_file_path = create_aggregation_cache_file_path(
+            org_id,
+            &stream_type.to_string(),
+            &stream_name,
+            hashed_query,
+            cache_interval,
+        );
+        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
+        log::info!(
+            "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
+            trace_id,
+            id,
+            cache_file_path
+        );
     }
 
     let mut files = Vec::new();
@@ -769,7 +811,7 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        streaming_output: req.streaming_output,
+        streaming_output: req.streaming_output && is_streaming_aggregate,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),
     };
@@ -779,7 +821,7 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(1);
+        let hist_int = sql.histogram_interval.unwrap_or(0);
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
@@ -861,8 +903,13 @@ pub async fn search_partition(
     );
 
     // Generate partitions
-    let partitions =
-        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+    let partitions = generator.generate_partitions(
+        req.start_time,
+        req.end_time,
+        step,
+        sql_order_by,
+        is_streaming_aggregate,
+    );
 
     if sql_order_by == OrderBy::Asc {
         resp.order_by = OrderBy::Asc;
@@ -966,6 +1013,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
                 file_list_took: scan_stats.file_list_took,
+                aggs_cache_ratio: scan_stats.aggs_cache_ratio,
             });
         let query_status = if result.is_queue {
             "waiting"

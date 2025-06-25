@@ -15,7 +15,7 @@
 
 use std::{
     cmp::{max, min},
-    fs,
+    fmt, fs,
     ops::Range,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -44,7 +44,7 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(RwLock::new(FileData::new(FileType::DATA)));
+        files.push(RwLock::new(FileData::new(FileType::Data)));
     }
     files
 });
@@ -54,7 +54,7 @@ static FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(FileData::new(FileType::DATA));
+        files.push(FileData::new(FileType::Data));
     }
     files
 });
@@ -63,7 +63,7 @@ static RESULT_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(RwLock::new(FileData::new(FileType::RESULT)));
+        files.push(RwLock::new(FileData::new(FileType::Result)));
     }
     files
 });
@@ -73,7 +73,27 @@ static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(FileData::new(FileType::RESULT));
+        files.push(FileData::new(FileType::Result));
+    }
+    files
+});
+
+// aggregation cache
+static AGGREGATION_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(RwLock::new(FileData::new(FileType::Aggregation)));
+    }
+    files
+});
+
+// read only aggregation cache
+static AGGREGATION_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(FileData::new(FileType::Aggregation));
     }
     files
 });
@@ -91,18 +111,30 @@ pub struct FileData {
     cur_size: usize,
     root_dir: String,
     multi_dir: Vec<String>,
+    file_type: FileType,
     data: CacheStrategy,
 }
 
 #[derive(Debug)]
 pub enum FileType {
-    DATA,
-    RESULT,
+    Data,
+    Result,
+    Aggregation,
+}
+
+impl fmt::Display for FileType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileType::Data => write!(f, "data"),
+            FileType::Result => write!(f, "result"),
+            FileType::Aggregation => write!(f, "aggregation"),
+        }
+    }
 }
 
 impl Default for FileData {
     fn default() -> Self {
-        Self::new(FileType::DATA)
+        Self::new(FileType::Data)
     }
 }
 
@@ -110,13 +142,18 @@ impl FileData {
     fn new(file_type: FileType) -> FileData {
         let cfg = get_config();
         let size = match file_type {
-            FileType::DATA => cfg.disk_cache.max_size,
-            FileType::RESULT => cfg.disk_cache.result_max_size,
+            FileType::Data => cfg.disk_cache.max_size,
+            FileType::Result => cfg.disk_cache.result_max_size,
+            FileType::Aggregation => cfg.disk_cache.aggregation_max_size,
         };
-        FileData::with_capacity_and_cache_strategy(size, &cfg.disk_cache.cache_strategy)
+        FileData::with_capacity_and_cache_strategy(file_type, size, &cfg.disk_cache.cache_strategy)
     }
 
-    fn with_capacity_and_cache_strategy(max_size: usize, strategy: &str) -> FileData {
+    fn with_capacity_and_cache_strategy(
+        file_type: FileType,
+        max_size: usize,
+        strategy: &str,
+    ) -> FileData {
         let cfg = get_config();
 
         FileData {
@@ -134,6 +171,7 @@ impl FileData {
                 .filter(|s| !s.trim().is_empty())
                 .map(|s| s.to_string())
                 .collect(),
+            file_type,
             data: CacheStrategy::new(strategy),
         }
     }
@@ -165,7 +203,8 @@ impl FileData {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "File disk cache is full, can't cache extra {} bytes",
+                "[CacheType:{}] File disk cache is full, can't cache extra {} bytes",
+                self.file_type,
                 data_size
             );
             // cache is full, need release some space
@@ -193,11 +232,15 @@ impl FileData {
                 .add(data_size as i64);
         } else if columns[0] == "results" {
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
+                .with_label_values(&[columns[1], columns[2], "results"])
                 .add(data_size as i64);
         } else if columns[0] == "metrics_results" {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
+                .add(data_size as i64);
+        } else if columns[0] == "aggregations" && columns.len() >= 3 {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2], "aggregations"])
                 .add(data_size as i64);
         };
         Ok(())
@@ -206,7 +249,8 @@ impl FileData {
     async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!(
-            "File disk cache start gc {}/{}, need to release {} bytes",
+            "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
+            self.file_type,
             self.cur_size,
             self.max_size,
             need_release_size
@@ -227,10 +271,15 @@ impl FileData {
                 self.choose_multi_dir(key.as_str()),
                 key
             );
-            log::debug!("File disk cache gc remove file: {}", key);
+            log::debug!(
+                "[CacheType:{}] File disk cache gc remove file: {}",
+                self.file_type,
+                key
+            );
             if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
-                    "File disk cache gc remove file: {}, error: {}",
+                    "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
+                    self.file_type,
                     file_path,
                     e
                 );
@@ -243,7 +292,8 @@ impl FileData {
                 let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
                 if let Err(e) = fs::remove_dir_all(&file_path) {
                     log::error!(
-                        "File disk cache gc remove file: {}, error: {}",
+                        "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
+                        self.file_type,
                         file_path,
                         e
                     );
@@ -269,11 +319,15 @@ impl FileData {
                     .sub(data_size as i64);
             } else if columns[0] == "results" {
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2]])
+                    .with_label_values(&[columns[1], columns[2], "results"])
                     .sub(data_size as i64);
             } else if columns[0] == "metrics_results" {
                 metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                     .with_label_values(&[columns[1]])
+                    .sub(data_size as i64);
+            } else if columns[0] == "aggregations" && columns.len() >= 3 {
+                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                    .with_label_values(&[columns[1], columns[2], "aggregations"])
                     .sub(data_size as i64);
             }
             release_size += data_size;
@@ -290,13 +344,21 @@ impl FileData {
             }
             drop(r);
         }
-        log::info!("File disk cache gc done, released {} bytes", release_size);
+        log::info!(
+            "[CacheType:{}] File disk cache gc done, released {} bytes",
+            self.file_type,
+            release_size
+        );
 
         Ok(())
     }
 
     async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
-        log::debug!("File disk cache remove file {}", file);
+        log::debug!(
+            "[CacheType:{}] File disk cache remove file {}",
+            self.file_type,
+            file
+        );
 
         let Some((key, data_size)) = self.data.remove_key(file) else {
             return Ok(());
@@ -311,7 +373,12 @@ impl FileData {
             key
         );
         if let Err(e) = fs::remove_file(&file_path) {
-            log::error!("File disk cache remove file: {}, error: {}", file_path, e);
+            log::error!(
+                "[CacheType:{}] File disk cache remove file: {}, error: {}",
+                self.file_type,
+                file_path,
+                e
+            );
         }
 
         // metrics
@@ -325,11 +392,15 @@ impl FileData {
                 .sub(data_size as i64);
         } else if columns[0] == "results" {
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
+                .with_label_values(&[columns[1], columns[2], "results"])
                 .sub(data_size as i64);
         } else if columns[0] == "metrics_results" {
             metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                 .with_label_values(&[columns[1]])
+                .sub(data_size as i64);
+        } else if columns[0] == "aggregations" && columns.len() >= 3 {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2], "aggregations"])
                 .sub(data_size as i64);
         }
 
@@ -367,8 +438,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     // trigger read only files
     for file in FILES_READER.iter() {
-        let root_dir = file.root_dir.clone();
-        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+        std::fs::create_dir_all(&file.root_dir).expect("create cache dir success");
+    }
+    // trigger read only aggregation files
+    for file in AGGREGATION_FILES_READER.iter() {
+        std::fs::create_dir_all(&file.root_dir).expect("create cache dir success");
     }
 
     tokio::task::spawn(async move {
@@ -410,6 +484,10 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("results") {
+        RESULT_FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES_READER.get(idx).unwrap()
     } else {
         RESULT_FILES_READER.get(idx).unwrap()
     };
@@ -424,6 +502,10 @@ pub async fn get_size(file: &str) -> Option<usize> {
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("results") {
+        RESULT_FILES_READER.get(idx).unwrap()
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES_READER.get(idx).unwrap()
     } else {
         RESULT_FILES_READER.get(idx).unwrap()
     };
@@ -438,6 +520,10 @@ pub async fn exist(file: &str) -> bool {
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES[idx].read().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].read().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].read().await
     } else {
         RESULT_FILES[idx].read().await
     };
@@ -471,6 +557,10 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     // get all the files from the bucket
     let mut files = if file.starts_with("files") {
         FILES[idx].write().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].write().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].write().await
     } else {
         RESULT_FILES[idx].write().await
     };
@@ -488,6 +578,10 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     let idx = get_bucket_idx(file);
     let mut files = if file.starts_with("files") {
         FILES[idx].write().await
+    } else if file.starts_with("results") {
+        RESULT_FILES[idx].write().await
+    } else if file.starts_with("aggregations") {
+        AGGREGATION_FILES[idx].write().await
     } else {
         RESULT_FILES[idx].write().await
     };
@@ -592,7 +686,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
                         // metrics
                         metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                            .with_label_values(&[org_id.as_str(), stream_type.as_str(), "results"])
                             .add(data_size as i64);
 
                         result_cache
@@ -607,6 +701,34 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .add(data_size as i64);
 
                         metrics_cache.push(file_key);
+                    } else if file_key.starts_with("aggregations") {
+                        let Some((org_id, stream_type, ..)) =
+                            parse_aggregation_cache_key(&file_key)
+                        else {
+                            log::error!("parse aggregation cache key error: {}", file_key);
+                            continue;
+                        };
+                        let mut w = AGGREGATION_FILES[idx].write().await;
+                        w.cur_size += data_size;
+                        w.data.insert(file_key.clone(), data_size);
+                        drop(w);
+
+                        // metrics
+                        metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                            .with_label_values(&[
+                                org_id.as_str(),
+                                stream_type.as_str(),
+                                "aggregations",
+                            ])
+                            .add(data_size as i64);
+
+                        // metrics for aggregations
+                        let columns = file_key.split('/').collect::<Vec<&str>>();
+                        if columns.len() >= 3 {
+                            metrics::QUERY_DISK_CACHE_USED_BYTES
+                                .with_label_values(&[columns[1], columns[2]])
+                                .add(data_size as i64);
+                        }
                     }
                 }
             }
@@ -647,6 +769,17 @@ async fn gc() -> Result<(), anyhow::Error> {
         w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
+    for file in AGGREGATION_FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + cfg.disk_cache.release_size < r.max_size {
+            drop(r);
+            continue;
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc(cfg.disk_cache.gc_size).await?;
+        drop(w);
+    }
     Ok(())
 }
 
@@ -655,8 +788,9 @@ pub async fn stats(file_type: FileType) -> (usize, usize) {
     let mut total_size = 0;
     let mut used_size = 0;
     let files = match file_type {
-        FileType::DATA => &FILES,
-        FileType::RESULT => &RESULT_FILES,
+        FileType::Data => &FILES,
+        FileType::Result => &RESULT_FILES,
+        FileType::Aggregation => &AGGREGATION_FILES,
     };
 
     for file in files.iter() {
@@ -672,8 +806,9 @@ pub async fn stats(file_type: FileType) -> (usize, usize) {
 pub async fn len(file_type: FileType) -> usize {
     let mut total = 0;
     let files = match file_type {
-        FileType::DATA => &FILES,
-        FileType::RESULT => &RESULT_FILES,
+        FileType::Data => &FILES,
+        FileType::Result => &RESULT_FILES,
+        FileType::Aggregation => &AGGREGATION_FILES,
     };
     for file in files.iter() {
         let r = file.read().await;
@@ -685,8 +820,9 @@ pub async fn len(file_type: FileType) -> usize {
 #[inline]
 pub async fn is_empty(file_type: FileType) -> bool {
     let files = match file_type {
-        FileType::DATA => &FILES,
-        FileType::RESULT => &RESULT_FILES,
+        FileType::Data => &FILES,
+        FileType::Result => &RESULT_FILES,
+        FileType::Aggregation => &AGGREGATION_FILES,
     };
 
     for file in files.iter() {
@@ -757,13 +893,53 @@ pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, Res
     Some((org_id, stream_type, query_key, meta))
 }
 
+// parse the aggregation cache key from the file name
+// returns (org_id, stream_type, query_key, ResultCacheMeta)
+// aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow
+pub fn parse_aggregation_cache_key(
+    file: &str,
+) -> Option<(String, String, String, ResultCacheMeta)> {
+    let columns = file.split('/').collect::<Vec<&str>>();
+    if columns.len() < 6 {
+        return None;
+    }
+    let org_id = columns[1].to_string();
+    let stream_type = columns[2].to_string();
+    let query_key = format!(
+        "{}_{}_{}_{}",
+        columns[1], columns[2], columns[3], columns[4]
+    );
+
+    // Remove file extension before parsing
+    let filename = columns[5];
+    let filename_without_ext = if let Some(dot_pos) = filename.rfind('.') {
+        &filename[..dot_pos]
+    } else {
+        filename
+    };
+
+    let meta = filename_without_ext.split('_').collect::<Vec<&str>>();
+    if meta.len() < 2 {
+        return None;
+    }
+
+    let meta = ResultCacheMeta {
+        start_time: meta[0].parse().unwrap(),
+        end_time: meta[1].parse().unwrap(),
+        is_aggregate: true,
+        // NOTE: aggregate record batches don't honor order by
+        is_descending: false,
+    };
+    Some((org_id, stream_type, query_key, meta))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
     async fn test_lru_cache_set_file() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
@@ -777,8 +953,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            FileType::Data,
+            get_config().disk_cache.max_size,
+            "lru",
+        );
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -792,7 +971,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_miss() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "lru");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
@@ -808,7 +987,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
@@ -825,8 +1005,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            FileType::Data,
+            get_config().disk_cache.max_size,
+            "fifo",
+        );
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -840,7 +1023,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_miss() {
-        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "fifo");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
@@ -862,8 +1045,11 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
 
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            FileType::Data,
+            get_config().disk_cache.max_size,
+            "lru",
+        );
         file_data.multi_dir = multi_dir;
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
@@ -894,5 +1080,19 @@ mod tests {
         assert_eq!(meta.end_time, 1744081170000000);
         assert_eq!(meta.is_aggregate, true);
         assert_eq!(meta.is_descending, false);
+    }
+
+    #[tokio::test]
+    async fn test_parse_aggregation_cache_key() {
+        let file_key = "aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
+        let Some((org_id, stream_type, query_key, meta)) = parse_aggregation_cache_key(file_key)
+        else {
+            panic!("parse aggregation cache key error");
+        };
+        assert_eq!(org_id, "default");
+        assert_eq!(stream_type, "logs");
+        assert_eq!(query_key, "default_logs_default_16042959487540176184");
+        assert_eq!(meta.start_time, 1744081170000000);
+        assert_eq!(meta.end_time, 1744081170000000);
     }
 }

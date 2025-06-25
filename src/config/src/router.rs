@@ -57,7 +57,7 @@ pub const INGESTER_ROUTES: [&str; 12] = [
     "/_kinesis_firehose",
     "/_sub",
     "/v1/logs",
-    "/loki/v1/push",
+    "/loki/api/v1/push",
     "/ingest/metrics/_json",
     "/v1/metrics",
     "/traces",

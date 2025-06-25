@@ -37,6 +37,7 @@ pub mod organizations;
 pub mod ratelimit;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;
+pub mod reports;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;

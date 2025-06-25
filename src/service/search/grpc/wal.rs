@@ -252,12 +252,11 @@ pub async fn search_parquet(
         )
     );
 
-    if cfg.common.memory_circuit_breaker_enable {
-        if let Err(e) = super::check_memory_circuit_breaker(&query.trace_id, &scan_stats) {
-            // release all files
-            wal::release_files(&lock_files);
-            return Err(e);
-        }
+    // check memory circuit breaker
+    if let Err(e) = ingester::check_memory_circuit_breaker() {
+        // release all files
+        wal::release_files(&lock_files);
+        return Err(Error::ResourceError(e.to_string()));
     }
 
     // construct latest schema map
@@ -422,10 +421,8 @@ pub async fn search_memtable(
         )
     );
 
-    let cfg = get_config();
-    if cfg.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
-    }
+    // check memory circuit breaker
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // construct latest schema map
     let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));

@@ -388,6 +388,7 @@ impl QueryConditionExt for QueryCondition {
                     skip_wal: false,
                     streaming_output: false,
                     streaming_id: None,
+                    histogram_interval: 0,
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
@@ -395,7 +396,7 @@ impl QueryConditionExt for QueryCondition {
                 timeout: 0,
                 search_type,
                 search_event_context,
-                use_cache: None,
+                use_cache: false,
                 local_mode: None,
             };
             log::debug!(

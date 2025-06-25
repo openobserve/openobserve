@@ -58,6 +58,13 @@ use super::{
     request::Request,
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
+use crate::service::search::{
+    datafusion::udf::{
+        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+        STR_MATCH_UDF_NAME,
+    },
+    index::get_arg_name,
+};
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -65,8 +72,6 @@ pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").u
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-
-const DASHBOARD_ALL: &str = "_o2_all_";
 
 #[derive(Clone, Debug)]
 pub struct Sql {
@@ -113,7 +118,8 @@ impl Sql {
         let sql = query.sql.clone();
         let offset = query.from as i64;
         let mut limit = query.size as i64;
-
+        let sql =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
         // 1. get table name
         let stream_names =
             resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
@@ -137,13 +143,19 @@ impl Sql {
             .pop()
             .unwrap();
 
+        //********************Change the sql here*********************************//
         // 2. rewrite track_total_hits
         if query.track_total_hits {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
             let _ = statement.visit(&mut trace_total_hits_visitor);
         }
 
-        // 3. get column name, alias, group by, order by
+        // 3. rewrite all filter that include DASHBOARD_ALL with true
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        //********************Change the sql here*********************************//
+
+        // 4. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         let _ = statement.visit(&mut column_visitor);
 
@@ -178,12 +190,12 @@ impl Sql {
             }
         }
 
-        // 4. get match_all() value
+        // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
         let need_fst_fields = match_visitor.match_items.is_some();
 
-        // 5. check if have full text search filed in stream
+        // 6. check if have full text search filed in stream
         if stream_names.len() == 1 && need_fst_fields {
             let schema = total_schemas.values().next().unwrap();
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
@@ -200,7 +212,7 @@ impl Sql {
             }
         }
 
-        // 6. generate used schema
+        // 7. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
@@ -223,21 +235,26 @@ impl Sql {
             }
         }
 
-        // 7. get partition column value
+        // 8. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 8. get prefix column value
+        // 9. get prefix column value
         let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut prefix_column_visitor);
 
-        // 9. pick up histogram interval
+        // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
-        let _ = statement.visit(&mut histogram_interval_visitor);
+        statement.visit(&mut histogram_interval_visitor);
+        let histogram_interval = if query.histogram_interval > 0 {
+            Some(query.histogram_interval)
+        } else {
+            histogram_interval_visitor.interval
+        };
 
-        // NOTE: only this place modify the sql
-        // 10. add _timestamp and _o2_id if need
+        //********************Change the sql here*********************************//
+        // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -246,11 +263,6 @@ impl Sql {
                 let _ = statement.visit(&mut add_o2_id_visitor);
             }
         }
-
-        // NOTE: only this place modify the sql
-        // 11. replace all filter that include DASHBOARD_ALL with true
-        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
 
         // 12. generate tantivy query
         let mut index_condition = None;
@@ -276,6 +288,7 @@ impl Sql {
                 conditions: vec![Condition::All()],
             });
         }
+        //********************Change the sql here*********************************//
 
         // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
@@ -332,7 +345,7 @@ impl Sql {
             time_range: Some((query.start_time, query.end_time)),
             group_by,
             order_by,
-            histogram_interval: histogram_interval_visitor.interval,
+            histogram_interval,
             sorted_by_time: need_sort_by_time,
             use_inverted_index,
             index_condition,
@@ -345,7 +358,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -363,6 +376,7 @@ impl std::fmt::Display for Sql {
             self.sorted_by_time,
             self.use_inverted_index,
             self.index_condition,
+            self.index_optimize_mode,
         )
     }
 }
@@ -1633,9 +1647,25 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             escape_char: _,
             any: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => {
-            let f = f.name.to_string().to_lowercase();
-            f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME
+        Expr::Function(func) => {
+            let f = func.name.to_string().to_lowercase();
+
+            if f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME {
+                return true;
+            }
+
+            if f == STR_MATCH_UDF_NAME
+                || f == STR_MATCH_UDF_IGNORE_CASE_NAME
+                || f == MATCH_FIELD_UDF_NAME
+                || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+            {
+                if let FunctionArguments::List(list) = &func.args {
+                    return list.args.len() == 2
+                        && index_fields.contains(&get_arg_name(&list.args[0]));
+                }
+            }
+
+            false
         }
         _ => false,
     }
@@ -1980,6 +2010,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
         match expr {
             Expr::BinaryOp {
                 left,
@@ -1992,11 +2023,11 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 right,
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(true));
                     }
                 } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(true));
                     }
                 }
@@ -2008,11 +2039,11 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 right,
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(false));
                     }
                 } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(false));
                     }
                 }
@@ -2029,7 +2060,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 ..
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(true));
                     }
                 }
@@ -2046,7 +2077,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 ..
             } => {
                 if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if value == DASHBOARD_ALL {
+                    if *value == placeholder {
                         *expr = Expr::Value(Value::Boolean(false));
                     }
                 }
@@ -2055,7 +2086,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             Expr::InList { list, negated, .. } if !(*negated) => {
                 for item in list.iter() {
                     if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if value == DASHBOARD_ALL {
+                        if *value == placeholder {
                             *expr = Expr::Value(Value::Boolean(true));
                             break;
                         }
@@ -2066,9 +2097,26 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             Expr::InList { list, negated, .. } if *negated => {
                 for item in list.iter() {
                     if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if value == DASHBOARD_ALL {
+                        if *value == placeholder {
                             *expr = Expr::Value(Value::Boolean(false));
                             break;
+                        }
+                    }
+                }
+            }
+            Expr::Function(func) => {
+                let f = func.name.to_string().to_lowercase();
+                if f == STR_MATCH_UDF_NAME
+                    || f == STR_MATCH_UDF_IGNORE_CASE_NAME
+                    || f == MATCH_FIELD_UDF_NAME
+                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+                {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() == 2 {
+                            let value = trim_quotes(list.args[1].to_string().as_str());
+                            if *value == placeholder {
+                                *expr = Expr::Value(Value::Boolean(true));
+                            }
                         }
                     }
                 }
@@ -2192,6 +2240,44 @@ mod tests {
             expected
         );
         assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    // test index_visitor for str_match
+    #[test]
+    fn test_index_visitor_str_match() {
+        let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match(name, 'value')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+    }
+
+    // test index_visitor for str_match_ignore_case
+    #[test]
+    fn test_index_visitor_str_match_ignore_case() {
+        let sql = "SELECT * FROM t WHERE str_match_ignore_case(name, 'value')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match_ignore_case(name, 'value')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
     }
 
     #[test]
@@ -2878,6 +2964,32 @@ mod tests {
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
         statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND false AND field3 = 'value3'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
+        let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
+        let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
     }
 }

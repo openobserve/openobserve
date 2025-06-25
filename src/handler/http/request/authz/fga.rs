@@ -48,22 +48,22 @@ pub async fn create_role(
     org_id: web::Path<String>,
     user_req: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::is_standard_role;
+    use crate::{
+        common::meta::user::is_standard_role, handler::http::auth::jwt::format_role_name_only,
+    };
 
     let org_id = org_id.into_inner();
-    let mut user_req = user_req.into_inner();
-    user_req.role = user_req.role.trim().to_lowercase();
+    let user_req = user_req.into_inner();
+    let role_name = format_role_name_only(user_req.role.trim());
 
-    if user_req.role.is_empty() || is_standard_role(&user_req.role) {
+    if role_name.is_empty() || is_standard_role(&role_name) {
         return Ok(MetaHttpResponse::bad_request(
-            "Role name cannot be empty or standard role",
+            "Custom role name cannot be empty or standard role",
         ));
     }
 
-    match o2_openfga::authorizer::roles::create_role(&user_req.role, &org_id).await {
-        Ok(_) => Ok(MetaHttpResponse::ok(
-            serde_json::json!({"successful": "true"}),
-        )),
+    match o2_openfga::authorizer::roles::create_role(&role_name, &org_id).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Role created successfully")),
         Err(err) => {
             let err = err.to_string();
             if err.contains("write_failed_due_to_invalid_input") {
@@ -280,7 +280,7 @@ pub async fn update_role(
     )
     .await
     {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Ok(_) => Ok(MetaHttpResponse::ok("Role updated successfully")),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
@@ -477,9 +477,11 @@ pub async fn create_group(
     org_id: web::Path<String>,
     user_group: web::Json<UserGroup>,
 ) -> Result<HttpResponse, Error> {
+    use crate::handler::http::auth::jwt::format_role_name_only;
+
     let org_id = org_id.into_inner();
     let mut user_grp = user_group.into_inner();
-    user_grp.name = user_grp.name.trim().to_lowercase();
+    user_grp.name = format_role_name_only(user_grp.name.trim());
 
     match o2_openfga::authorizer::groups::create_group(
         &org_id,
@@ -488,9 +490,7 @@ pub async fn create_group(
     )
     .await
     {
-        Ok(_) => Ok(MetaHttpResponse::ok(
-            serde_json::json!({"successful": "true"}),
-        )),
+        Ok(_) => Ok(MetaHttpResponse::ok("Group created successfully")),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
@@ -559,9 +559,7 @@ pub async fn update_group(
     )
     .await
     {
-        Ok(_) => Ok(MetaHttpResponse::ok(
-            serde_json::json!({"successful": "true"}),
-        )),
+        Ok(_) => Ok(MetaHttpResponse::ok("Group updated successfully")),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }

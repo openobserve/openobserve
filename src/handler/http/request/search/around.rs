@@ -18,7 +18,7 @@ use chrono::{Duration, Utc};
 use config::{
     DEFAULT_SEARCH_AROUND_FIELDS, TIMESTAMP_COL_NAME,
     meta::{
-        search::SearchEventType,
+        search::{SearchEventType, default_use_cache},
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
@@ -136,6 +136,9 @@ pub(crate) async fn around(
     // search forward
     let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, false)
         .unwrap_or(around_sql.to_string());
+    let fw_sql =
+        config::utils::query_select_utils::replace_o2_custom_patterns(&fw_sql).unwrap_or(fw_sql);
+
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: fw_sql,
@@ -152,6 +155,7 @@ pub(crate) async fn around(
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: regions.clone(),
@@ -159,7 +163,7 @@ pub(crate) async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
@@ -169,6 +173,8 @@ pub(crate) async fn around(
     // search backward
     let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, true)
         .unwrap_or(around_sql.to_string());
+    let bw_sql =
+        config::utils::query_select_utils::replace_o2_custom_patterns(&bw_sql).unwrap_or(bw_sql);
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: bw_sql,
@@ -185,6 +191,7 @@ pub(crate) async fn around(
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
@@ -192,7 +199,7 @@ pub(crate) async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)

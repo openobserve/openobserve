@@ -258,11 +258,8 @@ pub async fn set(
     drop(r);
 
     if need_gc {
-        if let Err(err) = gc(bucket_id).await {
-            log::error!(
-                "[trace_id {trace_id}] promql->search->cache: gc err: {:?}",
-                err
-            );
+        if let Err(e) = gc(bucket_id).await {
+            log::error!("[trace_id {trace_id}] promql->search->cache: gc err: {e}");
         }
     }
 

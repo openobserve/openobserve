@@ -24,6 +24,7 @@ use config::{
     meta::{
         alerts::alert,
         promql::*,
+        search::default_use_cache,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -53,7 +54,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{TriggerAlertData, evaluate_trigger, write_file},
+        ingestion::{TriggerAlertData, check_ingestion_allowed, evaluate_trigger, write_file},
         metrics::format_label_name,
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
@@ -66,25 +67,11 @@ pub async fn remote_write(
     org_id: &str,
     body: web::Bytes,
 ) -> std::result::Result<(), anyhow::Error> {
+    // check system resource
+    check_ingestion_allowed(org_id, StreamType::Metrics, None)?;
+
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    if !LOCAL_NODE.is_ingester() {
-        return Err(anyhow::anyhow!("not an ingester"));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Err(anyhow::anyhow!(
-            "Quota exceeded for this organization [{}]",
-            org_id
-        ));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Err(anyhow::Error::msg(e.to_string()));
-    }
 
     let cfg = get_config();
     let dedup_enabled = cfg.common.metrics_dedup_enabled;
@@ -769,7 +756,7 @@ pub(crate) async fn get_series(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
@@ -913,7 +900,7 @@ pub(crate) async fn get_label_values(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {

@@ -55,8 +55,11 @@ pub async fn search(
     let sql = Arc::new(meta);
 
     for s in sql.stream_names.iter() {
-        let schema =
-            infra::schema::get_cache(&sql.org_id, &s.stream_name(), sql.stream_type).await?;
+        // Get the schema from `TableReference` for join queries
+        // Since it resolves queries where stream_name is prefixed with the stream_type
+        // e.g. `logs.my_stream`, `enrich.my_stream`
+        let stream_type = config::meta::stream::StreamType::from(s.stream_type());
+        let schema = infra::schema::get_cache(&sql.org_id, &s.stream_name(), stream_type).await?;
         if schema.schema().fields().is_empty() {
             let mut result = search::Response::new(sql.offset, sql.limit);
             result.function_error = vec![format!("Stream not found {}", &s.stream_name())];
@@ -104,7 +107,7 @@ pub async fn search(
     let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
+            log::error!("[trace_id {trace_id}] http->search: err: {e}");
             return Err(e);
         }
     };
@@ -281,6 +284,7 @@ pub async fn search(
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
+    result.set_result_cache_ratio(scan_stats.aggs_cache_ratio as usize);
 
     if scan_stats.querier_files > 0 {
         let cached_ratio = (scan_stats.querier_memory_cached_files

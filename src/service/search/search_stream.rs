@@ -21,6 +21,7 @@ use config::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
             SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
         },
+        self_reporting::usage::{RequestStats, UsageType},
         sql::OrderBy,
         stream::StreamType,
         websocket::SearchResultType,
@@ -29,9 +30,12 @@ use config::{
 };
 use log;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::{
-    auditor::{AuditMessage, Protocol, ResponseMeta},
-    config::get_config as get_o2_config,
+use o2_enterprise::enterprise::{
+    common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config as get_o2_config,
+    },
+    search::datafusion::distributed_plan::streaming_aggs_exec,
 };
 use serde_json::Map;
 use tokio::sync::mpsc;
@@ -43,7 +47,8 @@ use crate::{
         utils::{stream::get_max_query_range, websocket::calc_queried_range},
     },
     service::{
-        search::{self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec},
+        search::{self as SearchService, cache},
+        self_reporting::report_request_usage_stats,
         websocket_events::{
             search::write_results_to_cache, sort::order_search_results,
             utils::calculate_progress_percentage,
@@ -112,39 +117,30 @@ pub async fn process_search_stream_request(
         log::error!("[HTTP2_STREAM] Error sending progress event: {}", e);
     }
 
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
+        req.query.sql = sql;
+    };
+
+    let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
-    let use_cache = req.use_cache.unwrap_or(false);
+    let use_cache = req.use_cache;
     let start_time = req.query.start_time;
     let end_time = req.query.end_time;
+    let all_streams = stream_names.join(",");
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
-    // HACK: always search from the first partition
+    // HACK: always search from the first partition, this is becuase to support pagination in http2
+    // streaming we need context of no of hits per partition, which currently is not available.
+    // Hence we start from the first partition everytime and skip the hits. The following is a
+    // global variable to keep track of how many hits to skip across all partitions.
+    // This is a temporary hack and will be removed once we have the context of no of hits per
+    // partition.
     let mut hits_to_skip = req.query.from;
-    let original_size = req.query.size;
-    req.query.from = 0;
-    req.query.size = original_size + hits_to_skip;
 
-    let use_cached_flow = if req.query.from == 0 && !req.query.track_total_hits {
-        if use_cache && hits_to_skip > 0 {
-            // do not use cached flow as its a paginated query
-            // use partitioned search instead
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Skipping cached flow as paginated query, hits_to_skip: {}",
-                trace_id,
-                hits_to_skip
-            );
-            false
-        } else {
-            // check cache for the first page
-            true
-        }
-    } else {
-        false
-    };
-
-    if use_cached_flow {
+    if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
+        // check cache for the first page
         let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
             .instrument(search_span.clone())
             .await
@@ -256,6 +252,8 @@ pub async fn process_search_stream_request(
                 &mut start,
                 sender.clone(),
                 values_ctx,
+                &all_streams,
+                started_at,
             )
             .instrument(search_span.clone())
             .await
@@ -569,9 +567,18 @@ pub async fn do_partitioned_search(
 
     // check if `streaming_aggs` is supported
     let is_streaming_aggs = partition_resp.streaming_aggs;
+    let mut use_cache = false;
     if is_streaming_aggs {
         req.query.streaming_output = true;
         req.query.streaming_id = partition_resp.streaming_id.clone();
+        use_cache = req.use_cache;
+        log::info!(
+            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] is_streaming_aggs: {}, use_cache: {}",
+            trace_id,
+            partition_resp.streaming_id.clone().unwrap(),
+            is_streaming_aggs,
+            use_cache
+        );
     }
 
     // The order by for the partitions is the same as the order by in the query
@@ -603,8 +610,13 @@ pub async fn do_partitioned_search(
             req.query.size -= curr_res_size;
         }
 
-        // do not use cache for partitioned search without cache
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
+        // here we increase the size of the query to fetch requested hits in addition to the
+        // hits_to_skip we set the from to 0 to fetch the hits from the the beginning of the
+        // partition
+        req.query.size += *hits_to_skip;
+        req.query.from = 0;
+        let mut search_res =
+            do_search(trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
 
         let mut total_hits = search_res.total as i64;
 
@@ -612,6 +624,7 @@ pub async fn do_partitioned_search(
         if skip_hits > 0 {
             search_res.hits = search_res.hits[skip_hits as usize..].to_vec();
             search_res.total = search_res.hits.len();
+            search_res.size = search_res.total as i64;
             total_hits = search_res.total as i64;
             *hits_to_skip -= skip_hits;
             log::info!(
@@ -624,14 +637,14 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req.query.size > 0 && total_hits > req.query.size {
+        if req_size > 0 && total_hits > req_size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
-                req.query.size
+                req_size
             );
-            search_res.hits.truncate(req.query.size as usize);
-            curr_res_size += req.query.size;
+            search_res.hits.truncate(req_size as usize);
+            curr_res_size += req_size;
         } else {
             curr_res_size += total_hits;
         }
@@ -735,6 +748,7 @@ pub async fn do_partitioned_search(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
     Ok(())
@@ -787,7 +801,7 @@ async fn do_search(
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
 
-    req.use_cache = Some(use_cache);
+    req.use_cache = use_cache;
     let res = SearchService::cache::search(
         trace_id,
         org_id,
@@ -836,6 +850,8 @@ pub async fn handle_cache_responses_and_deltas(
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
+    all_streams: &str,
+    started_at: i64,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -942,6 +958,11 @@ pub async fn handle_cache_responses_and_deltas(
                     cache_order_by,
                     start_timer,
                     sender.clone(),
+                    user_id,
+                    org_id,
+                    all_streams,
+                    stream_type,
+                    started_at,
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -984,6 +1005,11 @@ pub async fn handle_cache_responses_and_deltas(
                 cache_order_by,
                 start_timer,
                 sender.clone(),
+                user_id,
+                org_id,
+                all_streams,
+                stream_type,
+                started_at,
             )
             .await?;
         }
@@ -1231,6 +1257,7 @@ async fn process_delta(
 
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        #[cfg(feature = "enterprise")]
         streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
 
@@ -1296,6 +1323,11 @@ async fn send_cached_responses(
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    user_id: &str,
+    org_id: &str,
+    all_streams: &str,
+    stream_type: StreamType,
+    started_at: i64,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
@@ -1341,7 +1373,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
     let response = StreamResponses::SearchResponse {
-        results: cached.cached_response,
+        results: cached.cached_response.clone(),
         streaming_aggs: false,
         time_offset: TimeOffset {
             start_time: cached.response_start_time,
@@ -1370,6 +1402,36 @@ async fn send_cached_responses(
             ));
         }
     }
+
+    let num_fn = req.query.query_fn.is_some() as u16;
+    let req_stats = RequestStats {
+        records: cached.cached_response.hits.len() as i64,
+        response_time: cached.cached_response.took as f64,
+        size: cached.cached_response.scan_size as f64,
+        request_body: Some(req.query.sql.clone()),
+        function: req.query.query_fn.clone(),
+        user_email: Some(user_id.to_string()),
+        min_ts: Some(req.query.start_time),
+        max_ts: Some(req.query.end_time),
+        cached_ratio: Some(cached.cached_response.cached_ratio),
+        search_type: req.search_type,
+        search_event_context: req.search_event_context.clone(),
+        trace_id: Some(trace_id.to_string()),
+        took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
+        work_group: None, // TODO: add work group
+        result_cache_ratio: Some(cached.cached_response.cached_ratio),
+        ..Default::default()
+    };
+    report_request_usage_stats(
+        req_stats,
+        org_id,
+        all_streams,
+        stream_type,
+        UsageType::Search,
+        num_fn,
+        started_at,
+    )
+    .await;
 
     Ok(())
 }
@@ -1733,7 +1795,7 @@ mod tests {
                 track_total_hits: false,
                 ..Default::default()
             },
-            use_cache: Some(false),
+            use_cache: false,
             search_type: Some(SearchEventType::UI),
             ..Default::default()
         };
@@ -1796,7 +1858,7 @@ mod tests {
                 track_total_hits: false,
                 ..Default::default()
             },
-            use_cache: Some(true),
+            use_cache: true,
             search_type: Some(SearchEventType::UI),
             ..Default::default()
         }
@@ -1808,7 +1870,7 @@ mod tests {
         assert_eq!(req.query.sql, "SELECT * FROM test_stream");
         assert_eq!(req.query.from, 0);
         assert_eq!(req.query.size, 100);
-        assert!(req.use_cache.unwrap_or(false));
+        assert!(req.use_cache);
         assert_eq!(req.search_type, Some(SearchEventType::UI));
     }
 

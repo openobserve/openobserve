@@ -25,11 +25,7 @@ import {
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import {
-  addLabelsToSQlQuery,
-  changeHistogramInterval,
-  convertQueryIntoSingleLine,
-} from "@/utils/query/sqlUtils";
+import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
@@ -167,6 +163,7 @@ export const usePanelDataLoader = (
     loadingTotal: 0,
     loadingCompleted: 0,
     loadingProgressPercentage: 0,
+    isPartialData: false,
   });
 
   // observer for checking if panel is visible on the screen
@@ -175,8 +172,8 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
-  const saveCurrentStateToCache = () => {
-    savePanelCache(
+  const saveCurrentStateToCache = async () => {
+    await savePanelCache(
       getCacheKey(),
       { ...toRaw(state) },
       {
@@ -337,15 +334,32 @@ export const usePanelDataLoader = (
 
   const cancelQueryAbort = () => {
     state.loading = false;
-
     state.isOperationCancelled = true;
+    state.isPartialData = true; // Set to true when cancelled
+
+    if (
+      isStreamingEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
+      try {
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelStreamQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      } catch (error) {
+        console.error("Error during Stream cleanup:", error);
+      } finally {
+        state.searchRequestTraceIds = [];
+      }
+    }
 
     if (
       isWebSocketEnabled(store.state) &&
-      state.searchRequestTraceIds
+      state.searchRequestTraceIds?.length > 0
     ) {
       try {
-        // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
@@ -361,6 +375,7 @@ export const usePanelDataLoader = (
     if (abortController) {
       abortController?.abort();
     }
+    saveCurrentStateToCache();
   };
 
   const getHistogramSearchRequest = async (
@@ -368,15 +383,10 @@ export const usePanelDataLoader = (
     it: any,
     startISOTimestamp: string,
     endISOTimestamp: string,
-    histogramInterval: string | null,
+    histogramInterval: number | null | undefined,
   ) => {
-    const sql = store.state.zoConfig.sql_base64_enabled
-      ? b64EncodeUnicode(
-          await changeHistogramInterval(query, histogramInterval ?? null),
-        )
-      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
-      sql,
+      sql: query,
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -385,6 +395,7 @@ export const usePanelDataLoader = (
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
       size: -1,
+      histogram_interval: histogramInterval ?? undefined,
     };
   };
 
@@ -437,6 +448,10 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        // Set partial data when partition API call is interrupted
+        state.isPartialData = true;
+        // Save current state to cache with partial data flag
+        saveCurrentStateToCache();
         return;
       }
 
@@ -461,9 +476,7 @@ export const usePanelDataLoader = (
       const max_query_range = res?.data?.max_query_range ?? 0;
 
       // histogram_interval from partition api response
-      const histogramInterval = res?.data?.histogram_interval
-        ? `${res?.data?.histogram_interval} seconds`
-        : null;
+      const histogramInterval = res?.data?.histogram_interval ?? undefined;
 
       // Add empty objects to state.resultMetaData for the results of this query
       state.data.push([]);
@@ -580,6 +593,7 @@ export const usePanelDataLoader = (
               endISOTimestamp;
 
             // need to break the loop, save the cache
+            // this is async task, which will be executed in background(await is not required)
             saveCurrentStateToCache();
 
             break;
@@ -621,6 +635,7 @@ export const usePanelDataLoader = (
                   partition[0];
 
                 // need to break the loop, save the cache
+                // this is async task, which will be executed in background(await is not required)
                 saveCurrentStateToCache();
 
                 break;
@@ -633,6 +648,7 @@ export const usePanelDataLoader = (
 
         if (i == 0) {
           // if it is last partition, cache the result
+          // this is async task, which will be executed in background(await is not required)
           saveCurrentStateToCache();
         }
       }
@@ -680,6 +696,14 @@ export const usePanelDataLoader = (
     // update result metadata
     state.resultMetaData[payload?.meta?.currentQueryIndex] =
       searchRes?.content?.results ?? {};
+
+    // If we have data and loading is complete, set isPartialData to false
+    if (
+      state.data[payload?.meta?.currentQueryIndex]?.length > 0 &&
+      !state.loading
+    ) {
+      state.isPartialData = false;
+    }
   };
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
@@ -710,8 +734,9 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.order_by
-        ?.toLowerCase() === "asc"
+      state?.resultMetaData?.[
+        payload?.meta?.currentQueryIndex
+      ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
       state.data[payload?.meta?.currentQueryIndex] = [
@@ -733,45 +758,51 @@ export const usePanelDataLoader = (
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (payload: any, response: any) => {
     try {
-      // console.log("panel data loader response", payload.traceId, response);
-
       if (response.type === "search_response_metadata") {
         handleStreamingHistogramMetadata(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response_hits") {
         handleStreamingHistogramHits(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
+        saveCurrentStateToCache();
       }
 
       if (response.type === "error") {
-        // set loading to false
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
         state.loadingProgressPercentage = 0;
         state.isOperationCancelled = false;
-
         processApiError(response?.content, "sql");
       }
 
       if (response.type === "end") {
-        // set loading to false
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
-        state.loadingProgressPercentage = 0;
+        state.loadingProgressPercentage = 100; // Set to 100% when complete
         state.isOperationCancelled = false;
+        state.isPartialData = false; // Explicitly set to false when complete
+        saveCurrentStateToCache();
       }
+
       if (response.type === "event_progress") {
-        // The loadingProgressPercentage value is now in 0-100 format, no need to multiply
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
+        // Only set isPartialData to true if we're still loading and progress is not 100%
+        if (state.loading && state.loadingProgressPercentage < 100) {
+          state.isPartialData = true;
+        } else if (state.loadingProgressPercentage === 100) {
+          state.isPartialData = false;
+        }
+        saveCurrentStateToCache();
       }
     } catch (error: any) {
-      // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
       state.loadingTotal = 0;
@@ -800,13 +831,15 @@ export const usePanelDataLoader = (
       content: {
         trace_id: payload.traceId,
         payload: {
-          query: await getHistogramSearchRequest(
-            payload.queryReq.query,
-            payload.queryReq.it,
-            payload.queryReq.startISOTimestamp,
-            payload.queryReq.endISOTimestamp,
-            null,
-          ),
+          query: {
+            ...(await getHistogramSearchRequest(
+              payload.queryReq.query,
+              payload.queryReq.it,
+              payload.queryReq.startISOTimestamp,
+              payload.queryReq.endISOTimestamp,
+              null,
+            )),
+          },
           // pass encodig if enabled,
           // make sure that `encoding: null` is not being passed, that's why used object extraction logic
           ...(store.state.zoConfig.sql_base64_enabled
@@ -848,12 +881,19 @@ export const usePanelDataLoader = (
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
+    // Only set isPartialData to true if we haven't received complete data
+    if (state.loadingProgressPercentage < 100) {
+      state.isPartialData = true;
+    }
 
     // save current state to cache
+    // this is async task, which will be executed in background(await is not required)
     saveCurrentStateToCache();
   };
 
   const handleSearchReset = (payload: any, traceId?: string) => {
+    // Save current state to cache
+    saveCurrentStateToCache();
     loadData();
   };
 
@@ -870,6 +910,33 @@ export const usePanelDataLoader = (
     processApiError(response?.content, "sql");
   };
 
+  const shouldSkipSearchDueToEmptyVariables = () => {
+    // Retrieve all variables data
+    const allVars = [
+      ...(getDependentVariablesData() || []),
+      ...(getDynamicVariablesData() || []),
+    ];
+
+    // Identify variables with empty values
+    const variablesToSkip = allVars
+      .filter(
+        (v) =>
+          v.value === null ||
+          v.value === undefined ||
+          v.value === "" ||
+          (Array.isArray(v.value) && v.value.length === 0),
+      )
+      .map((v) => v.name);
+
+    // Log variables for which the API will be skipped
+    variablesToSkip.forEach((variableName) => {
+      state.loading = false;
+    });
+
+    // Return true if there are any variables to skip, indicating loading should be continued
+    return variablesToSkip.length > 0;
+  };
+
   const getDataThroughWebSocket = async (
     query: string,
     it: any,
@@ -884,7 +951,7 @@ export const usePanelDataLoader = (
 
       const payload: {
         queryReq: any;
-        type: "search" | "histogram" | "pageCount";
+        type: "search" | "histogram" | "pageCount" | "values";
         isPagination: boolean;
         traceId: string;
         org_id: string;
@@ -913,6 +980,10 @@ export const usePanelDataLoader = (
         },
       };
 
+      // Add guard here
+      if (shouldSkipSearchDueToEmptyVariables()) {
+        return;
+      }
       fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
@@ -955,13 +1026,15 @@ export const usePanelDataLoader = (
         meta: any;
       } = {
         queryReq: {
-          query: await getHistogramSearchRequest(
-            query,
-            it,
-            startISOTimestamp,
-            endISOTimestamp,
-            null,
-          ),
+          query: {
+            ...(await getHistogramSearchRequest(
+              query,
+              it,
+              startISOTimestamp,
+              endISOTimestamp,
+              null,
+            )),
+          },
         },
         type: "histogram",
         isPagination: false,
@@ -1000,6 +1073,15 @@ export const usePanelDataLoader = (
 
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
+        // Set partial data flag on abort
+        state.isPartialData = true;
+        // Save current state to cache
+        saveCurrentStateToCache();
+        return;
+      }
+
+      // Add guard here
+      if (shouldSkipSearchDueToEmptyVariables()) {
         return;
       }
 
@@ -1022,6 +1104,11 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
+    // Only reset isPartialData if we're starting a fresh load and not restoring from cache
+    if (runCount > 0 && !state.isOperationCancelled) {
+      state.isPartialData = false;
+    }
+
     try {
       log("loadData: entering...");
       state.loadingTotal = 0;
@@ -1057,6 +1144,20 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
+      if (runCount == 0) {
+        log("loadData: panelcache: run count is 0");
+        // restore from the cache and return
+        const isRestoredFromCache = await restoreFromCache();
+        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
+        if (isRestoredFromCache) {
+          state.loading = false;
+          state.isOperationCancelled = false;
+          log("loadData: panelcache: restored from cache");
+          runCount++;
+          return;
+        }
+      }
+
       // Wait for isVisible to become true
       await waitForThePanelToBecomeVisible(abortController.signal);
 
@@ -1082,20 +1183,6 @@ export const usePanelDataLoader = (
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
-      }
-
-      if (runCount == 0) {
-        log("loadData: panelcache: run count is 0");
-        // restore from the cache and return
-        const isRestoredFromCache = restoreFromCache();
-        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
-        if (isRestoredFromCache) {
-          state.loading = false;
-          state.isOperationCancelled = false;
-          log("loadData: panelcache: restored from cache");
-          runCount++;
-          return;
-        }
       }
 
       log(
@@ -1180,6 +1267,7 @@ export const usePanelDataLoader = (
         };
         state.annotations = annotationList || [];
 
+        // this is async task, which will be executed in background(await is not required)
         saveCurrentStateToCache();
       } else {
         // copy of current abortController
@@ -1392,6 +1480,7 @@ export const usePanelDataLoader = (
                   state.annotations = annotationList;
 
                   // need to break the loop, save the cache
+                  // this is async task, which will be executed in background(await is not required)
                   saveCurrentStateToCache();
                 } finally {
                   removeTraceId(traceId);
@@ -1418,8 +1507,7 @@ export const usePanelDataLoader = (
                   panelSchema.value.queryType,
                 );
 
-              // convert query into single line
-              const query = await convertQueryIntoSingleLine(query2);
+              const query = query2;
 
               const metadata: any = {
                 originalQuery: it.query,
@@ -1474,6 +1562,7 @@ export const usePanelDataLoader = (
                 );
               }
 
+              // this is async task, which will be executed in background(await is not required)
               saveCurrentStateToCache();
             }
           }
@@ -1574,30 +1663,37 @@ export const usePanelDataLoader = (
 
     // replace fixed variables with its values
     fixedVariables?.forEach((variable: any) => {
+      // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
       const variableName = `$${variable.name}`;
+      const variableNameWithBrackets = `\${${variable.name}}`;
       const variableValue = variable.value;
-      if (query.includes(variableName)) {
+      if (
+        query.includes(variableName) ||
+        query.includes(variableNameWithBrackets)
+      ) {
         metadata.push({
           type: "fixed",
           name: variable.name,
           value: variable.value,
         });
       }
+      query = query.replaceAll(variableNameWithBrackets, variableValue);
       query = query.replaceAll(variableName, variableValue);
     });
 
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
+        // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
         const variableName = `$${variable.name}`;
+        const variableNameWithBrackets = `\${${variable.name}}`;
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value =
             variable.value
-              .map((value: any) =>
-                variable.escapeSingleQuotes
-                  ? `'${escapeSingleQuotes(value)}'`
-                  : `'${value}'`,
+              .map(
+                (value: any) =>
+                  `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
               )
               .join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
@@ -1646,16 +1742,18 @@ export const usePanelDataLoader = (
           variableValue =
             variable.value === null
               ? ""
-              : variable.escapeSingleQuotes
-                ? `${escapeSingleQuotes(variable.value)}`
-                : `${variable.value}`;
-          if (query.includes(variableName)) {
+              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+          if (
+            query.includes(variableName) ||
+            query.includes(variableNameWithBrackets)
+          ) {
             metadata.push({
               type: "variable",
               name: variable.name,
               value: variable.value,
             });
           }
+          query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }
       });
@@ -1844,7 +1942,10 @@ export const usePanelDataLoader = (
     newDependentVariablesData: any,
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => it.isLoading || it.isVariableLoadingPending,
+      (it: any) =>
+        (it.value == null ||
+          (Array.isArray(it.value) && it.value.length === 0)) &&
+        (it.isLoading || it.isVariableLoadingPending),
     );
 
   const getDependentVariablesData = () =>
@@ -1900,8 +2001,8 @@ export const usePanelDataLoader = (
     }
 
     // Sort both arrays
-    const sortedArray1 = array1?.slice().sort();
-    const sortedArray2 = array2?.slice().sort();
+    const sortedArray1 = array1?.slice()?.sort();
+    const sortedArray2 = array2?.slice()?.sort();
 
     // Compare sorted arrays element by element
     for (let i = 0; i < sortedArray1?.length; i++) {
@@ -2173,17 +2274,60 @@ export const usePanelDataLoader = (
   onUnmounted(() => {
     // abort on unmount
     if (abortController) {
-      // this will stop partition api call
+      // Only set isPartialData if we're still loading or haven't received complete response
+      // AND we haven't already marked it as complete
+      if (
+        (state.loading || state.loadingProgressPercentage < 100) &&
+        !state.isOperationCancelled
+      ) {
+        state.isPartialData = true;
+      }
       abortController.abort();
     }
     if (observer) {
       observer.disconnect();
     }
-
-    // for websocket
-    if (isWebSocketEnabled(store.state) && state.searchRequestTraceIds) {
+    // cancel http2 queries using http streaming api
+    if (
+      isStreamingEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
       try {
-        // loop on state.searchRequestTraceIds
+        // Only set isPartialData if we're still loading or haven't received complete response
+        // AND we haven't already marked it as complete
+        if (
+          (state.loading || state.loadingProgressPercentage < 100) &&
+          !state.isOperationCancelled
+        ) {
+          state.isPartialData = true;
+        }
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelStreamQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      } catch (error) {
+        console.error("Error during HTTP2 cleanup:", error);
+      } finally {
+        state.searchRequestTraceIds = [];
+      }
+    }
+
+    // Cancel WebSocket queries
+    if (
+      isWebSocketEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
+      try {
+        // Only set isPartialData if we're still loading or haven't received complete response
+        // AND we haven't already marked it as complete
+        if (
+          (state.loading || state.loadingProgressPercentage < 100) &&
+          !state.isOperationCancelled
+        ) {
+          state.isPartialData = true;
+        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
@@ -2207,8 +2351,8 @@ export const usePanelDataLoader = (
     loadData(); // Loading the data
   });
 
-  const restoreFromCache: () => boolean = () => {
-    const cache = getPanelCache();
+  const restoreFromCache: () => Promise<boolean> = async () => {
+    const cache = await getPanelCache();
 
     if (!cache) {
       log("usePanelDataLoader: panelcache: cache is not there");
@@ -2255,6 +2399,9 @@ export const usePanelDataLoader = (
       state.resultMetaData = tempPanelCacheValue.resultMetaData;
       state.annotations = tempPanelCacheValue.annotations;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
+      // Restore isPartialData and isOperationCancelled from cache
+      state.isPartialData = tempPanelCacheValue.isPartialData;
+      state.isOperationCancelled = tempPanelCacheValue.isOperationCancelled;
 
       // set that the cache is restored
       isRestoredFromCache = true;

@@ -35,7 +35,10 @@ use datafusion::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
+use o2_enterprise::enterprise::{
+    search::{WorkGroup, datafusion::distributed_plan::rewrite::StreamingAggsRewriter},
+    super_cluster::search::get_cluster_nodes,
+};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -43,10 +46,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::{
     DATAFUSION_RUNTIME, SearchResult,
     cluster::flight::{generate_context, register_table},
-    datafusion::distributed_plan::{
-        remote_scan::RemoteScanExec,
-        rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
-    },
+    datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
@@ -275,6 +275,8 @@ async fn run_datafusion(
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
     let streaming_id = req.streaming_id.clone();
+    let use_cache = req.use_cache;
+    let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -306,9 +308,32 @@ async fn run_datafusion(
     }
 
     // check for streaming aggregation query
+    let mut aggs_cache_ratio = 0;
     if streaming_output {
-        let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
+        let Some(streaming_id) = streaming_id else {
+            return Err(Error::Message(
+                "streaming_id is required for streaming aggregation query".to_string(),
+            ));
+        };
+
+        // NOTE: temporary check
+        let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
+        let aggregation_cache_enabled = org_settings.aggregation_cache_enabled && use_cache;
+
+        let mut rewriter = StreamingAggsRewriter::new(
+            streaming_id,
+            start_time,
+            end_time,
+            aggregation_cache_enabled,
+        )
+        .await;
+
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+
+        // Check for aggs cache hit
+        if rewriter.is_complete_cache_hit {
+            aggs_cache_ratio = 100;
+        }
     }
 
     if cfg.common.print_key_sql {
@@ -341,6 +366,8 @@ async fn run_datafusion(
                     .build()
             )
         );
+        // Update scan stats to include aggregation cache ratio
+        visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }

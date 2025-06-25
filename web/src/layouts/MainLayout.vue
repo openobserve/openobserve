@@ -1162,6 +1162,8 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_websocket_search ?? false,
           enable_streaming_search:
             orgSettings?.data?.data?.enable_streaming_search ?? false,
+          aggregation_cache_enabled:
+            orgSettings?.data?.data?.aggregation_cache_enabled ?? false,
         });
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);
@@ -1325,6 +1327,14 @@ export default defineComponent({
       await this.getOrganizationSettings();
 
       this.isLoading = true;
+      // Find the matching organization from orgOptions
+      const matchingOrg = this.orgOptions.find(org => 
+        org.identifier === this.store.state.selectedOrganization.identifier
+      );
+      
+      if (matchingOrg) {
+        this.selectedOrg = matchingOrg;
+      }
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{num::NonZero, str::FromStr, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Field;
@@ -38,7 +38,7 @@ use datafusion::{
     execution::{
         cache::cache_manager::{CacheManagerConfig, FileStatisticsCache},
         context::SessionConfig,
-        memory_pool::{FairSpillPool, GreedyMemoryPool},
+        memory_pool::{FairSpillPool, GreedyMemoryPool, TrackConsumersPool, UnboundedMemoryPool},
         runtime_env::{RuntimeEnv, RuntimeEnvBuilder},
         session_state::SessionStateBuilder,
     },
@@ -147,6 +147,7 @@ pub async fn merge_parquet_files(
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
     let ctx = prepare_datafusion_context(
+        "",
         None,
         vec![],
         vec![],
@@ -255,6 +256,7 @@ pub async fn merge_parquet_files_with_downsampling(
     let sort_by_timestamp_desc = true;
     let target_partitions = 2; // force use 2 cpu cores for one merge task
     let ctx = prepare_datafusion_context(
+        "",
         None,
         vec![],
         vec![],
@@ -466,17 +468,26 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         })?;
     match mem_pool {
         super::MemoryPoolType::Greedy => {
-            builder = builder.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
+            let pool = GreedyMemoryPool::new(memory_size);
+            let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
+            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
         }
         super::MemoryPoolType::Fair => {
-            builder = builder.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
+            let pool = FairSpillPool::new(memory_size);
+            let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
+            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
         }
-        super::MemoryPoolType::None => {}
+        super::MemoryPoolType::None => {
+            let pool = UnboundedMemoryPool::default();
+            let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
+            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+        }
     };
     builder.build()
 }
 
 pub async fn prepare_datafusion_context(
+    _trace_id: &str,
     _work_group: Option<String>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
@@ -489,8 +500,13 @@ pub async fn prepare_datafusion_context(
     #[cfg(feature = "enterprise")]
     let (target_partition, memory_size) = (target_partitions, cfg.memory_cache.datafusion_max_size);
     #[cfg(feature = "enterprise")]
-    let (target_partition, memory_size) =
-        get_cpu_and_mem_limit(_work_group.clone(), target_partition, memory_size).await?;
+    let (target_partition, memory_size) = get_cpu_and_mem_limit(
+        _trace_id,
+        _work_group.clone(),
+        target_partition,
+        memory_size,
+    )
+    .await?;
 
     let session_config = create_session_config(sorted_by_time, target_partition)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
@@ -569,6 +585,7 @@ pub async fn register_table(
         sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
 
     let ctx = prepare_datafusion_context(
+        &session.id,
         session.work_group.clone(),
         vec![],
         vec![],
@@ -617,8 +634,13 @@ pub async fn create_parquet_table(
     };
 
     #[cfg(feature = "enterprise")]
-    let (target_partitions, _) =
-        get_cpu_and_mem_limit(session.work_group.clone(), target_partitions, 0).await?;
+    let (target_partitions, _) = get_cpu_and_mem_limit(
+        &session.id,
+        session.work_group.clone(),
+        target_partitions,
+        0,
+    )
+    .await?;
 
     let target_partitions = if target_partitions == 0 {
         DATAFUSION_MIN_PARTITION
@@ -708,6 +730,7 @@ pub async fn create_parquet_table(
 
 #[cfg(feature = "enterprise")]
 async fn get_cpu_and_mem_limit(
+    trace_id: &str,
     work_group: Option<String>,
     mut target_partitions: usize,
     mut memory_size: usize,
@@ -721,8 +744,9 @@ async fn get_cpu_and_mem_limit(
                 target_partitions = target_partitions * cpu as usize / 100;
             }
             memory_size = memory_size * mem as usize / 100;
-            log::debug!(
-                "[datafusion:{}] target_partition: {}, memory_size: {}",
+            log::info!(
+                "[trace_id: {}]datafusion work_group: {}, target_partition: {}, memory_size: {}",
+                trace_id,
                 wg,
                 target_partitions,
                 memory_size

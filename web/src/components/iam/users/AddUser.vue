@@ -482,7 +482,9 @@ export default defineComponent({
       this.formData = {...this.modelValue};
       this.formData.change_password = false;
       this.formData.password = "";
-      this.fetchUserRoles(this.modelValue.email)
+      if(config.isEnterprise == "true" || config.isCloud == true){
+        this.fetchUserRoles(this.modelValue.email)
+      }
     }
   },
   methods: {

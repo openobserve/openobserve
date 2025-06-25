@@ -70,6 +70,9 @@ pub struct ScanStats {
     /// unit: ms
     #[prost(int64, tag = "10")]
     pub file_list_took: i64,
+    /// unit: %
+    #[prost(int64, tag = "11")]
+    pub aggs_cache_ratio: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -1017,6 +1020,8 @@ pub struct SearchQuery {
     pub skip_wal: bool,
     #[prost(string, tag = "15")]
     pub action_id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "16")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2934,6 +2939,10 @@ pub struct SearchInfo {
     pub end_time: i64,
     #[prost(int64, tag = "6")]
     pub timeout: i64,
+    #[prost(bool, tag = "7")]
+    pub use_cache: bool,
+    #[prost(int64, tag = "8")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

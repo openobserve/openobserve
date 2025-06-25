@@ -920,9 +920,9 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
-    pub memory_circuit_breaker_enable: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_ENABLED", default = false)]
+    pub memory_circuit_breaker_enabled: bool,
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
     #[env_config(
         name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
@@ -1107,8 +1107,8 @@ pub struct Common {
     pub es_version: String,
     #[env_config(
         name = "ZO_CREATE_ORG_THROUGH_INGESTION",
-        default = false,
-        help = "If true (default false), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
+        default = true,
+        help = "If true (default true), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
     )]
     pub create_org_through_ingestion: bool,
     #[env_config(
@@ -1141,6 +1141,8 @@ pub struct Common {
         help = "Enable to use stream settings for partitions. This will apply for all streams"
     )]
     pub use_stream_settings_for_partitions_enabled: bool,
+    #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
+    pub dashboard_placeholder: String,
 }
 
 #[derive(EnvConfig)]
@@ -1267,7 +1269,7 @@ pub struct Limit {
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
-    pub http_worker_max_blocking: usize, // equals to 1024 if 0
+    pub http_worker_max_blocking: usize, // equals to 256 if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
@@ -1282,7 +1284,7 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 100000)] // records
+    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 1000000)] // records
     pub calculate_stats_step_limit: i64,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
@@ -1294,18 +1296,6 @@ pub struct Limit {
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
     pub http_slow_log_threshold: u64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLED", default = false)]
-    pub circuit_breaker_enabled: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_WATCHING_WINDOW", default = 60)] // seconds
-    pub circuit_breaker_watching_window: i64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RESET_WINDOW_NUM", default = 3)] // 3 * watching window
-    pub circuit_breaker_reset_window_num: i64,
-    #[env_config(
-        name = "ZO_CIRCUIT_BREAKER_SLOW_REQUEST_THRESHOLD",
-        default = 100,
-        help = "Trigger circuit break if over this threshold in watching window, and will be reset after 2 * watching window"
-    )] // slow requests
-    pub circuit_breaker_slow_request_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1614,6 +1604,10 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
+    #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
+    pub aggregation_max_size: usize,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1627,6 +1621,12 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
+    #[env_config(
+        name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
+        default = 10,
+        help = "Delay window indicates the time range from now to skip caching to disk, default is 10 minutes"
+    )]
+    pub delay_window_mins: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1887,6 +1887,7 @@ pub struct Encryption {
     #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
     pub master_key: String,
 }
+
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
@@ -2002,7 +2003,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.http_worker_num = cpu_num;
     }
     if cfg.limit.http_worker_max_blocking == 0 {
-        cfg.limit.http_worker_max_blocking = 1024;
+        cfg.limit.http_worker_max_blocking = 256;
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
@@ -2099,7 +2100,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check for calculate stats
     if cfg.limit.calculate_stats_step_limit < 1 {
-        cfg.limit.calculate_stats_step_limit = 10000;
+        cfg.limit.calculate_stats_step_limit = 1000000;
     }
 
     Ok(())
@@ -2505,13 +2506,23 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10%
         if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
             cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
         }
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
+
+    if cfg.disk_cache.aggregation_max_size == 0 {
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10%
+        if cfg.disk_cache.aggregation_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.aggregation_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
+    } else {
+        cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
+    }
+
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
         // 50% of max_size

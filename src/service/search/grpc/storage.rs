@@ -130,7 +130,8 @@ pub async fn search(
     let cfg = get_config();
     #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
-    let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
+    let use_inverted_index =
+        query.use_inverted_index && inverted_index_type == "tantivy" && index_condition.is_some();
     if use_inverted_index {
         log::info!(
             "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
@@ -247,9 +248,8 @@ pub async fn search(
         scan_stats.compressed_size
     );
 
-    if cfg.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
-    }
+    // check memory circuit breaker
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
@@ -999,6 +999,11 @@ async fn search_tantivy_index(
         "[trace_id {trace_id}] search->storage: IndexCondition not found"
     ))?;
     let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
+    let need_all_term_fields = condition
+        .need_all_term_fields()
+        .into_iter()
+        .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
+        .collect::<Vec<_>>();
 
     // warm up the terms in the query
     if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Puffin.to_string() {
@@ -1009,22 +1014,22 @@ async fn search_tantivy_index(
             let entry = warm_terms.entry(field).or_default();
             entry.insert(term.clone(), need_position);
         });
-        // if no terms are found in the query, warm up all fields
-        if warm_terms.is_empty() {
-            for field in condition.get_tantivy_fields() {
-                let field = tantivy_schema.get_field(&field).unwrap();
-                warm_terms.insert(field, HashMap::new());
-            }
-        }
+
         let need_fast_field = idx_optimize_rule
             .as_ref()
             .is_some_and(|rule| matches!(rule, InvertedIndexOptimizeMode::SimpleHistogram(..)));
-        warm_up_terms(&tantivy_searcher, &warm_terms, need_fast_field).await?;
+        warm_up_terms(
+            &tantivy_searcher,
+            &warm_terms,
+            need_all_term_fields,
+            need_fast_field,
+        )
+        .await?;
     }
 
     // search the index
     let file_in_range =
-        parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
+        parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
     let idx_optimize_rule_clone = idx_optimize_rule.clone();
     // TODO(taiming): refactor the return type throughout the tantivy index search
     let matched_docs =

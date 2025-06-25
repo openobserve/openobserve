@@ -16,7 +16,12 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{
+    TIMESTAMP_COL_NAME, get_config,
+    meta::{search::default_use_cache, stream::StreamType},
+    metrics,
+    utils::json,
+};
 use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -268,6 +273,7 @@ pub async fn get_latest_traces(
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
@@ -275,14 +281,11 @@ pub async fn get_latest_traces(
         timeout,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    req.use_cache = get_use_cache_from_request(&query);
 
     let stream_type = StreamType::Traces;
     let user_id = in_req
