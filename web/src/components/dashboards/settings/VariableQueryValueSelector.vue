@@ -113,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-html="
                   typeof opt.value === 'string' &&
-                  opt.value.endsWith(`::${CUSTOM_VALUE}`)
-                    ? `${opt.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), '')} (Custom)`
+                  opt.value.endsWith(`${CUSTOM_VALUE}`)
+                    ? `${opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), '')} (Custom)`
                     : opt.label
                 "
               ></span>
@@ -148,9 +148,9 @@ export default defineComponent({
       let opts = availableOptions.value.map((opt: any) => {
         if (
           typeof opt.value === "string" &&
-          opt.value.endsWith(`::${CUSTOM_VALUE}`)
+          opt.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
-          const base = opt.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), "");
+          const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
           return { ...opt, label: `${base} (Custom)` };
         }
         return opt;
@@ -250,7 +250,7 @@ export default defineComponent({
         }
         // Remove custom value suffix if present
         val = val.filter(
-          (v) => !(typeof v === "string" && v.endsWith(`::${CUSTOM_VALUE}`)),
+          (v) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)),
         );
       }
       selectedValue.value = val;
@@ -285,8 +285,8 @@ export default defineComponent({
               .map((it: any) => {
                 if (it === "") return "<blank>";
                 if (it === SELECT_ALL_VALUE) return "<ALL>";
-                if (typeof it === "string" && it.endsWith(`::${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (Custom)`;
+                if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
+                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
                 return it;
               })
               .join(", ");
@@ -302,8 +302,8 @@ export default defineComponent({
               .map((it: any) => {
                 if (it === "") return "<blank>";
                 if (it === SELECT_ALL_VALUE) return "<ALL>";
-                if (typeof it === "string" && it.endsWith(`::${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (Custom)`;
+                if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
+                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
                 return it;
               })
               .join(", ");
@@ -314,9 +314,9 @@ export default defineComponent({
           return "<ALL>";
         } else if (
           typeof selectedValue.value === "string" &&
-          selectedValue.value.endsWith(`::${CUSTOM_VALUE}`)
+          selectedValue.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
-          return `${selectedValue.value.replace(new RegExp(`::${CUSTOM_VALUE}$`), "")} (Custom)`;
+          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
         } else {
           return selectedValue.value;
         }
@@ -365,7 +365,7 @@ export default defineComponent({
     const handleCustomValue = async (value: string) => {
       if (!value?.trim()) return;
       const inputValue = value.trim();
-      const customValue = `${inputValue}::${CUSTOM_VALUE}`;
+      const customValue = `${inputValue}${CUSTOM_VALUE}`;
       if (props.variableItem.multiSelect) {
         selectedValue.value = [customValue];
         emit("update:modelValue", [customValue]);
