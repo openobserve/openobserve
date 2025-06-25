@@ -44,6 +44,7 @@ import {
   Compartment,
   StateEffect,
   StateField,
+  RangeSetBuilder,
 } from "@codemirror/state";
 import { sql } from "@codemirror/lang-sql";
 import { json } from "@codemirror/lang-json";
@@ -62,7 +63,7 @@ import {
   closeCompletion,
 } from "@codemirror/autocomplete";
 
-import { keymap, lineNumbers, showTooltip, Tooltip } from "@codemirror/view";
+import { keymap, lineNumbers, showTooltip, Tooltip, ViewPlugin, Decoration, DecorationSet } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
@@ -318,6 +319,34 @@ export default defineComponent({
       },
     ];
 
+    const functionCallHighlighter = ViewPlugin.fromClass(class {
+      decorations: DecorationSet;
+      constructor(view) {
+        this.decorations = this.build(view);
+      }
+      update(update) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = this.build(update.view);
+        }
+      }
+      build(view) {
+        const builder = new RangeSetBuilder();
+        for (let { from, to } of view.visibleRanges) {
+          const text = view.state.doc.sliceString(from, to);
+          const regex = /\b([a-zA-Z_][\w]*)\s*\(/g;
+          let match;
+          while ((match = regex.exec(text)) !== null) {
+            const start = from + match.index;
+            const end = start + match[1].length;
+            builder.add(start, end, Decoration.mark({ class: "cm-func-call" }));
+          }
+        }
+        return builder.finish();
+      }
+    }, {
+      decorations: v => v.decorations,
+    });
+
     // Create autocompletion function
     const createAutocompletion = () => {
       if (!props.showAutoComplete) return [];
@@ -430,6 +459,9 @@ export default defineComponent({
         ".cm-line": {
           paddingLeft: "0px !important",
         },
+        ".cm-func-call": {
+          color: "#795E26" /* function color like Monaco */
+        }
       },
       { dark: true },
     );
@@ -649,6 +681,7 @@ export default defineComponent({
                 padding: "0px 2px !important",
               },
             }),
+            functionCallHighlighter,
           ],
         });
 

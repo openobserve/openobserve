@@ -140,6 +140,9 @@ const oneLightTheme = EditorView.theme(
         display: "inline-block !important",
       }
     },
+    ".cm-func-call span": {
+      color: "#c700c7" /* function color like Monaco */
+    }
   },
   { dark: false }
 );

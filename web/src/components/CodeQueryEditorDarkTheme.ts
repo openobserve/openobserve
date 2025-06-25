@@ -137,6 +137,9 @@ const oneDarkTheme = EditorView.theme(
         display: "inline-block !important",
       }
     },
+    ".cm-func-call span": {
+      color: "#ff00ff" /* function color like Monaco */
+    }
   },
   { dark: true }
 );
