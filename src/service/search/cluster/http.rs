@@ -58,7 +58,11 @@ pub async fn search(
         // Get the schema from `TableReference` for join queries
         // Since it resolves queries where stream_name is prefixed with the stream_type
         // e.g. `logs.my_stream`, `enrich.my_stream`
-        let stream_type = config::meta::stream::StreamType::from(s.stream_type());
+        let stream_type = if s.stream_type().is_empty() {
+            sql.stream_type
+        } else {
+            config::meta::stream::StreamType::from(s.stream_type())
+        };
         let schema = infra::schema::get_cache(&sql.org_id, &s.stream_name(), stream_type).await?;
         if schema.schema().fields().is_empty() {
             let mut result = search::Response::new(sql.offset, sql.limit);
