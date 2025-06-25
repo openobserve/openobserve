@@ -443,7 +443,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        assert_eq!(count, 0);
+
         assert!(result.contains("username IN ('admin')"));
     }
 

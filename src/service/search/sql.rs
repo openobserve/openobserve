@@ -118,17 +118,8 @@ impl Sql {
         let sql = query.sql.clone();
         let offset = query.from as i64;
         let mut limit = query.size as i64;
-        let sql = match config::utils::query_select_utils::replace_o2_custom_patterns(&sql) {
-            Ok(parsed_sql) => parsed_sql,
-            Err(e) => {
-                log::error!(
-                    "Error replacing o2 custom patterns , returning original sql: {}",
-                    e
-                );
-                sql
-            }
-        };
-
+        let sql =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
         // 1. get table name
         let stream_names =
             resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
