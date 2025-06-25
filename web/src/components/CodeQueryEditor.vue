@@ -67,6 +67,7 @@ import { indentWithTab } from "@codemirror/commands";
 import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 
 import {
   searchKeymap,
@@ -579,6 +580,7 @@ export default defineComponent({
         const state = EditorState.create({
           doc: props.query?.trim() || "",
           extensions: [
+            indentationMarkers(),
             readOnlyCompartment.of(EditorState.readOnly.of(props.readOnly)),
             tooltipField,
             onFocusExtension,

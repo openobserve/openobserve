@@ -44,6 +44,7 @@
     "@openobserve/node-sql-parser": "^0.1.5",
     "@openobserve/rrweb-player": "^0.1.1",
     "@quasar/extras": "^1.16.16",
+    "@replit/codemirror-indentation-markers": "^6.5.3",
     "@tanstack/vue-table": "^8.20.5",
     "@tanstack/vue-virtual": "^3.11.2",
     "@types/codemirror": "^5.60.16",

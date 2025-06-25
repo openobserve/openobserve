@@ -144,7 +144,7 @@ export default defineConfig({
             "@openobserve/browser-rum",
           ],
           "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          "codemirror": ["codemirror", "@codemirror/state", "@codemirror/lang-sql", "@codemirror/lang-json", "@codemirror/lang-javascript", "@codemirror/lang-markdown", "@codemirror/autocomplete", "@codemirror/view", "@codemirror/commands", "@codemirror/language", "@codemirror/search"],
+          "codemirror": ["codemirror", "@codemirror/state", "@codemirror/lang-sql", "@codemirror/lang-json", "@codemirror/lang-javascript", "@codemirror/lang-markdown", "@codemirror/autocomplete", "@codemirror/view", "@codemirror/commands", "@codemirror/language", "@codemirror/search", "@replit/codemirror-indentation-markers"],
           "moment": ["moment", "moment-timezone"],
           "lodash": ["lodash-es"],
           "echarts": ["echarts/core", "echarts/renderers", "echarts/components", "echarts/features", "echarts/charts"],
