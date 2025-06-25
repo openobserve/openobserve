@@ -85,3 +85,33 @@ pub async fn get_super_cluster_info(
 
     Ok(response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proto::cluster_rpc::CompactionInfo;
+
+    #[test]
+    fn test_convert_response_to_cluster_info() {
+        let response = GetClusterInfoResponse {
+            compaction_info: Some(CompactionInfo {
+                pending_jobs: 5,
+                completed_jobs: 10,
+                in_progress_jobs: 2,
+            }),
+        };
+        
+        let cluster_info = convert_response_to_cluster_info(response);
+        assert_eq!(cluster_info.pending_jobs, 5);
+    }
+
+    #[test]
+    fn test_convert_response_to_cluster_info_no_compaction_info() {
+        let response = GetClusterInfoResponse {
+            compaction_info: None,
+        };
+        
+        let cluster_info = convert_response_to_cluster_info(response);
+        assert_eq!(cluster_info.pending_jobs, 0);
+    }
+}

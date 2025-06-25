@@ -182,3 +182,54 @@ fn subnets_overlap(net1: &IpNetwork, net2: &IpNetwork) -> bool {
         || net2.contains(net1.network())
         || net2.contains(net1.broadcast())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ipnetwork::IpNetwork;
+
+    #[test]
+    fn test_subnets_overlap() {
+        let net1: IpNetwork = "192.168.1.0/24".parse().unwrap();
+        let net2: IpNetwork = "192.168.1.128/25".parse().unwrap();
+        
+        assert!(subnets_overlap(&net1, &net2));
+    }
+
+    #[test]
+    fn test_subnets_no_overlap() {
+        let net1: IpNetwork = "192.168.1.0/24".parse().unwrap();
+        let net2: IpNetwork = "192.168.2.0/24".parse().unwrap();
+        
+        assert!(!subnets_overlap(&net1, &net2));
+    }
+
+    #[test]
+    fn test_response_from_ok_message() {
+        let response = Response::OkMessage("test message".to_string());
+        let http_response: HttpResponse = response.into();
+        assert_eq!(http_response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_response_from_not_found() {
+        let response = Response::NotFound;
+        let http_response: HttpResponse = response.into();
+        assert_eq!(http_response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_response_from_bad_request() {
+        let response = Response::BadRequest("bad request".to_string());
+        let http_response: HttpResponse = response.into();
+        assert_eq!(http_response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_response_from_internal_server_error() {
+        let error = anyhow::anyhow!("test error");
+        let response = Response::InternalServerError(error);
+        let http_response: HttpResponse = response.into();
+        assert_eq!(http_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}
