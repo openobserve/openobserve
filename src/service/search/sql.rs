@@ -15,7 +15,7 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
-use arrow_schema::{Field, FieldRef};
+use arrow_schema::FieldRef;
 use chrono::Duration;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -27,7 +27,7 @@ use config::{
     },
     utils::sql::AGGREGATE_UDF_LIST,
 };
-use datafusion::{arrow::datatypes::{DataType, Schema}, common::TableReference};
+use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
@@ -2124,6 +2124,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
 #[cfg(test)]
 mod tests {
 
+    use arrow_schema::{DataType, Field};
     use sqlparser::dialect::GenericDialect;
 
     use super::*;
@@ -2995,11 +2996,11 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let time_range = Some((1640995200000000, 1641081600000000)); // 2022-01-01 to 2022-01-02
         let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
         let _ = statement.visit(&mut histogram_interval_visitor);
-        
+
         // Should extract the interval from the histogram function
         assert_eq!(histogram_interval_visitor.interval, Some(10));
     }
@@ -3012,11 +3013,11 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let time_range = Some((0, 0));
         let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
         let _ = statement.visit(&mut histogram_interval_visitor);
-        
+
         // Should return default interval of 1 hour (3600 seconds)
         assert_eq!(histogram_interval_visitor.interval, Some(3600));
     }
@@ -3028,22 +3029,28 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut schemas = HashMap::new();
         let schema = Schema::new(vec![
             Arc::new(Field::new("name", DataType::Utf8, false)),
             Arc::new(Field::new("age", DataType::Int32, false)),
             Arc::new(Field::new("status", DataType::Utf8, false)),
         ]);
-        schemas.insert(TableReference::from("users"), Arc::new(SchemaCache::new(schema)));
-        
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
         let mut column_visitor = ColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut column_visitor);
-        
+
         // Should extract columns, group by, order by, and detect aggregate function
         assert!(column_visitor.has_agg_function);
         assert_eq!(column_visitor.group_by, vec!["name", "age"]);
-        assert_eq!(column_visitor.order_by, vec![("name".to_string(), OrderBy::Asc)]);
+        assert_eq!(
+            column_visitor.order_by,
+            vec![("name".to_string(), OrderBy::Asc)]
+        );
     }
 
     #[test]
@@ -3053,18 +3060,21 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut schemas = HashMap::new();
         let schema = Schema::new(vec![
             Arc::new(Field::new("name", DataType::Utf8, false)),
             Arc::new(Field::new("age", DataType::Int32, false)),
             Arc::new(Field::new("city", DataType::Utf8, false)),
         ]);
-        schemas.insert(TableReference::from("users"), Arc::new(SchemaCache::new(schema)));
-        
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
         let mut partition_visitor = PartitionColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut partition_visitor);
-        
+
         // Should extract equal conditions and IN list values
         let users_table = TableReference::from("users");
         assert!(partition_visitor.equal_items.contains_key(&users_table));
@@ -3082,17 +3092,20 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut schemas = HashMap::new();
         let schema = Schema::new(vec![
             Arc::new(Field::new("name", DataType::Utf8, false)),
             Arc::new(Field::new("email", DataType::Utf8, false)),
         ]);
-        schemas.insert(TableReference::from("users"), Arc::new(SchemaCache::new(schema)));
-        
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
         let mut prefix_visitor = PrefixColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut prefix_visitor);
-        
+
         // Should extract prefix patterns
         let users_table = TableReference::from("users");
         assert!(prefix_visitor.prefix_items.contains_key(&users_table));
@@ -3108,10 +3121,10 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
-        
+
         // Should extract match_all values
         assert!(match_visitor.match_items.is_some());
         let items = match_visitor.match_items.unwrap();
@@ -3126,10 +3139,10 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut field_visitor = FieldNameVisitor::new();
         let _ = statement.visit(&mut field_visitor);
-        
+
         // Should extract field names
         assert!(field_visitor.field_names.contains("name"));
         assert!(field_visitor.field_names.contains("age"));
@@ -3142,10 +3155,10 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut add_timestamp_visitor = AddTimestampVisitor::new();
         let _ = statement.visit(&mut add_timestamp_visitor);
-        
+
         // Should add _timestamp to the beginning of projection
         let expected = "SELECT _timestamp, name, age FROM users";
         assert_eq!(statement.to_string(), expected);
@@ -3158,10 +3171,10 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut add_o2_id_visitor = AddO2IdVisitor::new();
         let _ = statement.visit(&mut add_o2_id_visitor);
-        
+
         // Should add _o2_id to the beginning of projection
         let expected = "SELECT _o2_id, name, age FROM users";
         assert_eq!(statement.to_string(), expected);
@@ -3174,10 +3187,10 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut complex_visitor = ComplexQueryVisitor::new();
         let _ = statement.visit(&mut complex_visitor);
-        
+
         // Should detect complex query due to subquery
         assert!(complex_visitor.is_complex);
     }
@@ -3189,10 +3202,10 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        
+
         let mut ordering_visitor = AddOrderingTermVisitor::new("name".to_string(), true);
         let _ = statement.visit(&mut ordering_visitor);
-        
+
         // Should add ORDER BY clause
         let expected = "SELECT * FROM users ORDER BY name ASC";
         assert_eq!(statement.to_string(), expected);

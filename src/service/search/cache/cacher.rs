@@ -847,13 +847,11 @@ mod tests {
             );
         }
 
-        let expected_deltas = vec![
-            QueryDelta {
-                delta_start_time: 1747659555000000,
-                delta_end_time: 1747659600000000,
-                delta_removed_hits: false,
-            },
-        ];
+        let expected_deltas = vec![QueryDelta {
+            delta_start_time: 1747659555000000,
+            delta_end_time: 1747659600000000,
+            delta_removed_hits: false,
+        }];
         assert_eq!(deltas, expected_deltas);
     }
 }
