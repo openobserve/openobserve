@@ -263,7 +263,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-
 // write test for convert_to_vrl
 #[cfg(test)]
 mod tests {

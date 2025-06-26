@@ -187,7 +187,9 @@ mod tests {
         let item_key = "alerts/123/456".to_string();
         let org_id = "123".to_string();
         let module_key = "456".to_string();
-        let (updated_item_key, alert_id) = handle_format_conversion(item_key, &org_id, &module_key).await.unwrap();
+        let (updated_item_key, alert_id) = handle_format_conversion(item_key, &org_id, &module_key)
+            .await
+            .unwrap();
         assert_eq!(updated_item_key, "alerts/123/456".to_string());
         assert_eq!(alert_id, "456".to_string());
     }

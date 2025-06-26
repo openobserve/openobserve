@@ -102,7 +102,7 @@ mod tests {
         let user_email = "test@example.com";
 
         let result = ingest(thread_id, org_id, body, user_email).await;
-        
+
         match result {
             Ok(response) => {
                 // Should return InvalidFormat status for malformed JSON
