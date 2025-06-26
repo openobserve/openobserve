@@ -249,9 +249,9 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "a02dd16131190aea96c98a732c5dbdd84624e6c1" }
-datafusion-proto = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "a02dd16131190aea96c98a732c5dbdd84624e6c1" }
-datafusion-functions-aggregate-common = { git = "https://github.com/haohuaijin/arrow-datafusion", rev = "a02dd16131190aea96c98a732c5dbdd84624e6c1" }
+datafusion = { git = "https://github.com/openobserve/datafusion", rev = "d10f87ec41706d457e20c4a386c0c4dc41875855" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "d10f87ec41706d457e20c4a386c0c4dc41875855" }
+datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "d10f87ec41706d457e20c4a386c0c4dc41875855" }
 # datafusion-functions-json = "0.45.0"
 expect-test = "1.4"
 arrow = { version = "54.1.0", features = ["ipc_compression", "prettyprint"] }
