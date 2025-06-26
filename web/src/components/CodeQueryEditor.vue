@@ -1114,8 +1114,13 @@ export default defineComponent({
   background: #0060c0;
   color: #F0F0F0;
 }
-.cm-foldGutter .cm-gutterElement span {
+.cm-foldGutter .cm-gutterElement span[title="Fold line"] {
   position: relative;
   top: -5px;
+}
+
+.cm-foldGutter .cm-gutterElement span[title="Unfold line"] {
+  position: relative;
+  top: -1px;
 }
 </style>
