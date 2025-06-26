@@ -76,11 +76,11 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         function_name = f"function_{function_page.Unique_value_function}_{i}"
         function_page.create_function(session, base_url, user_email, user_password, org_id, function_name)
 
-        realTime_pipeline_name = f"realTime_pipeline_{pipeline_page.Unique_value_pipeline}_{i}"
-        pipeline_page.create_realTime_pipeline(session, base_url, user_email, user_password, org_id, stream_name, realTime_pipeline_name)
+        # realTime_pipeline_name = f"realTime_pipeline_{pipeline_page.Unique_value_pipeline}_{i}"
+        # pipeline_page.create_realTime_pipeline(session, base_url, user_email, user_password, org_id, stream_name, realTime_pipeline_name)
 
-        scheduled_pipeline_name = f"scheduled_pipeline_{pipeline_page.Unique_value_pipeline}_{i}"
-        pipeline_page.create_scheduled_pipeline(session, base_url, user_email, user_password, org_id, stream_name, scheduled_pipeline_name)
+        # scheduled_pipeline_name = f"scheduled_pipeline_{pipeline_page.Unique_value_pipeline}_{i}"
+        # pipeline_page.create_scheduled_pipeline(session, base_url, user_email, user_password, org_id, stream_name, scheduled_pipeline_name, True)
 
         scheduled_report_name = f"scheduled_report_{report_page.Unique_value_report}_{i}"
         report_page.create_scheduled_report(session, base_url, user_email, user_password, org_id, dashboard_id, folder_id, scheduled_report_name)
@@ -170,11 +170,11 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         function_admin = f"function_{function_page.Unique_value_function}_{i}admin"
         function_page.create_function(session, base_url, email_address_admin, "12345678", org_id, function_admin)
 
-        realTime_pipeline_admin = f"realTime_pipeline_{pipeline_page.Unique_value_pipeline}_{i}admin"
-        pipeline_page.create_realTime_pipeline(session, base_url, email_address_admin, "12345678", org_id, stream_name, realTime_pipeline_admin)
+        # realTime_pipeline_admin = f"realTime_pipeline_{pipeline_page.Unique_value_pipeline}_{i}admin"
+        # pipeline_page.create_realTime_pipeline(session, base_url, email_address_admin, "12345678", org_id, stream_name, realTime_pipeline_admin)
 
-        scheduled_pipeline_admin = f"scheduled_pipeline_{pipeline_page.Unique_value_pipeline}_{i}admin"
-        pipeline_page.create_scheduled_pipeline(session, base_url, email_address_admin, "12345678", org_id, stream_name, scheduled_pipeline_admin)
+        # scheduled_pipeline_admin = f"scheduled_pipeline_{pipeline_page.Unique_value_pipeline}_{i}admin"
+        # pipeline_page.create_scheduled_pipeline(session, base_url, email_address_admin, "12345678", org_id, stream_name, scheduled_pipeline_admin, True)
 
         scheduled_report_admin = f"scheduled_report_{report_page.Unique_value_report}_{i}admin"
         report_page.create_scheduled_report(session, base_url, email_address_admin, "12345678", org_id, dashboard_id, folder_id, scheduled_report_admin)
