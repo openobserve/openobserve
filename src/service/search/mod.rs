@@ -726,6 +726,7 @@ pub async fn search_partition(
             // this query can't use streaming_agg cache,
             // so we set is_streaming_aggregate to false and return None
             is_streaming_aggregate = false;
+            skip_get_file_list = true;
             (None, 0)
         } else {
             let streaming_id = ider::uuid();
