@@ -65,6 +65,7 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
     range_error: String,
+    is_http2_streaming: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -458,6 +459,7 @@ pub async fn search(
         && should_exec_query
         && c_resp.cache_query_response
         && should_cache_results
+        && !is_http2_streaming
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
