@@ -568,7 +568,7 @@ export default defineComponent({
         ...closeBracketsKeymap, // Auto close brackets
         ...searchKeymap, // ⌘F / Ctrl+F and other search-related key bindings
         {
-          key: "Ctrl-Shift-f",
+          key: "Mod-Shift-f",
           run(view) {
             formatDocument();
             return true;
@@ -653,7 +653,7 @@ export default defineComponent({
 
       const options = [
         {
-          label: "Format Document (Ctrl+Shift+F)",
+          label: "Format Document",
           action: () => formatDocument(),
         },
         { label: "Copy", action: () => copyToClipboard(view) },
