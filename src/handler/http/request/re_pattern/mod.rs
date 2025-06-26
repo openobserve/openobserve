@@ -36,6 +36,7 @@ struct PatternCreateRequest {
 struct PatternGetResponse {
     id: String,
     name: String,
+    description: String,
     pattern: String,
     created_at: i64,
     updated_at: i64,
@@ -46,6 +47,7 @@ struct PatternInfo {
     id: String,
     name: String,
     pattern: String,
+    description: String,
     created_at: i64,
     updated_at: i64,
 }
@@ -180,6 +182,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         let res = PatternGetResponse {
             id: pattern.id,
             name: pattern.name,
+            description: pattern.description,
             pattern: pattern.pattern,
             created_at: pattern.created_at,
             updated_at: pattern.updated_at,
@@ -224,6 +227,7 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
                 id: p.id,
                 name: p.name,
                 pattern: p.pattern,
+                description: p.description,
                 created_at: p.created_at,
                 updated_at: p.updated_at,
             })

@@ -553,6 +553,8 @@ pub struct UpdateSettingsWrapper<D> {
 pub struct PatternAssociation {
     pub field: String,
     pub pattern_name: String,
+    pub description: String,
+    pub pattern: String,
     pub pattern_id: String,
     pub policy: String,
     pub apply_at: String,
