@@ -535,7 +535,8 @@ mod tests {
                 "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
-                "dashboards"."dashboard_id" AS "dashboard_snowflake_id" FROM "reports" 
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
@@ -583,7 +584,8 @@ mod tests {
                 `report_dashboards`.`tab_names` AS `report_dashboard_tab_names`,
                 `report_dashboards`.`variables` AS `report_dashboard_variables`,
                 `report_dashboards`.`timerange` AS `report_dashboard_timerange`,
-                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id` 
+                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`,
+                `folders`.`org` AS `org_id`
                 FROM `reports` 
                 INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
                 INNER JOIN `report_dashboards` ON `reports`.`id` = `report_dashboards`.`report_id` 
@@ -632,7 +634,8 @@ mod tests {
                 "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
-                "dashboards"."dashboard_id" AS "dashboard_snowflake_id" FROM "reports" 
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
@@ -694,7 +697,8 @@ mod tests {
                 "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
-                "dashboards"."dashboard_id" AS "dashboard_snowflake_id"
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id"
                 FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
@@ -748,7 +752,8 @@ mod tests {
                 `report_dashboards`.`tab_names` AS `report_dashboard_tab_names`,
                 `report_dashboards`.`variables` AS `report_dashboard_variables`,
                 `report_dashboards`.`timerange` AS `report_dashboard_timerange`,
-                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`
+                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`,
+                `folders`.`org` AS `org_id`
                 FROM `reports` 
                 INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
                 INNER JOIN `report_dashboards` ON `reports`.`id` = `report_dashboards`.`report_id` 
@@ -801,7 +806,8 @@ mod tests {
                 "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
-                "dashboards"."dashboard_id" AS "dashboard_snowflake_id" FROM "reports" 
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
