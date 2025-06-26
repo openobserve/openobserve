@@ -636,6 +636,7 @@ export default defineComponent({
       menu.style.zIndex = "100000000000000";
 
       const options = [
+        { label: "Format Document (Ctrl+Shift+F)", action: () => formatDocument() },
         { label: "Copy", action: () => copyToClipboard(view) },
         { label: "Paste", action: () => pasteFromClipboard() },
       ];
