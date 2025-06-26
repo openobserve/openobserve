@@ -806,6 +806,8 @@ export default defineComponent({
     async function handleBeforeMount() {
       if (isLogsTab()) {
         await setupLogsTab();
+      } else {
+        handleVisualizeTab();
       }
     }
 
