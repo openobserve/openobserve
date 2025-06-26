@@ -208,11 +208,16 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
             data.into_iter()
                 .map(|d| {
                     let scheduled_job = scheduled_jobs.remove(&d.report_id);
-                    let Ok(mut item) = ListReportsResponseBodyItem::try_from(d) else {
-                        return None;
-                    };
-                    item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
-                    Some(item)
+                    match ListReportsResponseBodyItem::try_from(d) {
+                        Ok(mut item) => {
+                            item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
+                            Some(item)
+                        }
+                        Err(e) => {
+                            log::error!("Error converting report to response body: {}", e);
+                            None
+                        }
+                    }
                 })
                 .collect::<Option<Vec<_>>>()
                 .unwrap_or_default(),
