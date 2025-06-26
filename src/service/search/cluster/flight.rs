@@ -502,12 +502,20 @@ pub async fn run_datafusion(
         let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
         let use_cache = use_cache && org_settings.aggregation_cache_enabled;
         let target_partitions = ctx.state().config().target_partitions();
-        let mut rewriter =
-            o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache, target_partitions).await;
 
-        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+        let (plan,is_complete_cache_hit) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
+            streaming_id,
+            start_time,
+            end_time,
+            use_cache,
+            target_partitions,
+            physical_plan,
+            ctx.task_ctx(),
+        )
+        .await?;
+        physical_plan = plan;
         // Check for aggs cache hit
-        if rewriter.is_complete_cache_hit {
+        if is_complete_cache_hit {
             aggs_cache_ratio = 100;
             // skip empty exec visitor for streaming aggregation query
             // since the new plan after rewrite will have a `EmptyExec` for a complete cache
@@ -871,7 +879,7 @@ pub async fn generate_context(
 ) -> Result<SessionContext> {
     let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
-    let mut ctx = prepare_datafusion_context(
+    let ctx = prepare_datafusion_context(
         &req.trace_id,
         req.work_group.clone(),
         analyzer_rules,
@@ -883,7 +891,7 @@ pub async fn generate_context(
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+    // datafusion_functions_json::register_all(&mut ctx)?;
 
     Ok(ctx)
 }
