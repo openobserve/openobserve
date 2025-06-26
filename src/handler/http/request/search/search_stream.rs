@@ -36,13 +36,10 @@ use tracing::Span;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            http::{
-                get_fallback_order_by_col_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
-            },
-            websocket::update_histogram_interval_in_query,
+        utils::http::{
+            get_fallback_order_by_col_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_search_type_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
@@ -311,39 +308,7 @@ pub async fn search_http2_stream(
     };
 
     if let Some(interval) = sql.histogram_interval {
-        // modify the sql query statement to include the histogram interval
-        if let Ok(updated_query) = update_histogram_interval_in_query(&req.query.sql, interval) {
-            req.query.sql = updated_query;
-        } else {
-            log::error!(
-                "[HTTP2_STREAM] [trace_id: {}] Failed to update query with histogram interval: {}",
-                trace_id,
-                interval
-            );
-
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    400,
-                    Some("Failed to update query with histogram interval".to_string()),
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-            }
-
-            return MetaHttpResponse::bad_request("Failed to update query with histogram interval");
-        }
-        log::info!(
-            "[HTTP2_STREAM] [trace_id: {}] Updated query {}; with histogram interval: {}",
-            trace_id,
-            req.query.sql,
-            interval
-        );
+        req.query.histogram_interval = interval;
     }
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 

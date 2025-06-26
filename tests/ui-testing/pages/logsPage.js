@@ -58,6 +58,7 @@ export class LogsPage {
     this.partitionApplyButton = page.locator('[data-test="logs-search-partition-apply-btn"]');
     this.partitionClearButton = page.locator('[data-test="logs-search-partition-clear-btn"]');
     this.partitionActiveIndicator = page.locator('[data-test="logs-search-partition-active"]');
+    this.resultText = '[data-test="logs-search-search-result"]';
 
   }
 
@@ -474,11 +475,29 @@ async selectIndexStreamDefault() {
 
 }
 
+async selectIndexStream(streamName) {
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(3000);
+  await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first().click();
+
+}
+
 async clearAndFillQueryEditor(query) {
   const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').locator(".inputarea");
   await editor.fill(''); // Clear the editor
   await this.page.waitForTimeout(1000); // Optional: adjust or remove as per your needs
   await editor.fill(query); // Fill with the new query
+}
+
+async typeQuery(query) {
+  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await expect(queryEditor).toBeVisible();
+  await queryEditor.click();
+  await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content').fill(query);
+  await this.page.waitForTimeout(1000);
+  
+  
+
 }
 
 async waitForSearchResultAndCheckText(expectedText) {
@@ -716,5 +735,27 @@ async openTimestampMenu() {
     }
   }
 }
+
+async clickResultsPerPage() {
+  // Click the dropdown to open the options
+  await this.page.locator('[data-test="logs-search-search-result"]').getByText('arrow_drop_down').click();
+  await this.page.getByText('10', { exact: true }).click();
+  await this.page.waitForTimeout(2000);
+  await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10 out of');
+}
+
+async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
+  
+  await this.page.getByText(resultsPerPage, { exact: true }).click();
+  await this.page.waitForTimeout(2000);
+  await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedText);
+}
+
+async pageNotVisible() {
+  
+  const fastRewindElement = this.page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
+  await expect(fastRewindElement).not.toBeVisible();
+}
+
 
 }

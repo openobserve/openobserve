@@ -354,9 +354,10 @@ export default defineComponent({
       });      
       
       chart?.on("globalout", () => {
-        mouseHoverEffectFn({});
-        throttledSetHoveredSeriesIndex(-1, -1, -1, null);
-        throttledSetHoveredSeriesName("");
+        mouseOutEffectFn();
+        // flush any pending throttled calls to ensure immediate reset
+        throttledSetHoveredSeriesIndex.flush();
+        throttledSetHoveredSeriesName.flush();
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
