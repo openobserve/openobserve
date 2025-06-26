@@ -186,7 +186,9 @@ pub async fn register_and_keep_alive() -> Result<()> {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
-        let node = load_local_node();
+        let mut node = load_local_node();
+        node.status = NodeStatus::Online;
+        node.scheduled = true;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
