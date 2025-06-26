@@ -259,3 +259,15 @@ async fn send_to_node(
         }
     }
 }
+
+// write test for parse_item_key
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_send() {
+        let items: Vec<FileKey> = vec![];
+        assert!(send(&items).await.is_ok());
+    }
+}

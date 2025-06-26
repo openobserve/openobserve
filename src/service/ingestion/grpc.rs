@@ -279,4 +279,188 @@ mod tests {
         let resp = get_val_with_type_retained(&Some(&byte_val));
         assert!(resp.as_array().unwrap().first().unwrap().is_u64());
     }
+
+    #[test]
+    fn test_get_severity_value() {
+        // Test all severity levels
+        assert_eq!(get_severity_value(0), "Unspecified");
+        assert_eq!(get_severity_value(1), "Trace");
+        assert_eq!(get_severity_value(2), "Trace2");
+        assert_eq!(get_severity_value(3), "Trace3");
+        assert_eq!(get_severity_value(4), "Trace4");
+        assert_eq!(get_severity_value(5), "Debug");
+        assert_eq!(get_severity_value(6), "Debug2");
+        assert_eq!(get_severity_value(7), "Debug3");
+        assert_eq!(get_severity_value(8), "Debug4");
+        assert_eq!(get_severity_value(9), "Info");
+        assert_eq!(get_severity_value(10), "Info2");
+        assert_eq!(get_severity_value(11), "Info3");
+        assert_eq!(get_severity_value(12), "Info4");
+        assert_eq!(get_severity_value(13), "Warn ");
+        assert_eq!(get_severity_value(14), "Warn2");
+        assert_eq!(get_severity_value(15), "Warn3");
+        assert_eq!(get_severity_value(16), "Warn4");
+        assert_eq!(get_severity_value(17), "Error");
+        assert_eq!(get_severity_value(18), "Error2");
+        assert_eq!(get_severity_value(19), "Error3");
+        assert_eq!(get_severity_value(20), "Error4");
+        assert_eq!(get_severity_value(21), "Fatal");
+        assert_eq!(get_severity_value(22), "Fatal2");
+        assert_eq!(get_severity_value(23), "Fatal3");
+        assert_eq!(get_severity_value(24), "Fatal4");
+
+        // Test out of range values
+        assert_eq!(get_severity_value(-1), "Unspecified");
+        assert_eq!(get_severity_value(25), "Unspecified");
+        assert_eq!(get_severity_value(100), "Unspecified");
+    }
+
+    #[test]
+    fn test_get_metric_val() {
+        // Test AsDouble variant
+        let double_val = number_data_point::Value::AsDouble(42.5);
+        let resp = get_metric_val(&Some(double_val));
+        assert_eq!(resp.as_f64().unwrap(), 42.5);
+
+        // Test AsInt variant
+        let int_val = number_data_point::Value::AsInt(42);
+        let resp = get_metric_val(&Some(int_val));
+        assert_eq!(resp.as_f64().unwrap(), 42.0);
+
+        // Test None case
+        let resp = get_metric_val(&None);
+        assert!(resp.is_null());
+    }
+
+    #[test]
+    fn test_get_exemplar_val() {
+        // Test AsDouble variant
+        let double_val = exemplar::Value::AsDouble(42.5);
+        let resp = get_exemplar_val(&Some(double_val));
+        assert_eq!(resp.as_f64().unwrap(), 42.5);
+
+        // Test AsInt variant
+        let int_val = exemplar::Value::AsInt(42);
+        let resp = get_exemplar_val(&Some(int_val));
+        assert_eq!(resp.as_f64().unwrap(), 42.0);
+
+        // Test None case
+        let resp = get_exemplar_val(&None);
+        assert!(resp.is_null());
+    }
+
+    #[test]
+    fn test_get_val_for_attr() {
+        // Test with string value
+        let attr_val = json::json!({
+            "key1": "test_value"
+        });
+        let resp = get_val_for_attr(attr_val);
+        assert_eq!(resp.as_str().unwrap(), "test_value");
+
+        // Test with numeric value
+        let attr_val = json::json!({
+            "key2": 42
+        });
+        let resp = get_val_for_attr(attr_val);
+        assert_eq!(resp.as_str().unwrap(), "42");
+
+        // Test with boolean value
+        let attr_val = json::json!({
+            "key3": true
+        });
+        let resp = get_val_for_attr(attr_val);
+        assert_eq!(resp.as_str().unwrap(), "true");
+
+        // Test with float value
+        let attr_val = json::json!({
+            "key4": 3.14
+        });
+        let resp = get_val_for_attr(attr_val);
+        assert_eq!(resp.as_str().unwrap(), "3.14");
+    }
+
+    #[test]
+    fn test_get_val_edge_cases() {
+        // Test None case
+        let resp = get_val(&None);
+        assert!(resp.is_null());
+
+        // Test AnyValue with None value
+        let null_val = AnyValue { value: None };
+        let resp = get_val(&Some(&null_val));
+        assert!(resp.is_null());
+
+        // Test empty array
+        let empty_arr = AnyValue {
+            value: Some(Value::ArrayValue(
+                opentelemetry_proto::tonic::common::v1::ArrayValue { values: vec![] },
+            )),
+        };
+        let resp = get_val(&Some(&empty_arr));
+        assert!(resp.as_array().unwrap().is_empty());
+
+        // Test empty kvlist
+        let empty_kv = AnyValue {
+            value: Some(Value::KvlistValue(
+                opentelemetry_proto::tonic::common::v1::KeyValueList { values: vec![] },
+            )),
+        };
+        let resp = get_val(&Some(&empty_kv));
+        assert!(resp.as_object().unwrap().is_empty());
+
+        // Test invalid UTF-8 bytes
+        let invalid_bytes = Value::BytesValue(vec![0xFF, 0xFE, 0xFD]);
+        let byte_val = AnyValue {
+            value: Some(invalid_bytes),
+        };
+        let resp = get_val(&Some(&byte_val));
+        assert_eq!(resp.as_str().unwrap(), "");
+    }
+
+    #[test]
+    fn test_get_val_with_type_retained_edge_cases() {
+        // Test None case
+        let resp = get_val_with_type_retained(&None);
+        assert!(resp.is_null());
+
+        // Test AnyValue with None value
+        let null_val = AnyValue { value: None };
+        let resp = get_val_with_type_retained(&Some(&null_val));
+        assert!(resp.is_null());
+
+        // Test empty array
+        let empty_arr = AnyValue {
+            value: Some(Value::ArrayValue(
+                opentelemetry_proto::tonic::common::v1::ArrayValue { values: vec![] },
+            )),
+        };
+        let resp = get_val_with_type_retained(&Some(&empty_arr));
+        assert!(resp.as_array().unwrap().is_empty());
+
+        // Test empty kvlist
+        let empty_kv = AnyValue {
+            value: Some(Value::KvlistValue(
+                opentelemetry_proto::tonic::common::v1::KeyValueList { values: vec![] },
+            )),
+        };
+        let resp = get_val_with_type_retained(&Some(&empty_kv));
+        assert!(resp.as_object().unwrap().is_empty());
+
+        // Test nested structures
+        let nested_int = AnyValue {
+            value: Some(Value::IntValue(10)),
+        };
+        let nested_arr = AnyValue {
+            value: Some(Value::ArrayValue(
+                opentelemetry_proto::tonic::common::v1::ArrayValue {
+                    values: vec![nested_int],
+                },
+            )),
+        };
+        let resp = get_val_with_type_retained(&Some(&nested_arr));
+        let arr = resp.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0].as_i64().unwrap(), 10);
+    }
 }

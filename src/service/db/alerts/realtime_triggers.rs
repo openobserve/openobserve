@@ -167,3 +167,28 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("Alert realtime triggers Cached");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_item_key() {
+        let key_prefix = "alerts/";
+        let event_key = "alerts/123/456";
+        let (item_key, org_id, module_key) = parse_item_key(key_prefix, event_key);
+        assert_eq!(item_key, "123/456");
+        assert_eq!(org_id, "123");
+        assert_eq!(module_key, "456");
+    }
+
+    #[tokio::test]
+    async fn test_handle_format_conversion() {
+        let item_key = "alerts/123/456".to_string();
+        let org_id = "123".to_string();
+        let module_key = "456".to_string();
+        let (updated_item_key, alert_id) = handle_format_conversion(item_key, &org_id, &module_key).await.unwrap();
+        assert_eq!(updated_item_key, "alerts/123/456".to_string());
+        assert_eq!(alert_id, "456".to_string());
+    }
+}
