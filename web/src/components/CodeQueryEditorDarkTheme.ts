@@ -3,8 +3,8 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 
 // Replaced One Dark colors with VSCode Dark colors
-const chalky = "#4ec9b0",
-  coral = "#d4d4d4",
+const chalky = "#569cd6",
+  coral = "#ce9178",
   cyan = "#d4d4d4",
   invalid = "#ff0000",
   ivory = "#9cdcfe",
@@ -73,7 +73,7 @@ const oneDarkTheme = EditorView.theme(
     },
     ".cm-gutters": {
       backgroundColor: background,
-      color: stone,
+      color: "#858585",
       border: "none",
     },
     ".cm-activeLineGutter": {
@@ -148,14 +148,17 @@ const oneDarkTheme = EditorView.theme(
 const oneDarkHighlightStyle = HighlightStyle.define([
   { tag: tags.keyword, color: whiskey },
   {
+    tag: tags.brace,
+    color: "#FFD700", // green or any color you want for braces
+  },
+  {
     tag: [
       tags.name,
       tags.deleted,
       tags.character,
-      tags.propertyName,
       tags.macroName,
     ],
-    color: coral,
+    color: cursor,
   },
   {
     tag: [tags.function(tags.variableName), tags.labelName],
@@ -170,7 +173,7 @@ const oneDarkHighlightStyle = HighlightStyle.define([
     color: whiskey,
   },
   {
-    tag: [tags.definition(tags.name), tags.separator],
+    tag: [tags.definition(tags.name), tags.separator, tags.propertyName],
     color: ivory,
   },
   {
@@ -198,7 +201,7 @@ const oneDarkHighlightStyle = HighlightStyle.define([
     ],
     color: cyan,
   },
-  { tag: [tags.meta, tags.comment], color: stone },
+  { tag: [tags.meta], color: stone },
   { tag: tags.strong, fontWeight: "bold" },
   { tag: tags.emphasis, fontStyle: "italic" },
   { tag: tags.strikethrough, textDecoration: "line-through" },
@@ -210,9 +213,12 @@ const oneDarkHighlightStyle = HighlightStyle.define([
   },
   {
     tag: [tags.processingInstruction, tags.string, tags.inserted],
-    color: sage,
+    color: coral,
   },
+  { tag: [tags.string, tags.number, tags.bool, tags.null], color: coral },
   { tag: tags.invalid, color: invalid },
+  { tag: tags.lineComment, color: "#608b4e" },
+  { tag: tags.variableName, color: whiskey },
 ]);
 
 /** Export extension */

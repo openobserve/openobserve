@@ -1098,4 +1098,8 @@ export default defineComponent({
 .cm-context-menu > div:hover {
   background-color: #eee;
 }
+.cm-foldGutter .cm-gutterElement span {
+  position: relative;
+  top: -5px;
+}
 </style>

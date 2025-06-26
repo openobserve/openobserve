@@ -4,13 +4,13 @@ import { tags } from '@lezer/highlight';
 
 // Replaced One Light colors with VSCode Light colors
 const chalky = "#267f99",
-  coral = "#000000",
+  coral = "#a31515",
   cyan = "#383a42",
   invalid = "#e45649",
   ivory = "#383a42",
   stone = "#008000",
   malibu = "#795e26",
-  sage = "#a31515",
+  sage = "#0451a5",
   whiskey = "#0000ff",
   violet = "#af00db",
   lightBackground = "#ffffff",
@@ -71,7 +71,7 @@ const oneLightTheme = EditorView.theme(
     },
     ".cm-gutters": {
       backgroundColor: background,
-      color: stone,
+      color: cursor,
       border: "none",
     },
     ".cm-activeLineGutter": {
@@ -153,16 +153,19 @@ const oneLightHighlightStyle = HighlightStyle.define([
     tag: tags.name,
     color: "#795E26", // fallback function color like Monaco
   },
+  {
+    tag: tags.brace,
+    color: "#0431FA", // green or any color you want for braces
+  },
   { tag: tags.keyword, color: whiskey },
   {
     tag: [
       tags.name,
       tags.deleted,
       tags.character,
-      tags.propertyName,
       tags.macroName,
     ],
-    color: coral,
+    color: cursor,
   },
   {
     tag: [tags.function(tags.variableName), tags.labelName],
@@ -216,9 +219,10 @@ const oneLightHighlightStyle = HighlightStyle.define([
     color: whiskey,
   },
   {
-    tag: [tags.processingInstruction, tags.string, tags.inserted],
-    color: sage,
+    tag: [tags.processingInstruction, tags.string, tags.inserted, tags.propertyName],
+    color: coral,
   },
+  { tag: [tags.string, tags.number, tags.bool, tags.null], color: sage },
   { tag: tags.invalid, color: invalid },
 ]);
 
