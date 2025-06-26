@@ -1669,6 +1669,7 @@ pub fn get_top_k_values(
     Ok((top_k_values, result_count as u64))
 }
 
+#[allow(unused_variables)]
 #[cfg(feature = "enterprise")]
 async fn write_partial_results_to_cache(
     error: &infra::errors::Error,
@@ -1678,7 +1679,10 @@ async fn write_partial_results_to_cache(
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
 ) {
+    // TEMPORARY: disable writing partial cache
+    return;
     // write the partial results to cache if search is cancelled
+    #[allow(unreachable_code)]
     match error {
         #[cfg(feature = "enterprise")]
         infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(_)) => {
