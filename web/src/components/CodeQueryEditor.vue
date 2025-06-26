@@ -497,6 +497,24 @@ export default defineComponent({
         ".cm-vrl-func-call span": {
           color: "#569cd6",
         },
+        ".cm-vrl-comment": {
+          color: "#608b4e",
+        },
+        ".cm-vrl-number": {
+          color: "#b5cea8",
+        },
+        ".cm-vrl-bool": {
+          color: "#569cd6",
+        },
+        ".cm-vrl-null": {
+          color: "#569cd6",
+        },
+        ".cm-vrl-variableName": {
+          color: "#d4d4d4",
+        },
+        ".cm-vrl-propertyName": {
+          color: "#d4d4d4",
+        },
       },
       { dark: true },
     );
@@ -530,6 +548,21 @@ export default defineComponent({
       },
       ".cm-line": {
         paddingLeft: "0px !important",
+      },
+      ".cm-vrl-number": {
+        color: "#098658",
+      },
+      ".cm-vrl-bool": {
+        color: "#0000ff",
+      },
+      ".cm-vrl-null": {
+        color: "#0000ff",
+      },
+      ".cm-vrl-string": {
+        color: "#a31515",
+      },
+      ".cm-vrl-propertyName": {
+        color: "#000000",
       },
     });
 

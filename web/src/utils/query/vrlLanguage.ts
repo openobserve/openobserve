@@ -32,6 +32,13 @@ export const vrlLanguage = StreamLanguage.define({
     if (stream.match(/\d+[eE][+-]?\d+/)) return 'number'
     if (stream.match(/\d+/)) return 'number'
     
+
+    // Booleans
+    if (stream.match(/\b(true|false)\b/)) return 'bool'
+
+    // Null
+    if (stream.match(/\bnull\b/)) return 'null'
+    
     // Keywords
     // if (stream.match(/(?<![a-zA-Z0-9_])(if|else|for|while|loop|break|continue|return|let|in|as|use|impl|type|abort|until|then|self|std)(?![a-zA-Z0-9_])/)) return 'keyword'
        // List of keywords
@@ -91,28 +98,50 @@ export const vrlLanguage = StreamLanguage.define({
 
 // VRL theme colors (matching the provided image)
 export const vrlHighlightStyle = HighlightStyle.define([
-  { tag: t.comment, color: '#4CAF50' }, // green
-  { tag: t.keyword, color: '#0000ff' }, // purple
-  { tag: t.number, color: '#4078f2' }, // blue
-  { tag: t.bool, color: '#4078f2' }, // blue
-  { tag: t.null, color: '#4078f2' }, // blue
-  { tag: t.string, color: '#a31515' }, // red
-  { tag: t.regexp, color: '#a31515' }, // red (for VRL regex strings)
-  { tag: t.variableName, color: '#383a42' }, // black
-  { tag: t.definition(t.variableName), color: '#0000ff' }, // black
-  { tag: t.propertyName, color: '#383a42' }, // black
-  { tag: t.operator, color: '#383a42' }, // black
-  { tag: t.punctuation, color: '#383a42' }, // black
-  { tag: t.function(t.propertyName), color: '#0000ff'}, // blue
-  { tag: t.function(t.variableName), color: '#0000ff'}, // blue
+  { tag: t.comment, color: '#4CAF50', class: 'cm-vrl-comment' }, // green
+  { tag: t.keyword, color: '#569cd6', class: 'cm-vrl-keyword' }, // purple
+  { tag: t.number, color: '#b5cea8', class: 'cm-vrl-number' }, // blue
+  { tag: t.bool, color: '#0000ff', class: 'cm-vrl-bool' }, // blue
+  { tag: t.null, color: '#b5cea8', class: 'cm-vrl-null' }, // blue
+  { tag: t.string, color: '#a31515', class: 'cm-vrl-string' }, // red
+  { tag: t.regexp, color: '#ce9178', class: 'cm-vrl-regexp' }, // red (for VRL regex strings)
+  { tag: t.variableName, color: '#d4d4d4', class: 'cm-vrl-variableName' }, // black
+  { tag: t.definition(t.variableName), color: '#569cd6', class: 'cm-vrl-definition' }, // black
+  { tag: t.propertyName, color: '#d4d4d4', class: 'cm-vrl-propertyName' }, // black
+  { tag: t.operator, color: '#d4d4d4', class: 'cm-vrl-operator' }, // black
+  { tag: t.punctuation, color: '#d4d4d4', class: 'cm-vrl-punctuation' }, // black
+  { tag: t.function(t.propertyName), color: '#569cd6'}, // blue
+  { tag: t.function(t.variableName), color: '#569cd6'}, // blue
 ], 
 {
     themeType: "light"
 })
 
+// VRL theme colors (matching the provided image)
+export const vrlHighDarkStyle = HighlightStyle.define([
+    { tag: t.comment, color: '#608b4e', class: 'cm-vrl-comment' }, // green
+    { tag: t.keyword, color: '#569cd6', class: 'cm-vrl-keyword' }, // purple
+    { tag: t.number, color: '#b5cea8', class: 'cm-vrl-number' }, // blue
+    { tag: t.bool, color: '#b5cea8', class: 'cm-vrl-bool' }, // blue
+    { tag: t.null, color: '#b5cea8', class: 'cm-vrl-null' }, // blue
+    { tag: t.string, color: '#ce9178', class: 'cm-vrl-string' }, // red
+    { tag: t.regexp, color: '#ce9178', class: 'cm-vrl-regexp' }, // red (for VRL regex strings)
+    { tag: t.variableName, color: '#d4d4d4', class: 'cm-vrl-variableName' }, // black
+    { tag: t.definition(t.variableName), color: '#569cd6', class: 'cm-vrl-definition' }, // black
+    { tag: t.propertyName, color: '#d4d4d4', class: 'cm-vrl-propertyName' }, // black
+    { tag: t.operator, color: '#d4d4d4', class: 'cm-vrl-operator' }, // black
+    { tag: t.punctuation, color: '#d4d4d4', class: 'cm-vrl-punctuation' }, // black
+    { tag: t.function(t.propertyName), color: '#569cd6', class: 'cm-vrl-function' }, // blue
+    { tag: t.function(t.variableName), color: '#569cd6', class: 'cm-vrl-function' }, // blue
+  ], 
+  {
+      themeType: "dark",
+  })
+
 // Language support for VRL
 export function vrl() {
   return new LanguageSupport(vrlLanguage, [
-    syntaxHighlighting(vrlHighlightStyle)
+    syntaxHighlighting(vrlHighlightStyle),
+    syntaxHighlighting(vrlHighDarkStyle),
   ])
 } 
