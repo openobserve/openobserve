@@ -70,6 +70,9 @@ export default class ChartTypeSelector {
     };
 
     const buttonTestId = buttonSelectors[target];
+    console.log(`Adding field: ${fieldName} to: ${target}`);
+    console.log(`Button Test ID: ${buttonTestId}`);
+
     if (!buttonTestId) {
       throw new Error(`Invalid target type: ${target}`);
     }
