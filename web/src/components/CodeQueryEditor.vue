@@ -552,7 +552,7 @@ export default defineComponent({
         ...closeBracketsKeymap, // Auto close brackets
         ...searchKeymap, // ⌘F / Ctrl+F and other search-related key bindings
         {
-          key: "Mod-Shift-f",
+          key: "Ctrl-Shift-f",
           run(view) {
             formatDocument();
             return true;
@@ -636,7 +636,6 @@ export default defineComponent({
       menu.style.zIndex = "100000000000000";
 
       const options = [
-        { label: "Format Document", action: () => formatDocument() },
         { label: "Copy", action: () => copyToClipboard(view) },
         { label: "Paste", action: () => pasteFromClipboard() },
       ];
@@ -1085,18 +1084,34 @@ export default defineComponent({
 
 .cm-context-menu {
   position: absolute;
-  background: white;
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   z-index: 1000;
   font-size: 13px;
+}
+
+.body--light .cm-context-menu {
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.body--dark .cm-context-menu {
+  background: #3c3c3c;
+  color: #f0f0f0;
+  border: 1px solid #0a0a0a !important;
+  box-shadow: 0 2px 8px rgba(200,200,200,0.2);  
 }
 .cm-context-menu > div {
   padding: 6px 12px;
   cursor: pointer;
 }
-.cm-context-menu > div:hover {
-  background-color: #eee;
+.body--light .cm-context-menu > div:hover {
+  background-color: #0060c0;
+  color: #F0F0F0;
+}
+
+.body--dark .cm-context-menu > div:hover {
+  background: #0060c0;
+  color: #F0F0F0;
 }
 .cm-foldGutter .cm-gutterElement span {
   position: relative;
