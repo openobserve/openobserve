@@ -398,8 +398,14 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
     );
 
-    let consistent_hashing = cluster::print_consistent_hash().await;
-    stats.insert("CONSISTENT_HASHING", json::json!(consistent_hashing));
+    #[cfg(feature = "enterprise")]
+    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    #[cfg(not(feature = "enterprise"))]
+    let (total_count, expired_count) = (0, 0);
+    stats.insert(
+        "CARDINALITY",
+        json::json!({"total_count": total_count, "expired_count": expired_count}),
+    );
 
     Ok(HttpResponse::Ok().json(stats))
 }
