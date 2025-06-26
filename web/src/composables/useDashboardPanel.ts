@@ -198,6 +198,9 @@ const dashboardPanelDataObj: any = {
   dashboard: reactive({ ...getDefaultDashboardPanelData() }),
 };
 
+// Store watcher cleanup functions to prevent memory leaks
+const watcherCleanupFunctions: { [key: string]: Array<() => void> } = {};
+
 const getDefaultCustomChartText = () => {
   return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
   `;
@@ -208,6 +211,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const { showErrorNotification } = useNotifications();
   const valuesWebSocket = useValuesWebSocket();
 
+  // Initialize watcher cleanup array for this page key
+  if (!watcherCleanupFunctions[pageKey]) {
+    watcherCleanupFunctions[pageKey] = [];
+  }
+
   // Initialize the state for this page key if it doesn't already exist
   if (!dashboardPanelDataObj[pageKey]) {
     dashboardPanelDataObj[pageKey] = reactive({
@@ -215,7 +223,39 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     });
   }
 
-  const dashboardPanelData = reactive(dashboardPanelDataObj[pageKey]);
+  let dashboardPanelData = reactive(dashboardPanelDataObj[pageKey]);
+
+  const deleteDashboardPanelData = () => {
+    console.log("pageKey", pageKey);
+    // Stop all watchers for this page key
+    const cleanupFunctions = watcherCleanupFunctions[pageKey] || [];
+    cleanupFunctions.forEach((cleanup) => {
+      try {
+        cleanup();
+      } catch (error) {
+        console.error("Error cleaning up watcher:", error);
+      }
+    });
+    watcherCleanupFunctions[pageKey] = [];
+
+    // Clean up reactive references
+    if (dashboardPanelDataObj[pageKey]) {
+      // Clear all reactive properties
+      Object.keys(dashboardPanelDataObj[pageKey]).forEach(key => {
+        try {
+          delete dashboardPanelDataObj[pageKey][key];
+        } catch (error) {
+          console.error("Error deleting property:", key, error);
+        }
+      });
+    }
+
+    // Delete the object reference
+    delete dashboardPanelDataObj[pageKey];
+    dashboardPanelDataObj[pageKey] = null;
+    dashboardPanelData = null;
+  };
+
   const cleanupDraggingFields = () => {
     dashboardPanelData.meta.dragAndDrop.currentDragArea = null;
     dashboardPanelData.meta.dragAndDrop.targetDragIndex = -1;
@@ -2741,7 +2781,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   // Generate the query when the fields are updated
-  watch(
+  const watchAutoSQLQuery = watch(
     () => [
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -2804,6 +2844,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     },
     { deep: true },
   );
+
+  // Store watcher cleanup function
+  watcherCleanupFunctions[pageKey].push(watchAutoSQLQuery);
 
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (
@@ -3012,7 +3055,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  watch(
+  const watchCustomQuery = watch(
     () => [
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -3048,6 +3091,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     },
     { deep: true },
   );
+
+  // Store watcher cleanup function
+  watcherCleanupFunctions[pageKey].push(watchCustomQuery);
 
   const currentXLabel = computed(() => {
     return dashboardPanelData.data.type == "table"
@@ -3115,6 +3161,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentYLabel,
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
+    deleteDashboardPanelData,
   };
 };
 export default useDashboardPanelData;
