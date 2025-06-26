@@ -652,7 +652,7 @@ pub async fn search_partition(
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
     let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct && is_http_req;
-    
+
     #[cfg(feature = "enterprise")]
     let mut is_streaming_aggregate = ts_column.is_none()
         && is_cachable_aggs
@@ -706,18 +706,20 @@ pub async fn search_partition(
 
         let cardinality_value = cardinality_map.values().product::<f64>();
         let cardinality_level = CardinalityLevel::from(cardinality_value);
-        log::info!(
-            "[trace_id {}] search_partition: using streaming_output, group by fields: {:?}, cardinality level: {:?}",
-            trace_id,
-            cardinality_value,
-            cardinality_level
-        );
-
         let cache_interval = generate_aggregation_cache_interval(
             query.start_time,
             query.end_time,
             cardinality_level,
         );
+
+        log::info!(
+            "[trace_id {}] search_partition: using streaming_output, group by fields: {:?}, cardinality level: {:?}, interval: {:?}",
+            trace_id,
+            cardinality_map,
+            cardinality_level,
+            cache_interval
+        );
+
         let cache_interval_mins = cache_interval.get_duration_minutes();
         if cache_interval_mins == 0 {
             // this query can't use streaming_agg cache,
