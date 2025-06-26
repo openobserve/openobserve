@@ -355,13 +355,13 @@ test.describe("dashboard filter testcases", () => {
 
     await expect(
       page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         exact: true,
       })
     ).toBeVisible();
 
     const cell = page.getByRole("cell", {
-      name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
       exact: true,
     });
 
@@ -370,7 +370,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify it contains the correct text
     await expect(cell).toHaveText(
-      'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
     );
 
     await page.waitForTimeout(2000);
@@ -386,13 +386,13 @@ test.describe("dashboard filter testcases", () => {
 
     await expect(
       page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         exact: true,
       })
     ).toBeVisible();
 
     const ORoprator = page.getByRole("cell", {
-      name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
       exact: true,
     });
 
@@ -401,7 +401,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify it contains the correct text
     await expect(ORoprator).toHaveText(
-      'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
     );
 
     await page.waitForTimeout(2000);
@@ -417,9 +417,7 @@ test.describe("dashboard filter testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("Should  apply the  filter group inside group", async ({
-    page,
-  }) => {
+  test("Should  apply the  filter group inside group", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -481,7 +479,6 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(1000);
     await button.click();
-    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -534,11 +531,13 @@ test.describe("dashboard filter testcases", () => {
           .map((node) => node.textContent.trim()) // Trim whitespace
           .join("");
       });
-    console.log(textContent, "Text content");
-    console.log(`[data-test="dashboard-add-condition-label-0-${textContent}"]`);
+
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
-      .click({ force: true });
+      .waitFor({ state: "visible" });
+    await page
+      .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
+      .click();
 
     await page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
@@ -569,26 +568,14 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-    // await page.waitForTimeout(3000);
-    await page
+
+    const lastInput = page
       .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
-      .click();
+      .last();
+    await lastInput.click();
+    lastInput.fill("kubernetes_container_image");
 
-    await page
-      .locator('[data-test="dashboard-add-condition-column-0\\}"]')
-      .first()
-      .fill("kubernetes_container_image");
-
-    await page
-      .getByRole("option", { name: "kubernetes_container_image" })
-      .first()
-      .click({ force: true });
-    // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
-
-    // await option.waitFor({ state: "visible", timeout: 10000 });
-
-    // await option.click();
+    await page.getByText("kubernetes_container_image", { exact: true }).click();
 
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
@@ -617,7 +604,7 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await expect(
       page.getByRole("cell", {
-        name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         exact: true,
       })
     ).toBeVisible();
@@ -1031,7 +1018,9 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="common-auto-complete-option"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
     // await page.getByText("Error Loading Data").click();
-    await expect(page.getByText('sql parser error: Expected:').first()).toBeVisible();
+    await expect(
+      page.getByText("sql parser error: Expected:").first()
+    ).toBeVisible();
 
     await page
       .locator(

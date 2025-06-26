@@ -81,7 +81,7 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx = prepare_datafusion_context(
+    let ctx = prepare_datafusion_context(
         &trace_id,
         work_group.clone(),
         vec![],
@@ -93,7 +93,7 @@ pub async fn search(
 
     // register udf
     register_udf(&ctx, &org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+    // datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {
@@ -348,7 +348,7 @@ pub async fn search(
 
     // create a Union Plan to merge all tables
     let start = std::time::Instant::now();
-    let union_table = Arc::new(NewUnionTable::try_new(empty_exec.schema().clone(), tables)?);
+    let union_table = Arc::new(NewUnionTable::new(empty_exec.schema().clone(), tables));
 
     let union_exec = union_table
         .scan(

@@ -987,22 +987,22 @@ export default defineComponent({
           ?.length > 0;
 
       // Check for URL values first
-      const urlValue = props.initialVariableValues?.value[currentVariable.name];
-      if (urlValue) {
-        // If URL value exists, use it
-        if (currentVariable.multiSelect) {
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue
-            : [urlValue];
-        } else {
-          // For single select, if coming from multiSelect, take first value
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue[0]
-            : urlValue;
-        }
-        currentVariable.isVariableLoadingPending = true;
-        return;
-      }
+      // const urlValue = props.initialVariableValues?.value[currentVariable.name];
+      // if (urlValue) {
+      //   // If URL value exists, use it
+      //   if (currentVariable.multiSelect) {
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue
+      //       : [urlValue];
+      //   } else {
+      //     // For single select, if coming from multiSelect, take first value
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue[0]
+      //       : urlValue;
+      //   }
+      //   currentVariable.isVariableLoadingPending = true;
+      //   return;
+      // }
 
       // Only apply custom values if no URL value exists
       if (
@@ -1449,20 +1449,17 @@ export default defineComponent({
 
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
-      let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
 
-      const filters = JSON.parse(JSON.stringify(variableObject.query_data?.filter || []));
+      let dummyQuery: string;
 
-      if(searchText) {
-        filters.push({
-          name: variableObject.query_data.field,
-          operator: "LIKE",
-          value: `%${escapeSingleQuotes(searchText.trim())}%`,
-        });
+      if (searchText) {
+        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE CAST(${variableObject.query_data.field} AS TEXT) LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
+      } else {
+        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
       }
 
       // Construct the filter from the query data
-      const constructedFilter = filters.map(
+      const constructedFilter = (variableObject.query_data?.filter || []).map(
         (condition: any) => ({
           name: condition.name,
           operator: condition.operator,
@@ -1471,10 +1468,9 @@ export default defineComponent({
       );
 
       // Add labels to the dummy query
-      let queryContext = await addLabelsToSQlQuery(
-        dummyQuery,
-        constructedFilter,
-      );
+      let queryContext = constructedFilter.length
+        ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
+        : dummyQuery;
 
       // Replace variable placeholders with actual values
       for (const variable of variablesData.values) {
@@ -1937,14 +1933,25 @@ export default defineComponent({
           return;
         }
 
-        const filtered = currentVariable.value.filter((val: any) =>
-          currentVariable.options.some(
-            (opt: any) => opt.value === val || val == SELECT_ALL_VALUE,
-          ),
+        const optionValues = currentVariable.options.map(
+          (opt: any) => opt.value,
         );
 
-        if (filtered.length !== currentVariable.value.length) {
-          currentVariable.value = filtered;
+        const customTypedValues = currentVariable.value.filter(
+          (val: any) => !optionValues.includes(val) && val !== SELECT_ALL_VALUE,
+        );
+
+        const filtered = currentVariable.value.filter(
+          (val: any) => optionValues.includes(val) || val === SELECT_ALL_VALUE,
+        );
+
+        const merged = [
+          ...filtered,
+          ...customTypedValues.filter((v: any) => !filtered.includes(v)),
+        ];
+
+        if (merged.length !== currentVariable.value.length) {
+          currentVariable.value = merged;
         }
       }
 
