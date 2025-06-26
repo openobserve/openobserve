@@ -142,7 +142,13 @@ const oneLightTheme = EditorView.theme(
     },
     ".cm-func-call span": {
       color: "#c700c7" /* function color like Monaco */
-    }
+    },
+    ".cm-vrl-func-call": {
+      color: "#0000ff" /* function color like Monaco */
+    },
+    ".cm-vrl-func-call span": {
+      color: "#0000ff" /* function color like Monaco */,
+    },
   },
   { dark: false }
 );

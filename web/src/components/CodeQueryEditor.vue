@@ -65,20 +65,28 @@ import {
   closeCompletion,
 } from "@codemirror/autocomplete";
 
-import { keymap, lineNumbers, showTooltip, Tooltip, ViewPlugin, Decoration, DecorationSet } from "@codemirror/view";
+import {
+  keymap,
+  lineNumbers,
+  showTooltip,
+  Tooltip,
+  ViewPlugin,
+  Decoration,
+  DecorationSet,
+} from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
-import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { format } from "sql-formatter";
 // @ts-ignore
-import { html as htmlBeautify } from 'js-beautify';
+import { html as htmlBeautify } from "js-beautify";
 // @ts-ignore
 import * as acorn from "acorn";
 // @ts-ignore
 import escodegen from "escodegen";
-
+import { vrl } from "@/utils/query/vrlLanguage";
 
 import {
   searchKeymap,
@@ -122,7 +130,9 @@ export default defineComponent({
       default: false,
     },
     language: {
-      type: String as PropType<"sql" | "json" | "javascript" | "markdown" | "html" | "vrl">,
+      type: String as PropType<
+        "sql" | "json" | "javascript" | "markdown" | "html" | "vrl"
+      >,
       default: "sql",
     },
     autoComplete: {
@@ -150,25 +160,13 @@ export default defineComponent({
       editorView?.requestMeasure();
     };
 
-    // VRL language support
-    const createVrlLanguage = () => {
-      return {
-        name: "vrl",
-        tokenizer: vrlLanguageDefinition.tokenizer,
-        keywords: vrlLanguageDefinition.keywords,
-        symbols: vrlLanguageDefinition.symbols,
-        escapes: vrlLanguageDefinition.escapes,
-        brackets: vrlLanguageDefinition.brackets,
-      };
-    };
-
     // Get language support based on props.language
     const getLanguageSupport = () => {
       switch (props.language) {
         case "sql":
           return sql();
         case "vrl":
-          return sql();
+          return vrl();
         case "json":
           return json();
         case "javascript":
@@ -338,33 +336,45 @@ export default defineComponent({
       }
     });
 
-    const functionCallHighlighter = ViewPlugin.fromClass(class {
-      decorations: any;
-      constructor(view: EditorView) {
-        this.decorations = this.build(view);
-      }
-      update(update: any) {
-        if (update.docChanged || update.viewportChanged) {
-          this.decorations = this.build(update.view);
+    const functionCallHighlighter = ViewPlugin.fromClass(
+      class {
+        decorations: any;
+        constructor(view: EditorView) {
+          this.decorations = this.build(view);
         }
-      }
-      build(view: EditorView) {
-        const builder = new RangeSetBuilder();
-        for (let { from, to } of view.visibleRanges) {
-          const text = view.state.doc.sliceString(from, to);
-          const regex = /\b([a-zA-Z_][\w]*)\s*\(/g;
-          let match;
-          while ((match = regex.exec(text)) !== null) {
-            const start = from + match.index;
-            const end = start + match[1].length;
-            builder.add(start, end, Decoration.mark({ class: "cm-func-call" }));
+        update(update: any) {
+          if (update.docChanged || update.viewportChanged) {
+            this.decorations = this.build(update.view);
           }
         }
-        return builder.finish();
-      }
-    }, {
-      decorations: v => v.decorations,
-    });
+        build(view: EditorView) {
+          const builder = new RangeSetBuilder();
+          for (let { from, to } of view.visibleRanges) {
+            const text = view.state.doc.sliceString(from, to);
+            const regex = /\b([a-zA-Z_][\w]*)\s*\(/g;
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+              const start = from + match.index;
+              const end = start + match[1].length;
+              builder.add(
+                start,
+                end,
+                Decoration.mark({
+                  class:
+                    props.language === "vrl"
+                      ? "cm-vrl-func-call"
+                      : "cm-func-call",
+                }),
+              );
+            }
+          }
+          return builder.finish();
+        }
+      },
+      {
+        decorations: (v) => v.decorations,
+      },
+    );
 
     // Create autocompletion function
     const createAutocompletion = () => {
@@ -479,8 +489,14 @@ export default defineComponent({
           paddingLeft: "0px !important",
         },
         ".cm-func-call": {
-          color: "#795E26" /* function color like Monaco */
-        }
+          color: "#795E26",
+        },
+        ".cm-vrl-func-call": {
+          color: "#0000ff",
+        },
+        ".cm-vrl-func-call span": {
+          color: "#569cd6",
+        },
       },
       { dark: true },
     );
@@ -595,12 +611,12 @@ export default defineComponent({
     function copyToClipboard(view: EditorView) {
       const selectedText = view.state.sliceDoc(
         view.state.selection.main.from,
-        view.state.selection.main.to
+        view.state.selection.main.to,
       );
 
-      navigator.clipboard.writeText(selectedText).then(
-        (err) => console.error("Failed to copy:", err)
-      );
+      navigator.clipboard
+        .writeText(selectedText)
+        .then((err) => console.error("Failed to copy:", err));
     }
 
     async function pasteFromClipboard() {
@@ -636,12 +652,15 @@ export default defineComponent({
       menu.style.zIndex = "100000000000000";
 
       const options = [
-        { label: "Format Document (Ctrl+Shift+F)", action: () => formatDocument() },
+        {
+          label: "Format Document (Ctrl+Shift+F)",
+          action: () => formatDocument(),
+        },
         { label: "Copy", action: () => copyToClipboard(view) },
         { label: "Paste", action: () => pasteFromClipboard() },
       ];
 
-      options.forEach(opt => {
+      options.forEach((opt) => {
         const item = document.createElement("div");
         item.textContent = opt.label;
         item.onclick = () => {
@@ -659,7 +678,6 @@ export default defineComponent({
       });
     }
 
-
     const onFocusExtension = EditorView.domEventHandlers({
       focus(event, view) {
         if (view.state.readOnly) {
@@ -669,7 +687,7 @@ export default defineComponent({
       blur(event, view) {
         if (view.state.readOnly) {
           view.dispatch({
-            effects: setTooltip.of(null) // ✅ correctly removes the tooltip
+            effects: setTooltip.of(null), // ✅ correctly removes the tooltip
           });
         }
       },
@@ -680,7 +698,7 @@ export default defineComponent({
         const y = event.clientY;
 
         showCustomMenu(x, y, view); // custom function
-      }
+      },
     });
 
     // Debounced emit for document changes
@@ -944,29 +962,32 @@ export default defineComponent({
           // Basic formatting: trim whitespace and ensure proper indentation
           const currentValue = editorView.state.doc.toString();
           let formattedValue: any = null;
-          if(props.language == 'json') {
+          if (props.language == "json") {
             formattedValue = JSON.stringify(JSON.parse(currentValue), null, 2);
-          } else if(props.language == 'sql') {
+          } else if (props.language == "sql") {
             formattedValue = format(currentValue, {
               language: props.language as any,
             });
-          } else if(props.language == 'markdown') {
+          } else if (props.language == "markdown") {
             // Basic markdown formatting - just trim and normalize spacing
             formattedValue = currentValue
               .split("\n")
               .map((line: string) => line.trim())
               .filter((line: string) => line.length > 0)
               .join("\n");
-          } else if(props.language == 'html') {
+          } else if (props.language == "html") {
             formattedValue = htmlBeautify(currentValue, {
               indent_size: 2,
-              preserve_newlines: false,   // prevent it from preserving empty lines
-              max_preserve_newlines: 0,   // do not allow multiple blank lines
-              unformatted: [],            // format all tags
-              content_unformatted: [],    // format inner content of tags
-              extra_liners: [],   
+              preserve_newlines: false, // prevent it from preserving empty lines
+              max_preserve_newlines: 0, // do not allow multiple blank lines
+              unformatted: [], // format all tags
+              content_unformatted: [], // format inner content of tags
+              extra_liners: [],
             });
-          } else if(props.language == 'javascript' || props.language == 'vrl') {
+          } else if (
+            props.language == "javascript" ||
+            props.language == "vrl"
+          ) {
             formattedValue = formatJavaScript(currentValue);
           } else {
             formattedValue = currentValue;
@@ -1093,13 +1114,13 @@ export default defineComponent({
   background: #f5f5f5;
   color: #333;
   border: 1px solid #ccc;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 .body--dark .cm-context-menu {
   background: #3c3c3c;
   color: #f0f0f0;
   border: 1px solid #0a0a0a !important;
-  box-shadow: 0 2px 8px rgba(200,200,200,0.2);  
+  box-shadow: 0 2px 8px rgba(200, 200, 200, 0.2);
 }
 .cm-context-menu > div {
   padding: 6px 12px;
@@ -1107,12 +1128,12 @@ export default defineComponent({
 }
 .body--light .cm-context-menu > div:hover {
   background-color: #0060c0;
-  color: #F0F0F0;
+  color: #f0f0f0;
 }
 
 .body--dark .cm-context-menu > div:hover {
   background: #0060c0;
-  color: #F0F0F0;
+  color: #f0f0f0;
 }
 .cm-foldGutter .cm-gutterElement span[title="Fold line"] {
   position: relative;
