@@ -10,6 +10,7 @@ import {
   deleteDashboard,
 } from "../utils/dashCreation.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
+import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -558,10 +559,12 @@ test.describe("logs testcases", () => {
     const randomDashboardName =
       "Dashboard_" + Math.random().toString(36).substr(2, 9);
     const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
+
     const logsVisualise = new LogsVisualise(page);
     const dashboardPanel = new DashboardPanel(page);
     const dashboardCreate = new DashboardCreate(page);
     const dashboardActions = new DashboardactionPage(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
 
     // Open the logs page and set relative time
     await logsVisualise.openLogs();
@@ -569,17 +572,11 @@ test.describe("logs testcases", () => {
 
     // Open the visualization tab and add fields
     await logsVisualise.openVisualiseTab();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
-      )
-      .waitFor({ state: "visible" });
 
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
+    chartTypeSelector.searchAndAddField(
+      "kubernetes_annotations_kubernetes_io_psp",
+      "b"
+    );
 
     await logsVisualise.runQueryAndWaitForCompletion();
 
@@ -629,10 +626,11 @@ test.describe("logs testcases", () => {
       .click();
 
     await expect(
-      page.getByText(
-        'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1", kubernetes_annotations_kubernetes_io_psp AS "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1',
-        { exact: true }
-      )
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) AS "x_axis_1", COUNT(_timestamp) AS "y_axis_1", kubernetes_annotations_kubernetes_io_psp AS "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1',
+        })
+        .first()
     ).toBeVisible();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     await dashboardActions.applyDashboardBtn();
