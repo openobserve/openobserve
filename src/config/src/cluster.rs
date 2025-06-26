@@ -51,7 +51,7 @@ pub fn load_local_node() -> Node {
             cfg.grpc.port
         ),
         cpu_num: cfg.limit.cpu_num as u64,
-        scheduled: true,
+        scheduled: false,
         broadcasted: false,
         status: NodeStatus::Online,
         metrics: Default::default(),
