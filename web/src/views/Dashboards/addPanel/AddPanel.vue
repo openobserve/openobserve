@@ -649,6 +649,7 @@ export default defineComponent({
       resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
+      deleteDashboardPanelData,
     } = useDashboardPanelData("dashboard");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
@@ -768,6 +769,8 @@ export default defineComponent({
 
       // Clear all refs to prevent memory leaks
       dateTimePickerRef.value = null;
+
+      deleteDashboardPanelData();
     });
 
     onMounted(async () => {
