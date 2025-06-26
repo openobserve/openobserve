@@ -52,6 +52,12 @@ fn create_re_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(RePatterns::Org).string_len(100).not_null())
         .col(ColumnDef::new(RePatterns::Name).string_len(256).not_null())
         .col(
+            ColumnDef::new(RePatterns::Description)
+                .text()
+                .not_null()
+                .default("".to_string()),
+        )
+        .col(
             ColumnDef::new(RePatterns::CreatedBy)
                 .string_len(256)
                 .not_null(),
@@ -89,6 +95,7 @@ pub(super) enum RePatterns {
     Id,
     Org,
     Name,
+    Description,
     CreatedBy,
     CreatedAt,
     UpdatedAt,
@@ -109,6 +116,7 @@ mod tests {
             "id" varchar(100) NOT NULL PRIMARY KEY, 
             "org" varchar(100) NOT NULL, 
             "name" varchar(256) NOT NULL,
+            "description" text NOT NULL DEFAULT '',
             "created_by" varchar(256) NOT NULL,
             "created_at" bigint NOT NULL, 
             "updated_at" bigint NOT NULL, 
@@ -129,6 +137,7 @@ mod tests {
             `id` varchar(100) NOT NULL PRIMARY KEY, 
             `org` varchar(100) NOT NULL, 
             `name` varchar(256) NOT NULL,
+            `description` text NOT NULL DEFAULT '',
             `created_by` varchar(256) NOT NULL,
             `created_at` bigint NOT NULL, 
             `updated_at` bigint NOT NULL, 
@@ -149,6 +158,7 @@ mod tests {
             "id" varchar(100) NOT NULL PRIMARY KEY, 
             "org" varchar(100) NOT NULL, 
             "name" varchar(256) NOT NULL,
+            "description" text NOT NULL DEFAULT '',
             "created_by" varchar(256) NOT NULL,
             "created_at" bigint NOT NULL, 
             "updated_at" bigint NOT NULL, 

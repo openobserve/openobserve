@@ -28,6 +28,7 @@ use crate::common::{
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternCreateRequest {
     name: String,
+    description: String,
     pattern: String,
 }
 
@@ -117,6 +118,7 @@ pub async fn save(
         match crate::service::db::re_pattern::add(PatternEntry::new(
             &org_id,
             &req.name,
+            &req.description,
             &req.pattern,
             &user_id,
         ))
@@ -299,7 +301,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 
 /// update the pattern for given id
 #[utoipa::path(
-    post,
+    put,
     context_path = "/api",
     params(
         ("id" = String, Path, description = "id of the pattern to update", example = "12345")
@@ -327,6 +329,9 @@ pub async fn update(
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
+        use infra::table::re_pattern_stream_map::PatternPolicy;
+        use o2_enterprise::enterprise::re_patterns::PatternManager;
+
         let (_org_id, id) = path.into_inner();
         let req: PatternCreateRequest = match serde_json::from_slice(&body) {
             Ok(v) => v,
@@ -342,6 +347,15 @@ pub async fn update(
             }
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
+
+        match PatternManager::test_pattern(
+            req.pattern.clone(),
+            "".to_string(),
+            PatternPolicy::Redact,
+        ) {
+            Ok(_) => {}
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        }
 
         // we can be fairly certain that in db we have proper json
 

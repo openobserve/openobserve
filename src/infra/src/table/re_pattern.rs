@@ -28,6 +28,7 @@ pub struct PatternEntry {
     pub id: String,
     pub org: String,
     pub name: String,
+    pub description: String,
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -40,6 +41,7 @@ impl From<Model> for PatternEntry {
             id: val.id,
             org: val.org,
             name: val.name,
+            description: val.description,
             created_by: val.created_by,
             created_at: val.created_at,
             updated_at: val.updated_at,
@@ -49,12 +51,13 @@ impl From<Model> for PatternEntry {
 }
 
 impl PatternEntry {
-    pub fn new(org: &str, name: &str, pattern: &str, user: &str) -> Self {
+    pub fn new(org: &str, name: &str, description: &str, pattern: &str, user: &str) -> Self {
         let now = chrono::Utc::now().timestamp_micros();
         Self {
             id: ider::generate(),
             org: org.to_string(),
             name: name.to_string(),
+            description: description.to_string(),
             created_by: user.to_string(),
             created_at: now,
             updated_at: now,
@@ -71,6 +74,7 @@ pub async fn add(entry: PatternEntry) -> Result<(), errors::Error> {
         created_at: Set(entry.created_at),
         updated_at: Set(entry.updated_at),
         name: Set(entry.name),
+        description: Set(entry.description),
         pattern: Set(entry.pattern),
     };
 
