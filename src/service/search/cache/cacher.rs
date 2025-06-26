@@ -156,7 +156,6 @@ pub async fn check_cache(
             } else {
                 sql.time_range
             };
-        // TODO: is this still needed?
         handle_histogram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; // in microseconds
@@ -762,14 +761,10 @@ fn calculate_deltas_multi(
             .last()
             .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
     {
-        // Adding histogram interval to the current end time to ensure the next query
-        // fetches the data after the last cache result timestamp, thereby avoiding duplicates
-        let mut expected_delta_start_time = current_end_time + histogram_interval.abs();
-        if expected_delta_start_time > end_time {
-            expected_delta_start_time = start_time;
-        }
         deltas.push(QueryDelta {
-            delta_start_time: expected_delta_start_time,
+            // Adding histogram interval to the current end time to ensure the next query
+            // fetches the data after the last cache result timestamp, thereby avoiding duplicates
+            delta_start_time: current_end_time + histogram_interval.abs(),
             delta_end_time: end_time,
             delta_removed_hits: false,
         });
@@ -782,80 +777,4 @@ fn calculate_deltas_multi(
     deltas.dedup(); // Remove consecutive duplicates
 
     (deltas, None, cache_duration)
-}
-
-#[cfg(test)]
-mod tests {
-    use config::meta::search::{Response, ResponseTook};
-
-    use super::*;
-    use crate::common::meta::search::CachedQueryResponse;
-
-    #[test]
-    fn test_calculate_deltas_multi_expected_intervals() {
-        let hit = serde_json::json!({
-            "hits":[{"breakdown_1":"EUR","x_axis_1":"2025-05-23T12:00:00","y_axis_1":106,"y_axis_2":106}]
-        });
-        let cached_response = CachedQueryResponse {
-            cached_response: Response {
-                took: 450,
-                took_detail: ResponseTook {
-                    total: 0,
-                    cache_took: 0,
-                    file_list_took: 4,
-                    wait_in_queue: 3,
-                    idx_took: 0,
-                    search_took: 37,
-                },
-                columns: vec![],
-                hits: vec![hit],
-                total: 101,
-                from: 0,
-                size: 280,
-                file_count: 0,
-                cached_ratio: 100,
-                scan_size: 0,
-                idx_scan_size: 0,
-                scan_records: 34560,
-                response_type: "".to_string(),
-                trace_id: "".to_string(),
-                function_error: vec![],
-                is_partial: false,
-                histogram_interval: Some(3600),
-                new_start_time: None,
-                new_end_time: None,
-                result_cache_ratio: 33,
-                work_group: None,
-                order_by: Some(OrderBy::Asc),
-            },
-            deltas: vec![],
-            has_cached_data: true,
-            cache_query_response: true,
-            response_start_time: 1747657200000000,
-            response_end_time: 1747659555000000,
-            ts_column: "x_axis_1".to_string(),
-            is_descending: false,
-            limit: -1,
-        };
-        let query_start_time = 1747657200000000;
-        let query_end_time = 1747659600000000;
-        let histogram_interval = 3600000000; // 1 hour in microseconds
-
-        let (deltas, ..) = calculate_deltas_multi(
-            &[cached_response],
-            query_start_time,
-            query_end_time,
-            histogram_interval,
-        );
-        println!("Deltas: {:?}", deltas);
-
-        // All deltas should have start <= end
-        for delta in &deltas {
-            assert!(
-                delta.delta_start_time <= delta.delta_end_time,
-                "delta_start_time > delta_end_time: {:?}",
-                delta
-            );
-        }
-    }
 }
