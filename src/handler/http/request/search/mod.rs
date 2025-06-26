@@ -232,6 +232,9 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
+        req.query.sql = sql;
+    };
     req.use_cache = get_use_cache_from_request(&query);
 
     // set search event type
@@ -941,6 +944,9 @@ async fn values_v1(
             }
         }
     };
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&query_sql) {
+        query_sql = sql;
+    }
 
     let keyword = match query.get("keyword") {
         None => "".to_string(),
@@ -1109,6 +1115,11 @@ async fn values_v1(
         };
         let mut req = req.clone();
         req.query.sql = sql;
+        if let Ok(sql) =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
+        {
+            req.query.sql = sql;
+        }
 
         let search_res = SearchService::cache::search(
             &trace_id,
@@ -1323,6 +1334,10 @@ pub async fn search_partition(
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
+        req.sql = sql;
+    }
+
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
