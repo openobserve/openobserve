@@ -15,7 +15,7 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
-use arrow_schema::FieldRef;
+use arrow_schema::{Field, FieldRef};
 use chrono::Duration;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -27,7 +27,7 @@ use config::{
     },
     utils::sql::AGGREGATE_UDF_LIST,
 };
-use datafusion::{arrow::datatypes::Schema, common::TableReference};
+use datafusion::{arrow::datatypes::{DataType, Schema}, common::TableReference};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
@@ -2984,6 +2984,217 @@ mod tests {
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
         let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_histogram_interval_visitor() {
+        // Test with time range and histogram function
+        let sql = "SELECT histogram(_timestamp, '10 second') FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let time_range = Some((1640995200000000, 1641081600000000)); // 2022-01-01 to 2022-01-02
+        let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
+        let _ = statement.visit(&mut histogram_interval_visitor);
+        
+        // Should extract the interval from the histogram function
+        assert_eq!(histogram_interval_visitor.interval, Some(10));
+    }
+
+    #[test]
+    fn test_histogram_interval_visitor_with_zero_time_range() {
+        // Test with zero time range
+        let sql = "SELECT histogram(_timestamp, 20) FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let time_range = Some((0, 0));
+        let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
+        let _ = statement.visit(&mut histogram_interval_visitor);
+        
+        // Should return default interval of 1 hour (3600 seconds)
+        assert_eq!(histogram_interval_visitor.interval, Some(3600));
+    }
+
+    #[test]
+    fn test_column_visitor() {
+        let sql = "SELECT name, age, COUNT(*) FROM users WHERE status = 'active' GROUP BY name, age ORDER BY name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("status", DataType::Utf8, false)),
+        ]);
+        schemas.insert(TableReference::from("users"), Arc::new(SchemaCache::new(schema)));
+        
+        let mut column_visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut column_visitor);
+        
+        // Should extract columns, group by, order by, and detect aggregate function
+        assert!(column_visitor.has_agg_function);
+        assert_eq!(column_visitor.group_by, vec!["name", "age"]);
+        assert_eq!(column_visitor.order_by, vec![("name".to_string(), OrderBy::Asc)]);
+    }
+
+    #[test]
+    fn test_partition_column_visitor() {
+        let sql = "SELECT * FROM users WHERE name = 'john' AND age = 25 AND city IN ('NYC', 'LA')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("city", DataType::Utf8, false)),
+        ]);
+        schemas.insert(TableReference::from("users"), Arc::new(SchemaCache::new(schema)));
+        
+        let mut partition_visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut partition_visitor);
+        
+        // Should extract equal conditions and IN list values
+        let users_table = TableReference::from("users");
+        assert!(partition_visitor.equal_items.contains_key(&users_table));
+        let items = &partition_visitor.equal_items[&users_table];
+        assert!(items.contains(&("name".to_string(), "john".to_string())));
+        assert!(items.contains(&("age".to_string(), "25".to_string())));
+        assert!(items.contains(&("city".to_string(), "NYC".to_string())));
+        assert!(items.contains(&("city".to_string(), "LA".to_string())));
+    }
+
+    #[test]
+    fn test_prefix_column_visitor() {
+        let sql = "SELECT * FROM users WHERE name LIKE 'john%' AND email LIKE 'test%'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("email", DataType::Utf8, false)),
+        ]);
+        schemas.insert(TableReference::from("users"), Arc::new(SchemaCache::new(schema)));
+        
+        let mut prefix_visitor = PrefixColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut prefix_visitor);
+        
+        // Should extract prefix patterns
+        let users_table = TableReference::from("users");
+        assert!(prefix_visitor.prefix_items.contains_key(&users_table));
+        let items = &prefix_visitor.prefix_items[&users_table];
+        assert!(items.contains(&("name".to_string(), "john".to_string())));
+        assert!(items.contains(&("email".to_string(), "test".to_string())));
+    }
+
+    #[test]
+    fn test_match_visitor() {
+        let sql = "SELECT * FROM logs WHERE match_all('error') AND match_all('critical')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+        
+        // Should extract match_all values
+        assert!(match_visitor.match_items.is_some());
+        let items = match_visitor.match_items.unwrap();
+        assert!(items.contains(&"error".to_string()));
+        assert!(items.contains(&"critical".to_string()));
+    }
+
+    #[test]
+    fn test_field_name_visitor() {
+        let sql = "SELECT name, age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut field_visitor = FieldNameVisitor::new();
+        let _ = statement.visit(&mut field_visitor);
+        
+        // Should extract field names
+        assert!(field_visitor.field_names.contains("name"));
+        assert!(field_visitor.field_names.contains("age"));
+    }
+
+    #[test]
+    fn test_add_timestamp_visitor() {
+        let sql = "SELECT name, age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut add_timestamp_visitor = AddTimestampVisitor::new();
+        let _ = statement.visit(&mut add_timestamp_visitor);
+        
+        // Should add _timestamp to the beginning of projection
+        let expected = "SELECT _timestamp, name, age FROM users";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_add_o2_id_visitor() {
+        let sql = "SELECT name, age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut add_o2_id_visitor = AddO2IdVisitor::new();
+        let _ = statement.visit(&mut add_o2_id_visitor);
+        
+        // Should add _o2_id to the beginning of projection
+        let expected = "SELECT _o2_id, name, age FROM users";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_complex_query_visitor() {
+        let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut complex_visitor = ComplexQueryVisitor::new();
+        let _ = statement.visit(&mut complex_visitor);
+        
+        // Should detect complex query due to subquery
+        assert!(complex_visitor.is_complex);
+    }
+
+    #[test]
+    fn test_add_ordering_term_visitor() {
+        let sql = "SELECT * FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        
+        let mut ordering_visitor = AddOrderingTermVisitor::new("name".to_string(), true);
+        let _ = statement.visit(&mut ordering_visitor);
+        
+        // Should add ORDER BY clause
+        let expected = "SELECT * FROM users ORDER BY name ASC";
         assert_eq!(statement.to_string(), expected);
     }
 }
