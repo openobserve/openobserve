@@ -200,19 +200,6 @@ pub async fn ingest(
             }
         }
 
-        // we do not drop the record here, just log error and continue process
-        match pattern_manager.process_at_ingestion(
-            org_id,
-            StreamType::Logs,
-            in_stream_name,
-            &mut item,
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                log::error!("error in processing record for patterns : {e}");
-            }
-        }
-
         // store a copy of original data before it's being transformed and/or flattened, when
         // 1. original data is an object
         let original_data = if item.is_object() {
@@ -317,6 +304,19 @@ pub async fn ingest(
                     ALL_VALUES_COL_NAME.to_string(),
                     json::Value::String(values.join(" ")),
                 );
+            }
+
+            // we do not drop the record here, just log error and continue process
+            match pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Logs,
+                in_stream_name,
+                &mut local_val,
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("error in processing record for patterns : {e}");
+                }
             }
 
             let (ts_data, fn_num) = json_data_by_stream
@@ -453,6 +453,18 @@ pub async fn ingest(
                                 ALL_VALUES_COL_NAME.to_string(),
                                 json::Value::String(values.join(" ")),
                             );
+                        }
+
+                        match pattern_manager.process_at_ingestion(
+                            org_id,
+                            StreamType::Logs,
+                            &destination_stream,
+                            &mut local_val,
+                        ) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!("error in processing record for patterns : {e}");
+                            }
                         }
 
                         let (ts_data, fn_num) = json_data_by_stream

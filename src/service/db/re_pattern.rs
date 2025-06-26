@@ -167,6 +167,25 @@ pub async fn process_association_changes(
         return Ok(());
     }
 
+    let mgr = get_pattern_manager().await?;
+
+    for item in &update.add {
+        if !mgr.check_pattern_exists(&item.pattern_id) {
+            return Err(errors::Error::Message(format!(
+                "pattern with id {} not found",
+                item.pattern_id
+            )));
+        }
+    }
+    for item in &update.remove {
+        if !mgr.check_pattern_exists(&item.pattern_id) {
+            return Err(errors::Error::Message(format!(
+                "pattern with id {} not found",
+                item.pattern_id
+            )));
+        }
+    }
+
     let serialized = serde_json::to_vec(&update)?;
     let added = update
         .add
