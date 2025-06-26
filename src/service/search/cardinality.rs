@@ -128,6 +128,7 @@ pub async fn check_cardinality(
     stream_type: StreamType,
     stream_name: &str,
     field_names: &[String],
+    query_time: i64,
 ) -> Result<HashMap<String, f64>> {
     if field_names.is_empty() {
         return Ok(HashMap::new());
@@ -176,7 +177,15 @@ pub async fn check_cardinality(
 
     // Calculate cardinality for fields not in cache
     if !fields_to_calculate.is_empty() {
-        match get_cardinality(org_id, stream_type, stream_name, &fields_to_calculate).await {
+        match get_cardinality(
+            org_id,
+            stream_type,
+            stream_name,
+            &fields_to_calculate,
+            query_time,
+        )
+        .await
+        {
             Ok(calculated_results) => {
                 // Cache the results and add to final results
                 for (field_name, cardinality) in calculated_results {
@@ -254,6 +263,7 @@ async fn get_cardinality(
     stream_type: StreamType,
     stream_name: &str,
     field_names: &[String],
+    query_time: i64,
 ) -> Result<HashMap<String, f64>> {
     if field_names.is_empty() {
         return Ok(HashMap::new());
@@ -281,7 +291,11 @@ async fn get_cardinality(
         return Ok(HashMap::new());
     }
 
-    let now = now_micros();
+    let query_time = if query_time > 0 {
+        query_time
+    } else {
+        now_micros()
+    };
 
     // Build SQL query with multiple approx_distinct calls
     let mut select_clauses = Vec::new();
@@ -303,8 +317,8 @@ async fn get_cardinality(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql,
-            start_time: now - CACHE_EXPIRATION_MICROS,
-            end_time: now,
+            start_time: query_time - CACHE_EXPIRATION_MICROS,
+            end_time: query_time,
             from: 0,
             size: 10,
             ..Default::default()
@@ -569,7 +583,7 @@ mod tests {
         // schema)
 
         // Test that we get cached values for field1 and field2
-        let results = check_cardinality(org_id, stream_type, stream_name, &fields).await;
+        let results = check_cardinality(org_id, stream_type, stream_name, &fields, 0).await;
 
         // We expect this to work even if some fields fail, returning cached values for field1 and
         // field2
@@ -601,6 +615,7 @@ mod tests {
             StreamType::Logs,
             "test_stream",
             &[],
+            0,
         ));
 
         assert!(result.is_ok());

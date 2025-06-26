@@ -701,6 +701,7 @@ pub async fn search_partition(
             stream_type,
             &stream_name,
             &group_by_fields,
+            query.end_time,
         )
         .await?;
 
