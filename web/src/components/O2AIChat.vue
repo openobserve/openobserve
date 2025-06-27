@@ -216,12 +216,12 @@ import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL } from '@/utils/zincutils';
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface ChatHistoryEntry {
+export interface ChatHistoryEntry {
   id: number;
   timestamp: string;
   title: string;

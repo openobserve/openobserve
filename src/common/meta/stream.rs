@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     meta::{
         promql::Metadata,
-        stream::{StreamSettings, StreamStats, StreamType},
+        stream::{PatternAssociation, StreamSettings, StreamStats, StreamType},
     },
     utils::json,
 };
@@ -41,6 +41,7 @@ pub struct Stream {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
     pub total_fields: usize,
+    pub pattern_associations: Vec<PatternAssociation>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -153,6 +154,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            pattern_associations: vec![],
         };
 
         let list_stream = ListStream {
@@ -232,6 +234,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            pattern_associations: vec![],
         };
 
         assert!(stream.uds_schema.is_some());

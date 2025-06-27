@@ -35,6 +35,7 @@ use config::{
 };
 use flate2::read::GzDecoder;
 use infra::errors::{Error, Result};
+use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -71,6 +72,7 @@ pub async fn ingest(
     let cfg = config::get_config();
     let mut need_usage_report = true;
     let log_ingestion_errors = ingestion_log_enabled().await;
+    let pattern_manager = get_pattern_manager().await?;
 
     // check stream
     let stream_name = if cfg.common.skip_formatting_stream_name {
@@ -304,6 +306,19 @@ pub async fn ingest(
                 );
             }
 
+            // we do not drop the record here, just log error and continue process
+            match pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Logs,
+                in_stream_name,
+                &mut local_val,
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("error in processing record for patterns : {e}");
+                }
+            }
+
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
                 .or_insert_with(|| (Vec::new(), None));
@@ -438,6 +453,18 @@ pub async fn ingest(
                                 ALL_VALUES_COL_NAME.to_string(),
                                 json::Value::String(values.join(" ")),
                             );
+                        }
+
+                        match pattern_manager.process_at_ingestion(
+                            org_id,
+                            StreamType::Logs,
+                            &destination_stream,
+                            &mut local_val,
+                        ) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!("error in processing record for patterns : {e}");
+                            }
                         }
 
                         let (ts_data, fn_num) = json_data_by_stream

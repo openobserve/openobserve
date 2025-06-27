@@ -54,6 +54,7 @@ const organizationObj = {
     span_id_field_name: "span_id",
   },
   isDataIngested: false,
+  regexPatterns: [],
 };
 
 export default createStore({
@@ -235,6 +236,9 @@ export default createStore({
     setChatUpdated(state, payload) {
       state.chatUpdated = payload;
     },
+    setRegexPatterns(state, payload) {
+      state.organizationData.regexPatterns = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -377,6 +381,9 @@ export default createStore({
     },
     setChatUpdated(context, payload) {
       context.commit("setChatUpdated", payload);
+    },
+    setRegexPatterns(context, payload) {
+      context.commit("setRegexPatterns", payload);
     },
   },
   modules: {},
