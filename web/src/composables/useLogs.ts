@@ -364,8 +364,6 @@ const useLogs = () => {
     if (store.state.logs.isInitialized) {
       try {
         const state = store.getters["logs/getLogs"];
-        searchObj.loading = true;
-        searchObj.loadingHistogram = true;
         searchObj.organizationIdentifier = state.organizationIdentifier;
         searchObj.config = JSON.parse(JSON.stringify(state.config));
         searchObj.communicationMethod = state.communicationMethod;
@@ -397,8 +395,6 @@ const useLogs = () => {
         searchObj.data.histogram = JSON.parse(JSON.stringify(state.data.histogram));
         updateGridColumns();
         await nextTick();
-        searchObj.loading = false;
-        searchObj.loadingHistogram = false;
         // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
       } catch (e) {
         console.error("Error while initializing logs state", e);

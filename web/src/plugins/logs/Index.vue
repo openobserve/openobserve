@@ -1710,19 +1710,20 @@ export default defineComponent({
       if (
         newVal == true &&
         oldVal == false &&
-        this.searchObj.meta.histogramDirtyFlag == true &&
-        this.searchObj.data.queryResults.hits.length > 0
+        this.searchObj.meta?.histogramDirtyFlag == true &&
+        this.searchObj.data.queryResults?.hits?.length > 0
       ) {
         this.searchObj.meta.resetPlotChart = true;
         this.searchObj.data.queryResults.aggs = [];
       }
+
       let parsedSQL = null;
 
       if (this.searchObj.meta.sqlMode) parsedSQL = this.fnParsedSQL();
 
       if (
-        this.searchObj.meta.showHistogram &&
-        !this.searchObj.shouldIgnoreWatcher
+        this.searchObj.meta?.showHistogram &&
+        !this.searchObj?.shouldIgnoreWatcher
       ) {
         this.searchObj.data.queryResults.aggs = [];
 
