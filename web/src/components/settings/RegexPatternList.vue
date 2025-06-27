@@ -334,7 +334,7 @@
         });
       } catch (error) {
         $q.notify({
-          message: error.data.message || "Error deleting regex pattern",
+          message: error?.data?.message || "Error deleting regex pattern",
           color: "negative",
           icon: "error",
         });
