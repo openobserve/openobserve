@@ -395,10 +395,12 @@ export default defineComponent({
     const sortAsc = ref(true);
 
     const offset =
-      pagination.value.page - 1 * pagination.value.rowsPerPage < 0
+      (pagination.value.page - 1) * pagination.value.rowsPerPage < 0
         ? 0
-        : pagination.value.page - 1 * pagination.value.rowsPerPage;
+        : (pagination.value.page - 1) * pagination.value.rowsPerPage;
+
     const pageOffset = ref(offset);
+
     const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
 
     const streamFilterValues = [

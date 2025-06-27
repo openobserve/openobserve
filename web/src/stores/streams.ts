@@ -24,9 +24,6 @@ export default {
       getStream(state: any, streamType: string) {
         return state[streamType];
       },
-      getStreams(state: any) {
-        return state.streams;
-      },
       getStreamIndexMapping(state: any) {
         return state.streamsIndexMapping;
       },

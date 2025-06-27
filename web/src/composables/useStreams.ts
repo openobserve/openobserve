@@ -486,6 +486,7 @@ const useStreams = () => {
       // Deleting stream index that was mapped
       delete store.state.streams.streamsIndexMapping[streamType][streamName];
 
+      // TODO OK : Remove the multiple updates to store
       if (
         indexToRemove >= 0 &&
         indexToRemove < streamsCache[streamType].value?.list?.length
