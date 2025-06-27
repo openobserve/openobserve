@@ -22,6 +22,7 @@ use config::meta::{
     dashboards::reports::{ListReportsParams, Report as MetaReport},
     folder::{Folder as MetaFolder, FolderType},
 };
+pub use intermediate::convert_str_to_meta_report_timerange;
 pub use queries::ListReportsQueryResult;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ConnectionTrait, EntityTrait, ModelTrait, Set,

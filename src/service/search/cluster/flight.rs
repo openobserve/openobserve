@@ -157,7 +157,7 @@ pub async fn search(
                 .ok()
                 .map(RoleGroup::from)
         })
-        .unwrap_or(None);
+        .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
@@ -465,6 +465,8 @@ pub async fn run_datafusion(
     let streaming_id = req.streaming_id.clone();
     #[cfg(feature = "enterprise")]
     let use_cache = req.use_cache;
+    #[cfg(feature = "enterprise")]
+    let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -502,9 +504,13 @@ pub async fn run_datafusion(
                 "streaming_id is required for streaming aggregation query".to_string(),
             ));
         };
-        let mut rewriter =
-        o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter::new(streaming_id, start_time, end_time, use_cache).await;
 
+        // NOTE: temporary check
+        let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
+        let aggregation_cache_enabled = org_settings.aggregation_cache_enabled && use_cache;
+
+        let mut rewriter =
+            o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::StreamingAggsRewriter::new(streaming_id, start_time, end_time, aggregation_cache_enabled).await;
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
 
         // Check for aggs cache hit

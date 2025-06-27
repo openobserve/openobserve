@@ -182,7 +182,7 @@ pub async fn search(
                 .ok()
                 .map(RoleGroup::from)
         })
-        .unwrap_or(None);
+        .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
@@ -296,6 +296,7 @@ pub async fn search(
         end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
         timeout: req.timeout as u64,
         use_cache: req.use_cache,
+        histogram_interval: req.histogram_interval,
     };
 
     let context = tracing::Span::current().context();

@@ -139,6 +139,8 @@ pub struct Query {
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub histogram_interval: i64,
 }
 
 fn default_size() -> i64 {
@@ -162,6 +164,7 @@ impl Default for Query {
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         }
     }
 }
@@ -172,7 +175,18 @@ impl Request {
         match self.encoding {
             RequestEncoding::Base64 => {
                 self.query.sql = match base64::decode_url(&self.query.sql) {
-                    Ok(v) => v,
+                    Ok(v) => {
+                        match crate::utils::query_select_utils::replace_o2_custom_patterns(&v) {
+                            Ok(sql) => sql,
+                            Err(e) => {
+                                log::error!(
+                                    "Error replacing o2 custom patterns , returning original sql: {}",
+                                    e
+                                );
+                                v
+                            }
+                        }
+                    }
                     Err(e) => {
                         return Err(e);
                     }
@@ -618,6 +632,7 @@ impl SearchHistoryRequest {
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
+                histogram_interval: 0,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -821,6 +836,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             query_fn: query.query_fn.unwrap_or_default(),
             action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
+            histogram_interval: query.histogram_interval,
         }
     }
 }
@@ -1150,9 +1166,16 @@ impl MultiStreamRequest {
                     .as_ref()
                     .and_then(|v| base64::decode_url(v).ok())
             };
+            let sql = if let Ok(sql) =
+                crate::utils::query_select_utils::replace_o2_custom_patterns(&query.sql)
+            {
+                sql
+            } else {
+                query.sql.clone()
+            };
             res.push(Request {
                 query: Query {
-                    sql: query.sql.clone(),
+                    sql,
                     from: self.from,
                     size: self.size,
                     start_time: query.start_time.unwrap_or(self.start_time),
@@ -1166,6 +1189,7 @@ impl MultiStreamRequest {
                     skip_wal: self.skip_wal,
                     streaming_output: false,
                     streaming_id: None,
+                    histogram_interval: 0,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),

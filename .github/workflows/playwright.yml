@@ -127,6 +127,7 @@ jobs:
             "logsqueries.spec.js",
             "logsquickmode.spec.js",
             "multiselect-stream.spec.js",
+            "pagination.spec.js",
             "pipelines.spec.js",
             "reportsUpdated.spec.js",
             "reportsUpdated2.spec.js",
