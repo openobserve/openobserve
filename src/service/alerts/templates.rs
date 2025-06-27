@@ -42,10 +42,10 @@ pub async fn save(
     if template.name.contains('/') || is_ofga_unsupported(&template.name) {
         return Err(TemplateError::InvalidName);
     }
-    if let TemplateType::Email { title } = &template.template_type {
-        if title.is_empty() {
-            return Err(TemplateError::EmptyTitle);
-        }
+    if let TemplateType::Email { title } = &template.template_type
+        && title.is_empty()
+    {
+        return Err(TemplateError::EmptyTitle);
     }
 
     match db::alerts::templates::get(&template.org_id, &template.name).await {
@@ -91,7 +91,7 @@ pub async fn list(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("template:_all_{}", org_id))
+                    .contains(&format!("template:_all_{org_id}"))
         })
         .collect())
 }

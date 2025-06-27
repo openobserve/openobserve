@@ -472,7 +472,7 @@ fn process_partial_err(partial_err: Arc<Mutex<String>>, e: tonic::Status) {
     if partial_err.is_empty() {
         guard.push_str(e.to_string().as_str());
     } else {
-        guard.push_str(format!(" \n {}", e).as_str());
+        guard.push_str(format!(" \n {e}").as_str());
     }
 }
 
@@ -652,10 +652,10 @@ impl Stream for FlightStream {
 impl Drop for FlightStream {
     fn drop(&mut self) {
         let cfg = config::get_config();
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            if let Err(e) = self.create_stream_end_span() {
-                log::error!("error creating stream span: {}", e);
-            }
+        if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
+            && let Err(e) = self.create_stream_end_span()
+        {
+            log::error!("error creating stream span: {e}");
         }
         log::info!(
             "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",

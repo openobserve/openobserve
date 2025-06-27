@@ -124,8 +124,7 @@ impl Alert {
     /// If it is not present, then it uses the last_satisfied_at time from the alert table.
     /// Use this function instead of `get_last_satisfied_at_from_table` to get the actual timestamp.
     pub fn get_last_satisfied_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
-        if trigger.is_some() {
-            let trigger = trigger.unwrap();
+        if let Some(trigger) = trigger {
             let trigger_data: ScheduledTriggerData =
                 json::from_str(&trigger.data).unwrap_or_default();
             // last_satisfied_at is now supposed to be part of the trigger data
@@ -145,9 +144,7 @@ impl Alert {
     /// If it is not present, then it uses the last_triggered_at time from the alert table.
     /// Use this function instead of `get_last_triggered_at_from_table` to get the actual timestamp.
     pub fn get_last_triggered_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
-        if trigger.is_some() {
-            let trigger = trigger.unwrap();
-
+        if let Some(trigger) = trigger {
             // last_satisfied_at is now supposed to be part of the trigger data
             // but it was previously stored in the alert table. So, in case the trigger
             // data is not yet updated, we fallback to the value in the alert table.

@@ -69,15 +69,14 @@ impl Ingest for Ingester {
                     .unwrap_or(IngestionType::Multi); // multi is just place holder
                 if log_ingestion_type != IngestionType::Json {
                     Err(Error::IngestionError(format!(
-                        "Internal gPRC metric ingestion only supports json type data, got {:?}",
-                        log_ingestion_type
+                        "Internal gPRC metric ingestion only supports json type data, got {log_ingestion_type:?}"
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
                     crate::service::metrics::json::ingest(&org_id, data)
                         .await
                         .map(|_| ()) // we don't care about success response
-                        .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {}", e)))
+                        .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))
                 }
             }
             StreamType::Traces => {
@@ -88,15 +87,14 @@ impl Ingest for Ingester {
                     .unwrap_or(IngestionType::Multi); // multi is just place holder
                 if log_ingestion_type != IngestionType::Json {
                     Err(Error::IngestionError(format!(
-                        "Internal gRPC trace ingestion only supports json type data, got {:?}",
-                        log_ingestion_type
+                        "Internal gRPC trace ingestion only supports json type data, got {log_ingestion_type:?}"
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
                     crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name)
                         .await
                         .map(|_| ()) // we don't care about success response
-                        .map_err(|e| Error::IngestionError(format!("error in ingesting traces {}", e)))
+                        .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
                 }
             }
             StreamType::EnrichmentTables => {
@@ -128,20 +126,17 @@ impl Ingest for Ingester {
                 .await
                 {
                     Err(e) => Err(Error::IngestionError(format!(
-                        "Internal gPRC ingestion service errors saving enrichment data: {}",
-                        e
+                        "Internal gPRC ingestion service errors saving enrichment data: {e}"
                     ))),
                     Ok(res) => {
                         if res.status() != StatusCode::OK {
                             let status: StatusCode = res.status();
                             log::error!(
-                                "Internal gPRC ingestion service errors saving enrichment data: code: {}, body: {:?}",
-                                status,
+                                "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {:?}",
                                 res.into_body()
                             );
                             Err(Error::IngestionError(format!(
-                                "Internal gPRC ingestion service errors saving enrichment data: http code {}",
-                                status
+                                "Internal gPRC ingestion service errors saving enrichment data: http code {status}"
                             )))
                         } else {
                             Ok(())

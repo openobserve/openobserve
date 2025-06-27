@@ -60,8 +60,8 @@ impl Telemetry {
             HashMap::new()
         };
 
-        if data.is_some() {
-            for item in data.unwrap() {
+        if let Some(data) = data {
+            for item in data {
                 props.insert(item.0, item.1);
             }
         }

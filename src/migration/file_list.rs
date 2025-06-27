@@ -74,11 +74,11 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
             .query_deleted(org_id, end_time, 1_000_000)
             .await
             .expect("load file_list_deleted failed");
-        if !files.is_empty() {
-            if let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await {
-                log::error!("load file_list_deleted into db err: {}", e);
-                continue;
-            }
+        if !files.is_empty()
+            && let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await
+        {
+            log::error!("load file_list_deleted into db err: {e}");
+            continue;
         }
     }
 

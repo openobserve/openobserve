@@ -206,8 +206,8 @@ pub async fn get_job(updated_at: i64) -> Result<Option<Model>, errors::Error> {
         }
     };
 
-    if let Some(model) = &model {
-        if let Err(e) = Entity::update_many()
+    if let Some(model) = &model
+        && let Err(e) = Entity::update_many()
             .col_expr(Column::Status, Expr::value(1))
             .col_expr(Column::UpdatedAt, Expr::value(updated_at))
             .col_expr(Column::StartedAt, Expr::value(updated_at))
@@ -216,13 +216,12 @@ pub async fn get_job(updated_at: i64) -> Result<Option<Model>, errors::Error> {
             .filter(Column::Id.eq(&model.id))
             .exec(&tx)
             .await
-        {
-            log::error!("get job update status error: {e}");
-            if let Err(e) = tx.rollback().await {
-                return orm_err!(format!("get job rollback update status error: {e}"));
-            }
-            return orm_err!(format!("get job update status error: {e}"));
+    {
+        log::error!("get job update status error: {e}");
+        if let Err(e) = tx.rollback().await {
+            return orm_err!(format!("get job rollback update status error: {e}"));
         }
+        return orm_err!(format!("get job update status error: {e}"));
     }
 
     if let Err(e) = tx.commit().await {

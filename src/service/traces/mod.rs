@@ -94,7 +94,7 @@ pub async fn otlp_proto(
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid proto: {}", e),
+                format!("Invalid proto: {e}"),
             )));
         }
     };
@@ -129,7 +129,7 @@ pub async fn otlp_json(
             log::error!("[TRACES:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid json: {}", e),
+                format!("Invalid json: {e}"),
             )));
         }
     };
@@ -246,7 +246,7 @@ pub async fn handle_otlp_request(
                 for span_att in span.attributes {
                     let mut key = span_att.key;
                     if BLOCK_FIELDS.contains(&key.as_str()) {
-                        key = format!("attr_{}", key);
+                        key = format!("attr_{key}");
                     }
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
@@ -438,7 +438,7 @@ pub async fn handle_otlp_request(
                     e
                 );
                 partial_success.rejected_spans += records_count as i64;
-                partial_success.error_message = format!("Pipeline batch execution error: {}", e);
+                partial_success.error_message = format!("Pipeline batch execution error: {e}");
             }
             Ok(pl_results) => {
                 log::debug!(
@@ -886,31 +886,31 @@ async fn write_traces(
         }));
 
         // Start check for alert trigger
-        if let Some(alerts) = cur_stream_alerts {
-            if triggers.len() < alerts.len() {
-                let alert_end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Traces,
-                        stream_name,
-                        alert.get_unique_key()
-                    );
-                    // check if alert already evaluated
-                    if evaluated_alerts.contains(&key) {
-                        continue;
+        if let Some(alerts) = cur_stream_alerts
+            && triggers.len() < alerts.len()
+        {
+            let alert_end_time = now_micros();
+            for alert in alerts {
+                let key = format!(
+                    "{}/{}/{}/{}",
+                    org_id,
+                    StreamType::Traces,
+                    stream_name,
+                    alert.get_unique_key()
+                );
+                // check if alert already evaluated
+                if evaluated_alerts.contains(&key) {
+                    continue;
+                }
+                match alert
+                    .evaluate(Some(&record_val), (None, alert_end_time), None)
+                    .await
+                {
+                    Ok(res) if res.data.is_some() => {
+                        triggers.push((alert.clone(), res.data.unwrap()));
+                        evaluated_alerts.insert(key);
                     }
-                    match alert
-                        .evaluate(Some(&record_val), (None, alert_end_time), None)
-                        .await
-                    {
-                        Ok(res) if res.data.is_some() => {
-                            triggers.push((alert.clone(), res.data.unwrap()));
-                            evaluated_alerts.insert(key);
-                        }
-                        _ => {}
-                    }
+                    _ => {}
                 }
             }
         }
@@ -948,21 +948,22 @@ async fn write_traces(
     .await
     .map_err(|e| {
         log::error!("Error while writing traces: {}", e);
-        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+        std::io::Error::other(e.to_string())
     })?;
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
+    if !distinct_values.is_empty()
+        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
+    {
+        log::error!("Error while writing distinct values: {}", e);
     }
 
     // send trace metadata
-    if !trace_index_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await {
-            log::error!("Error while writing trace_index values: {}", e);
-        }
+    if !trace_index_values.is_empty()
+        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
+    {
+        log::error!("Error while writing trace_index values: {}", e);
     }
 
     // only one trigger per request

@@ -325,8 +325,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::OutOfRange(s) => write!(f, "Out of range: {}", s),
-            Self::BadRange(s) => write!(f, "Bad range: {}", s),
+            Self::OutOfRange(s) => write!(f, "Out of range: {s}"),
+            Self::BadRange(s) => write!(f, "Bad range: {s}"),
         }
     }
 }
@@ -355,15 +355,13 @@ impl std::fmt::Display for InvalidGetRange {
             Self::StartTooLarge { requested, length } => {
                 write!(
                     f,
-                    "Start too large: requested {} but length is {}",
-                    requested, length
+                    "Start too large: requested {requested} but length is {length}"
                 )
             }
             Self::Inconsistent { start, end } => {
                 write!(
                     f,
-                    "Inconsistent range: start {} is greater than end {}",
-                    start, end
+                    "Inconsistent range: start {start} is greater than end {end}"
                 )
             }
         }

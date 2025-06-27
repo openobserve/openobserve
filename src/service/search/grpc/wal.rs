@@ -118,23 +118,23 @@ pub async fn search_parquet(
         .await;
     for file in files_metadata {
         if file.meta.is_empty() {
-            wal::release_files(&[file.key.clone()]);
+            wal::release_files(std::slice::from_ref(&file.key));
             lock_files.retain(|f| f != &file.key);
             continue;
         }
-        if let Some((min_ts, max_ts)) = query.time_range {
-            if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
-                log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
-                    query.trace_id,
-                    &file.key,
-                    file.meta.min_ts,
-                    file.meta.max_ts
-                );
-                wal::release_files(&[file.key.clone()]);
-                lock_files.retain(|f| f != &file.key);
-                continue;
-            }
+        if let Some((min_ts, max_ts)) = query.time_range
+            && (file.meta.min_ts > max_ts || file.meta.max_ts < min_ts)
+        {
+            log::debug!(
+                "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
+                query.trace_id,
+                &file.key,
+                file.meta.min_ts,
+                file.meta.max_ts
+            );
+            wal::release_files(std::slice::from_ref(&file.key));
+            lock_files.retain(|f| f != &file.key);
+            continue;
         }
         new_files.push(file);
     }
@@ -611,14 +611,14 @@ async fn get_file_list_inner(
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(&[file.clone()]);
+                wal::release_files(std::slice::from_ref(file));
                 continue;
             }
         }
         if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {
-            wal::release_files(&[file.clone()]);
+            wal::release_files(std::slice::from_ref(file));
         }
     }
     Ok(result)

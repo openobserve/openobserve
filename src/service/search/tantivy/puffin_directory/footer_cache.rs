@@ -117,8 +117,7 @@ impl FooterCache {
         let footer_version = byteorder::LittleEndian::read_u32(&bytes.slice(range));
         if footer_version != FOOTER_CACHE_VERSION {
             return Err(tantivy::TantivyError::InvalidArgument(format!(
-                "Invalid footer version: {}",
-                footer_version
+                "Invalid footer version: {footer_version}"
             )));
         }
         // parse footer offset
@@ -128,8 +127,7 @@ impl FooterCache {
         // parse metadata
         if bytes.len() < FOOTER_OFFSET_LEN + FOOTER_VERSION_LEN + footer_offset as usize {
             return Err(tantivy::TantivyError::InvalidArgument(format!(
-                "Invalid footer offset: {}",
-                footer_offset
+                "Invalid footer offset: {footer_offset}"
             )));
         }
         let range = footer_offset as usize..(bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN);

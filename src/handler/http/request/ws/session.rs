@@ -289,11 +289,11 @@ async fn resolve_enterprise_user_id(
         // Cluster mode, try to determine user ID
         // First check if we're running without router nodes
         let router_nodes = get_cached_online_router_nodes().await;
-        if let Some(nodes) = router_nodes {
-            if nodes.is_empty() {
-                // Single node enterprise deployment
-                return Some(default_user_id.to_string());
-            }
+        if let Some(nodes) = router_nodes
+            && nodes.is_empty()
+        {
+            // Single node enterprise deployment
+            return Some(default_user_id.to_string());
         }
 
         // Next, try to use user_id from the event
@@ -538,8 +538,7 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
         session
     } else {
         return Err(Error::Message(format!(
-            "[req_id {}] session not found",
-            req_id
+            "[req_id {req_id}] session not found"
         )));
     };
 

@@ -54,10 +54,10 @@ pub struct TimedAnnotation {
 
 impl TimedAnnotation {
     pub fn validate(&self) -> Result<(), String> {
-        if let Some(end_time) = self.end_time {
-            if end_time <= self.start_time {
-                return Err("end time must be greater than start time".to_string());
-            }
+        if let Some(end_time) = self.end_time
+            && end_time <= self.start_time
+        {
+            return Err("end time must be greater than start time".to_string());
         }
 
         if self.title.is_empty() {

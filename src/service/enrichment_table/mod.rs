@@ -136,8 +136,7 @@ pub async fn save_enrichment_data(
             HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 format!(
-                    "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
-                    total_expected_size_in_mb, enrichment_table_max_size
+                    "enrichment table [{stream_name}] total expected storage size {total_expected_size_in_mb} exceeds max storage size {enrichment_table_max_size}"
                 ),
             )),
         );
@@ -243,13 +242,10 @@ pub async fn save_enrichment_data(
             Ok(stats) => stats,
             Err(e) => {
                 return Ok(HttpResponse::InternalServerError()
-                    .append_header((
-                        ERROR_HEADER,
-                        format!("Error writing enrichment table: {}", e),
-                    ))
+                    .append_header((ERROR_HEADER, format!("Error writing enrichment table: {e}")))
                     .json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Error writing enrichment table: {}", e),
+                        format!("Error writing enrichment table: {e}"),
                     )));
             }
         };
@@ -273,10 +269,10 @@ pub async fn save_enrichment_data(
         db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
 
     // notify update
-    if !schema.fields().is_empty() {
-        if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
-            log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
-        };
+    if !schema.fields().is_empty()
+        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await
+    {
+        log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }
 
     req_stats.response_time = start.elapsed().as_secs_f64();

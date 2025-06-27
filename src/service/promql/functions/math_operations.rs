@@ -108,8 +108,7 @@ fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
         }
         Value::None => Ok(Value::None),
         _ => Err(DataFusionError::NotImplemented(format!(
-            "Invalid input for minute value: {:?}",
-            data
+            "Invalid input for minute value: {data:?}"
         ))),
     }
 }

@@ -410,7 +410,7 @@ mod super_cluster {
     }
 
     pub async fn delete_user_from_super_cluster(email: &str) -> Result<(), infra::errors::Error> {
-        let key = format!("{USER_RECORD_KEY}{}", email);
+        let key = format!("{USER_RECORD_KEY}{email}");
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::user_delete(
                 &key,

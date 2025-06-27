@@ -39,10 +39,10 @@ pub async fn add(
     rum_token: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
     org_users::add(org_id, &user_email, role.clone(), token, rum_token.clone())
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to add user to org: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to add user to org: {e}"))?;
 
     log::debug!("Put into db_coordinator: {user_email}");
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
@@ -70,10 +70,10 @@ pub async fn update(
     rum_token: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
     org_users::update(org_id, &user_email, role.clone(), token, rum_token.clone())
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to update user role: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to update user role: {e}"))?;
 
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
@@ -94,10 +94,10 @@ pub async fn update(
 
 pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
     org_users::remove(org_id, &user_email)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
     let _ = delete_from_db_coordinator(&key, false, true, None).await;
 
     #[cfg(feature = "enterprise")]
@@ -107,10 +107,10 @@ pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error>
 
 pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
     let email = email.to_lowercase();
-    let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{}", email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{email}");
     org_users::remove_by_user(&email)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
     let _ = delete_from_db_coordinator(&key, false, true, None).await;
 
     #[cfg(feature = "enterprise")]
@@ -120,7 +120,7 @@ pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
 
 pub fn get_cached_user_org(org_id: &str, user_email: &str) -> Option<User> {
     let user_email = user_email.to_lowercase();
-    match ORG_USERS.get(&format!("{}/{}", org_id, user_email)) {
+    match ORG_USERS.get(&format!("{org_id}/{user_email}")) {
         Some(org_user) => match USERS.get(&user_email) {
             Some(user) => Some(User {
                 email: user.email.clone(),
@@ -145,13 +145,13 @@ pub async fn get_from_db(org_id: &str, user_email: &str) -> Result<OrgUserRecord
     let user_email = user_email.to_lowercase();
     let org_user = org_users::get(org_id, &user_email)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to fetch user role: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to fetch user role: {e}"))?;
     Ok(org_user)
 }
 
 pub async fn get(org_id: &str, user_email: &str) -> Result<OrgUserRecord, anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    if let Some(org_user) = ORG_USERS.get(&format!("{}/{}", org_id, user_email)) {
+    if let Some(org_user) = ORG_USERS.get(&format!("{org_id}/{user_email}")) {
         return Ok(org_user.value().clone());
     }
     let org_user = org_users::get(org_id, &user_email)
@@ -211,7 +211,7 @@ pub async fn update_rum_token(
     rum_token: &str,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
     org_users::update_rum_token(org_id, &user_email, rum_token)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update rum token: {}", e))?;
@@ -228,7 +228,7 @@ pub async fn update_token(
     token: &str,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
     org_users::update_token(org_id, &user_email, token)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update token: {}", e))?;
@@ -276,7 +276,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     if let Some(rum_token) = &item_value.rum_token {
                         USERS_RUM_TOKEN
                             .clone()
-                            .insert(format!("{}/{}", org_id, rum_token), item_value);
+                            .insert(format!("{org_id}/{rum_token}"), item_value);
                     }
                 } else if item_key.starts_with("many/user/") {
                     let item_key = item_key.strip_prefix("many/user/").unwrap();

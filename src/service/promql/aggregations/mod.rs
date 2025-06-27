@@ -405,3 +405,204 @@ pub(crate) fn score_to_instant_value(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Test data helpers
+    fn create_test_labels() -> Labels {
+        vec![
+            Arc::new(Label::new("instance", "localhost:9090")),
+            Arc::new(Label::new("job", "prometheus")),
+            Arc::new(Label::new("__name__", "http_requests_total")),
+        ]
+    }
+
+    fn create_test_vector() -> Value {
+        let labels1 = vec![
+            Arc::new(Label::new("instance", "localhost:9090")),
+            Arc::new(Label::new("job", "prometheus")),
+        ];
+        let labels2 = vec![
+            Arc::new(Label::new("instance", "localhost:9091")),
+            Arc::new(Label::new("job", "prometheus")),
+        ];
+
+        Value::Vector(vec![
+            InstantValue {
+                labels: labels1,
+                sample: Sample::new(1000000, 10.0),
+            },
+            InstantValue {
+                labels: labels2,
+                sample: Sample::new(1000000, 20.0),
+            },
+        ])
+    }
+
+    #[test]
+    fn test_labels_to_include() {
+        let actual_labels = create_test_labels();
+        let include_labels = vec!["instance".to_string(), "job".to_string()];
+
+        let result = labels_to_include(&include_labels, actual_labels.clone());
+
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().any(|l| l.name == "instance"));
+        assert!(result.iter().any(|l| l.name == "job"));
+        assert!(!result.iter().any(|l| l.name == "__name__"));
+    }
+
+    #[test]
+    fn test_labels_to_exclude_removes_name_label() {
+        let actual_labels = create_test_labels();
+        let exclude_labels = vec!["instance".to_string()];
+
+        let result = labels_to_exclude(&exclude_labels, actual_labels.clone());
+
+        // Should not contain __name__ label (which is NAME_LABEL)
+        assert!(!result.iter().any(|l| l.name == "__name__"));
+    }
+
+    #[test]
+    fn test_eval_arithmetic_processor() {
+        let mut score_values = HashMap::new();
+        let sum_labels = create_test_labels();
+        let f_handler = |total: f64, val: f64| total + val;
+
+        eval_arithmetic_processor(&mut score_values, f_handler, &sum_labels, 10.0);
+        eval_arithmetic_processor(&mut score_values, f_handler, &sum_labels, 20.0);
+
+        let signature = sum_labels.signature();
+        let item = score_values.get(&signature).unwrap();
+
+        assert_eq!(item.value, 30.0);
+        assert_eq!(item.num, 2);
+    }
+
+    #[test]
+    fn test_eval_count_values_processor() {
+        let mut score_values = HashMap::new();
+        let sum_labels = create_test_labels();
+
+        eval_count_values_processor(&mut score_values, &sum_labels);
+        eval_count_values_processor(&mut score_values, &sum_labels);
+
+        let signature = sum_labels.signature();
+        let item = score_values.get(&signature).unwrap();
+
+        assert_eq!(item.count, 2);
+    }
+
+    #[test]
+    fn test_eval_std_dev_var_processor() {
+        let mut score_values = HashMap::new();
+        let sum_labels = create_test_labels();
+
+        eval_std_dev_var_processor(&mut score_values, &sum_labels, 10.0);
+        eval_std_dev_var_processor(&mut score_values, &sum_labels, 20.0);
+
+        let signature = sum_labels.signature();
+        let item = score_values.get(&signature).unwrap();
+
+        assert_eq!(item.values, vec![10.0, 20.0]);
+        assert_eq!(item.current_count, 2);
+        assert_eq!(item.current_sum, 30.0);
+        assert_eq!(item.current_mean, 15.0);
+    }
+
+    #[test]
+    fn test_eval_arithmetic_with_exclude_labels() {
+        let data = create_test_vector();
+        let exclude_labels = LabelModifier::Exclude(promql_parser::label::Labels {
+            labels: vec!["instance".to_string()],
+        });
+
+        let result = eval_arithmetic(
+            &Some(exclude_labels),
+            data,
+            "test_function",
+            |total: f64, val: f64| total + val,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(result.len(), 1); // Only job label remains
+    }
+
+    #[test]
+    fn test_eval_std_dev_var_with_include_labels() {
+        let data = create_test_vector();
+        let include_labels = LabelModifier::Include(promql_parser::label::Labels {
+            labels: vec!["instance".to_string()],
+        });
+
+        let result = eval_std_dev_var(&Some(include_labels), data, "stddev")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(result.len(), 2); // Two different instance values
+    }
+
+    #[test]
+    fn test_eval_count_values_with_include_labels() {
+        let data = create_test_vector();
+        let include_labels = LabelModifier::Include(promql_parser::label::Labels {
+            labels: vec!["instance".to_string()],
+        });
+
+        let result = eval_count_values(&Some(include_labels), data, "count_values", "value_label")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(result.len(), 2); // Two different instance values
+    }
+
+    #[test]
+    fn test_eval_count_values_with_none_value() {
+        let result = eval_count_values(&None, Value::None, "count_values", "value_label").unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_eval_count_values_with_invalid_value_type() {
+        let result = eval_count_values(&None, Value::Float(10.0), "count_values", "value_label");
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("function only accept vector values")
+        );
+    }
+
+    #[test]
+    fn test_prepare_vector() {
+        let timestamp = 1000000;
+        let value = 42.5;
+
+        let result = prepare_vector(timestamp, value).unwrap();
+
+        match result {
+            Value::Vector(values) => {
+                assert_eq!(values.len(), 1);
+                let instant_value = &values[0];
+                assert_eq!(instant_value.sample.timestamp, timestamp);
+                assert_eq!(instant_value.sample.value, value);
+                assert!(instant_value.labels.is_empty());
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
+    fn test_score_to_instant_value_with_none() {
+        let timestamp = 1000000;
+
+        // This should panic due to unwrap() on None
+        score_to_instant_value(timestamp, None);
+    }
+}

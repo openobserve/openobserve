@@ -251,11 +251,11 @@ pub async fn list(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("report:{}", report.report_name))
+                    .contains(&format!("report:{}", &report.report_name))
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("report:_all_{}", org_id))
+                    .contains(&format!("report:_all_{org_id}"))
         })
         .collect_vec();
     Ok(result)

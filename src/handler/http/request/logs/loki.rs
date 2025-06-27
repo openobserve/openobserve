@@ -150,7 +150,7 @@ fn parse_protobuf_request(
         Some("snappy") | None => snap::raw::Decoder::new()
             .decompress_vec(&body)
             .map_err(|e| LokiError::UnsupportedContentEncoding {
-                encoding: format!("snappy decompression failed: {}", e),
+                encoding: format!("snappy decompression failed: {e}"),
             })?,
         Some("identity") => body.to_vec(),
         Some(encoding) => {

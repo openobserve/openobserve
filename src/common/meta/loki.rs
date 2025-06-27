@@ -118,31 +118,31 @@ impl From<LokiError> for actix_web::HttpResponse {
             // Client errors (400)
             LokiError::InvalidTimestamp { message } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("invalid timestamp: {}", message)),
+                .body(format!("invalid timestamp: {message}")),
             LokiError::InvalidLabels { message } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("invalid labels: {}", message)),
+                .body(format!("invalid labels: {message}")),
             LokiError::EmptyStream => HttpResponse::BadRequest()
                 .content_type("text/plain")
                 .body("empty stream data"),
             LokiError::UnsupportedContentType { content_type } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("unsupported content type: {}", content_type)),
+                .body(format!("unsupported content type: {content_type}")),
             LokiError::UnsupportedContentEncoding { encoding } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("unsupported content encoding: {}", encoding)),
+                .body(format!("unsupported content encoding: {encoding}")),
             LokiError::ProtobufDecode { source } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("failed to decode protobuf: {}", source)),
+                .body(format!("failed to decode protobuf: {source}")),
             LokiError::SnappyDecompression { source } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("failed to decompress snappy: {}", source)),
+                .body(format!("failed to decompress snappy: {source}")),
             LokiError::JsonParse { source } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("failed to parse JSON: {}", source)),
+                .body(format!("failed to parse JSON: {source}")),
             LokiError::GzipDecompression { source } => HttpResponse::BadRequest()
                 .content_type("text/plain")
-                .body(format!("failed to decompress gzip: {}", source)),
+                .body(format!("failed to decompress gzip: {source}")),
 
             // Server errors (500)
             LokiError::Ingestion { .. } => HttpResponse::InternalServerError()

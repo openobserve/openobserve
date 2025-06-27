@@ -153,8 +153,5 @@ pub fn get_resource_from_params(
     api_group_operation: &str,
     user_id: &str,
 ) -> String {
-    format!(
-        "{}:{}:{}:{}:{}:{}",
-        org, rule_type, user_role, api_group_name, api_group_operation, user_id
-    )
+    format!("{org}:{rule_type}:{user_role}:{api_group_name}:{api_group_operation}:{user_id}")
 }

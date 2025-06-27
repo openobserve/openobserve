@@ -34,3 +34,39 @@ fn exec(series: RangeValue) -> Option<f64> {
         ExtrapolationKind::Increase,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    #[test]
+    fn test_increase_function() {
+        // Create a range value with increasing counter values
+        let samples = vec![crate::service::promql::value::Sample::new(1000, 10.0)];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                eval_ts: 3000,
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = increase(matrix).unwrap();
+
+        // Should return a vector with increase value
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 0);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

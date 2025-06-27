@@ -81,10 +81,10 @@ impl PuffinDirWriter {
         let file_paths = self.file_paths.read().expect("poisoned lock");
         let allowed_file_paths = file_paths.iter().filter(|path| {
             let mut allowed = false;
-            if let Some(path_ext) = path.extension() {
-                if ALLOWED_FILE_EXT.contains(&path_ext.to_str().unwrap()) {
-                    allowed = true;
-                }
+            if let Some(path_ext) = path.extension()
+                && ALLOWED_FILE_EXT.contains(&path_ext.to_str().unwrap())
+            {
+                allowed = true;
             }
 
             // check if its meta.json file

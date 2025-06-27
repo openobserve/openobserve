@@ -397,13 +397,13 @@ impl RangeValue {
             self.samples.extend(other.samples);
         }
         // check exemplars
-        if let Some(exemplars) = other.exemplars {
-            if !exemplars.is_empty() {
-                if let Some(self_exemplars) = &mut self.exemplars {
-                    self_exemplars.extend(exemplars);
-                } else {
-                    self.exemplars = Some(exemplars);
-                }
+        if let Some(exemplars) = other.exemplars
+            && !exemplars.is_empty()
+        {
+            if let Some(self_exemplars) = &mut self.exemplars {
+                self_exemplars.extend(exemplars);
+            } else {
+                self.exemplars = Some(exemplars);
             }
         }
     }

@@ -31,3 +31,44 @@ fn exec(data: RangeValue) -> Option<f64> {
         .sum();
     Some(changes)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    #[test]
+    fn test_changes_function() {
+        // Create a range value with changing counter values
+        let samples = vec![
+            crate::service::promql::value::Sample::new(1000, 10.0),
+            crate::service::promql::value::Sample::new(2000, 15.0),
+            crate::service::promql::value::Sample::new(3000, 25.0),
+            crate::service::promql::value::Sample::new(4000, 25.0), // No change
+        ];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                eval_ts: 4000,
+                range: Duration::from_secs(3),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = changes(matrix).unwrap();
+
+        // Should return a vector with number of changes
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 1);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

@@ -38,3 +38,46 @@ fn exec(data: RangeValue) -> Option<f64> {
     };
     Some(dt_value / dt_seconds)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    #[test]
+    fn test_irate_function() {
+        // Create a range value with increasing counter values
+        let samples = vec![
+            crate::service::promql::value::Sample::new(1000, 10.0),
+            crate::service::promql::value::Sample::new(2000, 20.0),
+            crate::service::promql::value::Sample::new(3000, 30.0),
+        ];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                eval_ts: 3000,
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = irate(matrix).unwrap();
+
+        // Should return a vector with irate value
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 1);
+                // Irate should be positive for increasing counter
+                assert!(v[0].sample.value > 0.0);
+                assert_eq!(v[0].sample.timestamp, 3000);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

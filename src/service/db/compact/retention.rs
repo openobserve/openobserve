@@ -51,10 +51,10 @@ pub async fn delete_stream(
     let key = mk_key(org_id, stream_type, stream_name, date_range);
 
     // write in cache
-    if let Some(v) = CACHE.get(&key) {
-        if v.value() + hour_micros(1) > now_micros() {
-            return Ok(()); // already in cache, don't create same task in one hour
-        }
+    if let Some(v) = CACHE.get(&key)
+        && v.value() + hour_micros(1) > now_micros()
+    {
+        return Ok(()); // already in cache, don't create same task in one hour
     }
 
     let db_key = format!("/compact/delete/{key}");

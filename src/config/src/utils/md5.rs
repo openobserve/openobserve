@@ -16,7 +16,7 @@
 // Get the md5 hash of a string
 pub fn hash(input: &str) -> String {
     let digest = md5::compute(input.as_bytes());
-    format!("{:x}", digest)
+    format!("{digest:x}")
 }
 
 // Get a short hash of a string

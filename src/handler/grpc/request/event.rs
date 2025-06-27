@@ -76,17 +76,17 @@ impl Event for Eventer {
                 }
 
                 // cache index for the parquet
-                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
-                    if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
-                    {
-                        files_to_download.push((
-                            item.id,
-                            item.account.clone(),
-                            ttv_file,
-                            item.meta.index_size,
-                            item.meta.max_ts,
-                        ));
-                    }
+                if cfg.cache_latest_files.cache_index
+                    && item.meta.index_size > 0
+                    && let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
+                {
+                    files_to_download.push((
+                        item.id,
+                        item.account.clone(),
+                        ttv_file,
+                        item.meta.index_size,
+                        item.meta.max_ts,
+                    ));
                 }
             }
 

@@ -41,11 +41,11 @@ impl RedirectResponse {
             let query_string: String = self
                 .query_params
                 .iter()
-                .map(|(key, value)| format!("{}={}", key, value))
+                .map(|(key, value)| format!("{key}={value}"))
                 .collect::<Vec<String>>()
                 .join("&");
 
-            redirect_uri = format!("{}?{}", redirect_uri, query_string);
+            redirect_uri = format!("{redirect_uri}?{query_string}");
         }
 
         redirect_uri
@@ -84,7 +84,7 @@ impl RedirectResponse {
 impl fmt::Display for RedirectResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let redirect_uri = self.build_full_redirect_uri();
-        write!(f, "Redirecting to {}", redirect_uri)
+        write!(f, "Redirecting to {redirect_uri}")
     }
 }
 

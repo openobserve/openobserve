@@ -105,14 +105,13 @@ pub async fn validator(
                 );
 
                 #[cfg(feature = "enterprise")]
-                if let Some(role) = &res.user_role {
-                    if role.eq(&UserRole::Viewer)
-                        && req.method().eq(&Method::PUT)
-                        && path.ends_with(&format!("users/{}", res.user_email))
-                    {
-                        // Viewer should be able to update its own details
-                        return Ok(req);
-                    }
+                if let Some(role) = &res.user_role
+                    && role.eq(&UserRole::Viewer)
+                    && req.method().eq(&Method::PUT)
+                    && path.ends_with(&format!("users/{}", res.user_email))
+                {
+                    // Viewer should be able to update its own details
+                    return Ok(req);
                 }
 
                 if auth_info.bypass_check
@@ -158,10 +157,10 @@ pub async fn validate_credentials(
     path: &str,
 ) -> Result<TokenValidationResponse, Error> {
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
-    if let Some(v) = path_columns.last() {
-        if v.is_empty() {
-            path_columns.pop();
-        }
+    if let Some(v) = path_columns.last()
+        && v.is_empty()
+    {
+        path_columns.pop();
     }
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -312,10 +311,10 @@ pub async fn validate_credentials_ext(
     let config = get_config();
     let password_ext_salt = config.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
-    if let Some(v) = path_columns.last() {
-        if v.is_empty() {
-            path_columns.pop();
-        }
+    if let Some(v) = path_columns.last()
+        && v.is_empty()
+    {
+        path_columns.pop();
     }
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -998,7 +997,7 @@ pub(crate) async fn list_objects_for_user(
 /// Helper function to extract the relative path after the base URI and path prefix
 fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
     let base_uri = config::get_config().common.base_uri.clone();
-    let full_prefix = format!("{}{}", base_uri, path_prefix);
+    let full_prefix = format!("{base_uri}{path_prefix}");
     full_path
         .strip_prefix(&full_prefix)
         .unwrap_or(full_path)
@@ -1043,7 +1042,7 @@ fn extract_full_url(req: &ServiceRequest) -> String {
         .map(|pq| pq.as_str())
         .unwrap_or("");
 
-    format!("{}://{}{}", scheme, host, path)
+    format!("{scheme}://{host}{path}")
 }
 
 #[cfg(test)]

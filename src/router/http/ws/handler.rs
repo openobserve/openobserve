@@ -644,7 +644,7 @@ async fn select_querier(trace_id: &str, role_group: Option<RoleGroup>) -> WsResu
         role_group,
     )
     .await
-    .ok_or_else(|| WsError::QuerierNotAvailable(format!("for trace_id {}", trace_id)))?;
+    .ok_or_else(|| WsError::QuerierNotAvailable(format!("for trace_id {trace_id}")))?;
     Ok(node)
 }
 #[cfg(feature = "enterprise")]

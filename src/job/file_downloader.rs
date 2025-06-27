@@ -288,14 +288,12 @@ async fn download_file(
     let cfg = get_config();
 
     // download file from node
-    if cfg.cache_latest_files.download_from_node {
-        if let Ok(ok) =
+    if cfg.cache_latest_files.download_from_node
+        && let Ok(ok) =
             download_file_with_consistent_hash(file_id, account, file_name, file_size).await
-        {
-            if ok {
-                return Ok(file_size);
-            }
-        }
+        && ok
+    {
+        return Ok(file_size);
     }
 
     // download from object store
@@ -462,18 +460,18 @@ pub async fn download_from_node(
     // Cache the file contents
     for (file, content) in file_contents {
         let data = content.freeze();
-        if let Some(size) = file_size_map.get(&file) {
-            if *size != data.len() {
-                log::warn!(
-                    "[FILE_CACHE_DOWNLOAD:gRPC] Failed to download file {} from {}: size mismatch, expected {} but got {}",
-                    file,
-                    addr,
-                    size,
-                    data.len()
-                );
-                downloaded_files.remove(&file);
-                continue;
-            }
+        if let Some(size) = file_size_map.get(&file)
+            && *size != data.len()
+        {
+            log::warn!(
+                "[FILE_CACHE_DOWNLOAD:gRPC] Failed to download file {} from {}: size mismatch, expected {} but got {}",
+                file,
+                addr,
+                size,
+                data.len()
+            );
+            downloaded_files.remove(&file);
+            continue;
         }
         if let Err(e) = infra::cache::file_data::set(&file, data).await {
             log::error!(

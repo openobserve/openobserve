@@ -481,8 +481,7 @@ fn generate_index_condition(index_condition: &str) -> Result<Option<IndexConditi
             Ok(cond) => cond,
             Err(e) => {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(format!(
-                    "Invalid index condition JSON: {}",
-                    e
+                    "Invalid index condition JSON: {e}",
                 ))));
             }
         };

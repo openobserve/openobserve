@@ -187,8 +187,8 @@ pub async fn ingest(
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {
-                log::error!("IngestionError: {:?}", e);
-                return Err(Error::IngestionError(format!("Failed processing: {:?}", e)));
+                log::error!("IngestionError: {e:?}");
+                return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
             }
         };
 
@@ -262,12 +262,9 @@ pub async fn ingest(
             if streams_need_original_map
                 .get(&stream_name)
                 .is_some_and(|v| *v)
-                && original_data.is_some()
+                && let Some(original_data) = original_data
             {
-                local_val.insert(
-                    ORIGINAL_DATA_COL_NAME.to_string(),
-                    original_data.unwrap().into(),
-                );
+                local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
                 let record_id = crate::service::ingestion::generate_record_id(
                     org_id,
                     &stream_name,
@@ -322,13 +319,10 @@ pub async fn ingest(
         {
             Err(e) => {
                 log::error!(
-                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                    org_id,
-                    stream_name,
-                    e
+                    "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}.",
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -703,10 +697,10 @@ pub fn get_size_of_var_int_header(bytes: &[u8]) -> Option<usize> {
 
 fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Vec<json::Value>> {
     // If it's a protobuf, process it as an OpenTelemetry 1.0 metric
-    if let Some(header) = get_size_of_var_int_header(&data) {
-        if let Ok(a) = ExportMetricsServiceRequest::decode(&mut Cursor::new(&data[header..])) {
-            return construct_values_from_open_telemetry_v1_metric(a);
-        }
+    if let Some(header) = get_size_of_var_int_header(&data)
+        && let Ok(a) = ExportMetricsServiceRequest::decode(&mut Cursor::new(&data[header..]))
+    {
+        return construct_values_from_open_telemetry_v1_metric(a);
     }
 
     let mut events = vec![];
@@ -786,7 +780,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                         "CloudWatch metrics dimensions parsing failed"
                     ))?
                     .iter()
-                    .map(|(k, v)| format!("{}=[{}]", k, v))
+                    .map(|(k, v)| format!("{k}=[{v}]"))
                     .collect::<Vec<_>>()
                     .join(", ");
 
@@ -914,7 +908,7 @@ fn construct_values_from_open_telemetry_v1_metric(
                         }
                         .into_iter()
                         .filter_map(get_tuple_from_open_telemetry_key_value)
-                        .map(|(k, v)| format!("{}=[\"{}\"]", k, v))
+                        .map(|(k, v)| format!("{k}=[\"{v}\"]"))
                         .collect::<Vec<_>>()
                         .join(", ");
                         metric_value.insert("metric_dimensions".to_string(), string.into());

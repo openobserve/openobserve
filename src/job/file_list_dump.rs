@@ -114,7 +114,7 @@ async fn lock_stream(org_id: &str, stream_type: StreamType, stream_name: &str) -
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = match dist_lock::lock(&lock_key, 0).await {
             Ok(v) => v,
             Err(_) => return None,

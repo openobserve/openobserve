@@ -87,7 +87,7 @@ pub async fn generate_job_by_stream(
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
@@ -198,7 +198,7 @@ pub async fn generate_old_data_job_by_stream(
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
@@ -961,7 +961,7 @@ pub async fn merge_files(
             }
 
             let id = ider::generate();
-            let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+            let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
@@ -1009,7 +1009,7 @@ pub async fn merge_files(
                 }
 
                 let id = ider::generate();
-                let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+                let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
@@ -1180,20 +1180,16 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
         if let Err(e) = infra_file_list::batch_process(events).await {
-            log::error!("[COMPACTOR] batch_process to db failed, retrying: {}", e);
+            log::error!("[COMPACTOR] batch_process to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
-        if !del_items.is_empty() {
-            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
-            {
-                log::error!(
-                    "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
+        if !del_items.is_empty()
+            && let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
+        {
+            log::error!("[COMPACTOR] batch_add_deleted to db failed, retrying: {e}");
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
         }
         success = true;
         break;
@@ -1211,7 +1207,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
                 }
             }
             if let Err(e) = db::file_list::broadcast::send(&events).await {
-                log::error!("[COMPACTOR] send broadcast for file_list failed: {}", e);
+                log::error!("[COMPACTOR] send broadcast for file_list failed: {e}");
             }
         }
     } else {
@@ -1364,11 +1360,11 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                         if let Err(e) =
                             file_list::delete_parquet_file(&file_account, &file_name, true).await
                         {
-                            log::error!("[COMPACT] delete from file_list err: {}", e);
+                            log::error!("[COMPACT] delete from file_list err: {e}");
                         }
                         Some(file_name)
                     } else {
-                        log::error!("[COMPACT] download file to cache err: {}", e);
+                        log::error!("[COMPACT] download file to cache err: {e}");
                         // remove downloaded file
                         let _ = file_data::disk::remove(&file_name).await;
                         None
@@ -1407,10 +1403,10 @@ fn generate_schema_diff(
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = latest_schema_map.get(field.name()) {
-            if field.data_type() != latest_field.data_type() {
-                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-            }
+        if let Some(latest_field) = latest_schema_map.get(field.name())
+            && field.data_type() != latest_field.data_type()
+        {
+            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
         }
     }
 

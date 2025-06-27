@@ -62,3 +62,51 @@ pub(crate) fn label_join(
         .collect();
     Ok(Value::Vector(rate_values))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_label_join_function() {
+        let eval_ts = 1000;
+
+        // Create instant values with labels
+        let mut labels1 = crate::service::promql::value::Labels::default();
+        labels1.push(Arc::new(Label::new("instance", "server1")));
+        labels1.push(Arc::new(Label::new("job", "web")));
+
+        let instant_value1 = InstantValue {
+            labels: labels1,
+            sample: crate::service::promql::value::Sample::new(eval_ts, 42.0),
+        };
+
+        let mut labels2 = crate::service::promql::value::Labels::default();
+        labels2.push(Arc::new(Label::new("instance", "server2")));
+        labels2.push(Arc::new(Label::new("job", "web")));
+
+        let instant_value2 = InstantValue {
+            labels: labels2,
+            sample: crate::service::promql::value::Sample::new(eval_ts, 43.0),
+        };
+
+        let vector = Value::Vector(vec![instant_value1, instant_value2]);
+        let source_labels = vec!["instance".to_string(), "job".to_string()];
+        let result = label_join(vector, "combined", "-", source_labels).unwrap();
+
+        // Should return a vector with joined labels
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 2);
+                // Check that the combined label was added
+                let combined_label1 = v[0].labels.iter().find(|l| l.name == "combined");
+                let combined_label2 = v[1].labels.iter().find(|l| l.name == "combined");
+                assert!(combined_label1.is_some());
+                assert!(combined_label2.is_some());
+                assert_eq!(combined_label1.unwrap().value, "server1-web");
+                assert_eq!(combined_label2.unwrap().value, "server2-web");
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

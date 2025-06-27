@@ -101,8 +101,7 @@ fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
         Value::Vector(v) => v,
         _ => {
             return Err(DataFusionError::NotImplemented(format!(
-                "Invalid input for minute value: {:?}",
-                data
+                "Invalid input for minute value: {data:?}",
             )));
         }
     };

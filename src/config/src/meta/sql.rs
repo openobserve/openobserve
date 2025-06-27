@@ -591,27 +591,27 @@ fn parse_expr_for_field(
             }
         }
         SqlExpr::IsNull(expr) => {
-            if let SqlExpr::Identifier(ident) = expr.as_ref() {
-                if parse_expr_check_field_name(&ident.value, field) {
-                    fields.push((
-                        ident.value.to_string(),
-                        SqlValue::String("".to_string()),
-                        SqlOperator::Eq,
-                        *expr_op,
-                    ));
-                }
+            if let SqlExpr::Identifier(ident) = expr.as_ref()
+                && parse_expr_check_field_name(&ident.value, field)
+            {
+                fields.push((
+                    ident.value.to_string(),
+                    SqlValue::String("".to_string()),
+                    SqlOperator::Eq,
+                    *expr_op,
+                ));
             }
         }
         SqlExpr::IsNotNull(expr) => {
-            if let SqlExpr::Identifier(ident) = expr.as_ref() {
-                if parse_expr_check_field_name(&ident.value, field) {
-                    fields.push((
-                        ident.value.to_string(),
-                        SqlValue::String("".to_string()),
-                        SqlOperator::Eq,
-                        *expr_op,
-                    ));
-                }
+            if let SqlExpr::Identifier(ident) = expr.as_ref()
+                && parse_expr_check_field_name(&ident.value, field)
+            {
+                fields.push((
+                    ident.value.to_string(),
+                    SqlValue::String("".to_string()),
+                    SqlOperator::Eq,
+                    *expr_op,
+                ));
             }
         }
         _ => {}
@@ -643,21 +643,21 @@ fn parse_expr_like(
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
-    if let SqlExpr::Identifier(ident) = expr {
-        if parse_expr_check_field_name(&ident.value, field) {
-            let val = get_value_from_expr(pattern);
-            if val.is_none() {
-                return Err(anyhow::anyhow!(
-                    "SqlExpr::Like: We only support Identifier at the moment"
-                ));
-            }
-            fields.push((
-                ident.value.to_string(),
-                val.unwrap(),
-                SqlOperator::Like,
-                *next_op,
+    if let SqlExpr::Identifier(ident) = expr
+        && parse_expr_check_field_name(&ident.value, field)
+    {
+        let val = get_value_from_expr(pattern);
+        if val.is_none() {
+            return Err(anyhow::anyhow!(
+                "SqlExpr::Like: We only support Identifier at the moment"
             ));
         }
+        fields.push((
+            ident.value.to_string(),
+            val.unwrap(),
+            SqlOperator::Like,
+            *next_op,
+        ));
     }
     Ok(())
 }
@@ -979,10 +979,10 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyho
                     fields.extend(v);
                 }
             }
-            if let Some(expr) = else_result.as_ref() {
-                if let Some(v) = get_field_name_from_expr(expr)? {
-                    fields.extend(v);
-                }
+            if let Some(expr) = else_result.as_ref()
+                && let Some(v) = get_field_name_from_expr(expr)?
+            {
+                fields.extend(v);
             }
             Ok((!fields.is_empty()).then_some(fields))
         }
@@ -1013,10 +1013,10 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyho
                             stride,
                         } => {
                             let mut func = |expr: &Option<SqlExpr>| -> Result<(), anyhow::Error> {
-                                if let Some(expr) = expr {
-                                    if let Some(v) = get_field_name_from_expr(expr)? {
-                                        fields.extend(v);
-                                    }
+                                if let Some(expr) = expr
+                                    && let Some(v) = get_field_name_from_expr(expr)?
+                                {
+                                    fields.extend(v);
                                 }
                                 Ok(())
                             };

@@ -318,11 +318,11 @@ impl QuerierConnection {
 
     pub async fn _send_ping(&self) -> WsResult<()> {
         let mut write_guard = self.write.write().await;
-        if let Some(write) = write_guard.as_mut() {
-            if let Err(e) = write.send(WsMessage::Ping(vec![])).await {
-                drop(write_guard);
-                return Err(WsError::ConnectionError(e.to_string()));
-            }
+        if let Some(write) = write_guard.as_mut()
+            && let Err(e) = write.send(WsMessage::Ping(vec![])).await
+        {
+            drop(write_guard);
+            return Err(WsError::ConnectionError(e.to_string()));
         }
         drop(write_guard);
         Ok(())
@@ -512,14 +512,11 @@ impl Connection for QuerierConnection {
                 }
                 Err(e) => {
                     log::error!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via connection {}. Mark the connection disconnected",
-                        trace_id,
-                        e
+                        "[WS::QuerierConnection] trace_id: {trace_id}, error sending messages via connection {e}. Mark the connection disconnected",
                     );
                     drop(write_guard);
                     Err(WsError::ConnectionError(format!(
-                        "[WS::QuerierConnection] trace_id: {}, error sending messages via connection {}. Mark the connection disconnected",
-                        trace_id, e
+                        "[WS::QuerierConnection] trace_id: {trace_id}, error sending messages via connection {e}. Mark the connection disconnected",
                     )))
                 }
             }
@@ -551,8 +548,7 @@ fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Re
         }
         other_schema => {
             return Err(WsError::QuerierWSUrlError(format!(
-                "Unsupported URL scheme: {}",
-                other_schema
+                "Unsupported URL scheme: {other_schema}"
             )));
         }
     }

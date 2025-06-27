@@ -26,11 +26,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             let actual_message: KeysMessage = serde_json::from_slice(&msg.value.unwrap())?;
             match actual_message {
                 KeysMessage::Delete { name, org } => {
-                    log::info!("[SUPER_CLUSTER:DB] deleting key {}/{}", org, name);
+                    log::info!("[SUPER_CLUSTER:DB] deleting key {org}/{name}");
                     infra::table::cipher::remove(&org, EntryKind::CipherKey, &name).await?;
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
-                        .delete(&format!("/cipher_keys/{}/{}", org, name), false, true, None)
+                        .delete(&format!("/cipher_keys/{org}/{name}"), false, true, None)
                         .await?;
                 }
                 KeysMessage::Put { entry } => {
@@ -49,7 +49,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .put(
-                            &format!("/cipher_keys/{}/{}", org, name),
+                            &format!("/cipher_keys/{org}/{name}"),
                             bytes::Bytes::new(), // no actual data, the receiver can query the db
                             true,
                             None,
@@ -68,7 +68,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .put(
-                            &format!("/cipher_keys/{}/{}", org, name),
+                            &format!("/cipher_keys/{org}/{name}"),
                             bytes::Bytes::new(), // no actual data, the receiver can query the db
                             true,
                             None,

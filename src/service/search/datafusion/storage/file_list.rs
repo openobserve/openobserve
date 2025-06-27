@@ -36,7 +36,7 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
 }
 
 pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
-    let key = format!("{}/schema={}", trace_id, schema_key);
+    let key = format!("{trace_id}/schema={schema_key}");
     let mut values = Vec::with_capacity(files.len());
     let mut segment_data = HashMap::new();
     for file in files {

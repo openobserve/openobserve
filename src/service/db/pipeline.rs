@@ -166,23 +166,23 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     stream_exec_pl.clear();
 
     for pipeline in pipelines.into_iter() {
-        if pipeline.enabled {
-            if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                match ExecutablePipeline::new(&pipeline).await {
-                    Err(e) => {
-                        log::error!(
-                            "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
-                            pipeline.org,
-                            pipeline.id,
-                            e
-                        )
-                    }
-                    Ok(exec_pl) => {
-                        pipeline_stream_mapping_cache.insert(pipeline.id, stream_params.clone());
-                        stream_exec_pl.insert(stream_params.clone(), exec_pl);
-                    }
-                };
-            }
+        if pipeline.enabled
+            && let PipelineSource::Realtime(stream_params) = &pipeline.source
+        {
+            match ExecutablePipeline::new(&pipeline).await {
+                Err(e) => {
+                    log::error!(
+                        "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
+                        pipeline.org,
+                        pipeline.id,
+                        e
+                    )
+                }
+                Ok(exec_pl) => {
+                    pipeline_stream_mapping_cache.insert(pipeline.id, stream_params.clone());
+                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                }
+            };
         }
     }
 

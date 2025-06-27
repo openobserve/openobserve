@@ -41,3 +41,46 @@ pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
         .collect();
     Ok(Value::Vector(out))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::promql::value::Labels;
+
+    #[test]
+    fn test_clamp_function() {
+        let eval_ts = 1000;
+
+        // Test clamping values within range
+        let instant_values = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(eval_ts, 5.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(eval_ts, 15.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(eval_ts, 25.0),
+            },
+        ];
+
+        let vector = Value::Vector(instant_values);
+        let result = clamp(vector, 10.0, 20.0).unwrap();
+
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 3);
+                // 5.0 should be clamped to 10.0
+                assert!((v[0].sample.value - 10.0).abs() < 0.001);
+                // 15.0 should remain 15.0
+                assert!((v[1].sample.value - 15.0).abs() < 0.001);
+                // 25.0 should be clamped to 20.0
+                assert!((v[2].sample.value - 20.0).abs() < 0.001);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

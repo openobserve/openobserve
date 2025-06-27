@@ -78,7 +78,7 @@ impl Display for FileType {
             FileType::AVRO => "avro",
             FileType::ARROW => "arrow",
         };
-        write!(f, "{}", out)
+        write!(f, "{out}")
     }
 }
 

@@ -166,7 +166,7 @@ pub async fn update(
         Err(e) => {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("Invalid query string: {}", e),
+                format!("Invalid query string: {e}"),
             ));
         }
     };
@@ -176,8 +176,7 @@ pub async fn update(
             "true" => true,
             "false" => false,
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     " 'rotateToken' query param with value 'true' or 'false' allowed",
                 ));
             }

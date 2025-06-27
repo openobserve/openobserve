@@ -26,6 +26,7 @@ use crate::meta::{
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "source_type")]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum PipelineSource {
     Realtime(StreamParams),
     Scheduled(DerivedStream),
@@ -133,6 +134,7 @@ impl Edge {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "node_type")]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum NodeData {
     RemoteStream(RemoteStreamParams),
     Stream(StreamParams),

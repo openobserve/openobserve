@@ -304,7 +304,7 @@ pub async fn delete_from_folder(
     // Delete any report that referenced the dashboard.
     for r in report_models {
         let rslt = r.delete(&txn).await;
-        println!("delete report result: {:?}", rslt);
+        println!("delete report result: {rslt:?}");
     }
 
     let _ = dashboard_model.delete(&txn).await?;

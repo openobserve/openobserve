@@ -521,12 +521,12 @@ pub async fn local_cache_gc() -> Result<()> {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
         interval.tick().await; // the first tick is immediate
         loop {
-            if let Ok(min_id) = get_min_pk_value().await {
-                if min_id > 0 {
-                    match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
-                        Ok(_) => log::info!("[file_list] local cache gc done"),
-                        Err(e) => log::error!("[file_list] local cache gc failed: {}", e),
-                    }
+            if let Ok(min_id) = get_min_pk_value().await
+                && min_id > 0
+            {
+                match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                    Ok(_) => log::info!("[file_list] local cache gc done"),
+                    Err(e) => log::error!("[file_list] local cache gc failed: {e}"),
                 }
             }
             interval.tick().await;
@@ -537,10 +537,10 @@ pub async fn local_cache_gc() -> Result<()> {
 }
 
 fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
+    if let Some((start, end)) = time_range
+        && (start > end || start == 0 || end == 0)
+    {
+        return Err(Error::Message("[file_list] invalid time range".to_string()));
     }
     Ok(())
 }

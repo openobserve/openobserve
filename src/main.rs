@@ -240,48 +240,48 @@ async fn main() -> Result<(), anyhow::Error> {
             // it must be initialized before the server starts
             if let Err(e) = cluster::register_and_keep_alive().await {
                 job_init_tx.send(false).ok();
-                panic!("cluster init failed: {}", e);
+                panic!("cluster init failed: {e}");
             }
             // init config
             if let Err(e) = config::init().await {
                 job_init_tx.send(false).ok();
-                panic!("config init failed: {}", e);
+                panic!("config init failed: {e}");
             }
 
             // db related inits
             if let Err(e) = migration::init_db().await {
                 job_init_tx.send(false).ok();
-                panic!("db init failed: {}", e);
+                panic!("db init failed: {e}");
             }
 
             // init infra
             if let Err(e) = infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("infra init failed: {}", e);
+                panic!("infra init failed: {e}");
             }
 
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("common infra init failed: {}", e);
+                panic!("common infra init failed: {e}");
             }
 
             // init enterprise
             #[cfg(feature = "enterprise")]
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
-                panic!("enterprise init failed: {}", e);
+                panic!("enterprise init failed: {e}");
             }
 
             // ingester init
             if let Err(e) = ingester::init().await {
                 job_init_tx.send(false).ok();
-                panic!("ingester init failed: {}", e);
+                panic!("ingester init failed: {e}");
             }
 
             // init job
             if let Err(e) = job::init().await {
                 job_init_tx.send(false).ok();
-                panic!("job init failed: {}", e);
+                panic!("job init failed: {e}");
             }
 
             // init meter provider
@@ -295,7 +295,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 log::info!("Initializing WebSocket session garbage collector");
                 if let Err(e) = handler::http::request::ws::init().await {
                     job_init_tx.send(false).ok();
-                    panic!("websocket gc init failed: {}", e);
+                    panic!("websocket gc init failed: {e}");
                 }
             }
 

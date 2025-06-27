@@ -21,6 +21,7 @@ pub mod grpc;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(ThisError, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("IoError# {0}")]
     IoError(#[from] std::io::Error),

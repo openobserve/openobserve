@@ -254,16 +254,15 @@ pub async fn query_by_ids(
             log::error!("[trace_id {trace_id}] file_list set cache failed for db files: {e}");
         }
 
-        if !cfg.common.file_list_dump_dual_write {
-            if let Err(e) = file_list::LOCAL_CACHE
+        if !cfg.common.file_list_dump_dual_write
+            && let Err(e) = file_list::LOCAL_CACHE
                 .batch_add_with_id(&dumped_files)
                 .await
-            {
-                log::error!(
-                    "[trace_id {trace_id}] file_list set cache failed for dumped files: {:?}",
-                    e
-                );
-            }
+        {
+            log::error!(
+                "[trace_id {trace_id}] file_list set cache failed for dumped files: {:?}",
+                e
+            );
         }
 
         log::info!(

@@ -122,7 +122,7 @@ impl Partition {
     ) -> Result<ReadRecordBatchEntry> {
         let mut batches = Vec::with_capacity(self.files.len());
         for (key, file) in self.files.iter() {
-            let key = format!("{}/", key);
+            let key = format!("{key}/");
             if filter_source_by_partition_key(&key, partition_filters) {
                 batches.extend(file.read(time_range)?);
             } else {

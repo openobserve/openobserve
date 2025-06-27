@@ -155,7 +155,7 @@ impl SessionManager {
         let mut w = self.sessions.write().await;
         let session_info = w
             .get_mut(client_id)
-            .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?;
+            .ok_or(WsError::SessionNotFound(format!("client_id {client_id}")))?;
         session_info
             .trace_id_map
             .insert(trace_id.clone(), querier_name.clone());
@@ -177,7 +177,7 @@ impl SessionManager {
         let r = self.sessions.read().await;
         let querier_name = r
             .get(client_id)
-            .ok_or(WsError::SessionNotFound(format!("client_id {}", client_id)))?
+            .ok_or(WsError::SessionNotFound(format!("client_id {client_id}")))?
             .trace_id_map
             .get(trace_id)
             .cloned();

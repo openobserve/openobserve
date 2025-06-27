@@ -219,10 +219,9 @@ async fn scan_wal_files(
             tx,
         )
         .await
+            && !e.to_string().contains("No such file or directory")
         {
-            if !e.to_string().contains("No such file or directory") {
-                log::error!("[INGESTER:JOB] Failed to scan files: {}", e);
-            }
+            log::error!("[INGESTER:JOB] Failed to scan files: {}", e);
         }
     });
     let mut files_num = 0;
@@ -954,7 +953,7 @@ pub(crate) async fn generate_index_on_ingester(
         if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
         } else {
-            format!("{}_{}", stream_name, stream_type)
+            format!("{stream_name}_{stream_type}")
         };
     let record_batches = prepare_index_record_batches(
         org_id,
@@ -1022,8 +1021,7 @@ pub(crate) async fn generate_index_on_ingester(
         if cfg.common.inverted_index_old_format
             && stream_type == StreamType::Logs
             && !schema.fields_map().contains_key("segment_ids")
-        {
-            if let Err(e) = db::schema::merge(
+            && let Err(e) = db::schema::merge(
                 org_id,
                 &index_stream_name,
                 StreamType::Index,
@@ -1031,12 +1029,10 @@ pub(crate) async fn generate_index_on_ingester(
                 Some(Utc::now().timestamp_micros()),
             )
             .await
-            {
-                return Err(anyhow::anyhow!(
-                    "generate_index_on_ingester update schema error: {}",
-                    e
-                ));
-            };
+        {
+            return Err(anyhow::anyhow!(
+                "generate_index_on_ingester update schema error: {e}",
+            ));
         }
 
         // TODO: disable it, because the prefix partition key will cause the file_list much bigger
@@ -1133,7 +1129,7 @@ pub(crate) async fn generate_index_on_compactor(
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
         } else {
-            format!("{}_{}", stream_name, stream_type)
+            format!("{stream_name}_{stream_type}")
         };
     let mut record_batches = prepare_index_record_batches(
         org_id,
@@ -1151,7 +1147,7 @@ pub(crate) async fn generate_index_on_compactor(
     }
 
     let schema = record_batches.first().unwrap().schema();
-    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
+    let prefix_to_remove = format!("files/{org_id}/{stream_type}/{stream_name}/");
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
 
     let _timestamp: ArrayRef = Arc::new(Int64Array::from(
@@ -1389,7 +1385,7 @@ async fn prepare_index_record_batches(
     }
 
     // build record batch
-    let prefix_to_remove = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
+    let prefix_to_remove = format!("files/{org_id}/{stream_type}/{stream_name}/");
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
     for (column_name, column_uniq_terms) in uniq_terms {

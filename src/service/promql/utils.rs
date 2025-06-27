@@ -64,44 +64,44 @@ pub fn apply_label_selector(
     label_selectors: &Option<HashSet<String>>,
 ) -> Option<DataFrame> {
     let mut df = df;
-    if let Some(label_selector) = label_selectors {
-        if !label_selector.is_empty() {
-            let schema_fields = schema
-                .fields()
-                .iter()
-                .map(|f| f.name())
-                .collect::<HashSet<_>>();
-            let mut def_labels = vec![
-                HASH_LABEL.to_string(),
-                VALUE_LABEL.to_string(),
-                BUCKET_LABEL.to_string(),
-                TIMESTAMP_COL_NAME.to_string(),
-            ];
-            for label in label_selector.iter() {
-                if def_labels.contains(label) {
-                    def_labels.retain(|x| x != label);
-                }
+    if let Some(label_selector) = label_selectors
+        && !label_selector.is_empty()
+    {
+        let schema_fields = schema
+            .fields()
+            .iter()
+            .map(|f| f.name())
+            .collect::<HashSet<_>>();
+        let mut def_labels = vec![
+            HASH_LABEL.to_string(),
+            VALUE_LABEL.to_string(),
+            BUCKET_LABEL.to_string(),
+            TIMESTAMP_COL_NAME.to_string(),
+        ];
+        for label in label_selector.iter() {
+            if def_labels.contains(label) {
+                def_labels.retain(|x| x != label);
             }
-            // include only found columns and required _timestamp, hash, value, le cols
-            let selected_cols: Vec<_> = label_selector
-                .iter()
-                .chain(def_labels.iter())
-                .filter_map(|label| {
-                    if schema_fields.contains(label) {
-                        Some(col(label))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            df = match df.select(selected_cols) {
-                Ok(df) => df,
-                Err(e) => {
-                    log::error!("Selecting cols error: {}", e);
-                    return None;
-                }
-            };
         }
+        // include only found columns and required _timestamp, hash, value, le cols
+        let selected_cols: Vec<_> = label_selector
+            .iter()
+            .chain(def_labels.iter())
+            .filter_map(|label| {
+                if schema_fields.contains(label) {
+                    Some(col(label))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        df = match df.select(selected_cols) {
+            Ok(df) => df,
+            Err(e) => {
+                log::error!("Selecting cols error: {}", e);
+                return None;
+            }
+        };
     }
     Some(df)
 }

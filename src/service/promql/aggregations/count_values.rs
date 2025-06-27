@@ -58,3 +58,66 @@ pub async fn count_values(
 
     Ok(Value::Vector(values))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use promql_parser::parser::{Expr as PromExpr, StringLiteral};
+
+    use super::*;
+    use crate::service::promql::{
+        aggregations::bottomk::tests::MockTableProvider,
+        value::{InstantValue, Labels, Sample, Value},
+    };
+
+    // Helper function to create a mock Engine for testing
+    async fn create_mock_engine() -> Engine {
+        use crate::service::promql::exec::PromqlContext;
+
+        let ctx = PromqlContext::new("test_org", MockTableProvider, false, 30);
+        Engine::new("test_trace", Arc::new(ctx), 1640995200)
+    }
+
+    #[tokio::test]
+    async fn test_count_values_invalid_label_name() {
+        let timestamp = 1640995200;
+        let mut engine = create_mock_engine().await;
+
+        let data = Value::Vector(vec![InstantValue {
+            labels: Labels::default(),
+            sample: Sample::new(timestamp, 10.5),
+        }]);
+
+        // Create parameter expression with invalid label name
+        let param = Box::new(PromExpr::StringLiteral(StringLiteral {
+            val: "invalid-label-name!".to_string(),
+        }));
+
+        // Test count_values with invalid label name
+        let result = count_values(&mut engine, timestamp, param, &None, data).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("invalid"));
+    }
+
+    #[tokio::test]
+    async fn test_count_values_invalid_param_type() {
+        let timestamp = 1640995200;
+        let mut engine = create_mock_engine().await;
+
+        let data = Value::Vector(vec![InstantValue {
+            labels: Labels::default(),
+            sample: Sample::new(timestamp, 10.5),
+        }]);
+
+        // Create parameter expression with wrong type (number instead of string)
+        let param = Box::new(PromExpr::NumberLiteral(
+            promql_parser::parser::NumberLiteral { val: 42.0 },
+        ));
+
+        // Test count_values with invalid parameter type
+        let result = count_values(&mut engine, timestamp, param, &None, data).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must be a String"));
+    }
+}

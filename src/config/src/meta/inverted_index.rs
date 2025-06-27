@@ -72,7 +72,7 @@ impl std::fmt::Display for InvertedIndexOptimizeMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InvertedIndexOptimizeMode::SimpleSelect(limit, ascend) => {
-                write!(f, "simple_select(limit: {}, ascend: {})", limit, ascend)
+                write!(f, "simple_select(limit: {limit}, ascend: {ascend})")
             }
             InvertedIndexOptimizeMode::SimpleCount => write!(f, "simple_count"),
             InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {

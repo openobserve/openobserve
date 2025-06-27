@@ -221,7 +221,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             // It will send event even if the alert is not realtime alert.
             // But that is okay, for non-realtime alerts, since the triggers are not
             // present in the cache at all, it will just do nothing.
-            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
+            let key = format!("{TRIGGERS_KEY}{module}/{org}/{key}");
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;
         }
@@ -474,8 +474,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
             Ok(job) => job,
             Err(_) => {
                 return Err(Error::from(DbError::KeyNotExists(format!(
-                    "{org}/{}/{key}",
-                    module
+                    "{org}/{module}/{key}"
                 ))));
             }
         };

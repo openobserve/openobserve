@@ -29,3 +29,46 @@ fn exec(data: RangeValue) -> Option<f64> {
     let previous = data.samples.get(data.samples.len() - 2).unwrap();
     Some(last.value - previous.value)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    #[test]
+    fn test_idelta_function() {
+        // Create a range value with sample data
+        let samples = vec![
+            crate::service::promql::value::Sample::new(1000, 10.0),
+            crate::service::promql::value::Sample::new(2000, 15.0),
+            crate::service::promql::value::Sample::new(3000, 25.0),
+        ];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                eval_ts: 3000,
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = idelta(matrix).unwrap();
+
+        // Should return a vector with idelta value
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 1);
+                // Idelta should be 25.0 - 15.0 = 10.0
+                assert!((v[0].sample.value - 10.0).abs() < 0.001);
+                assert_eq!(v[0].sample.timestamp, 3000);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}
