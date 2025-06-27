@@ -611,7 +611,7 @@ test.describe("dashboard filter testcases", () => {
     ).toBeVisible();
 
     // Fix filter condition (change to "=" operator)
-    await chartTypeSelector.addFilterCondition(
+    await dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
