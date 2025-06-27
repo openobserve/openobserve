@@ -84,39 +84,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <q-form @submit="saveRegexPattern" class="tw-flex tw-flex-col tw-gap-4" style="overflow: auto; height: calc(100vh - 150px);">
                 <div class="tw-flex tw-flex-col">
-                    <div data-test="add-regex-pattern-name-input">
-                <q-input
-                    v-bind:readonly="isEdit"
-                    v-bind:disable="isEdit"
-                    v-model="regexPatternInputs.name"
-                    color="input-border"
-                    bg-color="input-bg"
-                    stack-label
-                    outlined
-                    filled
-                    tabindex="0"
-                    style="min-width: 480px;"
-                    placeholder="Enter Pattern Name*"
-                    class="add-regex-pattern-name-input"
-                    @update:model-value='updatePatternInputs'
-                    :rules="[val => val !== '' || '* Name is required']"
-                />
-                </div>
-                <div data-test="add-regex-pattern-description-input" class="tw-mb-4">
-                <q-input
-                    v-model="regexPatternInputs.description"
-                    color="input-border"
-                    bg-color="input-bg"
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    tabindex="0"
-                    placeholder="Enter Pattern Description"
-                    style="min-width: 480px"
-                    class="add-regex-pattern-description-input"
-                />
-                </div>
+                    <q-input
+                        v-bind:readonly="isEdit"
+                        v-bind:disable="isEdit"
+                        v-model="regexPatternInputs.name"
+                        :label="t('regex_patterns.name') + ' *'"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="showLabelOnTop"
+                        data-test="add-regex-pattern-name-input"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        :lazy-rules="true"
+                        :rules="[val => val !== '' || '* Name is required']"
+                        />
+                    <q-input
+                        v-model="regexPatternInputs.description"
+                        :label="t('regex_patterns.description')"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="q-pb-md showLabelOnTop"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        data-test="add-regex-pattern-description-input"
+                        />
                 <div class="regex-pattern-input-container">
                     <FullViewContainer
                         style="padding: 12px 8px;"

@@ -1261,6 +1261,7 @@
     "create_close":"Create and Close",
     "cancel":"Cancel",
     "edit_regex_pattern": "Edit Regex Pattern",
-    "update_close": "Update and Close"
+    "update_close": "Update and Close",
+    "description": "Description"
   }
 }
