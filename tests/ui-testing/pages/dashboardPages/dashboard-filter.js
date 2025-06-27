@@ -90,9 +90,9 @@ export default class DashboardFilter {
       // await expect(errorMessage).toBeVisible();
     }
   }
+
   // Select List Filter Items in the test case we have to slect the itesm pass in Array
   //eg   ["ingress-nginx", "kube-system"]
-
   async selectListFilterItems(index, fieldName, values) {
     // console.log("Selecting list filter items", values);
 
@@ -127,6 +127,7 @@ export default class DashboardFilter {
       await option.click();
     }
   }
+
   // Add filter condition with dynamic ,Group inside group filter
   async addGroupFilterCondition(index, newFieldName, operator, value) {
     const idx = String(index);
