@@ -470,7 +470,8 @@
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
     "extendedStartDate": "Start Date",
-    "extendedEndDate": "End Date"
+    "extendedEndDate": "End Date",
+    "regexPatterns": "Regex Patterns"
   },
   "pipeline": {
     "header": "Pipelines",

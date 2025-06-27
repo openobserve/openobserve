@@ -283,6 +283,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     regexPatternInputs.value.name = props.data.name;
                     regexPatternInputs.value.pattern = props.data.pattern;
                 }
+                else{
+                    regexPatternInputs.value = {
+                        name: "",
+                        pattern: "",
+                        description: ""
+                    }
+                }
             })
 
             const isSaving = ref(false);
@@ -331,7 +338,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     try {
                     const regex = new RegExp(regexPatternInputs.value.pattern);
                     isPatternValid.value = regex.test(testString.value);
-                    console.log(isPatternValid.value);
                     } catch (error) {
                     isPatternValid.value = false;
                     console.log(error);
@@ -344,6 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 const payload = {
                     name: regexPatternInputs.value.name,
                     pattern: regexPatternInputs.value.pattern,
+                    description: regexPatternInputs.value.description,
                 }
 
                 try {

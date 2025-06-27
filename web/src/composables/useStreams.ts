@@ -555,6 +555,7 @@ const useStreams = () => {
       "bloom_filter_fields",
       "defined_schema_fields",
       "extended_retention_days",
+      "pattern_associations"
     ];
 
     let updatedSettings: any = {};
@@ -620,7 +621,13 @@ const useStreams = () => {
                 JSON.stringify(previousItem) === JSON.stringify(currentItem),
             ),
         );
-      } else {
+      } 
+      else if (attribute === "pattern_associations") {
+        const result: any = comparePatternAssociations(previousArray, currentArray);
+        add = result.add;
+        remove = result.remove;
+      }
+      else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));
         remove = previousArray.filter(
@@ -644,6 +651,29 @@ const useStreams = () => {
       console.log("Error while clearing local cache for stream type.", e);
     }
   };
+  //this function is used to compare the pattern associations
+  //so we compare array of objects and check if the pattern_id and field are same why both -> sometimes we are getting same pattern_id but different field
+  //if they are same then we consider them as same
+  //otherwise we consider them as different
+  //this is used to compare the pattern associations in the settings
+  const comparePatternAssociations = (prev: any[], curr: any[]) => {
+    const isSame = (a: any, b: any) => {
+      return a.pattern_id === b.pattern_id && a.field === b.field;
+    };
+  
+    const add = curr.filter(
+      (currItem) =>
+        !prev.some((prevItem) => isSame(currItem, prevItem))
+    );
+  
+    const remove = prev.filter(
+      (prevItem) =>
+        !curr.some((currItem) => isSame(currItem, prevItem))
+    );
+  
+    return { add, remove };
+  };
+  
 
   return {
     getStreams,

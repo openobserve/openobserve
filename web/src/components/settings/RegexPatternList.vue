@@ -278,6 +278,8 @@
 
     const createRegexPattern = () => {
       showAddRegexPatternDialog.value.show = true;
+      showAddRegexPatternDialog.value.isEdit = false;
+      showAddRegexPatternDialog.value.data = {};
     }
     //call this function only on mounted or any changes in the list like updating the existing regex pattern or deleting the existing regex pattern
     //we are storing the regex patterns in the store to avoid multiple api calls and it is stored in the organizationData.regexPatterns
