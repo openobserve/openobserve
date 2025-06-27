@@ -314,6 +314,11 @@ pub async fn search_multi(
 
         // add search type to request
         req.search_type = search_type;
+        if let Ok(sql) =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
+        {
+            req.query.sql = sql;
+        }
 
         let trace_id = trace_id.clone();
         // do search
@@ -324,6 +329,7 @@ pub async fn search_multi(
             Some(user_id.to_string()),
             &req,
             range_error.clone(),
+            false,
         )
         .instrument(http_span.clone())
         .await;

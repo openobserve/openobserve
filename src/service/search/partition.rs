@@ -52,12 +52,16 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
-        #[cfg(feature = "enterprise")] is_streaming_aggregate: bool,
+        _is_streaming_aggregate: bool,
+        _streaming_interval_micros: i64,
     ) -> Vec<[i64; 2]> {
         #[cfg(feature = "enterprise")]
-        if is_streaming_aggregate {
+        if _is_streaming_aggregate {
             return self.generate_partitions_with_streaming_aggregate_partition_window(
-                start_time, end_time, order_by,
+                start_time,
+                end_time,
+                _streaming_interval_micros,
+                order_by,
             );
         }
 
@@ -150,14 +154,10 @@ impl PartitionGenerator {
         &self,
         start_time: i64,
         end_time: i64,
+        interval_micros: i64,
         order_by: OrderBy,
     ) -> Vec<[i64; 2]> {
         // Generate partitions by DESC order
-        let interval =
-            o2_enterprise::enterprise::search::cache::streaming_agg::generate_aggregation_cache_interval(
-                start_time, end_time,
-            );
-        let interval_micros = interval.get_interval_microseconds();
         let mut end_window = end_time - (end_time % interval_micros);
 
         let mut partitions = Vec::new();
@@ -243,14 +243,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Desc,
-            #[cfg(feature = "enterprise")]
-            false,
-        );
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false, 0);
 
         // Expected partitions:
         // Partition 1: 10:15 - 10:17
@@ -302,14 +296,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Asc,
-            #[cfg(feature = "enterprise")]
-            false,
-        );
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false, 0);
 
         // Expected partitions for ASC order:
         // Partition 1: 10:02 - 10:05
@@ -381,14 +369,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Desc,
-            #[cfg(feature = "enterprise")]
-            false,
-        );
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false, 0);
 
         // Expected partitions:
         // 1. 10:16 - 10:17 (mini partition)
@@ -445,14 +427,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Asc,
-            #[cfg(feature = "enterprise")]
-            false,
-        );
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false, 0);
 
         // Expected partitions with ASC order:
         // 1. 10:02 - 10:03 (mini partition)
@@ -511,13 +487,15 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
+        let interval = 3600000000;
+
         let partitions = generator.generate_partitions(
             start_time,
             end_time,
             step,
             OrderBy::Desc,
-            #[cfg(feature = "enterprise")]
             true,
+            interval,
         );
 
         let mut expected_partitions = vec![
@@ -529,14 +507,8 @@ mod enterprise_tests {
         ];
         assert_eq!(partitions, expected_partitions);
 
-        let partitions_asc = generator.generate_partitions(
-            start_time,
-            end_time,
-            step,
-            OrderBy::Asc,
-            #[cfg(feature = "enterprise")]
-            true,
-        );
+        let partitions_asc =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true, interval);
         expected_partitions.reverse();
         assert_eq!(partitions_asc, expected_partitions);
     }
@@ -554,13 +526,15 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
+        let interval = 3600000000;
+
         let partitions = generator.generate_partitions(
             start_time,
             end_time,
             step,
             OrderBy::Desc,
-            #[cfg(feature = "enterprise")]
             true,
+            interval,
         );
 
         // Verify no empty partitions exist

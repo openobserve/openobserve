@@ -762,12 +762,7 @@ export const usePanelDataLoader = (
 
       if (response.type === "event_progress") {
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
-        // Only set isPartialData to true if we're still loading and progress is not 100%
-        if (state.loading && state.loadingProgressPercentage < 100) {
-          state.isPartialData = true;
-        } else if (state.loadingProgressPercentage === 100) {
-          state.isPartialData = false;
-        }
+        state.isPartialData = true;
         saveCurrentStateToCache();
       }
     } catch (error: any) {
@@ -844,11 +839,7 @@ export const usePanelDataLoader = (
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
-    // Only set isPartialData to true if we haven't received complete data
-    if (state.loadingProgressPercentage < 100) {
-      state.isPartialData = true;
-    }
-
+    state.isPartialData = false;
     // save current state to cache
     // this is async task, which will be executed in background(await is not required)
     saveCurrentStateToCache();
