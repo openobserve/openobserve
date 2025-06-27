@@ -615,6 +615,7 @@ pub async fn search_partition(
         start_time: req.start_time,
         end_time: req.end_time,
         sql: req.sql.to_string(),
+        histogram_interval: req.histogram_interval,
         ..Default::default()
     };
     let sql = Sql::new(&query, org_id, stream_type, None).await?;
@@ -1352,6 +1353,7 @@ pub async fn search_partition_multi(
                 clusters: req.clusters.clone(),
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
+                histogram_interval: req.histogram_interval,
             },
             false,
             true,

@@ -518,6 +518,8 @@ pub struct SearchPartitionRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub streaming_output: bool,
+    #[serde(default)]
+    pub histogram_interval: i64,
 }
 
 impl SearchPartitionRequest {
@@ -550,6 +552,7 @@ impl From<&Request> for SearchPartitionRequest {
             clusters: req.clusters.clone(),
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
+            histogram_interval: req.query.histogram_interval,
         }
     }
 }
@@ -1057,6 +1060,8 @@ pub struct MultiSearchPartitionRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub streaming_output: bool,
+    #[serde(default)]
+    pub histogram_interval: i64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
