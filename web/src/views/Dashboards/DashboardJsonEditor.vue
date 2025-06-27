@@ -78,7 +78,7 @@
 import { defineComponent, ref, onMounted, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import QueryEditor from "@/components/QueryEditor.vue";
+import QueryEditor from "@/components/CodeQueryEditor.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { validateDashboardJson } from "@/utils/dashboard/convertDataIntoUnitValue";
 

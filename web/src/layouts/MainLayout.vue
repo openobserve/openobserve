@@ -419,19 +419,9 @@ class="padding-none" />
         />
       </q-list>
     </q-drawer>
-    <q-page-container
-      :key="store.state.selectedOrganization?.identifier"
-      v-if="isLoading"
-    >
+    <q-page-container v-if="isLoading">
       <router-view v-slot="{ Component }">
-        <template v-if="$route.meta.keepAlive">
-          <keep-alive>
-            <component :is="Component" />
-          </keep-alive>
-        </template>
-        <template v-else>
-          <component :is="Component" />
-        </template>
+        <component :is="Component" />
       </router-view>
     </q-page-container>
   </q-layout>
@@ -906,6 +896,7 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       resetStreams();
+      store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
