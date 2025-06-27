@@ -358,6 +358,7 @@ pub async fn search(
         Some(user_id),
         &req,
         range_error,
+        false,
     )
     .instrument(http_span)
     .await;
@@ -1128,6 +1129,7 @@ async fn values_v1(
             Some(user_id.to_string()),
             &req,
             "".to_string(),
+            false,
         )
         .instrument(http_span)
         .await;
