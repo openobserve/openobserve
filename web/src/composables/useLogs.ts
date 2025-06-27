@@ -396,8 +396,9 @@ const useLogs = () => {
         updateGridColumns();
         await nextTick();
         // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
-      } catch (e) {
-        console.error("Error while initializing logs state", e);
+      } catch (e: any) {
+        console.error("Error while initializing logs state", e?.message);
+        searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier;
         resetSearchObj();
       } finally {
         return Promise.resolve(true);

@@ -663,11 +663,15 @@ export default defineComponent({
 
       cancelOnGoingSearchQueries();
 
-      if (searchObj)
-        await store.dispatch(
-          "logs/setLogs",
-          JSON.parse(JSON.stringify(searchObj)),
-        );
+      try {
+        if (searchObj)
+          await store.dispatch(
+            "logs/setLogs",
+            JSON.parse(JSON.stringify(searchObj)),
+          );
+      } catch (error) {
+        console.error("Failed to set logs:", error.message);
+      }
 
       clearSearchObj();
       searchBarRef.value = null;
