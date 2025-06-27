@@ -326,7 +326,7 @@ export default defineComponent({
         legendOption.selected = params.selected;
 
         // set options with selected object
-        chart?.setOption({ legend: [legendOption] });
+        chart?.setOption({ legend: [legendOption] }, { lazyUpdate: true });
       }
     };
 
@@ -518,8 +518,8 @@ export default defineComponent({
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
         try {
-          chart?.setOption(options, true);
-          chart?.setOption({ animation: true });
+          chart?.setOption(options, { lazyUpdate: true, notMerge: true });
+          chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
             message: e,
@@ -547,7 +547,7 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, true);
+        chart?.setOption(props?.data?.options || {}, { lazyUpdate: true, notMerge: true });
         chartInitialSetUp();
       } catch (e: any) {
         emit("error", {
@@ -635,7 +635,7 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, true);
+        chart?.setOption(props?.data?.options || {}, { lazyUpdate: true, notMerge: true });
         chartInitialSetUp();
         windowResizeEventCallback();
 
@@ -677,7 +677,7 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(props?.data?.options || {}, true);
+            chart?.setOption(props?.data?.options || {}, { lazyUpdate: true, notMerge: true });
           } catch (error) {
             console.error("Error during setOption", error);
           }
