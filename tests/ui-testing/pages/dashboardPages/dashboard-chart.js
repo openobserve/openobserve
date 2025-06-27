@@ -90,7 +90,13 @@ export default class ChartTypeSelector {
     await button.click();
     //    // Clear the search input after adding the field
     await this.page.waitForTimeout(2000); // Wait for any UI updates
-    await this.page.getByLabel("Clear").click();
+    // await this.page.getByLabel("Clear").click();
+
+    // Now click the Clear button if it is visible
+    const clearButton = this.page.getByLabel("Clear");
+    if (await clearButton.isVisible()) {
+      await clearButton.click();
+    }
   }
 
   //remove fields
