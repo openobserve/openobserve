@@ -365,6 +365,7 @@ async fn do_search(
         Some(user_id.to_string()),
         &req.payload,
         "".to_string(),
+        true,
     )
     .await;
 

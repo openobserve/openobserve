@@ -329,6 +329,7 @@ pub async fn search_multi(
             Some(user_id.to_string()),
             &req,
             range_error.clone(),
+            false,
         )
         .instrument(http_span.clone())
         .await;
