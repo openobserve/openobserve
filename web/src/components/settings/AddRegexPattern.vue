@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon="arrow_back"
                 />
           <div class="add-regex-pattern-title" data-test="add-regex-pattern-title">
-            {{ t("regex_patterns.create_regex_pattern") }}
+            {{ isEdit ? t("regex_patterns.edit_regex_pattern") : t("regex_patterns.create_regex_pattern") }}
           </div>
         </div>
         <div class="tw-flex tw-items-center tw-justify-between tw-gap-2">
@@ -169,27 +169,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :o2AIicon="false"
                     />
                     <div v-if="expandState.regexTestString" class="regex-pattern-input">
-                        <q-input
-                        data-test="regex-pattern-test-string-textarea"
-                        v-model="testString"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="regex-test-string-input"
-                        :class="[store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input',
-                            isPatternValid ? 'is-pattern-valid' : 'is-pattern-invalid'
-                        ]"
-                        
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        style="width: 100%; resize: none; "
-                        type="textarea"
-                        placeholder="Eg. yhk1abc2"
-                        rows="5"
-                        @update:model-value='updatePatternInputs'
-                        />
+                        <div 
+                            ref="editableDiv"
+                            contenteditable="true"
+                            class="editable-div"
+                            :class="[
+                                store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
+                            ]"
+                            @input="handleTestStringInput"
+                            @paste="handlePaste"
+                            :placeholder="'Eg. yhk1abc2'"
+                            v-html="highlightedText"
+                        ></div>
                     </div>
                 </div>
                 </div>
@@ -207,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                     data-test="save-stream-btn"
-                    :label="isSaving ? 'Saving...' : t('regex_patterns.create_close')"
+                    :label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
                     class="q-my-sm text-bold no-border"
                     :style="{
                         'background-color': isFormEmpty ? '#aeaeae' : '#5ca380',
@@ -232,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </template>
   
 <script lang="ts">
-    import { defineComponent, onMounted, ref, watch } from "vue";
+    import { defineComponent, onMounted, ref, watch, nextTick, onBeforeUnmount } from "vue";
     import { useI18n } from "vue-i18n";
     import type { Ref } from "vue";
     import { useStore } from "vuex";
@@ -273,8 +264,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             const isFullScreen = ref(false);
 
             const testString = ref("");
+            const highlightedText = ref("");
+            const editableDiv = ref<HTMLElement | null>(null);
+            let savedSelection: { start: number; end: number } | null = null;
 
-            const isFormEmpty = ref(true);
+            const isFormEmpty = ref(props.isEdit ? false : true);
 
             const isPatternValid = ref(false);
 
@@ -320,7 +314,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 window.dispatchEvent(new Event("resize"));
             };
 
-            const updatePatternInputs = debounce(() => {
+            const saveSelection = () => {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0 && editableDiv.value) {
+                    const range = selection.getRangeAt(0);
+                    savedSelection = {
+                        start: range.startOffset,
+                        end: range.endOffset
+                    };
+                }
+            };
+
+            const restoreSelection = () => {
+                if (savedSelection && editableDiv.value) {
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    let childNodes = Array.from(editableDiv.value.childNodes);
+                    let currentPos = 0;
+                    let startNode: Node = editableDiv.value;
+                    let endNode: Node = editableDiv.value;
+                    let startOffset = savedSelection.start;
+                    let endOffset = savedSelection.end;
+
+                    // Find the correct nodes and offsets
+                    for (let node of childNodes) {
+                        const length = node.textContent?.length || 0;
+                        if (currentPos + length >= savedSelection.start) {
+                            startNode = node;
+                            startOffset = savedSelection.start - currentPos;
+                            break;
+                        }
+                        currentPos += length;
+                    }
+
+                    currentPos = 0;
+                    for (let node of childNodes) {
+                        const length = node.textContent?.length || 0;
+                        if (currentPos + length >= savedSelection.end) {
+                            endNode = node;
+                            endOffset = savedSelection.end - currentPos;
+                            break;
+                        }
+                        currentPos += length;
+                    }
+
+                    if (selection) {
+                        range.setStart(startNode, startOffset);
+                        range.setEnd(endNode, endOffset);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }
+                }
+            };
+
+            // Create debounced function as a ref so we can clean it up
+            const debouncedUpdatePatternInputs = ref(debounce(() => {
                 if (
                     regexPatternInputs.value.name === "" ||
                     regexPatternInputs.value.name === undefined ||
@@ -333,17 +381,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }
 
                 isPatternValid.value = false;
-
-                if (regexPatternInputs.value.pattern) {
+                
+                if (regexPatternInputs.value.pattern && testString.value) {
                     try {
-                    const regex = new RegExp(regexPatternInputs.value.pattern);
-                    isPatternValid.value = regex.test(testString.value);
+                        const regex = new RegExp(regexPatternInputs.value.pattern, 'g');
+                        let text = testString.value;
+                        
+                        // Save current cursor position relative to text content
+                        const selection = window.getSelection();
+                        let cursorOffset = 0;
+                        if (selection && selection.rangeCount > 0 && editableDiv.value) {
+                            const range = selection.getRangeAt(0);
+                            const preCaretRange = range.cloneRange();
+                            preCaretRange.selectNodeContents(editableDiv.value);
+                            preCaretRange.setEnd(range.endContainer, range.endOffset);
+                            cursorOffset = preCaretRange.toString().length;
+                        }
+
+                        // Generate highlighted HTML
+                        let html = text;
+                        const matches = Array.from(text.matchAll(regex));
+                        
+                        // Replace matches from end to start to avoid position issues
+                        for (let i = matches.length - 1; i >= 0; i--) {
+                            const match = matches[i];
+                            if (match.index !== undefined) {
+                                const start = match.index;
+                                const end = start + match[0].length;
+                                const before = html.substring(0, start);
+                                const matched = html.substring(start, end);
+                                const after = html.substring(end);
+                                html = before + `<span class="match">${matched}</span>` + after;
+                            }
+                        }
+                        
+                        highlightedText.value = html;
+                        isPatternValid.value = matches.length > 0;
+
+                        // Restore cursor position after Vue updates the DOM
+                        nextTick(() => {
+                            if (editableDiv.value) {
+                                // Create a temporary div to count positions including newlines
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = html;
+                                
+                                const textNodes = [];
+                                const offsets = [];
+                                let totalOffset = 0;
+                                
+                                // Walk through all nodes and calculate their positions
+                                const walk = document.createTreeWalker(
+                                    editableDiv.value,
+                                    NodeFilter.SHOW_TEXT,
+                                    null
+                                );
+                                
+                                let node;
+                                while (node = walk.nextNode()) {
+                                    textNodes.push(node);
+                                    offsets.push(totalOffset);
+                                    totalOffset += node.textContent?.length || 0;
+                                }
+
+                                // Find the right node and offset
+                                let targetNode = textNodes[0];
+                                let targetOffset = 0;
+
+                                for (let i = 0; i < textNodes.length; i++) {
+                                    const nextOffset = i + 1 < offsets.length ? offsets[i + 1] : totalOffset;
+                                    if (offsets[i] <= cursorOffset && cursorOffset <= nextOffset) {
+                                        targetNode = textNodes[i];
+                                        targetOffset = cursorOffset - offsets[i];
+                                        break;
+                                    }
+                                }
+
+                                if (targetNode && selection) {
+                                    const range = document.createRange();
+                                    range.setStart(targetNode, targetOffset);
+                                    range.setEnd(targetNode, targetOffset);
+                                    selection.removeAllRanges();
+                                    selection.addRange(range);
+                                    
+                                    // Ensure the cursor is visible
+                                    const rect = range.getBoundingClientRect();
+                                    if (rect) {
+                                        editableDiv.value.scrollTop = rect.top - editableDiv.value.offsetHeight / 2;
+                                    }
+                                }
+                            }
+                        });
                     } catch (error) {
-                    isPatternValid.value = false;
-                    console.log(error);
+                        isPatternValid.value = false;
+                        console.log(error);
                     }
+                } else {
+                    highlightedText.value = testString.value;
                 }
-                }, 300);
+            }, 300));
+
+            // Add cleanup
+            onBeforeUnmount(() => {
+                // Cancel any pending debounced calls
+                if (debouncedUpdatePatternInputs.value?.cancel) {
+                    debouncedUpdatePatternInputs.value.cancel();
+                }
+                
+                // Clear references
+                editableDiv.value = null;
+                savedSelection = null;
+            });
+
+            const handleTestStringInput = (event: InputEvent) => {
+                const target = event.target as HTMLElement;
+                testString.value = target.innerText;
+                debouncedUpdatePatternInputs.value();
+            };
+
+            const handlePaste = (event: ClipboardEvent) => {
+                event.preventDefault();
+                const text = event.clipboardData?.getData('text/plain') || '';
+                document.execCommand('insertText', false, text);
+            };
 
             const saveRegexPattern = async () => {
                 isSaving.value = true;
@@ -391,10 +550,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 expandState,
                 testString,
                 isFormEmpty,
-                updatePatternInputs,
+                updatePatternInputs: debouncedUpdatePatternInputs.value,
                 saveRegexPattern,
                 isSaving,
-                isPatternValid
+                isPatternValid,
+                editableDiv,
+                handleTestStringInput,
+                handlePaste,
+                highlightedText,
+                saveSelection,
+                restoreSelection
             }
     }
     });
@@ -482,6 +647,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
     }
 
+    .editable-div {
+        height: 150px;
+        max-height: 150px;
+        padding: 12px;
+        border: 1px solid #E6E6E6;
+        border-radius: 4px;
+        outline: none;
+        font-family: monospace;
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
+        
+        &.dark-mode {
+            background-color: #181A1B;
+            border-color: #212121;
+            color: #ffffff;
+        }
+        
+        &.light-mode {
+            background-color: #ffffff;
+            border-color: #E6E6E6;
+            color: #000000;
+        }
+
+        &:empty:before {
+            content: attr(placeholder);
+            color: #999;
+        }
+
+        .match {
+            background-color: rgba(92, 163, 128, 0.3);
+            border-radius: 2px;
+        }
+    }
 
   </style>
   

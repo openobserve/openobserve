@@ -1259,6 +1259,8 @@
     "delete": "Delete",
     "create_regex_pattern": "Create New Regex Pattern",
     "create_close":"Create and Close",
-    "cancel":"Cancel"
+    "cancel":"Cancel",
+    "edit_regex_pattern": "Edit Regex Pattern",
+    "update_close": "Update and Close"
   }
 }

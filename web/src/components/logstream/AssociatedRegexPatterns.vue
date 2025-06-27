@@ -220,27 +220,18 @@
                 <span class="individual-section-sub-title2">
                   Add Test
                 </span>
-                <q-input
-                        data-test="regex-pattern-test-string-textarea"
-                        v-model="testString"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="regex-test-string-input"
-                        :class="[store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input',
-                        isPatternValid ? 'is-pattern-valid' : ''
-                        ]"
-                        
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        style="width: 100%; resize: none; "
-                        type="textarea"
-                        placeholder="Eg: sybihsfv@gmailcom"
-                        rows="5"
-                        @update:model-value="handleTestStringUpdate"
-                        />
+                <div 
+                    ref="editableDiv"
+                    contenteditable="true"
+                    class="editable-div"
+                    :class="[
+                        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
+                    ]"
+                    @input="handleTestStringInput"
+                    @paste="handlePaste"
+                    :placeholder="'Eg: sybihsfv@gmailcom'"
+                    v-html="highlightedText"
+                ></div>
               </div>
               <q-separator />
             </div>
@@ -307,7 +298,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onMounted, PropType, ref, watch } from 'vue';
+import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import  regexPatternsService  from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
@@ -361,6 +352,105 @@ export default defineComponent({
         const appliedPatternsExpandedRef = ref<any>(null);
         const allPatternsExpandedRef = ref<any>(null);
         const isFormDirty = ref(false);
+        const highlightedText = ref("");
+        const editableDiv = ref<HTMLElement | null>(null);
+        const debouncedUpdateHighlighting = ref(debounce((text: string) => {
+            if (userClickedPattern.value?.pattern && text) {
+                try {
+                    const regex = new RegExp(userClickedPattern.value.pattern, 'g');
+                    let html = text;
+                    
+                    // Save current cursor position relative to text content
+                    const selection = window.getSelection();
+                    let cursorOffset = 0;
+                    if (selection && selection.rangeCount > 0 && editableDiv.value) {
+                        const range = selection.getRangeAt(0);
+                        const preCaretRange = range.cloneRange();
+                        preCaretRange.selectNodeContents(editableDiv.value);
+                        preCaretRange.setEnd(range.endContainer, range.endOffset);
+                        cursorOffset = preCaretRange.toString().length;
+                    }
+
+                    const matches = Array.from(text.matchAll(regex));
+                    
+                    // Replace matches from end to start to avoid position issues
+                    for (let i = matches.length - 1; i >= 0; i--) {
+                        const match = matches[i];
+                        if (match.index !== undefined) {
+                            const start = match.index;
+                            const end = start + match[0].length;
+                            const before = html.substring(0, start);
+                            const matched = html.substring(start, end);
+                            const after = html.substring(end);
+                            html = before + `<span class="match">${matched}</span>` + after;
+                        }
+                    }
+                    
+                    highlightedText.value = html;
+                    isPatternValid.value = matches.length > 0;
+
+                    // Restore cursor position after Vue updates the DOM
+                    nextTick(() => {
+                        if (editableDiv.value) {
+                            // Create a temporary div to count positions including newlines
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = html;
+                            
+                            const textNodes = [];
+                            const offsets = [];
+                            let totalOffset = 0;
+                            
+                            // Walk through all nodes and calculate their positions
+                            const walk = document.createTreeWalker(
+                                editableDiv.value,
+                                NodeFilter.SHOW_TEXT,
+                                null
+                            );
+                            
+                            let node;
+                            while (node = walk.nextNode()) {
+                                textNodes.push(node);
+                                offsets.push(totalOffset);
+                                totalOffset += node.textContent?.length || 0;
+                            }
+
+                            // Find the right node and offset
+                            let targetNode = textNodes[0];
+                            let targetOffset = 0;
+
+                            for (let i = 0; i < textNodes.length; i++) {
+                                const nextOffset = i + 1 < offsets.length ? offsets[i + 1] : totalOffset;
+                                if (offsets[i] <= cursorOffset && cursorOffset <= nextOffset) {
+                                    targetNode = textNodes[i];
+                                    targetOffset = cursorOffset - offsets[i];
+                                    break;
+                                }
+                            }
+
+                            if (targetNode && selection) {
+                                const range = document.createRange();
+                                range.setStart(targetNode, targetOffset);
+                                range.setEnd(targetNode, targetOffset);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                
+                                // Ensure the cursor is visible
+                                const rect = range.getBoundingClientRect();
+                                if (rect) {
+                                    editableDiv.value.scrollTop = rect.top - editableDiv.value.offsetHeight / 2;
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    isPatternValid.value = false;
+                    console.log(error);
+                }
+            } else {
+                highlightedText.value = text;
+                isPatternValid.value = false;
+            }
+        }, 300));
         const closeDialog = () => {
             emit("closeDialog");
         }
@@ -455,17 +545,17 @@ export default defineComponent({
           return userClickedPattern.value?.pattern_name === patternName;
         }
 
-        const handleTestStringUpdate = debounce(() => {
-            if (  userClickedPattern.value.pattern && testString.value) {
-              try {
-              const regex = new RegExp(userClickedPattern.value.pattern);
-              isPatternValid.value = regex.test(testString.value);
-              } catch (error) {
-              isPatternValid.value = true;
-              console.log(error);
-              }
-          }
-        }, 300);
+        const handleTestStringInput = (event: InputEvent) => {
+            const target = event.target as HTMLElement;
+            testString.value = target.innerText;
+            debouncedUpdateHighlighting.value(target.innerText);
+        };
+
+        const handlePaste = (event: ClipboardEvent) => {
+            event.preventDefault();
+            const text = event.clipboardData?.getData('text/plain') || '';
+            document.execCommand('insertText', false, text);
+        };
 
         const handleFilterMethod = (rows: any, terms: any) => {
           var filtered = [];
@@ -548,7 +638,19 @@ export default defineComponent({
           }
         }
 
-
+        // Add cleanup
+        onBeforeUnmount(() => {
+            // Cancel any pending debounced calls
+            if (debouncedUpdateHighlighting.value?.cancel) {
+                debouncedUpdateHighlighting.value.cancel();
+            }
+            
+            // Clear references
+            editableDiv.value = null;
+            userClickedPattern.value = null;
+            appliedPatternsExpandedRef.value = null;
+            allPatternsExpandedRef.value = null;
+        });
 
         return {
             store,
@@ -572,7 +674,8 @@ export default defineComponent({
             policy,
             apply_at,
             isPatternValid,
-            handleTestStringUpdate,
+            handleTestStringInput,
+            handlePaste,
             appliedPatternsExpandedRef,
             allPatternsExpandedRef,
             handleFilterMethod,
@@ -580,7 +683,9 @@ export default defineComponent({
             handleAddOrRemovePattern,
             isFormDirty,
             getImageURL,
-            t
+            t,
+            highlightedText,
+            editableDiv
         }
     }
 })
@@ -723,4 +828,38 @@ export default defineComponent({
     font-weight: 400;
     line-height: 12px;
   }
+    .editable-div {
+        height: 100px;
+        max-height: 100px;
+        padding: 12px;
+        border: 1px solid #E6E6E6;
+        border-radius: 4px;
+        outline: none;
+        font-family: monospace;
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
+        overflow-y: auto;
+        
+        &.dark-mode {
+            background-color: #181A1B;
+            border-color: #212121;
+            color: #ffffff;
+        }
+        
+        &.light-mode {
+            background-color: #ffffff;
+            border-color: #E6E6E6;
+            color: #000000;
+        }
+
+        &:empty:before {
+            content: attr(placeholder);
+            color: #999;
+        }
+
+        .match {
+            background-color: rgba(92, 163, 128, 0.3);
+            border-radius: 2px;
+        }
+    }
 </style>
