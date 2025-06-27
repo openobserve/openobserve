@@ -471,7 +471,8 @@ mod tests {
     }
 
     #[test]
-    fn test_partition_generator_with_histogram_alignment_desc_order_with_1_hour_interval_with_incomplete_times() {
+    fn test_partition_generator_with_histogram_alignment_desc_order_with_1_hour_interval_with_incomplete_times()
+     {
         // Test case: 00:19 - 01:00 with 1 hour histogram interval
         let start_time = 1750983540000000; // 00:19
         let end_time = 1750986000000000; // 01:00
