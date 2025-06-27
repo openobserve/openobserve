@@ -368,6 +368,7 @@ const useLogs = () => {
         searchObj.loadingHistogram = true;
         searchObj.organizationIdentifier = state.organizationIdentifier;
         searchObj.config = JSON.parse(JSON.stringify(state.config));
+        searchObj.communicationMethod = state.communicationMethod;
         await nextTick();
         searchObj.meta = JSON.parse(JSON.stringify({
           ...state.meta,
