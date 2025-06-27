@@ -238,24 +238,24 @@ async fn get_cardinality_from_cache(
     let cache_key = generate_cache_key(org_id, stream_type, stream_name, field_name);
 
     // Check if entry exists in cache
-    if let Some(entry) = CARDINALITY_CACHE.get(&cache_key) {
-        let entry = entry.value().clone();
-
-        // Check if entry is expired
-        if is_cache_expired(&entry) {
-            // Remove expired entry
-            CARDINALITY_CACHE.remove(&cache_key);
+    let entry = match CARDINALITY_CACHE.get(&cache_key) {
+        Some(entry) => entry.clone(),
+        None => {
             return Err(Error::Message(
-                "cardinality cache miss - expired".to_string(),
+                "cardinality cache miss - not found".to_string(),
             ));
         }
+    };
 
-        return Ok(entry.value);
+    // Check if entry is expired
+    if is_cache_expired(&entry) {
+        CARDINALITY_CACHE.remove(&cache_key);
+        Err(Error::Message(
+            "cardinality cache miss - expired".to_string(),
+        ))
+    } else {
+        Ok(entry.value)
     }
-
-    Err(Error::Message(
-        "cardinality cache miss - not found".to_string(),
-    ))
 }
 
 async fn get_cardinality(
