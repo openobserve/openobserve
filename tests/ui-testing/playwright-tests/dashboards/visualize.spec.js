@@ -577,7 +577,6 @@ test.describe("logs testcases", () => {
       "kubernetes_annotations_kubernetes_io_psp",
       "b"
     );
-
     await logsVisualise.runQueryAndWaitForCompletion();
 
     // Change the chart types

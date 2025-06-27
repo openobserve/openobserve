@@ -70,8 +70,6 @@ export default class ChartTypeSelector {
     };
 
     const buttonTestId = buttonSelectors[target];
-    console.log(`Adding field: ${fieldName} to: ${target}`);
-    console.log(`Button Test ID: ${buttonTestId}`);
 
     if (!buttonTestId) {
       throw new Error(`Invalid target type: ${target}`);
@@ -84,22 +82,13 @@ export default class ChartTypeSelector {
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
-    // await button.waitFor({ state: "enabled" });
 
     // Click the button
     await button.click();
-    //    // Clear the search input after adding the field
-    await this.page.waitForTimeout(2000); // Wait for any UI updates
-    // await this.page.getByLabel("Clear").click();
-
-    // Now click the Clear button if it is visible
-    const clearButton = this.page.getByLabel("Clear");
-    if (await clearButton.isVisible()) {
-      await clearButton.click();
-    }
+    await searchInput.fill(""); // Clear the search input
   }
 
-  //remove fields
+  //remove fields from the dashboard
   // Remove field by type (x, y, breakdown, etc.)
   async removeField(fieldName, target) {
     console.log(`Removing field: ${fieldName} from: ${target}`);
