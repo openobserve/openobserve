@@ -108,7 +108,7 @@ jobs:
             "dashboards/dashboard.spec.js",
             "dashboards/dashboard-filter.spec.js",
             "dashboards/dashboard-folder.spec.js",
-            # "dashboards/dashboard-geoMap.spec.js",
+            "dashboards/dashboard-geoMap.spec.js",
             "dashboards/dashboard-general-setting.spec.js",
             "dashboards/dashboard-import.spec.js",
             "dashboards/dashboard-maps.spec.js",

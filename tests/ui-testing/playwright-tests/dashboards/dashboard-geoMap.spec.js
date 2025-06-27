@@ -83,6 +83,7 @@ test.describe("dashboard maps testcases", () => {
     // selct the variable and enter the value
 
     await dashboardFilter.addFilterCondition(
+      0,
       "country",
       "country",
       ">=",
@@ -99,8 +100,9 @@ test.describe("dashboard maps testcases", () => {
       "china"
     );
 
-    // Apply   conditions
-    await chartTypeSelector.addFilterCondition(
+    // apply the filter condition
+    await dashboardFilter.addFilterCondition(
+      0,
       "country",
       "country",
       "=",
