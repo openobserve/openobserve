@@ -1599,7 +1599,7 @@ export default defineComponent({
             return;
           }
 
-          const payload = {};
+          const payload: any = {};
 
           const stream =
             dashboardPanelData.data.queries[
