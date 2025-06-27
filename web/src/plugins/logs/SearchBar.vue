@@ -3678,7 +3678,7 @@ export default defineComponent({
       this.resetEditorLayout();
     },
     resetFunction(newVal) {
-      if (newVal == "" && store.state.savedViewFlag == false) {
+      if (newVal == "" && store?.state?.savedViewFlag == false) {
         this.resetFunctionContent();
       }
     },
