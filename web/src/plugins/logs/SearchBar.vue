@@ -2189,12 +2189,7 @@ export default defineComponent({
           timeout: 3000,
         });
       }
-      console.log(
-        "fnValue",
-        fnValue,
-        fnEditorRef?.value,
-        showFunctionEditor.value,
-      );
+
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -2378,7 +2373,7 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
-              searchObj.value = mergeDeep(searchObj, extractedObj);
+              mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -2463,7 +2458,7 @@ export default defineComponent({
               extractedObj.meta.scrollInfo = {};
               delete searchObj.data.queryResults.aggs;
 
-              searchObj.value = mergeDeep(searchObj, extractedObj);
+              mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
 
               const streamData = await getStreams(
@@ -2473,7 +2468,6 @@ export default defineComponent({
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
-              // searchObj.value = mergeDeep(searchObj, extractedObj);
 
               const streamValues = searchObj.data.stream.streamLists.map(
                 (item) => item.value,
@@ -2572,13 +2566,6 @@ export default defineComponent({
                   searchObj.data.stream.selectedStream
                 ];
             }
-
-            // } else {
-            //   searchObj.value = mergeDeep(searchObj, extractedObj);
-            //   await nextTick();
-            //   updatedLocalLogFilterField();
-            //   handleRunQuery();
-            // }
           } else {
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
@@ -2601,11 +2588,6 @@ export default defineComponent({
           });
           console.log(err);
         });
-      // const extractedObj = JSON.parse(b64DecodeUnicode(item.data));
-      // searchObj.value = mergeDeep(searchObj, extractedObj);
-      // await nextTick();
-      // updatedLocalLogFilterField();
-      // handleRunQuery();
     };
 
     const handleSavedView = () => {
@@ -2702,7 +2684,6 @@ export default defineComponent({
         delete savedSearchObj.data.transforms;
 
         savedSearchObj.data.timezone = store.state.timezone;
-        delete savedSearchObj.value;
 
         if (savedSearchObj.data.parsedQuery) {
           delete savedSearchObj.data.parsedQuery;
