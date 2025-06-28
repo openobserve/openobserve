@@ -357,13 +357,14 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await page.waitForTimeout(2000);
-    // await page.waitForSelector('.table-row'); // adjust selector as needed
+
+    await page.waitForSelector('.cm-content');
     await expect(
       page
-        .getByRole("code")
-        .locator("div")
+        .locator(".cm-content")
+        .locator(".cm-line")
         .filter({ hasText: '"dashboardId": "' })
-        .nth(4)
+        .nth(0)
     ).toBeVisible();
 
     //is used for setting the file to be importedad
