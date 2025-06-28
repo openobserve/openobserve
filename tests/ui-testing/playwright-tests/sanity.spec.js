@@ -262,9 +262,7 @@ test.describe("Sanity testcases", () => {
       .filter({ hasText: "save" })
       .click();
     await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line"
-      )
+      .locator('#fnEditor').getByRole('textbox')
       .click();
     await page
       .locator("#fnEditor")
