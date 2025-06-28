@@ -68,7 +68,7 @@ test.describe("dashboard Import testcases", () => {
     await page.waitForTimeout(2000);
 
     await expect(
-      page.getByRole("code").filter({ hasText: '"dashboardId": "' })
+      page.locator('.cm-content').filter({ hasText: '"dashboardId": "' })
     ).toBeVisible();
   
     //is used for setting the file to be imported

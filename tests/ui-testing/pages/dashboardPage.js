@@ -180,8 +180,8 @@ async addCustomChart(page, pictorialJSON) {
   await this.page.waitForSelector('[data-test="selected-chart-custom_chart-item"]');
   await this.page.locator('[data-test="selected-chart-custom_chart-item"]').click();
 
-  await this.page.waitForSelector(".cm-lines");
-  await this.page.locator(".cm-lines").first().click();
+  // await this.page.waitForSelector(".cm-lines");
+  await this.page.locator(".cm-content").first().click();
 
   await this.page.keyboard.press("Control+A");
   await this.page.keyboard.press("Backspace");

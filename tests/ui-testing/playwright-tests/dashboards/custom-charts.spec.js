@@ -95,7 +95,7 @@ test.describe("Sanity Tests", () => { let dashboardPage
   
   await page.waitForTimeout(1000);
   await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
-  await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole("textbox", { name: "Editor content;Press Alt+F1" }).fill('select * from "e2e_automate"');
+  await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('textbox').fill('select * from "e2e_automate"');
   await page.locator('[data-test="dashboard-apply"]').click();
   await page.waitForTimeout(3000);
   await expect(page.getByText("Unsafe code detected: Access to 'document' is not allowed")).toBeVisible();
@@ -114,7 +114,7 @@ test("Add line JSON in Monaco Editor", async ({ page }) => {
   
   await page.waitForTimeout(1000);
   await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
-  await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole("textbox", { name: "Editor content;Press Alt+F1" }).fill('select * from "e2e_automate"');
+  await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole("textbox").fill('select * from "e2e_automate"');
   await page.waitForTimeout(3000);
   await page.locator('[data-test="dashboard-apply"]').click();
   await page.waitForTimeout(3000);
