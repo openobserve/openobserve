@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         use-input
         multiple
+        emit-value
         map-options
         @filter="filterStreamFn"
         @update:model-value="handleMultiStreamSelection"
