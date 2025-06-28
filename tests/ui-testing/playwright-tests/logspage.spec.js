@@ -339,12 +339,13 @@ test.describe("Logs UI testcases", () => {
       .locator('[data-test="menu-link-/logs-item"]')
       .click({ force: true });
     await page.waitForTimeout(2000);
+
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("code")
-      .locator("div")
+      .locator(".cm-content")
+      .locator(".cm-line")
       .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
-      .nth(4);
+      .nth(0);
   });
   test("should display ingested logs - search logs, navigate on another tab, revisit logs page", async ({
     page,

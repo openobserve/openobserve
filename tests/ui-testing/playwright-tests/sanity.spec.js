@@ -224,17 +224,20 @@ test.describe("Sanity testcases", () => {
 
   test("should only display 5 result if limit 5 added", async ({ page }) => {
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("code")
-      .locator("div")
+      .locator(".cm-content")
+      .locator(".cm-line")
       .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
-      .nth(4)
+      .nth(0)
       .click();
+
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator(".cm-content")
       .fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+
     await page.waitForTimeout(2000);
     await page
       .locator('[data-test="logs-search-bar-refresh-btn"]')
