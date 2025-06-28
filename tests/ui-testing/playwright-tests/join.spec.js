@@ -147,7 +147,7 @@ test.describe("Join for logs", () => {
         await logsPage.validateInterestingFieldsQuery();
     });
 
-    test.skip("Add/remove interesting field removes it from editor and results too", async ({ page }) => {
+    test("Add/remove interesting field removes it from editor and results too", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
