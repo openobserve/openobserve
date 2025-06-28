@@ -822,6 +822,7 @@ export default defineComponent({
     };
 
     const exploreStream = async (props: any) => {
+      store.dispatch("logs/setIsInitialized", false);
       const dateTime = await getTimeRange(props.row);
       router.push({
         name: "logs",

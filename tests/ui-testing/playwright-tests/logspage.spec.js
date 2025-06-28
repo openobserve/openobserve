@@ -323,14 +323,12 @@ test.describe("Logs UI testcases", () => {
     // Assert that the SQL query is visible
     const expectedQuery =
       'SELECT * FROM "e2e_automate"';
-    const text = await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').textContent();
+    // const text = await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').textContent();
     //   console.log(textval)
-    // const text = await page.evaluate(() => {
-    //   const editor = document
-    //     .querySelector('[data-test="logs-search-bar-query-editor"]')
-    //     .querySelector(".cm-lines"); // Adjust selector if needed
-    //   return editor ? editor.textContent.trim() : null;
-    // });
+    const text = await page.evaluate(() => {
+      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.cm-content'); // Adjust selector if needed
+      return editor ? editor.textContent.trim() : null;
+    });
 
     console.log(text);
     await expect(text.replace(/\s/g, "")).toContain(
