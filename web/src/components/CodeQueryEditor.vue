@@ -74,7 +74,7 @@ import {
   Decoration,
   DecorationSet,
 } from "@codemirror/view";
-import { indentWithTab } from "@codemirror/commands";
+import { indentWithTab, selectAll } from "@codemirror/commands";
 import { o2QueryEditorDarkTheme } from "@/components/CodeQueryEditorDarkTheme";
 import { o2QueryEditorLightTheme } from "@/components/CodeQueryEditorLightTheme";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
@@ -575,6 +575,7 @@ export default defineComponent({
     // Create keymap with Ctrl+Enter support
     const createKeymap = () => {
       return keymap.of([
+        // Add explicit select all keymaps for cross-platform compatibility - place first to override defaults
         indentWithTab,
         {
           key: "Ctrl-Enter",
@@ -606,6 +607,13 @@ export default defineComponent({
             formatDocument();
             return true;
           },
+        },
+        // Add explicit select all keymaps for cross-platform compatibility - place first to override defaults
+        {
+          key: "Ctrl-a",
+          preventDefault: true,
+          stopPropagation: true,
+          run: selectAll,
         },
       ]);
     };
