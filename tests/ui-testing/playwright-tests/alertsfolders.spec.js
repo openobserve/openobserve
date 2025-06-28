@@ -88,7 +88,7 @@ test.describe("Alert folders testcases", () => {
     await page.locator('[data-test="add-template-name-input"]').fill(templateName);
     
     const jsonString = '{"text": "{alert_name} is active"}';
-    await page.locator(".view-line").click();
+    await page.locator(".cm-line").click();
     await page.keyboard.type(jsonString);
     await page.waitForTimeout(500);
     

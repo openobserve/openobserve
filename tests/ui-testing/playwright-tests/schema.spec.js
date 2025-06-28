@@ -169,7 +169,7 @@ test.describe("Schema testcases", () => {
     await page.waitForTimeout(1000);
     await page.locator('[data-test="menu-link-\\/-item"]').click();
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click()
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line').click()
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
     await page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
     await page.getByText(streamName).click();

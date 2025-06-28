@@ -339,7 +339,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.enterFunctionName(randomFunctionName);
     await page
       .locator('[data-test="logs-vrl-function-editor"]')
-      .locator(".view-lines")
+      .locator(".cm-lines")
       .click();
     // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
@@ -455,7 +455,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.enterFunctionName(randomFunctionName);
     await page
       .locator('[data-test="logs-vrl-function-editor"]')
-      .locator(".view-lines")
+      .locator(".cm-lines")
       .click();
     // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".new_k8s_id=.kubernetes_namespace_name", {

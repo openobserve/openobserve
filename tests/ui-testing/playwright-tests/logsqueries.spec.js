@@ -166,9 +166,9 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').waitFor({ state: "visible" });
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
     await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({ force: true });
-    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor .view-lines').waitFor({ state: "visible" });
+    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor .cm-lines').waitFor({ state: "visible" });
     const text = await page.evaluate(() => {
-      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.view-lines');
+      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.cm-lines');
       return editor ? editor.textContent : null;
     });
     await expect(text).toEqual("");

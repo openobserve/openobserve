@@ -260,7 +260,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line"
+        "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line"
       )
       .click();
     await page
@@ -369,7 +369,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="add-template-name-input"]').fill(templateName);
   
     const jsonString = '{"text": "{alert_name} is active"}';
-    await page.locator(".view-line").click();
+    await page.locator(".cm-line").click();
     await page.keyboard.type(jsonString);
     await page.waitForTimeout(500); // Ensure typing completes before submit
   
@@ -615,7 +615,7 @@ test.describe("Sanity testcases", () => {
   //   await page.locator('[data-test="menu-link-\\/logs-item"]').click();
   //   await page
   //     .locator(
-  //       "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
+  //       "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines"
   //     )
   //     .click();
   //   await page.getByLabel("SQL Mode").locator("div").nth(2).click();

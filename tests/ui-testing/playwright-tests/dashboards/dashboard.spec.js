@@ -302,7 +302,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-customSql"]').click();
 
     // Focus on the first line of the editor
-    await page.locator(".view-line").first().click();
+    await page.locator(".cm-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
       .getByLabel("Editor content;Press Alt+F1")

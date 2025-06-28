@@ -192,7 +192,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
     await page
       .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
+        "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines"
       )
       .click();
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();

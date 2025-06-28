@@ -400,7 +400,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .cm-lines > .cm-line"
       )
       .click();
     await page
@@ -479,7 +479,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .cm-lines > .cm-line"
       )
       .click();
     await page

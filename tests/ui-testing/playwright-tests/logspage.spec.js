@@ -278,13 +278,13 @@ test.describe("Logs UI testcases", () => {
   test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", async ({
     page,
   }) => {
-    await expect(page.locator("#fnEditor .view-lines")).toBeVisible();
+    await expect(page.locator("#fnEditor .cm-lines")).toBeVisible();
     await page
       .locator(
         '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
       )
       .click({ force: true });
-    await expect(page.locator("#fnEditor .view-lines")).not.toBeVisible();
+    await expect(page.locator("#fnEditor .cm-lines")).not.toBeVisible();
   });
 
   test("should switch from past 6 weeks to past 6 days on date-time UI", async ({
@@ -326,7 +326,7 @@ test.describe("Logs UI testcases", () => {
     const text = await page.evaluate(() => {
       const editor = document
         .querySelector('[data-test="logs-search-bar-query-editor"]')
-        .querySelector(".view-lines"); // Adjust selector if needed
+        .querySelector(".cm-lines"); // Adjust selector if needed
       return editor ? editor.textContent.trim() : null;
     });
 
@@ -400,7 +400,7 @@ test.describe("Logs UI testcases", () => {
   test('should create a function and then delete it', async ({ page }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line').click();
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
@@ -495,7 +495,7 @@ test.describe("Logs UI testcases", () => {
 
   test.skip('should display results for search around after adding function', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line').click();
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();

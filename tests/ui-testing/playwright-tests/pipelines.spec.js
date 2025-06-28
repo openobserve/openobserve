@@ -349,7 +349,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByLabel('Stream Type *').click();
 
     // Click on the editor to type the query
-    await page.locator(".view-lines").first().click();
+    await page.locator(".cm-lines").first().click();
     const sqlQuery = 'select * from "default"';
 
     // Locate the editor and type the SQL query if it's not already typed
@@ -402,7 +402,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".view-lines").click();
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-lines").click();
     // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
