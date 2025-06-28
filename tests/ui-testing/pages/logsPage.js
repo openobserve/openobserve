@@ -356,9 +356,7 @@ export class LogsPage {
     await this.page.waitForTimeout(2000);
     await this.page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true, });
     await this.page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({ force: true, });
-    await this.page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true, });
     await expect(this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')).toHaveText(/job/);
-
   }
 
 
