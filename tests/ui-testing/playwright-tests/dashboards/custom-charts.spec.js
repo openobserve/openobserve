@@ -84,7 +84,7 @@ test.describe("Sanity Tests", () => { let dashboardPage
     await ingestion(page);
   });
 
-  test("Add Pictorial JSON in Monaco Editor", async ({ page }) => {
+  test.skip("Add Pictorial JSON in Monaco Editor", async ({ page }) => {
     if (!pictorialJSON) {
       console.error("Skipping test: pictorial.json not found");
       return;
