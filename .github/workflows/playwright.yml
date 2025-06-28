@@ -118,7 +118,7 @@ jobs:
             "dashboards/dashboard-general-setting.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",
             "dashboards/dashboard-tabs-setting.spec.js",
-            # "dashboards/dashboard-import.spec.js",
+            "dashboards/dashboard-import.spec.js",
             "reportsUpdated.spec.js",
             "reportsUpdated2.spec.js",
             "dashboards/dashboard-filter.spec.js",
