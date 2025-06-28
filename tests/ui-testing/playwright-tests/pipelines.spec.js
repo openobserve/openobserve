@@ -361,8 +361,8 @@ test.describe("Pipeline testcases", () => {
 
     // Check if the query exists in the editor (using `hasText` to ensure it's typed)
     const queryTyped = await page
-      .locator("code")
-      .locator("div")
+      .locator(".cm-content")
+      .locator(".cm-line")
       .filter({ hasText: sqlQuery })
       .count();
 

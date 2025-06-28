@@ -403,7 +403,7 @@ test.describe(" visualize UI testcases", () => {
     // Enter an invalid query into the search bar
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator(".cm-content")
       .fill("select from user whare ID =1");
 
     // Refresh the search
