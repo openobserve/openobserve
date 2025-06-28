@@ -109,6 +109,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
         />
+        <q-btn
+          data-test="dashboard-query-editor-fullscreen-btn"
+          :icon="
+            dashboardPanelData.layout.queryEditorFullScreen
+              ? 'fullscreen_exit'
+              : 'fullscreen'
+          "
+          :title="
+            dashboardPanelData.layout.queryEditorFullScreen
+              ? 'Exit Full Screen'
+              : 'Full Screen'
+          "
+          flat
+          dense
+          size="sm"
+          @click="toggleFullScreen"
+        />
         <QueryTypeSelector></QueryTypeSelector>
       </div>
     </q-bar>
@@ -142,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <SqlQueryEditor
                 ref="queryEditorRef"
                 class="monaco-editor"
-                style="width: 100%"
+                style="width: 100%; height: 100%"
                 v-model:query="currentQuery"
                 data-test="dashboard-panel-query-editor"
                 v-model:functions="dashboardPanelData.meta.stream.functions"
@@ -457,7 +474,20 @@ export default defineComponent({
       () => dashboardPanelData.layout.showQueryBar,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
+    );
+
+    // handle full screen query editor layout changes
+    watch(
+      () => dashboardPanelData.layout.queryEditorFullScreen,
+      () => {
+        // Trigger resize event for proper layout
+        window.dispatchEvent(new Event("resize"));
+        // Reset editor layout for VRL function editor
+        nextTick(() => {
+          vrlFnEditorRef?.value?.resetEditorLayout();
+        });
+      },
     );
 
     // this is only for VRLs
@@ -553,6 +583,11 @@ export default defineComponent({
       dashboardPanelData.layout.showQueryBar = true;
     };
 
+    const toggleFullScreen = () => {
+      dashboardPanelData.layout.queryEditorFullScreen =
+        !dashboardPanelData.layout.queryEditorFullScreen;
+    };
+
     return {
       t,
       router,
@@ -580,6 +615,7 @@ export default defineComponent({
       filterFunctionOptions,
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
+      toggleFullScreen,
     };
   },
 });
