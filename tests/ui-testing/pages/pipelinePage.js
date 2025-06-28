@@ -52,7 +52,7 @@ class PipelinePage {
     this.confirmDeleteButton = page.locator('[data-test="confirm-button"]');
     this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
     this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
-    this.sqlQueryInput = page.locator('.view-lines');
+    this.sqlQueryInput = page.locator('.cm-lines');
     this.frequencyUnit = page.locator('[data-test="scheduled-pipeline-frequency-unit"]');
     this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
     this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
