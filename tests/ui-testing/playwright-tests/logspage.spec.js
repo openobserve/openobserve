@@ -124,7 +124,7 @@ test.describe("Logs UI testcases", () => {
     await applyQueryButton(page);
 
 
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
     await page.waitForTimeout(1000);
     await applyQueryButton(page);
     const warningElement = page.locator('text=warning Query execution');
@@ -278,13 +278,13 @@ test.describe("Logs UI testcases", () => {
   test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", async ({
     page,
   }) => {
-    await expect(page.locator("#fnEditor .cm-lines")).toBeVisible();
+    await expect(page.locator("#fnEditor")).toBeVisible();
     await page
       .locator(
         '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
       )
       .click({ force: true });
-    await expect(page.locator("#fnEditor .cm-lines")).not.toBeVisible();
+    await expect(page.locator("#fnEditor")).not.toBeVisible();
   });
 
   test("should switch from past 6 weeks to past 6 days on date-time UI", async ({
@@ -323,12 +323,14 @@ test.describe("Logs UI testcases", () => {
     // Assert that the SQL query is visible
     const expectedQuery =
       'SELECT * FROM "e2e_automate"';
-    const text = await page.evaluate(() => {
-      const editor = document
-        .querySelector('[data-test="logs-search-bar-query-editor"]')
-        .querySelector(".cm-lines"); // Adjust selector if needed
-      return editor ? editor.textContent.trim() : null;
-    });
+    const text = await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').textContent();
+    //   console.log(textval)
+    // const text = await page.evaluate(() => {
+    //   const editor = document
+    //     .querySelector('[data-test="logs-search-bar-query-editor"]')
+    //     .querySelector(".cm-lines"); // Adjust selector if needed
+    //   return editor ? editor.textContent.trim() : null;
+    // });
 
     console.log(text);
     await expect(text.replace(/\s/g, "")).toContain(
@@ -400,8 +402,7 @@ test.describe("Logs UI testcases", () => {
   test('should create a function and then delete it', async ({ page }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line').click();
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').click();
@@ -420,7 +421,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display click save directly while creating a function', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
@@ -429,7 +430,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding only blank spaces under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill(' ');
@@ -440,7 +441,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding invalid characters under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill('e2e@@@');
@@ -450,7 +451,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display added function on switching between tabs and again navigate to log', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="menu-link-\\/metrics-item"]').click();
@@ -496,7 +497,7 @@ test.describe("Logs UI testcases", () => {
   test.skip('should display results for search around after adding function', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line').click();
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=1');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
