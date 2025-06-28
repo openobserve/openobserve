@@ -502,6 +502,7 @@ export default defineComponent({
     };
 
     const exploreEnrichmentTable = async (props: any) => {
+      store.dispatch("logs/setIsInitialized", false);
       const timestamps = await getTimeRange(props.row);
       router.push({
         name: "logs",
