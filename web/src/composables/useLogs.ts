@@ -390,6 +390,7 @@ const useLogs = () => {
           },
         }));
         await nextTick();
+        await getStreamList(false);
         searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
         searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
         searchObj.data.histogram = JSON.parse(JSON.stringify(state.data.histogram));
@@ -544,7 +545,7 @@ const useLogs = () => {
     searchObj.data.searchAround.size = 0;
   }
 
-  async function loadStreamLists() {
+  async function loadStreamLists(selectStream: boolean = true) {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
@@ -579,9 +580,10 @@ const useLogs = () => {
           }
         }
         if (
-          store.state.zoConfig.query_on_stream_selection == false ||
-          router.currentRoute.value.query?.type == "stream_explorer"
+          (store.state.zoConfig.query_on_stream_selection == false ||
+          router.currentRoute.value.query?.type == "stream_explorer") && selectStream
         ) {
+          console.log("selectedStream", selectedStream);
           searchObj.data.stream.selectedStream = selectedStream;
         }
       } else {
@@ -615,7 +617,7 @@ const useLogs = () => {
     }
   }
 
-  const getStreamList = async () => {
+  const getStreamList = async (selectStream: boolean = true) => {
     try {
       // commented below function as we are doing resetStreamData from all the places where getStreamList is called
       // resetStreamData();
@@ -625,7 +627,7 @@ const useLogs = () => {
         ...streamData,
       };
       await nextTick();
-      await loadStreamLists();
+      await loadStreamLists(selectStream);
       return;
     } catch (e: any) {
       console.error("Error while getting stream list", e);
