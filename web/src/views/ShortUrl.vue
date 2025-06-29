@@ -37,10 +37,11 @@ export default defineComponent({
       const urlArray = url.split("/");
 
       // if the url contains web, then route to the original url
+
       if (urlArray.includes("web")) {
-        routeToOriginalUrl(urlArray[4]);
+        routeToOriginalUrl(urlArray.slice(4).join("/"));
       } else {
-        routeToOriginalUrl(urlArray[3]);
+        routeToOriginalUrl(urlArray.slice(3).join("/"));
       }
     };
 

@@ -256,17 +256,51 @@ const useHttpStreaming = () => {
 
       // Get the ReadableStream
       const readableStream = response.body;
+
       if (!readableStream) {
         throw new Error('Response body is null');
       }
       
       // Start the stream in the worker
-      if(worker) {
+      if (worker) {        
+        // Initialize the stream in the worker
         worker.postMessage({
           action: 'startStream',
-          traceId,
-          readableStream
-        }, [readableStream as any]);
+          traceId
+        });
+        
+        // For Safari compatibility: manually read the stream and send chunks to worker
+        const reader = readableStream.getReader();
+        const decoder = new TextDecoder();
+        
+        (async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                worker.postMessage({
+                  action: 'endStream',
+                  traceId
+                });
+                break;
+              }
+              
+              // Decode and send chunks to the worker
+              const chunk = decoder.decode(value, { stream: true });
+              worker.postMessage({
+                action: 'processChunk',
+                traceId,
+                chunk
+              });
+            }
+          } catch (error) {
+            console.error('Error reading stream:', error);
+            onError(traceId, error);
+          } finally {
+            reader.releaseLock();
+          }
+        })();
       } else {
         throw new Error('Worker is not supported');
       }
