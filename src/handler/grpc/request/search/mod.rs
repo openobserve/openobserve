@@ -162,6 +162,7 @@ impl Search for Searcher {
             req.user_id.clone(),
             &request,
             "".to_string(),
+            false,
         )
         .await;
 
