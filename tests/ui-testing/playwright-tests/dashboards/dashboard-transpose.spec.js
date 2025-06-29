@@ -375,8 +375,6 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page.getByRole("option", { name: "e2e_automate" }).click();
 
-    await page.waitForTimeout(2000);
-
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
@@ -402,12 +400,12 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator(
-        "[data-test='dashboard-vrl-function-editor']"
-      ).locator(".cm-content")
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+      )
       .click();
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
-      .getByRole("textbox")
+      .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=100");
 
     await page.waitForTimeout(2000);
