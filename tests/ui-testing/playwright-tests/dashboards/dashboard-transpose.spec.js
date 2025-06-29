@@ -375,6 +375,8 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page.getByRole("option", { name: "e2e_automate" }).click();
 
+    await page.waitForTimeout(2000);
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
@@ -400,12 +402,12 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .cm-lines > .cm-line"
-      )
+        "[data-test='dashboard-vrl-function-editor']"
+      ).locator(".cm-content")
       .click();
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
-      .locator(".cm-content")
+      .getByRole("textbox")
       .fill(".vrl=100");
 
     await page.waitForTimeout(2000);
@@ -477,14 +479,15 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="logs-search-bar-show-query-toggle-btn"] div')
       .nth(2)
       .click();
-    await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .cm-lines > .cm-line"
-      )
-      .click();
+
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
       .locator(".cm-content")
+      .click();
+
+    await page
+      .locator('[data-test="dashboard-vrl-function-editor"]')
+      .getByRole("textbox")
       .fill(".vrl=100");
 
     await page.locator('[data-test="selected-chart-table-item"] img').click();
