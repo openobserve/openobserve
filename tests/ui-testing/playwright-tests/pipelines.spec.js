@@ -402,7 +402,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-lines").click();
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByRole('textbox').click();
     // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
