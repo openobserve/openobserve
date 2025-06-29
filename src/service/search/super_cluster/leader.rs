@@ -96,8 +96,7 @@ pub async fn search(
                 .ok()
                 .map(RoleGroup::from)
         })
-        .unwrap_or(None);
-
+        .unwrap_or(Some(RoleGroup::Interactive));
     let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters, role_group).await?;
     log::info!(
         "{}",
