@@ -93,8 +93,8 @@ mod tests {
             grpc_addr: format!("grpc://node-{}.example.com", id),
             role: vec![Role::Ingester],
             role_group: RoleGroup::None,
-            scheduled: true,
-            broadcasted: true,
+            scheduled: false,
+            broadcasted: false,
             status: NodeStatus::Online,
             cpu_num: 0,
             metrics: NodeMetrics {

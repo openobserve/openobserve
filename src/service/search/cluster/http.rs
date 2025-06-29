@@ -55,7 +55,7 @@ pub async fn search(
     let sql = Arc::new(meta);
 
     for s in sql.stream_names.iter() {
-        // Get the schem from `TableReference` for join queries
+        // Get the schema from `TableReference` for join queries
         // Since it resolves queries where stream_name is prefixed with the stream_type
         // e.g. `logs.my_stream`, `enrich.my_stream`
         let stream_type = if s.stream_type().is_empty() {
