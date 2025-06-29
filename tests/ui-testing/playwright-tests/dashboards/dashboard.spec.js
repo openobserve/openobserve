@@ -302,13 +302,14 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-customSql"]').click();
 
     // Focus on the first line of the editor
-    await page.locator(".cm-line").first().click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".cm-content")
-      .fill(
-        'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
-      );
+    // await page.locator(".view-line").first().click();
+    await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('textbox').click();
+    // await page
+    //   .locator('[data-test="dashboard-panel-query-editor"]')
+    //   .locator('.inputarea')
+    //   .fill(
+    //     'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
+    //   );
 
     // Fill the custom SQL query
     await page.keyboard.type(
