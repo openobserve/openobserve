@@ -209,6 +209,8 @@ pub async fn ingest(
                     {
                         Some(value.to_string())
                     } else {
+                        None
+                    }
                 } else {
                     // 3. with pipeline, storing original as long as streams_need_original_set is
                     //    not empty
