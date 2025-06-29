@@ -367,9 +367,6 @@ impl Condition {
                 } else if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
                     Box::new(RegexQuery::from_pattern(&value, default_field)?)
-                } else if value.to_lowercase().starts_with("re:") {
-                    let value = value[3..].trim();
-                    Box::new(RegexQuery::from_pattern(value, default_field)?)
                 } else {
                     let mut tokens = o2_collect_tokens(value);
                     let last_prefix = if value.ends_with("*") {
