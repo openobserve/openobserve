@@ -958,7 +958,6 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
