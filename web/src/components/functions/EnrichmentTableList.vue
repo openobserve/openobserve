@@ -178,7 +178,11 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
-import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import {
+  formatSizeFromMB,
+  getImageURL,
+  verifyOrganizationStatus,
+} from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
@@ -186,7 +190,13 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
-  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog, EnrichmentSchema },
+  components: {
+    QTablePagination,
+    AddEnrichmentTable,
+    NoData,
+    ConfirmDialog,
+    EnrichmentSchema,
+  },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -236,7 +246,7 @@ export default defineComponent({
         align: "left",
         sortable: true,
         sort: (a, b, rowA, rowB) => {
-          return rowA.original_storage_size- rowB.original_storage_size
+          return rowA.original_storage_size - rowB.original_storage_size;
         },
       },
       {
@@ -246,7 +256,7 @@ export default defineComponent({
         align: "left",
         sortable: false,
         sort: (a, b, rowA, rowB) =>
-          rowA.original_compressed_size- rowB.original_compressed_size,
+          rowA.original_compressed_size - rowB.original_compressed_size,
       },
       {
         name: "actions",
@@ -265,12 +275,11 @@ export default defineComponent({
     const getLookupTables = () => {
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading functions...",
+        message: "Please wait while loading enrichment tables...",
       });
 
       getStreams("enrichment_tables", false)
         .then((res: any) => {
-
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {
@@ -279,6 +288,8 @@ export default defineComponent({
             let compressed_size = "";
             let original_storage_size = "";
             let original_compressed_size = "";
+            let doc_min_time = "";
+            let doc_max_time = "";
 
             if (data.stats) {
               doc_num = data.stats.doc_num;
@@ -286,10 +297,12 @@ export default defineComponent({
               compressed_size = data.stats.compressed_size + " MB";
               original_storage_size = data.stats.storage_size;
               original_compressed_size = data.stats.compressed_size;
+              doc_min_time = data.stats.doc_time_min;
+              doc_max_time = data.stats.doc_time_max;
             }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
-              id: data.name + counter,
+              id: data.name + doc_min_time + "-" + doc_max_time,
               name: data.name,
               doc_num: doc_num,
               storage_size: storage_size,
@@ -298,6 +311,8 @@ export default defineComponent({
               original_compressed_size: original_compressed_size,
               actions: "action buttons",
               stream_type: data.stream_type,
+              doc_min_time: doc_min_time,
+              doc_max_time: doc_max_time,
             };
           });
           dismiss();
@@ -338,6 +353,8 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
+
+    const filterQuery = ref<string>("");
 
     const addLookupTable = () => {
       showAddJSTransformDialog.value = true;
@@ -537,11 +554,11 @@ export default defineComponent({
       maxRecordToReturn,
       showAddJSTransformDialog,
       outlinedDelete,
-      filterQuery: ref(""),
+      filterQuery,
       filterData(rows: any, terms: any) {
-        var filtered = [];
+        const filtered: any[] = [];
         terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
+        for (let i = 0; i < rows.length; i++) {
           if (rows[i]["name"].toLowerCase().includes(terms)) {
             filtered.push(rows[i]);
           }

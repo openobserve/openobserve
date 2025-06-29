@@ -450,9 +450,6 @@ const useRoutes = () => {
         name: "createReport",
         component: CreateReport,
         props: true,
-        meta: {
-          keepAlive: true,
-        },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
