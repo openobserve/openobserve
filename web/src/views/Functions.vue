@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   .includes('pipelines')
               "
               data-test="stream-pipelines-tab"
-              name="streamPipelines"
+              name="pipelines"
               :to="{
                 name: 'pipelines',
                 query: {
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-route-tab
               data-test="function-stream-tab"
               default
-              name="functions"
+              name="functionList"
               :to="{
                 name: 'functionList',
                 query: {
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, onBeforeMount, watch, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -117,7 +117,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
-    const activeTab: any = ref("streamPipelines");
+    const activeTab: any = ref("pipelines");
     const templates = ref([]);
     const functionAssociatedStreams = ref([]);
     const splitterModel = ref(220);
@@ -140,14 +140,24 @@ export default defineComponent({
 
     watch(
       () => router.currentRoute.value.name,
-      (routeName) => {
+      (routeName, oldRouteName) => {
         // This is added to redirect to functionList if the user is on functions route
         // This case happens when user clicks on functions from menu when he is already on functions page
-        if (routeName === "pipeline") router.back();
+        const childRoutes = ["functionList", "enrichmentTables", "pipelines"];
+        if (
+          routeName === "pipeline" &&
+          childRoutes.includes(oldRouteName as string)
+        ) {
+          router.back();
+        }
       },
     );
 
     onBeforeMount(() => {
+      redirectRoute();
+    });
+
+    onActivated(() => {
       redirectRoute();
     });
 
@@ -160,7 +170,7 @@ export default defineComponent({
     const redirectRoute = () => {
       if (router.currentRoute.value.name === "pipeline") {
         router.replace({
-          name: "pipelines",
+          name: activeTab.value,
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
