@@ -495,7 +495,7 @@ test.describe("Logs UI testcases", () => {
 
   test.skip('should display results for search around after adding function', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines > .cm-line').click();
+    await page.locator('#fnEditor').getByRole('textbox').click();
     await page.locator('#fnEditor').getByRole('textbox').fill('.a=1');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
