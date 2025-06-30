@@ -197,7 +197,11 @@ pub async fn process_token(
         } else {
             // check if user is service account and skip the role update ,
             // assumption is always a service account irrespective of the orgs it belongs to
-            if res.0.user_role.is_some_and(|r| r.eq(&UserRole::ServiceAccount)) {
+            if res
+                .0
+                .user_role
+                .is_some_and(|r| r.eq(&UserRole::ServiceAccount))
+            {
                 log::info!("User is service account and skipping the role update");
                 return;
             }
