@@ -15,7 +15,7 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
-use arrow_schema::FieldRef;
+use arrow_schema::{DataType, Field, FieldRef};
 use chrono::Duration;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -327,7 +327,33 @@ impl Sql {
             }
         }
 
+        // 15. replace the Utf8 to Utf8View type
+        let final_schemas = if cfg.common.utf8_view_enabled {
+            let mut final_schemas = HashMap::with_capacity(used_schemas.len());
+            for (stream, schema) in used_schemas.iter() {
+                let fields = schema
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| {
+                        if f.data_type() == &DataType::Utf8 {
+                            Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
+                        } else {
+                            f.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let new_schema =
+                    Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+                final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
+            }
+            final_schemas
+        } else {
+            used_schemas.clone()
+        };
+
         let is_complex = is_complex_query(&mut statement);
+
         Ok(Sql {
             sql: statement.to_string(),
             is_complex,
@@ -339,7 +365,7 @@ impl Sql {
             prefix_items: prefix_column_visitor.prefix_items,
             columns,
             aliases,
-            schemas: used_schemas,
+            schemas: final_schemas,
             limit,
             offset,
             time_range: Some((query.start_time, query.end_time)),
