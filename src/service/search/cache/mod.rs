@@ -433,10 +433,10 @@ pub async fn search(
 
     // result cache save changes start
     if cfg.common.result_cache_enabled
+        && !is_http2_streaming
         && should_exec_query
         && c_resp.cache_query_response
         && should_cache_results
-        && !is_http2_streaming
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
