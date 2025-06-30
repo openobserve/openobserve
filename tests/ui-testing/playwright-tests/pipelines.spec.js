@@ -74,6 +74,8 @@ async function exploreStreamAndNavigateToPipeline(page, streamName) {
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
 
+  await page.waitForTimeout(3000);
+
   await page.waitForSelector('[data-test="logs-search-result-table-body"]');
   
   // Expand the log table menu
@@ -94,6 +96,8 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
+
+  await page.waitForTimeout(3000);
 
   await page.waitForSelector('[data-test="logs-search-result-table-body"]');
   
