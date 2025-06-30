@@ -402,8 +402,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByRole('textbox').click();
-    // Type the function text with a delay to ensure each character registers
+    await page.locator('[data-test="logs-vrl-function-editor"] .cm-content').click();    // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
     await page.keyboard.type(".", { delay: 100 });
@@ -420,7 +419,7 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(3000);
     await pipelinePage.saveFunction();
     await page.waitForTimeout(3000);
-    await page.getByRole("button", { name: randomFunctionName }).hover();
+    await page.getByText(randomFunctionName).hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     // await pipelinePage.toggleCreateStream();
     // await page.getByLabel("Name *").click();
@@ -563,9 +562,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByPlaceholder("Value").fill("prometheus");
     await pipelinePage.saveCondition();
     await page.waitForTimeout(2000);
-    await page
-      .getByRole("button", { name: "kubernetes_container_name" })
-      .hover();
+    await page.getByText("kubernetes_container_name").hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     // await pipelinePage.toggleCreateStream();
     // await page.getByLabel("Name *").click();
