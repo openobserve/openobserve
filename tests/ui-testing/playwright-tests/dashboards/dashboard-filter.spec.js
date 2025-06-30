@@ -627,4 +627,95 @@ test.describe("dashboard filter testcases", () => {
     await dashboardCreate.searchDashboard(randomDashboardName);
     await dashboardCreate.deleteDashboard(randomDashboardName);
   });
+  test("Should Filter work correctly if Added the breakdown field", async ({
+    page,
+  }) => {
+    const dashboardCreate = new DashboardCreate(page);
+    const dashboardList = new DashboardListPage(page);
+    const dashboardSetting = new DashboardSetting(page);
+    const dashboardVariables = new DashboardVariables(page);
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardActions = new DashboardactionPage(page);
+    const dashboardRefresh = new DashboardTimeRefresh(page);
+
+    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await dashboardCreate.createDashboard(randomDashboardName);
+    await page.waitForTimeout(3000);
+
+    // Open settings and add variable
+    await dashboardSetting.openSetting();
+    await dashboardVariables.addDashboardVariable(
+      "variablename",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name"
+    );
+
+    // Add a panel
+    await dashboardCreate.addPanel();
+    await dashboardActions.addPanelName(panelName);
+
+    // Select stream and add fields
+    await chartTypeSelector.selectStreamType("logs");
+    await chartTypeSelector.selectStream("e2e_automate");
+    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "b");
+
+    await dashboardActions.applyDashboardBtn();
+
+    // Set date range
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
+      timeout: 5000,
+    });
+    await dashboardRefresh.setRelative("6", "w");
+    await dashboardActions.waitForChartToRender();
+
+    // Add filter field and set value
+    await chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "filter"
+    );
+    await dashboardVariables.selectValueFromVariableDropDown(
+      "variablename",
+      "ziox"
+    );
+
+    // Add filter condition
+    const dashboardFilter = new Dashboardfilter(page);
+    await dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_container_name",
+      "",
+      "=",
+      "$variablename"
+    );
+    await dashboardActions.applyDashboardBtn();
+    await dashboardActions.waitForChartToRender();
+
+    // Open query inspector and verify
+    await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+    await expect(
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    // Save the dashboard panel
+    await dashboardActions.savePanel();
+
+    // Delete the dashboard
+    await dashboardCreate.backToDashboardList();
+    await dashboardCreate.searchDashboard(randomDashboardName);
+    await dashboardCreate.deleteDashboard(randomDashboardName);
+  });
 });
