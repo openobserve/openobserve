@@ -15,9 +15,12 @@
 
 use arrow_schema::DataType;
 
+pub mod approx_topk_v1;
+pub mod approx_topk_v2;
+pub mod approx_topk_v3;
+pub mod approx_topk_v4;
 pub mod percentile_cont;
 pub mod summary_percentile;
-pub mod approx_topk;
 
 pub static NUMERICS: &[DataType] = &[
     DataType::Int8,

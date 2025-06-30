@@ -26,20 +26,20 @@ use datafusion::{
     common::{internal_err, not_impl_err, plan_err},
     error::Result,
     logical_expr::{
+        Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
         function::{AccumulatorArgs, StateFieldsArgs},
         utils::format_state_name,
-        Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
     },
     physical_plan::PhysicalExpr,
     scalar::ScalarValue,
 };
 
-const APPROX_TOPK: &str = "approx_topk";
+const APPROX_TOPK: &str = "approx_topk_v3";
 
 /// Approximate TopK UDAF that returns the top K elements by frequency.
 ///
 /// For efficiency and accuracy:
-/// - Maintains exact counts for top-k candidates (items in heap + recent high-frequency items)  
+/// - Maintains exact counts for top-k candidates (items in heap + recent high-frequency items)
 /// - Uses Count-Min Sketch only as a filter for items unlikely to be in top-k
 /// - Optimized for both small and large cardinalities
 pub(crate) struct ApproxTopK(Signature);
@@ -58,7 +58,7 @@ impl ApproxTopK {
 
 impl std::fmt::Debug for ApproxTopK {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_struct("ApproxTopK")
+        f.debug_struct("ApproxTopKV3")
             .field("name", &self.name())
             .field("signature", &self.0)
             .finish()
@@ -86,19 +86,17 @@ impl AggregateUDFImpl for ApproxTopK {
 
     fn return_type(&self, arg_types: &[DataType]) -> Result<DataType> {
         match &arg_types[0] {
-            DataType::Utf8 | DataType::LargeUtf8 => {
-                Ok(DataType::List(Arc::new(Field::new(
-                    "item",
-                    DataType::Struct(
-                        vec![
-                            Field::new("value", DataType::Utf8, false),
-                            Field::new("count", DataType::Int64, false),
-                        ]
-                        .into(),
-                    ),
-                    true,
-                ))))
-            }
+            DataType::Utf8 | DataType::LargeUtf8 => Ok(DataType::List(Arc::new(Field::new(
+                "item",
+                DataType::Struct(
+                    vec![
+                        Field::new("value", DataType::Utf8, false),
+                        Field::new("count", DataType::Int64, false),
+                    ]
+                    .into(),
+                ),
+                true,
+            )))),
             _ => plan_err!("approx_topk requires string input types"),
         }
     }
@@ -127,9 +125,7 @@ impl AggregateUDFImpl for ApproxTopK {
         let value_data_type = args.exprs[0].data_type(args.schema)?;
 
         match value_data_type {
-            DataType::Utf8 | DataType::LargeUtf8 => {
-                Ok(Box::new(ApproxTopKAccumulator::new(k)))
-            }
+            DataType::Utf8 | DataType::LargeUtf8 => Ok(Box::new(ApproxTopKAccumulator::new(k))),
             other => {
                 not_impl_err!("Support for 'APPROX_TOPK' for data type {other} is not implemented")
             }
@@ -173,7 +169,7 @@ impl Ord for TopKItem {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Min-heap: smaller counts first
         match self.count.cmp(&other.count) {
-            std::cmp::Ordering::Equal => other.value.cmp(&self.value), // Reverse for deterministic results
+            std::cmp::Ordering::Equal => other.value.cmp(&self.value), /* Reverse for deterministic results */
             other => other,
         }
     }
@@ -240,16 +236,13 @@ impl ApproxTopKAccumulator {
     /// Update heap for a specific item
     fn update_heap_for_item(&mut self, value: &str, count: i64) {
         // First check if this item is already in the heap
-        let already_in_heap = self
-            .top_k_heap
-            .iter()
-            .any(|item| item.value == value);
+        let already_in_heap = self.top_k_heap.iter().any(|item| item.value == value);
 
         if already_in_heap {
             // Item is already in heap - need to update it
             // Rebuild heap with updated count
             let mut items: Vec<_> = self.top_k_heap.drain().collect();
-            
+
             // Update the item's count
             for item in &mut items {
                 if item.value == value {
@@ -257,15 +250,15 @@ impl ApproxTopKAccumulator {
                     break;
                 }
             }
-            
+
             // Find the new minimum before rebuilding heap
             let new_min = items.iter().map(|item| item.count).min().unwrap_or(0);
-            
+
             // Rebuild heap
             for item in items {
                 self.top_k_heap.push(item);
             }
-            
+
             // Update minimum threshold with the actual minimum
             self.min_heap_count = new_min;
             return;
@@ -281,7 +274,8 @@ impl ApproxTopKAccumulator {
             if self.top_k_heap.len() == self.k {
                 // Update min threshold when heap becomes full
                 // Find actual minimum from all items in heap
-                self.min_heap_count = self.top_k_heap
+                self.min_heap_count = self
+                    .top_k_heap
                     .iter()
                     .map(|item| item.count)
                     .min()
@@ -301,7 +295,8 @@ impl ApproxTopKAccumulator {
                     });
                     // Update minimum threshold
                     // Find actual minimum from all items in heap
-                    self.min_heap_count = self.top_k_heap
+                    self.min_heap_count = self
+                        .top_k_heap
                         .iter()
                         .map(|item| item.count)
                         .min()
@@ -329,7 +324,7 @@ impl ApproxTopKAccumulator {
     fn rebuild_heap(&mut self) {
         // Clear heap and rebuild from exact counts
         self.top_k_heap.clear();
-        
+
         // Sort all items by count
         let mut all_items: Vec<_> = self
             .exact_counts
@@ -339,7 +334,7 @@ impl ApproxTopKAccumulator {
                 count: *c,
             })
             .collect();
-        
+
         // Sort by count descending, then by value ascending
         all_items.sort_by(|a, b| match b.count.cmp(&a.count) {
             std::cmp::Ordering::Equal => a.value.cmp(&b.value),
@@ -352,7 +347,8 @@ impl ApproxTopKAccumulator {
         }
 
         // Update minimum threshold
-        self.min_heap_count = self.top_k_heap
+        self.min_heap_count = self
+            .top_k_heap
             .iter()
             .map(|item| item.count)
             .min()
@@ -452,7 +448,10 @@ impl Accumulator for ApproxTopKAccumulator {
         }
 
         // Create struct array from the top k results
-        use arrow::{array::{Int64Array, StringArray}, datatypes::Fields};
+        use arrow::{
+            array::{Int64Array, StringArray},
+            datatypes::Fields,
+        };
 
         let values: Vec<Option<String>> = top_k.iter().map(|(v, _)| Some(v.clone())).collect();
         let counts: Vec<Option<i64>> = top_k.iter().map(|(_, c)| Some(*c)).collect();
@@ -573,7 +572,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_approx_topk_accuracy() {
+    async fn test_approx_topk_udaf_v3() {
         let ctx = SessionContext::new();
 
         // Create test data
@@ -581,11 +580,21 @@ mod tests {
 
         let mut values = Vec::new();
         // Create clear frequency differences
-        for _ in 0..100 { values.push("item_1".to_string()); }
-        for _ in 0..80  { values.push("item_2".to_string()); }
-        for _ in 0..60  { values.push("item_3".to_string()); }
-        for _ in 0..40  { values.push("item_4".to_string()); }
-        for _ in 0..20  { values.push("item_5".to_string()); }
+        for _ in 0..100 {
+            values.push("item_1".to_string());
+        }
+        for _ in 0..80 {
+            values.push("item_2".to_string());
+        }
+        for _ in 0..60 {
+            values.push("item_3".to_string());
+        }
+        for _ in 0..40 {
+            values.push("item_4".to_string());
+        }
+        for _ in 0..20 {
+            values.push("item_5".to_string());
+        }
         // Add some noise
         for i in 6..50 {
             values.push(format!("item_{}", i));
@@ -607,14 +616,14 @@ mod tests {
 
         // Test the function
         let df = ctx
-            .sql("SELECT approx_topk(item, 5) as top_items FROM test_table")
+            .sql("SELECT approx_topk_v3(item, 5) as top_items FROM test_table")
             .await
             .unwrap();
         let results = df.collect().await.unwrap();
 
         // Verify we got the right results
         println!("Results: {:?}", results[0]);
-        
+
         // The results should match the exact count
         assert_eq!(results.len(), 1);
     }
