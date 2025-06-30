@@ -347,9 +347,10 @@ test.describe("Pipeline testcases", () => {
     await page
       .locator('div').filter({ hasText: /^Stream Type \*$/ }).first().click();
     await page.getByLabel('Stream Type *').click();
-
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="scheduled-pipeline-sql-editor"] .cm-content').click();
     // Click on the editor to type the query
-    await page.locator(".cm-lines").first().click();
+    // await page.locator(".cm-lines").first().click();
     const sqlQuery = 'select * from "default"';
 
     // Locate the editor and type the SQL query if it's not already typed
