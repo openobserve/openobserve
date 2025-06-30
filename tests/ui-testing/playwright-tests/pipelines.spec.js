@@ -437,7 +437,7 @@ test.describe("Pipeline testcases", () => {
     // await pipelinePage.clickSaveStream();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(1000);
     await pipelinePage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
