@@ -16,7 +16,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Formatter,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::Hash,
     sync::Arc,
 };
 
@@ -193,9 +193,7 @@ impl CountMinSketch {
     // Increment the count for a given item.
     fn increment<T: Hash>(&mut self, item: &T) {
         for i in 0..self.depth {
-            let mut h = self.hashers[i].build_hasher();
-            item.hash(&mut h);
-            let hash = h.finish();
+            let hash = self.hashers[i].hash_one(item);
             let index = (hash % self.width as u64) as usize;
             self.counters[i][index] += 1;
         }
@@ -205,9 +203,7 @@ impl CountMinSketch {
     fn estimate<T: Hash>(&self, item: &T) -> u64 {
         (0..self.depth)
             .map(|i| {
-                let mut h = self.hashers[i].build_hasher();
-                item.hash(&mut h);
-                let hash = h.finish();
+                let hash = self.hashers[i].hash_one(item);
                 let index = (hash % self.width as u64) as usize;
                 self.counters[i][index]
             })

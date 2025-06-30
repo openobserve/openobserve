@@ -188,7 +188,7 @@ impl ApproxTopKAccumulator {
     }
 
     fn with_memory_limit(k: usize, max_candidates: Option<usize>) -> Self {
-        let default_max = (k * 10).max(1000).min(100_000); // Cap at 100k for safety
+        let default_max = (k * 10).min(1000).max(k); // Cap at 100k for safety
         Self {
             candidates: HashMap::new(),
             k,
@@ -244,7 +244,7 @@ impl ApproxTopKAccumulator {
     }
 
     /// Get the top k elements as (value, count) pairs sorted by count descending
-    fn get_top_k(&self) -> Vec<(String, i64)> {
+    fn get_top_k(&self, n: usize) -> Vec<(String, i64)> {
         let mut items: Vec<_> = self
             .candidates
             .iter()
@@ -257,7 +257,7 @@ impl ApproxTopKAccumulator {
             other => other,
         });
 
-        items
+        items.into_iter().take(n).collect()
     }
 
     /// Convert string array to vector of strings
@@ -292,7 +292,7 @@ impl ApproxTopKAccumulator {
 
 impl Accumulator for ApproxTopKAccumulator {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
-        let pairs: Vec<_> = self.get_top_k();
+        let pairs: Vec<_> = self.get_top_k(self.max_candidates);
 
         let values = ScalarValue::List(ScalarValue::new_list_nullable(
             &pairs
@@ -316,11 +316,7 @@ impl Accumulator for ApproxTopKAccumulator {
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {
-        let top_k = self
-            .get_top_k()
-            .into_iter()
-            .take(self.k)
-            .collect::<Vec<_>>();
+        let top_k = self.get_top_k(self.k);
 
         if top_k.is_empty() {
             return Ok(ScalarValue::List(ScalarValue::new_list_nullable(
@@ -473,7 +469,7 @@ mod tests {
         }
 
         // Get top results
-        let top_k = acc.get_top_k();
+        let top_k = acc.get_top_k(acc.k);
         assert!(!top_k.is_empty());
 
         // Most frequent items should be at the top

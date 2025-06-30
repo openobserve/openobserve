@@ -308,7 +308,7 @@ impl ApproxTopKAccumulator {
             cms: CountMinSketch::new(),
             top_k_heap: BinaryHeap::new(),
             k,
-            max_candidates: (k * 10).max(1000).min(100_000), // Cap at 100k for safety
+            max_candidates: (k * 10).min(1000).max(k), // Cap at 100k for safety
         }
     }
 
@@ -362,7 +362,7 @@ impl ApproxTopKAccumulator {
     }
 
     /// Get the top k elements as (value, count) pairs sorted by count descending
-    fn get_top_k(&self) -> Vec<(String, i64)> {
+    fn get_top_k(&self, n: usize) -> Vec<(String, i64)> {
         let mut items: Vec<_> = self
             .top_k_heap
             .iter()
@@ -375,7 +375,7 @@ impl ApproxTopKAccumulator {
             other => other,
         });
 
-        items
+        items.into_iter().take(n).collect()
     }
 
     /// Convert string array to vector of strings
@@ -410,7 +410,7 @@ impl ApproxTopKAccumulator {
 
 impl Accumulator for ApproxTopKAccumulator {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
-        let top_k = self.get_top_k();
+        let top_k = self.get_top_k(self.max_candidates);
 
         // Serialize Count-Min Sketch
         let cms_counters = ScalarValue::List(ScalarValue::new_list_nullable(
@@ -446,11 +446,7 @@ impl Accumulator for ApproxTopKAccumulator {
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {
-        let top_k = self
-            .get_top_k()
-            .into_iter()
-            .take(self.k)
-            .collect::<Vec<_>>();
+        let top_k = self.get_top_k(self.k);
 
         if top_k.is_empty() {
             return Ok(ScalarValue::List(ScalarValue::new_list_nullable(
@@ -607,7 +603,7 @@ mod tests {
         acc.update_batch(&[string_array]).unwrap();
 
         // Get top k results
-        let top_k = acc.get_top_k();
+        let top_k = acc.get_top_k(acc.k);
 
         // Should have at most 3 items, with apple being most frequent
         assert!(top_k.len() <= 3);
@@ -718,7 +714,7 @@ mod tests {
         acc.update_batch(&[string_array]).unwrap();
 
         // Get results
-        let top_k = acc.get_top_k();
+        let top_k = acc.get_top_k(acc.k);
 
         // Should return top 10 items
         assert_eq!(top_k.len(), 10);
