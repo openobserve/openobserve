@@ -564,7 +564,9 @@ impl Condition {
                     .trim_end_matches('*') // prefix or contains
                     .to_string();
                 let term = if get_config().common.utf8_view_enabled {
-                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!(
+                        "%{value}%"
+                    )))))
                 } else {
                     Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))))
                 };
@@ -591,7 +593,7 @@ impl Condition {
                 let term = if get_config().common.utf8_view_enabled {
                     Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
                 } else {
-                    Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))))
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))))
                 };
                 let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
