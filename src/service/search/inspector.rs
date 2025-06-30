@@ -122,6 +122,10 @@ pub fn search_inspector_fields(msg: String, kvs: SearchInspectorFields) -> Strin
         return msg;
     }
 
+    search_inspector_fields_inner(msg, kvs)
+}
+
+fn search_inspector_fields_inner(msg: String, kvs: SearchInspectorFields) -> String {
     if msg.is_empty() {
         return msg;
     }
@@ -158,7 +162,7 @@ mod tests {
             .component("search".to_string())
             .build();
 
-        let result = search_inspector_fields(msg.clone(), fields);
+        let result = search_inspector_fields_inner(msg.clone(), fields);
         assert!(result.contains("test message"));
         assert!(result.contains("\"duration\":100"));
         assert!(result.contains("\"component\":\"search\""));
