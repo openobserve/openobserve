@@ -165,7 +165,7 @@
                 <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                     Redact
                     <span class="tw-font-[400] individual-section-sub-information">
-                      This will obscure the email field 
+                      This will redact the matched expression 
                     </span>
                   </div>
 
@@ -177,7 +177,7 @@
                 <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                     Drop
                     <span class="tw-font-[400] individual-section-sub-information">
-                      This will remove the email field completely
+                      This will drop the field completely
                     </span>
                   </div>
                   
@@ -191,10 +191,10 @@
               </span>
               <div class="tw-flex tw-gap-8 tw-ml-2">
                 <q-checkbox size="sm" v-model="apply_at" val="AtIngestion" >
-                  <span class="individual-section-sub-title">Ingestion Stage</span>
+                  <span class="individual-section-sub-title">Ingestion</span>
                 </q-checkbox>
                 <q-checkbox size="sm" v-model="apply_at" val="AtSearch">
-                  <span class="individual-section-sub-title">During Logs Search</span>
+                  <span class="individual-section-sub-title">Query</span>
                 </q-checkbox>
 
               </div>

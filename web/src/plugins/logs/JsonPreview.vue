@@ -203,6 +203,24 @@
                 >
               </q-item-section>
             </q-item>
+            <q-item clickable v-close-popup>
+              <q-item-section>
+                <q-item-label
+                  data-test="redirect-to-regex-pattern-btn"
+                  @click.stop="createRegexPatternFromLogs(key,value[key])"
+                  v-close-popup
+                  ><q-btn
+                    title="Add field to table"
+                    size="6px"
+                    round
+                    class="q-mr-sm pointer"
+                  >
+                  <q-img height="14px" width="14px" :src="regexIcon" />
+                  </q-btn
+                  >{{t('regex_patterns.create_regex_pattern_field')}}</q-item-label
+                >
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-btn-dropdown>
 
@@ -285,6 +303,8 @@ export default {
     const { getStreams } = useStreams();
 
     const filteredTracesStreamOptions = ref([]);
+
+    const router = useRouter();
 
     const tracesStreams = ref([]);
 
@@ -488,6 +508,23 @@ export default {
       }
       return t("common.addFieldToTable");
     };
+    const regexIcon = computed(()=>{
+      return getImageURL(store.state.theme == 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+    })
+
+    const createRegexPatternFromLogs = (key: string, value: string) => {
+      store.state.organizationData.regexPatternFromLogs.key = key;
+      store.state.organizationData.regexPatternFromLogs.value = value;
+      store.state.organizationData.regexPatternFromLogs.stream = searchObj.data.stream.selectedStream[0];
+      router.push({
+        path: '/settings/regex_patterns',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          from: 'logs'
+        },
+      })
+
+    }
 
     return {
       t,
@@ -517,6 +554,8 @@ export default {
       setViewTraceBtn,
       getOriginalData,
       addOrRemoveLabel,
+      regexIcon,
+      createRegexPatternFromLogs
     };
   },
 };

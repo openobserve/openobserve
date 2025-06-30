@@ -1262,6 +1262,8 @@
     "cancel":"Cancel",
     "edit_regex_pattern": "Edit Regex Pattern",
     "update_close": "Update and Close",
-    "description": "Description"
+    "description": "Description",
+    "create_regex_pattern_field": "Redact / Drop using Regex"
+    
   }
 }

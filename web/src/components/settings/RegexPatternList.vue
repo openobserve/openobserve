@@ -246,6 +246,10 @@
         regexPatterns.value = store.state.organizationData.regexPatterns;
         resultTotal.value = regexPatterns.value.length;
       }
+
+      if(router.currentRoute.value.query.from == 'logs'){
+        createRegexPattern();
+      }
     });
 
     const changePagination = (val: { label: string; value: any }) => { 

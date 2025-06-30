@@ -215,6 +215,7 @@ import useAiChat from '@/composables/useAiChat';
 
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL } from '@/utils/zincutils';
+import { useRouter } from 'vue-router';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -318,6 +319,7 @@ export default defineComponent({
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
+    const router = useRouter();
     
     const modelConfig: any = {
       openai: [
@@ -727,6 +729,11 @@ export default defineComponent({
         fetchInitialMessage();
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
+      }
+      //here we will check if the user is on the regexPatterns page and if the regexPatternFromLogs is set because it only happens when the user clicks on the create regex pattern button 
+      //in the logs page
+      if(store.state.organizationData.regexPatternFromLogs.key && router.currentRoute.value.name == 'regexPatterns'){
+        inputMessage.value = `Create a regex pattern for ${store.state.organizationData.regexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.regexPatternFromLogs.value}" from the ${store.state.organizationData.regexPatternFromLogs.stream} stream`;
       }
     });
 

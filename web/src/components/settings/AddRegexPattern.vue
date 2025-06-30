@@ -230,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     import FullViewContainer from "../functions/FullViewContainer.vue";
     import regexPatternService from "@/services/regex_pattern";
     import O2AIChat from "@/components/O2AIChat.vue";
+import { useRouter } from "vue-router";
     export default defineComponent({
         name: "AddRegexPattern",
         props: {
@@ -258,6 +259,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             const isFullScreen = ref(false);
 
+            const router = useRouter();
+
             const testString = ref("");
             const highlightedText = ref("");
             const editableDiv = ref<HTMLElement | null>(null);
@@ -278,6 +281,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         pattern: "",
                         description: ""
                     }
+                }
+                if(router.currentRoute.value.query.from == 'logs'){
+                    store.dispatch('setIsAiChatEnabled',true);
+                    testString.value = "hi";
                 }
             })
 

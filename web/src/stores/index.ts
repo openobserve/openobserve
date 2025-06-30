@@ -55,6 +55,11 @@ const organizationObj = {
   },
   isDataIngested: false,
   regexPatterns: [],
+  regexPatternFromLogs:{
+    key: "",
+    value: "",
+    stream: "",
+  }
 };
 
 export default createStore({
