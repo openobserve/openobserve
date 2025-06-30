@@ -126,70 +126,70 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
         ));
     }
 
-        // 1. cast both arguments to be aligned with the signature
-        let ColumnarValue::Array(haystack) = &args[0] else {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError(
-                    "Invalid argument types[haystack] to str_match function".to_string(),
-                ),
-                None,
-            ));
-        };
-        let haystack = as_string_array(&haystack)?;
-        let ColumnarValue::Scalar(needle) = &args[1] else {
+    // 1. cast both arguments to be aligned with the signature
+    let ColumnarValue::Array(haystack) = &args[0] else {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "Invalid argument types[haystack] to str_match function".to_string(),
+            ),
+            None,
+        ));
+    };
+    let haystack = as_string_array(&haystack)?;
+    let ColumnarValue::Scalar(needle) = &args[1] else {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "Invalid argument types[needle] to str_match function".to_string(),
+            ),
+            None,
+        ));
+    };
+    let mut needle = match needle {
+        ScalarValue::Utf8(v) => v,
+        ScalarValue::Utf8View(v) => v,
+        ScalarValue::LargeUtf8(v) => v,
+        _ => {
             return Err(DataFusionError::SQL(
                 ParserError::ParserError(
                     "Invalid argument types[needle] to str_match function".to_string(),
                 ),
                 None,
             ));
-        };
-        let mut needle = match needle {
-            ScalarValue::Utf8(v) => v,
-            ScalarValue::Utf8View(v) => v,
-            ScalarValue::LargeUtf8(v) => v,
-            _ => {
-                return Err(DataFusionError::SQL(
-                    ParserError::ParserError(
-                        "Invalid argument types[needle] to str_match function".to_string(),
-                    ),
-                    None,
-                ));
-            }
         }
-        .as_ref()
-        .ok_or_else(|| {
-            DataFusionError::SQL(
-                ParserError::ParserError(
-                    "Invalid argument types[needle] to str_match function".to_string(),
-                ),
-                None,
-            )
-        })?
-        .to_string();
+    }
+    .as_ref()
+    .ok_or_else(|| {
+        DataFusionError::SQL(
+            ParserError::ParserError(
+                "Invalid argument types[needle] to str_match function".to_string(),
+            ),
+            None,
+        )
+    })?
+    .to_string();
 
-        // pre-compute the needle
-        if case_insensitive {
-            needle.make_ascii_lowercase();
-        };
+    // pre-compute the needle
+    if case_insensitive {
+        needle.make_ascii_lowercase();
+    };
 
     let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 
-        // 2. perform the computation
-        let array = haystack
-            .iter()
-            .map(|haystack| {
-                haystack.map(|haystack| {
-                    if case_insensitive {
-                        mem_finder
-                            .find(haystack.to_lowercase().as_bytes())
-                            .is_some()
-                    } else {
-                        mem_finder.find(haystack.as_bytes()).is_some()
-                    }
-                })
+    // 2. perform the computation
+    let array = haystack
+        .iter()
+        .map(|haystack| {
+            haystack.map(|haystack| {
+                if case_insensitive {
+                    mem_finder
+                        .find(haystack.to_lowercase().as_bytes())
+                        .is_some()
+                } else {
+                    mem_finder.find(haystack.as_bytes()).is_some()
+                }
             })
-            .collect::<BooleanArray>();
+        })
+        .collect::<BooleanArray>();
 
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.
