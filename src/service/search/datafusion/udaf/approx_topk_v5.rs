@@ -253,11 +253,11 @@ impl ApproxTopKAccumulator {
         }
 
         // Collect items with their counts
-        let mut items: Vec<(String, i64)> = self
+        let mut items = self
             .candidates
             .iter()
-            .map(|(k, v)| (k.clone(), *v))
-            .collect();
+            .map(|(k, v)| (k, *v))
+            .collect::<Vec<_>>();
 
         // Sort by count descending, then by key for deterministic results
         items.sort_by(|a, b| match b.1.cmp(&a.1) {
@@ -266,9 +266,13 @@ impl ApproxTopKAccumulator {
         });
 
         // Keep only the top target_size items
-        self.candidates.clear();
-        for (key, count) in items.into_iter().take(target_size) {
-            self.candidates.insert(key, count);
+        let removed_items = items
+            .into_iter()
+            .skip(target_size)
+            .map(|(k, _)| k.clone())
+            .collect::<Vec<_>>();
+        for key in removed_items {
+            self.candidates.remove(&key);
         }
 
         // Update minimum threshold to the lowest count we're keeping
