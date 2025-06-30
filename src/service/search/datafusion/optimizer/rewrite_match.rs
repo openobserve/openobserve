@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::get_config;
 use datafusion::{
     self,
     common::{
@@ -135,7 +136,11 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                         .trim_start_matches('*') // contains
                         .trim_end_matches('*') // prefix or contains
                         .to_string(); // remove prefix and suffix *
-                    let item = Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))));
+                    let item = if get_config().common.utf8_view_enabled {
+                        Expr::Literal(ScalarValue::Utf8View(Some(format!("%{item}%"))))
+                    } else {
+                        Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))))
+                    };
                     for field in self.fields.iter() {
                         let new_expr = Expr::Like(Like {
                             negated: false,
@@ -167,7 +172,11 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                         )));
                     };
                     let mut expr_list = Vec::with_capacity(self.fields.len());
-                    let item = Expr::Literal(ScalarValue::Utf8(Some(item.to_string())));
+                    let item = if get_config().common.utf8_view_enabled {
+                        Expr::Literal(ScalarValue::Utf8View(Some(item.to_string())))
+                    } else {
+                        Expr::Literal(ScalarValue::Utf8(Some(item.to_string())))
+                    };
                     let distance = Expr::Literal(ScalarValue::Int64(Some(distance)));
                     let fuzzy_expr = fuzzy_match_udf::FUZZY_MATCH_UDF.clone();
                     for field in self.fields.iter() {
