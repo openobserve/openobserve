@@ -16,8 +16,13 @@
 use std::sync::Arc;
 
 use arrow_schema::{DataType, Field, Schema};
+use config::get_config;
 
 pub fn change_schema_to_utf8_view(schema: Schema) -> Schema {
+    if !get_config().common.utf8_view_enabled {
+        return schema;
+    }
+
     let fields = schema
         .fields()
         .iter()
