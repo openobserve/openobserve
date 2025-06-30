@@ -139,6 +139,7 @@ import {
   computed,
   watch,
   onUnmounted,
+  defineAsyncComponent,
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
@@ -146,7 +147,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
-import QueryEditor from "@/components/QueryEditor.vue";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -182,7 +182,9 @@ export default defineComponent({
     },
   },
   components: {
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
+    ),
     FunctionsToolbar,
     FullViewContainer,
     TestFunction,

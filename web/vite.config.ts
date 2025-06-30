@@ -21,11 +21,10 @@ import vueJsx from "@vitejs/plugin-vue-jsx";
 import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
-import * as path from "path";
-import * as dotenv from "dotenv";
-import * as fs from "fs-extra";
-import monacoEditorPlugin from "vite-plugin-monaco-editor";
-import { visualizer } from "rollup-plugin-visualizer";
+import path from "path";
+import dotenv from "dotenv";
+import fs from "fs-extra";
+import visualizer from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
@@ -64,21 +63,6 @@ const enterpriseResolverPlugin = {
     }
   },
 };
-
-function monacoEditorTestResolver() {
-  return {
-    name: "monaco-editor-test-resolver",
-    enforce: "post",
-    resolveId(id: string) {
-      if (id === "monaco-editor") {
-        return {
-          id: "monaco-editor/esm/vs/editor/editor.api",
-        };
-      }
-      return null;
-    },
-  };
-}
 
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
@@ -123,10 +107,7 @@ export default defineConfig({
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    (monacoEditorPlugin as any).default({
-      customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
-    }),
-    isTesting && monacoEditorTestResolver(),
+    isTesting,
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -163,7 +144,17 @@ export default defineConfig({
             "@openobserve/browser-rum",
           ],
           "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          "editor.api": ["monaco-editor"],
+          "codemirror": ["codemirror", "@codemirror/state", "@codemirror/lang-sql", "@codemirror/lang-json", "@codemirror/lang-javascript", "@codemirror/lang-markdown", "@codemirror/autocomplete", "@codemirror/view", "@codemirror/commands", "@codemirror/language", "@codemirror/search", "@replit/codemirror-indentation-markers", "js-beautify", "sql-formatter", "acorn", "escodegen"],
+          "moment": ["moment", "moment-timezone"],
+          "lodash": ["lodash-es"],
+          "echarts": ["echarts/core", "echarts/renderers", "echarts/components", "echarts/features", "echarts/charts"],
+          "luxon": ["luxon"],
+          "marked": ["marked"],
+          "jszip": ["jszip"],
+          "leaflet": ["leaflet"],
+          "gridstack": ["gridstack"],
+          "flag-icons": ["flag-icons"],
+          "highlight.js": ["highlight.js"],
         },
         chunkFileNames: ({ name }) => {
           if (name.startsWith("o2cs-")) {
@@ -171,6 +162,14 @@ export default defineConfig({
           }
 
           if (name.includes("editor.api")) {
+            return `assets/${name}.v1.js`;
+          }
+
+          if (name.includes("codemirror")) {
+            return `assets/${name}.v1.js`;
+          }
+
+          if (name.includes("moment")) {
             return `assets/${name}.v1.js`;
           }
 

@@ -70,10 +70,13 @@ async function exploreStreamAndNavigateToPipeline(page, streamName) {
   // Search for the stream
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill(streamName);
-  await page.waitForTimeout(1000);
   
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
+
+  await page.waitForTimeout(3000);
+
+  await page.waitForSelector('[data-test="logs-search-result-table-body"]');
   
   // Expand the log table menu
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
@@ -93,6 +96,10 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
+
+  await page.waitForTimeout(3000);
+
+  await page.waitForSelector('[data-test="logs-search-result-table-body"]');
   
   // Expand the log table menu
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
@@ -347,9 +354,10 @@ test.describe("Pipeline testcases", () => {
     await page
       .locator('div').filter({ hasText: /^Stream Type \*$/ }).first().click();
     await page.getByLabel('Stream Type *').click();
-
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="scheduled-pipeline-sql-editor"] .cm-content').click();
     // Click on the editor to type the query
-    await page.locator(".view-lines").first().click();
+    // await page.locator(".cm-lines").first().click();
     const sqlQuery = 'select * from "default"';
 
     // Locate the editor and type the SQL query if it's not already typed
@@ -361,8 +369,8 @@ test.describe("Pipeline testcases", () => {
 
     // Check if the query exists in the editor (using `hasText` to ensure it's typed)
     const queryTyped = await page
-      .locator("code")
-      .locator("div")
+      .locator(".cm-content")
+      .locator(".cm-line")
       .filter({ hasText: sqlQuery })
       .count();
 
@@ -402,8 +410,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".view-lines").click();
-    // Type the function text with a delay to ensure each character registers
+    await page.locator('[data-test="logs-vrl-function-editor"] .cm-content').click();    // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
     await page.keyboard.type(".", { delay: 100 });
@@ -420,7 +427,7 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(3000);
     await pipelinePage.saveFunction();
     await page.waitForTimeout(3000);
-    await page.getByRole("button", { name: randomFunctionName }).hover();
+    await page.getByText(randomFunctionName).hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     // await pipelinePage.toggleCreateStream();
     // await page.getByLabel("Name *").click();
@@ -438,7 +445,7 @@ test.describe("Pipeline testcases", () => {
     // await pipelinePage.clickSaveStream();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(1000);
     await pipelinePage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
@@ -563,9 +570,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByPlaceholder("Value").fill("prometheus");
     await pipelinePage.saveCondition();
     await page.waitForTimeout(2000);
-    await page
-      .getByRole("button", { name: "kubernetes_container_name" })
-      .hover();
+    await page.getByText("kubernetes_container_name").hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     // await pipelinePage.toggleCreateStream();
     // await page.getByLabel("Name *").click();

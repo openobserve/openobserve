@@ -66,8 +66,8 @@ Cypress.Commands.add('CallQueryFunction',()=>
             {
          cy.once('uncaught:exception', () => false); 
            //inputQueryFunctionSearch
-         cy.get('div.view-lines.monaco-mouse-cursor-text').should('be.visible',{ timeout: 30000 }); 
-         cy.get('div.view-lines.monaco-mouse-cursor-text').type("queryFunction(_p,stream) as newcol |");
+         cy.get('div.cm-lines.monaco-mouse-cursor-text').should('be.visible',{ timeout: 30000 }); 
+         cy.get('div.cm-lines.monaco-mouse-cursor-text').type("queryFunction(_p,stream) as newcol |");
         cy.get('span.q-btn__content.text-center.col.items-center.q-anchor--skip.justify-center.row').contains(details.bSearch).click()//click on search button
             cy.get('tbody.q-virtual-scroll__content').should('be.visible',{ timeout: 30000 });
             cy.get('.q-table__top.relative-position.row.items-center').type(details.queryFunctionColumn);

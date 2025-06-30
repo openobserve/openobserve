@@ -561,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- floating footer for the table -->
 
           <div
-            :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+            :class="store.state.theme === 'dark' ? 'dark-theme-floating-buttons' : 'light-theme-floating-buttons'"
             class="floating-buttons q-px-md q-py-xs"
           >
             <div
@@ -1242,6 +1242,10 @@ export default defineComponent({
           modifiedSettings,
         )
         .then(async (res) => {
+          if(store.state.logs.logs.data.stream.selectedStream.includes(indexData.value.name)) {
+            store.dispatch("logs/setIsInitialized", false);
+          }
+          
           await getStream(
             indexData.value.name,
             indexData.value.stream_type,
@@ -1973,11 +1977,11 @@ export default defineComponent({
   z-index: 1; /* Ensure it stays on top of table content */
   width: 100%;
 }
-.dark-theme {
+.dark-theme-floating-buttons {
   background-color: var(--q-light);
   backdrop-filter: blur(10px);
 }
-.light-theme {
+.light-theme-floating-buttons {
   background-color: var(--q-light);
   backdrop-filter: blur(10px);
 }
