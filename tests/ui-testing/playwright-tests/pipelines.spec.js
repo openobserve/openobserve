@@ -75,6 +75,7 @@ async function exploreStreamAndNavigateToPipeline(page, streamName) {
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
   
+  await page.waitForTimeout(5000);
   // Expand the log table menu
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
   
