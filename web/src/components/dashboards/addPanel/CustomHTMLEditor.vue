@@ -25,11 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #before>
           <div class="col" style="height: 100%">
-            <MonacoHTMLEditor
-              v-model="htmlContent"
+            <CodeQueryEditor
+              language="html"
+              v-model:query="htmlContent"
               :debounceTime="500"
-              @update:modelValue="onEditorValueChange"
+              @update:query="onEditorValueChange"
               data-test="dashboard-html-editor"
+              class="!tw-h-full"
             />
           </div>
         </template>
@@ -61,8 +63,8 @@ import HTMLRenderer from "../panels/HTMLRenderer.vue";
 
 export default defineComponent({
   components: {
-    MonacoHTMLEditor: defineAsyncComponent(
-      () => import("./MonacoHTMLEditor.vue"),
+    CodeQueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
     HTMLRenderer,
   },

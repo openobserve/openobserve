@@ -45,7 +45,10 @@ test.describe("logs testcases", () => {
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
       .click();
-    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl12=123");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .fill(".vrl12=123");
 
     await page.waitForTimeout(3000);
 
@@ -92,7 +95,10 @@ test.describe("logs testcases", () => {
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
       .click();
-    await page.locator("#fnEditor").locator(".inputarea").fill(".vrL=1000");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .fill(".vrL=1000");
     await page.waitForTimeout(3000);
 
     await page
@@ -148,7 +154,10 @@ test.describe("logs testcases", () => {
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
       .click();
-    await page.locator("#fnEditor").locator(".inputarea").fill(".VRL=1000");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .fill(".VRL=1000");
 
     await page.waitForTimeout(3000);
 
@@ -231,7 +240,10 @@ test.describe("logs testcases", () => {
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
       .click();
-    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=11abc");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .fill(".vrl=11abc");
     await page.waitForTimeout(2000);
 
     await page
@@ -240,8 +252,14 @@ test.describe("logs testcases", () => {
 
     // await expect(page.getByText("warningFunction error: error[")).toBeVisible();
 
-    await page.locator("#fnEditor").locator(".inputarea").press("Control+a");
-    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=123");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .press("Control+a");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .fill(".vrl=123");
 
     await page.waitForTimeout(3000);
 
@@ -292,7 +310,10 @@ test.describe("logs testcases", () => {
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
       .click();
-    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=100");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .fill(".vrl=100");
 
     await page.waitForTimeout(3000);
     await page
@@ -331,7 +352,7 @@ test.describe("logs testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .locator(".inputarea")
+      .locator(".cm-content")
       .fill(".vrlsanity=100");
 
     await page.waitForTimeout(3000);
@@ -348,7 +369,10 @@ test.describe("logs testcases", () => {
       .filter({ hasText: /^\.vrlsanity=100$/ })
       .nth(3)
       .click();
-    await page.locator("#fnEditor").locator(".inputarea").press("Control+a");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .press("Control+a");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
@@ -365,7 +389,10 @@ test.describe("logs testcases", () => {
       .locator('[data-test="logs-vrl-function-editor"]')
       .first()
       .click();
-    await page.locator("#fnEditor").locator(".inputarea").fill(".vrl=123");
+    await page
+      .locator("#fnEditor")
+      .locator(".cm-content")
+      .fill(".vrl=123");
 
     await page.waitForTimeout(3000);
 
@@ -420,7 +447,7 @@ test.describe("logs testcases", () => {
       .click();
     await page
       .locator("#fnEditor")
-      .locator(".inputarea")
+      .locator(".cm-content")
       .fill(".VRLsanity=1000");
     await page.waitForTimeout(3000);
 

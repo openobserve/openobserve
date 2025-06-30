@@ -57,6 +57,8 @@ export const modifySQLQuery = async (
   } else {
     modString = querySQL;
   }
+
+  moment = null;
   return modString;
 };
 

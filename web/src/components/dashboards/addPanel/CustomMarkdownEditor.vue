@@ -28,10 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #before>
           <div class="col" style="height: 100%">
-            <MonacoMarkdownEditor
-              v-model="markdownContent"
+            <CodeQueryEditor
+              language="markdown"
+              v-model:query="markdownContent"
               :debounceTime="500"
-              @update:modelValue="onEditorValueChange"
+              @update:query="onEditorValueChange"
               data-test="dashboard-markdown-editor"
             />
           </div>
@@ -64,8 +65,8 @@ import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 
 export default defineComponent({
   components: {
-    MonacoMarkdownEditor: defineAsyncComponent(
-      () => import("./MonacoMarkdownEditor.vue"),
+    CodeQueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
     MarkdownRenderer,
   },

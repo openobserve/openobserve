@@ -147,7 +147,7 @@ import useStreams from "@/composables/useStreams";
 import { useQuasar } from "quasar";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 const { t } = useI18n();
 const dateTime = ref({
@@ -295,7 +295,7 @@ const getStreamFields = () => {
 const getErrorLogs = () => {
   const interval = getTimeInterval(
     dateTime.value.startTime,
-    dateTime.value.endTime
+    dateTime.value.endTime,
   );
   const parsedQuery = parseQuery(errorTrackingState.data.editorValue, false);
   const queryPayload: any = {
@@ -373,7 +373,7 @@ const getErrorLogs = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       errorTrackingState.data.errors = res.data.hits;
@@ -381,7 +381,7 @@ const getErrorLogs = () => {
         (acc: number, curr: any) => {
           return acc + curr.events;
         },
-        0
+        0,
       );
     })
     .catch((err) => {
