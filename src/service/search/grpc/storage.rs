@@ -53,6 +53,7 @@ use crate::service::{
     search::{
         datafusion::exec,
         generate_search_schema_diff,
+        grpc::utils,
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         tantivy::puffin_directory::{
@@ -345,8 +346,10 @@ pub async fn search(
         if files.is_empty() {
             continue;
         }
-        let schema = schema_versions[ver].clone();
-        let schema = schema.with_metadata(Default::default());
+        let schema = schema_versions[ver]
+            .clone()
+            .with_metadata(Default::default());
+        let schema = utils::change_schema_to_utf8_view(schema);
 
         let session = config::meta::search::Session {
             id: format!("{}-storage-{ver}", query.trace_id),

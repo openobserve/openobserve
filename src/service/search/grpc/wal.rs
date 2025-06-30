@@ -46,6 +46,7 @@ use crate::{
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
+            grpc::utils,
             index::IndexCondition,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             match_source,
@@ -278,6 +279,7 @@ pub async fn search_parquet(
         let schema = schema_versions[ver]
             .clone()
             .with_metadata(Default::default());
+        let schema = utils::change_schema_to_utf8_view(schema);
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,

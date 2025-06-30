@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::get_config;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -99,6 +100,10 @@ impl SearchInspectorFieldsBuilder {
 }
 
 pub fn search_inspector_fields(msg: String, kvs: SearchInspectorFields) -> String {
+    if !get_config().common.search_inspector_enabled {
+        return msg;
+    }
+
     if msg.is_empty() {
         return msg;
     }

@@ -1097,6 +1097,8 @@ pub struct Common {
     pub dashboard_placeholder: String,
     #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
     pub aggregation_cache_enabled: bool,
+    #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = true)]
+    pub search_inspector_enabled: bool,
 }
 
 #[derive(EnvConfig)]
