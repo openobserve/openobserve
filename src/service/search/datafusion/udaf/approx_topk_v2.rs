@@ -438,10 +438,7 @@ impl Accumulator for ApproxTopKAccumulator {
 
         let k_scalar = ScalarValue::Int64(Some(self.k as i64));
 
-        let ret = vec![cms_counters, values, counts, k_scalar];
-        dbg!(&ret);
-
-        Ok(ret)
+        Ok(vec![cms_counters, values, counts, k_scalar])
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {

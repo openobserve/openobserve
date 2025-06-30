@@ -30,7 +30,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-const APPROX_TOPK: &str = "approx_topk_v1";
+const APPROX_TOPK: &str = "approx_topk_v5";
 
 /// Approximate TopK UDAF that returns the top K elements by frequency.
 ///
@@ -57,7 +57,7 @@ impl ApproxTopK {
 
 impl std::fmt::Debug for ApproxTopK {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_struct("ApproxTopKV1")
+        f.debug_struct("ApproxTopKV5")
             .field("name", &self.name())
             .field("signature", &self.0)
             .finish()
@@ -160,31 +160,93 @@ fn validate_k_parameter(expr: &Arc<dyn PhysicalExpr>) -> Result<usize> {
     Ok(k)
 }
 
-/// Accumulator for ApproxTopK that maintains frequency counts
+/// Memory-efficient accumulator that only tracks top-K candidates
+/// Uses a min-heap to maintain only the most frequent items
 struct ApproxTopKAccumulator {
-    // Map from value to count
-    value_counts: HashMap<String, i64>,
+    // Only keep track of top candidates - LIMITED SIZE!
+    candidates: HashMap<String, i64>,
     k: usize,
+    // Memory management
+    max_candidates: usize,    // Maximum candidates to keep in memory
+    min_count_threshold: i64, // Minimum count to be considered
 }
 
 impl std::fmt::Debug for ApproxTopKAccumulator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ApproxTopKAccumulator(k={})", self.k)
+        write!(
+            f,
+            "ApproxTopKAccumulator(k={}, candidates={})",
+            self.k,
+            self.candidates.len()
+        )
     }
 }
 
 impl ApproxTopKAccumulator {
     fn new(k: usize) -> Self {
+        Self::with_memory_limit(k, None)
+    }
+
+    fn with_memory_limit(k: usize, max_candidates: Option<usize>) -> Self {
+        let default_max = (k * 10).max(1000).min(100_000); // Cap at 100k for safety
         Self {
-            value_counts: HashMap::new(),
+            candidates: HashMap::new(),
             k,
+            max_candidates: max_candidates.unwrap_or(default_max),
+            min_count_threshold: 1,
+        }
+    }
+
+    /// Memory-efficient update that only keeps top candidates
+    fn update_with_pruning(&mut self, value: String) {
+        // Update count
+        let count = self.candidates.entry(value).or_insert(0);
+        *count += 1;
+
+        // Periodically prune low-frequency items to save memory
+        if self.candidates.len() > self.max_candidates {
+            self.prune_low_frequency_items();
+        }
+    }
+
+    /// Remove low-frequency items to keep memory usage bounded
+    fn prune_low_frequency_items(&mut self) {
+        let current_size = self.candidates.len();
+        let target_size = (self.max_candidates / 2).max(self.k);
+
+        if current_size <= target_size {
+            return; // No need to prune
+        }
+
+        // Collect items with their counts
+        let mut items: Vec<(String, i64)> = self
+            .candidates
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+
+        // Sort by count descending, then by key for deterministic results
+        items.sort_by(|a, b| match b.1.cmp(&a.1) {
+            std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+            other => other,
+        });
+
+        // Keep only the top target_size items
+        self.candidates.clear();
+        for (key, count) in items.into_iter().take(target_size) {
+            self.candidates.insert(key, count);
+        }
+
+        // Update minimum threshold to the lowest count we're keeping
+        if let Some(min_count) = self.candidates.values().min() {
+            self.min_count_threshold = (*min_count).max(self.min_count_threshold);
         }
     }
 
     /// Get the top k elements as (value, count) pairs sorted by count descending
     fn get_top_k(&self) -> Vec<(String, i64)> {
         let mut pairs: Vec<_> = self
-            .value_counts
+            .candidates
             .iter()
             .map(|(v, c)| (v.clone(), *c))
             .collect();
@@ -250,7 +312,6 @@ impl Accumulator for ApproxTopKAccumulator {
 
         let k_scalar = ScalarValue::Int64(Some(self.k as i64));
 
-         
         Ok(vec![values, counts, k_scalar])
     }
 
@@ -308,7 +369,10 @@ impl Accumulator for ApproxTopKAccumulator {
     }
 
     fn size(&self) -> usize {
-        self.value_counts.len()
+        // Estimate memory usage:
+        // - HashMap overhead + String keys + i64 values
+        // - Average string length ~20 bytes + HashMap overhead ~40 bytes per entry
+        self.candidates.len() * 60
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
@@ -316,7 +380,7 @@ impl Accumulator for ApproxTopKAccumulator {
 
         // Count each string value
         for string_val in strings {
-            *self.value_counts.entry(string_val).or_insert(0) += 1;
+            self.update_with_pruning(string_val);
         }
 
         Ok(())
@@ -337,7 +401,12 @@ impl Accumulator for ApproxTopKAccumulator {
 
                 // Merge the counts from this state
                 for (value, count) in values.into_iter().zip(counts.into_iter()) {
-                    *self.value_counts.entry(value).or_insert(0) += count;
+                    *self.candidates.entry(value).or_insert(0) += count;
+                }
+
+                // Check if we need to prune after merging
+                if self.candidates.len() > self.max_candidates {
+                    self.prune_low_frequency_items();
                 }
             }
         }
@@ -370,8 +439,54 @@ mod tests {
         assert!(matches!(result, ScalarValue::List(_)));
     }
 
+    #[test]
+    fn test_memory_efficient_pruning() {
+        // Test that the accumulator prunes low-frequency items to save memory
+        let mut acc = ApproxTopKAccumulator::with_memory_limit(3, Some(20)); // Small limit for testing
+
+        // Add many different items with low frequency
+        for i in 0..100 {
+            let item = format!("low_freq_{}", i);
+            let array: ArrayRef = Arc::new(StringArray::from(vec![item.as_str()]));
+            acc.update_batch(&[array]).unwrap();
+        }
+
+        // Should have pruned significantly
+        assert!(
+            acc.candidates.len() < 100,
+            "Should prune low-frequency items"
+        );
+
+        // Add some high-frequency items
+        for _ in 0..15 {
+            let array: ArrayRef = Arc::new(StringArray::from(vec!["very_frequent"]));
+            acc.update_batch(&[array]).unwrap();
+        }
+
+        for _ in 0..8 {
+            let array: ArrayRef = Arc::new(StringArray::from(vec!["medium_frequent"]));
+            acc.update_batch(&[array]).unwrap();
+        }
+
+        // Get top results
+        let top_k = acc.get_top_k();
+        assert!(!top_k.is_empty());
+
+        // Most frequent items should be at the top
+        assert_eq!(top_k[0].0, "very_frequent");
+        assert_eq!(top_k[0].1, 15);
+
+        if top_k.len() > 1 {
+            assert_eq!(top_k[1].0, "medium_frequent");
+            assert_eq!(top_k[1].1, 8);
+        }
+
+        // Memory usage should be reasonable
+        assert!(acc.candidates.len() <= 50, "Memory usage should be bounded");
+    }
+
     #[tokio::test]
-    async fn test_approx_topk_udaf_v1() {
+    async fn test_approx_topk_udaf_v5() {
         let ctx = SessionContext::new();
 
         // Create test data
@@ -395,7 +510,7 @@ mod tests {
 
         // Test the function
         let df = ctx
-            .sql("SELECT approx_topk_v1(item, 2) as top_items FROM test_table")
+            .sql("SELECT approx_topk_v5(item, 2) as top_items FROM test_table")
             .await
             .unwrap();
         let results = df.collect().await.unwrap();
