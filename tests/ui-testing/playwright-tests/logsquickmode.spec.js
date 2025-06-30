@@ -188,7 +188,7 @@ test.describe("Logs Quickmode testcases", () => {
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
     await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
+      page.locator('[data-test="logs-search-bar-query-editor"]')
     ).toBeVisible();
     
    

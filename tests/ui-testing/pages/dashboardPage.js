@@ -179,11 +179,15 @@ async addCustomChart(page, pictorialJSON) {
   await this.page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
   await this.page.waitForSelector('[data-test="selected-chart-custom_chart-item"]');
   await this.page.locator('[data-test="selected-chart-custom_chart-item"]').click();
+  
+  await this.page.waitForSelector('[data-test="dashboard-markdown-editor-query-editor"] .cm-content');
 
-  await this.page.waitForSelector(".view-lines");
-  await this.page.locator(".view-lines").first().click();
+  await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"] .cm-content').click();
 
-  await this.page.keyboard.press("Control+A");
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+  await this.page.keyboard.press(`${modifier}+A`);
+  
   await this.page.keyboard.press("Backspace");
   
   console.log("Pictorial JSON", pictorialJSON);
@@ -191,7 +195,7 @@ async addCustomChart(page, pictorialJSON) {
   // First clear any existing content
   await this.page.waitForSelector('[data-test="dashboard-markdown-editor-query-editor"]');
   await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"]').click();
-  await this.page.keyboard.press('Control+A');
+  await this.page.keyboard.press(`${modifier}+A`);
   await this.page.keyboard.press('Delete');
 }
 

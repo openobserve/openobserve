@@ -329,7 +329,7 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
+import QueryEditor from "@/components/CodeQueryEditor.vue";
 import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",

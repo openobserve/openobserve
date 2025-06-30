@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, onBeforeMount, ref } from "vue";
+import { defineComponent, onBeforeMount, onBeforeUnmount, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -51,6 +51,10 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importMoment();
+    });
+
+    onBeforeUnmount(() => {
+      moment = null;
     });
 
     /**
@@ -114,13 +118,13 @@ export default defineComponent({
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
-            
+
               if (data.type == "default") {
                 tempDefaultOrg = optiondata;
               }
-              
+
               return optiondata;
-            }
+            },
           );
 
           if (localOrgFlag == false) {
@@ -220,7 +224,7 @@ export default defineComponent({
           firstName: this.userInfo.given_name,
           lastName: this.userInfo.family_name,
         },
-        { originalTimestamp: moment.utc().format() }
+        { originalTimestamp: moment.utc().format() },
       );
 
       openobserveRum.setUser({
@@ -268,7 +272,7 @@ export default defineComponent({
                 firstName: this.userInfo.given_name,
                 lastName: this.userInfo.family_name,
               },
-              { originalTimestamp: moment.utc().format() }
+              { originalTimestamp: moment.utc().format() },
             );
 
             openobserveRum.setUser({
@@ -294,7 +298,7 @@ export default defineComponent({
               firstName: this.userInfo.given_name,
               lastName: this.userInfo.family_name,
             },
-            { originalTimestamp: moment.utc().format() }
+            { originalTimestamp: moment.utc().format() },
           );
 
           openobserveRum.setUser({

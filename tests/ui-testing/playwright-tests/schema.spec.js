@@ -127,10 +127,11 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
 
     await page.waitForSelector('[data-test="log-expand-detail-key-_all"]', { state: 'visible' });
-    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+    await page.locator('[data-test="logs-search-bar-query-editor"]').locator('.cm-content').click();
     await page.keyboard.type("str_match(_all, \'test\')");
     await page.waitForTimeout(2000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
     const errorMessage = page.locator('[data-test="logs-search-error-message"]');
     await expect(errorMessage).not.toBeVisible();
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
@@ -169,7 +170,7 @@ test.describe("Schema testcases", () => {
     await page.waitForTimeout(1000);
     await page.locator('[data-test="menu-link-\\/-item"]').click();
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click()
+    await page.locator('#fnEditor').getByRole('textbox').click()
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
     await page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
     await page.getByText(streamName).click();

@@ -1,7 +1,7 @@
 import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { onBeforeMount } from "vue";
+import { onBeforeMount, onBeforeUnmount } from "vue";
 
 interface BuildQueryPayload {
   from?: number;
@@ -69,6 +69,10 @@ const useQuery = () => {
 
   onBeforeMount(async () => {
     await importSqlParser();
+  });
+
+  onBeforeUnmount(() => {
+    parser = null;
   });
 
   const importSqlParser = async () => {

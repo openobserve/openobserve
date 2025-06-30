@@ -318,16 +318,16 @@ onBeforeMount(() => {
       }));
       resultTotal.value = reportsTableRows.value.length;
       staticReportsList.value = JSON.parse(
-        JSON.stringify(reportsTableRows.value)
+        JSON.stringify(reportsTableRows.value),
       );
       filterReports();
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        type: "negative",
-        message: err?.data?.message || "Error while fetching reports!",
-        timeout: 3000,
+          type: "negative",
+          message: err?.data?.message || "Error while fetching reports!",
+          timeout: 3000,
         });
       }
     })
@@ -372,25 +372,43 @@ const toggleReportState = (report: any) => {
     .toggleReportState(
       store.state.selectedOrganization.identifier,
       report.name,
-      !report.enabled
+      !report.enabled,
     )
     .then(() => {
-      report.enabled = !report.enabled;
+      // Create a new report object with updated enabled status
+      const updatedReport = { ...report, enabled: !report.enabled };
+
+      // Update in staticReportsList
+      staticReportsList.value = staticReportsList.value.map((r: any) => {
+        if (r.name === report.name) {
+          return updatedReport;
+        }
+        return r;
+      });
+
+      // Update in reportsTableRows
+      reportsTableRows.value = reportsTableRows.value.map((r: any) => {
+        if (r.name === report.name) {
+          return { ...r, enabled: !r.enabled };
+        }
+        return r;
+      });
+
       q.notify({
         type: "positive",
         message: `${
-          report.enabled ? "Started" : "Stopped"
+          updatedReport.enabled ? "Started" : "Stopped"
         } report successfully.`,
         timeout: 2000,
       });
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        type: "negative",
-        message: err?.data?.message || "Error while stopping report!",
-        timeout: 4000,
-      });
+          type: "negative",
+          message: err?.data?.message || "Error while stopping report!",
+          timeout: 4000,
+        });
       }
     })
     .finally(() => {
@@ -423,24 +441,16 @@ const deleteReport = (report: any) => {
   reports
     .deleteReport(
       store.state.selectedOrganization.identifier,
-      deleteDialog.value.data
+      deleteDialog.value.data,
     )
     .then(() => {
       // Find the index of the row that matches the condition
-      const deleteIndex = reportsTableRows.value.findIndex(
-        (row: any) => row.name === deleteDialog.value.data
+      // update in staticReportsList and call filterReports
+      staticReportsList.value = staticReportsList.value.filter(
+        (r: any) => r.name !== deleteDialog.value.data,
       );
 
-      // Check if a matching row was found
-      if (deleteIndex !== -1) {
-        // Remove the row from the array
-        reportsTableRows.value.splice(deleteIndex, 1);
-
-        // Update the "#" property for the remaining rows
-        reportsTableRows.value.forEach((row: any, index: number) => {
-          row["#"] = index + 1;
-        });
-      }
+      filterReports();
 
       q.notify({
         type: "positive",
@@ -449,12 +459,12 @@ const deleteReport = (report: any) => {
       });
     })
     .catch((err: any) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        type: "negative",
-        message: err?.data?.message || "Error while deleting report!",
-        timeout: 4000,
-      });
+          type: "negative",
+          message: err?.data?.message || "Error while deleting report!",
+          timeout: 4000,
+        });
       }
     })
     .finally(() => dismiss());
@@ -469,11 +479,11 @@ const filterReports = () => {
   // If reports are cached, show only cached reports
   if (activeTab.value === "cached") {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => !report.destinations.length
+      (report: any) => !report.destinations.length,
     );
   } else {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => report.destinations.length
+      (report: any) => report.destinations.length,
     );
   }
 
@@ -483,7 +493,7 @@ const filterReports = () => {
         ...report,
         "#": index + 1,
       };
-    }
+    },
   ) as any[];
 
   resultTotal.value = reportsTableRows.value.length;

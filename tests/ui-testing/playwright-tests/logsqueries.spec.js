@@ -161,14 +161,14 @@ test.describe("Logs Queries testcases", () => {
   test("should reset the editor on clicking reset filter button", async ({ page }) => {
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+    await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').click();
     await page.keyboard.type("match_all_raw_ignore_case('provide_credentials')");
     await page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').waitFor({ state: "visible" });
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
     await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({ force: true });
-    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor .view-lines').waitFor({ state: "visible" });
+    await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').waitFor({ state: "visible" });
     const text = await page.evaluate(() => {
-      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.view-lines');
+      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.cm-content');
       return editor ? editor.textContent : null;
     });
     await expect(text).toEqual("");
@@ -252,10 +252,8 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should display enter count query", async ({ page }) => {
-    await page.locator(
-
-      '[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
-    await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+    await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').click();
+    // await page.click('.cm-lines')
     await page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
     await page.waitForTimeout(4000);
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();

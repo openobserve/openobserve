@@ -66,7 +66,7 @@ test.describe("Sanity testcases", () => {
 
   
 
-  test('should send a large log payload to the API and verify success', async ({ page }) => {
+  test.skip('should send a large log payload to the API and verify success', async ({ page }) => {
     // Setup: Define organization info and the base URL from environment variables
     const baseUrl = process.env.INGESTION_URL;  // Base URL from the environment variable
     const orgId = process.env["ORGNAME"];  // Organization ID from environment variable

@@ -848,6 +848,8 @@ export const convertPromQLData = async (
     };
   }
 
+  moment = null;
+
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
   // promql query will be always timeseries except gauge and metric text chart.

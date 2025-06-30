@@ -154,8 +154,8 @@ test.describe("Alerts testcases", () => {
     await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]')
     await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({ force: true });
     await page.waitForTimeout(100);
-    await page.waitForSelector(".view-line")
-    await page.click(".view-line")
+    await page.waitForSelector(".cm-line")
+    await page.click(".cm-line")
     await page.keyboard.type("oooo");
     await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
     await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
@@ -169,7 +169,7 @@ test.describe("Alerts testcases", () => {
     await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
     await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({ force: true });
     await page.waitForTimeout(100);
-    await page.click(".view-line")
+    await page.click(".cm-line")
     await page.keyboard.type("   ");
     await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
     await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
@@ -197,7 +197,7 @@ test.describe("Alerts testcases", () => {
     });
     await page.waitForTimeout(1000); await page.locator(
       '[data-test="add-template-name-input"]').fill("test");
-    await page.click(".view-line")
+    await page.click(".cm-line")
     await page.keyboard.type('test');
     await page.waitForTimeout(500);
     await page.locator(

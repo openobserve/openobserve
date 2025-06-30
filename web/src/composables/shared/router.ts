@@ -22,9 +22,9 @@ import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 
-const Search = () => import("@/views/Search.vue");
-const AppMetrics = () => import("@/views/AppMetrics.vue");
-const AppTraces = () => import("@/views/AppTraces.vue");
+const Search = () => import("@/plugins/logs/Index.vue");
+const AppMetrics = () => import("@/plugins/metrics/Index.vue");
+const AppTraces = () => import("@/plugins/traces/Index.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 
@@ -438,9 +438,6 @@ const useRoutes = () => {
         name: "reports",
         component: ReportList,
         props: true,
-        meta: {
-          keepAlive: true,
-        },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
@@ -450,9 +447,6 @@ const useRoutes = () => {
         name: "createReport",
         component: CreateReport,
         props: true,
-        meta: {
-          keepAlive: true,
-        },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },

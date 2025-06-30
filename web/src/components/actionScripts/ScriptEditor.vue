@@ -53,7 +53,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
+import QueryEditor from "@/components/CodeQueryEditor.vue";
 import axios from "axios";
 import { useI18n } from "vue-i18n";
 

@@ -7,31 +7,36 @@
     "
   >
     <div v-if="!showSearchResults">
-      <div class="flex tw-justify-between tw-items-center" >
+      <div class="flex tw-justify-between tw-items-center">
         <div class="flex items-center q-py-sm q-pl-md">
           <div
-          data-test="search-scheduler-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
-          title="Go Back"
-          @click="closeSearchHistory">
-          <q-icon name="arrow_back_ios_new" size="14px" />
-        </div>
-        <div class="text-h6" data-test="search-scheduler-title">
-          Search Job Scheduler
-        </div>
+            data-test="search-scheduler-back-btn"
+            class="flex justify-center items-center q-mr-md cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="closeSearchHistory"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
+          <div class="text-h6" data-test="search-scheduler-title">
+            Search Job Scheduler
+          </div>
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
-            <div>
-              <q-btn
-                color="secondary"
-                label="Get Jobs"
-                @click="fetchSearchHistory"
-                class="q-ml-md"
-                :disable="isLoading"
-              />
-            </div>
-  
+          <div>
+            <q-btn
+              color="secondary"
+              label="Get Jobs"
+              @click="fetchSearchHistory"
+              class="q-ml-md"
+              :disable="isLoading"
+            />
+          </div>
         </div>
       </div>
 
@@ -49,7 +54,6 @@
             class="custom-table search-job-list-table"
             style="width: 100%"
             :sort-method="sortMethod"
-
           >
             <template v-slot:body="props">
               <q-tr
@@ -60,7 +64,7 @@
               >
                 <q-td>
                   <q-btn
-                   data-test="search-scheduler-expand-btn"
+                    data-test="search-scheduler-expand-btn"
                     dense
                     flat
                     size="xs"
@@ -130,7 +134,7 @@
                       @click="confirmDeleteJob(props.row)"
                     ></q-btn>
                     <q-btn
-                    data-test="search-scheduler-restart-btn"
+                      data-test="search-scheduler-restart-btn"
                       icon="refresh"
                       :title="'Restart'"
                       class="q-ml-xs"
@@ -187,7 +191,6 @@
                                 copyToClipboard(props.row.sql, 'SQL Query')
                               "
                               data-test="search-scheduler-copy-sql-btn"
-
                               size="xs"
                               dense
                               flat
@@ -305,7 +308,6 @@
               </div>
             </template>
           </q-table>
-
         </q-page>
         <ConfirmDialog
           title="Delete Scheduled Search"
@@ -323,7 +325,6 @@
         />
       </div>
     </div>
-    
   </div>
 
   <!-- Show NoData component if there's no data to display -->
@@ -360,9 +361,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import JsonPreview from "./JsonPreview.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import config from "@/aws-exports";
-
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -374,7 +373,9 @@ export default defineComponent({
     ConfirmDialog,
     AppTabs,
     JsonPreview,
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
+    ),
   },
   props: {
     isClicked: {
@@ -398,7 +399,8 @@ export default defineComponent({
     const toBeDeletedJob = ref({});
 
     const qTableSchedule: Ref<InstanceType<typeof qTable> | null> = ref(null);
-    const qTableRef: Ref<InstanceType<typeof qTableSchedule> | null> = ref(null);
+    const qTableRef: Ref<InstanceType<typeof qTableSchedule> | null> =
+      ref(null);
     const searchDateTimeRef = ref(null);
     const { searchObj, extractTimestamps } = useLogs();
     const dataToBeLoaded: any = ref([]);
@@ -525,7 +527,7 @@ export default defineComponent({
         };
       });
     };
-  
+
     function filterRow(row) {
       const desiredColumns = [
         { key: "trace_id", label: "Trace ID" },
@@ -544,7 +546,7 @@ export default defineComponent({
     }
 
     const fetchSearchHistory = async () => {
-      if(config.isEnterprise == "false"){
+      if (config.isEnterprise == "false") {
         return;
       }
 
@@ -554,65 +556,68 @@ export default defineComponent({
         // dataToBeLoaded.value = [];
         expandedRow.value = [];
         isLoading.value = true;
-          let responseToBeFetched = [];
-          searchService
-            .get_scheduled_search_list({
-              org_identifier: store.state.selectedOrganization.identifier,
-            })
-            .then((res) => {
-              responseToBeFetched = res.data;
-              resultTotal.value = res.data.length;
+        let responseToBeFetched = [];
+        searchService
+          .get_scheduled_search_list({
+            org_identifier: store.state.selectedOrganization.identifier,
+          })
+          .then((res) => {
+            responseToBeFetched = res.data;
+            resultTotal.value = res.data.length;
 
-              columnsToBeRendered.value = generateColumns(
-                responseToBeFetched[0],
+            columnsToBeRendered.value = generateColumns(responseToBeFetched[0]);
+
+            responseToBeFetched.forEach((element) => {
+              const { formatted, raw } = calculateDuration(
+                element.start_time,
+                element.end_time,
               );
 
-              responseToBeFetched.forEach((element) => {
-                const {formatted, raw} = calculateDuration(element.start_time, element.end_time);
+              element.rawDuration = raw;
 
-                element.rawDuration = raw;
-                
+              element["duration"] = formatted;
+              element.toBeStoredStartTime = element.start_time;
+              element.toBeStoredEndTime = element.end_time;
+              element.toBeCreatedAt = element.created_at;
+              element.start_time = convertUnixToQuasarFormat(
+                element.start_time,
+              );
+              element.end_time = convertUnixToQuasarFormat(element.end_time);
+              element.created_at = convertUnixToQuasarFormat(
+                element.created_at,
+              );
+              element.started_at = convertUnixToQuasarFormat(
+                element.started_at,
+              );
+              element.ended_at = convertUnixToQuasarFormat(element.ended_at);
+              element.status_code = element.status;
+              element["sql"] = JSON.parse(element.payload).query.sql;
 
-                element["duration"] = formatted;
-                element.toBeStoredStartTime = element.start_time;
-                element.toBeStoredEndTime = element.end_time;
-                element.toBeCreatedAt = element.created_at;
-                element.start_time = convertUnixToQuasarFormat(
-                  element.start_time,
+              if (JSON.parse(element.payload).query.query_fn) {
+                element["function"] = b64DecodeUnicode(
+                  JSON.parse(element.payload).query.query_fn,
                 );
-                element.end_time = convertUnixToQuasarFormat(element.end_time);
-                element.created_at = convertUnixToQuasarFormat(
-                  element.created_at,
-                );
-                element.started_at = convertUnixToQuasarFormat(
-                  element.started_at,
-                );
-                element.ended_at = convertUnixToQuasarFormat(element.ended_at);
-                element.status_code = element.status;
-                element["sql"] = JSON.parse(element.payload).query.sql;
-
-                if (JSON.parse(element.payload).query.query_fn) {
-                  element["function"] = b64DecodeUnicode(
-                    JSON.parse(element.payload).query.query_fn,
-                  );
-                }
-              });
-
-              dataToBeLoaded.value = responseToBeFetched;
-              isLoading.value = false;
-            }).catch((e)=>{
-              if(e.response.status != 403){
-                $q.notify({
-                  type: "negative",
-                  message: "Failed to fetch search history. Please try again later.",
-                  timeout: 5000,
-                });
               }
-            }).finally(()=>{
-              isLoading.value = false;
-            })
+            });
+
+            dataToBeLoaded.value = responseToBeFetched;
+            isLoading.value = false;
+          })
+          .catch((e) => {
+            if (e.response.status != 403) {
+              $q.notify({
+                type: "negative",
+                message:
+                  "Failed to fetch search history. Please try again later.",
+                timeout: 5000,
+              });
+            }
+          })
+          .finally(() => {
+            isLoading.value = false;
+          });
       } catch (error) {
-        if(error.response.status != 403){
+        if (error.response.status != 403) {
           $q.notify({
             type: "negative",
             message: "Failed to fetch search history",
@@ -635,17 +640,20 @@ export default defineComponent({
             message: "Search Job has been cancelled successfully",
             timeout: 2000,
           });
-        }).catch((e)=> {
-          if(e.response.status != 403){
-            $q.notify({
-            type: "negative",
-            message: e.response?.data?.message ||  "Failed to cancel search job",
-            timeout: 2000,
-          });
-          } 
-        }).finally(()=> {
-          fetchSearchHistory();
         })
+        .catch((e) => {
+          if (e.response.status != 403) {
+            $q.notify({
+              type: "negative",
+              message:
+                e.response?.data?.message || "Failed to cancel search job",
+              timeout: 2000,
+            });
+          }
+        })
+        .finally(() => {
+          fetchSearchHistory();
+        });
     };
     const retrySearchJob = (row) => {
       searchService
@@ -659,19 +667,20 @@ export default defineComponent({
             message: "Search Job has been restarted successfully",
             timeout: 2000,
           });
-        }).catch((e)=> {
-          if(e.response.status != 403){
-            $q.notify({
-            type: "negative",
-            message: e.response?.data?.message ||  "Failed to restart search job",
-            timeout: 2000,
-          });
-          }
-          
-        }).finally(()=> {
-          fetchSearchHistory();
-
         })
+        .catch((e) => {
+          if (e.response.status != 403) {
+            $q.notify({
+              type: "negative",
+              message:
+                e.response?.data?.message || "Failed to restart search job",
+              timeout: 2000,
+            });
+          }
+        })
+        .finally(() => {
+          fetchSearchHistory();
+        });
     };
     const confirmDeleteJob = (row) => {
       confirmDelete.value = true;
@@ -694,17 +703,20 @@ export default defineComponent({
             message: "Search Job has been deleted successfully",
             timeout: 2000,
           });
-        }).catch((e)=>{
-          if(e.response.status != 403){
-            $q.notify({
-            type: "negative",
-            message: e.response?.data?.message ||  "Failed to delete search job",
-            timeout: 2000,
-          });
-          }
-        }).finally(()=> {
-          fetchSearchHistory();
         })
+        .catch((e) => {
+          if (e.response.status != 403) {
+            $q.notify({
+              type: "negative",
+              message:
+                e.response?.data?.message || "Failed to delete search job",
+              timeout: 2000,
+            });
+          }
+        })
+        .finally(() => {
+          fetchSearchHistory();
+        });
     };
     const sortMethod = (rows, sortBy, descending) => {
       const data = [...rows];
@@ -848,7 +860,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(row.sql);
-      const rawStreamNames = JSON.parse(row.stream_names)
+      const rawStreamNames = JSON.parse(row.stream_names);
       const stream_name =
         rawStreamNames.length > 1
           ? rawStreamNames.join(",")
@@ -1005,7 +1017,6 @@ export default defineComponent({
       confirmCancelJob,
       toBeCancelled,
       confirmCancel,
-
     };
     // Watch the searchObj for changes
   },
