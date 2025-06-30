@@ -901,15 +901,14 @@ async fn write_traces(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    match alert
+
+                    if let Ok(Some(data)) = alert
                         .evaluate(Some(&record_val), (None, alert_end_time), None)
                         .await
+                        .map(|res| res.data)
                     {
-                        Ok(res) if res.data.is_some() => {
-                            triggers.push((alert.clone(), res.data.unwrap()));
-                            evaluated_alerts.insert(key);
-                        }
-                        _ => {}
+                        triggers.push((alert.clone(), data));
+                        evaluated_alerts.insert(key);
                     }
                 }
             }
