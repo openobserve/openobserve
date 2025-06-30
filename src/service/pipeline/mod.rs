@@ -205,6 +205,38 @@ pub async fn enable_pipeline(
 }
 
 #[tracing::instrument]
+pub async fn pause_pipeline(
+    org_id: &str,
+    pipeline_id: &str,
+    paused: bool,
+) -> Result<(), PipelineError> {
+    let Ok(mut pipeline) = pipeline::get_by_id(pipeline_id).await else {
+        return Err(PipelineError::NotFound(pipeline_id.to_string()));
+    };
+
+    // add or remove trigger if it's a scheduled pipeline
+    let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source else {
+        return Err(PipelineError::PipelineDoesNotApply);
+    };
+
+    pipeline.enabled = paused;
+    // bring next_run_at to now if unpaused
+    if !paused {
+        super::alerts::derived_streams::save(
+            derived_stream.clone(),
+            &pipeline.name,
+            pipeline_id,
+            false,
+        )
+        .await
+        .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
+    }
+
+    pipeline::update(&pipeline, None).await?;
+    Ok(())
+}
+
+#[tracing::instrument]
 pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     let Ok(existing_pipeline) = pipeline::get_by_id(pipeline_id).await else {
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
