@@ -34,9 +34,11 @@ const APPROX_TOPK: &str = "approx_topk_v5";
 
 /// Approximate TopK UDAF that returns the top K elements by frequency.
 ///
-/// Usage: approx_topk(field, k)
+/// Usage: approx_topk_v5(field, k) or approx_topk_v5(field, k, cap)
 /// - field: the field to find top k values from
 /// - k: number of top elements to return
+/// - cap: optional maximum number of candidates to keep in memory (default: max(k*2, min(k*10,
+///   1000)))
 ///
 /// For partial aggregation, returns top k elements from each partition.
 /// For final aggregation, merges results from all partitions and returns final top k.
@@ -49,6 +51,9 @@ impl ApproxTopK {
                 // String field with Int64 k
                 TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64]),
                 TypeSignature::Exact(vec![DataType::LargeUtf8, DataType::Int64]),
+                // String field with Int64 k and optional Int64 cap
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64, DataType::Int64]),
+                TypeSignature::Exact(vec![DataType::LargeUtf8, DataType::Int64, DataType::Int64]),
             ],
             Volatility::Immutable,
         ))
@@ -124,10 +129,17 @@ impl AggregateUDFImpl for ApproxTopK {
 
     fn accumulator(&self, args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
         let k = validate_k_parameter(&args.exprs[1])?;
+        let cap = if args.exprs.len() > 2 {
+            Some(validate_cap_parameter(&args.exprs[2])?)
+        } else {
+            None
+        };
         let value_data_type = args.exprs[0].data_type(args.schema)?;
 
         match value_data_type {
-            DataType::Utf8 | DataType::LargeUtf8 => Ok(Box::new(ApproxTopKAccumulator::new(k))),
+            DataType::Utf8 | DataType::LargeUtf8 => {
+                Ok(Box::new(ApproxTopKAccumulator::new(k, cap)))
+            }
             other => {
                 not_impl_err!("Support for 'APPROX_TOPK' for data type {other} is not implemented")
             }
@@ -160,6 +172,31 @@ fn validate_k_parameter(expr: &Arc<dyn PhysicalExpr>) -> Result<usize> {
     Ok(k)
 }
 
+fn validate_cap_parameter(expr: &Arc<dyn PhysicalExpr>) -> Result<usize> {
+    let empty_schema = Arc::new(Schema::empty());
+    let batch = RecordBatch::new_empty(Arc::clone(&empty_schema));
+
+    let cap = match expr.evaluate(&batch)? {
+        ColumnarValue::Scalar(ScalarValue::Int64(Some(value))) => {
+            if value <= 0 {
+                return plan_err!("cap parameter for 'APPROX_TOPK' must be positive, got {value}");
+            }
+            value as usize
+        }
+        ColumnarValue::Scalar(other) => {
+            return not_impl_err!(
+                "cap parameter for 'APPROX_TOPK' must be Int64 literal (got {:?})",
+                other.data_type()
+            );
+        }
+        _ => {
+            return internal_err!("Expected scalar value for cap parameter");
+        }
+    };
+
+    Ok(cap)
+}
+
 /// Memory-efficient accumulator that only tracks top-K candidates
 /// Uses a min-heap to maintain only the most frequent items
 struct ApproxTopKAccumulator {
@@ -183,11 +220,7 @@ impl std::fmt::Debug for ApproxTopKAccumulator {
 }
 
 impl ApproxTopKAccumulator {
-    fn new(k: usize) -> Self {
-        Self::with_memory_limit(k, None)
-    }
-
-    fn with_memory_limit(k: usize, max_candidates: Option<usize>) -> Self {
+    fn new(k: usize, max_candidates: Option<usize>) -> Self {
         // Cap at least 2*k for safety
         let default_max = (k * 10).min(1000).max(k * 2);
         Self {
@@ -425,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_approx_topk_accumulator() {
-        let mut acc = ApproxTopKAccumulator::new(3);
+        let mut acc = ApproxTopKAccumulator::new(3, None);
 
         // Add some test data
         let values = vec!["apple", "banana", "apple", "cherry", "banana", "apple"];
@@ -443,7 +476,7 @@ mod tests {
     #[test]
     fn test_memory_efficient_pruning() {
         // Test that the accumulator prunes low-frequency items to save memory
-        let mut acc = ApproxTopKAccumulator::with_memory_limit(3, Some(20)); // Small limit for testing
+        let mut acc = ApproxTopKAccumulator::new(3, Some(20)); // Small limit for testing
 
         // Add many different items with low frequency
         for i in 0..100 {
@@ -486,6 +519,41 @@ mod tests {
         assert!(acc.candidates.len() <= 50, "Memory usage should be bounded");
     }
 
+    #[test]
+    fn test_accumulator_with_explicit_cap() {
+        // Test that the accumulator respects explicit cap parameter
+        let mut acc = ApproxTopKAccumulator::new(3, Some(5)); // Very small cap for testing
+
+        // Add items that would exceed the cap
+        let items = vec!["a", "b", "c", "d", "e", "f", "g", "h"];
+        for item in items {
+            let array: ArrayRef = Arc::new(StringArray::from(vec![item]));
+            acc.update_batch(&[array]).unwrap();
+        }
+
+        // Should respect the cap limit
+        assert!(
+            acc.candidates.len() <= 5,
+            "Should respect explicit cap parameter, got {} candidates",
+            acc.candidates.len()
+        );
+
+        // Add some items multiple times to create frequency differences
+        for _ in 0..10 {
+            let array: ArrayRef = Arc::new(StringArray::from(vec!["frequent"]));
+            acc.update_batch(&[array]).unwrap();
+        }
+
+        // Get results
+        let top_k = acc.get_top_k(acc.k);
+        assert!(!top_k.is_empty());
+
+        // Most frequent item should be at the top
+        assert_eq!(top_k[0].0, "frequent");
+        // Due to pruning with very small cap, count might be slightly less than 10
+        assert!(top_k[0].1 >= 9, "Expected count >= 9, got {}", top_k[0].1);
+    }
+
     #[tokio::test]
     async fn test_approx_topk_udaf_v5() {
         let ctx = SessionContext::new();
@@ -512,6 +580,41 @@ mod tests {
         // Test the function
         let df = ctx
             .sql("SELECT approx_topk_v5(item, 2) as top_items FROM test_table")
+            .await
+            .unwrap();
+        let results = df.collect().await.unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].num_columns(), 1);
+        assert_eq!(results[0].num_rows(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_approx_topk_udaf_v5_with_cap() {
+        let ctx = SessionContext::new();
+
+        // Create test data
+        let schema = Schema::new(vec![Field::new("item", DataType::Utf8, false)]);
+
+        let values = vec![
+            "apple", "banana", "apple", "cherry", "banana", "apple", "date",
+        ];
+        let batch = RecordBatch::try_new(
+            Arc::new(schema.clone()),
+            vec![Arc::new(StringArray::from(values))],
+        )
+        .unwrap();
+
+        let table = MemTable::try_new(Arc::new(schema), vec![vec![batch]]).unwrap();
+        ctx.register_table("test_table", Arc::new(table)).unwrap();
+
+        // Register the UDAF
+        let topk_udaf = AggregateUDF::from(ApproxTopK::new());
+        ctx.register_udaf(topk_udaf);
+
+        // Test the function with cap parameter
+        let df = ctx
+            .sql("SELECT approx_topk_v5(item, 2, 10) as top_items FROM test_table")
             .await
             .unwrap();
         let results = df.collect().await.unwrap();
