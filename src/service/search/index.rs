@@ -554,7 +554,7 @@ impl Condition {
                     .trim_end_matches('*') // prefix or contains
                     .to_string();
                 let term = if get_config().common.utf8_view_enabled {
-                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!("%{value}%")))))
                 } else {
                     Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))))
                 };
