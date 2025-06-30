@@ -207,8 +207,9 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, StringArray};
+    use arrow::array::{Array, Int64Array, StringArray, StringViewArray};
     use arrow_schema::DataType;
+    use config::get_config;
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -273,32 +274,64 @@ mod tests {
             ),
         ];
 
-        // define a schema.
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("_timestamp", DataType::Int64, false),
-            Field::new("name", DataType::Utf8, false),
-            Field::new("log", DataType::Utf8, false),
-        ]));
+        let schema = if get_config().common.utf8_view_enabled {
+            // define a schema.
+            Arc::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                Field::new("name", DataType::Utf8View, false),
+                Field::new("log", DataType::Utf8View, false),
+            ]))
+        } else {
+            Arc::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                Field::new("name", DataType::Utf8, false),
+                Field::new("log", DataType::Utf8, false),
+            ]))
+        };
+
+        let name_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
+            Arc::new(StringViewArray::from(vec![
+                "open",
+                "observe",
+                "openobserve",
+                "OBserve",
+                "oo",
+            ]))
+        } else {
+            Arc::new(StringArray::from(vec![
+                "open",
+                "observe",
+                "openobserve",
+                "OBserve",
+                "oo",
+            ]))
+        };
+
+        let log_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
+            Arc::new(StringViewArray::from(vec![
+                "o2",
+                "obSERVE",
+                "openobserve",
+                "o2",
+                "oo",
+            ]))
+        } else {
+            Arc::new(StringArray::from(vec![
+                "o2",
+                "obSERVE",
+                "openobserve",
+                "o2",
+                "oo",
+            ]))
+        };
 
         // define data.
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
                 Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
-                Arc::new(StringArray::from(vec![
-                    "open",
-                    "observe",
-                    "openobserve",
-                    "OBserve",
-                    "oo",
-                ])),
-                Arc::new(StringArray::from(vec![
-                    "o2",
-                    "obSERVE",
-                    "openobserve",
-                    "o2",
-                    "oo",
-                ])),
+                name_array,
+                log_array,
             ],
         )
         .unwrap();
