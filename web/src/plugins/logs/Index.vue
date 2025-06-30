@@ -353,6 +353,7 @@ import {
   defineComponent,
   ref,
   onActivated,
+  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -388,6 +389,7 @@ import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import useAiChat from "@/composables/useAiChat";
 
 export default defineComponent({
   name: "PageSearch",
@@ -570,6 +572,7 @@ export default defineComponent({
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
+      getStream,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -596,6 +599,8 @@ export default defineComponent({
     const visualizeErrorData: any = reactive({
       errors: [],
     });
+
+    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 
     // function restoreUrlQueryParams() {
     //   const queryParams = router.currentRoute.value.query;
@@ -655,11 +660,14 @@ export default defineComponent({
           router.back();
         }
       }
+
+      registerAiContextHandler();
     });
 
     onBeforeUnmount(() => {
       // Cancel all the search queries
       cancelOnGoingSearchQueries();
+      removeAiContextHandler();
     });
 
     onActivated(() => {
@@ -1545,6 +1553,80 @@ export default defineComponent({
       sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
     };
 
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const isLogsPage = router.currentRoute.value.name === "logs";
+
+          const isStreamSelectedInLogsPage =
+            searchObj.meta.logsVisualizeToggle === "logs" &&
+            searchObj.data.stream.selectedStream.length;
+
+          const isStreamSelectedInDashboardPage =
+            searchObj.meta.logsVisualizeToggle === "visualize" &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          if (
+            !isLogsPage ||
+            !(isStreamSelectedInLogsPage || isStreamSelectedInDashboardPage)
+          ) {
+            resolve("");
+            return;
+          }
+
+          const payload = {};
+
+          const streams =
+            searchObj.meta.logsVisualizeToggle === "logs"
+              ? searchObj.data.stream.selectedStream
+              : [
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.stream,
+                ];
+
+          const streamType =
+            searchObj.meta.logsVisualizeToggle === "logs"
+              ? searchObj.data.stream.streamType
+              : dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream_type;
+
+          if (!streamType || !streams?.length) {
+            resolve("");
+            return;
+          }
+
+          for (let i = 0; i < streams.length; i++) {
+            const schema = await getStream(streams[i], streamType, true);
+
+            payload["stream_name_" + (i + 1)] = streams[i];
+            payload["schema_" + (i + 1)] =
+              schema.uds_schema || schema.schema || [];
+          }
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for logs page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
     return {
       t,
       store,
@@ -1668,7 +1750,12 @@ export default defineComponent({
         : 0;
     },
     async showHistogram(newVal, oldVal) {
-      if(newVal == true && oldVal == false && this.searchObj.meta.histogramDirtyFlag == true && this.searchObj.data.queryResults.hits.length > 0){
+      if (
+        newVal == true &&
+        oldVal == false &&
+        this.searchObj.meta.histogramDirtyFlag == true &&
+        this.searchObj.data.queryResults.hits.length > 0
+      ) {
         this.searchObj.meta.resetPlotChart = true;
         this.searchObj.data.queryResults.aggs = [];
       }
@@ -1828,7 +1915,7 @@ export default defineComponent({
       this.refreshHistogramChart();
     },
   },
-});
+}) as any;
 </script>
 
 <style lang="scss">

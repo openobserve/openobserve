@@ -137,6 +137,7 @@ struct ConfigResponse<'a> {
     streaming_enabled: bool,
     max_query_range: i64,
     histogram_enabled: bool,
+    ai_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -268,6 +269,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = false;
 
     #[cfg(feature = "enterprise")]
+    let ai_enabled = o2cfg.ai.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let ai_enabled = false;
+
+    #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
@@ -331,6 +337,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         streaming_enabled: cfg.websocket.streaming_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         histogram_enabled: cfg.limit.histogram_enabled,
+        ai_enabled,
     }))
 }
 
