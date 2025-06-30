@@ -122,7 +122,6 @@ test.describe("dashboard UI testcases", () => {
     await orgNavigation;
   });
 
-
   test("should add and delete the dashboard", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -302,19 +301,22 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-customSql"]').click();
 
     // Focus on the first line of the editor
-    // await page.locator(".view-line").first().click();
-    await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('textbox').click();
-    // await page
-    //   .locator('[data-test="dashboard-panel-query-editor"]')
-    //   .locator('.inputarea')
-    //   .fill(
-    //     'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
-    //   );
+    await page.locator(".cm-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .getByRole("textbox")
+      .click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".cm-content")
+      .fill(
+        'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
+      );
 
     // Fill the custom SQL query
-    await page.keyboard.type(
-      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
-    );
+    // await page.keyboard.type(
+    //   'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
+    // );
     await page.waitForTimeout(400);
 
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -731,7 +733,8 @@ test.describe("dashboard UI testcases", () => {
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]'
-      ).click();
+      )
+      .click();
 
     await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
@@ -905,7 +908,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-     await waitForDateTimeButtonToBeEnabled(page);
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-5-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
