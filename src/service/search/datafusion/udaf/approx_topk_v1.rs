@@ -37,7 +37,8 @@ const APPROX_TOPK: &str = "approx_topk_v1";
 /// Usage: approx_topk_v1(field, k) or approx_topk_v1(field, k, cap)
 /// - field: the field to find top k values from
 /// - k: number of top elements to return
-/// - cap: optional maximum number of candidates to keep in memory (default: max(k, min(k*10, 1000)))
+/// - cap: optional maximum number of candidates to keep in memory (default: max(k, min(k*10,
+///   1000)))
 ///
 /// For partial aggregation, returns top k elements from each partition.
 /// For final aggregation, merges results from all partitions and returns final top k.
@@ -136,7 +137,9 @@ impl AggregateUDFImpl for ApproxTopK {
         let value_data_type = args.exprs[0].data_type(args.schema)?;
 
         match value_data_type {
-            DataType::Utf8 | DataType::LargeUtf8 => Ok(Box::new(ApproxTopKAccumulator::new(k, cap))),
+            DataType::Utf8 | DataType::LargeUtf8 => {
+                Ok(Box::new(ApproxTopKAccumulator::new(k, cap)))
+            }
             other => {
                 not_impl_err!("Support for 'APPROX_TOPK' for data type {other} is not implemented")
             }
@@ -234,25 +237,6 @@ impl ApproxTopKAccumulator {
         });
 
         items.into_iter().take(n).collect()
-    }
-
-    /// Remove low-frequency items to keep memory usage bounded
-    fn prune_low_frequency_items(&mut self) {
-        let current_size = self.value_counts.len();
-        let target_size = (self.max_candidates / 2).max(self.k);
-
-        if current_size <= target_size {
-            return; // No need to prune
-        }
-
-        // Get top items to keep
-        let top_items = self.get_top_k(target_size);
-        
-        // Clear and rebuild with only top items
-        self.value_counts.clear();
-        for (key, count) in top_items {
-            self.value_counts.insert(key, count);
-        }
     }
 
     /// Convert string array to vector of strings
@@ -375,11 +359,6 @@ impl Accumulator for ApproxTopKAccumulator {
             *self.value_counts.entry(string_val).or_insert(0) += 1;
         }
 
-        // Periodically prune low-frequency items to save memory
-        if self.value_counts.len() > self.max_candidates {
-            self.prune_low_frequency_items();
-        }
-
         Ok(())
     }
 
@@ -399,11 +378,6 @@ impl Accumulator for ApproxTopKAccumulator {
                 // Merge the counts from this state
                 for (value, count) in values.into_iter().zip(counts.into_iter()) {
                     *self.value_counts.entry(value).or_insert(0) += count;
-                }
-
-                // Check if we need to prune after merging
-                if self.value_counts.len() > self.max_candidates {
-                    self.prune_low_frequency_items();
                 }
             }
         }
