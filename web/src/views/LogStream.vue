@@ -416,6 +416,7 @@ export default defineComponent({
       removeStream,
       getStream,
       getPaginatedStreams,
+      addNewStreams,
     } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
@@ -571,6 +572,7 @@ export default defineComponent({
             let index_size = "";
             resultTotal.value = res.list.length;
             pagination.value.rowsNumber = res.total;
+
             logStream.value.push(
               ...res.list.map((data: any) => {
                 doc_num = "--";
@@ -604,6 +606,9 @@ export default defineComponent({
             });
             // onChangeStreamFilter(selectedStreamType.value);
             loadingState.value = false;
+
+            addNewStreams(selectedStreamType.value, res.list);
+
             dismiss();
           })
           .catch((err) => {
@@ -823,6 +828,9 @@ export default defineComponent({
 
     const exploreStream = async (props: any) => {
       store.dispatch("logs/setIsInitialized", false);
+
+      // We need to check if stream is present in store, if not then we need to fetch the stream
+
       const dateTime = await getTimeRange(props.row);
       router.push({
         name: "logs",

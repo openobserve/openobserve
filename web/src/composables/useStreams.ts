@@ -393,8 +393,8 @@ const useStreams = () => {
     return isStreamFetched;
   };
 
-  const setStreams = (streamName: string = "all", streamList: any[] = []) => {
-    if (isStreamFetched(streamName || "all")) return;
+  const setStreams = (streamName: string = "all", streamList: any[] = [], force: boolean = false) => {
+    if (isStreamFetched(streamName || "all") && !force) return;
 
     if (!store.state.organizationData.isDataIngested && !!streamList.length)
       store.dispatch("setIsDataIngested", !!streamList.length);
@@ -721,6 +721,24 @@ const useStreams = () => {
     )
   }
 
+  const addNewStreams = (streamType: string, streamList: any[]) => {
+    
+    // Check if stream exist in store, if not then add it
+    const streamsToAdd = [...streamsCache[streamType].value?.list || []];
+
+
+    streamList.forEach((stream) => {
+      if (!isStreamExists(stream.name, streamType)) {
+        streamsToAdd.push(stream);
+      }
+    });
+
+
+    if (streamsToAdd.length > 0) {
+      setStreams(streamType, streamsToAdd, true);
+    }
+  }
+
   return {
     getStreams,
     getStream,
@@ -734,6 +752,7 @@ const useStreams = () => {
     getPaginatedStreams,
     isStreamExists,
     isStreamFetched,
+    addNewStreams
   };
 };
 

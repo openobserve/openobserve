@@ -558,6 +558,7 @@ const useLogs = () => {
           value: string;
         };
         
+
         for (const item of searchObj.data.streamResults.list) {
           itemObj = {
             label: item.name,
@@ -583,7 +584,6 @@ const useLogs = () => {
           (store.state.zoConfig.query_on_stream_selection == false ||
           router.currentRoute.value.query?.type == "stream_explorer") && selectStream
         ) {
-          console.log("selectedStream", selectedStream);
           searchObj.data.stream.selectedStream = selectedStream;
         }
       } else {
