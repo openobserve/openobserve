@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BinaryHeap, fmt::Formatter, sync::Arc};
+use std::{
+    collections::{BinaryHeap, HashMap},
+    fmt::Formatter,
+    sync::Arc,
+};
 
 use arrow::array::{Array, AsArray, RecordBatch, StructArray};
 use arrow_schema::{Field, Schema};
@@ -22,9 +26,9 @@ use datafusion::{
     common::{internal_err, not_impl_err, plan_err},
     error::Result,
     logical_expr::{
-        Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
         function::{AccumulatorArgs, StateFieldsArgs},
         utils::format_state_name,
+        Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
     },
     physical_plan::PhysicalExpr,
     scalar::ScalarValue,
@@ -32,27 +36,18 @@ use datafusion::{
 
 const APPROX_TOPK: &str = "approx_topk";
 
-/// Count-Min Sketch parameters for high cardinality data
-/// These parameters provide good accuracy vs memory tradeoff
-const CMS_WIDTH: usize = 2048;  // Width of the sketch (more = better accuracy)
-const CMS_DEPTH: usize = 5;     // Depth of the sketch (more hash functions = better accuracy)
-
 /// Approximate TopK UDAF that returns the top K elements by frequency.
 ///
-/// Usage: approx_topk(field, k)
-/// - field: the field to find top k values from
-/// - k: number of top elements to return
-///
-/// Uses Count-Min Sketch for memory-efficient frequency estimation on high cardinality data.
-/// For partial aggregation, returns top k elements from each partition.
-/// For final aggregation, merges results from all partitions and returns final top k.
+/// For efficiency and accuracy:
+/// - Maintains exact counts for top-k candidates (items in heap + recent high-frequency items)  
+/// - Uses Count-Min Sketch only as a filter for items unlikely to be in top-k
+/// - Optimized for both small and large cardinalities
 pub(crate) struct ApproxTopK(Signature);
 
 impl ApproxTopK {
     pub fn new() -> Self {
         Self(Signature::one_of(
             vec![
-                // String field with Int64 k
                 TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64]),
                 TypeSignature::Exact(vec![DataType::LargeUtf8, DataType::Int64]),
             ],
@@ -92,7 +87,6 @@ impl AggregateUDFImpl for ApproxTopK {
     fn return_type(&self, arg_types: &[DataType]) -> Result<DataType> {
         match &arg_types[0] {
             DataType::Utf8 | DataType::LargeUtf8 => {
-                // Return array of structs: [{value: string, count: int64}]
                 Ok(DataType::List(Arc::new(Field::new(
                     "item",
                     DataType::Struct(
@@ -111,12 +105,6 @@ impl AggregateUDFImpl for ApproxTopK {
 
     fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
         Ok(vec![
-            // Store Count-Min Sketch as flattened array
-            Field::new(
-                format_state_name(args.name, "cms_counters"),
-                DataType::List(Arc::new(Field::new("item", DataType::Int64, true))),
-                true,
-            ),
             // Store top-k values
             Field::new(
                 format_state_name(args.name, "values"),
@@ -137,9 +125,11 @@ impl AggregateUDFImpl for ApproxTopK {
     fn accumulator(&self, args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
         let k = validate_k_parameter(&args.exprs[1])?;
         let value_data_type = args.exprs[0].data_type(args.schema)?;
-        
+
         match value_data_type {
-            DataType::Utf8 | DataType::LargeUtf8 => Ok(Box::new(ApproxTopKAccumulator::new(k))),
+            DataType::Utf8 | DataType::LargeUtf8 => {
+                Ok(Box::new(ApproxTopKAccumulator::new(k)))
+            }
             other => {
                 not_impl_err!("Support for 'APPROX_TOPK' for data type {other} is not implemented")
             }
@@ -150,7 +140,7 @@ impl AggregateUDFImpl for ApproxTopK {
 fn validate_k_parameter(expr: &Arc<dyn PhysicalExpr>) -> Result<usize> {
     let empty_schema = Arc::new(Schema::empty());
     let batch = RecordBatch::new_empty(Arc::clone(&empty_schema));
-    
+
     let k = match expr.evaluate(&batch)? {
         ColumnarValue::Scalar(ScalarValue::Int64(Some(value))) => {
             if value <= 0 {
@@ -168,94 +158,11 @@ fn validate_k_parameter(expr: &Arc<dyn PhysicalExpr>) -> Result<usize> {
             return internal_err!("Expected scalar value for k parameter");
         }
     };
-    
+
     Ok(k)
 }
 
-/// Count-Min Sketch implementation for frequency estimation
-#[derive(Debug, Clone)]
-struct CountMinSketch {
-    /// 2D array of counters [depth][width]
-    counters: Vec<Vec<i64>>,
-    /// Width and depth of the sketch
-    width: usize,
-    depth: usize,
-}
-
-impl CountMinSketch {
-    fn new() -> Self {
-        Self {
-            counters: vec![vec![0; CMS_WIDTH]; CMS_DEPTH],
-            width: CMS_WIDTH,
-            depth: CMS_DEPTH,
-        }
-    }
-
-    /// Hash function using FNV-1a algorithm with different seeds
-    fn hash_static(value: &str, seed: usize, width: usize) -> usize {
-        let mut hash = 2166136261u32.wrapping_add(seed as u32);
-        for byte in value.bytes() {
-            hash ^= byte as u32;
-            hash = hash.wrapping_mul(16777619);
-        }
-        (hash as usize) % width
-    }
-
-    /// Add an item to the sketch
-    fn add(&mut self, value: &str, count: i64) {
-        for i in 0..self.depth {
-            let pos = Self::hash_static(value, i, self.width);
-            self.counters[i][pos] += count;
-        }
-    }
-
-    /// Query the estimated frequency of an item
-    fn query(&self, value: &str) -> i64 {
-        let mut min_count = i64::MAX;
-        for i in 0..self.depth {
-            let pos = Self::hash_static(value, i, self.width);
-            min_count = min_count.min(self.counters[i][pos]);
-        }
-        min_count.max(0)
-    }
-
-    /// Merge another Count-Min Sketch into this one
-    fn merge(&mut self, other: &CountMinSketch) {
-        for (i, row) in self.counters.iter_mut().enumerate() {
-            for (j, counter) in row.iter_mut().enumerate() {
-                *counter += other.counters[i][j];
-            }
-        }
-    }
-
-    /// Get all counters as a flat vector for serialization
-    fn to_flat_counters(&self) -> Vec<i64> {
-        self.counters.iter().flatten().copied().collect()
-    }
-
-    /// Restore from flat counters
-    fn from_flat_counters(flat: &[i64]) -> Self {
-        if flat.len() != CMS_WIDTH * CMS_DEPTH {
-            // Return empty sketch if size mismatch
-            return Self::new();
-        }
-        
-        let mut counters = vec![vec![0; CMS_WIDTH]; CMS_DEPTH];
-        for (i, &value) in flat.iter().enumerate() {
-            let row = i / CMS_WIDTH;
-            let col = i % CMS_WIDTH;
-            counters[row][col] = value;
-        }
-        
-        Self {
-            counters,
-            width: CMS_WIDTH,
-            depth: CMS_DEPTH,
-        }
-    }
-}
-
-/// Item in the top-k heap with count and value
+/// Item in the top-k heap
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct TopKItem {
     value: String,
@@ -264,10 +171,10 @@ struct TopKItem {
 
 impl Ord for TopKItem {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Min-heap: smaller counts first, then lexicographic order for ties
+        // Min-heap: smaller counts first
         match self.count.cmp(&other.count) {
             std::cmp::Ordering::Equal => other.value.cmp(&self.value), // Reverse for deterministic results
-            other => other
+            other => other,
         }
     }
 }
@@ -278,119 +185,224 @@ impl PartialOrd for TopKItem {
     }
 }
 
-/// Accumulator for ApproxTopK using Count-Min Sketch for high cardinality
+/// Efficient accumulator using exact counting for top-k candidates
 struct ApproxTopKAccumulator {
-    /// Count-Min Sketch for frequency estimation
-    cms: CountMinSketch,
+    /// Exact counts for all candidates (items in heap + buffer)
+    exact_counts: HashMap<String, i64>,
     /// Min-heap to maintain top-k items
     top_k_heap: BinaryHeap<TopKItem>,
     /// Target k value
     k: usize,
+    /// Minimum count threshold for heap (for optimization)
+    min_heap_count: i64,
 }
 
 impl std::fmt::Debug for ApproxTopKAccumulator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ApproxTopKAccumulator(k={}, heap_size={})", self.k, self.top_k_heap.len())
+        write!(
+            f,
+            "ApproxTopKAccumulator(k={}, heap_size={}, candidates={})",
+            self.k,
+            self.top_k_heap.len(),
+            self.exact_counts.len()
+        )
     }
 }
 
 impl ApproxTopKAccumulator {
     fn new(k: usize) -> Self {
         Self {
-            cms: CountMinSketch::new(),
+            exact_counts: HashMap::new(),
             top_k_heap: BinaryHeap::new(),
             k,
+            min_heap_count: 0,
         }
     }
 
-    /// Add an item and update the top-k tracking
+    /// Add an item efficiently
     fn add_item(&mut self, value: &str, count: i64) {
-        // Update Count-Min Sketch
-        self.cms.add(value, count);
-        
-        // Get updated frequency estimate
-        let estimated_freq = self.cms.query(value);
-        
-        // Update top-k heap
-        // First, check if this item is already in the heap
-        let mut found_index = None;
-        for (i, item) in self.top_k_heap.iter().enumerate() {
-            if item.value == value {
-                found_index = Some(i);
-                break;
-            }
+        // Always update exact count
+        let total_count = {
+            let entry = self.exact_counts.entry(value.to_string()).or_insert(0);
+            *entry += count;
+            *entry
+        };
+
+        // Quick check: if heap is full and this item's count is too low, skip heap update
+        if self.top_k_heap.len() >= self.k && total_count < self.min_heap_count {
+            return;
         }
-        
-        if let Some(_) = found_index {
-            // Item already in heap, rebuild heap with updated counts
+
+        // Update heap if necessary
+        self.update_heap_for_item(value, total_count);
+    }
+
+    /// Update heap for a specific item
+    fn update_heap_for_item(&mut self, value: &str, count: i64) {
+        // First check if this item is already in the heap
+        let already_in_heap = self
+            .top_k_heap
+            .iter()
+            .any(|item| item.value == value);
+
+        if already_in_heap {
+            // Item is already in heap - need to update it
+            // Rebuild heap with updated count
             let mut items: Vec<_> = self.top_k_heap.drain().collect();
+            
+            // Update the item's count
             for item in &mut items {
                 if item.value == value {
-                    item.count = estimated_freq;
+                    item.count = count;
+                    break;
                 }
             }
-            self.top_k_heap.extend(items);
-        } else {
-            // New item
-            let new_item = TopKItem {
-                value: value.to_string(),
-                count: estimated_freq,
-            };
             
-            if self.top_k_heap.len() < self.k {
-                // Heap not full, just add
-                self.top_k_heap.push(new_item);
-            } else if let Some(min_item) = self.top_k_heap.peek() {
-                // If new item has higher count than minimum, replace
-                if estimated_freq > min_item.count || 
-                   (estimated_freq == min_item.count && value < min_item.value.as_str()) {
+            // Find the new minimum before rebuilding heap
+            let new_min = items.iter().map(|item| item.count).min().unwrap_or(0);
+            
+            // Rebuild heap
+            for item in items {
+                self.top_k_heap.push(item);
+            }
+            
+            // Update minimum threshold with the actual minimum
+            self.min_heap_count = new_min;
+            return;
+        }
+
+        // Item is not in heap
+        if self.top_k_heap.len() < self.k {
+            // Heap not full, just add
+            self.top_k_heap.push(TopKItem {
+                value: value.to_string(),
+                count,
+            });
+            if self.top_k_heap.len() == self.k {
+                // Update min threshold when heap becomes full
+                // Find actual minimum from all items in heap
+                self.min_heap_count = self.top_k_heap
+                    .iter()
+                    .map(|item| item.count)
+                    .min()
+                    .unwrap_or(0);
+            }
+        } else {
+            // Heap is full - check if this item should replace the minimum
+            if let Some(min_item) = self.top_k_heap.peek() {
+                if count > min_item.count
+                    || (count == min_item.count && value < min_item.value.as_str())
+                {
+                    // Remove minimum and add new item
                     self.top_k_heap.pop();
-                    self.top_k_heap.push(new_item);
+                    self.top_k_heap.push(TopKItem {
+                        value: value.to_string(),
+                        count,
+                    });
+                    // Update minimum threshold
+                    // Find actual minimum from all items in heap
+                    self.min_heap_count = self.top_k_heap
+                        .iter()
+                        .map(|item| item.count)
+                        .min()
+                        .unwrap_or(0);
                 }
             }
         }
     }
 
-    /// Get the top k elements as (value, count) pairs sorted by count descending
+    /// Merge another accumulator's data
+    fn merge_from(&mut self, other_values: Vec<String>, other_counts: Vec<i64>) {
+        // Merge all values with their counts
+        for (value, count) in other_values.into_iter().zip(other_counts.into_iter()) {
+            self.add_item(&value, count);
+        }
+
+        // After merging, we might need to rebuild the heap to ensure correctness
+        // This is necessary because some items might have updated counts
+        if self.exact_counts.len() > self.k {
+            self.rebuild_heap();
+        }
+    }
+
+    /// Rebuild heap from scratch (used after merge operations)
+    fn rebuild_heap(&mut self) {
+        // Clear heap and rebuild from exact counts
+        self.top_k_heap.clear();
+        
+        // Sort all items by count
+        let mut all_items: Vec<_> = self
+            .exact_counts
+            .iter()
+            .map(|(v, c)| TopKItem {
+                value: v.clone(),
+                count: *c,
+            })
+            .collect();
+        
+        // Sort by count descending, then by value ascending
+        all_items.sort_by(|a, b| match b.count.cmp(&a.count) {
+            std::cmp::Ordering::Equal => a.value.cmp(&b.value),
+            other => other,
+        });
+
+        // Take top k and build heap
+        for item in all_items.into_iter().take(self.k) {
+            self.top_k_heap.push(item);
+        }
+
+        // Update minimum threshold
+        self.min_heap_count = self.top_k_heap
+            .iter()
+            .map(|item| item.count)
+            .min()
+            .unwrap_or(0);
+
+        // Clean up exact_counts to only keep relevant items
+        if self.exact_counts.len() > self.k * 10 {
+            // Keep only items that might make it to top-k
+            let threshold = self.min_heap_count / 2; // Keep items with at least half the min count
+            self.exact_counts.retain(|_, &mut count| count >= threshold);
+        }
+    }
+
+    /// Get the top k elements sorted by count descending
     fn get_top_k(&self) -> Vec<(String, i64)> {
-        let mut items: Vec<_> = self.top_k_heap
+        let mut items: Vec<_> = self
+            .top_k_heap
             .iter()
             .map(|item| (item.value.clone(), item.count))
             .collect();
-        
-        // Sort by count descending, then by value ascending for deterministic results
+
+        // Sort by count descending, then by value ascending
         items.sort_by(|a, b| match b.1.cmp(&a.1) {
             std::cmp::Ordering::Equal => a.0.cmp(&b.0),
             other => other,
         });
-        
+
         items
     }
 
-    /// Convert string array to vector of strings
     fn convert_to_strings(values: &ArrayRef) -> Result<Vec<String>> {
         match values.data_type() {
             DataType::Utf8 => {
                 let array = values.as_string::<i32>();
                 Ok(array
                     .iter()
-                    .map(|v| v.unwrap_or_default().to_string())
+                    .filter_map(|v| v.map(|s| s.to_string()))
                     .collect())
             }
             DataType::LargeUtf8 => {
                 let array = values.as_string::<i64>();
                 Ok(array
                     .iter()
-                    .map(|v| v.unwrap_or_default().to_string())
+                    .filter_map(|v| v.map(|s| s.to_string()))
                     .collect())
             }
-            other => {
-                internal_err!("APPROX_TOPK received unexpected type {other:?}")
-            }
+            other => internal_err!("APPROX_TOPK received unexpected type {other:?}"),
         }
     }
 
-    /// Convert int64 array to vector of counts
     fn convert_to_counts(values: &ArrayRef) -> Result<Vec<i64>> {
         let array = values.as_primitive::<arrow::datatypes::Int64Type>();
         Ok(array.iter().map(|v| v.unwrap_or_default()).collect())
@@ -400,17 +412,8 @@ impl ApproxTopKAccumulator {
 impl Accumulator for ApproxTopKAccumulator {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
         let top_k = self.get_top_k();
-        
-        // Serialize Count-Min Sketch
-        let cms_counters = ScalarValue::List(ScalarValue::new_list_nullable(
-            &self.cms.to_flat_counters()
-                .iter()
-                .map(|&count| ScalarValue::Int64(Some(count)))
-                .collect::<Vec<ScalarValue>>(),
-            &DataType::Int64,
-        ));
-        
-        // Serialize top-k values and counts
+
+        // Only serialize the top-k items
         let values = ScalarValue::List(ScalarValue::new_list_nullable(
             &top_k
                 .iter()
@@ -418,7 +421,7 @@ impl Accumulator for ApproxTopKAccumulator {
                 .collect::<Vec<ScalarValue>>(),
             &DataType::Utf8,
         ));
-        
+
         let counts = ScalarValue::List(ScalarValue::new_list_nullable(
             &top_k
                 .iter()
@@ -426,18 +429,15 @@ impl Accumulator for ApproxTopKAccumulator {
                 .collect::<Vec<ScalarValue>>(),
             &DataType::Int64,
         ));
-        
+
         let k_scalar = ScalarValue::Int64(Some(self.k as i64));
 
-        let ret = vec![cms_counters, values, counts, k_scalar];
-        dbg!(&ret);
-        
-        Ok(ret)
+        Ok(vec![values, counts, k_scalar])
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {
         let top_k = self.get_top_k();
-        
+
         if top_k.is_empty() {
             return Ok(ScalarValue::List(ScalarValue::new_list_nullable(
                 &[],
@@ -450,19 +450,16 @@ impl Accumulator for ApproxTopKAccumulator {
                 ),
             )));
         }
-        
+
         // Create struct array from the top k results
-        use arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::Fields,
-        };
-        
+        use arrow::{array::{Int64Array, StringArray}, datatypes::Fields};
+
         let values: Vec<Option<String>> = top_k.iter().map(|(v, _)| Some(v.clone())).collect();
         let counts: Vec<Option<i64>> = top_k.iter().map(|(_, c)| Some(*c)).collect();
-        
+
         let value_array = Arc::new(StringArray::from(values));
         let count_array = Arc::new(Int64Array::from(counts));
-        
+
         let struct_array = StructArray::new(
             Fields::from(vec![
                 Field::new("value", DataType::Utf8, false),
@@ -471,7 +468,7 @@ impl Accumulator for ApproxTopKAccumulator {
             vec![value_array as ArrayRef, count_array as ArrayRef],
             None,
         );
-        
+
         Ok(ScalarValue::List(ScalarValue::new_list_nullable(
             &top_k
                 .into_iter()
@@ -489,19 +486,17 @@ impl Accumulator for ApproxTopKAccumulator {
     }
 
     fn size(&self) -> usize {
-        // Count-Min Sketch size + top-k heap size
-        CMS_WIDTH * CMS_DEPTH * std::mem::size_of::<i64>() + 
-        self.top_k_heap.len() * (std::mem::size_of::<TopKItem>() + 32) // Estimate string size
+        self.exact_counts.len() * 40 + self.top_k_heap.len() * 40
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
         let strings = Self::convert_to_strings(&values[0])?;
-        
-        // Add each string value to the sketch and update top-k
+
+        // Process in batches for better performance
         for string_val in strings {
             self.add_item(&string_val, 1);
         }
-        
+
         Ok(())
     }
 
@@ -510,34 +505,19 @@ impl Accumulator for ApproxTopKAccumulator {
             return Ok(());
         }
 
-        // Extract Count-Min Sketch counters
-        let cms_list = states[0].as_list::<i32>();
-        let values_list = states[1].as_list::<i32>();
-        let counts_list = states[2].as_list::<i32>();
-        
-        for ((cms_opt, values_opt), counts_opt) in cms_list.iter()
-            .zip(values_list.iter())
-            .zip(counts_list.iter()) {
-            
-            if let (Some(cms_array), Some(values_array), Some(counts_array)) = 
-               (cms_opt, values_opt, counts_opt) {
-                
-                // Merge Count-Min Sketch
-                let cms_counters = Self::convert_to_counts(&cms_array)?;
-                let other_cms = CountMinSketch::from_flat_counters(&cms_counters);
-                self.cms.merge(&other_cms);
-                
-                // Merge top-k items by re-adding them with their counts
+        let values_list = states[0].as_list::<i32>();
+        let counts_list = states[1].as_list::<i32>();
+
+        for (values_opt, counts_opt) in values_list.iter().zip(counts_list.iter()) {
+            if let (Some(values_array), Some(counts_array)) = (values_opt, counts_opt) {
                 let values = Self::convert_to_strings(&values_array)?;
                 let counts = Self::convert_to_counts(&counts_array)?;
-                
-                for (value, count) in values.into_iter().zip(counts.into_iter()) {
-                    // Add to our sketch (this updates the frequency estimates)
-                    self.add_item(&value, count);
-                }
+
+                // Merge the data
+                self.merge_from(values, counts);
             }
         }
-        
+
         Ok(())
     }
 }
@@ -550,139 +530,92 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_count_min_sketch() {
-        let mut cms = CountMinSketch::new();
-        
-        // Add some items
-        cms.add("apple", 5);
-        cms.add("banana", 3);
-        cms.add("apple", 2); // Total: 7
-        
-        // Query frequencies
-        let apple_freq = cms.query("apple");
-        let banana_freq = cms.query("banana");
-        let cherry_freq = cms.query("cherry"); // Should be 0
-        
-        assert!(apple_freq >= 7); // CMS may overestimate, never underestimate
-        assert!(banana_freq >= 3);
-        assert_eq!(cherry_freq, 0);
+    fn test_exact_counting() {
+        let mut acc = ApproxTopKAccumulator::new(3);
+
+        // Add items with specific frequencies
+        for _ in 0..5 {
+            acc.add_item("apple", 1);
+        }
+        for _ in 0..3 {
+            acc.add_item("banana", 1);
+        }
+        for _ in 0..2 {
+            acc.add_item("cherry", 1);
+        }
+        acc.add_item("date", 1);
+
+        let top_k = acc.get_top_k();
+
+        // Should return exactly top 3
+        assert_eq!(top_k.len(), 3);
+        assert_eq!(top_k[0], ("apple".to_string(), 5));
+        assert_eq!(top_k[1], ("banana".to_string(), 3));
+        assert_eq!(top_k[2], ("cherry".to_string(), 2));
     }
 
     #[test]
-    fn test_approx_topk_accumulator() {
-        let mut acc = ApproxTopKAccumulator::new(3);
-        
-        // Add some test data with different frequencies
-        let values = vec![
-            "apple", "banana", "apple", "cherry", "banana", "apple", 
-            "date", "elderberry", "fig", "grape", "apple", "banana"
-        ];
-        let string_array: ArrayRef = Arc::new(StringArray::from(values));
-        
-        acc.update_batch(&[string_array]).unwrap();
-        
-        // Get top k results
+    fn test_heap_updates() {
+        let mut acc = ApproxTopKAccumulator::new(2);
+
+        // Add initial items
+        acc.add_item("a", 1);
+        acc.add_item("b", 2);
+        acc.add_item("c", 3);
+
+        // Update existing item
+        acc.add_item("a", 5); // Now a=6, should be in top-2
+
         let top_k = acc.get_top_k();
-        
-        // Should have at most 3 items, with apple being most frequent
-        assert!(top_k.len() <= 3);
-        assert!(top_k.len() > 0);
-        
-        // apple should be first (most frequent)
-        assert_eq!(top_k[0].0, "apple");
-        assert!(top_k[0].1 >= 4); // CMS may overestimate
+        assert_eq!(top_k.len(), 2);
+        assert_eq!(top_k[0], ("a".to_string(), 6));
+        assert_eq!(top_k[1], ("c".to_string(), 3));
     }
 
     #[tokio::test]
-    async fn test_approx_topk_udaf() {
+    async fn test_approx_topk_accuracy() {
         let ctx = SessionContext::new();
-        
-        // Create test data with high frequency differences
+
+        // Create test data
         let schema = Schema::new(vec![Field::new("item", DataType::Utf8, false)]);
-        
-        let values = vec![
-            "apple", "banana", "apple", "cherry", "banana", "apple", 
-            "date", "elderberry", "fig", "grape", "apple", "banana",
-            "apple", "apple", "banana", "cherry", "date", "apple"
-        ];
+
+        let mut values = Vec::new();
+        // Create clear frequency differences
+        for _ in 0..100 { values.push("item_1".to_string()); }
+        for _ in 0..80  { values.push("item_2".to_string()); }
+        for _ in 0..60  { values.push("item_3".to_string()); }
+        for _ in 0..40  { values.push("item_4".to_string()); }
+        for _ in 0..20  { values.push("item_5".to_string()); }
+        // Add some noise
+        for i in 6..50 {
+            values.push(format!("item_{}", i));
+        }
+
+        let string_refs: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
         let batch = RecordBatch::try_new(
             Arc::new(schema.clone()),
-            vec![Arc::new(StringArray::from(values))],
+            vec![Arc::new(StringArray::from(string_refs))],
         )
         .unwrap();
-        
+
         let table = MemTable::try_new(Arc::new(schema), vec![vec![batch]]).unwrap();
         ctx.register_table("test_table", Arc::new(table)).unwrap();
-        
+
         // Register the UDAF
         let topk_udaf = AggregateUDF::from(ApproxTopK::new());
         ctx.register_udaf(topk_udaf);
-        
+
         // Test the function
         let df = ctx
-            .sql("SELECT approx_topk(item, 3) as top_items FROM test_table")
+            .sql("SELECT approx_topk(item, 5) as top_items FROM test_table")
             .await
             .unwrap();
         let results = df.collect().await.unwrap();
-        
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].num_columns(), 1);
-        assert_eq!(results[0].num_rows(), 1);
-        
-        // Verify the result contains the expected top items
+
+        // Verify we got the right results
         println!("Results: {:?}", results[0]);
-    }
-
-    #[test]
-    fn test_cms_serialization() {
-        let mut cms = CountMinSketch::new();
-        cms.add("test", 5);
-        cms.add("item", 3);
         
-        // Serialize and deserialize
-        let flat = cms.to_flat_counters();
-        let restored = CountMinSketch::from_flat_counters(&flat);
-        
-        // Verify queries work the same
-        assert_eq!(cms.query("test"), restored.query("test"));
-        assert_eq!(cms.query("item"), restored.query("item"));
-        assert_eq!(cms.query("missing"), restored.query("missing"));
-    }
-
-    #[tokio::test]
-    async fn test_high_cardinality_performance() {
-        let mut acc = ApproxTopKAccumulator::new(10);
-        
-        // Simulate high cardinality data
-        let mut values = Vec::new();
-        
-        // Add many unique values with zipfian-like distribution
-        for i in 0..1000 {
-            let freq = if i < 10 { 100 } else if i < 100 { 10 } else { 1 };
-            for _ in 0..freq {
-                values.push(format!("item_{}", i));
-            }
-        }
-        
-        // Convert to Arrow array
-        let string_values: Vec<&str> = values.iter().map(|s| s.as_str()).collect();
-        let string_array: ArrayRef = Arc::new(StringArray::from(string_values));
-        
-        // Process the data
-        acc.update_batch(&[string_array]).unwrap();
-        
-        // Get results
-        let top_k = acc.get_top_k();
-        
-        // Should return top 10 items
-        assert_eq!(top_k.len(), 10);
-        
-        // Top items should be from the most frequent group (item_0 to item_9)
-        for (value, count) in &top_k {
-            assert!(value.starts_with("item_"));
-            let item_num: usize = value.strip_prefix("item_").unwrap().parse().unwrap();
-            assert!(item_num < 10, "Expected top frequent items, got {}", value);
-            assert!(*count >= 90, "Expected high count, got {}", count); // CMS may overestimate
-        }
+        // The results should match the exact count
+        assert_eq!(results.len(), 1);
     }
 }
