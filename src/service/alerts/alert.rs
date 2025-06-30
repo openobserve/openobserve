@@ -718,8 +718,7 @@ pub async fn list_v2<C: ConnectionTrait>(
                 || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap()))
                 // Include the alert if the alert is permitted with the new OpenFGA identifier.
                 || a.id
-                    .filter(|id| permissions.contains(&format!("alert:{id}")))
-                    .is_some()
+                    .is_some_and(|id| permissions.contains(&format!("alert:{id}")))
         })
         .collect_vec();
     Ok(alerts)
@@ -1312,13 +1311,11 @@ async fn process_dest_template(
     }
 
     // Use only the main alert time range if multi_time_range is enabled
-    let use_given_time = alert.query_condition.multi_time_range.is_some()
-        && !alert
-            .query_condition
-            .multi_time_range
-            .as_ref()
-            .unwrap()
-            .is_empty();
+    let use_given_time = alert
+        .query_condition
+        .multi_time_range
+        .as_ref()
+        .is_some_and(|tr| !tr.is_empty());
     // calculate start and end time
     let (alert_start_time, alert_end_time) = get_alert_start_end_time(
         &vars,
@@ -1856,7 +1853,7 @@ mod tests {
     async fn test_update_cron_expression_1() {
         let cron_exp = "* * * * * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
         let updated = format!("{} * * * * * *", now);
         assert_eq!(new_cron_exp, updated);
     }
@@ -1865,7 +1862,7 @@ mod tests {
     async fn test_update_cron_expression_2() {
         let cron_exp = "47*/12 * * * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
         assert_eq!(new_cron_exp, "47*/12 * * * * *");
     }
 
@@ -1873,7 +1870,7 @@ mod tests {
     async fn test_update_cron_expression_3() {
         let cron_exp = "**/15 21-23,0-8 * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
         let updated = format!("{} */15 21-23,0-8 * * *", now);
         assert_eq!(new_cron_exp, updated);
     }
@@ -1882,7 +1879,7 @@ mod tests {
     async fn test_update_cron_expression_4() {
         let cron_exp = "*10*****";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
         let updated = format!("{} 10*****", now);
         assert_eq!(new_cron_exp, updated);
     }
@@ -1891,7 +1888,7 @@ mod tests {
     async fn test_update_cron_expression_5() {
         let cron_exp = "* */10 2 * * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
         let updated = format!("{} */10 2 * * * *", now);
         assert_eq!(new_cron_exp, updated);
     }

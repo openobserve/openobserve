@@ -536,7 +536,9 @@ mod tests {
         for strategy in strategies.iter() {
             let score = select_cache_meta(&meta, &req, strategy);
             // Score should be a valid i64 (no overflow/underflow for reasonable inputs)
-            assert!(score >= i64::MIN && score <= i64::MAX);
+            // TODO: This test should go away because an i64 will always be in range,
+            // despite any overflow or underflow.
+            assert!((i64::MIN..=i64::MAX).contains(&score));
         }
     }
 }

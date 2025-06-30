@@ -436,10 +436,9 @@ pub async fn get_job_result(
             return Ok(res);
         }
 
-        if model.error_message.is_some() {
+        if let Some(msg) = model.error_message {
             Ok(MetaHttpResponse::ok(format!(
-                "job_id: {job_id} error: {}",
-                model.error_message.unwrap()
+                "job_id: {job_id} error: {msg}",
             )))
         } else if model.status == 1 && model.partition_num != Some(1) {
             let response = get_partition_result(&model, from, size).await;
@@ -449,9 +448,9 @@ pub async fn get_job_result(
                 "[Job_Id: {job_id}] don't have result_path or cluster"
             )))
         } else {
-            let path = model.result_path.clone().unwrap();
-            let cluster = model.cluster.clone().unwrap();
-            let response = get_result(&path, &cluster, from, size).await;
+            let path = model.result_path.unwrap();
+            let cluster = model.cluster.unwrap();
+            let response = get_result(path, cluster, from, size).await;
             if let Err(e) = response {
                 return Ok(MetaHttpResponse::internal_error(e));
             }
