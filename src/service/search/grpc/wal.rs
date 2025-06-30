@@ -16,6 +16,7 @@
 use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
+use arrow_schema::{DataType, Field};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -657,6 +658,14 @@ pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatc
         if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
             cols.push(Arc::clone(&batch_cols[idx]));
             fields.push(field.clone());
+        } else if *field_latest.data_type() == DataType::Utf8View {
+            // in memtable, the schema should be utf8
+            cols.push(new_null_array(&DataType::Utf8, batch.num_rows()));
+            fields.push(Field::new(
+                field_latest.name(),
+                DataType::Utf8,
+                field_latest.is_nullable(),
+            ));
         } else {
             cols.push(new_null_array(field_latest.data_type(), batch.num_rows()));
             fields.push(field_latest.as_ref().clone());
