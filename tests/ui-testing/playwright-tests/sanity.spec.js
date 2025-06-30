@@ -224,17 +224,20 @@ test.describe("Sanity testcases", () => {
 
   test("should only display 5 result if limit 5 added", async ({ page }) => {
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("code")
-      .locator("div")
+      .locator(".cm-content")
+      .locator(".cm-line")
       .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
-      .nth(4)
+      .nth(0)
       .click();
+
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator(".cm-content")
       .fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+
     await page.waitForTimeout(2000);
     await page
       .locator('[data-test="logs-search-bar-refresh-btn"]')
@@ -259,13 +262,11 @@ test.describe("Sanity testcases", () => {
       .filter({ hasText: "save" })
       .click();
     await page
-      .locator(
-        "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line"
-      )
+      .locator('#fnEditor').getByRole('textbox')
       .click();
     await page
       .locator("#fnEditor")
-      .getByLabel("Editor content;Press Alt+F1")
+      .locator(".cm-content")
       .fill(".a=2");
     await page.waitForTimeout(1000);
     await page
@@ -300,13 +301,13 @@ test.describe("Sanity testcases", () => {
     await page.getByLabel("Name").click();
     await page.getByLabel("Name").fill("sanitytest");
     await page.locator('[data-test="logs-vrl-function-editor"]').click();
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").fill("sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").fill("sanity=1");
     await page.locator('[data-test="logs-vrl-function-editor"]').getByText("sanity=").click();
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").fill(".sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").fill(".sanity=1");
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByPlaceholder("Search Function").click();
     await page.getByPlaceholder("Search Function").fill("sanity");
@@ -369,7 +370,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="add-template-name-input"]').fill(templateName);
   
     const jsonString = '{"text": "{alert_name} is active"}';
-    await page.locator(".view-line").click();
+    await page.locator(".cm-line").click();
     await page.keyboard.type(jsonString);
     await page.waitForTimeout(500); // Ensure typing completes before submit
   
@@ -615,7 +616,7 @@ test.describe("Sanity testcases", () => {
   //   await page.locator('[data-test="menu-link-\\/logs-item"]').click();
   //   await page
   //     .locator(
-  //       "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
+  //       "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .cm-lines"
   //     )
   //     .click();
   //   await page.getByLabel("SQL Mode").locator("div").nth(2).click();

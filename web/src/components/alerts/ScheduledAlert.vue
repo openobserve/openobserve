@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'empty-function'
                 : ''
             "
-            language="ruby"
+            language="vrl"
             @focus="functionEditorPlaceholderFlag = false"
             @blur="onBlurFunctionEditor"
           />
@@ -931,7 +931,7 @@ import { useQuasar } from "quasar";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -1372,7 +1372,7 @@ const validateFrequency = (frequency: {
 
     if (frequency.frequency < intervalInMins) {
       cronJobError.value =
-        "Minimum frequency should be " + (intervalInMins) + " minutes";
+        "Minimum frequency should be " + intervalInMins + " minutes";
       return;
     }
   }
@@ -1394,7 +1394,7 @@ defineExpose({
   overflow: hidden;
 }
 </style>
-<style lang="scss" >
+<style lang="scss">
 .scheduled-alert-tabs {
   .q-tab--active {
     background-color: $primary;

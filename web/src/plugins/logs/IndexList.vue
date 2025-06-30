@@ -662,6 +662,7 @@ import {
   watch,
   computed,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -730,6 +731,8 @@ export default defineComponent({
       reorderSelectedFields,
       getFilterExpressionByFieldType,
       extractValueQuery,
+      fnParsedSQL,
+      fnUnparsedSQL,
     } = useLogs();
 
     const {
@@ -755,7 +758,7 @@ export default defineComponent({
         slot: "all_fields_slot",
       },
     ];
-    const streamOptions: any = ref(searchObj.data.stream.streamLists);
+    const streamOptions: any = ref([]);
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
@@ -773,16 +776,30 @@ export default defineComponent({
       };
     }> = ref({});
 
-    let parser: any;
-
     const streamTypes = [
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
 
+    const streamList = computed(() => {
+      return searchObj.data.stream.streamLists;
+    });
+
+    watch(
+      () => streamList.value,
+      () => {
+        if (streamOptions.value.length === 0) {
+          streamOptions.value = streamList.value;
+        }
+      },
+      {
+        deep: true,
+      },
+    );
+
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
-        streamOptions.value = searchObj.data.stream.streamLists;
+        streamOptions.value = streamList.value;
         const needle = val.toLowerCase();
         streamOptions.value = streamOptions.value.filter(
           (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
@@ -790,29 +807,7 @@ export default defineComponent({
       });
     };
 
-    onBeforeMount(async () => {
-      await importSqlParser();
-    });
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
-    //removed this watcher as search stream not working
-    // watch(
-    //   () => {
-    //     searchObj.data.stream.streamLists.length;
-    //     store.state.organizationData.streams;
-    //   },
-    //   () => {
-
-    //     streamOptions.value =
-    //       searchObj.data.stream.streamLists ||
-    //       store.state.organizationData.streams;
-    //   }
-    // );
+    const selectedStream = ref("");
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -921,9 +916,9 @@ export default defineComponent({
         searchObj.data.missingStreamMessage = "";
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
         if (searchObj.meta.sqlMode == true && query.trim().length) {
-          const parsedSQL: any = parser.astify(query);
+          const parsedSQL: any = fnParsedSQL(query);
           //hack add time stamp column to parsedSQL if not already added
-          query_context = parser.sqlify(parsedSQL).replace(/`/g, '"') || "";
+          query_context = fnUnparsedSQL(parsedSQL).replace(/`/g, '"') || "";
 
           if (searchObj.data.stream.selectedStream.length > 1) {
             queries = extractValueQuery();
@@ -1655,6 +1650,7 @@ export default defineComponent({
       placeHolderText,
       cancelTraceId,
       cancelFilterCreator,
+      selectedStream,
     };
   },
 });
