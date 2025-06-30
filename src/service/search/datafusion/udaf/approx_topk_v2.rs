@@ -286,14 +286,17 @@ struct ApproxTopKAccumulator {
     top_k_heap: BinaryHeap<TopKItem>,
     /// Target k value
     k: usize,
+    // Maximum candidates to keep in memory
+    max_candidates: usize,
 }
 
 impl std::fmt::Debug for ApproxTopKAccumulator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ApproxTopKAccumulator(k={}, heap_size={})",
+            "ApproxTopKAccumulator(k={}, max_candidates={}, heap_size={})",
             self.k,
+            self.max_candidates,
             self.top_k_heap.len()
         )
     }
@@ -305,6 +308,7 @@ impl ApproxTopKAccumulator {
             cms: CountMinSketch::new(),
             top_k_heap: BinaryHeap::new(),
             k,
+            max_candidates: (k * 10).max(1000).min(100_000), // Cap at 100k for safety
         }
     }
 
@@ -342,7 +346,7 @@ impl ApproxTopKAccumulator {
                 count: estimated_freq,
             };
 
-            if self.top_k_heap.len() < self.k {
+            if self.top_k_heap.len() < self.max_candidates {
                 // Heap not full, just add
                 self.top_k_heap.push(new_item);
             } else if let Some(min_item) = self.top_k_heap.peek() {
@@ -442,7 +446,11 @@ impl Accumulator for ApproxTopKAccumulator {
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {
-        let top_k = self.get_top_k();
+        let top_k = self
+            .get_top_k()
+            .into_iter()
+            .take(self.k)
+            .collect::<Vec<_>>();
 
         if top_k.is_empty() {
             return Ok(ScalarValue::List(ScalarValue::new_list_nullable(

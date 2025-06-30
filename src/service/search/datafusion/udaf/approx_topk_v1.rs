@@ -250,7 +250,6 @@ impl Accumulator for ApproxTopKAccumulator {
 
         let k_scalar = ScalarValue::Int64(Some(self.k as i64));
 
-         
         Ok(vec![values, counts, k_scalar])
     }
 

@@ -245,19 +245,19 @@ impl ApproxTopKAccumulator {
 
     /// Get the top k elements as (value, count) pairs sorted by count descending
     fn get_top_k(&self) -> Vec<(String, i64)> {
-        let mut pairs: Vec<_> = self
+        let mut items: Vec<_> = self
             .candidates
             .iter()
             .map(|(v, c)| (v.clone(), *c))
             .collect();
 
         // Sort by count descending, then by value ascending for deterministic results
-        pairs.sort_by(|a, b| match b.1.cmp(&a.1) {
+        items.sort_by(|a, b| match b.1.cmp(&a.1) {
             std::cmp::Ordering::Equal => a.0.cmp(&b.0),
             other => other,
         });
 
-        pairs.into_iter().take(self.k).collect()
+        items
     }
 
     /// Convert string array to vector of strings
@@ -292,7 +292,7 @@ impl ApproxTopKAccumulator {
 
 impl Accumulator for ApproxTopKAccumulator {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
-        let pairs: Vec<_> = self.candidates.iter().map(|(v, c)| (v, *c)).collect();
+        let pairs: Vec<_> = self.get_top_k();
 
         let values = ScalarValue::List(ScalarValue::new_list_nullable(
             &pairs
@@ -316,7 +316,11 @@ impl Accumulator for ApproxTopKAccumulator {
     }
 
     fn evaluate(&mut self) -> Result<ScalarValue> {
-        let top_k = self.get_top_k();
+        let top_k = self
+            .get_top_k()
+            .into_iter()
+            .take(self.k)
+            .collect::<Vec<_>>();
 
         if top_k.is_empty() {
             return Ok(ScalarValue::List(ScalarValue::new_list_nullable(
