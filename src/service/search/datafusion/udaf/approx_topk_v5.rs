@@ -292,18 +292,18 @@ impl ApproxTopKAccumulator {
 
 impl Accumulator for ApproxTopKAccumulator {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
-        let top_k = self.get_top_k();
+        let pairs: Vec<_> = self.candidates.iter().map(|(v, c)| (v, *c)).collect();
 
         let values = ScalarValue::List(ScalarValue::new_list_nullable(
-            &top_k
+            &pairs
                 .iter()
-                .map(|(v, _)| ScalarValue::Utf8(Some(v.clone())))
+                .map(|(v, _)| ScalarValue::Utf8(Some(v.to_string())))
                 .collect::<Vec<ScalarValue>>(),
             &DataType::Utf8,
         ));
 
         let counts = ScalarValue::List(ScalarValue::new_list_nullable(
-            &top_k
+            &pairs
                 .iter()
                 .map(|(_, c)| ScalarValue::Int64(Some(*c)))
                 .collect::<Vec<ScalarValue>>(),
