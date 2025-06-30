@@ -188,7 +188,8 @@ impl ApproxTopKAccumulator {
     }
 
     fn with_memory_limit(k: usize, max_candidates: Option<usize>) -> Self {
-        let default_max = (k * 10).min(1000).max(k); // Cap at 100k for safety
+        // Cap at at least 2*k for safety
+        let default_max = (k * 10).min(1000).max(k * 2);
         Self {
             candidates: HashMap::new(),
             k,

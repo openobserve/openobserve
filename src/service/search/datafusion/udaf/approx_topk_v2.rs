@@ -308,7 +308,7 @@ impl ApproxTopKAccumulator {
             cms: CountMinSketch::new(),
             top_k_heap: BinaryHeap::new(),
             k,
-            max_candidates: (k * 10).min(1000).max(k), // Cap at 100k for safety
+            max_candidates: (k * 10).min(1000).max(k),
         }
     }
 
