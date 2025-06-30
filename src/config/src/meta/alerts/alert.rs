@@ -124,18 +124,16 @@ impl Alert {
     /// If it is not present, then it uses the last_satisfied_at time from the alert table.
     /// Use this function instead of `get_last_satisfied_at_from_table` to get the actual timestamp.
     pub fn get_last_satisfied_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
-        if trigger.is_some() {
-            let trigger = trigger.unwrap();
-            let trigger_data: ScheduledTriggerData =
-                json::from_str(&trigger.data).unwrap_or_default();
+        if let Some(data) = trigger.map(|trigger| trigger.data.as_str()) {
+            log::info!("Trigger data: {data}");
+
             // last_satisfied_at is now supposed to be part of the trigger data
             // but it was previously stored in the alert table. So, in case the trigger
             // data is not yet updated, we fallback to the value in the alert table.
-            if trigger_data.last_satisfied_at.is_some() {
-                trigger_data.last_satisfied_at
-            } else {
-                self.last_satisfied_at
-            }
+            json::from_str::<ScheduledTriggerData>(data)
+                .ok()
+                .and_then(|trigger_data| trigger_data.last_satisfied_at)
+                .or(self.last_satisfied_at)
         } else {
             self.last_satisfied_at
         }
@@ -145,17 +143,11 @@ impl Alert {
     /// If it is not present, then it uses the last_triggered_at time from the alert table.
     /// Use this function instead of `get_last_triggered_at_from_table` to get the actual timestamp.
     pub fn get_last_triggered_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
-        if trigger.is_some() {
-            let trigger = trigger.unwrap();
-
-            // last_satisfied_at is now supposed to be part of the trigger data
+        if let Some(trigger) = trigger {
+            // `last_triggered_at` is now supposed to be part of the trigger data
             // but it was previously stored in the alert table. So, in case the trigger
             // data is not yet updated, we fallback to the value in the alert table.
-            if trigger.start_time.is_some() {
-                trigger.start_time
-            } else {
-                self.last_triggered_at
-            }
+            trigger.start_time.or(self.last_triggered_at)
         } else {
             self.last_triggered_at
         }

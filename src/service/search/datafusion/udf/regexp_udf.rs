@@ -475,7 +475,7 @@ mod tests {
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
-        let sqls = vec![
+        let sqls = [
             (
                 r#"select regexp_match_to_fields(log, '(?P<timestamp>[^\s]+ [^\s]+) (?P<client_ip>[^\s]+) (?P<http_method>[^\s]+) (?P<requested_path>[^\s]+) (?P<placeholder1>[^\s]+) (?P<server_port>[^\s]+)') as subquery from t"#,
                 vec![
