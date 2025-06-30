@@ -491,7 +491,7 @@ mod tests {
         let step = 3600000000; // 1 hour
 
         let partitions =
-            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false, 0);
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false);
 
         // Print the actual partitions for debugging
         println!("HISTOGRAM PARTITIONS (DESC):");
