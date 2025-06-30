@@ -73,6 +73,8 @@ async function exploreStreamAndNavigateToPipeline(page, streamName) {
   
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
+
+  await page.waitForSelector('[data-test="logs-search-result-table-body"]');
   
   // Expand the log table menu
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
@@ -92,6 +94,8 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
+
+  await page.waitForSelector('[data-test="logs-search-result-table-body"]');
   
   // Expand the log table menu
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
