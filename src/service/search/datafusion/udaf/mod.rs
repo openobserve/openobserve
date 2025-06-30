@@ -15,6 +15,7 @@
 
 use arrow_schema::DataType;
 
+pub mod approx_topk;
 pub mod percentile_cont;
 pub mod summary_percentile;
 
@@ -30,3 +31,5 @@ pub static NUMERICS: &[DataType] = &[
     DataType::Float32,
     DataType::Float64,
 ];
+
+pub static APPROX_TOPK_INPUTS: &[DataType] = &[DataType::Int64];

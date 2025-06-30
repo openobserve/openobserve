@@ -305,6 +305,8 @@ impl Sql {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
         }
 
+        println!("\n schemas: {:?}\n", used_schemas);
+
         let is_complex = is_complex_query(&mut statement);
         Ok(Sql {
             sql: statement.to_string(),
