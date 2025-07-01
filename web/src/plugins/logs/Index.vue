@@ -275,6 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
+              :searchResponse="searchObj.data.queryResults"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -1582,6 +1583,7 @@ export default defineComponent({
               )
             : cloneDeep(searchObj.data.datetime);
 
+        console.log("New dateTime");
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(dateTime.startTime),
           end_time: new Date(dateTime.endTime),

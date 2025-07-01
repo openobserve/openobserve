@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :width="6"
                             @error="handleChartApiError"
+                            :searchResponse="searchResponse"
                           />
                         </div>
                         <div
@@ -313,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :width="6"
                             @error="handleChartApiError"
+                            :searchResponse="searchResponse"
                           />
 
                     </template>
@@ -400,6 +402,10 @@ export default defineComponent({
     errorData: {
       type: Object,
       required: true,
+    },
+    searchResponse: {
+      type: Object,
+      required: false,
     },
   },
   components: {
