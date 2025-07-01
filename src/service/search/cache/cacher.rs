@@ -683,7 +683,7 @@ fn handle_histogram(
 ) {
     let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
     let interval = if histogram_interval > 0 {
-        format!("{} seconds", histogram_interval)
+        format!("{histogram_interval} seconds")
     } else {
         let attrs = caps
             .get(1)
@@ -693,14 +693,13 @@ fn handle_histogram(
             .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
             .collect::<Vec<&str>>();
 
-        let interval = match attrs.get(1) {
+        match attrs.get(1) {
             Some(v) => match v.parse::<u16>() {
                 Ok(v) => generate_histogram_interval(q_time_range, v),
                 Err(_) => v.to_string(),
             },
             None => generate_histogram_interval(q_time_range, 0),
-        };
-        interval
+        }
     };
 
     *origin_sql = origin_sql.replace(
@@ -876,7 +875,7 @@ mod tests {
         // Test case 1: Basic histogram with numeric interval
         let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
         let time_range = Some((1640995200000000, 1641081600000000)); // 2022-01-01 to 2022-01-02
-        handle_histogram(&mut sql, time_range);
+        handle_histogram(&mut sql, time_range, 10);
         assert!(sql.contains("histogram(_timestamp,"));
         assert!(sql.contains("second"));
     }

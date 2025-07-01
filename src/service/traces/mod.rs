@@ -886,30 +886,30 @@ async fn write_traces(
         }));
 
         // Start check for alert trigger
-        if let Some(alerts) = cur_stream_alerts {
-            if triggers.len() < alerts.len() {
-                let alert_end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Traces,
-                        stream_name,
-                        alert.get_unique_key()
-                    );
-                    // check if alert already evaluated
-                    if evaluated_alerts.contains(&key) {
-                        continue;
-                    }
+        if let Some(alerts) = cur_stream_alerts
+            && triggers.len() < alerts.len()
+        {
+            let alert_end_time = now_micros();
+            for alert in alerts {
+                let key = format!(
+                    "{}/{}/{}/{}",
+                    org_id,
+                    StreamType::Traces,
+                    stream_name,
+                    alert.get_unique_key()
+                );
+                // check if alert already evaluated
+                if evaluated_alerts.contains(&key) {
+                    continue;
+                }
 
-                    if let Ok(Some(data)) = alert
-                        .evaluate(Some(&record_val), (None, alert_end_time), None)
-                        .await
-                        .map(|res| res.data)
-                    {
-                        triggers.push((alert.clone(), data));
-                        evaluated_alerts.insert(key);
-                    }
+                if let Ok(Some(data)) = alert
+                    .evaluate(Some(&record_val), (None, alert_end_time), None)
+                    .await
+                    .map(|res| res.data)
+                {
+                    triggers.push((alert.clone(), data));
+                    evaluated_alerts.insert(key);
                 }
             }
         }

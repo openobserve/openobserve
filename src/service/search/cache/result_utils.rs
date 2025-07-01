@@ -43,15 +43,16 @@ pub fn round_down_to_nearest_minute(microseconds: i64) -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn test_get_ts_value_with_string_timestamp() {
         let record = json!({
             "timestamp": "2023-01-01T12:30:45.123456Z"
         });
-        
+
         let result = get_ts_value("timestamp", &record);
         // The exact value depends on the parse_str_to_timestamp_micros_as_option implementation
         // but it should be a non-zero value
