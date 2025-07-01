@@ -26,7 +26,7 @@ use crate::{meta::stream::StreamType, utils::json};
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#$").unwrap());
+    Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
 // Checks for #ResultArray#SkipVRL#
 pub static RESULT_ARRAY_SKIP_VRL: Lazy<Regex> = Lazy::new(|| {
