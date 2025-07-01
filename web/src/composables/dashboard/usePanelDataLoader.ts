@@ -2283,17 +2283,11 @@ export const usePanelDataLoader = (
     // cancel http2 queries using http streaming api
     if (
       isStreamingEnabled(store.state) &&
-      state.searchRequestTraceIds?.length > 0
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
     ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
@@ -2314,17 +2308,11 @@ export const usePanelDataLoader = (
     // Cancel WebSocket queries
     if (
       isWebSocketEnabled(store.state) &&
-      state.searchRequestTraceIds?.length > 0
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
     ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
