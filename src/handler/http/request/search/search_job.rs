@@ -450,7 +450,7 @@ pub async fn get_job_result(
         } else {
             let path = model.result_path.unwrap();
             let cluster = model.cluster.unwrap();
-            let response = get_result(path, cluster, from, size).await;
+            let response = get_result(&path, &cluster, from, size).await;
             if let Err(e) = response {
                 return Ok(MetaHttpResponse::internal_error(e));
             }
