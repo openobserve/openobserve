@@ -103,7 +103,9 @@ class PipelinePage {
   }
 
   async addPipeline() {
-    await this.addPipelineButton.waitFor({ state: 'visible' });
+    await this.addPipelineButton.waitFor({ state: 'visible', timeout: 30000 });
+    // Ensure the element is stable and ready for interaction
+    await this.page.waitForTimeout(1000);
     await this.addPipelineButton.click();
   }
 
