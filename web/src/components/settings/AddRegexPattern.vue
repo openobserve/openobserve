@@ -288,6 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }
                 }
                 if(router.currentRoute.value.query.from == 'logs'){
+                    let value = store.state.organizationData.customRegexPatternFromLogs.value ? store.state.organizationData.customRegexPatternFromLogs.value : store.state.organizationData.regexPatternFromLogs.value;
+                    if(value){
+                        testString.value = value;
+                    }
                     store.dispatch('setIsAiChatEnabled',true);
                 }
             })
@@ -356,15 +360,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             let decorationIds: string[] = [];
 
-            const updateTestString = (value: string) => {
+            const updateTestString = debounce((value: string) => {
                 testString.value = value;
 
                 if (queryEditorRef.value) {
-                    queryEditorRef.value.highlightRegexMatches(regexPatternInputs.value.pattern);
+                    queryEditorRef.value.highlightRegexMatches(regexPatternInputs.value.pattern?.trim());
                 }
-            };
+            }, 300);
 
-
+            onBeforeUnmount(() => {
+                // Cancel any pending debounced calls
+                updateTestString.cancel();
+            });
 
             // Form validation watcher
             watch([() => regexPatternInputs.value.name, () => regexPatternInputs.value.pattern], () => {
@@ -378,9 +385,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 } else {
                     isFormEmpty.value = false;
                 }
-                // Update highlighting when pattern changes
-                if (testString.value && queryEditorRef.value?.editorObj) {
-                    queryEditorRef.value.highlightRegexMatches(regexPatternInputs.value.pattern);
+            });
+
+            // Watch for pattern changes to update highlighting
+            watch(() => regexPatternInputs.value.pattern, (newPattern) => {
+                if (testString.value && queryEditorRef.value) {
+                    queryEditorRef.value.highlightRegexMatches(newPattern?.trim());
                 }
             });
 
