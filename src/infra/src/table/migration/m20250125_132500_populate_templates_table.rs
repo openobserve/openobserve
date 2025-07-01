@@ -130,7 +130,7 @@ mod meta_templates {
                 DestinationType::Sns => "sns",
                 DestinationType::RemotePipeline => "remote_pipeline",
             };
-            write!(f, "{}", s)
+            write!(f, "{s}")
         }
     }
 }

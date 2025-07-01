@@ -361,12 +361,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let latest_schema = latest_schema.pop().unwrap();
                 let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
-                if settings.store_original_data || settings.index_original_data {
-                    if let dashmap::Entry::Vacant(entry) =
+                if (settings.store_original_data || settings.index_original_data)
+                    && let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-                    {
-                        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-                    }
+                {
+                    entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
                 }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
@@ -429,10 +428,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     || cfg.common.usage_enabled
                     || audit_enabled)
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
+                    && let Err(e) = check_and_create_org(org_id).await
                 {
-                    if let Err(e) = check_and_create_org(org_id).await {
-                        log::error!("Failed to save organization in database: {}", e);
-                    }
+                    log::error!("Failed to save organization in database: {}", e);
                 }
             }
             db::Event::Delete(ev) => {
@@ -479,11 +477,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         get_config().common.data_wal_dir
                     );
                     let path = std::path::Path::new(&data_dir);
-                    if path.exists() {
-                        if let Err(e) = tokio::fs::remove_dir_all(path).await {
-                            log::error!("[Schema:watch] remove_dir_all: {}", e);
-                        };
-                    }
+                    if path.exists()
+                        && let Err(e) = tokio::fs::remove_dir_all(path).await
+                    {
+                        log::error!("[Schema:watch] remove_dir_all: {}", e);
+                    };
                 }
             }
             db::Event::Empty => {}
@@ -531,12 +529,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let latest_schema = latest_schema.last().unwrap();
         let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
-        if settings.store_original_data || settings.index_original_data {
-            if let dashmap::Entry::Vacant(entry) =
+        if (settings.store_original_data || settings.index_original_data)
+            && let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-            {
-                entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-            }
+        {
+            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);

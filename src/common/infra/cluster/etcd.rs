@@ -194,7 +194,7 @@ async fn register() -> Result<()> {
     let opt = PutOptions::new().with_lease(id);
     if let Err(e) = client.put(key, val, Some(opt)).await {
         dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(format!("register node error: {}", e)));
+        return Err(Error::Message(format!("register node error: {e}")));
     }
 
     // 7. register ok, release lock
@@ -273,7 +273,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.put(key, val, Some(opt)).await {
-        return Err(Error::Message(format!("online node error: {}", e)));
+        return Err(Error::Message(format!("online node error: {e}")));
     }
 
     Ok(())
@@ -284,7 +284,7 @@ pub(crate) async fn leave() -> Result<()> {
     let key = format!("{}nodes/{}", get_config().etcd.prefix, LOCAL_NODE.uuid);
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.delete(key, None).await {
-        return Err(Error::Message(format!("leave node error: {}", e)));
+        return Err(Error::Message(format!("leave node error: {e}")));
     }
 
     Ok(())
@@ -296,7 +296,7 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let val = json::to_string(&node).unwrap();
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.put(key, val, Some(opt)).await {
-        return Err(Error::Message(format!("update node error: {}", e)));
+        return Err(Error::Message(format!("update node error: {e}")));
     }
     Ok(())
 }

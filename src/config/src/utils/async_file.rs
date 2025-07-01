@@ -52,10 +52,7 @@ pub async fn get_file_contents(
         if read != to_read {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
-                format!(
-                    "Expected to read {} bytes, but read {} bytes",
-                    to_read, read
-                ),
+                format!("Expected to read {to_read} bytes, but read {read} bytes"),
             ));
         }
         buf
@@ -80,7 +77,7 @@ pub async fn put_file_contents(
     };
 
     // Create a temporary file in the same directory
-    let temp_file = format!("{}.tmp", path);
+    let temp_file = format!("{path}.tmp");
 
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file).await?;
@@ -105,25 +102,25 @@ pub async fn clean_empty_dirs(
                 if entry.path().display().to_string() == dir {
                     continue;
                 }
-                if let Ok(f) = entry.file_type().await {
-                    if f.is_dir() {
-                        match last_updated {
-                            None => {
+                if let Ok(f) = entry.file_type().await
+                    && f.is_dir()
+                {
+                    match last_updated {
+                        None => {
+                            dirs.push(entry.path().to_str().unwrap().to_string());
+                        }
+                        Some(last_updated) => {
+                            if let Ok(meta) = entry.metadata().await
+                                && meta.modified().unwrap() < last_updated
+                            {
                                 dirs.push(entry.path().to_str().unwrap().to_string());
-                            }
-                            Some(last_updated) => {
-                                if let Ok(meta) = entry.metadata().await {
-                                    if meta.modified().unwrap() < last_updated {
-                                        dirs.push(entry.path().to_str().unwrap().to_string());
-                                    }
-                                }
                             }
                         }
                     }
                 }
             }
             Some(Err(e)) => {
-                log::error!("clean_empty_dirs, err: {}", e);
+                log::error!("clean_empty_dirs, err: {e}");
                 break;
             }
             None => break,
@@ -131,12 +128,11 @@ pub async fn clean_empty_dirs(
     }
     dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));
     for dir in dirs {
-        if let Ok(mut entries) = read_dir(&dir).await {
-            if let Ok(None) = entries.next_entry().await {
-                if let Err(e) = remove_dir(&dir).await {
-                    log::error!("Failed to remove empty dir: {}, err: {}", dir, e);
-                }
-            }
+        if let Ok(mut entries) = read_dir(&dir).await
+            && let Ok(None) = entries.next_entry().await
+            && let Err(e) = remove_dir(&dir).await
+        {
+            log::error!("Failed to remove empty dir: {dir}, err: {e}");
         }
     }
     Ok(())

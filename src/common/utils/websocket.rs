@@ -84,22 +84,21 @@ impl VisitorMut for HistogramIntervalVisitorMut {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(func) = expr {
-            if func.name.to_string().to_lowercase() == "histogram" {
-                if let FunctionArguments::List(list) = &mut func.args {
-                    let mut args = list.args.iter();
-                    // first is field
-                    let _ = args.next();
-                    // second is interval
-                    if args.next().is_none() {
-                        let interval_value = format!("{} seconds", self.interval);
-                        list.args.push(sqlparser::ast::FunctionArg::Unnamed(
-                            sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(
-                                sqlparser::ast::Value::SingleQuotedString(interval_value),
-                            )),
-                        ));
-                    }
-                }
+        if let Expr::Function(func) = expr
+            && func.name.to_string().to_lowercase() == "histogram"
+            && let FunctionArguments::List(list) = &mut func.args
+        {
+            let mut args = list.args.iter();
+            // first is field
+            let _ = args.next();
+            // second is interval
+            if args.next().is_none() {
+                let interval_value = format!("{} seconds", self.interval);
+                list.args.push(sqlparser::ast::FunctionArg::Unnamed(
+                    sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(
+                        sqlparser::ast::Value::SingleQuotedString(interval_value),
+                    )),
+                ));
             }
         }
         ControlFlow::Continue(())
@@ -118,7 +117,7 @@ pub fn update_histogram_interval_in_query(
         .unwrap();
 
     let mut histogram_interval_visitor = HistogramIntervalVisitorMut::new(histogram_interval);
-    statement.visit(&mut histogram_interval_visitor);
+    let _ = statement.visit(&mut histogram_interval_visitor);
 
     Ok(statement.to_string())
 }

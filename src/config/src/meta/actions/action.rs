@@ -24,7 +24,7 @@ impl std::fmt::Display for ExecutionDetailsType {
             ExecutionDetailsType::Repeat => "repeat",
             ExecutionDetailsType::Service => "service",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -79,7 +79,7 @@ impl Display for ActionStatus {
             ActionStatus::Errored => "errored",
             ActionStatus::Completed => "completed",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -159,7 +159,7 @@ impl Display for ActionType {
             ActionType::CronJob => "cronjob".to_string(),
             ActionType::Service => "service".to_string(),
         };
-        write!(f, "{}", str)
+        write!(f, "{str}")
     }
 }
 impl TryFrom<&str> for ActionType {
@@ -170,7 +170,7 @@ impl TryFrom<&str> for ActionType {
             "job" => Ok(ActionType::Job),
             "cronjob" => Ok(ActionType::CronJob),
             "service" => Ok(ActionType::Service),
-            _ => Err(anyhow::anyhow!("Invalid action type: {}", s)),
+            _ => Err(anyhow::anyhow!("Invalid action type: {s}")),
         }
     }
 }

@@ -43,7 +43,7 @@ fn generate_index_file_name_from_compacted_file(
 ) -> String {
     // eg: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
     let file_columns = compacted_file_name.split('/').collect::<Vec<&str>>();
-    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
     let file_date = format!(
         "{}/{}/{}/{}",
         file_columns[4], file_columns[5], file_columns[6], file_columns[7]

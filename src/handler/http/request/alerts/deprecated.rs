@@ -317,7 +317,7 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
             if let Ok(scheduled_job) = scheduler::get(
                 &org_id,
                 TriggerModule::Alert,
-                &format!("{}/{}/{}", stream_type, stream_name, name),
+                &format!("{stream_type}/{stream_name}/{name}"),
             )
             .await
             {

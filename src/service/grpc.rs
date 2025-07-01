@@ -45,14 +45,16 @@ pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::S
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
     let nodes = cluster::get_cached_schedulable_ingester_nodes().await;
-    if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
+
+    if let Some(nodes) = nodes
+        && !nodes.is_empty()
+    {
+        let node = get_rand_element(&nodes);
+        Ok(node.grpc_addr.to_string())
+    } else {
         Err(tonic::Status::internal(
             "No online ingester nodes".to_string(),
         ))
-    } else {
-        let nodes = nodes.unwrap();
-        let node = get_rand_element(&nodes);
-        Ok(node.grpc_addr.to_string())
     }
 }
 
@@ -174,7 +176,7 @@ pub async fn make_grpc_metrics_client<T>(
     let cfg = get_config();
     let org_id: MetadataValue<_> = org_id
         .parse()
-        .map_err(|_| Error::Message(format!("invalid org_id: {}", org_id)))?;
+        .map_err(|_| Error::Message(format!("invalid org_id: {org_id}")))?;
     request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
     opentelemetry::global::get_text_map_propagator(|propagator| {

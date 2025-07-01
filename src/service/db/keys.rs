@@ -132,7 +132,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
         let cluster_coordinator = get_coordinator().await;
         cluster_coordinator
             .delete(
-                &format!("{CIPHER_KEY_PREFIX}{}/{}", org, name),
+                &format!("{CIPHER_KEY_PREFIX}{org}/{name}"),
                 false,
                 true,
                 None,

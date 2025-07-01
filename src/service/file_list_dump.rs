@@ -333,18 +333,17 @@ async fn move_and_delete(
     let mut inserted_into_deleted = false;
 
     for _ in 0..5 {
-        if !inserted_into_deleted {
-            if let Err(e) =
+        if !inserted_into_deleted
+            && let Err(e) =
                 infra::file_list::batch_add_deleted(org, Utc::now().timestamp_micros(), &del_items)
                     .await
-            {
-                log::error!(
-                    "[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
+        {
+            log::error!(
+                "[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {}",
+                e
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
         }
         inserted_into_deleted = true;
         let items: Vec<_> = list
@@ -454,17 +453,17 @@ WHERE {field} = '{value}'
         "#
     );
     let sql = match pk_value {
-        None => format!("{} GROUP BY stream", sql),
-        Some((0, 0)) => format!("{} GROUP BY stream", sql),
+        None => format!("{sql} GROUP BY stream"),
+        Some((0, 0)) => format!("{sql} GROUP BY stream"),
         Some((min, max)) => {
-            format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+            format!("{sql} AND id > {min} AND id <= {max} GROUP BY stream")
         }
     };
 
     let task_id = tokio::task::try_id()
         .map(|id| id.to_string())
         .unwrap_or_else(|| rand::random::<u64>().to_string());
-    let fake_trace_id = format!("stats_on_dump-{}", task_id);
+    let fake_trace_id = format!("stats_on_dump-{task_id}");
     let t = exec(&fake_trace_id, cfg.limit.cpu_num, &dump_files, &sql).await?;
     let ret = t.into_iter().flat_map(record_batch_to_stats).collect();
     Ok(ret)
