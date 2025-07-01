@@ -203,7 +203,7 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item clickable v-close-popup>
+            <q-item v-if="config.isEnterprise == 'true'" clickable v-close-popup>
               <q-item-section>
                 <q-item-label
                   data-test="redirect-to-regex-pattern-btn"
