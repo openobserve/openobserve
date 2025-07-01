@@ -3,6 +3,7 @@
     :class="store.state.theme === 'dark' ? 'dark-theme-list' : 'light-theme-list'"
     >
         <q-table
+          v-if="!showImportRegexPatternDialog"
           data-test="regex-pattern-list-table"
           ref="regexPatternListTableRef"
           :rows="regexPatterns"
@@ -32,7 +33,7 @@
             borderless
             filled
             dense
-            class="q-ml-auto q-mb-xs no-border"
+            class="q-ml-auto no-border"
             :placeholder="t('regex_patterns.search')"
           >
             <template #prepend>
@@ -40,8 +41,17 @@
             </template>
           </q-input>
           <q-btn
+            class="q-ml-md text-bold"
+            padding="sm lg"
+            outline
+            no-caps
+            :label="t(`regex_patterns.import`)"
+            @click="importRegexPattern"
+            data-test="regex-pattern-list-import"
+          />
+          <q-btn
             data-test="regex-pattern-list-add-pattern-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
+            class="q-ml-md text-bold no-border"
             padding="sm lg"
             color="secondary"
             no-caps
@@ -79,6 +89,18 @@
               {{ props.row[col.field] }}
             </template>
             <template v-else>
+              <q-btn
+              icon="download"
+              title="Export Regex Pattern"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="exportRegexPattern(props.row)"
+              data-test="regex-pattern-export"
+            ></q-btn>
               <q-btn
               :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
               icon="edit"
@@ -118,6 +140,12 @@
           />
         </template>
         </q-table>
+        <ImportRegexPattern 
+          v-else-if="showImportRegexPatternDialog" 
+          @cancel:hideform="showImportRegexPatternDialog = false" 
+          @update:list="getRegexPatterns" 
+          :regex-patterns="regexPatterns.map(pattern => pattern.name)" 
+        />
         <ConfirmDialog
           v-model="deleteDialog.show"
           :title="deleteDialog.title"
@@ -145,6 +173,7 @@
     import regexPatternsService from "@/services/regex_pattern";
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import AddRegexPattern from "./AddRegexPattern.vue";
+    import ImportRegexPattern from "./ImportRegexPattern.vue";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -152,7 +181,8 @@
             QTablePagination,
             NoRegexPatterns,
             ConfirmDialog,
-            AddRegexPattern
+            AddRegexPattern,
+            ImportRegexPattern
         },
     setup() {
 
@@ -228,6 +258,8 @@
     const listLoading = ref(false);
     const selectedPerPage = ref<number>(20);
 
+    const showImportRegexPatternDialog = ref(false);
+
 
     const showAddRegexPatternDialog = ref({
       show: false,
@@ -249,6 +281,10 @@
 
       if(router.currentRoute.value.query.from == 'logs'){
         createRegexPattern();
+      }
+      //this is kept so that when user tries to refresh the page while in import regex pattern dialog, the dialog is not closed
+      if(router.currentRoute.value.query.action == 'import'){
+        importRegexPattern();
       }
     });
 
@@ -348,6 +384,47 @@
       }
     }
 
+    const importRegexPattern = () => {
+      showImportRegexPatternDialog.value = true;
+      router.push({
+        path: '/settings/regex_patterns',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          action: 'import'
+        },
+      })
+    }
+
+    const exportRegexPattern = (row: any) => {
+      try{
+      const regexPatternToBeExported = {
+        name: row.name,
+        pattern: row.pattern,
+        description: row.description,
+      }
+
+      const regexPatternJson = JSON.stringify(regexPatternToBeExported, null, 2);
+      const blob = new Blob([regexPatternJson], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${row.name || 'regex_pattern'}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      $q.notify({
+        message: `Regex pattern exported successfully`,
+        color: "positive",
+        icon: "check",
+      });
+    } catch (error) {
+      $q.notify({
+        message: error.data.message || "Error exporting regex pattern",
+        color: "negative",
+        icon: "error",
+      });
+    }
+  }
+
     return {
         t,
         store,
@@ -370,7 +447,10 @@
         confirmDeleteRegexPattern,
         showAddRegexPatternDialog,
         getRegexPatterns,
-        selectedPerPage
+        selectedPerPage,
+        showImportRegexPatternDialog,
+        importRegexPattern,
+        exportRegexPattern
     }
     }
 })

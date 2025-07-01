@@ -94,10 +94,10 @@ import { useRouter } from "vue-router";
   }
   .dark-mode{
     .title-text{
-        color: #343434;
+        color: #ffffff;
     }
     .subtitle-text{
-        color: #343434;
+        color: #ffffff;
     }
   }
   </style>

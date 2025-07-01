@@ -1263,7 +1263,8 @@
     "edit_regex_pattern": "Edit Regex Pattern",
     "update_close": "Update and Close",
     "description": "Description",
-    "create_regex_pattern_field": "Redact / Drop using Regex"
-    
+    "create_regex_pattern_field": "Redact / Drop using Regex",
+    "import": "Import",
+    "import_title": "Import Regex Pattern"
   }
 }
