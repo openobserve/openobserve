@@ -1932,10 +1932,6 @@ export default defineComponent({
                   onStreamChange(searchObj.data.query);
                 }
               });
-              console.log(
-                "searchObj.data.streamResults.list",
-                JSON.parse(JSON.stringify(searchObj.data.streamResults.list)),
-              );
 
               if (streamFound == false) {
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
@@ -2662,7 +2658,7 @@ export default defineComponent({
                 searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
                 searchObj.shouldIgnoreWatcher = false;
-                console.log(e);
+                console.log("Error while applying saved view", e);
               }
             }, 1000);
 
@@ -2714,7 +2710,7 @@ export default defineComponent({
             position: "bottom",
             timeout: 1000,
           });
-          console.log(err);
+          console.log("Error while applying saved view", err);
         });
     };
 
@@ -2788,7 +2784,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.log("Error while deleting saved view", err);
           });
       } catch (e: any) {
         console.log("Error while getting saved views", e);
@@ -2884,7 +2880,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.log("Error while creating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -2958,7 +2954,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.log("Error while updating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -3157,7 +3153,6 @@ export default defineComponent({
               //     delete favoriteViewsList[key];
               //   }
               // }
-              console.log(favoriteViewsList);
               localSavedViews.value = favoriteViewsList;
             }
           }
@@ -3434,7 +3429,6 @@ export default defineComponent({
     };
 
     const selectTransform = (item: any, isSelected: boolean) => {
-      console.log("item", item);
       if (searchObj.data.transformType === "function") {
         populateFunctionImplementation(item, isSelected);
       }
