@@ -694,9 +694,12 @@ pub async fn filter_file_list_by_tantivy_index(
                 )
                 .await
                 .map_err(|e| {
-                    let err = format!("[trace_id {trace_id}] search->tantivy: error filtering via index: {}, error: {:?}", file.key, e);
-                    log::error!("{}", err);
-                    anyhow::anyhow!(err)
+                    log::error!(
+                        "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, error: {:?}",
+                         file.key,
+                         e
+                    );
+                    e
                 });
                 drop(permit);
                 ret
