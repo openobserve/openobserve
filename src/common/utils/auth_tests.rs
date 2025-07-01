@@ -3141,6 +3141,8 @@ mod tests {
                 ingestion_url: String::default(),
                 dashboard_placeholder: String::default(),
                 aggregation_cache_enabled: bool::default(),
+                utf8_view_enabled: bool::default(),
+                search_inspector_enabled: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
