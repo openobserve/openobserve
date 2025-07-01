@@ -749,7 +749,8 @@ export default {
       regexIconForContextMenu,
       typeOfRegexPattern,
       regexPatternType,
-      confirmRegexPatternType
+      confirmRegexPatternType,
+      config
     };
   },
 };
