@@ -174,6 +174,7 @@
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import AddRegexPattern from "./AddRegexPattern.vue";
     import ImportRegexPattern from "./ImportRegexPattern.vue";
+    import config from "@/aws-exports";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -278,12 +279,12 @@
         regexPatterns.value = store.state.organizationData.regexPatterns;
         resultTotal.value = regexPatterns.value.length;
       }
-
-      if(router.currentRoute.value.query.from == 'logs'){
+      // we need to open the add regex pattern dialog if the user has been redirected from the logs page
+      if(router.currentRoute.value.query.from == 'logs' && config.isEnterprise == 'true'){
         createRegexPattern();
       }
       //this is kept so that when user tries to refresh the page while in import regex pattern dialog, the dialog is not closed
-      if(router.currentRoute.value.query.action == 'import'){
+      if(router.currentRoute.value.query.action == 'import' && config.isEnterprise == 'true'){
         importRegexPattern();
       }
     });

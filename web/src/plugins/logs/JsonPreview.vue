@@ -261,7 +261,7 @@
       </div>
 
     </div>
-    <q-dialog v-model="typeOfRegexPattern">
+    <q-dialog v-if="config.isEnterprise == 'true'" v-model="typeOfRegexPattern">
       <q-card style="width: 700px; max-width: 80vw">
         <q-card-section>
           <div class="text-h6">What is the type of regex pattern you want to create?</div>
@@ -329,6 +329,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import { is, useQuasar } from "quasar";
 import { load } from "rudder-sdk-js";
+import config from "@/aws-exports";
 
 export default {
   name: "JsonPreview",
@@ -480,12 +481,13 @@ export default {
 
     onMounted(() => {
       // Handler for closing menu on outside click
+      //because when user clicks on the log content with right click, the context menu is shown and when user clicks outside the log content, the context menu is closed
       const handleOutsideClick = (e: MouseEvent) => {
         if (!(e.target as HTMLElement).closest('.q-btn')) {
           showMenu.value = false;
         }
       };
-
+      //this is used to show the context menu when user right clicks on the log content
       // Handler for context menu using event delegation
       const handleContextMenu = (e: MouseEvent) => {
         // Only handle right clicks on the log content area
@@ -513,15 +515,19 @@ export default {
       };
 
       // Add event listeners
-      window.addEventListener('click', handleOutsideClick);
-      window.addEventListener('contextmenu', handleContextMenu);
+      if(config.isEnterprise == 'true'){
+        window.addEventListener('click', handleOutsideClick);
+        window.addEventListener('contextmenu', handleContextMenu);
+      }
 
       // Cleanup
       //this is used to remove the event listeners when the component is unmounted 
       //it is used to avoid memory leaks
       onUnmounted(() => {
-        window.removeEventListener('click', handleOutsideClick);
-        window.removeEventListener('contextmenu', handleContextMenu);
+        if(config.isEnterprise == 'true'){
+          window.removeEventListener('click', handleOutsideClick);
+          window.removeEventListener('contextmenu', handleContextMenu);
+        }
       });
     });
 
@@ -651,25 +657,6 @@ export default {
       })
 
     }
-
-
-    const handleRightClick = (event: MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const selection = window.getSelection()?.toString().trim() || '';
-      selectedText.value = selection;
-
-      // Use the mouse event coordinates directly
-      menuX.value = event.clientX + 5; // Small offset from cursor
-      menuY.value = event.clientY + 5; // Small offset from cursor
-
-      showMenu.value = true;
-    };
-
-
-
-
 
     const handleCreateRegex = () => {
       console.log('Create regex for:', selectedText.value || 'No selection');
