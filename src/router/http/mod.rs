@@ -636,6 +636,7 @@ mod tests {
         assert!(!is_querier_route("/api/clusters/_bulk"));
         assert!(!is_querier_route("/api/clusters/ws/_multi"));
         assert!(!is_querier_route("/api/default/config/_json"));
+        assert!(is_querier_route("/api/default/ai/chat_stream"));
     }
 
     #[test]
