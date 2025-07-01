@@ -479,9 +479,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     .dark-mode-regex-test-string-input  { 
         background-color:#181A1B !important;
-        border-left: 1px solid #212121 !important;
-        border-right: 1px solid #212121 !important;
-        border-bottom: 1px solid #212121 !important;
+        border-left: 2px solid #212121 !important;
+        border-right: 2px solid #212121 !important;
+        border-bottom: 2px solid #212121 !important;
     }
     .light-mode-regex-test-string-input { 
     background-color:#ffffff !important;
@@ -505,6 +505,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       .regex-pattern-test-string-editor{
         .lines-content{
             padding-left: 12px !important;
+        }
+
+    }
+    .light-mode-regex-test-string-input{
+        .monaco-editor-background{
+            background-color: #ffffff !important;
+        }
+    }
+    .dark-mode-regex-test-string-input{
+        .monaco-editor-background{
+            background-color: #181a1b !important;
         }
     }
 </style>

@@ -697,21 +697,6 @@ export default defineComponent({
       width: fit-content;
     }
 
-    .dark-mode-regex-test-string-input .q-field__control  { 
-        background-color:transparent !important;
-        border-left: 1px solid #666666 !important;
-        border-top: 1px solid #666666 !important;
-        border-right: 1px solid #666666 !important;
-        border-bottom: 1px solid #666666 !important;
-    }
-  .light-mode-regex-test-string-input .q-field__control  { 
-    background-color:#ffffff !important;
-    border-left: 1px solid #E6E6E6 !important;
-    border-top: 1px solid #E6E6E6 !important;
-    border-right: 1px solid #E6E6E6 !important;
-    border-bottom: 1px solid #E6E6E6 !important;
-  
-  }
   .regex-test-string-input > div > div > div > textarea{
     resize: none !important;
     }
@@ -765,10 +750,10 @@ export default defineComponent({
   }
   .dark-mode-regex-associated-test-string-input  { 
         background-color:#181A1B !important;
-        border-top: 1px solid #212121 !important;
-        border-left: 1px solid #212121 !important;
-        border-right: 1px solid #212121 !important;
-        border-bottom: 1px solid #212121 !important;
+        border-top: 1px solid #666666 !important;
+        border-left: 1px solid #666666 !important;
+        border-right: 1px solid #666666 !important;
+        border-bottom: 1px solid #666666 !important;
     }
     .light-mode-regex-associated-test-string-input { 
     background-color:#ffffff !important;
@@ -777,5 +762,11 @@ export default defineComponent({
     border-right: 1px solid #E6E6E6 !important;
     border-bottom: 1px solid #E6E6E6 !important;
     
+    }
+    .light-mode-regex-associated-test-string-input .monaco-editor-background{
+      background-color: #ffffff !important;
+    }
+    .dark-mode-regex-associated-test-string-input .monaco-editor-background{
+      background-color: #1f1f1f !important;
     }
 </style>
