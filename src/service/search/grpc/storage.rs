@@ -916,9 +916,8 @@ async fn search_tantivy_index(
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     // generate the tantivy query
-    let condition: IndexCondition = index_condition.ok_or(anyhow::anyhow!(
-        "[trace_id {trace_id}] search->storage: IndexCondition not found"
-    ))?;
+    let condition: IndexCondition =
+        index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
     let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
     let need_all_term_fields = condition
         .need_all_term_fields()
@@ -994,7 +993,7 @@ async fn search_tantivy_index(
         )
     {
         log::debug!(
-            "matched docs over [{}/100] in tantivy index, skip this file: {}",
+            "[trace_id {trace_id}] matched docs over [{}/100] in tantivy index, skip this file: {}",
             cfg.limit.inverted_index_skip_threshold,
             parquet_file.key
         );
@@ -1008,17 +1007,16 @@ async fn search_tantivy_index(
         .context("Count segments")?;
     if seg_metas.len() > 1 {
         return Err(anyhow::anyhow!(
-            "[trace_id {trace_id}] search->storage: Multiple segments in tantivy index not supported"
+            "Multiple segments in tantivy index not supported"
         ));
     }
     let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
     let max_doc_id = matched_docs.iter().map(|doc| doc.doc_id).max().unwrap_or(0) as i64;
-    if max_doc_id > parquet_file.meta.records {
+    if max_doc_id >= parquet_file.meta.records {
         return Err(anyhow::anyhow!(
-            "[trace_id {trace_id}] search->storage: file {}, records {}, doc_id {} is out of range",
-            parquet_file.key,
+            "doc_id {} is out of range, records {}",
+            max_doc_id,
             parquet_file.meta.records,
-            max_doc_id
         ));
     }
     let matched_num = matched_docs.len();
