@@ -598,6 +598,7 @@ export default defineComponent({
       validatePanel,
       generateLabelFromName,
       resetDashboardPanelData,
+      setCustomQueryFields,
     } = useDashboardPanelData("logs");
     const visualizeErrorData: any = reactive({
       errors: [],
@@ -1493,24 +1494,58 @@ export default defineComponent({
       showSearchScheduler.value = false;
     };
 
-    // watch for changes in the visualize toggle
-    // if it is in visualize mode, then set the query and stream name in the dashboard panel
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
-      async () => {
-        // emit resize event
-        // this will rerender/call resize method of already rendered chart to resize
-        window.dispatchEvent(new Event("resize"));
-
+      () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
+
+          // emit resize event
+          // this will rerender/call resize method of already rendered chart to resize
+          window.dispatchEvent(new Event("resize"));
+
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          // set fields and conditions
-          await setFieldsAndConditions();
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery = true;
+
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query = searchObj.data.query;
+
+          // select chary type as line
+          dashboardPanelData.data.type = "line";
+
+          // extract custom fields from query
+          // identify x axis, y axis and breakdown fields
+          // push on query fields
+          setCustomQueryFields();
 
           // run query
           handleRunQueryFn();
+
+          // TODO: extract custom fields from query
+          // above one will be done via query watcher on useDashboardPanelData hook
+          // TODO: On visualization toggle, extract which field will go to x axis, y axis and breakdown
+          console.log(
+            "custom fields",
+            dashboardPanelData.meta.stream.customQueryFields,
+          );
+          console.log("logs page query results", searchObj.data.queryResults);
+        }
+      },
+    );
+
+    watch(
+      () => [searchObj.data.query, searchObj.meta.logsVisualizeToggle],
+      () => {
+        if (searchObj.meta.logsVisualizeToggle == "visualize") {
+          // Here, it may go to infinite loop
+          // TODO: add check for auto sql mode
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query = searchObj.data.query;
         }
       },
     );

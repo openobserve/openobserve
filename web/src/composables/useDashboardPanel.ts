@@ -21,6 +21,7 @@ import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
+import { extractTimestampAndGroupBy } from "@/utils/query/extractFields";
 
 const colors = [
   "#5960b2",
@@ -3068,6 +3069,92 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         : "Y-Axis";
   });
 
+  const resetFields = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields = {
+      stream: "",
+      stream_type: "logs",
+      x: [],
+      y: [],
+      z: [],
+      breakdown: [],
+      filter: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      },
+      latitude: null,
+      longitude: null,
+      weight: null,
+      name: null,
+      value_for_maps: null,
+      source: null,
+      target: null,
+      value: null,
+    };
+  };
+
+  // TODO: will need to select custom fields from query to x axis, y axis and breakdown
+  // logic will be take timestamp field as x axis if available, else first group by field will go to x axis
+  // 2nd group by field will go to breakdown
+  // all other fields will go to y axis
+  const setCustomQueryFields = () => {
+    resetFields();
+    const extractedFields = extractTimestampAndGroupBy(
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query,
+    );
+    console.log("extractedFields", extractedFields);
+    //  extractedFields = {
+    //     "timestamp": "x_axis_1",
+    //     "groupBy": [
+    //         "breakdown_1"
+    //     ],
+    //     "yAxisFields": [
+    //         "y_axis_1"
+    //     ]
+    // }
+    // based on extractedFields, we will set the custom query fields
+    // if timestamp is available, we will set it as x axis, else first groupBy field will go to x axis
+    // if groupBy is available, we will set it as breakdown
+    // if yAxisFields is available, we will set it as y axis
+    // if timestamp is not available, we will set the first groupBy field as x axis
+
+    if (
+      extractedFields.timestamp &&
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.x.length == 0
+    ) {
+      addXAxisItem({ name: extractedFields.timestamp });
+    }
+
+    // add first group by field as x axis if timestamp is not available
+    if (extractedFields.groupBy.length > 0) {
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x.length == 0
+      ) {
+        addXAxisItem({ name: extractedFields.groupBy[0] });
+        // add second group by field as breakdown if available
+        if (extractedFields.groupBy.length > 1) {
+          addBreakDownAxisItem({ name: extractedFields.groupBy[1] });
+        }
+      } else {
+        // timestamp fields is available, add first group by field on breakdown
+        addBreakDownAxisItem({ name: extractedFields.groupBy[0] });
+      }
+    }
+
+    // add all y axis fields
+    extractedFields.yAxisFields.forEach((field: any) => {
+      addYAxisItem({ name: field });
+    });
+  };
+
   return {
     dashboardPanelData,
     resetDashboardPanelData,
@@ -3118,6 +3205,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentYLabel,
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
+    setCustomQueryFields,
   };
 };
 export default useDashboardPanelData;
