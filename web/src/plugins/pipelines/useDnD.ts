@@ -216,7 +216,6 @@ export default function useDragAndDrop() {
     if(changes.length > 0){
       pipelineObj.edgesChange = true;
     }
-    console.log("Edges change", changes);
   }
 
   function onConnect(connection:any) {

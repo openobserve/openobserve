@@ -313,7 +313,6 @@ import {
   onMounted,
   onUpdated,
   defineAsyncComponent,
-  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -599,7 +598,6 @@ export default defineComponent({
     };
 
     const getWidth = computed(() => {
-      console.log("get search width", searchListContainer);
       return "";
     });
 

@@ -284,7 +284,6 @@ export default defineComponent({
     const updateSearch = () => {
       if (props.searchQuery?.trim()) {
         searchResults.value = findMatches(props.spanList, props.searchQuery);
-        console.log("Search Results", searchResults.value);
         currentIndex.value = 0; // Reset to first match
         nextTick(() => {
           scrollToMatch(); // Wait for DOM updates before scrolling
