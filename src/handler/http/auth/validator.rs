@@ -960,8 +960,10 @@ async fn list_objects(
     permission: &str,
     object_type: &str,
     org_id: &str,
+    role: &str,
 ) -> Result<Vec<String>, anyhow::Error> {
-    o2_openfga::authorizer::authz::list_objects(user_id, permission, object_type, org_id).await
+    o2_openfga::authorizer::authz::list_objects(user_id, permission, object_type, org_id, role)
+        .await
 }
 
 #[cfg(feature = "enterprise")]
@@ -973,14 +975,11 @@ pub(crate) async fn list_objects_for_user(
 ) -> Result<Option<Vec<String>>, Error> {
     let openfga_config = get_openfga_config();
     if !is_root_user(user_id) && openfga_config.enabled && openfga_config.list_only_permitted {
-        match crate::handler::http::auth::validator::list_objects(
-            user_id,
-            permission,
-            object_type,
-            org_id,
-        )
-        .await
-        {
+        let role = match users::get_user(Some(org_id), user_id).await {
+            Some(user) => user.role.to_string(),
+            None => "".to_string(),
+        };
+        match list_objects(user_id, permission, object_type, org_id, &role).await {
             Ok(resp) => {
                 log::debug!(
                     "list_objects_for_user for user {user_id} from {org_id} org returns: {:#?}",
