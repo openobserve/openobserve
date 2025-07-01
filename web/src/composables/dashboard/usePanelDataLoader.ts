@@ -45,6 +45,7 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -153,6 +154,7 @@ export const usePanelDataLoader = (
     isPartialData: false,
   });
 
+  const cancelQueryComposable = useCancelQuery();
   // observer for checking if panel is visible on the screen
   let observer: any = null;
 
@@ -2237,22 +2239,23 @@ export const usePanelDataLoader = (
       observer.disconnect();
     }
     // cancel http2 queries using http streaming api
-    if (isStreamingEnabled() && state.searchRequestTraceIds?.length > 0) {
+    if (
+      isStreamingEnabled() &&
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
+    ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+        cancelQueryComposable.searchRequestTraceIds(
+          state.searchRequestTraceIds,
+        );
+        cancelQueryComposable.cancelQuery(false);
       } catch (error) {
         console.error("Error during HTTP2 cleanup:", error);
       } finally {
@@ -2261,22 +2264,23 @@ export const usePanelDataLoader = (
     }
 
     // Cancel WebSocket queries
-    if (isWebSocketEnabled() && state.searchRequestTraceIds?.length > 0) {
+    if (
+      isWebSocketEnabled() &&
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
+    ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+        cancelQueryComposable.searchRequestTraceIds(
+          state.searchRequestTraceIds,
+        );
+        cancelQueryComposable.cancelQuery(false);
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {
