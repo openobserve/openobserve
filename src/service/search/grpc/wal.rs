@@ -444,10 +444,12 @@ pub async fn search_memtable(
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
+        // the field in latest_schema_map, but not in schema,
+        // so not in the diff_fields, so not be cast which case the issue
+        let mut diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         let mut adapt_batches = Vec::with_capacity(record_batches.len());
         for batch in record_batches {
-            adapt_batches.push(adapt_batch(latest_schema.clone(), batch));
+            adapt_batches.push(adapt_batch(latest_schema.clone(), batch, &mut diff_fields));
         }
         let record_batches = adapt_batches;
 
@@ -671,7 +673,11 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
+fn adapt_batch(
+    latest_schema: Arc<Schema>,
+    batch: RecordBatch,
+    diff_fields: &mut HashMap<String, DataType>,
+) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
@@ -689,6 +695,7 @@ pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatc
                 DataType::Utf8,
                 field_latest.is_nullable(),
             ));
+            diff_fields.insert(field_latest.name().to_string(), DataType::Utf8View);
         } else {
             cols.push(new_null_array(field_latest.data_type(), batch.num_rows()));
             fields.push(field_latest.as_ref().clone());
