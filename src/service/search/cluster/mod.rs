@@ -201,10 +201,12 @@ pub fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::Arc;
-    use ::datafusion::arrow::datatypes::{Field, DataType, Schema};
+
+    use ::datafusion::arrow::datatypes::{DataType, Field, Schema};
     use serde_json as json;
+
+    use super::*;
 
     #[test]
     fn test_handle_table_response() {
@@ -218,10 +220,7 @@ mod tests {
         ];
         let (columns, table) = handle_table_response(schema, sources);
         assert_eq!(columns, vec!["col1", "col2"]);
-        assert_eq!(table, vec![
-            json::json!(["a", 1]),
-            json::json!(["b", 2]),
-        ]);
+        assert_eq!(table, vec![json::json!(["a", 1]), json::json!(["b", 2]),]);
     }
 
     #[test]
