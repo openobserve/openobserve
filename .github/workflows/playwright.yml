@@ -143,7 +143,8 @@ jobs:
             "usersOrg.spec.js",
             "websocket.spec.js",
             "pipeline-dynamic.spec.js",
-            "searchpartition.spec.js"
+            "searchpartition.spec.js",
+            "pipelines-core.spec.js"
              # "remotepipeline.spec.js",
 
           ]
