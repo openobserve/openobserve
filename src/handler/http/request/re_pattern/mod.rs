@@ -287,7 +287,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         }
         match crate::service::db::re_pattern::remove(&id).await {
             Ok(_) => {
-                remove_ownership(&org_id, "re_pattern", Authz::new(&id)).await;
+                remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK,
                     "Pattern removed successfully",
