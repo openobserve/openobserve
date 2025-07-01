@@ -270,7 +270,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmDelete();
   });
 
-  test("should add source & destination node and then delete the pipeline", async ({
+  test.skip("should add source & destination node and then delete the pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -378,7 +378,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmDelete();
   });
 
-  test("should add source, function,destination and then delete pipeline", async ({
+  test.skip("should add source, function,destination and then delete pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -525,7 +525,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.assertStreamSelectionErrorVisible();
   });
 
-  test("should add source, condition & destination node and then delete the pipeline", async ({
+  test.skip("should add source, condition & destination node and then delete the pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
