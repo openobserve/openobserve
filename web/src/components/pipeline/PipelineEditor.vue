@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="pipelineObj.currentSelectedPipeline.name"
           :label="t('pipeline.pipelineName')"
-          style="border: 1px solid #eaeaea; width: calc(30vw);"
+          style="border: 1px solid #eaeaea; width: calc(30vw)"
           filled
-          dense          
+          dense
         />
       </div>
     </div>
@@ -83,7 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator class="q-mb-md" />
 
       <div class="flex q-mt-sm">
-        <NodeSidebar v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'" :nodeTypes="nodeTypes"  />
+        <NodeSidebar
+          v-show="
+            !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
+          "
+          :nodeTypes="nodeTypes"
+        />
       </div>
     </div>
     <div
@@ -138,8 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ExternalDestination
         v-if="pipelineObj.dialog.name === 'remote_stream'"
         @cancel:hideform="resetDialog"
-       />
-      
+      />
     </div>
   </q-dialog>
   <confirm-dialog
@@ -353,7 +357,7 @@ const nodeTypes: any = [
     icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
     isSectionHeader: false,
-  }
+  },
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
@@ -429,21 +433,20 @@ onBeforeMount(() => {
 
 onMounted(() => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
-  const { path, query } = router.currentRoute.value; 
-    if (path.includes("edit") && !query.id) {
-      router.push({
-        name:"pipelines",
-        query:{
-          org_identifier: store.state.selectedOrganization.identifier
-        }
-      })
-    }
+  const { path, query } = router.currentRoute.value;
+  if (path.includes("edit") && !query.id) {
+    router.push({
+      name: "pipelines",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  }
 });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
 });
-
 
 let forceSkipBeforeUnloadListener = false;
 
@@ -644,15 +647,23 @@ const confirmSaveBasicPipeline = async () => {
 };
 const validatePipeline = () => {
   // Find input node
-  const inputNode = pipelineObj.currentSelectedPipeline.nodes?.find((node: any) => node.type === 'input');
+  const inputNode = pipelineObj.currentSelectedPipeline.nodes?.find(
+    (node: any) => node.type === "input",
+  );
 
-  const outputNode = pipelineObj.currentSelectedPipeline.nodes?.find((node: any) => node.type === 'output');
-  
+  const outputNode = pipelineObj.currentSelectedPipeline.nodes?.find(
+    (node: any) => node.type === "output",
+  );
 
   // If trying to use enrichment_tables with stream input, return false
-  if ( inputNode.data?.node_type === 'stream' && outputNode.data?.node_type === 'stream' && outputNode.data?.stream_type === 'enrichment_tables') {
+  if (
+    inputNode.data?.node_type === "stream" &&
+    outputNode.data?.node_type === "stream" &&
+    outputNode.data?.stream_type === "enrichment_tables"
+  ) {
     q.notify({
-      message: "Enrichment tables as destination stream is only available for scheduled pipelines",
+      message:
+        "Enrichment tables as destination stream is only available for scheduled pipelines",
       color: "negative",
       position: "bottom",
       timeout: 2000,
@@ -665,7 +676,7 @@ const validatePipeline = () => {
 
 const onSubmitPipeline = async () => {
   isPipelineSaving.value = true;
-  if(!validatePipeline()){
+  if (!validatePipeline()) {
     isPipelineSaving.value = false;
     return;
   }
@@ -805,7 +816,6 @@ const findMissingEdges = () => {
   });
 
   if (unconnectedNodes.length > 0) {
-    console.log(unconnectedNodes, "unconnectedNodes");
     return true; // There are unconnected nodes
   }
 

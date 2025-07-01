@@ -1039,7 +1039,6 @@ const addField = () => {
 
 const updateDateTimePicker = (data: any) => {
   emits("update:multi_time_range", dateTimePicker.value);
-  console.log("data", dateTimePicker.value);
 };
 
 const removeTimeShift = (index: any) => {
@@ -1229,8 +1228,6 @@ const filterColumns = (options: string[], val: string, update: Function) => {
       filteredOptions = [...options];
     });
   }
-
-  console.log("options", options);
 
   update(() => {
     const value = val.toLowerCase();

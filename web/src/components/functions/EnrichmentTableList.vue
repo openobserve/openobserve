@@ -312,7 +312,7 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.log("--", err);
+          console.info("Error while fetching enrichment tables", err);
           dismiss();
           if (err.response.status != 403) {
             $q.notify({

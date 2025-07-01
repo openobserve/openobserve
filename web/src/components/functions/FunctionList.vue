@@ -243,8 +243,7 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
     const { searchObj } = useLogs();
-    const pipelineList = ref([
-    ]);
+    const pipelineList = ref([]);
     const selectedPipeline = ref("");
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -329,7 +328,7 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.log("--", err);
+          console.error("Error while pulling function", err);
 
           dismiss();
           if (err.response.status != 403) {
