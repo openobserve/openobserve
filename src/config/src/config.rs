@@ -1809,12 +1809,6 @@ pub struct Pipeline {
     )]
     pub batch_enabled: bool,
     #[env_config(
-        name = "ZO_PIPELINE_BATCH_SIZE",
-        default = 100,
-        help = "Maximum number of entries to batch together"
-    )]
-    pub batch_size: usize,
-    #[env_config(
         name = "ZO_PIPELINE_BATCH_TIMEOUT_MS",
         default = 1000,
         help = "Maximum time to wait for a batch to fill up (in milliseconds)"
