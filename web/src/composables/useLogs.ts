@@ -2498,12 +2498,6 @@ const useLogs = () => {
         searchObj.meta.resultGrid.showPagination = true;
       }
 
-
-      if(isInitialRequest) {
-        searchObj.meta.resultGrid.showPagination = true;
-      }
-
-
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432

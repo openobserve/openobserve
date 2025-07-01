@@ -882,8 +882,6 @@ export default defineComponent({
           setupCloudSpecificThreshold();
         }
 
-        searchObj.meta.quickMode = isQuickModeEnabled();
-        searchObj.meta.showHistogram = isHistogramEnabled();
         isLogsMounted.value = true;
       } catch (error) {
         console.error("Failed to setup logs tab:", error);
