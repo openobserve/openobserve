@@ -278,7 +278,7 @@
           </div>
           <div class="tw-h-full" v-if="!userClickedPattern">
             <div
-              class="full-width full-height column flex-center q-gutter-sm q-mt-xs"
+              class="full-width column flex-center q-gutter-sm tw-h-full"
               style="font-size: 1.5rem"
               :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
             >

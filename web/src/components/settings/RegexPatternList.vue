@@ -463,7 +463,14 @@
     padding: 0px 16px !important;
     height: 36px !important;
   };
+  th:last-child,
+  td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+  }
 }
+
 
 .dark-theme-regex-pattern-list{
   th:last-child.actions-column,
