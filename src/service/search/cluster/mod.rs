@@ -198,3 +198,56 @@ pub fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 
     new_sources
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use ::datafusion::arrow::datatypes::{Field, DataType, Schema};
+    use serde_json as json;
+
+    #[test]
+    fn test_handle_table_response() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("col1", DataType::Utf8, false),
+            Field::new("col2", DataType::Int64, false),
+        ]));
+        let sources = vec![
+            json::json!({"col1": "a", "col2": 1}),
+            json::json!({"col1": "b", "col2": 2}),
+        ];
+        let (columns, table) = handle_table_response(schema, sources);
+        assert_eq!(columns, vec!["col1", "col2"]);
+        assert_eq!(table, vec![
+            json::json!(["a", 1]),
+            json::json!(["b", 2]),
+        ]);
+    }
+
+    #[test]
+    fn test_handle_metrics_response() {
+        // TIMESTAMP_COL_NAME is imported from config, but for test, we use the string directly
+        let sources = vec![
+            json::json!({"_timestamp": 123, "value": 10, "metric": "cpu", "host": "a"}),
+            json::json!({"_timestamp": 124, "value": 20, "metric": "cpu", "host": "a"}),
+            json::json!({"_timestamp": 123, "value": 30, "metric": "mem", "host": "b"}),
+        ];
+        let result = handle_metrics_response(sources);
+        // Should group by metric and host
+        assert_eq!(result.len(), 2);
+        let mut found_cpu = false;
+        let mut found_mem = false;
+        for entry in result {
+            let metrics = &entry["metrics"];
+            let values = &entry["values"];
+            if metrics["metric"] == "cpu" && metrics["host"] == "a" {
+                found_cpu = true;
+                assert_eq!(values, &json::json!([[123, "10"], [124, "20"]]));
+            } else if metrics["metric"] == "mem" && metrics["host"] == "b" {
+                found_mem = true;
+                assert_eq!(values, &json::json!([[123, "30"]]));
+            }
+        }
+        assert!(found_cpu && found_mem);
+    }
+}
