@@ -1826,12 +1826,6 @@ pub struct Pipeline {
         help = "Use shared HTTP client instances for better connection pooling"
     )]
     pub use_shared_http_client: bool,
-    #[env_config(
-        name = "ZO_PIPELINE_WAL_DISABLE_TIME_ROTATION",
-        default = false,
-        help = "Disable time-based WAL rotation when no data has been written. This can reduce file descriptor usage in shared environments."
-    )]
-    pub wal_disable_time_rotation: bool,
 }
 
 #[derive(EnvConfig)]
