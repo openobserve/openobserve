@@ -24,7 +24,7 @@ import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfil
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs-extra";
-import visualizer from "rollup-plugin-visualizer";
+import {visualizer} from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
@@ -37,8 +37,6 @@ if (process.env.NODE_ENV === "production") {
 } else {
   dotenv.config();
 }
-
-const isTesting = process.env.NODE_ENV === "test";
 
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
@@ -107,7 +105,6 @@ export default defineConfig({
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    isTesting,
   ].filter(Boolean),
   resolve: {
     alias: {

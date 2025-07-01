@@ -1198,7 +1198,7 @@ import config from "../../../aws-exports";
 
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const props = defineProps([
