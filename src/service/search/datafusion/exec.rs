@@ -49,6 +49,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use hashbrown::HashMap;
+use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 #[cfg(feature = "enterprise")]
 use {
     arrow::array::Int64Array,
@@ -57,7 +58,6 @@ use {
         common::config::get_config as get_o2_config,
         common::downsampling::get_largest_downsampling_rule, search::WorkGroup,
     },
-    parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue},
 };
 
 use super::{
@@ -186,9 +186,14 @@ pub async fn merge_parquet_files(
         &schema,
         bloom_filter_fields,
         metadata,
-        true,
+        false,
         compression,
     );
+
+    // calculate the new file meta records
+    let mut new_file_meta = metadata.clone();
+    new_file_meta.records = 0;
+
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let task = tokio::task::spawn(async move {
@@ -212,6 +217,7 @@ pub async fn merge_parquet_files(
         Ok(())
     });
     while let Some(batch) = rx.recv().await {
+        new_file_meta.records += batch.num_rows() as i64;
         if let Err(e) = writer.write(&batch).await {
             log::error!("merge_parquet_files write error: {}", e);
             return Err(e.into());
@@ -219,6 +225,7 @@ pub async fn merge_parquet_files(
     }
     task.await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
+    append_metadata(&mut writer, &new_file_meta)?;
     writer.close().await?;
 
     ctx.deregister_table("tbl")?;
@@ -368,7 +375,6 @@ pub async fn merge_parquet_files_with_downsampling(
     Ok((schema, MergeParquetResult::Multiple { bufs, file_metas }))
 }
 
-#[cfg(feature = "enterprise")]
 fn append_metadata(
     writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
     file_meta: &FileMeta,
@@ -825,22 +831,24 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
 
 #[cfg(feature = "enterprise")]
 fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
-    let timestamp = record_batch
+    record_batch
         .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
+        .slice(0, 1)
         .as_any()
         .downcast_ref::<Int64Array>()
-        .unwrap();
-    timestamp.value(0)
+        .unwrap()
+        .value(0)
 }
 
 #[cfg(feature = "enterprise")]
 fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
-    let timestamp = record_batch
+    record_batch
         .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
+        .slice(record_batch.num_rows() - 1, 1)
         .as_any()
         .downcast_ref::<Int64Array>()
-        .unwrap();
-    timestamp.value(timestamp.len() - 1)
+        .unwrap()
+        .value(0)
 }
