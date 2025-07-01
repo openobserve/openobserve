@@ -447,7 +447,7 @@ mod tests {
         assert_eq!(response.status(), http::StatusCode::OK);
 
         let body: TestVRLResponse =
-            serde_json::from_slice(&*to_bytes(response.into_body()).await.unwrap()).unwrap();
+            serde_json::from_slice(&to_bytes(response.into_body()).await.unwrap()).unwrap();
 
         // Validate transformed events
         assert_eq!(body.results.len(), 1);

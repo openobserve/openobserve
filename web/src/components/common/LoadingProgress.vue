@@ -125,6 +125,9 @@ export default defineComponent({
       if (!props.loading) {
         return internalPercentage.value;
       }
+      if (props.loadingProgressPercentage < 5) {
+        return 5;
+      }
       return props.loadingProgressPercentage;
     });
 

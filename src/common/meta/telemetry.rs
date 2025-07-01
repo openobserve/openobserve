@@ -60,10 +60,8 @@ impl Telemetry {
             HashMap::new()
         };
 
-        if data.is_some() {
-            for item in data.unwrap() {
-                props.insert(item.0, item.1);
-            }
+        if let Some(data) = data {
+            props.extend(data);
         }
 
         if send_zo_data {

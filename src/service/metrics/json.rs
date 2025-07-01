@@ -417,14 +417,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert
+                        if let Ok(Some(data)) = alert
                             .evaluate(Some(record), (None, alert_end_time), None)
                             .await
+                            .map(|res| res.data)
                         {
-                            Ok(res) if res.data.is_some() => {
-                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
-                            }
-                            _ => {}
+                            trigger_alerts.push((alert.clone(), data))
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));

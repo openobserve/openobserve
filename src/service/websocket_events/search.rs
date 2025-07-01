@@ -365,6 +365,7 @@ async fn do_search(
         Some(user_id.to_string()),
         &req.payload,
         "".to_string(),
+        true,
     )
     .await;
 
@@ -785,6 +786,7 @@ async fn get_partitions(
         // vrl is not required for _search_partition
         query_fn: Default::default(),
         streaming_output: true,
+        histogram_interval: search_payload.query.histogram_interval,
     };
 
     let res = SearchService::search_partition(

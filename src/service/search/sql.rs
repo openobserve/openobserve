@@ -2137,7 +2137,7 @@ mod tests {
     #[test]
     fn test_index_visitor1() {
         let sql = "SELECT * FROM t WHERE name = 'a' AND age = 1 AND (name = 'b' OR (match_all('good') AND match_all('bar'))) AND (match_all('foo') OR age = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2157,7 +2157,7 @@ mod tests {
     #[test]
     fn test_index_visitor2() {
         let sql = "SELECT * FROM t WHERE name is not null AND age > 1 AND (match_all('foo') OR abs(age) = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2181,7 +2181,7 @@ mod tests {
     #[test]
     fn test_index_visitor3() {
         let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2205,7 +2205,7 @@ mod tests {
     #[test]
     fn test_index_visitor4() {
         let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') AND name = 'c')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2225,7 +2225,7 @@ mod tests {
     #[test]
     fn test_index_visitor5() {
         let sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd' AND ((match_all('good') AND match_all('bar')) OR (match_all('foo') AND name = 'c'))";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2246,7 +2246,7 @@ mod tests {
     #[test]
     fn test_index_visitor_str_match() {
         let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2265,7 +2265,7 @@ mod tests {
     #[test]
     fn test_index_visitor_str_match_ignore_case() {
         let sql = "SELECT * FROM t WHERE str_match_ignore_case(name, 'value')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2283,7 +2283,7 @@ mod tests {
     #[test]
     fn test_track_total_hits1() {
         let sql = "SELECT * FROM t WHERE name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2296,7 +2296,7 @@ mod tests {
     #[test]
     fn test_track_total_hits2() {
         let sql = "SELECT name, count(*) FROM t WHERE name = 'a' group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2309,7 +2309,7 @@ mod tests {
     #[test]
     fn test_track_total_hits3() {
         let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where t1.name = 'openobserve' group by t1.name, t2.name order by t1.name, t2.name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2322,7 +2322,7 @@ mod tests {
     #[test]
     fn test_track_total_hits4() {
         let sql = "SELECT name from t1 where name not in (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2336,7 +2336,7 @@ mod tests {
     #[test]
     fn test_track_total_hits5() {
         let sql = "SELECT name from t1 union select name from t2";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2350,7 +2350,7 @@ mod tests {
     #[test]
     fn test_track_total_hits6() {
         let sql = "(SELECT name from t1) union (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2363,7 +2363,7 @@ mod tests {
     #[test]
     fn test_track_total_hits7() {
         let sql = "SELECT name from t1 union select name from t2 union select name from t3";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2382,61 +2382,61 @@ mod tests {
     #[test]
     fn test_is_simple_count_visit1() {
         let sql = "SELECT count(*) from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement),);
     }
 
     #[test]
     fn test_is_simple_count_visit2() {
         let sql = "SELECT count(*) as cnt from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit3() {
         let sql = "SELECT count(*) as cnt from t where name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit4() {
         let sql = "SELECT name, count(*) as cnt from t group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit5() {
         let sql = "SELECT count(_timestamp) as cnt from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit6() {
         let sql = "SELECT count(*) as cnt from (select * from t)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     fn is_simple_histogram_query(statement: &mut Statement) -> bool {
@@ -2448,66 +2448,66 @@ mod tests {
     #[test]
     fn test_is_simple_histogram_visit1() {
         let sql = "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from \"default\"  GROUP BY zo_sql_key ORDER BY zo_sql_key";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), true);
+        assert!(is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit2() {
         // Test with additional where clause
         let sql = "select histogram(_timestamp, '1m') as h, count(*) from t where name = 'test'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), true);
+        assert!(is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit3() {
         // Test with wrong order of projections (count before histogram)
         let sql = "select count(*), histogram(_timestamp, '1m') from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit4() {
         // Test with subquery - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*) from (select * from t)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit5() {
         // Test with additional projection - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*), name from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit6() {
         // Test with join - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*) from t1 join t2";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
@@ -2876,7 +2876,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor() {
         let sql = "select * from t where field1 = '_o2_all_'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2889,7 +2889,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list() {
         let sql = "select * from t where field1 in ('_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2902,7 +2902,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list_and_negated() {
         let sql = "select * from t where field1 not in ('_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2915,7 +2915,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list_and_negated_and_other_filter() {
         let sql = "select * from t where field1 not in ('_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2929,7 +2929,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_multi_and_or_with_o2_all() {
         let sql = "select * from t where field1 = '_o2_all_' and (field2 = '_o2_all_' or field3 = '_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2943,7 +2943,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_like_and_not_like() {
         let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2957,7 +2957,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_like_and_not_like_and_other_filter() {
         let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_' and field3 = 'value3'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

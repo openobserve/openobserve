@@ -1078,7 +1078,7 @@ mod tests {
         );
         assert_eq!(meta.start_time, 1744081170000000);
         assert_eq!(meta.end_time, 1744081170000000);
-        assert_eq!(meta.is_aggregate, true);
+        assert!(meta.is_aggregate);
         assert_eq!(meta.is_descending, false);
     }
 
