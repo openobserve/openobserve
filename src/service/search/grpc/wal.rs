@@ -16,6 +16,7 @@
 use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
+use arrow_schema::{DataType, Field};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -46,6 +47,7 @@ use crate::{
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
+            grpc::utils,
             index::IndexCondition,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             match_source,
@@ -278,6 +280,7 @@ pub async fn search_parquet(
         let schema = schema_versions[ver]
             .clone()
             .with_metadata(Default::default());
+        let schema = utils::change_schema_to_utf8_view(schema);
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
@@ -441,10 +444,13 @@ pub async fn search_memtable(
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
+        // the field in latest_schema_map, but not in schema,
+        // so not in the diff_fields, result in Utf8View issue
+        // so we need to add it to the diff_fields
+        let mut diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         let mut adapt_batches = Vec::with_capacity(record_batches.len());
         for batch in record_batches {
-            adapt_batches.push(adapt_batch(latest_schema.clone(), batch));
+            adapt_batches.push(adapt_batch(latest_schema.clone(), batch, &mut diff_fields));
         }
         let record_batches = adapt_batches;
 
@@ -653,7 +659,11 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
+fn adapt_batch(
+    latest_schema: Arc<Schema>,
+    batch: RecordBatch,
+    diff_fields: &mut HashMap<String, DataType>,
+) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
@@ -663,6 +673,15 @@ pub fn adapt_batch(latest_schema: Arc<Schema>, batch: RecordBatch) -> RecordBatc
         if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
             cols.push(Arc::clone(&batch_cols[idx]));
             fields.push(field.clone());
+        } else if *field_latest.data_type() == DataType::Utf8View {
+            // in memtable, the schema should be utf8
+            cols.push(new_null_array(&DataType::Utf8, batch.num_rows()));
+            fields.push(Field::new(
+                field_latest.name(),
+                DataType::Utf8,
+                field_latest.is_nullable(),
+            ));
+            diff_fields.insert(field_latest.name().to_string(), DataType::Utf8View);
         } else {
             cols.push(new_null_array(field_latest.data_type(), batch.num_rows()));
             fields.push(field_latest.as_ref().clone());

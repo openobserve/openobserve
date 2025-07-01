@@ -70,6 +70,7 @@ impl TableProvider for NewUnionTable {
             let plan = table.scan(state, projection, filters, limit).await?;
             table_plans.push(plan);
         }
+
         Ok(Arc::new(UnionExec::new(table_plans)))
     }
 
