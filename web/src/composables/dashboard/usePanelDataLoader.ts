@@ -2303,7 +2303,7 @@ export const usePanelDataLoader = (
         cancelQueryComposable.searchRequestTraceIds(
           state.searchRequestTraceIds,
         );
-        cancelQueryComposable.cancelQuery();
+        cancelQueryComposable.cancelQuery(false);
       } catch (error) {
         console.error("Error during HTTP2 cleanup:", error);
       } finally {
@@ -2334,7 +2334,7 @@ export const usePanelDataLoader = (
         cancelQueryComposable.searchRequestTraceIds(
           state.searchRequestTraceIds,
         );
-        cancelQueryComposable.cancelQuery();
+        cancelQueryComposable.cancelQuery(false);
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {
