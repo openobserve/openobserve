@@ -86,6 +86,7 @@ async fn audit_middleware(
     if get_o2_config().common.audit_enabled
         && !(path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
         || path_columns.get(1).unwrap_or(&"").to_string().ends_with("_stream") // skip for http2 streams
+        || path.ends_with("ai/chat_stream") // skip for ai
         || (method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1])))
     {
         let query_params = req.query_string().to_string();
@@ -585,7 +586,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::list_role_ratelimit)
         .service(ratelimit::update_ratelimit)
         .service(ratelimit::api_modules)
-        .service(actions::operations::test_action);
+        .service(actions::operations::test_action)
+        .service(ai::chat)
+        .service(ai::chat_stream);
 
     svc.service(service);
 }

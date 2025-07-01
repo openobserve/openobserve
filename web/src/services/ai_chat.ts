@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! This module contains models that can be serialized and deserialized as JSON
-//! for HTTP responses and requests.
+import http from "./http";
 
-pub mod action;
-#[cfg(feature = "enterprise")]
-pub mod ai;
-pub mod alerts;
-pub mod dashboards;
-pub mod destinations;
-pub mod folders;
+export const getAiChat = (messages: any) => {
+  return http().post("/api/default/ai/chat_stream", { messages });
+};
+
