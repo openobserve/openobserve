@@ -15,24 +15,24 @@
 
 use std::sync::Arc;
 
-use ::datafusion::datasource::TableProvider;
-use config::meta::{search::ScanStats, stream::StreamType};
-use infra::errors::Result;
+use arrow_schema::{DataType, Field, Schema};
+use config::get_config;
 
-pub mod flight;
-pub mod storage;
-pub(crate) mod utils;
-pub mod wal;
+pub fn change_schema_to_utf8_view(schema: Schema) -> Schema {
+    if !get_config().common.utf8_view_enabled {
+        return schema;
+    }
 
-pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;
-
-#[derive(Debug)]
-pub struct QueryParams {
-    pub trace_id: String,
-    pub org_id: String,
-    pub stream_type: StreamType,
-    pub stream_name: String,
-    pub time_range: Option<(i64, i64)>,
-    pub work_group: Option<String>,
-    pub use_inverted_index: bool,
+    let fields = schema
+        .fields()
+        .iter()
+        .map(|f| {
+            if f.data_type() == &DataType::Utf8 {
+                Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
+            } else {
+                f.clone()
+            }
+        })
+        .collect::<Vec<_>>();
+    Schema::new(fields)
 }
