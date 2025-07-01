@@ -270,7 +270,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",
@@ -328,7 +328,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",
@@ -380,7 +380,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+----------------------------------+",
             "| matches                          |",
             "+----------------------------------+",
@@ -425,7 +425,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",

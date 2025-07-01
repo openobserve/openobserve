@@ -473,6 +473,63 @@ mod tests {
             "Mini partition should start at start_time"
         );
     }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_desc_order_with_1_hour_interval_with_incomplete_times()
+     {
+        // Test case: 00:19 - 01:00 with 1 hour histogram interval
+        let start_time = 1750983540000000; // 00:19
+        let end_time = 1750986000000000; // 01:00
+        let min_step = 3600000000; // 1 hour in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = 3600000000; // 1 hour
+
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false);
+
+        // Print the actual partitions for debugging
+        println!("HISTOGRAM PARTITIONS (DESC):");
+        println!("Number of partitions: {}", partitions.len());
+        for (i, [start, end]) in partitions.iter().enumerate() {
+            // Convert to human-readable time for debugging
+            let partition_start = chrono::DateTime::from_timestamp_micros(*start)
+                .unwrap()
+                .with_timezone(&chrono::Local);
+            let partition_end = chrono::DateTime::from_timestamp_micros(*end)
+                .unwrap()
+                .with_timezone(&chrono::Local);
+            let start_time = chrono::DateTime::from_timestamp_micros(start_time)
+                .unwrap()
+                .with_timezone(&chrono::Local);
+            let end_time = chrono::DateTime::from_timestamp_micros(end_time)
+                .unwrap()
+                .with_timezone(&chrono::Local);
+            println!("start: {}, end: {}", start_time, end_time);
+            println!(
+                "Partition {}: {} - {}",
+                i + 1,
+                partition_start,
+                partition_end,
+            );
+        }
+
+        // Verify histogram alignment
+        for [start, end] in &partitions {
+            if *start != start_time && *end != end_time {
+                assert_eq!(
+                    *start % min_step,
+                    0,
+                    "Partition start should align with histogram interval"
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]

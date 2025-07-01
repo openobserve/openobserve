@@ -140,7 +140,11 @@ pub async fn process_token(
         if let Some(db_user) = db_user {
             // check if user is service account and skip the role update ,
             // assumption is always a service account irrespective of the orgs it belongs to
-            if res.0.user_role.is_some() && res.0.user_role.unwrap().eq(&UserRole::ServiceAccount) {
+            if res
+                .0
+                .user_role
+                .is_some_and(|r| r.eq(&UserRole::ServiceAccount))
+            {
                 log::info!("User is service account and skipping the role update");
                 return;
             }
@@ -488,7 +492,7 @@ async fn map_group_to_custom_role(
         }
     } else {
         // check if user is service account and skip the role update
-        if default_role.is_some() && default_role.unwrap().eq(&UserRole::ServiceAccount) {
+        if default_role.is_some_and(|r| r.eq(&UserRole::ServiceAccount)) {
             log::info!(
                 "group_to_custom_role: User is external service account and skipping the role update"
             );

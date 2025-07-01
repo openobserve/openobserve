@@ -568,8 +568,7 @@ mod tests {
         };
 
         let result = reader.exists(&path);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
+        assert!(result.is_ok_and(|exists| exists), "Expected file to exist");
     }
 
     #[test]
@@ -885,8 +884,7 @@ mod tests {
 
                 let path = PathBuf::from("shared_file.terms");
                 let exists = reader_clone.exists(&path);
-                assert!(exists.is_ok());
-                assert_eq!(exists.unwrap(), true);
+                assert!(exists.is_ok_and(|exists| exists), "Expected file to exist");
 
                 i // Return thread index for verification
             });

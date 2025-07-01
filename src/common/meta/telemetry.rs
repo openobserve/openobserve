@@ -61,9 +61,7 @@ impl Telemetry {
         };
 
         if let Some(data) = data {
-            for item in data {
-                props.insert(item.0, item.1);
-            }
+            props.extend(data);
         }
 
         if send_zo_data {

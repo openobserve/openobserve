@@ -144,7 +144,7 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
             None,
         ));
     };
-    let needle = match needle {
+    let mut needle = match needle {
         ScalarValue::Utf8(v) => v,
         ScalarValue::Utf8View(v) => v,
         ScalarValue::LargeUtf8(v) => v,
@@ -156,20 +156,21 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
                 None,
             ));
         }
-    };
-    if needle.is_none() {
-        return Err(DataFusionError::SQL(
+    }
+    .as_ref()
+    .ok_or_else(|| {
+        DataFusionError::SQL(
             ParserError::ParserError(
                 "Invalid argument types[needle] to str_match function".to_string(),
             ),
             None,
-        ));
-    }
+        )
+    })?
+    .to_string();
+
     // pre-compute the needle
-    let needle = if case_insensitive {
-        needle.as_ref().unwrap().to_lowercase()
-    } else {
-        needle.as_ref().unwrap().to_string()
+    if case_insensitive {
+        needle.make_ascii_lowercase();
     };
 
     let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
@@ -178,19 +179,15 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
     let array = haystack
         .iter()
         .map(|haystack| {
-            match haystack {
-                // in arrow, any value can be null.
-                // Here we decide to make our UDF to return null when haystack is null.
-                Some(haystack) => match case_insensitive {
-                    true => Some(
-                        mem_finder
-                            .find(haystack.to_lowercase().as_bytes())
-                            .is_some(),
-                    ),
-                    false => Some(mem_finder.find(haystack.as_bytes()).is_some()),
-                },
-                _ => None,
-            }
+            haystack.map(|haystack| {
+                if case_insensitive {
+                    mem_finder
+                        .find(haystack.to_lowercase().as_bytes())
+                        .is_some()
+                } else {
+                    mem_finder.find(haystack.as_bytes()).is_some()
+                }
+            })
         })
         .collect::<BooleanArray>();
 

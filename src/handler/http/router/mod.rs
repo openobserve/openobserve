@@ -654,14 +654,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_proxy_routes() {
-        let mut app =
+        let app =
             init_service(App::new().configure(|cfg| get_proxy_routes_inner(cfg, false))).await;
 
         // Test GET request to /proxy/{org_id}/{target_url}
         let req = TestRequest::get()
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
-        let resp = call_service(&mut app, req).await;
+        let resp = call_service(&app, req).await;
         assert_eq!(resp.status().as_u16(), 404);
     }
 }

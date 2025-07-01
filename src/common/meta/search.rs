@@ -116,12 +116,12 @@ mod tests {
             limit: 100,
         };
 
-        assert_eq!(response.has_cached_data, true);
-        assert_eq!(response.cache_query_response, true);
+        assert!(response.has_cached_data);
+        assert!(response.cache_query_response);
         assert_eq!(response.response_start_time, 1000);
         assert_eq!(response.response_end_time, 2000);
         assert_eq!(response.ts_column, "timestamp");
-        assert_eq!(response.is_descending, false);
+        assert!(!response.is_descending);
         assert_eq!(response.limit, 100);
         assert_eq!(response.deltas.len(), 1);
     }
@@ -136,7 +136,7 @@ mod tests {
 
         assert_eq!(delta.delta_start_time, 1000);
         assert_eq!(delta.delta_end_time, 2000);
-        assert_eq!(delta.delta_removed_hits, true);
+        assert!(delta.delta_removed_hits);
     }
 
     #[test]
@@ -170,10 +170,10 @@ mod tests {
 
         assert_eq!(request.q_start_time, 1000);
         assert_eq!(request.q_end_time, 2000);
-        assert_eq!(request.is_aggregate, true);
+        assert!(request.is_aggregate);
         assert_eq!(request.ts_column, "timestamp");
         assert_eq!(request.discard_interval, 100);
-        assert_eq!(request.is_descending, false);
+        assert!(!request.is_descending);
     }
 
     #[test]
@@ -194,15 +194,15 @@ mod tests {
             trace_id: "trace123".to_string(),
         };
 
-        assert_eq!(response.has_cached_data, true);
-        assert_eq!(response.cache_query_response, true);
+        assert!(response.has_cached_data);
+        assert!(response.cache_query_response);
         assert_eq!(response.ts_column, "timestamp");
-        assert_eq!(response.is_descending, false);
+        assert!(!response.is_descending);
         assert_eq!(response.limit, 100);
         assert_eq!(response.took, 50);
         assert_eq!(response.histogram_interval, 1000);
         assert_eq!(response.total_cache_duration, 2000);
-        assert_eq!(response.is_aggregate, true);
+        assert!(response.is_aggregate);
         assert_eq!(response.file_path, "test.json");
         assert_eq!(response.trace_id, "trace123");
         assert_eq!(response.cached_response.len(), 1);

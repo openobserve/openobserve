@@ -479,24 +479,17 @@ pub async fn handle_otlp_request(
             let need_trigger = !stream_trigger_map.contains_key(&local_metric_name);
             if need_trigger && !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!(
-                    "{}/{}/{}",
-                    &org_id,
-                    StreamType::Metrics,
-                    local_metric_name.clone()
-                );
+                let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, local_metric_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert
+                        if let Ok(Some(data)) = alert
                             .evaluate(Some(val_map), (None, alert_end_time), None)
                             .await
+                            .map(|res| res.data)
                         {
-                            Ok(res) if res.data.is_some() => {
-                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
-                            }
-                            _ => {}
+                            trigger_alerts.push((alert.clone(), data))
                         }
                     }
                     stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));
