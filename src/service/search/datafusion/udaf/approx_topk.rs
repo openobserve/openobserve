@@ -260,7 +260,7 @@ impl ApproxTopKAccumulator {
 
         // Sort by count descending, then by key for deterministic results
         items.sort_by(|a, b| match b.1.cmp(&a.1) {
-            std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+            std::cmp::Ordering::Equal => a.0.cmp(b.0),
             other => other,
         });
 

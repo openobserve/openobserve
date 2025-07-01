@@ -716,9 +716,8 @@ pub async fn filter_file_list_by_tantivy_index(
                     query.trace_id,
                     e
                 );
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    e.to_string(),
-                )));
+                // search error, need add filter back
+                return Ok((start.elapsed().as_millis() as usize, true, 0));
             }
         };
         for result in tasks {
@@ -1013,6 +1012,15 @@ async fn search_tantivy_index(
         ));
     }
     let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+    let max_doc_id = matched_docs.iter().map(|doc| doc.doc_id).max().unwrap_or(0) as i64;
+    if max_doc_id > parquet_file.meta.records {
+        return Err(anyhow::anyhow!(
+            "[trace_id {trace_id}] search->storage: file {}, records {}, doc_id {} is out of range",
+            parquet_file.key,
+            parquet_file.meta.records,
+            max_doc_id
+        ));
+    }
     let matched_num = matched_docs.len();
     for doc in matched_docs {
         res.set(doc.doc_id as usize, true);
