@@ -445,7 +445,8 @@ pub async fn search_memtable(
         }
 
         // the field in latest_schema_map, but not in schema,
-        // so not in the diff_fields, so not be cast which case the issue
+        // so not in the diff_fields, result in Utf8View issue
+        // so we need to add it to the diff_fields
         let mut diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         let mut adapt_batches = Vec::with_capacity(record_batches.len());
         for batch in record_batches {
@@ -478,22 +479,7 @@ pub async fn search_memtable(
                 if group.len() == 1 {
                     group.remove(0)
                 } else {
-                    if let Ok(batch) = concat_batches(group[0].schema().clone(), group.clone()) {
-                        batch
-                    } else {
-                        log::error!(
-                            "[trace_id {}] wal->mem->search: concat batches error, will use the first batch",
-                            query.trace_id
-                        );
-                        for (i, batch) in group.iter().enumerate() {
-                            log::error!(
-                                "trace_id {}: concat batches error, batch {i}: schema {:?}",
-                                query.trace_id,
-                                batch.schema()
-                            );
-                        }
-                        concat_batches(group[0].schema().clone(), group).unwrap()
-                    }
+                    concat_batches(group[0].schema().clone(), group).unwrap()
                 }
             })
             .collect::<Vec<_>>();

@@ -348,11 +348,7 @@ pub async fn search(
 
     // create a Union Plan to merge all tables
     let start = std::time::Instant::now();
-    let union_table = Arc::new(NewUnionTable::new(
-        Some(trace_id.to_string()),
-        empty_exec.schema().clone(),
-        tables,
-    ));
+    let union_table = Arc::new(NewUnionTable::new(empty_exec.schema().clone(), tables));
 
     let union_exec = union_table
         .scan(
