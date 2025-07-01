@@ -1124,15 +1124,29 @@ UPDATE stream_stats
             let limit = config::get_config().limit.calculate_stats_step_limit;
             loop {
                 let start = std::time::Instant::now();
-                match sqlx::query("DELETE FROM file_list WHERE id IN (SELECT id FROM file_list WHERE org = ? AND deleted IS TRUE AND id <= ? LIMIT ?);")
-                    .bind(org_id)
-                    .bind(max_id)
-                    .bind(limit)
-                    .execute(&mut *tx)
-                    .await
+                match sqlx::query(
+                    r#"DELETE f
+                                  FROM file_list f
+                                  JOIN (
+                                      SELECT id
+                                      FROM file_list
+                                      WHERE org = ? AND deleted IS TRUE AND id <= ?
+                                      LIMIT ?
+                                  ) AS sub
+                                  ON f.id = sub.id;"#,
+                )
+                .bind(org_id)
+                .bind(max_id)
+                .bind(limit)
+                .execute(&mut *tx)
+                .await
                 {
                     Ok(v) => {
-                        log::debug!("[MYSQL] delete file list rows affected: {}, took: {} ms", v.rows_affected(), start.elapsed().as_millis());
+                        log::debug!(
+                            "[MYSQL] delete file list rows affected: {}, took: {} ms",
+                            v.rows_affected(),
+                            start.elapsed().as_millis()
+                        );
                         if v.rows_affected() == 0 {
                             break;
                         }
