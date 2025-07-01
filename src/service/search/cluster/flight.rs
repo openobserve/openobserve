@@ -879,7 +879,7 @@ pub async fn generate_context(
 ) -> Result<SessionContext> {
     let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
-    let ctx = prepare_datafusion_context(
+    let mut ctx = prepare_datafusion_context(
         &req.trace_id,
         req.work_group.clone(),
         analyzer_rules,
@@ -891,7 +891,7 @@ pub async fn generate_context(
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
-    // datafusion_functions_json::register_all(&mut ctx)?;
+    datafusion_functions_json::register_all(&mut ctx)?;
 
     Ok(ctx)
 }
