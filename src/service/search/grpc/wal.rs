@@ -476,7 +476,22 @@ pub async fn search_memtable(
                 if group.len() == 1 {
                     group.remove(0)
                 } else {
-                    concat_batches(group[0].schema().clone(), group).unwrap()
+                    if let Ok(batch) = concat_batches(group[0].schema().clone(), group.clone()) {
+                        batch
+                    } else {
+                        log::error!(
+                            "[trace_id {}] wal->mem->search: concat batches error, will use the first batch",
+                            query.trace_id
+                        );
+                        for (i, batch) in group.iter().enumerate() {
+                            log::error!(
+                                "trace_id {}: concat batches error, batch {i}: schema {:?}",
+                                query.trace_id,
+                                batch.schema()
+                            );
+                        }
+                        concat_batches(group[0].schema().clone(), group).unwrap()
+                    }
                 }
             })
             .collect::<Vec<_>>();
