@@ -144,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="textarea"
                         placeholder="Eg. \d....\d "
                         rows="5"
-                        @update:model-value='updatePatternInputs'
                         :rules="[val => val !== '' || '* Pattern is required']"
                         />
                     </div>
@@ -163,19 +162,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelClass="tw-py-md"
                         :o2AIicon="false"
                     />
-                    <div v-if="expandState.regexTestString" class="regex-pattern-input">
-                        <div 
-                            ref="editableDiv"
-                            contenteditable="true"
-                            class="editable-div"
-                            :class="[
-                                store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
-                            ]"
-                            @input="handleTestStringInput"
-                            @paste="handlePaste"
-                            :placeholder="'Eg. yhk1abc2'"
-                            v-html="highlightedText"
-                        ></div>
+                    <div v-if="expandState.regexTestString" class="regex-pattern-input" >
+                        <query-editor
+                        data-test="regex-pattern-test-string-editor"
+                        ref="queryEditorRef"
+                        editor-id="regex-pattern-test-string-editor"
+                        class="tw-w-full regex-pattern-test-string-editor"
+                        :debounceTime="300"
+                        v-model:query="testString"
+                        @update:query="updateTestString"
+                        style="height: 100px !important;"
+                        language="markdown"
+                        :showLineNumbers="false"
+                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
+                         />
                     </div>
                 </div>
                 </div>
@@ -230,7 +230,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     import FullViewContainer from "../functions/FullViewContainer.vue";
     import regexPatternService from "@/services/regex_pattern";
     import O2AIChat from "@/components/O2AIChat.vue";
-import { useRouter } from "vue-router";
+    import { useRouter } from "vue-router";
+    import QueryEditor from "../QueryEditor.vue";
     export default defineComponent({
         name: "AddRegexPattern",
         props: {
@@ -246,7 +247,8 @@ import { useRouter } from "vue-router";
         emit: ["close", "update:list"],
         components: {
             FullViewContainer,
-            O2AIChat
+            O2AIChat,
+            QueryEditor
         },
         setup(props, {emit}) {
             const { t } = useI18n();
@@ -261,6 +263,7 @@ import { useRouter } from "vue-router";
 
             const router = useRouter();
 
+
             const testString = ref("");
             const highlightedText = ref("");
             const editableDiv = ref<HTMLElement | null>(null);
@@ -269,6 +272,8 @@ import { useRouter } from "vue-router";
             const isFormEmpty = ref(props.isEdit ? false : true);
 
             const isPatternValid = ref(false);
+
+            const queryEditorRef = ref<any>(null);
 
             onMounted(()=>{
                 if(props.isEdit){
@@ -284,17 +289,6 @@ import { useRouter } from "vue-router";
                 }
                 if(router.currentRoute.value.query.from == 'logs'){
                     store.dispatch('setIsAiChatEnabled',true);
-                    const value = store.state.organizationData.customRegexPatternFromLogs.value || 
-                                store.state.organizationData.regexPatternFromLogs.value || '';
-                    testString.value = value;
-                    highlightedText.value = value;
-                    nextTick(() => {
-                        if (editableDiv.value) {
-                            editableDiv.value.innerText = value;
-                            // Trigger the pattern update to show highlighting
-                            debouncedUpdatePatternInputs.value();
-                        }
-                    });
                 }
             })
 
@@ -326,195 +320,6 @@ import { useRouter } from "vue-router";
                 window.dispatchEvent(new Event("resize"));
             };
 
-            const saveSelection = () => {
-                const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0 && editableDiv.value) {
-                    const range = selection.getRangeAt(0);
-                    savedSelection = {
-                        start: range.startOffset,
-                        end: range.endOffset
-                    };
-                }
-            };
-
-            const restoreSelection = () => {
-                if (savedSelection && editableDiv.value) {
-                    const selection = window.getSelection();
-                    const range = document.createRange();
-                    let childNodes = Array.from(editableDiv.value.childNodes);
-                    let currentPos = 0;
-                    let startNode: Node = editableDiv.value;
-                    let endNode: Node = editableDiv.value;
-                    let startOffset = savedSelection.start;
-                    let endOffset = savedSelection.end;
-
-                    // Find the correct nodes and offsets
-                    for (let node of childNodes) {
-                        const length = node.textContent?.length || 0;
-                        if (currentPos + length >= savedSelection.start) {
-                            startNode = node;
-                            startOffset = savedSelection.start - currentPos;
-                            break;
-                        }
-                        currentPos += length;
-                    }
-
-                    currentPos = 0;
-                    for (let node of childNodes) {
-                        const length = node.textContent?.length || 0;
-                        if (currentPos + length >= savedSelection.end) {
-                            endNode = node;
-                            endOffset = savedSelection.end - currentPos;
-                            break;
-                        }
-                        currentPos += length;
-                    }
-
-                    if (selection) {
-                        range.setStart(startNode, startOffset);
-                        range.setEnd(endNode, endOffset);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                    }
-                }
-            };
-
-            // Create debounced function as a ref so we can clean it up
-            const debouncedUpdatePatternInputs = ref(debounce(() => {
-                if (
-                    regexPatternInputs.value.name === "" ||
-                    regexPatternInputs.value.name === undefined ||
-                    regexPatternInputs.value.pattern === "" ||
-                    regexPatternInputs.value.pattern === undefined
-                ) {
-                    isFormEmpty.value = true;
-                } else {
-                    isFormEmpty.value = false;
-                }
-
-                isPatternValid.value = false;
-                
-                if (regexPatternInputs.value.pattern && testString.value) {
-                    try {
-                        const regex = new RegExp(regexPatternInputs.value.pattern, 'g');
-                        let text = testString.value;
-                        
-                        // Save current cursor position relative to text content
-                        const selection = window.getSelection();
-                        let cursorOffset = 0;
-                        if (selection && selection.rangeCount > 0 && editableDiv.value) {
-                            const range = selection.getRangeAt(0);
-                            const preCaretRange = range.cloneRange();
-                            preCaretRange.selectNodeContents(editableDiv.value);
-                            preCaretRange.setEnd(range.endContainer, range.endOffset);
-                            cursorOffset = preCaretRange.toString().length;
-                        }
-
-                        // Generate highlighted HTML
-                        let html = text;
-                        const matches = Array.from(text.matchAll(regex));
-                        
-                        // Replace matches from end to start to avoid position issues
-                        for (let i = matches.length - 1; i >= 0; i--) {
-                            const match = matches[i];
-                            if (match.index !== undefined) {
-                                const start = match.index;
-                                const end = start + match[0].length;
-                                const before = html.substring(0, start);
-                                const matched = html.substring(start, end);
-                                const after = html.substring(end);
-                                html = before + `<span class="match">${matched}</span>` + after;
-                            }
-                        }
-                        
-                        highlightedText.value = html;
-                        isPatternValid.value = matches.length > 0;
-
-                        // Restore cursor position after Vue updates the DOM
-                        nextTick(() => {
-                            if (editableDiv.value) {
-                                // Create a temporary div to count positions including newlines
-                                const tempDiv = document.createElement('div');
-                                tempDiv.innerHTML = html;
-                                
-                                const textNodes = [];
-                                const offsets = [];
-                                let totalOffset = 0;
-                                
-                                // Walk through all nodes and calculate their positions
-                                const walk = document.createTreeWalker(
-                                    editableDiv.value,
-                                    NodeFilter.SHOW_TEXT,
-                                    null
-                                );
-                                
-                                let node;
-                                while (node = walk.nextNode()) {
-                                    textNodes.push(node);
-                                    offsets.push(totalOffset);
-                                    totalOffset += node.textContent?.length || 0;
-                                }
-
-                                // Find the right node and offset
-                                let targetNode = textNodes[0];
-                                let targetOffset = 0;
-
-                                for (let i = 0; i < textNodes.length; i++) {
-                                    const nextOffset = i + 1 < offsets.length ? offsets[i + 1] : totalOffset;
-                                    if (offsets[i] <= cursorOffset && cursorOffset <= nextOffset) {
-                                        targetNode = textNodes[i];
-                                        targetOffset = cursorOffset - offsets[i];
-                                        break;
-                                    }
-                                }
-
-                                if (targetNode && selection) {
-                                    const range = document.createRange();
-                                    range.setStart(targetNode, targetOffset);
-                                    range.setEnd(targetNode, targetOffset);
-                                    selection.removeAllRanges();
-                                    selection.addRange(range);
-                                    
-                                    // Ensure the cursor is visible
-                                    const rect = range.getBoundingClientRect();
-                                    if (rect) {
-                                        editableDiv.value.scrollTop = rect.top - editableDiv.value.offsetHeight / 2;
-                                    }
-                                }
-                            }
-                        });
-                    } catch (error) {
-                        isPatternValid.value = false;
-                        console.log(error);
-                    }
-                } else {
-                    highlightedText.value = testString.value;
-                }
-            }, 300));
-
-            // Add cleanup
-            onBeforeUnmount(() => {
-                // Cancel any pending debounced calls
-                if (debouncedUpdatePatternInputs.value?.cancel) {
-                    debouncedUpdatePatternInputs.value.cancel();
-                }
-                
-                // Clear references
-                editableDiv.value = null;
-                savedSelection = null;
-            });
-
-            const handleTestStringInput = (event: InputEvent) => {
-                const target = event.target as HTMLElement;
-                testString.value = target.innerText;
-                debouncedUpdatePatternInputs.value();
-            };
-
-            const handlePaste = (event: ClipboardEvent) => {
-                event.preventDefault();
-                const text = event.clipboardData?.getData('text/plain') || '';
-                document.execCommand('insertText', false, text);
-            };
 
             const saveRegexPattern = async () => {
                 isSaving.value = true;
@@ -549,6 +354,36 @@ import { useRouter } from "vue-router";
                 }
             }
 
+            let decorationIds: string[] = [];
+
+            const updateTestString = (value: string) => {
+                testString.value = value;
+
+                if (queryEditorRef.value) {
+                    queryEditorRef.value.highlightRegexMatches(regexPatternInputs.value.pattern);
+                }
+            };
+
+
+
+            // Form validation watcher
+            watch([() => regexPatternInputs.value.name, () => regexPatternInputs.value.pattern], () => {
+                if (
+                    regexPatternInputs.value.name === "" ||
+                    regexPatternInputs.value.name === undefined ||
+                    regexPatternInputs.value.pattern === "" ||
+                    regexPatternInputs.value.pattern === undefined
+                ) {
+                    isFormEmpty.value = true;
+                } else {
+                    isFormEmpty.value = false;
+                }
+                // Update highlighting when pattern changes
+                if (testString.value && queryEditorRef.value?.editorObj) {
+                    queryEditorRef.value.highlightRegexMatches(regexPatternInputs.value.pattern);
+                }
+            });
+
             return {
                 t,
                 store,
@@ -562,16 +397,11 @@ import { useRouter } from "vue-router";
                 expandState,
                 testString,
                 isFormEmpty,
-                updatePatternInputs: debouncedUpdatePatternInputs.value,
                 saveRegexPattern,
                 isSaving,
                 isPatternValid,
-                editableDiv,
-                handleTestStringInput,
-                handlePaste,
-                highlightedText,
-                saveSelection,
-                restoreSelection
+                queryEditorRef,
+                updateTestString,
             }
     }
     });
@@ -637,13 +467,13 @@ import { useRouter } from "vue-router";
     resize: none !important;
     }
 
-    .dark-mode-regex-test-string-input .q-field__control  { 
-    background-color:#181A1B !important;
-    border-left: 1px solid #212121 !important;
+    .dark-mode-regex-test-string-input  { 
+        background-color:#181A1B !important;
+        border-left: 1px solid #212121 !important;
         border-right: 1px solid #212121 !important;
         border-bottom: 1px solid #212121 !important;
     }
-    .light-mode-regex-test-string-input .q-field__control  { 
+    .light-mode-regex-test-string-input { 
     background-color:#ffffff !important;
     border-left: 1px solid #E6E6E6 !important;
     border-right: 1px solid #E6E6E6 !important;
@@ -659,40 +489,14 @@ import { useRouter } from "vue-router";
         }
     }
 
-    .editable-div {
-        height: 150px;
-        max-height: 150px;
-        padding: 12px;
-        border: 1px solid #E6E6E6;
-        border-radius: 4px;
-        outline: none;
-        font-family: monospace;
-        white-space: pre-wrap;
-        overflow-wrap: break-word;
-        overflow-y: auto;
-        
-        &.dark-mode {
-            background-color: #181A1B;
-            border-color: #212121;
-            color: #ffffff;
-        }
-        
-        &.light-mode {
-            background-color: #ffffff;
-            border-color: #E6E6E6;
-            color: #000000;
-        }
+  </style>
 
-        &:empty:before {
-            content: attr(placeholder);
-            color: #999;
-        }
-
-        .match {
-            background-color: rgba(92, 163, 128, 0.3);
-            border-radius: 2px;
+  <style lang="scss">
+      .regex-pattern-test-string-editor{
+        .lines-content{
+            padding-left: 12px !important;
         }
     }
+</style>
 
-  </style>
   

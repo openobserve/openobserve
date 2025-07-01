@@ -133,7 +133,7 @@
         </div>
         <q-separator vertical />
         <!-- here we will have the right side section -->
-        <div class="tw-w-[75%] tw-h-full tw-flex tw-flex-col tw-justify-between">
+        <div class="tw-w-[75%] tw-h-full tw-flex tw-flex-col tw-justify-between tw-pt-4">
           <div v-if="userClickedPattern" class="tw-flex tw-flex-col tw-gap-3 tw-px-4 tw-h-full">
             <!-- pattern name section -->
             <div class="tw-flex tw-flex-col tw-gap-1">
@@ -220,18 +220,18 @@
                 <span class="individual-section-sub-title2">
                   Add Test
                 </span>
-                <div 
-                    ref="editableDiv"
-                    contenteditable="true"
-                    class="editable-div"
-                    :class="[
-                        store.state.theme === 'dark' ? 'dark-mode' : 'light-mode',
-                    ]"
-                    @input="handleTestStringInput"
-                    @paste="handlePaste"
-                    :placeholder="'Eg: sybihsfv@gmailcom'"
-                    v-html="highlightedText"
-                ></div>
+                <query-editor
+                  data-test="regex-pattern-test-string-editor"
+                  ref="queryEditorRef"
+                  editor-id="regex-pattern-test-string-editor"
+                  class="tw-w-full"
+                  :debounceTime="300"
+                  v-model:query="testString"
+                  @update:query="handleTestStringInput"
+                  style="min-height: 10rem; height: 10rem !important;"
+                  language="markdown"
+                  :showLineNumbers="false"
+                />
               </div>
               <q-separator />
             </div>
@@ -277,7 +277,7 @@
           </div>
           <div class="tw-h-full" v-if="!userClickedPattern">
             <div
-              class="full-width column flex-center q-gutter-sm q-mt-xs"
+              class="full-width full-height column flex-center q-gutter-sm q-mt-xs"
               style="font-size: 1.5rem"
               :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
             >
@@ -300,11 +300,12 @@
 <script lang="ts">
 import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, watch } from 'vue';
 import { useStore } from 'vuex';
-import  regexPatternsService  from '@/services/regex_pattern';
+import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
 import { debounce, useQuasar } from 'quasar';
 import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
+import QueryEditor from '@/components/QueryEditor.vue';
 
 export interface PatternAssociation {
     field: string;
@@ -315,6 +316,9 @@ export interface PatternAssociation {
 }
 export default defineComponent({
     name: "AssociatedRegexPatterns",
+    components: {
+        QueryEditor
+    },
     props: {
         data: {
             type: Array as PropType<PatternAssociation[]>,
@@ -352,108 +356,12 @@ export default defineComponent({
         const appliedPatternsExpandedRef = ref<any>(null);
         const allPatternsExpandedRef = ref<any>(null);
         const isFormDirty = ref(false);
-        const highlightedText = ref("");
-        const editableDiv = ref<HTMLElement | null>(null);
-        const debouncedUpdateHighlighting = ref(debounce((text: string) => {
-            if (userClickedPattern.value?.pattern && text) {
-                try {
-                    const regex = new RegExp(userClickedPattern.value.pattern, 'g');
-                    let html = text;
-                    
-                    // Save current cursor position relative to text content
-                    const selection = window.getSelection();
-                    let cursorOffset = 0;
-                    if (selection && selection.rangeCount > 0 && editableDiv.value) {
-                        const range = selection.getRangeAt(0);
-                        const preCaretRange = range.cloneRange();
-                        preCaretRange.selectNodeContents(editableDiv.value);
-                        preCaretRange.setEnd(range.endContainer, range.endOffset);
-                        cursorOffset = preCaretRange.toString().length;
-                    }
+        const queryEditorRef = ref<any>(null);
 
-                    const matches = Array.from(text.matchAll(regex));
-                    
-                    // Replace matches from end to start to avoid position issues
-                    for (let i = matches.length - 1; i >= 0; i--) {
-                        const match = matches[i];
-                        if (match.index !== undefined) {
-                            const start = match.index;
-                            const end = start + match[0].length;
-                            const before = html.substring(0, start);
-                            const matched = html.substring(start, end);
-                            const after = html.substring(end);
-                            html = before + `<span class="match">${matched}</span>` + after;
-                        }
-                    }
-                    
-                    highlightedText.value = html;
-                    isPatternValid.value = matches.length > 0;
-
-                    // Restore cursor position after Vue updates the DOM
-                    nextTick(() => {
-                        if (editableDiv.value) {
-                            // Create a temporary div to count positions including newlines
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = html;
-                            
-                            const textNodes = [];
-                            const offsets = [];
-                            let totalOffset = 0;
-                            
-                            // Walk through all nodes and calculate their positions
-                            const walk = document.createTreeWalker(
-                                editableDiv.value,
-                                NodeFilter.SHOW_TEXT,
-                                null
-                            );
-                            
-                            let node;
-                            while (node = walk.nextNode()) {
-                                textNodes.push(node);
-                                offsets.push(totalOffset);
-                                totalOffset += node.textContent?.length || 0;
-                            }
-
-                            // Find the right node and offset
-                            let targetNode = textNodes[0];
-                            let targetOffset = 0;
-
-                            for (let i = 0; i < textNodes.length; i++) {
-                                const nextOffset = i + 1 < offsets.length ? offsets[i + 1] : totalOffset;
-                                if (offsets[i] <= cursorOffset && cursorOffset <= nextOffset) {
-                                    targetNode = textNodes[i];
-                                    targetOffset = cursorOffset - offsets[i];
-                                    break;
-                                }
-                            }
-
-                            if (targetNode && selection) {
-                                const range = document.createRange();
-                                range.setStart(targetNode, targetOffset);
-                                range.setEnd(targetNode, targetOffset);
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                                
-                                // Ensure the cursor is visible
-                                const rect = range.getBoundingClientRect();
-                                if (rect) {
-                                    editableDiv.value.scrollTop = rect.top - editableDiv.value.offsetHeight / 2;
-                                }
-                            }
-                        }
-                    });
-                } catch (error) {
-                    isPatternValid.value = false;
-                    console.log(error);
-                }
-            } else {
-                highlightedText.value = text;
-                isPatternValid.value = false;
-            }
-        }, 300));
         const closeDialog = () => {
             emit("closeDialog");
-        }
+        };
+
         onMounted( async () => {
           if(store.state.organizationData.regexPatterns.length == 0){
             await getRegexPatterns();
@@ -480,7 +388,6 @@ export default defineComponent({
         //reset the values when user clicks on a pattern from the list
         //because we need to reset the values when user clicks on a pattern from the list
         watch(()=> userClickedPattern.value, (newVal) => {
-          console.log(newVal,'newVal');
           let applied_at_value = newVal.apply_at;
           if(applied_at_value == 'Both'){
             apply_at.value = ['AtIngestion', 'AtSearch'];
@@ -490,7 +397,12 @@ export default defineComponent({
           }
           policy.value = newVal.policy || "Redact";
           testString.value = "";
-          isPatternValid.value = false;
+          // Update highlighting when pattern changes
+          nextTick(() => {
+            if (queryEditorRef.value && newVal?.pattern) {
+                queryEditorRef.value.highlightRegexMatches(newVal.pattern);
+            }
+          });
         })
         //this runs when users clicks on add / remove pattern button 
         //to update the applied patterns list
@@ -500,11 +412,9 @@ export default defineComponent({
           makeSyncWithAppliedPatterns();
         })
         watch(()=> policy.value, (newVal) => {
-          console.log(newVal,'newVal');
           checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)
         })
         watch(()=> apply_at.value, (newVal) => {
-          console.log(newVal,'newVal');
           checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)
         })
 
@@ -545,10 +455,11 @@ export default defineComponent({
           return userClickedPattern.value?.pattern_name === patternName;
         }
 
-        const handleTestStringInput = (event: InputEvent) => {
-            const target = event.target as HTMLElement;
-            testString.value = target.innerText;
-            debouncedUpdateHighlighting.value(target.innerText);
+        const handleTestStringInput = (value: string) => {
+            testString.value = value;
+            if (queryEditorRef.value && userClickedPattern.value?.pattern) {
+                queryEditorRef.value.highlightRegexMatches(userClickedPattern.value.pattern);
+            }
         };
 
         const handlePaste = (event: ClipboardEvent) => {
@@ -640,13 +551,7 @@ export default defineComponent({
 
         // Add cleanup
         onBeforeUnmount(() => {
-            // Cancel any pending debounced calls
-            if (debouncedUpdateHighlighting.value?.cancel) {
-                debouncedUpdateHighlighting.value.cancel();
-            }
-            
             // Clear references
-            editableDiv.value = null;
             userClickedPattern.value = null;
             appliedPatternsExpandedRef.value = null;
             allPatternsExpandedRef.value = null;
@@ -684,8 +589,7 @@ export default defineComponent({
             isFormDirty,
             getImageURL,
             t,
-            highlightedText,
-            editableDiv
+            queryEditorRef
         }
     }
 })
@@ -828,7 +732,7 @@ export default defineComponent({
     font-weight: 400;
     line-height: 12px;
   }
-    .editable-div {
+    .query-editor {
         height: 100px;
         max-height: 100px;
         padding: 12px;

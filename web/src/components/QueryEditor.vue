@@ -79,6 +79,10 @@ export default defineComponent({
       type: String,
       default: "sql",
     },
+    showLineNumbers: {
+      type: Boolean,
+      default: true,
+    },
   },
   emits: ["update-query", "run-query", "update:query", "focus", "blur"],
   setup(props, { emit }) {
@@ -171,12 +175,12 @@ export default defineComponent({
         folding: enableCodeFolding.value,
         wordWrap: "on",
         automaticLayout: true,
-        lineNumbers: "on",
+        lineNumbers: props.showLineNumbers ? "on" : "off",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: false,
         overviewRulerBorder: false,
-        lineDecorationsWidth: 3,
+        lineDecorationsWidth: props.showLineNumbers ? 3 : 0,
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
@@ -320,6 +324,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       provider.value?.dispose();
+      clearDecorations();
     });
 
     const enableCodeFolding = computed(() => {
@@ -357,6 +362,64 @@ export default defineComponent({
       if (editorObj?.setValue) {
         editorObj.setValue(value);
         editorObj?.layout();
+      }
+    };
+
+    const clearDecorations = () => {
+      if (!editorObj) return;
+      const model = editorObj.getModel();
+      if (!model) return;
+
+      const oldDecorations = model.getAllDecorations()
+        .filter(d => d.options.inlineClassName === 'monaco-regex-highlight')
+        .map(d => d.id);
+      model.deltaDecorations(oldDecorations, []);
+    };
+
+    const highlightRegexMatches = (pattern: string) => {
+      if (!editorObj) return;
+      
+      // Clear existing decorations
+      clearDecorations();
+
+      if (!pattern) return;
+
+      try {
+        // Remove any start/end anchors from the pattern if they exist
+        let processedPattern = pattern.replace(/^[\^]|[\$]$/g, '');
+        
+        // Create regex that can match the pattern anywhere in the text
+        const regex = new RegExp(processedPattern, 'g');
+        const model = editorObj.getModel();
+        if (!model) return;
+        
+        const text = model.getValue();
+        const decorations = [];
+        let match;
+
+        while ((match = regex.exec(text)) !== null) {
+          const startPos = model.getPositionAt(match.index);
+          const endPos = model.getPositionAt(match.index + match[0].length);
+          
+          decorations.push({
+            range: new monaco.Range(
+              startPos.lineNumber,
+              startPos.column,
+              endPos.lineNumber,
+              endPos.column
+            ),
+            options: {
+              inlineClassName: 'monaco-regex-highlight',
+              hoverMessage: { value: 'Regex match' },
+              stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+            }
+          });
+        }
+
+        model.deltaDecorations([], decorations);
+      } catch (e) {
+        // Invalid regex pattern - ignore
+        console.warn('Invalid regex pattern:', e);
       }
     };
 
@@ -549,6 +612,7 @@ export default defineComponent({
       getValue,
       decorateRanges,
       addErrorDiagnostics,
+      highlightRegexMatches,
     };
   },
 });
@@ -580,5 +644,10 @@ export default defineComponent({
   background-color: rgba(255, 0, 0, 0.1);
   text-decoration: underline;
   text-decoration-color: red;
+}
+.monaco-editor .monaco-regex-highlight {
+  background-color: #B3F2D3 !important;
+  border-radius: 2px;
+  color: #000000 !important;
 }
 </style>
