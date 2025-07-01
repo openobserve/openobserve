@@ -6,7 +6,7 @@ import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
-const randomPipelineName = `Pipeline${Math.floor(Math.random() * 1000)}`;
+
 const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 async function login(page) {
@@ -111,7 +111,6 @@ test.describe("Core Pipeline Tests", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
     await applyQueryButton(page);
   });
