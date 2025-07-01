@@ -775,10 +775,18 @@ fn calculate_deltas_multi(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::search::{Response, ResponseTook};
+    use std::sync::Arc;
+
+    use arrow_schema::Schema;
+    use config::meta::{
+        search::{Query, Request, RequestEncoding, Response, ResponseTook, SearchEventType},
+        sql::OrderBy,
+    };
+    use datafusion::common::TableReference;
+    use infra::schema::SchemaCache;
 
     use super::*;
-    use crate::common::meta::search::CachedQueryResponse;
+    use crate::{common::meta::search::CachedQueryResponse, service::search::Sql};
 
     #[test]
     fn test_calculate_deltas_multi_expected_intervals() {
@@ -853,5 +861,201 @@ mod tests {
             delta_removed_hits: false,
         }];
         assert_eq!(deltas, expected_deltas);
+    }
+
+    #[test]
+    fn test_handle_histogram() {
+        // Test case 1: Basic histogram with numeric interval
+        let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
+        let time_range = Some((1640995200000000, 1641081600000000)); // 2022-01-01 to 2022-01-02
+        handle_histogram(&mut sql, time_range);
+        assert!(sql.contains("histogram(_timestamp,"));
+        assert!(sql.contains("second"));
+    }
+
+    #[test]
+    fn test_get_ts_col_order_by() {
+        let sql = Sql {
+            sql: "SELECT _timestamp, field1 FROM logs ORDER BY _timestamp DESC".to_string(),
+            is_complex: false,
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_names: vec![TableReference::from("logs")],
+            match_items: None,
+            equal_items: hashbrown::HashMap::new(),
+            prefix_items: hashbrown::HashMap::new(),
+            columns: {
+                let mut cols = hashbrown::HashMap::new();
+                let mut set = hashbrown::HashSet::new();
+                set.insert("_timestamp".to_string());
+                set.insert("field1".to_string());
+                cols.insert(TableReference::from("logs"), set);
+                cols
+            },
+            aliases: vec![("_timestamp".to_string(), "_timestamp".to_string())],
+            schemas: {
+                let mut schemas = hashbrown::HashMap::new();
+                schemas.insert(
+                    TableReference::from("logs"),
+                    Arc::new(SchemaCache::new(Schema::empty())),
+                );
+                schemas
+            },
+            limit: 100,
+            offset: 0,
+            time_range: None,
+            group_by: vec![],
+            order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
+            histogram_interval: None,
+            sorted_by_time: true,
+            use_inverted_index: false,
+            index_condition: None,
+            index_optimize_mode: None,
+        };
+
+        let result = get_ts_col_order_by(&sql, "_timestamp", false);
+        assert!(result.is_some());
+        let (ts_col, is_descending) = result.unwrap();
+        assert_eq!(ts_col, "_timestamp");
+        assert!(is_descending);
+    }
+
+    #[tokio::test]
+    async fn test_invalidate_cached_response_by_stream_min_ts() {
+        let mock_stream_min_ts = Utc::now().timestamp_micros() - 3600000000; // 1 hour ago
+
+        let responses = vec![
+            CachedQueryResponse {
+                cached_response: Response {
+                    took: 100,
+                    took_detail: ResponseTook::default(),
+                    columns: vec![],
+                    hits: vec![serde_json::json!({"timestamp": "2025-01-01T10:00:00Z"})],
+                    total: 1,
+                    from: 0,
+                    size: 10,
+                    file_count: 1,
+                    cached_ratio: 100,
+                    scan_size: 1000,
+                    idx_scan_size: 1000,
+                    scan_records: 100,
+                    response_type: "".to_string(),
+                    trace_id: "".to_string(),
+                    function_error: vec![],
+                    is_partial: false,
+                    histogram_interval: None,
+                    new_start_time: None,
+                    new_end_time: None,
+                    result_cache_ratio: 100,
+                    work_group: None,
+                    order_by: None,
+                },
+                deltas: vec![],
+                has_cached_data: true,
+                cache_query_response: true,
+                response_start_time: mock_stream_min_ts - 7200000000, // 2 hours ago
+                response_end_time: mock_stream_min_ts - 3600000000,   // 1 hour ago
+                ts_column: "_timestamp".to_string(),
+                is_descending: true,
+                limit: 10,
+            },
+            CachedQueryResponse {
+                cached_response: Response {
+                    took: 100,
+                    took_detail: ResponseTook::default(),
+                    columns: vec![],
+                    hits: vec![serde_json::json!({"timestamp": "2025-01-01T11:00:00Z"})],
+                    total: 1,
+                    from: 0,
+                    size: 10,
+                    file_count: 1,
+                    cached_ratio: 100,
+                    scan_size: 1000,
+                    idx_scan_size: 1000,
+                    scan_records: 100,
+                    response_type: "".to_string(),
+                    trace_id: "".to_string(),
+                    function_error: vec![],
+                    is_partial: false,
+                    histogram_interval: None,
+                    new_start_time: None,
+                    new_end_time: None,
+                    result_cache_ratio: 100,
+                    work_group: None,
+                    order_by: None,
+                },
+                deltas: vec![],
+                has_cached_data: true,
+                cache_query_response: true,
+                response_start_time: mock_stream_min_ts - 1800000000, // 30 minutes ago
+                response_end_time: mock_stream_min_ts + 1800000000,   // 30 minutes from now
+                ts_column: "_timestamp".to_string(),
+                is_descending: true,
+                limit: 10,
+            },
+        ];
+
+        let file_path = "test_org/logs/test_stream";
+        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses).await;
+        assert!(result.is_ok());
+        let filtered_responses = result.unwrap();
+        assert_eq!(filtered_responses.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_check_cache() {
+        // Test case 1: Basic cache check with valid SQL
+        let trace_id = "test_trace_123";
+        let org_id = "test_org";
+        let stream_type = StreamType::Logs;
+        let mut req = Request {
+            query: Query {
+                sql: "SELECT _timestamp, message FROM logs WHERE _timestamp >= 1640995200000000 AND _timestamp <= 1641081600000000 ORDER BY _timestamp DESC LIMIT 100".to_string(),
+                start_time: 1640995200000000,
+                end_time: 1641081600000000,
+                from: 0,
+                size: 100,
+                track_total_hits: false,
+                query_fn: None,
+                quick_mode: false,
+                query_type: "sql".to_string(),
+                uses_zo_fn: false,
+                action_id: None,
+                skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
+                histogram_interval: 0,
+            },
+            encoding: RequestEncoding::Empty,
+            regions: vec![],
+            clusters: vec![],
+            timeout: 30,
+            search_type: Some(SearchEventType::UI),
+            search_event_context: None,
+            use_cache: true,
+            local_mode: None,
+        };
+        let mut origin_sql = req.query.sql.clone();
+        let mut file_path = "test_org/logs/test_stream".to_string();
+        let is_aggregate = false;
+        let mut should_exec_query = true;
+
+        let result = check_cache(
+            trace_id,
+            org_id,
+            stream_type,
+            &mut req,
+            &mut origin_sql,
+            &mut file_path,
+            is_aggregate,
+            &mut should_exec_query,
+        )
+        .await;
+
+        assert!(result.cache_query_response);
+        assert_eq!(result.ts_column, "_timestamp");
+        assert!(result.is_descending);
+        assert_eq!(result.limit, 100);
+        assert_eq!(result.file_path, "test_org/logs/test_stream");
     }
 }
