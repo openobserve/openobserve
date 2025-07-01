@@ -568,7 +568,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should apply various filter operators to the dashboard field and display the correct results", async ({
+  test("should apply various filter operators to the dashboard field and display the correct results", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -614,7 +614,8 @@ test.describe("dashboard UI testcases", () => {
       0,
       "kubernetes_host",
       "",
-      "Is Null"
+      "Is Null",
+      ""
     );
     await dashboardAction.applyDashboardBtn();
     // Add assertion if possible: expect some filtered chart result or no data text
@@ -624,7 +625,8 @@ test.describe("dashboard UI testcases", () => {
       0,
       "kubernetes_host",
       "",
-      "Is Not Null"
+      "Is Not Null",
+      ""
     );
     await dashboardAction.applyDashboardBtn();
     // Add assertion if possible: expect some filtered chart result or different behavior
@@ -636,7 +638,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Cleanup
     await dashboardCreate.backToDashboardList();
-    await waitForDashboardPage(page);
+    // await waitForDashboardPage(page);
     await deleteDashboard(page, randomDashboardName);
   });
 
@@ -772,7 +774,7 @@ test.describe("dashboard UI testcases", () => {
     // Set date-time filter and timezone
     await waitForDateTimeButtonToBeEnabled(page);
     await dashboardTimeRefresh.setRelative("5", "w");
-    await dashboardActions.applyDashboardBtn();
+    // await dashboardActions.applyDashboardBtn();
 
     // Verify the gauge chart is visible
     await dashboardActions.waitForChartToRender();
