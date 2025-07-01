@@ -665,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <h5>Wait while loading...</h5>
   </q-card>
   <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
-    <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" />
+    <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
   </q-dialog>
 
   <ConfirmDialog
@@ -1699,6 +1699,16 @@ export default defineComponent({
       patternAssociationDialog.value.data = [...filteredData];
     }
 
+    const handleUpdateAppliedPattern = (pattern: PatternAssociation) => {
+      patternAssociations.value[pattern.field].forEach((p: PatternAssociation) => {
+        if(p.pattern_id === pattern.pattern_id){
+          p.policy = pattern.policy;
+          p.apply_at = pattern.apply_at;
+        }
+      });
+      patternAssociationDialog.value.data = [...patternAssociations.value[pattern.field]];
+    }
+
 
     return {
       t,
@@ -1772,7 +1782,8 @@ export default defineComponent({
       patternAssociationDialog,
       openPatternAssociationDialog,
       handleAddPattern,
-      handleRemovePattern
+      handleRemovePattern,
+      handleUpdateAppliedPattern
     };
   },
   created() {

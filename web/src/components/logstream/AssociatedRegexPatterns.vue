@@ -329,7 +329,7 @@ export default defineComponent({
             required: true
         }
     },
-    emits: ["closeDialog", "addPattern", "removePattern", "updateSettings"],
+    emits: ["closeDialog", "addPattern", "removePattern", "updateSettings", "updateAppliedPattern"],
     setup(props, { emit }){
         const store = useStore();
         const filterPattern = ref("");
@@ -412,10 +412,29 @@ export default defineComponent({
           makeSyncWithAppliedPatterns();
         })
         watch(()=> policy.value, (newVal) => {
-          checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)
+          if(checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)){
+            let updatedPattern = {
+              ...userClickedPattern.value,
+              policy: newVal,
+            }
+            emit("updateAppliedPattern", updatedPattern);
+          }
         })
         watch(()=> apply_at.value, (newVal) => {
-          checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)
+          if(checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)){
+            let apply_at_value = "";
+            if(newVal.length == 2){
+              apply_at_value = 'Both';
+            }
+            else{
+              apply_at_value = newVal[0];
+            }
+            let updatedPattern = {
+              ...userClickedPattern.value,
+              apply_at: apply_at_value
+            }
+            emit("updateAppliedPattern", updatedPattern);
+          }
         })
 
 
@@ -535,6 +554,10 @@ export default defineComponent({
           });
         };
 
+        //why this check because user might update the policy or apply_at value of already applied pattern 
+        //so we need to check if the policy or apply_at value is changed and if it is then we need to update the isFormDirty value
+        //so that the user can see the update changes button
+        //after this we need to add the logic to add this to add array
         const checkIfPatternIsAppliedAndUpdate = (patternId: string) => {
           let applied_pattern = appliedPatterns.value.find((pattern: any) => pattern.pattern_id === patternId);
           let apply_at_value = "";
@@ -546,7 +569,9 @@ export default defineComponent({
           }
           if(applied_pattern){
             applied_pattern.policy !== policy.value || applied_pattern.apply_at !== apply_at_value ? isFormDirty.value = true : isFormDirty.value = false;
+            return true;
           }
+          return false;
         }
 
         // Add cleanup

@@ -658,7 +658,18 @@ const useStreams = () => {
   //this is used to compare the pattern associations in the settings
   const comparePatternAssociations = (prev: any[], curr: any[]) => {
     const isSame = (a: any, b: any) => {
-      return a.pattern_id === b.pattern_id && a.field === b.field;
+      // If apply_at is undefined/null in either object, consider them the same
+      //because some times user might not select the apply_at value while updating the already applied pattern 
+      //so instead of sending undefined/null we dont consider them as different
+      if (!a.apply_at || !b.apply_at) {
+        return a.pattern_id === b.pattern_id && 
+               a.field === b.field && 
+               a.policy === b.policy;
+      }
+      return a.pattern_id === b.pattern_id && 
+             a.field === b.field && 
+             a.policy === b.policy && 
+             a.apply_at === b.apply_at;
     };
   
     const add = curr.filter(
