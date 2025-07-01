@@ -30,15 +30,14 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-const APPROX_TOPK: &str = "approx_topk_v5";
+const APPROX_TOPK: &str = "approx_topk";
 
 /// Approximate TopK UDAF that returns the top K elements by frequency.
 ///
-/// Usage: approx_topk_v5(field, k) or approx_topk_v5(field, k, cap)
+/// Usage: approx_topk(field, k) or approx_topk(field, k, cap)
 /// - field: the field to find top k values from
 /// - k: number of top elements to return
-/// - cap: optional maximum number of candidates to keep in memory (default: max(k*2, min(k*10,
-///   1000)))
+/// - cap: optional maximum number of candidates to keep in memory (default: max(k*2, 1000))
 ///
 /// For partial aggregation, returns top k elements from each partition.
 /// For final aggregation, merges results from all partitions and returns final top k.
@@ -62,7 +61,7 @@ impl ApproxTopK {
 
 impl std::fmt::Debug for ApproxTopK {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_struct("ApproxTopKV5")
+        f.debug_struct("ApproxTopK")
             .field("name", &self.name())
             .field("signature", &self.0)
             .finish()
@@ -222,7 +221,7 @@ impl std::fmt::Debug for ApproxTopKAccumulator {
 impl ApproxTopKAccumulator {
     fn new(k: usize, max_candidates: Option<usize>) -> Self {
         // Cap at least 2*k for safety
-        let default_max = (k * 10).min(1000).max(k * 2);
+        let default_max = (k * 2).max(1000);
         Self {
             candidates: HashMap::new(),
             k,
@@ -559,7 +558,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_approx_topk_udaf_v5() {
+    async fn test_approx_topk_udaf() {
         let ctx = SessionContext::new();
 
         // Create test data
@@ -583,7 +582,7 @@ mod tests {
 
         // Test the function
         let df = ctx
-            .sql("SELECT approx_topk_v5(item, 2) as top_items FROM test_table")
+            .sql("SELECT approx_topk(item, 2) as top_items FROM test_table")
             .await
             .unwrap();
         let results = df.collect().await.unwrap();
@@ -594,7 +593,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_approx_topk_udaf_v5_with_cap() {
+    async fn test_approx_topk_udaf_with_cap() {
         let ctx = SessionContext::new();
 
         // Create test data
@@ -618,7 +617,7 @@ mod tests {
 
         // Test the function with cap parameter
         let df = ctx
-            .sql("SELECT approx_topk_v5(item, 2, 10) as top_items FROM test_table")
+            .sql("SELECT approx_topk(item, 2, 10) as top_items FROM test_table")
             .await
             .unwrap();
         let results = df.collect().await.unwrap();
