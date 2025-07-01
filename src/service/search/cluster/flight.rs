@@ -510,7 +510,6 @@ pub async fn run_datafusion(
             use_cache,
             target_partitions,
             physical_plan,
-            ctx.task_ctx(),
         )
         .await?;
         physical_plan = plan;
