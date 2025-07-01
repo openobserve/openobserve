@@ -669,6 +669,7 @@ import { useRouter } from "vue-router";
         font-family: monospace;
         white-space: pre-wrap;
         overflow-wrap: break-word;
+        overflow-y: auto;
         
         &.dark-mode {
             background-color: #181A1B;
