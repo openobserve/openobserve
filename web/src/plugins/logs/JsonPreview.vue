@@ -240,12 +240,80 @@
         </span>
       </div>
       }
+      <div
+        v-if="showMenu"
+        class="context-menu shadow-lg rounded-sm"
+        :style="{ position: 'fixed', top: `${menuY}px`, left: `${menuX}px`, zIndex: 9999 }"
+        :class="store.state.theme === 'dark' ? 'context-menu-dark' : 'context-menu-light'"
+      >
+        <div class="context-menu-item" @click="copySelectedText">
+          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          Copy
+        </div>
+        <div class="context-menu-item" @click="handleCreateRegex">
+          <q-img 
+            :src="regexIconForContextMenu" 
+            class="q-mr-sm" 
+            style="width: 14px; height: 14px;"
+          />
+          Create regex pattern
+        </div>
+      </div>
+
     </div>
+    <q-dialog v-model="typeOfRegexPattern">
+      <q-card style="width: 700px; max-width: 80vw">
+        <q-card-section>
+          <div class="text-h6">What is the type of regex pattern you want to create?</div>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+          <div>
+            <q-input
+              type="text"
+              data-test="regex-pattern-type-input"
+              v-model="regexPatternType"
+              color="input-border"
+              label="Type of regex pattern (e.g. email, phone number, etc.)"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn
+            data-test="search-scheduler-max-records-cancel-btn"
+            unelevated
+            no-caps
+            class="q-mr-sm text-bold"
+            :label="t('confirmDialog.cancel')"
+            v-close-popup
+          />
+          <q-btn
+            data-test="search-scheduler-max-records-submit-btn"
+            unelevated
+            no-caps
+            :label="t('confirmDialog.ok')"
+            color="secondary"
+            class="text-bold"
+            @click="confirmRegexPatternType"
+            v-close-popup
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </div>
+  
 </template>
 
 <script lang="ts">
-import { ref, onBeforeMount, computed, nextTick, onMounted, watch } from "vue";
+import { ref, onBeforeMount, computed, nextTick, onMounted, watch, onUnmounted } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -312,12 +380,20 @@ export default {
 
     const isTracesStreamsLoading = ref(false);
 
+    const typeOfRegexPattern = ref(false);
+    const regexPatternType = ref('');
+
     const previewId = ref("");
     const schemaToBeSearch = ref({});
 
     const $q = useQuasar();
     const unflattendData: any = ref("");
     const loading = ref(false);
+
+    const showMenu = ref(false);
+    const menuX = ref(0);
+    const menuY = ref(0);
+    const selectedText = ref('');
 
     const tabs = [
       {
@@ -401,7 +477,54 @@ export default {
       previewId.value = getUUID();
     });
 
-    onMounted(async () => {});
+
+    onMounted(() => {
+      // Handler for closing menu on outside click
+      const handleOutsideClick = (e: MouseEvent) => {
+        if (!(e.target as HTMLElement).closest('.q-btn')) {
+          showMenu.value = false;
+        }
+      };
+
+      // Handler for context menu using event delegation
+      const handleContextMenu = (e: MouseEvent) => {
+        // Only handle right clicks on the log content area
+        const target = e.target as HTMLElement;
+        if (target.closest('.log_json_content')) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const selection = window.getSelection()?.toString().trim() || '';
+          selectedText.value = selection;
+
+          // Get window width
+          const windowWidth = window.innerWidth;
+          // Context menu width (from CSS) plus some padding
+          const menuWidth = 220;
+          // Calculate if menu would overflow
+          const wouldOverflow = e.clientX + menuWidth > windowWidth;
+
+          // Position menu to the left if it would overflow, otherwise to the right
+          menuX.value = wouldOverflow ? e.clientX - menuWidth - 5 : e.clientX + 15;
+          menuY.value = e.clientY + 15;
+
+          showMenu.value = true;
+        }
+      };
+
+      // Add event listeners
+      window.addEventListener('click', handleOutsideClick);
+      window.addEventListener('contextmenu', handleContextMenu);
+
+      // Cleanup
+      //this is used to remove the event listeners when the component is unmounted 
+      //it is used to avoid memory leaks
+      onUnmounted(() => {
+        window.removeEventListener('click', handleOutsideClick);
+        window.removeEventListener('contextmenu', handleContextMenu);
+      });
+    });
+
 
     const getOriginalData = async () => {
         setViewTraceBtn();
@@ -508,9 +631,12 @@ export default {
       }
       return t("common.addFieldToTable");
     };
-    const regexIcon = computed(()=>{
-      return getImageURL(store.state.theme == 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
-    })
+      const regexIcon = computed(()=>{
+        return getImageURL(store.state.theme == 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+      })
+      const regexIconForContextMenu = computed(()=>{
+        return getImageURL(store.state.theme == 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+      })
 
     const createRegexPatternFromLogs = (key: string, value: string) => {
       store.state.organizationData.regexPatternFromLogs.key = key;
@@ -525,6 +651,77 @@ export default {
       })
 
     }
+
+
+    const handleRightClick = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const selection = window.getSelection()?.toString().trim() || '';
+      selectedText.value = selection;
+
+      // Use the mouse event coordinates directly
+      menuX.value = event.clientX + 5; // Small offset from cursor
+      menuY.value = event.clientY + 5; // Small offset from cursor
+
+      showMenu.value = true;
+    };
+
+
+
+
+
+    const handleCreateRegex = () => {
+      console.log('Create regex for:', selectedText.value || 'No selection');
+      showMenu.value = false;
+      typeOfRegexPattern.value = true;
+    };
+
+    const confirmRegexPatternType = () => {
+      typeOfRegexPattern.value = false;
+      store.state.organizationData.customRegexPatternFromLogs.key = regexPatternType.value;
+      store.state.organizationData.customRegexPatternFromLogs.value = selectedText.value;
+      store.state.organizationData.customRegexPatternFromLogs.stream = searchObj.data.stream.selectedStream[0];
+      store.state.organizationData.customRegexPatternFromLogs.type = regexPatternType.value;
+      $q.notify({
+        message: 'Redirecting to regex pattern page',
+        spinner: true,
+        timeout: 1000
+      }
+      )
+      setTimeout(() => {
+      router.push({
+        path: '/settings/regex_patterns',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          from: 'logs'
+        },
+      })
+    }, 1000);
+    }
+
+
+
+    const copySelectedText = () => {
+      if (selectedText.value) {
+        navigator.clipboard.writeText(selectedText.value).then(() => {
+          showMenu.value = false;
+          $q.notify({
+            message: 'Text copied to clipboard',
+            color: 'positive',
+            position: 'bottom',
+            timeout: 1500
+          });
+        }).catch(() => {
+          $q.notify({
+            message: 'Failed to copy text',
+            color: 'negative',
+            position: 'bottom',
+            timeout: 1500
+          });
+        });
+      }
+    };
 
     return {
       t,
@@ -555,7 +752,17 @@ export default {
       getOriginalData,
       addOrRemoveLabel,
       regexIcon,
-      createRegexPatternFromLogs
+      createRegexPatternFromLogs,
+      showMenu,
+      menuX,
+      menuY,
+      selectedText,
+      handleCreateRegex,
+      copySelectedText,
+      regexIconForContextMenu,
+      typeOfRegexPattern,
+      regexPatternType,
+      confirmRegexPatternType
     };
   },
 };
@@ -634,6 +841,41 @@ export default {
     &.active {
       background: #5960b2;
       color: #ffffff !important;
+    }
+  }
+}
+
+.context-menu {
+  min-width: 200px;
+  padding: 4px 0;
+  font-size: 13px;
+
+  .context-menu-item {
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+}
+
+
+.context-menu-dark {
+  background-color: #1a1a1a;
+  border: 1px solid #4a5568;
+  .context-menu-item {
+    color: #e2e8f0;
+    &:hover {
+      background-color: #4a5568;
+    }
+  }
+}
+.context-menu-light {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  .context-menu-item {
+    &:hover {
+      background-color: #f3f4f6;
     }
   }
 }

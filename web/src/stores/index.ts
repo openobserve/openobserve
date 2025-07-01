@@ -59,6 +59,12 @@ const organizationObj = {
     key: "",
     value: "",
     stream: "",
+  },
+  customRegexPatternFromLogs:{
+    key: "",
+    value: "",
+    stream: "",
+    type: "",
   }
 };
 

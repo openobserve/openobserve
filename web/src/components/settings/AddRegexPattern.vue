@@ -284,7 +284,17 @@ import { useRouter } from "vue-router";
                 }
                 if(router.currentRoute.value.query.from == 'logs'){
                     store.dispatch('setIsAiChatEnabled',true);
-                    testString.value = "hi";
+                    const value = store.state.organizationData.customRegexPatternFromLogs.value || 
+                                store.state.organizationData.regexPatternFromLogs.value || '';
+                    testString.value = value;
+                    highlightedText.value = value;
+                    nextTick(() => {
+                        if (editableDiv.value) {
+                            editableDiv.value.innerText = value;
+                            // Trigger the pattern update to show highlighting
+                            debouncedUpdatePatternInputs.value();
+                        }
+                    });
                 }
             })
 

@@ -732,8 +732,13 @@ export default defineComponent({
       }
       //here we will check if the user is on the regexPatterns page and if the regexPatternFromLogs is set because it only happens when the user clicks on the create regex pattern button 
       //in the logs page
+      //here first condition is to check if user clicked on whole log line and then clicked on create regex pattern button
+      //second condition is to check if user clicked on a specific text on the log line and then clicked on create regex pattern button
       if(store.state.organizationData.regexPatternFromLogs.key && router.currentRoute.value.name == 'regexPatterns'){
         inputMessage.value = `Create a regex pattern for ${store.state.organizationData.regexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.regexPatternFromLogs.value}" from the ${store.state.organizationData.regexPatternFromLogs.stream} stream`;
+      }
+      else if(store.state.organizationData.customRegexPatternFromLogs.key && router.currentRoute.value.name == 'regexPatterns'){
+        inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
       }
     });
 
