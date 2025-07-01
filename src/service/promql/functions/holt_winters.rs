@@ -77,3 +77,46 @@ pub fn holt_winters_calculation(
 
     Some(current_smoothed)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    #[test]
+    fn test_holt_winters_function() {
+        // Create a range value with sample data
+        let samples = vec![
+            crate::service::promql::value::Sample::new(1000, 10.0),
+            crate::service::promql::value::Sample::new(2000, 15.0),
+            crate::service::promql::value::Sample::new(3000, 20.0),
+        ];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                eval_ts: 3000,
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = holt_winters(matrix, 0.5, 0.3).unwrap();
+
+        // Should return a vector with holt-winters forecast
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 1);
+                // Should return a forecasted value
+                assert!(v[0].sample.value.is_finite());
+                assert_eq!(v[0].sample.timestamp, 3000);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

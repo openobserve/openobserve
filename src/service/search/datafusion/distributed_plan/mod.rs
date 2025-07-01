@@ -123,3 +123,123 @@ impl TreeNodeRewriter for ReplaceTableScanExec {
         Ok(transformed)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{any::Any, sync::Arc};
+
+    use datafusion::physical_plan::{ExecutionPlan, PlanProperties};
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct MockExecPlan;
+    impl datafusion::physical_plan::DisplayAs for MockExecPlan {
+        fn fmt_as(
+            &self,
+            _: datafusion::physical_plan::DisplayFormatType,
+            _: &mut std::fmt::Formatter,
+        ) -> std::fmt::Result {
+            Ok(())
+        }
+    }
+    impl ExecutionPlan for MockExecPlan {
+        fn name(&self) -> &'static str {
+            "NewEmptyExec"
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn properties(&self) -> &PlanProperties {
+            panic!("not needed")
+        }
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![]
+        }
+        fn with_new_children(
+            self: Arc<Self>,
+            _: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
+            Ok(self)
+        }
+        fn execute(
+            &self,
+            _: usize,
+            _: Arc<datafusion::execution::TaskContext>,
+        ) -> datafusion::common::Result<datafusion::execution::SendableRecordBatchStream> {
+            panic!("not needed")
+        }
+        fn statistics(&self) -> datafusion::common::Result<datafusion::common::Statistics> {
+            panic!("not needed")
+        }
+    }
+
+    #[derive(Debug)]
+    struct MockEmptyExecPlan;
+    impl datafusion::physical_plan::DisplayAs for MockEmptyExecPlan {
+        fn fmt_as(
+            &self,
+            _: datafusion::physical_plan::DisplayFormatType,
+            _: &mut std::fmt::Formatter,
+        ) -> std::fmt::Result {
+            Ok(())
+        }
+    }
+    impl ExecutionPlan for MockEmptyExecPlan {
+        fn name(&self) -> &'static str {
+            "EmptyExec"
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn properties(&self) -> &PlanProperties {
+            panic!("not needed")
+        }
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![]
+        }
+        fn with_new_children(
+            self: Arc<Self>,
+            _: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
+            Ok(self)
+        }
+        fn execute(
+            &self,
+            _: usize,
+            _: Arc<datafusion::execution::TaskContext>,
+        ) -> datafusion::common::Result<datafusion::execution::SendableRecordBatchStream> {
+            panic!("not needed")
+        }
+        fn statistics(&self) -> datafusion::common::Result<datafusion::common::Statistics> {
+            panic!("not needed")
+        }
+    }
+
+    #[test]
+    fn test_new_empty_exec_visitor() {
+        let plan = Arc::new(MockExecPlan) as Arc<dyn ExecutionPlan>;
+        let mut visitor = NewEmptyExecVisitor::new();
+        let _ = visitor.f_up(&plan);
+        assert!(visitor.get_data().is_some());
+    }
+
+    #[test]
+    fn test_empty_exec_visitor() {
+        let plan = Arc::new(MockEmptyExecPlan) as Arc<dyn ExecutionPlan>;
+        let mut visitor = EmptyExecVisitor::new();
+        let _ = visitor.f_up(&plan);
+        assert!(visitor.get_data().is_some());
+    }
+
+    #[test]
+    fn test_replace_table_scan_exec() {
+        let input = Arc::new(MockExecPlan) as Arc<dyn ExecutionPlan>;
+        let mut rewriter = ReplaceTableScanExec::new(input.clone());
+        let plan = Arc::new(MockExecPlan) as Arc<dyn ExecutionPlan>;
+        let result = rewriter.f_up(plan.clone()).unwrap();
+        // Should be transformed to input
+        assert!(result.transformed);
+        assert!(Arc::ptr_eq(&result.data, &input));
+    }
+}

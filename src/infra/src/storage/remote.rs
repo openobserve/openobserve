@@ -383,7 +383,7 @@ fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
         _ => match init_aws_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("{} init config error: {:?}", provider, e);
+                panic!("{provider} init config error: {e:?}");
             }
         },
     }

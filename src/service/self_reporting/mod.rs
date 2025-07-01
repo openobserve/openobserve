@@ -327,7 +327,7 @@ pub fn http_report_metrics(
     search_group: &str,
 ) {
     let time = start.elapsed().as_secs_f64();
-    let uri = format!("/api/org/{}", uri);
+    let uri = format!("/api/org/{uri}");
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             &uri,

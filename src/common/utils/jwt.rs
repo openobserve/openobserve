@@ -75,11 +75,11 @@ pub(crate) async fn verify_decode_token(
                 )?;
                 let mut final_claims = HashMap::new();
                 let claims = decoded_token.clone().claims;
-                if let Some(federated_claims) = claims.get("federated_claims") {
-                    if let Some(map) = federated_claims.as_object() {
-                        for (key, value) in map.iter() {
-                            final_claims.insert(key.to_string(), value.clone());
-                        }
+                if let Some(federated_claims) = claims.get("federated_claims")
+                    && let Some(map) = federated_claims.as_object()
+                {
+                    for (key, value) in map.iter() {
+                        final_claims.insert(key.to_string(), value.clone());
                     }
                 };
 

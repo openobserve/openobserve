@@ -63,7 +63,7 @@ impl JsonEncoder {
 
             // Write `# TYPE` header.
             let metric_type: MetricType = mf.get_field_type();
-            let lowercase_type = json!(format!("{:?}", metric_type).to_lowercase());
+            let lowercase_type = json!(format!("{metric_type:?}").to_lowercase());
             mf_map.insert("__type__".to_string(), lowercase_type);
 
             for m in mf.get_metric() {

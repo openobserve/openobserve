@@ -113,16 +113,15 @@ pub fn get_tcp_conn_resets() -> usize {
     match std::fs::read_to_string("/proc/net/netstat") {
         Ok(contents) => {
             for line in contents.lines() {
-                if line.starts_with("TcpExt:") {
-                    if let Some(next_line) = contents
+                if line.starts_with("TcpExt:")
+                    && let Some(next_line) = contents
                         .lines()
                         .nth(contents.lines().position(|l| l == line).unwrap() + 1)
-                    {
-                        let values: Vec<&str> = next_line.split_whitespace().collect();
-                        // TCPAbortOnData is at index 19
-                        if let Some(resets) = values.get(19) {
-                            return resets.parse().unwrap_or(0);
-                        }
+                {
+                    let values: Vec<&str> = next_line.split_whitespace().collect();
+                    // TCPAbortOnData is at index 19
+                    if let Some(resets) = values.get(19) {
+                        return resets.parse().unwrap_or(0);
                     }
                 }
             }

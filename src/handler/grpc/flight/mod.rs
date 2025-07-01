@@ -158,12 +158,9 @@ impl FlightService for FlightServiceImpl {
                 .indent(false)
                 .to_string();
             println!("+---------------------------+--------------------------+");
-            println!(
-                "follow physical plan, is_super_cluster_follower_leader: {}",
-                is_super_cluster
-            );
+            println!("follow physical plan, is_super_cluster_follower_leader: {is_super_cluster}");
             println!("+---------------------------+--------------------------+");
-            println!("{}", plan);
+            println!("{plan}");
         }
 
         schema = add_scan_stats_to_schema(schema, scan_stats);

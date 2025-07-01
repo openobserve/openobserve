@@ -48,10 +48,10 @@ async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow:
                 metadata: None,
             };
             if let Err(e) = crate::service::ingestion::ingestion_service::ingest(req).await {
-                eprintln!("insert data fail {:?}: {:?}", path, e);
+                eprintln!("insert data fail {path:?}: {e:?}");
                 return Ok(false);
             } else {
-                println!("insert data success: {:?}", path);
+                println!("insert data success: {path:?}");
             }
         } else if path.is_dir()
             && !read_files_in_directory(c.clone(), &path.to_string_lossy()).await?

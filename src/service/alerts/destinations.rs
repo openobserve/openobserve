@@ -138,7 +138,7 @@ pub async fn list(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("destination:_all_{}", org_id))
+                    .contains(&format!("destination:_all_{org_id}"))
         })
         .collect())
 }
@@ -146,7 +146,7 @@ pub async fn list(
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     let cacher = ALERTS.read().await;
     for (stream_key, (_, alert)) in cacher.iter() {
-        if stream_key.starts_with(&format!("{}/", org_id))
+        if stream_key.starts_with(&format!("{org_id}/"))
             && alert.destinations.contains(&name.to_string())
         {
             return Err(DestinationError::UsedByAlert(alert.name.to_string()));

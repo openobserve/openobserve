@@ -130,7 +130,7 @@ pub async fn convert_puffin_file_to_tantivy_dir<T: Into<PathBuf>>(
             .write(true)
             .create(true)
             .truncate(true)
-            .open(dest_path.join(format!("{}.{}", filename, file_ext)))?;
+            .open(dest_path.join(format!("{filename}.{file_ext}")))?;
         h.write_all(&data)?;
         h.flush()?;
         total += data.len();

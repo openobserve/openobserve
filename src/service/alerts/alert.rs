@@ -406,20 +406,19 @@ async fn prepare_alert(
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
             for stream in stream_names.iter() {
-                if !stream.eq(stream_name) {
-                    if let Some(settings) =
+                if !stream.eq(stream_name)
+                    && let Some(settings) =
                         infra::schema::get_settings(org_id, stream, stream_type).await
+                {
+                    let max_query_range = settings.max_query_range;
+                    if max_query_range > 0
+                        && !alert.is_real_time
+                        && alert.trigger_condition.period > max_query_range * 60
                     {
-                        let max_query_range = settings.max_query_range;
-                        if max_query_range > 0
-                            && !alert.is_real_time
-                            && alert.trigger_condition.period > max_query_range * 60
-                        {
-                            return Err(AlertError::PeriodExceedsMaxQueryRange {
-                                max_query_range_hours: max_query_range,
-                                stream_name: stream_name.to_owned(),
-                            });
-                        }
+                        return Err(AlertError::PeriodExceedsMaxQueryRange {
+                            max_query_range_hours: max_query_range,
+                            stream_name: stream_name.to_owned(),
+                        });
                     }
                 }
             }
@@ -583,9 +582,10 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     #[cfg(feature = "enterprise")]
-    if _folder_info.is_some() && get_openfga_config().enabled {
+    if let Some((curr_folder_id, dst_folder_id)) = _folder_info
+        && get_openfga_config().enabled
+    {
         let alert_id = alert.id.unwrap().to_string();
-        let (curr_folder_id, dst_folder_id) = _folder_info.unwrap();
         set_parent_relation(
             &alert_id,
             &get_ofga_type("alerts"),
@@ -666,7 +666,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("alert:_all_{}", org_id))
+                        .contains(&format!("alert:_all_{org_id}"))
                 {
                     if owner.is_some() && !owner.eq(&alert.owner) {
                         continue;
@@ -1095,7 +1095,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         ));
     }
 
-    Ok(format!("sent status: {}, body: {}", resp_status, resp_body))
+    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
 async fn send_email_notification(
@@ -1406,8 +1406,8 @@ async fn process_dest_template(
                 }
             }
             QueryType::Custom => {
-                if let Some(conditions) = &alert.query_condition.conditions {
-                    if let Ok(v) = build_sql(
+                if let Some(conditions) = &alert.query_condition.conditions
+                    && let Ok(v) = build_sql(
                         &alert.org_id,
                         &alert.stream_name,
                         alert.stream_type,
@@ -1415,9 +1415,8 @@ async fn process_dest_template(
                         conditions,
                     )
                     .await
-                    {
-                        alert_query = v;
-                    }
+                {
+                    alert_query = v;
                 }
             }
             _ => unreachable!(),

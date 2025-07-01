@@ -49,12 +49,12 @@ pub async fn udp_server(socket: UdpSocket) {
         if input_str != STOP_SRV {
             let _ = syslog::ingest(&input_str, addr).await;
         }
-        if let Ok(val) = udp_receiver_rx.try_recv() {
-            if !val {
-                log::warn!("UDP server - received the stop signal, exiting.");
-                break;
-            }
-        };
+        if let Ok(val) = udp_receiver_rx.try_recv()
+            && !val
+        {
+            log::warn!("UDP server - received the stop signal, exiting.");
+            break;
+        }
     }
 }
 
@@ -84,12 +84,12 @@ pub async fn tls_tcp_server(listener: TcpListener, tls_acceptor: Option<TlsAccep
             }
         }
 
-        if let Ok(val) = tcp_receiver_rx.try_recv() {
-            if !val {
-                log::warn!("TCP server - received the stop signal, exiting.");
-                drop(listener);
-                break;
-            }
+        if let Ok(val) = tcp_receiver_rx.try_recv()
+            && !val
+        {
+            log::warn!("TCP server - received the stop signal, exiting.");
+            drop(listener);
+            break;
         }
     }
 }

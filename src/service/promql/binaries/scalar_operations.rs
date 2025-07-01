@@ -34,8 +34,7 @@ pub fn scalar_binary_operations(
             token::T_LTE => lhs <= rhs,
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported scalar comparison operation: {:?} {:?} {:?}",
-                    token, lhs, rhs
+                    "Unsupported scalar comparison operation: {token:?} {lhs:?} {rhs:?}",
                 )));
             }
         };
@@ -48,8 +47,7 @@ pub fn scalar_binary_operations(
                 lhs
             } else {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Must filter this lhs value scalar operation: {:?} {:?} {:?}",
-                    token, lhs, rhs
+                    "Must filter this lhs value scalar operation: {token:?} {lhs:?} {rhs:?}",
                 )));
             }
         }
@@ -64,8 +62,7 @@ pub fn scalar_binary_operations(
             token::T_ATAN2 => lhs.atan2(rhs),
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported scalar operation: {:?} {:?} {:?}",
-                    token, lhs, rhs
+                    "Unsupported scalar operation: {token:?} {lhs:?} {rhs:?}"
                 )));
             }
         }
