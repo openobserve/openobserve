@@ -224,13 +224,14 @@
                   data-test="regex-pattern-test-string-editor"
                   ref="queryEditorRef"
                   editor-id="regex-pattern-test-string-editor"
-                  class="tw-w-full"
+                  class="tw-w-full regex-pattern-associated-test-string-editor"
                   :debounceTime="300"
                   v-model:query="testString"
                   @update:query="handleTestStringInput"
-                  style="min-height: 10rem; height: 10rem !important;"
+                  style="height: 100px !important;"
                   language="markdown"
                   :showLineNumbers="false"
+                  :class="store.state.theme === 'dark' ? 'dark-mode-regex-associated-test-string-input' : 'light-mode-regex-associated-test-string-input'"
                 />
               </div>
               <q-separator />
@@ -757,38 +758,24 @@ export default defineComponent({
     font-weight: 400;
     line-height: 12px;
   }
-    .query-editor {
-        height: 100px;
-        max-height: 100px;
-        padding: 12px;
-        border: 1px solid #E6E6E6;
-        border-radius: 4px;
-        outline: none;
-        font-family: monospace;
-        white-space: pre-wrap;
-        overflow-wrap: break-word;
-        overflow-y: auto;
-        
-        &.dark-mode {
-            background-color: #181A1B;
-            border-color: #212121;
-            color: #ffffff;
-        }
-        
-        &.light-mode {
-            background-color: #ffffff;
-            border-color: #E6E6E6;
-            color: #000000;
-        }
-
-        &:empty:before {
-            content: attr(placeholder);
-            color: #999;
-        }
-
-        .match {
-            background-color: rgba(92, 163, 128, 0.3);
-            border-radius: 2px;
-        }
+  .regex-pattern-associated-test-string-editor{
+    .lines-content{
+      padding-left: 12px !important;
+    }
+  }
+  .dark-mode-regex-associated-test-string-input  { 
+        background-color:#181A1B !important;
+        border-top: 1px solid #212121 !important;
+        border-left: 1px solid #212121 !important;
+        border-right: 1px solid #212121 !important;
+        border-bottom: 1px solid #212121 !important;
+    }
+    .light-mode-regex-associated-test-string-input { 
+    background-color:#ffffff !important;
+    border-top: 1px solid #E6E6E6 !important;
+    border-left: 1px solid #E6E6E6 !important;
+    border-right: 1px solid #E6E6E6 !important;
+    border-bottom: 1px solid #E6E6E6 !important;
+    
     }
 </style>
