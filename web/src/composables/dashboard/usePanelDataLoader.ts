@@ -59,6 +59,7 @@ const adjustTimestampByTimeRangeGap = (
   return timestamp - timeRangeGapSeconds * 1000;
 };
 
+let globalTraceIds: string[] = [];
 export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
@@ -1833,12 +1834,18 @@ export const usePanelDataLoader = (
     }
 
     state.searchRequestTraceIds = [...state.searchRequestTraceIds, traceId];
+
+    if (!globalTraceIds.includes(traceId)) {
+      globalTraceIds.push(traceId);
+    }
   };
 
   const removeTraceId = (traceId: string) => {
     state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
       (id: any) => id !== traceId,
     );
+
+    globalTraceIds = globalTraceIds.filter((id) => id !== traceId);
   };
 
   const hasAtLeastOneQuery = () =>
@@ -2225,8 +2232,6 @@ export const usePanelDataLoader = (
   onUnmounted(() => {
     // abort on unmount
     if (abortController) {
-      // Only set isPartialData if we're still loading or haven't received complete response
-      // AND we haven't already marked it as complete
       if (
         (state.loading || state.loadingProgressPercentage < 100) &&
         !state.isOperationCancelled
@@ -2241,50 +2246,48 @@ export const usePanelDataLoader = (
     // cancel http2 queries using http streaming api
     if (
       isStreamingEnabled() &&
-      state.searchRequestTraceIds?.length > 0 &&
+      globalTraceIds?.length > 0 &&
       state.loading &&
       !state.isOperationCancelled
     ) {
       try {
-        state.searchRequestTraceIds.forEach((traceId) => {
+        globalTraceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
-        cancelQueryComposable.searchRequestTraceIds(
-          state.searchRequestTraceIds,
-        );
+        cancelQueryComposable.searchRequestTraceIds(globalTraceIds);
         cancelQueryComposable.cancelQuery(false);
       } catch (error) {
         console.error("Error during HTTP2 cleanup:", error);
       } finally {
         state.searchRequestTraceIds = [];
+        globalTraceIds = [];
       }
     }
 
     // Cancel WebSocket queries
     if (
       isWebSocketEnabled() &&
-      state.searchRequestTraceIds?.length > 0 &&
+      globalTraceIds?.length > 0 &&
       state.loading &&
       !state.isOperationCancelled
     ) {
       try {
-        state.searchRequestTraceIds.forEach((traceId) => {
+        globalTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
-        cancelQueryComposable.searchRequestTraceIds(
-          state.searchRequestTraceIds,
-        );
+        cancelQueryComposable.searchRequestTraceIds(globalTraceIds);
         cancelQueryComposable.cancelQuery(false);
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {
         state.searchRequestTraceIds = [];
+        globalTraceIds = [];
       }
     }
 
