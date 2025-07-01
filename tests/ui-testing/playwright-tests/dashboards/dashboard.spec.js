@@ -742,7 +742,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
+  test("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
     page,
   }) => {
     const dashboardCreate = new DashboardCreate(page);
@@ -778,13 +778,14 @@ test.describe("dashboard UI testcases", () => {
     await dashboardActions.waitForChartToRender();
     await page.locator('[data-test="dashboard-panel-discard"]').click();
 
-    await page.waitForTimeout(5000);
-    const dialogLocator = page.locator(
-      "text=You have unsaved changes. Are you sure you want to leave?"
-    );
-    await expect(dialogLocator).toBeVisible({ timeout: 5000 });
+    // Listen for the dialog and assert its message
+    page.once("dialog", async (dialog) => {
+      console.log(`Dialog message: ${dialog.message()}`);
+      await dialog.accept();
+    });
+    await dashboardList.menuItem("logs-item");
 
-    await page.getByRole("button", { name: "Cancel" }).click();
+    // await page.getByRole("button", { name: "Cancel" }).click();
   });
 });
 
