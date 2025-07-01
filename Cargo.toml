@@ -90,7 +90,7 @@ dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 datafusion-functions-aggregate-common.workspace = true
-# datafusion-functions-json.workspace = true
+datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
 arrow-schema.workspace = true
@@ -249,10 +249,10 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = { git = "https://github.com/openobserve/datafusion", rev = "f6b76528ec4a846eab9ee8722276036252b24826" }
-datafusion-proto = { git = "https://github.com/openobserve/datafusion", rev = "f6b76528ec4a846eab9ee8722276036252b24826" }
-datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", rev = "f6b76528ec4a846eab9ee8722276036252b24826" }
-# datafusion-functions-json = "0.45.0"
+datafusion = "45.0.0"
+datafusion-proto = "45.0.0"
+datafusion-functions-aggregate-common = "45.0.0"
+datafusion-functions-json = "0.45.0"
 expect-test = "1.4"
 arrow = { version = "54.1.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "54.1.0"
