@@ -9,7 +9,6 @@ import { useStore } from "vuex";
  * @returns {{
  *   traceIdRef: Ref<any[]>,
  *   searchRequestTraceIds: (data: any) => void,
- *   cancelQuery: (showNotification?: boolean) => void,
  * }}
  */
 const useCancelQuery = () => {
@@ -29,9 +28,8 @@ const useCancelQuery = () => {
 
   /**
    * Cancels the running queries with trace IDs in `traceIdRef.value`.
-   * @param {boolean} showNotification Whether to show notifications (default: true)
    */
-  const cancelQuery = (showNotification = true) => {
+  const cancelQuery = () => {
     window.dispatchEvent(new Event("cancelQuery"));
 
     const traceIdArray = Array.isArray(traceIdRef.value)
@@ -52,7 +50,7 @@ const useCancelQuery = () => {
       .then((res) => {
         const isCancelled = res.data.some((item: any) => item.is_success);
 
-        if (isCancelled && showNotification) {
+        if (isCancelled) {
           showPositiveNotification("Running query canceled successfully", {
             timeout: 3000,
           });
@@ -60,12 +58,10 @@ const useCancelQuery = () => {
       })
       .catch((error) => {
         console.error("delete running queries error", error);
-        if (showNotification) {
-          showErrorNotification(
-            error.response?.data?.message || "Failed to cancel running query",
-            { timeout: 3000 },
-          );
-        }
+        showErrorNotification(
+          error.response?.data?.message || "Failed to cancel running query",
+          { timeout: 3000 },
+        );
       })
       .finally(() => {
         traceIdRef.value = traceIdRef.value.filter(
@@ -80,6 +76,5 @@ const useCancelQuery = () => {
     cancelQuery,
   };
 };
-
 
 export default useCancelQuery;

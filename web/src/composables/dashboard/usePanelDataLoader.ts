@@ -45,7 +45,6 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
-import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -155,7 +154,6 @@ export const usePanelDataLoader = (
     isPartialData: false,
   });
 
-  const cancelQueryComposable = useCancelQuery();
   // observer for checking if panel is visible on the screen
   let observer: any = null;
 
@@ -2257,8 +2255,10 @@ export const usePanelDataLoader = (
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
-        cancelQueryComposable.searchRequestTraceIds(globalTraceIds);
-        cancelQueryComposable.cancelQuery(false);
+        queryService.delete_running_queries(
+          store?.state?.selectedOrganization?.identifier,
+          state.searchRequestTraceIds,
+        );
       } catch (error) {
         console.error("Error during HTTP2 cleanup:", error);
       } finally {
@@ -2281,8 +2281,10 @@ export const usePanelDataLoader = (
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
-        cancelQueryComposable.searchRequestTraceIds(globalTraceIds);
-        cancelQueryComposable.cancelQuery(false);
+        queryService.delete_running_queries(
+          store?.state?.selectedOrganization?.identifier,
+          state.searchRequestTraceIds,
+        );
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {
