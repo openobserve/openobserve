@@ -161,10 +161,10 @@ pub async fn search_multi(
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
 
-    if let Some(vrl_function) = &query_fn {
-        if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
-        }
+    if let Some(vrl_function) = &query_fn
+        && !vrl_function.trim().ends_with('.')
+    {
+        query_fn = Some(format!("{vrl_function} \n ."));
     }
 
     let mut range_error = String::new();
@@ -306,7 +306,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
         for fn_name in functions::get_all_transform_keys(&org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -451,24 +451,23 @@ pub async fn search_multi(
                 log::error!("search error: {:?}", err);
                 multi_res.function_error =
                     vec![multi_res.function_error.join(", "), err.to_string()];
-                if let errors::Error::ErrorCode(code) = err {
-                    if let errors::ErrorCodes::SearchCancelQuery(_) = code {
-                        return Ok(HttpResponse::TooManyRequests().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                &code,
-                                Some(trace_id),
-                            ),
-                        ));
-                    }
+                if let errors::Error::ErrorCode(code) = err
+                    && let errors::ErrorCodes::SearchCancelQuery(_) = code
+                {
+                    return Ok(HttpResponse::TooManyRequests().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
+                    ));
                 }
             }
         }
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() && per_query_resp {
+    multi_res.hits = if let Some(input_fn) = query_fn.as_ref()
+        && per_query_resp
+    {
         // compile vrl function & apply the same before returning the response
-        let mut input_fn = query_fn.unwrap().trim().to_string();
+        let mut input_fn = input_fn.trim().to_string();
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
@@ -823,7 +822,7 @@ pub async fn around_multi(
 
     let mut around_sqls = stream_names
         .iter()
-        .map(|name| format!("SELECT * FROM \"{}\" ", name))
+        .map(|name| format!("SELECT * FROM \"{name}\" "))
         .collect::<Vec<String>>();
     if let Some(v) = query.get("sql") {
         let sqls = v.split(',').collect::<Vec<&str>>();
@@ -845,7 +844,7 @@ pub async fn around_multi(
         ..Default::default()
     };
     for (i, stream_name) in stream_names.iter().enumerate() {
-        let trace_id = format!("{}-{}", trace_id, i);
+        let trace_id = format!("{trace_id}-{i}");
         let search_res = super::around::around(
             &trace_id,
             http_span.clone(),

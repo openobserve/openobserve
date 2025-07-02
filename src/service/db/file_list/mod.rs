@@ -96,14 +96,14 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
             }
         }
         // update stream stats realtime
-        if config::get_config().common.local_mode {
-            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data) {
-                log::error!(
-                    "service:db:file_list: add {}, incr_stream_stats error: {}",
-                    key,
-                    e
-                );
-            }
+        if config::get_config().common.local_mode
+            && let Err(e) = infra::cache::stats::incr_stream_stats(key, data)
+        {
+            log::error!(
+                "service:db:file_list: add {}, incr_stream_stats error: {}",
+                key,
+                e
+            );
         }
     }
 

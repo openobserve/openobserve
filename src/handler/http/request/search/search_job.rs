@@ -643,10 +643,10 @@ async fn cancel_job_inner(
 
     // 3. use job_id to make background_partition_job cancel
     let status = status.unwrap();
-    if status == 1 {
-        if let Err(e) = cancel_partition_job(job_id).await {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
+    if status == 1
+        && let Err(e) = cancel_partition_job(job_id).await
+    {
+        return Ok(MetaHttpResponse::bad_request(e));
     }
 
     // 4. use cancel query function to cancel the query

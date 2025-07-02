@@ -177,7 +177,7 @@ mod legacy_folders {
             for folder in folders {
                 let ksuid = ksuid_from_hash(&folder).to_string();
                 let mut am = folder.into_active_model();
-                println!("folder ksuid: {}", ksuid);
+                println!("folder ksuid: {ksuid}");
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }

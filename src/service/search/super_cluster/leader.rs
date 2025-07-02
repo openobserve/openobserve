@@ -252,7 +252,7 @@ async fn run_datafusion(
         println!("+---------------------------+----------+");
         println!("leader physical plan before rewrite");
         println!("+---------------------------+----------+");
-        println!("{}", plan);
+        println!("{plan}");
     }
 
     // 6. rewrite physical plan
@@ -342,7 +342,7 @@ async fn run_datafusion(
         println!("+---------------------------+----------+");
         println!("leader physical plan after rewrite");
         println!("+---------------------------+----------+");
-        println!("{}", plan);
+        println!("{plan}");
     }
 
     let datafusion_start = std::time::Instant::now();

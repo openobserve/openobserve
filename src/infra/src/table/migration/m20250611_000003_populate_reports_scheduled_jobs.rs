@@ -80,7 +80,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
     let triggers_result = db
         .query_all(statement)
         .await
-        .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {}", e)))?;
+        .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {e}")))?;
 
     log::info!(
         "[SCHEDULED_TRIGGERS_MIGRATION] triggers_result length: {}",
@@ -90,11 +90,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
     for trigger_row in triggers_result {
         let org = trigger_row
             .try_get::<String>("", "org")
-            .map_err(|e| DbErr::Custom(format!("Failed to get org: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to get org: {e}")))?;
 
         let report_name = trigger_row
             .try_get::<String>("", "module_key")
-            .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {e}")))?;
 
         // Query the corresponding report to get its ID
         let report_query = Query::select()
@@ -111,14 +111,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             sea_orm::DatabaseBackend::Sqlite => report_query.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
-        log::info!(
-            "[SCHEDULED_TRIGGERS_MIGRATION] report_query to get id: {}",
-            statement
-        );
+        log::info!("[SCHEDULED_TRIGGERS_MIGRATION] report_query to get id: {statement}");
         let report_result = db
             .query_one(statement)
             .await
-            .map_err(|e| DbErr::Custom(format!("Failed to query report: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to query report: {e}")))?;
         log::info!(
             "[SCHEDULED_TRIGGERS_MIGRATION] report_result is found: {}",
             report_result.is_some()
@@ -128,7 +125,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         if let Some(report_row) = report_result {
             let report_id = report_row
                 .try_get::<String>("", "id")
-                .map_err(|e| DbErr::Custom(format!("Failed to get report ID: {}", e)))?;
+                .map_err(|e| DbErr::Custom(format!("Failed to get report ID: {e}")))?;
 
             log::info!(
                 "[SCHEDULED_TRIGGERS_MIGRATION] report_id to upgrade: {}",
@@ -149,12 +146,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             };
             let statement = Statement::from_sql_and_values(backend, sql, values);
             log::info!(
-                "[SCHEDULED_TRIGGERS_MIGRATION] update_query report scheduled job statement: {}",
-                statement
+                "[SCHEDULED_TRIGGERS_MIGRATION] update_query report scheduled job statement: {statement}"
             );
             db.execute(statement)
                 .await
-                .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {}", e)))?;
+                .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {e}")))?;
         }
     }
 

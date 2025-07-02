@@ -39,7 +39,7 @@ pub async fn query(
         query,
         ..Default::default()
     };
-    let url = format!("/api/{}/_search", org);
+    let url = format!("/api/{org}/_search");
     let body = serde_json::to_vec(&search_req)?;
     let response = request(&url, Some(body), reqwest::Method::POST).await?;
     let Some(body) = response else {

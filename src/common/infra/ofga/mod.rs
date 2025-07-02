@@ -199,8 +199,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         org_name,
                         &mut tuples,
                         OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
+                            .values()
+                            .map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )
@@ -213,8 +213,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         DEFAULT_ORG,
                         &mut tuples,
                         OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
+                            .values()
+                            .map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )

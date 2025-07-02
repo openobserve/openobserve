@@ -78,7 +78,7 @@ impl Message {
             Message::Nats(msg) => msg
                 .ack()
                 .await
-                .map_err(|e| Error::Message(format!("ack error:{}", e)))?,
+                .map_err(|e| Error::Message(format!("ack error:{e}")))?,
         }
         Ok(())
     }

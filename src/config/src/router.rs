@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 23] = [
+const QUERIER_ROUTES: [(&str, usize); 24] = [
     ("config", 0),                            // /config
     ("summary", 2),                           // /api/{org_id}/summary
     ("organizations", 1),                     // /api/organizations
@@ -37,7 +37,8 @@ const QUERIER_ROUTES: [(&str, usize); 23] = [
     ("prometheus/api/v1/query_exemplars", 2), // /api/{org_id}/prometheus/api/v1/query_exemplars
     ("prometheus/api/v1/metadata", 2),        // /api/{org_id}/prometheus/api/v1/metadata
     ("prometheus/api/v1/labels", 2),          // /api/{org_id}/prometheus/api/v1/labels
-    ("prometheus/api/v1/label/", 2),          /* /api/{org_id}/prometheus/api/v1/label/
+    ("prometheus/api/v1/label/", 2),          // /api/{org_id}/prometheus/api/v1/label/
+    ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
 ];
