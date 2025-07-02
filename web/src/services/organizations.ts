@@ -77,7 +77,7 @@ const organizations = {
     return http().post(`/api/${orgIdentifier}/settings`, data);
   },
   get_admin_org: (orgIdentifier: string) => {
-    return http().get(`/api/${orgIdentifier}/organizations`);
+    return http().get(`/api/${orgIdentifier}/organizations?page_size=1000000`);
   },
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
