@@ -168,8 +168,8 @@ async fn update_passcode_inner(
         return Err(anyhow::Error::msg("User not found"));
     };
 
-    if org_id.is_some() {
-        local_org_id = org_id.unwrap();
+    if let Some(org_id) = org_id {
+        local_org_id = org_id;
     }
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));

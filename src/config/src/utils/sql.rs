@@ -28,7 +28,7 @@ use sqlparser::{
 
 use crate::TIMESTAMP_COL_NAME;
 
-pub const AGGREGATE_UDF_LIST: [&str; 10] = [
+pub const AGGREGATE_UDF_LIST: [&str; 16] = [
     "min",
     "max",
     "avg",
@@ -39,21 +39,26 @@ pub const AGGREGATE_UDF_LIST: [&str; 10] = [
     "approx_percentile_cont",
     "percentile_cont",
     "summary_percentile",
+    "first_value",
+    "last_value",
+    "approx_distinct",
+    "approx_median",
+    "approx_percentile_cont",
+    "approx_percentile_cont_with_weight",
 ];
 
 pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
-        if let Statement::Query(query) = statement {
-            if is_aggregate_in_select(query)
+        if let Statement::Query(query) = statement
+            && (is_aggregate_in_select(query)
                 || has_group_by(query)
                 || has_having(query)
                 || has_join(query)
                 || has_subquery(statement)
-                || has_union(query)
-            {
-                return Ok(true);
-            }
+                || has_union(query))
+        {
+            return Ok(true);
         }
     }
     Ok(false)
@@ -67,14 +72,13 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
         if has_subquery(statement) || has_window_functions(statement) {
             return Ok(false);
         }
-        if let Statement::Query(query) = statement {
-            if !is_aggregate_in_select(query)
+        if let Statement::Query(query) = statement
+            && (!is_aggregate_in_select(query)
                 || has_join(query)
                 || has_union(query)
-                || has_cte(query)
-            {
-                return Ok(false);
-            }
+                || has_cte(query))
+        {
+            return Ok(false);
         }
     }
     Ok(true)
@@ -84,10 +88,11 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
 pub fn is_simple_distinct_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
-        if let Statement::Query(query) = statement {
-            if has_distinct(query) && !has_group_by(query) {
-                return Ok(true);
-            }
+        if let Statement::Query(query) = statement
+            && has_distinct(query)
+            && !has_group_by(query)
+        {
+            return Ok(true);
         }
     }
     Ok(false)
@@ -113,10 +118,9 @@ fn is_aggregate_in_select(query: &Query) -> bool {
         for select_item in &select.projection {
             if let SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, alias: _ } =
                 select_item
+                && is_aggregate_expression(expr)
             {
-                if is_aggregate_expression(expr) {
-                    return true;
-                }
+                return true;
             }
         }
     }
@@ -133,14 +137,14 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
             is_aggregate_expression(left) || is_aggregate_expression(right)
         }
         Expr::Case {
+            operand,
             conditions,
-            results,
             else_result,
-            ..
         } => {
             // Check if any part of the CASE expression is an aggregate function
-            conditions.iter().any(is_aggregate_expression)
-                || results.iter().any(is_aggregate_expression)
+            conditions.iter().any(|c| {
+                is_aggregate_expression(&c.condition) || is_aggregate_expression(&c.result)
+            }) || operand.as_ref().is_some_and(|e| is_aggregate_expression(e))
                 || else_result
                     .as_ref()
                     .is_some_and(|e| is_aggregate_expression(e))
@@ -176,7 +180,7 @@ fn has_group_by(query: &Query) -> bool {
 // Check if has distinct
 fn has_distinct(query: &Query) -> bool {
     let mut visitor = DistinctVisitor::new();
-    query.visit(&mut visitor);
+    let _ = query.visit(&mut visitor);
     visitor.has_distinct
 }
 
@@ -197,11 +201,11 @@ impl Visitor for DistinctVisitor {
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
         // Check for SELECT DISTINCT
-        if let SetExpr::Select(select) = query.body.as_ref() {
-            if select.distinct.is_some() {
-                self.has_distinct = true;
-                return ControlFlow::Break(());
-            }
+        if let SetExpr::Select(select) = query.body.as_ref()
+            && select.distinct.is_some()
+        {
+            self.has_distinct = true;
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -248,13 +252,13 @@ fn has_join(query: &Query) -> bool {
 
 fn has_union(query: &Query) -> bool {
     let mut visitor = UnionVisitor::new();
-    query.visit(&mut visitor);
+    let _ = query.visit(&mut visitor);
     visitor.has_union
 }
 
 fn has_subquery(stat: &Statement) -> bool {
     let mut visitor = SubqueryVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.is_subquery
 }
 
@@ -320,7 +324,7 @@ impl Visitor for SubqueryVisitor {
 
 fn has_timestamp(stat: &Statement) -> bool {
     let mut visitor = TimestampVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.timestamp_selected
 }
 
@@ -415,11 +419,11 @@ impl Visitor for TimestampVisitor {
 
                         // Handle alias chain: SELECT ts1 FROM (...) where ts1 is alias for
                         // _timestamp
-                        if let Expr::Identifier(ident) = expr {
-                            if self.timestamp_aliases.contains(&ident.value) {
-                                self.timestamp_selected = true;
-                                return ControlFlow::Break(());
-                            }
+                        if let Expr::Identifier(ident) = expr
+                            && self.timestamp_aliases.contains(&ident.value)
+                        {
+                            self.timestamp_selected = true;
+                            return ControlFlow::Break(());
                         }
                     }
 
@@ -436,10 +440,10 @@ impl Visitor for TimestampVisitor {
                         }
 
                         // If the expression is an alias we already know maps to timestamp
-                        if let Expr::Identifier(ident) = expr {
-                            if self.timestamp_aliases.contains(&ident.value) {
-                                self.timestamp_aliases.insert(alias.value.clone());
-                            }
+                        if let Expr::Identifier(ident) = expr
+                            && self.timestamp_aliases.contains(&ident.value)
+                        {
+                            self.timestamp_aliases.insert(alias.value.clone());
                         }
                     }
 
@@ -459,7 +463,7 @@ impl Visitor for TimestampVisitor {
 
 fn has_window_functions(stat: &Statement) -> bool {
     let mut visitor = WindowFunctionVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.has_window_function
 }
 

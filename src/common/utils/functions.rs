@@ -26,7 +26,7 @@ use crate::common::{
 };
 
 pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
-    let org_key = &format!("{}/", org_id);
+    let org_key = &format!("{org_id}/");
 
     crate::common::infra::config::QUERY_FUNCTIONS
         .clone()
@@ -59,18 +59,14 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
     }
     drop(en_tables);
 
-    if GEOIP_CITY_TABLE.read().is_some() {
-        tables.insert(
-            GEO_IP_CITY_ENRICHMENT_TABLE.to_owned(),
-            Box::new(GEOIP_CITY_TABLE.read().as_ref().unwrap().clone()),
-        );
+    if let Some(v) = GEOIP_CITY_TABLE.read().as_ref() {
+        tables.insert(GEO_IP_CITY_ENRICHMENT_TABLE.to_owned(), Box::new(v.clone()));
     }
-    if GEOIP_ASN_TABLE.read().is_some() {
-        tables.insert(
-            GEO_IP_ASN_ENRICHMENT_TABLE.to_owned(),
-            Box::new(GEOIP_ASN_TABLE.read().as_ref().unwrap().clone()),
-        );
+
+    if let Some(v) = GEOIP_ASN_TABLE.read().as_ref() {
+        tables.insert(GEO_IP_ASN_ENRICHMENT_TABLE.to_owned(), Box::new(v.clone()));
     }
+
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .common

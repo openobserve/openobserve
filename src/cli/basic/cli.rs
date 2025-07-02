@@ -259,7 +259,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         match command.get_one::<String>("path") {
             Some(path) => {
                 set_permission(path, 0o777)?;
-                println!("init dir {} successfully", path);
+                println!("init dir {path} successfully");
             }
             None => {
                 return Err(anyhow::anyhow!("please set data path"));
@@ -372,7 +372,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 Some(to) => to.to_string(),
                 None => "".to_string(),
             };
-            println!("Running migration file_list from {} to {}", from, to);
+            println!("Running migration file_list from {from} to {to}");
             migration::file_list::run(&from, &to).await?;
         }
         "migrate-meta" => {
@@ -384,7 +384,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 Some(to) => to.to_string(),
                 None => "".to_string(),
             };
-            println!("Running migration metadata from {} to {}", from, to);
+            println!("Running migration metadata from {from} to {to}");
             migration::meta::run(&from, &to).await?
         }
         "migrate-dashboards" => {
@@ -404,10 +404,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let file = command.get_one::<String>("file").unwrap();
             match file_list::delete_parquet_file(&account, file, true).await {
                 Ok(_) => {
-                    println!("delete parquet file {} successfully", file);
+                    println!("delete parquet file {file} successfully");
                 }
                 Err(e) => {
-                    println!("delete parquet file {} failed, error: {}", file, e);
+                    println!("delete parquet file {file} failed, error: {e}");
                 }
             }
         }
@@ -511,13 +511,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         }
         "parse-id" => {
             let id = command.get_one::<String>("id").unwrap();
-            println!("id: {}", id);
+            println!("id: {id}");
             let id = id.parse::<i64>().unwrap();
             let ts = config::ider::to_timestamp_millis(id);
-            println!("timestamp: {}", ts);
+            println!("timestamp: {ts}");
             let t = chrono::Utc.timestamp_nanos(ts * 1_000_000);
             let td = t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            println!("datetimes: {}", td);
+            println!("datetimes: {td}");
         }
         "consistent-hash" => {
             let files = command

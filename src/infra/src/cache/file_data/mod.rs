@@ -249,18 +249,14 @@ async fn download_from_storage(
         // if the downloaded length is not equal to what the blog store
         // sent in headers, we might have a partial download, so we log
         // and retry
-        if data_len != expected_blob_size {
+        if data_len as u64 != expected_blob_size {
             let msg = if i == DOWNLOAD_RETRY_TIMES - 1 {
-                format!("after {} retries", DOWNLOAD_RETRY_TIMES)
+                format!("after {DOWNLOAD_RETRY_TIMES} retries")
             } else {
                 "will retry".to_string()
             };
             log::warn!(
-                "download file {} found size mismatch with blob store header, expected: {}, actual: {}, {}",
-                file,
-                expected_blob_size,
-                data_len,
-                msg
+                "download file {file} found size mismatch with blob store header, expected: {expected_blob_size}, actual: {data_len}, {msg}",
             );
             tokio::time::sleep(tokio::time::Duration::from_secs(retry_time)).await;
             retry_time *= 2;
@@ -272,7 +268,7 @@ async fn download_from_storage(
     }
     // if even after retries, the download size does not match, we skip it
     // no point in validating or setting the value
-    if data_len != expected_blob_size {
+    if data_len as u64 != expected_blob_size {
         return Err(anyhow::anyhow!(
             "file {file} could not be downloaded completely: expected {expected_blob_size}, got {data_len} skipping"
         ));
@@ -348,7 +344,7 @@ pub async fn set(key: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
 pub async fn get(
     account: &str,
     file: &str,
-    range: Option<Range<usize>>,
+    range: Option<Range<u64>>,
 ) -> object_store::Result<bytes::Bytes> {
     get_opts(account, file, range, true).await
 }
@@ -356,22 +352,23 @@ pub async fn get(
 pub async fn get_opts(
     account: &str,
     file: &str,
-    range: Option<Range<usize>>,
+    range: Option<Range<u64>>,
     remote: bool,
 ) -> object_store::Result<bytes::Bytes> {
     let cfg = config::get_config();
     // get from memory cache
-    if cfg.memory_cache.enabled {
-        if let Some(v) = memory::get(file, range.clone()).await {
-            return Ok(v);
-        }
+    if cfg.memory_cache.enabled
+        && let Some(v) = memory::get(file, range.clone()).await
+    {
+        return Ok(v);
     }
     // get from disk cache
-    if cfg.disk_cache.enabled {
-        if let Some(v) = disk::get(file, range.clone()).await {
-            return Ok(v);
-        }
+    if cfg.disk_cache.enabled
+        && let Some(v) = disk::get(file, range.clone()).await
+    {
+        return Ok(v);
     }
+
     // get from storage
     if remote {
         return match range {
@@ -382,7 +379,7 @@ pub async fn get_opts(
 
     Err(object_store::Error::NotFound {
         path: file.to_string(),
-        source: Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, file)),
+        source: Box::new(std::io::Error::other(file)),
     })
 }
 
@@ -393,21 +390,22 @@ pub async fn get_size(account: &str, file: &str) -> object_store::Result<usize> 
 pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_store::Result<usize> {
     let cfg = config::get_config();
     // get from memory cache
-    if cfg.memory_cache.enabled {
-        if let Some(v) = memory::get_size(file).await {
-            return Ok(v);
-        }
+    if cfg.memory_cache.enabled
+        && let Some(v) = memory::get_size(file).await
+    {
+        return Ok(v);
     }
     // get from disk cache
-    if cfg.disk_cache.enabled {
-        if let Some(v) = disk::get_size(file).await {
-            return Ok(v);
-        }
+    if cfg.disk_cache.enabled
+        && let Some(v) = disk::get_size(file).await
+    {
+        return Ok(v);
     }
+
     // get from storage
     if remote {
         let meta = crate::storage::head(account, file).await?;
-        return Ok(meta.size);
+        return Ok(meta.size as usize);
     }
 
     Err(object_store::Error::NotFound {

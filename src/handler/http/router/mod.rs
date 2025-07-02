@@ -227,13 +227,11 @@ async fn proxy(
         .request(method, &path.target_url)
         .send()
         .await
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Request failed: {}", e))
-        })?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Request failed: {e}")))?;
 
     let status = forwarded_resp.status().as_u16();
     let body = forwarded_resp.bytes().await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
+        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {e}"))
     })?;
 
     Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap()).body(body))
@@ -658,14 +656,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_proxy_routes() {
-        let mut app =
+        let app =
             init_service(App::new().configure(|cfg| get_proxy_routes_inner(cfg, false))).await;
 
         // Test GET request to /proxy/{org_id}/{target_url}
         let req = TestRequest::get()
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
-        let resp = call_service(&mut app, req).await;
+        let resp = call_service(&app, req).await;
         assert_eq!(resp.status().as_u16(), 404);
     }
 }

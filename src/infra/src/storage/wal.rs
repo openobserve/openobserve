@@ -35,7 +35,7 @@ pub async fn get_opts(path: &Path, options: GetOptions) -> Result<GetResult> {
     DEFAULT.get_opts(path, options).await
 }
 
-pub async fn get_range(path: &Path, range: Range<usize>) -> Result<bytes::Bytes> {
+pub async fn get_range(path: &Path, range: Range<u64>) -> Result<bytes::Bytes> {
     DEFAULT.get_range(path, range).await
 }
 

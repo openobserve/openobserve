@@ -79,6 +79,7 @@ import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
+import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -634,7 +635,15 @@ const useLogs = () => {
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
-    // query["timezone"] = store.state.timezone;
+
+    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
+      query["regions"] = searchObj.meta.regions.join(",");
+    }
+
+    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
+      query["clusters"] = searchObj.meta.clusters.join(",");
+    }
+
     return query;
   };
 
@@ -1244,6 +1253,8 @@ const useLogs = () => {
                 paginations: [],
               };
 
+              searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
+
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
                 let partitions = [];
@@ -1458,6 +1469,7 @@ const useLogs = () => {
         for (const [index, item] of partitionDetail.partitions.entries()) {
           total = partitionDetail.partitionTotal[index];
           
+          
           if (!partitionDetail.paginations[pageNumber]) {
             partitionDetail.paginations[pageNumber] = [];
           }
@@ -1495,7 +1507,11 @@ const useLogs = () => {
                   recordSize = rowsPerPage - lastPartitionSize;
                 }
 
-                if (total < recordSize) {
+                if (total == 0) {
+                  recordSize = 0;
+                }
+      
+                if (total !== -1 && total < recordSize) {
                   recordSize = total;
                 }
               }
@@ -1582,6 +1598,7 @@ const useLogs = () => {
       return false;
     }
   };
+
 
   /**
    * This function is used to get the total pages for the single partition 
@@ -1881,7 +1898,7 @@ const useLogs = () => {
                 if (partitions.length > 1) {
                   setTimeout(async () => {
                     await generateHistogramData();
-                    refreshPartitionPagination(true);
+                    if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
                   }, 100);
                 }
               }
@@ -1889,7 +1906,7 @@ const useLogs = () => {
             }
           }
           await generateHistogramData();
-          refreshPartitionPagination(true);
+          if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
@@ -2353,11 +2370,34 @@ const useLogs = () => {
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 
+
+  const fetchAllParitions = async(queryReq: any) => {
+    if (
+      searchObj.data.queryResults.partitionDetail.partitions[
+        searchObj.data.queryResults.subpage
+      ]?.length
+    ) {
+      queryReq.query.start_time =
+        searchObj.data.queryResults.partitionDetail.partitions[
+          searchObj.data.queryResults.subpage
+        ][0];
+      queryReq.query.end_time =
+        searchObj.data.queryResults.partitionDetail.partitions[
+          searchObj.data.queryResults.subpage
+        ][1];
+      queryReq.query.from = 0;
+      queryReq.query.size = -1;
+      searchObj.data.queryResults.subpage++;
+      await getPaginatedData(queryReq, true, false);
+    }
+  }
+
   const getPaginatedData = async (
     queryReq: any,
     appendResult: boolean = false,
+    isInitialRequest: boolean = true
   ) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
       // // it will be used to send pagination request
       // if (queryReq.query.from == 0) {
@@ -2382,7 +2422,12 @@ const useLogs = () => {
         searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
       }
       const parsedSQL: any = fnParsedSQL();
-      searchObj.meta.resultGrid.showPagination = true;
+
+      if(isInitialRequest) {
+        searchObj.meta.resultGrid.showPagination = true;
+      }
+
+
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
@@ -2406,6 +2451,12 @@ const useLogs = () => {
         }
       }
 
+      const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
+
+      if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+      }
+      
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
       const decideSearch = searchObj.meta.jobId
@@ -2482,15 +2533,13 @@ const useLogs = () => {
 
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
-          if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
-            if (
-              hasAggregation(parsedSQL?.columns) ||
-              parsedSQL.groupby != null
-            ) {
+
+          if (isAggregation) {
+            if(queryReq.query?.streaming_output) {
               searchAggData.total = res.data.total;
               searchAggData.hasAggregation = true;
-              searchObj.meta.resultGrid.showPagination = false;
             }
+            searchObj.meta.resultGrid.showPagination = false;
           }
 
           let regeratePaginationFlag = false;
@@ -2499,20 +2548,41 @@ const useLogs = () => {
           }
           // if total records in partition is greater than recordsPerPage then we need to update pagination
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-          if (searchObj.meta.jobId == "") {
+          if (searchObj.meta.jobId == "" && !(queryReq.query?.streaming_output || isAggregation)) {
             refreshPartitionPagination(regeratePaginationFlag);
           }
           // Scan-size and took time in histogram title
           // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
           // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
 
-          if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
+          // Aggregation
+
+          // Streaming Outout
+
+          // Normal 
+
+          if(queryReq.query?.streaming_output) {
+            searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
+            searchObj.data.queryResults.from = res.data.from;
+            searchObj.data.queryResults.scan_size = (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
+            searchObj.data.queryResults.took = (searchObj.data.queryResults.took || 0) + res.data.took;
+            searchObj.data.queryResults.hits = res.data.hits;
+            fetchAllParitions(queryReq);
+          } else if(isAggregation) {
+            searchObj.data.queryResults.from = res.data.from;
+            searchObj.data.queryResults.total = (searchObj.data.queryResults.total || 0) + res.data.total;
+            searchObj.data.queryResults.scan_size = (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
+            searchObj.data.queryResults.took = (searchObj.data.queryResults.took || 0) + res.data.took;
+            searchObj.data.queryResults.hits.push(...res.data.hits);
+            fetchAllParitions(queryReq);
+          } else if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult && !queryReq.query?.streaming_output) {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
               await chunkedAppend(searchObj.data.queryResults.hits, res.data.hits);
             } else {
+              // Replace result
               if(queryReq.query?.streaming_output) {
                 searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
                 searchObj.data.queryResults.from = res.data.from;
@@ -2520,13 +2590,12 @@ const useLogs = () => {
                 searchObj.data.queryResults.took += res.data.took;
                 searchObj.data.queryResults.hits = res.data.hits;
               } else {
+                // Replace result
                 searchObj.data.queryResults.from = res.data.from;
                 searchObj.data.queryResults.scan_size = res.data.scan_size;
                 searchObj.data.queryResults.took = res.data.took;
                 searchObj.data.queryResults.hits = res.data.hits;
               }
-              
-              
             }
           } else {
             resetFieldValues();
@@ -2563,6 +2632,7 @@ const useLogs = () => {
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
           if (
+            !(isAggregation  && queryReq.query?.streaming_output) &&
             searchObj.meta.jobId == "" &&
             searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
@@ -2601,7 +2671,7 @@ const useLogs = () => {
               //   searchObj.data.functionError = res.data.function_error;
               // }
             }, 0);
-            await getPaginatedData(queryReq, true);
+            await getPaginatedData(queryReq, true, false);
           }
           if (searchObj.meta.jobId != "") {
             searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
@@ -2966,6 +3036,10 @@ const useLogs = () => {
         for (const key of Object.keys(item)) {
           if (excludedFields.includes(key)) {
             return;
+          }
+
+          if(fieldValues.value === undefined) {
+            fieldValues.value = {}
           }
 
           if (fieldValues.value[key] == undefined) {
@@ -3694,7 +3768,7 @@ const useLogs = () => {
 
       let plusSign: string = "";
       if (
-        searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 && 
+        searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 &&
         endCount < totalCount &&
         searchObj.meta.showHistogram == false
       ) {
@@ -4265,6 +4339,16 @@ const useLogs = () => {
     ) {
       delete queryParams.type;
     }
+
+
+    if(store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
+      searchObj.meta.regions = queryParams.regions.split(",");
+    }
+
+    if(store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
+      searchObj.meta.clusters = queryParams.clusters.split(",");
+    }
+
     // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
@@ -5074,7 +5158,9 @@ const useLogs = () => {
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       
-      if(searchObj.meta.refreshInterval === 0) updatePageCountSearchSize(queryReq);
+      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval === 0) {
+        queryReq.query.size = queryReq.query.size + 1;
+      }
 
       // in case of live refresh, reset from to 0
       if (
@@ -5302,14 +5388,14 @@ const useLogs = () => {
     // Scan-size and took time in histogram title
     // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
     // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-    if (appendResult) {
+    if((isPagination && searchPartitionMap[payload.traceId] === 1) || !appendResult){
+      searchObj.data.queryResults.hits = response.content.results.hits;
+    } else if (appendResult) {
       searchObj.data.queryResults.hits.push(
         ...response.content.results.hits,
       );
-    } else {
-      searchObj.data.queryResults.hits = response.content.results.hits;
-    }
-
+    } 
+    
     if (searchObj.meta.refreshInterval === 0) {
       updatePageCountTotal(payload.queryReq, response.content.results.hits.length, searchObj.data.queryResults.hits.length);
       trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
@@ -5370,6 +5456,8 @@ const useLogs = () => {
     if(searchObj.meta.refreshInterval === 0) {
       if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
+      } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total != payload.queryReq.query.size)){
+        searchObj.data.queryResults.pageCountTotal = (payload.queryReq.query.size * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + response.content.results.total;
       }
     }
 
@@ -6193,6 +6281,8 @@ const useLogs = () => {
       let totalPages = 0;
 
       total = getAggsTotal();
+
+
 
       if((searchObj.data.queryResults.pageCountTotal || -1) > total) {
         total = searchObj.data.queryResults.pageCountTotal;

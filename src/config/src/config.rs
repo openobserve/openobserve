@@ -1145,6 +1145,10 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
+    #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
+    pub search_inspector_enabled: bool,
+    #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
+    pub utf8_view_enabled: bool,
 }
 
 #[derive(EnvConfig)]

@@ -46,16 +46,10 @@ impl PuffinDirReader {
     pub async fn from_path(account: String, source: object_store::ObjectMeta) -> io::Result<Self> {
         let mut source = PuffinBytesReader::new(account, source);
         let Some(metadata) = source.get_metadata().await.map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("Error reading metadata from puffin file: {e}"),
-            )
+            io::Error::other(format!("Error reading metadata from puffin file: {e}"))
         })?
         else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Error reading metadata from puffin file",
-            ));
+            return Err(io::Error::other("Error reading metadata from puffin file"));
         };
 
         let mut blobs_metadata = HashMap::new();
@@ -104,29 +98,25 @@ impl HasLen for PuffinSliceHandle {
 #[async_trait::async_trait]
 impl FileHandle for PuffinSliceHandle {
     fn read_bytes(&self, _byte_range: Range<usize>) -> io::Result<OwnedBytes> {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!(
-                "Error read_bytes from blob: {:?}, Not supported with PuffinSliceHandle",
-                self.path
-            ),
-        ))
+        Err(io::Error::other(format!(
+            "Error read_bytes from blob: {:?}, Not supported with PuffinSliceHandle",
+            self.path
+        )))
     }
 
     async fn read_bytes_async(&self, byte_range: Range<usize>) -> io::Result<OwnedBytes> {
         if byte_range.is_empty() {
             return Ok(OwnedBytes::empty());
         }
+        let byte_range = Range {
+            start: byte_range.start as u64,
+            end: byte_range.end as u64,
+        };
         let data = self
             .source
             .read_blob_bytes(&self.metadata, Some(byte_range.clone()))
             .await
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Error reading bytes from blob: {e}"),
-                )
-            })?;
+            .map_err(|e| io::Error::other(format!("Error reading bytes from blob: {e}")))?;
         Ok(OwnedBytes::new(data.to_vec()))
     }
 }
@@ -315,7 +305,7 @@ mod tests {
         object_store::ObjectMeta {
             location: file_name.into(),
             last_modified: chrono::Utc::now(),
-            size,
+            size: size as u64,
             e_tag: None,
             version: None,
         }
@@ -582,8 +572,7 @@ mod tests {
         };
 
         let result = reader.exists(&path);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
+        assert!(result.is_ok_and(|exists| exists), "Expected file to exist");
     }
 
     #[test]
@@ -899,8 +888,7 @@ mod tests {
 
                 let path = PathBuf::from("shared_file.terms");
                 let exists = reader_clone.exists(&path);
-                assert!(exists.is_ok());
-                assert_eq!(exists.unwrap(), true);
+                assert!(exists.is_ok_and(|exists| exists), "Expected file to exist");
 
                 i // Return thread index for verification
             });

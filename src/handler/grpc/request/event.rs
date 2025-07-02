@@ -76,17 +76,17 @@ impl Event for Eventer {
                 }
 
                 // cache index for the parquet
-                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
-                    if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
-                    {
-                        files_to_download.push((
-                            item.id,
-                            item.account.clone(),
-                            ttv_file,
-                            item.meta.index_size,
-                            item.meta.max_ts,
-                        ));
-                    }
+                if cfg.cache_latest_files.cache_index
+                    && item.meta.index_size > 0
+                    && let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
+                {
+                    files_to_download.push((
+                        item.id,
+                        item.account.clone(),
+                        ttv_file,
+                        item.meta.index_size,
+                        item.meta.max_ts,
+                    ));
                 }
             }
 
@@ -211,11 +211,11 @@ async fn handle_file_chunked(
 ) -> Result<(), Status> {
     let start = std::time::Instant::now();
     let filename = path.to_string();
-    let mut offset = 0usize;
-    let total_size = disk::get_size(path).await.unwrap_or(0);
+    let mut offset = 0u64;
+    let total_size = disk::get_size(path).await.unwrap_or(0) as u64;
 
-    while offset < total_size as usize {
-        let chunk_size = std::cmp::min(CHUNK_SIZE, total_size - offset);
+    while offset < total_size {
+        let chunk_size = std::cmp::min(CHUNK_SIZE as u64, total_size - offset);
         let chunk = match infra::cache::file_data::disk::get(
             path,
             Some(Range {

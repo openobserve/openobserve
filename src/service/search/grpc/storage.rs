@@ -53,6 +53,7 @@ use crate::service::{
     search::{
         datafusion::exec,
         generate_search_schema_diff,
+        grpc::utils,
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         tantivy::puffin_directory::{
@@ -290,7 +291,7 @@ pub async fn search(
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {cache_type:?} in background,")
     };
     log::info!(
         "{}",
@@ -350,8 +351,10 @@ pub async fn search(
         if files.is_empty() {
             continue;
         }
-        let schema = schema_versions[ver].clone();
-        let schema = schema.with_metadata(Default::default());
+        let schema = schema_versions[ver]
+            .clone()
+            .with_metadata(Default::default());
+        let schema = utils::change_schema_to_utf8_view(schema);
 
         let session = config::meta::search::Session {
             id: format!("{}-storage-{ver}", query.trace_id),
@@ -585,7 +588,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {cache_type:?} in background,")
     };
     log::info!(
         "{}",
@@ -750,9 +753,8 @@ pub async fn filter_file_list_by_tantivy_index(
                     query.trace_id,
                     e
                 );
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    e.to_string(),
-                )));
+                // search error, need add filter back
+                return Ok((start.elapsed().as_millis() as usize, true, 0, vec![]));
             }
         };
         for result in tasks {
@@ -899,7 +901,7 @@ pub async fn get_tantivy_directory(
     let source = object_store::ObjectMeta {
         location: file_name.into(),
         last_modified: *BASE_TIME,
-        size: file_size as usize,
+        size: file_size as u64,
         e_tag: None,
         version: None,
     };
@@ -995,9 +997,8 @@ async fn search_tantivy_index(
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     // generate the tantivy query
-    let condition: IndexCondition = index_condition.ok_or(anyhow::anyhow!(
-        "[trace_id {trace_id}] search->storage: IndexCondition not found"
-    ))?;
+    let condition: IndexCondition =
+        index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
     let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
     let need_all_term_fields = condition
         .need_all_term_fields()
@@ -1115,7 +1116,7 @@ async fn search_tantivy_index(
         )
     {
         log::debug!(
-            "matched docs over [{}/100] in tantivy index, skip this file: {}",
+            "[trace_id {trace_id}] matched docs over [{}/100] in tantivy index, skip this file: {}",
             cfg.limit.inverted_index_skip_threshold,
             parquet_file.key
         );
@@ -1129,10 +1130,18 @@ async fn search_tantivy_index(
         .context("Count segments")?;
     if seg_metas.len() > 1 {
         return Err(anyhow::anyhow!(
-            "[trace_id {trace_id}] search->storage: Multiple segments in tantivy index not supported"
+            "Multiple segments in tantivy index not supported"
         ));
     }
     let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+    let max_doc_id = matched_docs.iter().map(|doc| doc.doc_id).max().unwrap_or(0) as i64;
+    if max_doc_id >= parquet_file.meta.records {
+        return Err(anyhow::anyhow!(
+            "doc_id {} is out of range, records {}",
+            max_doc_id,
+            parquet_file.meta.records,
+        ));
+    }
     let matched_num = matched_docs.len();
     for doc in matched_docs {
         res.set(doc.doc_id as usize, true);

@@ -62,7 +62,6 @@ use {
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
-    std::io::ErrorKind,
 };
 
 use crate::{
@@ -125,7 +124,8 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     ingestion_url: String,
-    websocket_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    aggregation_cache_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
@@ -326,7 +326,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
-        websocket_enabled: cfg.websocket.enabled,
+        #[cfg(feature = "enterprise")]
+        aggregation_cache_enabled: cfg.disk_cache.aggregation_cache_enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
@@ -480,7 +481,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let code = match query.get("code") {
         Some(code) => code,
         None => {
-            return Err(Error::new(ErrorKind::Other, "no code in request"));
+            return Err(Error::other("no code in request"));
         }
     };
     let mut audit_message = AuditMessage {
@@ -508,7 +509,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
-                return Err(Error::new(ErrorKind::Other, "invalid state in request"));
+                return Err(Error::other("invalid state in request"));
             }
         },
 
@@ -516,7 +517,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // Bad Request
             audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
-            return Err(Error::new(ErrorKind::Other, "no state in request"));
+            return Err(Error::other("no state in request"));
         }
     };
 
@@ -539,15 +540,14 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
-                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await {
-                        if db_user
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
+                        && db_user
                             .organizations
                             .iter()
                             .any(|org| org.role.eq(&UserRole::ServiceAccount))
-                        {
-                            return Ok(HttpResponse::Unauthorized()
-                                .json("Service accounts are not allowed to login".to_string()));
-                        }
+                    {
+                        return Ok(HttpResponse::Unauthorized()
+                            .json("Service accounts are not allowed to login".to_string()));
                     }
 
                     audit_message.user_email = res.0.user_email.clone();
@@ -591,7 +591,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
@@ -694,7 +694,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,

@@ -305,49 +305,74 @@ pub struct ListReportsQueryResult {
     pub report_name: String,
     pub report_owner: Option<String>,
     pub report_description: Option<String>,
+    pub report_created_at: i64,
+    pub report_frequency: Json,
+    /// KSUID primary key of the dashboard.
+    pub report_dashboard_id: String,
+    pub report_dashboard_tab_names: Json,
+    /// The `timerange` JSON field from the `report_dashboards` table.
+    pub report_dashboard_timerange: Json,
+    /// Snowflake ID of the dashboard.
+    pub dashboard_snowflake_id: String,
+    pub org_id: String,
     pub folder_id: String,
     pub folder_name: String,
     pub report_enabled: bool,
 }
 
 impl ListReportsQueryResult {
-    /// Executes the query to select the reports that statisfy the given parameters.
+    /// Executes the query to select the reports that satisfy the given parameters.
     pub async fn get<C: ConnectionTrait>(
         conn: &C,
         params: &ListReportsParams,
     ) -> Result<Vec<Self>, sea_orm::DbErr> {
         let rslts = Self::select(params).all(conn).await?;
+        log::info!("rslts: {:?}", rslts);
         Ok(rslts)
     }
 
-    /// Returns the query that selects the reports that statisfy the given parameters.
+    /// Returns the query that selects the reports that satisfy the given parameters.
     fn select(params: &ListReportsParams) -> Selector<SelectModel<Self>> {
         let mut query = reports::Entity::find()
             .column_as(reports::Column::Id, "report_id")
             .column_as(reports::Column::Name, "report_name")
             .column_as(reports::Column::Owner, "report_owner")
             .column_as(reports::Column::Description, "report_description")
+            .column_as(reports::Column::CreatedAt, "report_created_at")
+            .column_as(reports::Column::Frequency, "report_frequency")
             .column_as(folders::Column::FolderId, "folder_id")
             .column_as(folders::Column::Name, "folder_name")
             .column_as(reports::Column::Enabled, "report_enabled")
+            .column_as(
+                report_dashboards::Column::DashboardId,
+                "report_dashboard_id",
+            )
+            .column_as(
+                report_dashboards::Column::TabNames,
+                "report_dashboard_tab_names",
+            )
+            .column_as(
+                report_dashboards::Column::Variables,
+                "report_dashboard_variables",
+            )
+            .column_as(
+                report_dashboards::Column::Timerange,
+                "report_dashboard_timerange",
+            )
+            .column_as(dashboards::Column::DashboardId, "dashboard_snowflake_id")
+            .column_as(folders::Column::Org, "org_id")
             .join(
                 sea_orm::JoinType::InnerJoin,
                 reports::Relation::Folders.def(),
+            )
+            .join(
+                sea_orm::JoinType::InnerJoin,
+                reports::Relation::ReportDashboards.def(),
+            )
+            .join(
+                sea_orm::JoinType::InnerJoin,
+                report_dashboards::Relation::Dashboards.def(),
             );
-
-        // Conditionally join on `report_dashboards` and `dashboards` if the list parameters filter
-        // on the dashboard snowflake ID.
-        if params.dashboard_snowflake_id.is_some() {
-            query = query
-                .join(
-                    sea_orm::JoinType::InnerJoin,
-                    reports::Relation::ReportDashboards.def(),
-                )
-                .join(
-                    sea_orm::JoinType::InnerJoin,
-                    report_dashboards::Relation::Dashboards.def(),
-                );
-        };
 
         // Add filters.
         query = query.filter(folders::Column::Org.eq(&params.org_id));
@@ -501,10 +526,20 @@ mod tests {
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name",
-                "reports"."enabled" AS "report_enabled" FROM "reports" 
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
                 WHERE "folders"."org" = 'TEST_ORG_ID' 
                 ORDER BY 
                 "reports"."name" ASC,
@@ -540,11 +575,21 @@ mod tests {
                 `reports`.`name` AS `report_name`,
                 `reports`.`owner` AS `report_owner`,
                 `reports`.`description` AS `report_description`,
+                `reports`.`created_at` AS `report_created_at`,
+                `reports`.`frequency` AS `report_frequency`,
                 `folders`.`folder_id` AS `folder_id`,
                 `folders`.`name` AS `folder_name`,
-                `reports`.`enabled` AS `report_enabled` 
+                `reports`.`enabled` AS `report_enabled`,
+                `report_dashboards`.`dashboard_id` AS `report_dashboard_id`,
+                `report_dashboards`.`tab_names` AS `report_dashboard_tab_names`,
+                `report_dashboards`.`variables` AS `report_dashboard_variables`,
+                `report_dashboards`.`timerange` AS `report_dashboard_timerange`,
+                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`,
+                `folders`.`org` AS `org_id`
                 FROM `reports` 
                 INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
+                INNER JOIN `report_dashboards` ON `reports`.`id` = `report_dashboards`.`report_id` 
+                INNER JOIN `dashboards` ON `report_dashboards`.`dashboard_id` = `dashboards`.`id` 
                 WHERE `folders`.`org` = 'TEST_ORG_ID' 
                 ORDER BY 
                 `reports`.`name` ASC,
@@ -580,10 +625,20 @@ mod tests {
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name",
-                "reports"."enabled" AS "report_enabled" FROM "reports" 
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
                 WHERE "folders"."org" = 'TEST_ORG_ID' 
                 ORDER BY 
                 "reports"."name" ASC,
@@ -633,9 +688,17 @@ mod tests {
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name",
-                "reports"."enabled" AS "report_enabled"
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id"
                 FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
@@ -680,9 +743,17 @@ mod tests {
                 `reports`.`name` AS `report_name`,
                 `reports`.`owner` AS `report_owner`,
                 `reports`.`description` AS `report_description`,
+                `reports`.`created_at` AS `report_created_at`,
+                `reports`.`frequency` AS `report_frequency`,
                 `folders`.`folder_id` AS `folder_id`,
                 `folders`.`name` AS `folder_name`,
-                `reports`.`enabled` AS `report_enabled`
+                `reports`.`enabled` AS `report_enabled`,
+                `report_dashboards`.`dashboard_id` AS `report_dashboard_id`,
+                `report_dashboards`.`tab_names` AS `report_dashboard_tab_names`,
+                `report_dashboards`.`variables` AS `report_dashboard_variables`,
+                `report_dashboards`.`timerange` AS `report_dashboard_timerange`,
+                `dashboards`.`dashboard_id` AS `dashboard_snowflake_id`,
+                `folders`.`org` AS `org_id`
                 FROM `reports` 
                 INNER JOIN `folders` ON `reports`.`folder_id` = `folders`.`id` 
                 INNER JOIN `report_dashboards` ON `reports`.`id` = `report_dashboards`.`report_id` 
@@ -726,9 +797,17 @@ mod tests {
                 "reports"."name" AS "report_name",
                 "reports"."owner" AS "report_owner",
                 "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
                 "folders"."folder_id" AS "folder_id",
                 "folders"."name" AS "folder_name",
-                "reports"."enabled" AS "report_enabled" FROM "reports" 
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports" 
                 INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 

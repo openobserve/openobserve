@@ -158,7 +158,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let scalar_regex = if is_scalar_pattern {
         Some(
             Regex::new(regex.value(0))
-                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?,
+                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {e}")))?,
         )
     } else {
         None
@@ -179,7 +179,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
             scalar_regex.clone().unwrap()
         } else {
             Regex::new(regex.value(i))
-                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?
+                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {e}")))?
         };
 
         let mut has_match = false;
@@ -270,7 +270,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",
@@ -328,7 +328,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",
@@ -380,7 +380,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+----------------------------------+",
             "| matches                          |",
             "+----------------------------------+",
@@ -425,7 +425,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",

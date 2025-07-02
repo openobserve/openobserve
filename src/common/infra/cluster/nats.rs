@@ -169,7 +169,7 @@ async fn register() -> Result<()> {
         role_group: LOCAL_NODE.role_group,
         cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
-        scheduled: true,
+        scheduled: false,
         broadcasted: false,
         metrics: Default::default(),
         version: config::VERSION.to_string(),
@@ -200,7 +200,7 @@ async fn register() -> Result<()> {
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
         dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(format!("register node error: {}", e)));
+        return Err(Error::Message(format!("register node error: {e}")));
     }
 
     // 7. register ok, release lock
@@ -251,7 +251,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             role_group: LOCAL_NODE.role_group,
             cpu_num: cfg.limit.cpu_num as u64,
             status: status.clone(),
-            scheduled: true,
+            scheduled: false,
             broadcasted: false,
             metrics: Default::default(),
             version: config::VERSION.to_string(),
@@ -268,7 +268,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
-        return Err(Error::Message(format!("online node error: {}", e)));
+        return Err(Error::Message(format!("online node error: {e}")));
     }
 
     Ok(())
@@ -279,7 +279,7 @@ pub(crate) async fn leave() -> Result<()> {
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.delete(&key, false, NEED_WATCH, None).await {
-        return Err(Error::Message(format!("leave node error: {}", e)));
+        return Err(Error::Message(format!("leave node error: {e}")));
     }
 
     Ok(())
@@ -290,7 +290,7 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let val = json::to_vec(&node).unwrap();
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
-        return Err(Error::Message(format!("update node error: {}", e)));
+        return Err(Error::Message(format!("update node error: {e}")));
     }
     Ok(())
 }

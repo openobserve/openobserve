@@ -141,17 +141,16 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
         Some(SHORT_URL_CACHE_LIMIT),
     )
     .await
+        && !expired_short_ids.is_empty()
     {
-        if !expired_short_ids.is_empty() {
-            // delete from db
-            short_urls::batch_remove(expired_short_ids.clone()).await?;
+        // delete from db
+        short_urls::batch_remove(expired_short_ids.clone()).await?;
 
-            // delete from cache & notify super cluster
-            for short_id in expired_short_ids {
-                cluster::emit_delete_event(&short_id).await?;
-                #[cfg(feature = "enterprise")]
-                super_cluster::emit_delete_event(&short_id).await?;
-            }
+        // delete from cache & notify super cluster
+        for short_id in expired_short_ids {
+            cluster::emit_delete_event(&short_id).await?;
+            #[cfg(feature = "enterprise")]
+            super_cluster::emit_delete_event(&short_id).await?;
         }
     }
 

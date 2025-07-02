@@ -186,7 +186,9 @@ pub async fn register_and_keep_alive() -> Result<()> {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
-        let node = load_local_node();
+        let mut node = load_local_node();
+        node.status = NodeStatus::Online;
+        node.scheduled = true;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
@@ -372,10 +374,10 @@ async fn watch_node_list() -> Result<()> {
                 log::info!("[CLUSTER] join {:?}", item_value);
                 item_value.broadcasted = true;
                 // check if the same node is already in the cluster
-                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
-                    if node.uuid.ne(&item_value.uuid) {
-                        NODES.write().await.remove(&node.uuid);
-                    }
+                if let Some(node) = get_cached_node_by_name(&item_value.name).await
+                    && node.uuid.ne(&item_value.uuid)
+                {
+                    NODES.write().await.remove(&node.uuid);
                 }
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(

@@ -76,11 +76,11 @@ pub async fn ingest(
         if let Some(s) = value.time {
             data["_timestamp"] = s.into();
         }
-        if let Some(fields) = value.fields {
-            if let Some(o) = fields.as_object() {
-                for (f, v) in o {
-                    data[f] = v.to_owned()
-                }
+        if let Some(fields) = value.fields
+            && let Some(o) = fields.as_object()
+        {
+            for (f, v) in o {
+                data[f] = v.to_owned()
             }
         }
 
@@ -97,4 +97,32 @@ pub async fn ingest(
     }
 
     Ok(HecStatus::Success.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_ingest_invalid_json() {
+        // Test with invalid JSON data
+        let invalid_data = r#"{"invalid": json}"#;
+        let body = web::Bytes::from(invalid_data);
+        let thread_id = 1;
+        let org_id = "test-org";
+        let user_email = "test@example.com";
+
+        let result = ingest(thread_id, org_id, body, user_email).await;
+
+        match result {
+            Ok(response) => {
+                // Should return InvalidFormat status for malformed JSON
+                assert!(matches!(response.code, 400));
+            }
+            Err(e) => {
+                // If it fails with an error, that's also acceptable
+                assert!(e.to_string().len() > 0);
+            }
+        }
+    }
 }

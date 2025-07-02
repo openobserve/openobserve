@@ -49,6 +49,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use hashbrown::HashMap;
+use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 #[cfg(feature = "enterprise")]
 use {
     arrow::array::Int64Array,
@@ -57,7 +58,6 @@ use {
         common::config::get_config as get_o2_config,
         common::downsampling::get_largest_downsampling_rule, search::WorkGroup,
     },
-    parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue},
 };
 
 use super::{
@@ -116,8 +116,7 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let sql = if stream_type == StreamType::Index {
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
-            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {TIMESTAMP_COL_NAME} DESC) ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -131,16 +130,15 @@ pub async fn merge_parquet_files(
             .collect::<Vec<_>>();
         let fields_str = fields.join(", ");
         format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
-            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, fields_str, fields_str, TIMESTAMP_COL_NAME
+            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, SUM(count) as count, {fields_str} FROM tbl GROUP BY {fields_str} ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
         "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
-        format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
+        format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
     };
-    log::debug!("merge_parquet_files sql: {}", sql);
+    log::debug!("merge_parquet_files sql: {sql}");
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -171,7 +169,7 @@ pub async fn merge_parquet_files(
         println!("+---------------------------+--------------------------+");
         println!("merge_parquet_files");
         println!("+---------------------------+--------------------------+");
-        println!("{}", plan);
+        println!("{plan}");
     }
 
     // write result to parquet file
@@ -186,9 +184,14 @@ pub async fn merge_parquet_files(
         &schema,
         bloom_filter_fields,
         metadata,
-        true,
+        false,
         compression,
     );
+
+    // calculate the new file meta records
+    let mut new_file_meta = metadata.clone();
+    new_file_meta.records = 0;
+
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let task = tokio::task::spawn(async move {
@@ -212,6 +215,7 @@ pub async fn merge_parquet_files(
         Ok(())
     });
     while let Some(batch) = rx.recv().await {
+        new_file_meta.records += batch.num_rows() as i64;
         if let Err(e) = writer.write(&batch).await {
             log::error!("merge_parquet_files write error: {}", e);
             return Err(e.into());
@@ -219,6 +223,7 @@ pub async fn merge_parquet_files(
     }
     task.await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
+    append_metadata(&mut writer, &new_file_meta)?;
     writer.close().await?;
 
     ctx.deregister_table("tbl")?;
@@ -368,7 +373,6 @@ pub async fn merge_parquet_files_with_downsampling(
     Ok((schema, MergeParquetResult::Multiple { bufs, file_metas }))
 }
 
-#[cfg(feature = "enterprise")]
 fn append_metadata(
     writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
     file_meta: &FileMeta,
@@ -464,7 +468,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_limit);
     let mem_pool = super::MemoryPoolType::from_str(&cfg.memory_cache.datafusion_memory_pool)
         .map_err(|e| {
-            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
+            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {e}"))
         })?;
     match mem_pool {
         super::MemoryPoolType::Greedy => {
@@ -735,23 +739,19 @@ async fn get_cpu_and_mem_limit(
     mut target_partitions: usize,
     mut memory_size: usize,
 ) -> Result<(usize, usize)> {
-    if let Some(wg) = work_group {
-        if let Ok(wg) = WorkGroup::from_str(&wg) {
-            let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
-                DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
-            })?;
-            if get_o2_config().search_group.cpu_limit_enabled {
-                target_partitions = target_partitions * cpu as usize / 100;
-            }
-            memory_size = memory_size * mem as usize / 100;
-            log::info!(
-                "[trace_id: {}]datafusion work_group: {}, target_partition: {}, memory_size: {}",
-                trace_id,
-                wg,
-                target_partitions,
-                memory_size
-            );
+    if let Some(wg) = work_group
+        && let Ok(wg) = WorkGroup::from_str(&wg)
+    {
+        let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
+            DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
+        })?;
+        if get_o2_config().search_group.cpu_limit_enabled {
+            target_partitions = target_partitions * cpu as usize / 100;
         }
+        memory_size = memory_size * mem as usize / 100;
+        log::info!(
+            "[trace_id: {trace_id}]datafusion work_group: {wg}, target_partition: {target_partitions}, memory_size: {memory_size}"
+        );
     }
     Ok((target_partitions, memory_size))
 }
@@ -825,22 +825,24 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
 
 #[cfg(feature = "enterprise")]
 fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
-    let timestamp = record_batch
+    record_batch
         .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
+        .slice(0, 1)
         .as_any()
         .downcast_ref::<Int64Array>()
-        .unwrap();
-    timestamp.value(0)
+        .unwrap()
+        .value(0)
 }
 
 #[cfg(feature = "enterprise")]
 fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
-    let timestamp = record_batch
+    record_batch
         .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
+        .slice(record_batch.num_rows() - 1, 1)
         .as_any()
         .downcast_ref::<Int64Array>()
-        .unwrap();
-    timestamp.value(timestamp.len() - 1)
+        .unwrap()
+        .value(0)
 }

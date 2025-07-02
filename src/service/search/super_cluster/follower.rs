@@ -147,7 +147,7 @@ pub async fn search(
                 .component("super:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_num))
+                .desc(format!("get files {file_id_list_num} ids"))
                 .build()
         )
     );
@@ -182,7 +182,7 @@ pub async fn search(
                 .ok()
                 .map(RoleGroup::from)
         })
-        .unwrap_or(None);
+        .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
@@ -296,6 +296,7 @@ pub async fn search(
         end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
         timeout: req.timeout as u64,
         use_cache: req.use_cache,
+        histogram_interval: req.histogram_interval,
     };
 
     let context = tracing::Span::current().context();
@@ -342,12 +343,12 @@ pub async fn get_file_id_lists(
     let stream_name = stream.stream_name();
     let stream_type = stream.get_stream_type(stream_type);
     // if stream is enrich, rewrite the time_range
-    if let Some(schema) = stream.schema() {
-        if schema == "enrich" || schema == "enrichment_tables" {
-            let start = enrichment_table::get_start_time(org_id, &stream_name).await;
-            let end = config::utils::time::now_micros();
-            time_range = Some((start, end));
-        }
+    if let Some(schema) = stream.schema()
+        && (schema == "enrich" || schema == "enrichment_tables")
+    {
+        let start = enrichment_table::get_start_time(org_id, &stream_name).await;
+        let end = config::utils::time::now_micros();
+        time_range = Some((start, end));
     }
     let file_id_list = crate::service::file_list::query_ids(
         trace_id,

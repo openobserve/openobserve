@@ -22,8 +22,8 @@ use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::{
-    GetOptions, GetRange, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOpts,
-    PutOptions, PutPayload, PutResult, Result, WriteMultipart, path::Path,
+    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOpts, PutOptions,
+    PutPayload, PutResult, Result, WriteMultipart, path::Path,
 };
 use once_cell::sync::Lazy;
 use parquet::file::metadata::ParquetMetaDataReader;
@@ -69,13 +69,12 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
         location: &Path,
         options: GetOptions,
     ) -> Result<GetResult>;
-    async fn get_range(&self, account: &str, location: &Path, range: Range<usize>)
-    -> Result<Bytes>;
+    async fn get_range(&self, account: &str, location: &Path, range: Range<u64>) -> Result<Bytes>;
     async fn get_ranges(
         &self,
         account: &str,
         location: &Path,
-        ranges: &[Range<usize>],
+        ranges: &[Range<u64>],
     ) -> Result<Vec<Bytes>>;
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta>;
     async fn delete(&self, account: &str, location: &Path) -> Result<()>;
@@ -84,13 +83,13 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
         account: &str,
         locations: BoxStream<'a, Result<Path>>,
     ) -> BoxStream<'a, Result<Path>>;
-    fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>>;
+    fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>>;
     fn list_with_offset(
         &self,
         account: &str,
         prefix: Option<&Path>,
         offset: &Path,
-    ) -> BoxStream<'_, Result<ObjectMeta>>;
+    ) -> BoxStream<'static, Result<ObjectMeta>>;
     async fn list_with_delimiter(&self, account: &str, prefix: Option<&Path>)
     -> Result<ListResult>;
     async fn copy(&self, account: &str, from: &Path, to: &Path) -> Result<()>;
@@ -123,7 +122,7 @@ pub async fn get_opts(account: &str, file: &str, options: GetOptions) -> Result<
         .await
 }
 
-pub async fn get_range(account: &str, file: &str, range: Range<usize>) -> Result<bytes::Bytes> {
+pub async fn get_range(account: &str, file: &str, range: Range<u64>) -> Result<bytes::Bytes> {
     MULTI_ACCOUNTS.get_range(account, &file.into(), range).await
 }
 
@@ -263,24 +262,25 @@ async fn get_parquet_metadata(
     let mut data = get_range(
         account,
         file,
-        file_size - parquet::file::FOOTER_SIZE..file_size,
+        (file_size - parquet::file::FOOTER_SIZE as u64)..file_size,
     )
     .await?;
     let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
     data.copy_to_slice(&mut buf);
-    let metadata_len = ParquetMetaDataReader::decode_footer(&buf)?;
+    let metadata_len =
+        ParquetMetaDataReader::decode_footer_tail(&buf).map(|f| f.metadata_length())?;
 
     // read metadata
     let data = get_range(
         account,
         file,
-        file_size - parquet::file::FOOTER_SIZE - metadata_len
-            ..file_size - parquet::file::FOOTER_SIZE,
+        (file_size - parquet::file::FOOTER_SIZE as u64 - metadata_len as u64)
+            ..(file_size - parquet::file::FOOTER_SIZE as u64),
     )
     .await?;
 
     Ok((
-        file_size,
+        file_size as usize,
         Arc::new(ParquetMetaDataReader::decode_metadata(&data)?),
     ))
 }
@@ -325,8 +325,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::OutOfRange(s) => write!(f, "Out of range: {}", s),
-            Self::BadRange(s) => write!(f, "Bad range: {}", s),
+            Self::OutOfRange(s) => write!(f, "Out of range: {s}"),
+            Self::BadRange(s) => write!(f, "Bad range: {s}"),
         }
     }
 }
@@ -339,84 +339,6 @@ impl From<Error> for object_store::Error {
                 std::io::ErrorKind::InvalidInput,
                 source.to_string(),
             )),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum InvalidGetRange {
-    StartTooLarge { requested: usize, length: usize },
-    Inconsistent { start: usize, end: usize },
-}
-
-impl std::fmt::Display for InvalidGetRange {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StartTooLarge { requested, length } => {
-                write!(
-                    f,
-                    "Start too large: requested {} but length is {}",
-                    requested, length
-                )
-            }
-            Self::Inconsistent { start, end } => {
-                write!(
-                    f,
-                    "Inconsistent range: start {} is greater than end {}",
-                    start, end
-                )
-            }
-        }
-    }
-}
-
-pub trait GetRangeExt {
-    fn is_valid(&self) -> Result<(), InvalidGetRange>;
-    /// Convert to a [`Range`] if valid.
-    fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange>;
-}
-
-impl GetRangeExt for GetRange {
-    fn is_valid(&self) -> Result<(), InvalidGetRange> {
-        match self {
-            Self::Bounded(r) if r.end <= r.start => {
-                return Err(InvalidGetRange::Inconsistent {
-                    start: r.start,
-                    end: r.end,
-                });
-            }
-            _ => (),
-        };
-        Ok(())
-    }
-
-    /// Convert to a [`Range`] if valid.
-    fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange> {
-        self.is_valid()?;
-        match self {
-            Self::Bounded(r) => {
-                if r.start >= len {
-                    Err(InvalidGetRange::StartTooLarge {
-                        requested: r.start,
-                        length: len,
-                    })
-                } else if r.end > len {
-                    Ok(r.start..len)
-                } else {
-                    Ok(r.clone())
-                }
-            }
-            Self::Offset(o) => {
-                if *o >= len {
-                    Err(InvalidGetRange::StartTooLarge {
-                        requested: *o,
-                        length: len,
-                    })
-                } else {
-                    Ok(*o..len)
-                }
-            }
-            Self::Suffix(n) => Ok(len.saturating_sub(*n)..len),
         }
     }
 }

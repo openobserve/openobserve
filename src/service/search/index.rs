@@ -19,7 +19,7 @@ use std::{
 };
 
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL,
+    INDEX_FIELD_NAME_FOR_ALL, get_config,
     utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
 };
 use datafusion::{
@@ -209,21 +209,20 @@ impl Condition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
         match self {
-            Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::Equal(field, value) => format!("{field}={value}"),
             Condition::StrMatch(field, value, case_sensitive) => {
                 if *case_sensitive {
-                    format!("str_match({}, '{}')", field, value)
+                    format!("str_match({field}, '{value}')")
                 } else {
-                    format!("str_match_ignore_case({}, '{}')", field, value)
+                    format!("str_match_ignore_case({field}, '{value}')")
                 }
             }
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
-            Condition::Regex(field, value) => format!("{}=~{}", field, value),
-            Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
-            Condition::FuzzyMatchAll(value, distance) => format!(
-                "{}:fuzzy({}, {})",
-                INDEX_FIELD_NAME_FOR_ALL, value, distance
-            ),
+            Condition::Regex(field, value) => format!("{field}=~{value}"),
+            Condition::MatchAll(value) => format!("{INDEX_FIELD_NAME_FOR_ALL}:{value}"),
+            Condition::FuzzyMatchAll(value, distance) => {
+                format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
+            }
             Condition::All() => "ALL".to_string(),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
@@ -563,7 +562,13 @@ impl Condition {
                     .trim_start_matches('*') // contains
                     .trim_end_matches('*') // prefix or contains
                     .to_string();
-                let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
+                let term = if get_config().common.utf8_view_enabled {
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!(
+                        "%{value}%"
+                    )))))
+                } else {
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))))
+                };
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
@@ -584,7 +589,11 @@ impl Condition {
             }
             Condition::FuzzyMatchAll(value, distance) => {
                 let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
-                let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(value.clone()))));
+                let term = if get_config().common.utf8_view_enabled {
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
+                } else {
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))))
+                };
                 let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
@@ -779,6 +788,9 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
             value.as_bytes().to_vec(),
         )))),
+        DataType::Utf8View => {
+            Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
+        }
         _ => unimplemented!(),
     })
 }

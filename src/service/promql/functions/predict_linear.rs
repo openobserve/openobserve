@@ -51,3 +51,43 @@ fn exec(data: Value, duration: f64) -> Result<Value> {
     }
     Ok(Value::Vector(rate_values))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+
+    #[test]
+    fn test_predict_linear_function() {
+        // Create a range value with a linear trend
+        let samples = vec![
+            crate::service::promql::value::Sample::new(1000, 10.0),
+            crate::service::promql::value::Sample::new(2000, 20.0),
+            crate::service::promql::value::Sample::new(3000, 30.0),
+        ];
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                eval_ts: 3000,
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+        let matrix = Value::Matrix(vec![range_value]);
+        let duration = 10.0;
+        let result = predict_linear(matrix, duration).unwrap();
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 1);
+                // Should return a predicted value (should be finite)
+                assert!(v[0].sample.value.is_finite());
+                assert_eq!(v[0].sample.timestamp, 3000);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}
