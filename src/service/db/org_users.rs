@@ -321,12 +321,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 if item_key.starts_with("single") {
                     let item_key = item_key.strip_prefix("single/").unwrap();
-                    if let Some((_, item_value)) = ORG_USERS.remove(item_key) {
-                        if let Some(rum_token) = item_value.rum_token {
-                            USERS_RUM_TOKEN
-                                .clone()
-                                .remove(&format!("{}/{}", item_value.org_id, rum_token));
-                        }
+                    if let Some((_, item_value)) = ORG_USERS.remove(item_key)
+                        && let Some(rum_token) = item_value.rum_token
+                    {
+                        USERS_RUM_TOKEN
+                            .clone()
+                            .remove(&format!("{}/{}", item_value.org_id, rum_token));
                     }
                 } else if item_key.starts_with("many/user/") {
                     let item_key = item_key.strip_prefix("many/user/").unwrap();
