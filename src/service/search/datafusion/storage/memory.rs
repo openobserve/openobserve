@@ -54,7 +54,7 @@ impl ObjectStore for FS {
         infra::cache::storage::get_opts(&account, &location, options).await
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let (account, location) = format_location(location);
         infra::cache::storage::get_range(&account, &location, range).await
     }
@@ -65,7 +65,7 @@ impl ObjectStore for FS {
     }
 
     #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.unwrap().to_string();
         let objects = match super::file_list::get(&key) {
             Ok(objects) => objects,

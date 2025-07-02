@@ -180,7 +180,7 @@ impl FileData {
         self.data.contains_key(file)
     }
 
-    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
         tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
@@ -477,7 +477,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
     if !get_config().disk_cache.enabled {
         return None;
     }

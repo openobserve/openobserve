@@ -78,11 +78,11 @@ impl FileData {
         self.data.contains_key(file)
     }
 
-    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
         let idx = get_bucket_idx(file);
         let data = DATA[idx].get(file)?;
         Some(if let Some(range) = range {
-            data.value().slice(range)
+            data.value().slice(range.start as usize..range.end as usize)
         } else {
             data.value().clone()
         })
@@ -233,7 +233,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
     if !get_config().memory_cache.enabled {
         return None;
     }

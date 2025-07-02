@@ -196,7 +196,7 @@ impl ObjectStore for Remote {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data = self
@@ -252,7 +252,7 @@ impl ObjectStore for Remote {
         result
     }
 
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.map(|p| p.as_ref());
         let prefix = format_key(key.unwrap_or(""), true);
         self.client.list(Some(&prefix.into()))

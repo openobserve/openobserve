@@ -86,10 +86,10 @@ pub struct BlobMetadata {
 }
 
 impl BlobMetadata {
-    pub fn get_offset(&self, range: Option<core::ops::Range<usize>>) -> core::ops::Range<usize> {
+    pub fn get_offset(&self, range: Option<core::ops::Range<u64>>) -> core::ops::Range<u64> {
         match range {
-            None => self.offset as usize..(self.offset + self.length) as usize,
-            Some(v) => self.offset as usize + v.start..(self.offset as usize + v.start + v.len()),
+            None => self.offset..(self.offset + self.length),
+            Some(v) => self.offset + v.start..(self.offset + v.end),
         }
     }
 }
