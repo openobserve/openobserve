@@ -30,7 +30,6 @@ use config::{
 use datafusion::{
     arrow::datatypes::Schema,
     common::{TableReference, tree_node::TreeNode},
-    prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -66,7 +65,7 @@ use super::{
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 use crate::service::search::{
-    cluster::flight::register_table,
+    cluster::flight::{generate_context, register_table},
     datafusion::{
         distributed_plan::rewrite::GroupByFieldVisitor,
         udf::{
@@ -340,7 +339,7 @@ impl Sql {
 
         let is_complex = is_complex_query(&mut statement);
 
-        let mut sql = Sql {
+        Ok(Sql {
             sql: statement.to_string(),
             is_complex,
             org_id: org_id.to_string(),
@@ -362,25 +361,7 @@ impl Sql {
             use_inverted_index,
             index_condition,
             index_optimize_mode,
-        };
-
-        // create plan by sql, used for check group by fields
-        if sql.schemas.len() == 1 {
-            let ctx = SessionContext::new();
-            register_table(&ctx, &sql).await?;
-            let plan = ctx.state().create_logical_plan(&sql.sql).await?;
-            let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-            // visit group by fields
-            let mut group_by_visitor = GroupByFieldVisitor::new();
-            physical_plan.visit(&mut group_by_visitor)?;
-            let group_by_fields = group_by_visitor.get_group_by_fields();
-            if !group_by_fields.is_empty() {
-                sql.group_by = group_by_fields;
-            }
-        }
-
-        Ok(sql)
+        })
     }
 }
 
@@ -2109,6 +2090,24 @@ impl VisitorMut for RemoveDashboardAllVisitor {
         }
         ControlFlow::Continue(())
     }
+}
+
+// get group by fields from sql, if sql is not a single table query, return empty vector
+#[allow(dead_code)]
+pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
+    if sql.schemas.len() != 1 {
+        return Ok(vec![]);
+    }
+    let sql_arc = Arc::new(sql.clone());
+    let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
+    register_table(&ctx, &sql_arc).await?;
+    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+    // visit group by fields
+    let mut group_by_visitor = GroupByFieldVisitor::new();
+    physical_plan.visit(&mut group_by_visitor)?;
+    Ok(group_by_visitor.get_group_by_fields())
 }
 
 #[cfg(test)]

@@ -54,6 +54,7 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
+    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
     config::utils::sql::is_simple_aggregate_query,
     o2_enterprise::enterprise::{
         common::infra::config::get_config as get_o2_config,
@@ -75,8 +76,6 @@ use {
 };
 
 use super::self_reporting::report_request_usage_stats;
-#[cfg(feature = "enterprise")]
-use crate::service::grpc::make_grpc_search_client;
 use crate::{
     common::{
         infra::cluster as infra_cluster,
@@ -689,14 +688,7 @@ pub async fn search_partition(
         };
 
         // check cardinality for group by fields
-        let group_by_fields = sql
-            .group_by
-            .iter()
-            .map(|f| match sql.aliases.iter().find(|(_, a)| a == f) {
-                Some((f, _)) => f.to_string(),
-                None => f.to_string(),
-            })
-            .collect::<Vec<_>>();
+        let group_by_fields = get_group_by_fields(&sql).await?;
         let cardinality_map = crate::service::search::cardinality::check_cardinality(
             org_id,
             stream_type,
