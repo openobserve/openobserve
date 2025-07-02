@@ -660,7 +660,7 @@ const useStreams = () => {
     const isSame = (a: any, b: any) => {
       // If apply_at is undefined/null in either object, consider them the same
       //because some times user might not select the apply_at value while updating the already applied pattern 
-      //so instead of sending undefined/null we dont consider them as different
+        //so instead of sending undefined/null we dont consider them as different
       if (!a.apply_at || !b.apply_at) {
         return a.pattern_id === b.pattern_id && 
                a.field === b.field && 

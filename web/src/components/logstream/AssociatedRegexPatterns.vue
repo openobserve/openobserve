@@ -282,12 +282,12 @@
           <div class="tw-h-full" v-if="!userClickedPattern">
             <div
               class="full-width column flex-center q-gutter-sm tw-h-full"
-              style="font-size: 1.5rem"
+              style="font-size: 1.5rem; margin: auto auto"
               :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
             >
               <q-img
                 :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
-                style="width: 125px; margin: 30vh auto 0rem"
+                style="width: 125px;"
               />
               <span class="no-pattern-applied-title" data-test="associated-regex-patterns-no-pattern-applied-title">No Patterns Applied Yet</span>
                 <span class="no-pattern-applied-subtitle" data-test="associated-regex-patterns-no-pattern-applied-subtitle">Browse the pattern library to begin </span> 
@@ -378,7 +378,8 @@ export default defineComponent({
               pattern_name: pattern.name,
               pattern_id: pattern.id,
               apply_at: "",
-              policy: ""
+              policy: "",
+              field: props.fieldName
             }));
             resultTotal.value = store.state.organizationData.regexPatterns.length;
           }
@@ -437,7 +438,7 @@ export default defineComponent({
               ...userClickedPattern.value,
               policy: newVal,
             }
-            emit("updateAppliedPattern", updatedPattern);
+            emit("updateAppliedPattern", updatedPattern , props.fieldName, userClickedPattern.value.pattern_id, "policy");
           }
         })
         watch(()=> apply_at.value, (newVal) => {
@@ -453,7 +454,7 @@ export default defineComponent({
               ...userClickedPattern.value,
               apply_at: apply_at_value
             }
-            emit("updateAppliedPattern", updatedPattern);
+            emit("updateAppliedPattern", updatedPattern, props.fieldName, userClickedPattern.value.pattern_id, "apply_at");
           }
         })
 
@@ -469,7 +470,8 @@ export default defineComponent({
                 created_at: convertUnixToQuasarFormat(pattern.created_at),
                 updated_at: convertUnixToQuasarFormat(pattern.updated_at),
                 pattern_name: pattern.name,
-                pattern_id: pattern.id
+                pattern_id: pattern.id,
+                field: props.fieldName
               }));
               store.dispatch("setRegexPatterns", allPatterns.value);
               resultTotal.value = allPatterns.value.length;

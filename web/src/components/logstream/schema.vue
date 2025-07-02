@@ -781,6 +781,8 @@ export default defineComponent({
     const IsdeleteBtnVisible = ref(false);
     const redBtnRows = ref([]);
 
+    const patternIdToApplyAtMap = new Map();
+
     const newSchemaFields = ref([]);
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
@@ -1011,6 +1013,11 @@ export default defineComponent({
           JSON.stringify(streamResponse.settings),
         );
       }
+      //after this we need to have a map of pattern_id and according to field as well
+      //so that we can easily access the apply_at value for a pattern if it is undefined or null
+      previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
+        patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
+      });
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
@@ -1195,8 +1202,6 @@ export default defineComponent({
             });
         });
       }
-
-      console.log(patternAssociations.value,'patternAssociations.value')
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -1694,7 +1699,7 @@ export default defineComponent({
     //this is used to remove a pattern from the field
     const handleRemovePattern = (patternId: string, fieldName: string) => {
       formDirtyFlag.value = true;
-      let filteredData = patternAssociations.value[fieldName].filter((pattern: PatternAssociation) => {
+      let filteredData = patternAssociations.value[fieldName] && patternAssociations.value[fieldName].filter((pattern: PatternAssociation) => {
         return pattern.pattern_id !== patternId;
       });
       patternAssociations.value[fieldName] = [...filteredData];
@@ -1703,14 +1708,25 @@ export default defineComponent({
 
     //this is used to update an already applied pattern in the field
     //for suppose user wants to update policy or apply_at for a pattern
-    const handleUpdateAppliedPattern = (pattern: PatternAssociation) => {
-      patternAssociations.value[pattern.field].forEach((p: PatternAssociation) => {
-        if(p.pattern_id === pattern.pattern_id){
-          p.policy = pattern.policy;
-          p.apply_at = pattern.apply_at;
+    const handleUpdateAppliedPattern = (pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
+      patternAssociations.value[pattern.field] && patternAssociations.value[fieldName].forEach((p: PatternAssociation) => {
+        if(p.pattern_id === pattern.pattern_id && p.pattern_name === pattern.pattern_name){
+          if(attribute === "policy"){
+            p.policy = pattern.policy;
+          }
+          else if(attribute === "apply_at"){
+            if(pattern.apply_at != undefined && pattern.apply_at != null){
+              p.apply_at = pattern.apply_at;
+            }
+            else{
+              p.apply_at = patternIdToApplyAtMap.get(fieldName + patternId)?.apply_at;
+            }
+          }
         }
       });
-      patternAssociationDialog.value.data = [...patternAssociations.value[pattern.field]];
+      if(patternAssociations.value[fieldName]){
+        patternAssociationDialog.value.data = [...patternAssociations.value[fieldName]];
+      }
     }
 
 
