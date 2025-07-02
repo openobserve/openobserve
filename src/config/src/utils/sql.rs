@@ -137,14 +137,14 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
             is_aggregate_expression(left) || is_aggregate_expression(right)
         }
         Expr::Case {
+            operand,
             conditions,
-            results,
             else_result,
-            ..
         } => {
             // Check if any part of the CASE expression is an aggregate function
-            conditions.iter().any(is_aggregate_expression)
-                || results.iter().any(is_aggregate_expression)
+            conditions.iter().any(|c| {
+                is_aggregate_expression(&c.condition) || is_aggregate_expression(&c.result)
+            }) || operand.as_ref().is_some_and(|e| is_aggregate_expression(e))
                 || else_result
                     .as_ref()
                     .is_some_and(|e| is_aggregate_expression(e))
