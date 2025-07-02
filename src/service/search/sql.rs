@@ -737,27 +737,23 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut() {
-            match &mut order_by.kind {
-                OrderByKind::Expressions(exprs) => {
-                    for order in exprs.iter_mut() {
-                        let mut name_visitor = FieldNameVisitor::new();
-                        let _ = order.expr.visit(&mut name_visitor);
-                        if name_visitor.field_names.len() == 1 {
-                            let expr_name =
-                                name_visitor.field_names.iter().next().unwrap().to_string();
-                            self.order_by.push((
-                                expr_name,
-                                if order.options.asc.unwrap_or(true) {
-                                    OrderBy::Asc
-                                } else {
-                                    OrderBy::Desc
-                                },
-                            ));
-                        }
-                    }
+        if let Some(order_by) = query.order_by.as_mut()
+            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
+        {
+            for order in exprs.iter_mut() {
+                let mut name_visitor = FieldNameVisitor::new();
+                let _ = order.expr.visit(&mut name_visitor);
+                if name_visitor.field_names.len() == 1 {
+                    let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
+                    self.order_by.push((
+                        expr_name,
+                        if order.options.asc.unwrap_or(true) {
+                            OrderBy::Asc
+                        } else {
+                            OrderBy::Desc
+                        },
+                    ));
                 }
-                _ => {}
             }
         }
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
@@ -816,29 +812,19 @@ impl VisitorMut for ColumnVisitor<'_> {
                 }
             }
         }
-        if let Some(limit) = query.limit.as_ref() {
-            match limit {
-                Expr::Value(ValueWithSpan { value, span: _ }) => {
-                    if let Value::Number(n, _) = value
-                        && let Ok(num) = n.to_string().parse::<i64>()
-                    {
-                        self.limit = Some(num);
-                    }
-                }
-                _ => {}
-            }
+        if let Some(limit) = query.limit.as_ref()
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
+            && let Value::Number(n, _) = value
+            && let Ok(num) = n.to_string().parse::<i64>()
+        {
+            self.limit = Some(num);
         }
-        if let Some(offset) = query.offset.as_ref() {
-            match &offset.value {
-                Expr::Value(ValueWithSpan { value, span: _ }) => {
-                    if let Value::Number(n, _) = value
-                        && let Ok(num) = n.to_string().parse::<i64>()
-                    {
-                        self.offset = Some(num);
-                    }
-                }
-                _ => {}
-            }
+        if let Some(offset) = query.offset.as_ref()
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
+            && let Value::Number(n, _) = value
+            && let Ok(num) = n.to_string().parse::<i64>()
+        {
+            self.offset = Some(num);
         }
         ControlFlow::Continue(())
     }
@@ -2071,9 +2057,9 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                     | BinaryOperator::Lt,
                 right,
             } => {
-                if is_eq_placeholder(left.as_ref(), &placeholder) {
-                    *expr = expr_boolean(true);
-                } else if is_eq_placeholder(right.as_ref(), &placeholder) {
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
+                {
                     *expr = expr_boolean(true);
                 }
             }
@@ -2083,9 +2069,9 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 op: BinaryOperator::NotEq,
                 right,
             } => {
-                if is_eq_placeholder(left.as_ref(), &placeholder) {
-                    *expr = expr_boolean(false);
-                } else if is_eq_placeholder(right.as_ref(), &placeholder) {
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
+                {
                     *expr = expr_boolean(false);
                 }
             }
