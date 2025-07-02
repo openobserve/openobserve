@@ -379,7 +379,11 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import {
+  buildSqlQuery,
+  getFieldsFromQuery,
+  shouldUseHistogramQuery,
+} from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
@@ -1494,11 +1498,11 @@ export default defineComponent({
 
     const searchResponseForVisualization = ref({});
 
-    const copyLogsQueryToDashboardPanel = () => {
-      // Handle pagination
-      // If pagination is enabled, then set histogram query
-      // else set same query
-      if (searchObj.meta.resultGrid.showPagination) {
+    const copyLogsQueryToDashboardPanel = async () => {
+      // Check should use histogram query
+      // If true, then set histogram query
+      // else set logs page query
+      if (await shouldUseHistogramQuery(searchObj.data.query)) {
         // set histogram query
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1521,7 +1525,7 @@ export default defineComponent({
 
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
-      () => {
+      async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
           // emit resize event
           // this will rerender/call resize method of already rendered chart to resize
@@ -1534,7 +1538,7 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
 
-          copyLogsQueryToDashboardPanel();
+          await copyLogsQueryToDashboardPanel();
 
           // select chary type as line
           dashboardPanelData.data.type = "line";
@@ -1545,7 +1549,7 @@ export default defineComponent({
           setCustomQueryFields();
 
           // set logs page data to searchResponseForVisualization
-          if (searchObj.meta.resultGrid.showPagination) {
+          if (await shouldUseHistogramQuery(searchObj.data.query)) {
             // replace hits with histogram query data
             searchResponseForVisualization.value = {
               ...searchObj.data.queryResults,
@@ -1574,11 +1578,9 @@ export default defineComponent({
 
     watch(
       () => [searchObj.data.query, searchObj.meta.logsVisualizeToggle],
-      () => {
+      async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
-          // Here, it may go to infinite loop
-          // TODO: add check for auto sql mode
-          copyLogsQueryToDashboardPanel();
+          await copyLogsQueryToDashboardPanel();
         }
       },
     );

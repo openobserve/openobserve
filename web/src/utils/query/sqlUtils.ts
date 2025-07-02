@@ -775,6 +775,38 @@ export const convertQueryIntoSingleLine = async (query: any) => {
   }
 };
 
+function hasAggregation(columns: any) {
+  if (columns) {
+    for (const column of columns) {
+      if (column.expr && column.expr.type === "aggr_func") {
+        return true; // Found aggregation function or non-null groupby property
+      }
+    }
+  }
+  return false; // No aggregation function or non-null groupby property found
+}
+
+const isLimitQuery = (parsedSQL: any = null) => {
+  return parsedSQL?.limit && parsedSQL?.limit.value?.length > 0;
+};
+
+export const shouldUseHistogramQuery = async (query: any) => {
+  try {
+    await importSqlParser();
+    const ast: any = parser.astify(query);
+
+    if (!query) return true;
+
+    if (isLimitQuery(ast)) return false;
+
+    if (hasAggregation(ast.columns)) return false;
+
+    return true;
+  } catch (error) {
+    return true;
+  }
+};
+
 // // Test function for extractFields
 // export const testExtractFields = async () => {
 //   console.log("=== Testing extractFields function ===");
