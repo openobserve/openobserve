@@ -300,6 +300,7 @@ pub async fn process_token(
                     }
                 }
             }
+            None
         } else {
             log::info!("User does not exist in the database");
 
@@ -352,9 +353,11 @@ pub async fn process_token(
                             }
                         }
                     }
+                    None
                 }
                 Err(e) => {
                     log::error!("Error adding user to the database: {}", e);
+                    None
                 }
             }
         }
