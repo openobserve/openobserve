@@ -611,7 +611,7 @@ async executeQueryWithErrorHandling() {
 
 // New methods for histogram query test
 async executeHistogramQuery(query) {
-  await this.page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+  await this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.cm-content').click();
   await this.page.keyboard.type(query);
   await this.page.waitForTimeout(2000);
 }
