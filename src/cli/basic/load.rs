@@ -26,8 +26,8 @@ pub async fn load_file_list_from_s3(
             "prefix is required, eg: files/default/logs/default/2025/"
         ));
     }
-    println!("account: {}", account);
-    println!("prefix: {}", prefix);
+    println!("account: {account}");
+    println!("prefix: {prefix}");
 
     println!("Listing files...");
     let files = infra::storage::list(account, prefix).await?;
@@ -35,13 +35,13 @@ pub async fn load_file_list_from_s3(
 
     println!("Processing files...");
     for (i, file) in files.iter().enumerate() {
-        println!("{} {}", i, file);
+        println!("{i} {file}");
         let (stream_key, date, file_name) = parse_file_key_columns(file)?;
         let (org, stream) = stream_key.split_once('/').unwrap();
         let file_meta = infra::storage::get_file_meta(account, file).await?;
         if insert {
             if let Err(e) = infra::file_list::add(account, file, &file_meta).await {
-                println!("insert to db with file {} error: {}", file, e);
+                println!("insert to db with file {file} error: {e}");
             }
         } else {
             println!(

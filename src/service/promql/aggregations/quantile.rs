@@ -63,3 +63,32 @@ pub async fn quantile(
     let quantile_value = calculate_quantile(&values, qtile).unwrap();
     prepare_vector(timestamp, quantile_value)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_quantile_calculation() {
+        // Test the core quantile calculation logic
+        let values = vec![10.0, 20.0, 30.0];
+        let qtile = 0.5; // 50th percentile
+
+        let quantile_value = calculate_quantile(&values, qtile).unwrap();
+        assert_eq!(quantile_value, 20.0); // 50th percentile should be 20.0
+    }
+
+    #[test]
+    fn test_quantile_edge_cases() {
+        // Test edge cases for quantile calculation
+        let values = vec![10.0, 20.0, 30.0];
+
+        // 0th percentile (minimum)
+        let min_value = calculate_quantile(&values, 0.0).unwrap();
+        assert_eq!(min_value, 10.0);
+
+        // 100th percentile (maximum)
+        let max_value = calculate_quantile(&values, 1.0).unwrap();
+        assert_eq!(max_value, 30.0);
+    }
+}

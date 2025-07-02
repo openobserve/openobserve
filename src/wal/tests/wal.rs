@@ -216,3 +216,20 @@ fn test_reader_from_path_position_and_metadata() {
     let reader_metadata = reader.metadata().unwrap();
     assert_eq!(reader_metadata.len(), fs_metadata.len());
 }
+
+#[test]
+fn test_build_file_path() {
+    // Test with string path
+    let root_dir = "/tmp/wal";
+    let org_id = "test_org";
+    let stream_type = "logs";
+    let id = "stream_123";
+
+    let path = build_file_path(root_dir, org_id, stream_type, id.to_string());
+
+    // Verify the path structure
+    assert_eq!(
+        path.to_string_lossy(),
+        "/tmp/wal/test_org/logs/stream_123.wal"
+    );
+}

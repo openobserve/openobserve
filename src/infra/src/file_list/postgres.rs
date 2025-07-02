@@ -392,10 +392,11 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -450,10 +451,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         date_range: Option<(String, String)>,
     ) -> Result<Vec<FileKey>> {
-        if let Some((start, end)) = date_range.as_ref() {
-            if start.is_empty() && end.is_empty() {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = date_range.as_ref()
+            && start.is_empty()
+            && end.is_empty()
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -530,10 +532,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<super::FileId>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -646,10 +649,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<String>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -894,16 +898,16 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
             "#
         );
         if deleted {
-            sql = format!("{} AND deleted IS TRUE", sql);
+            sql = format!("{sql} AND deleted IS TRUE");
         }
         let sql = match pk_value {
-            None => format!("{} GROUP BY stream", sql),
-            Some((0, 0)) => format!("{} GROUP BY stream", sql),
+            None => format!("{sql} GROUP BY stream"),
+            Some((0, 0)) => format!("{sql} GROUP BY stream"),
             Some((min, max)) => {
                 if deleted {
-                    format!("{} AND id <= {} GROUP BY stream", sql, max)
+                    format!("{sql} AND id <= {max} GROUP BY stream")
                 } else {
-                    format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                    format!("{sql} AND id > {min} AND id <= {max} GROUP BY stream")
                 }
             }
         };
@@ -940,7 +944,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
                 stream_name.unwrap()
             )
         } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{}';", org_id)
+            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
         };
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -962,8 +966,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         stream_name: &str,
     ) -> Result<()> {
         let sql = format!(
-            "DELETE FROM stream_stats WHERE stream = '{}/{}/{}';",
-            org_id, stream_type, stream_name
+            "DELETE FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';"
         );
         let pool = CLIENT.clone();
         DB_QUERY_NUMS

@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind},
-    sync::Arc,
-};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
@@ -73,7 +69,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid proto: {}", e),
+                format!("Invalid proto: {e}"),
             )));
         }
     };
@@ -85,7 +81,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
                 org_id,
                 e
             );
-            Err(Error::new(ErrorKind::Other, e))
+            Err(Error::other(e))
         }
     }
 }
@@ -97,18 +93,15 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
             log::error!("[METRICS:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid json: {}", e),
+                format!("Invalid json: {e}"),
             )));
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson).await {
         Ok(v) => Ok(v),
         Err(e) => {
-            log::error!(
-                "[METRICS:OTLP] Error while handling http trace request: {}",
-                e
-            );
-            Err(Error::new(ErrorKind::Other, e))
+            log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
+            Err(Error::other(e))
         }
     }
 }
@@ -249,21 +242,20 @@ pub async fn handle_otlp_request(
                 };
 
                 // update schema metadata
-                if !schema_exists.has_metadata {
-                    if let Err(e) = db::schema::update_setting(
+                if !schema_exists.has_metadata
+                    && let Err(e) = db::schema::update_setting(
                         org_id,
                         metric_name,
                         StreamType::Metrics,
                         prom_meta,
                     )
                     .await
-                    {
-                        log::error!(
-                            "Failed to set metadata for metric: {} with error: {}",
-                            metric_name,
-                            e
-                        );
-                    }
+                {
+                    log::error!(
+                        "Failed to set metadata for metric: {} with error: {}",
+                        metric_name,
+                        e
+                    );
                 }
                 for mut rec in records {
                     // flattening
@@ -347,8 +339,7 @@ pub async fn handle_otlp_request(
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 let err_msg = format!(
-                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
-                    stream_name
+                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
                 );
                 log::error!("{err_msg}");
                 partial_success.error_message = err_msg;
@@ -361,8 +352,7 @@ pub async fn handle_otlp_request(
             {
                 Err(e) => {
                     let err_msg = format!(
-                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
-                        stream_name, e,
+                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
                     );
                     log::error!("{err_msg}");
                     // update status

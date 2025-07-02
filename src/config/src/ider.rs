@@ -152,10 +152,7 @@ impl SnowflakeIdGenerator {
             if now_millis == self.last_time_millis {
                 now_millis = biding_time_conditions(self.last_time_millis, self.epoch);
                 if now_millis == self.last_time_millis {
-                    panic!(
-                        "Clock is moving backwards.  Rejecting requests until {}.",
-                        now_millis
-                    );
+                    panic!("Clock is moving backwards.  Rejecting requests until {now_millis}.");
                 }
             }
 

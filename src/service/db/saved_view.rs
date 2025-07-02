@@ -33,7 +33,7 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         data: view.data.clone(),
         view_name: view.view_name.clone(),
     };
-    let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
+    let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     db::put(
         &key,
         json::to_vec(&view).unwrap().into(),
@@ -50,7 +50,7 @@ pub async fn update_view(
     view_id: &str,
     view: &UpdateViewRequest,
 ) -> Result<View, Error> {
-    let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
+    let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     let updated_view = match get_view(org_id, view_id).await {
         Ok(original_view) => View {
             data: view.data.clone(),
@@ -71,7 +71,7 @@ pub async fn update_view(
 
 /// Get the saved view id associated with an org_id
 pub async fn get_view(org_id: &str, view_id: &str) -> Result<View, Error> {
-    let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
+    let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     let ret = db::get(&key).await?;
     let view = json::from_slice(&ret).unwrap();
     Ok(view)
@@ -80,7 +80,7 @@ pub async fn get_view(org_id: &str, view_id: &str) -> Result<View, Error> {
 /// Return all the saved views but query limited data only, associated with a
 /// provided org_id This will not contain the payload.
 pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error> {
-    let key = format!("{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id);
+    let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}");
     let ret = db::list_values(&key).await?;
     let mut views: Vec<ViewWithoutData> = ret
         .iter()
@@ -95,7 +95,7 @@ pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error
 // pub async fn delete_view(org_id: &str, view_id: &str) -> Result<View, Error>
 // {
 pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
-    let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
+    let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     db::delete(&key, false, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }

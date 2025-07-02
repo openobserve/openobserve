@@ -382,9 +382,9 @@ async fn proxy_querier_by_body(
             let request_type = if is_stream { "stream" } else { "search" };
 
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse {} request data: {:?}", request_type, e);
+                log::error!("Failed to parse {request_type} request data: {e:?}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                    format!("Failed to parse {} request data", request_type).as_str(),
+                    format!("Failed to parse {request_type} request data").as_str(),
                 )))
             })?;
             let Ok(query) = json::from_slice::<SearchRequest>(&body) else {
@@ -636,6 +636,7 @@ mod tests {
         assert!(!is_querier_route("/api/clusters/_bulk"));
         assert!(!is_querier_route("/api/clusters/ws/_multi"));
         assert!(!is_querier_route("/api/default/config/_json"));
+        assert!(is_querier_route("/api/default/ai/chat_stream"));
     }
 
     #[test]

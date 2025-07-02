@@ -40,3 +40,30 @@ pub fn round_down_to_nearest_minute(microseconds: i64) -> i64 {
     // Convert the adjusted time back to microseconds
     adjusted_seconds * microseconds_per_second
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_get_ts_value_with_string_timestamp() {
+        let record = json!({
+            "timestamp": "2023-01-01T12:30:45.123456Z"
+        });
+
+        let result = get_ts_value("timestamp", &record);
+        // The exact value depends on the parse_str_to_timestamp_micros_as_option implementation
+        // but it should be a non-zero value
+        assert!(result > 0);
+    }
+
+    #[test]
+    fn test_round_down_to_nearest_minute_exact_minute() {
+        // 2023-01-01T12:30:00.000000Z (exact minute)
+        let microseconds = 1672575000000000;
+        let result = round_down_to_nearest_minute(microseconds);
+        assert_eq!(result, 1672575000000000);
+    }
+}

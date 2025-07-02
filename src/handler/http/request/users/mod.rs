@@ -89,7 +89,7 @@ pub async fn list(
     // Check if user has access to get users
     if get_openfga_config().enabled
         && check_permissions(
-            Some(format!("_all_{}", org_id)),
+            Some(format!("_all_{org_id}")),
             &org_id,
             &user_email.user_id,
             "users",
@@ -558,7 +558,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
-                format!("q_auth {}", s)
+                format!("q_auth {s}")
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
                 match auth_header.to_str() {
                     Ok(auth_header_str) => auth_header_str.to_string(),

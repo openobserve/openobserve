@@ -186,7 +186,7 @@ pub(crate) async fn create_context(
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {cache_type:?} in background,")
     };
     log::info!(
         "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",

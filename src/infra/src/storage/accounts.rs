@@ -109,10 +109,10 @@ impl StorageClientFactory {
     /// Get the client for the given name.
     /// If the name is not found, return the default client.
     pub fn get_client_by_name(&self, name: &str) -> &dyn ObjectStore {
-        if !name.is_empty() {
-            if let Some(client) = self.accounts.get(name) {
-                return client;
-            }
+        if !name.is_empty()
+            && let Some(client) = self.accounts.get(name)
+        {
+            return client;
         }
         self.accounts
             .get(DEFAULT_ACCOUNT)

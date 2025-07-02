@@ -250,7 +250,7 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON);
+        let file_name = format!("{thread_id}/{key}/{id}{FILE_EXT_JSON}");
         let file_path = format!("{dir_path}{file_name}");
         create_dir_all(Path::new(&file_path).parent().unwrap())
             .await

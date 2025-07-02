@@ -153,10 +153,10 @@ pub async fn update_folder(
     }
 
     folder.folder_id = folder_id.to_string();
-    if let Ok(existing_folder) = get_folder_by_name(org_id, &folder.name, folder_type).await {
-        if existing_folder.folder_id != folder_id {
-            return Err(FolderError::FolderNameAlreadyExists);
-        }
+    if let Ok(existing_folder) = get_folder_by_name(org_id, &folder.name, folder_type).await
+        && existing_folder.folder_id != folder_id
+    {
+        return Err(FolderError::FolderNameAlreadyExists);
     }
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
@@ -197,14 +197,14 @@ pub async fn list_folders(
 
     let filtered = match permitted_folders {
         Some(permitted_folders) => {
-            if permitted_folders.contains(&format!("{}:_all_{}", folder_ofga_model, org_id)) {
+            if permitted_folders.contains(&format!("{folder_ofga_model}:_all_{org_id}")) {
                 folders
             } else {
                 folders
                     .into_iter()
                     .filter(|folder_loc| {
                         permitted_folders
-                            .contains(&format!("{}:{}", folder_ofga_model, folder_loc.folder_id))
+                            .contains(&format!("{folder_ofga_model}:{}", folder_loc.folder_id))
                     })
                     .collect::<Vec<_>>()
             }
@@ -353,9 +353,9 @@ async fn permitted_folders(
     .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
 
     log::debug!("permitted_dashboards: {:?}", permitted_dashboards);
-    if permitted_dashboards.is_some() {
+    if let Some(permitted_dashboards) = permitted_dashboards {
         let mut folder_list_with_roles = vec![];
-        for dashboard in permitted_dashboards.unwrap() {
+        for dashboard in permitted_dashboards {
             let Some((_, folder_id)) = dashboard.split_once(":") else {
                 continue;
             };
@@ -365,10 +365,9 @@ async fn permitted_folders(
                 continue;
             };
             log::info!("folder_id: {:?}", folder_id);
-            folder_list_with_roles.push(format!("{}:{}", folder_ofga_model, folder_id));
+            folder_list_with_roles.push(format!("{folder_ofga_model}:{folder_id}"));
         }
-        if folder_list.is_some() {
-            let folder_list = folder_list.as_mut().unwrap();
+        if let Some(folder_list) = folder_list.as_mut() {
             folder_list.extend(folder_list_with_roles);
         } else {
             folder_list = Some(folder_list_with_roles);
