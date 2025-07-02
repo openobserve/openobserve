@@ -278,6 +278,17 @@ setup(props, {emit}) {
 
     const isSaving = ref(false);
 
+    const regexPatternInputs: any = ref({
+        name: "",
+        pattern: "",
+        description: "",//this is optional we dont consider it anyway but it is should go in the payload with atleast empty string if user doesnot provide it
+    });
+
+    const expandState = ref({
+        regexPattern: true,
+        regexTestString: true,
+    });
+
 
     onMounted(()=>{
         if(props.isEdit){
@@ -326,19 +337,6 @@ setup(props, {emit}) {
             queryEditorRef.value.highlightRegexMatches(newPattern?.trim());
         }
     });
-
-    const regexPatternInputs: any = ref({
-        name: "",
-        pattern: "",
-        description: "",//this is optional we dont consider it anyway but it is should go in the payload with atleast empty string if user doesnot provide it
-    });
-
-    const expandState = ref({
-        regexPattern: true,
-        regexTestString: true,
-    });
-
-
 
     const getBtnLogo = computed(() => {
         if (isHovered.value || store.state.isAiChatEnabled) {

@@ -17,7 +17,7 @@
           :class="store.state.theme === 'dark' ? 'dark-theme-regex-pattern-list' : 'light-theme-regex-pattern-list'"
         >
         <template #no-data>
-          <NoRegexPatterns v-if="!listLoading" @create-new-regex-pattern="createRegexPattern" />
+          <NoRegexPatterns v-if="!listLoading" @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
           <div v-else class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
             <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
 

@@ -44,7 +44,7 @@ import { useRouter } from "vue-router";
   export default defineComponent({
     
     name: "NoRegexPatterns",
-    emits: ["create-new-regex-pattern"],
+    emits: ["create-new-regex-pattern", "import-regex-pattern"],
     setup(props, { emit }) {
       const { t } = useI18n();
       const store = useStore();
@@ -53,7 +53,7 @@ import { useRouter } from "vue-router";
         emit("create-new-regex-pattern");
       }
       const importRegexPattern = () => {
-        console.log("importRegexPattern");
+        emit("import-regex-pattern");
       }
   
       return { t, getImageURL, store, router, createNewRegexPattern, importRegexPattern };
