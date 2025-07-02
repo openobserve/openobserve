@@ -128,23 +128,14 @@ impl TreeNodeRewriter for HistogramToDatebin {
                         let interval = if self.histogram_interval > 0 {
                             format!("{} second", self.histogram_interval)
                         } else {
-                            generate_histogram_interval(Some((self.start_time, self.end_time)), 0)
+                            generate_histogram_interval(Some((self.start_time, self.end_time)))
                         };
                         cast(
                             Expr::Literal(ScalarValue::from(interval)),
                             DataType::Interval(IntervalUnit::MonthDayNano),
                         )
                     } else if args.len() == 2 {
-                        if let Expr::Literal(ScalarValue::Int64(Some(num))) = &args[1] {
-                            let interval = generate_histogram_interval(
-                                Some((self.start_time, self.end_time)),
-                                *num as u16,
-                            );
-                            cast(
-                                Expr::Literal(ScalarValue::from(interval)),
-                                DataType::Interval(IntervalUnit::MonthDayNano),
-                            )
-                        } else if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
+                        if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
                             cast(
                                 args[1].clone(),
                                 DataType::Interval(IntervalUnit::MonthDayNano),
@@ -232,20 +223,6 @@ mod tests {
                     "| 1970-01-01T00:00:00                       |",
                     "| 1970-01-01T00:00:00                       |",
                     "+-------------------------------------------+",
-                ],
-            ),
-            (
-                "select histogram(_timestamp, 5) from t",
-                vec![
-                    "+----------------------------------+",
-                    "| histogram(t._timestamp,Int64(5)) |",
-                    "+----------------------------------+",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "+----------------------------------+",
                 ],
             ),
         ];

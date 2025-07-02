@@ -718,13 +718,10 @@ fn handle_histogram(
             .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
             .collect::<Vec<&str>>();
 
-        match attrs.get(1) {
-            Some(v) => match v.parse::<u16>() {
-                Ok(v) => generate_histogram_interval(q_time_range, v),
-                Err(_) => v.to_string(),
-            },
-            None => generate_histogram_interval(q_time_range, 0),
-        }
+        attrs.get(1).map_or_else(
+            || generate_histogram_interval(q_time_range),
+            |v| v.to_string(),
+        )
     };
 
     *origin_sql = origin_sql.replace(
