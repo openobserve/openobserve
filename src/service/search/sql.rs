@@ -1839,6 +1839,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 return ControlFlow::Continue(());
             }
             let fname = names.first().unwrap();
+            let fname = fname.as_ident().unwrap();
             if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
                 let list = match args {
                     FunctionArguments::List(list) => list,
@@ -1861,9 +1862,10 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                     FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
-                    FunctionArgExpr::Expr(Expr::Value(
-                        sqlparser::ast::Value::SingleQuotedString(s),
-                    )) => {
+                    FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
+                        value: Value::SingleQuotedString(s),
+                        span: _,
+                    })) => {
                         self.keys.push(s.to_owned());
                     }
                     _ => {
