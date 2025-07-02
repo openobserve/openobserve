@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="row"
               style="height: calc(100vh - 99px); overflow-y: auto"
             >
-              <div class="col" style="height: 100%">
+              <div class="col" style="height: 100%; overflow-y: auto">
                 <q-splitter
                   class="query-editor-splitter"
                   v-model="dashboardPanelData.layout.querySplitter"
