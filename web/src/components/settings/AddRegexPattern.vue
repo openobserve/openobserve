@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw-cursor-pointer" 
             :class="store.state.theme === 'dark' ? 'tw-text-white' : ''"
             :color="isFullScreen ? 'primary' : undefined"
-            @click="() => isFullScreen = !isFullScreen" 
+            @click="toggleFullScreen"
           />
           <q-btn
             data-test="add-regex-pattern-close-btn"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- form inputs starts here -->
        <div class="tw-flex tw-w-[100%]">
             <div class=" "
-            :class="store.state.isAiChatEnabled ? isFullScreen ? 'tw-w-[85%] q-pl-sm' : 'tw-w-[65%] q-pl-sm' : 'tw-w-[100%] q-px-md'"
+            :class="store.state.isAiChatEnabled ? isFullScreen ? 'tw-w-[75%] q-pl-sm' : 'tw-w-[65%] q-pl-sm' : 'tw-w-[100%] q-px-md'"
             >
             <q-form @submit="saveRegexPattern" class="tw-flex tw-flex-col tw-gap-4" style="overflow: auto; height: calc(100vh - 150px);">
                 <div class="tw-flex tw-flex-col">
@@ -394,6 +394,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }
             });
 
+            const toggleFullScreen = () => {
+                isFullScreen.value = !isFullScreen.value;
+                window.dispatchEvent(new Event("resize"));
+            }
+
             return {
                 t,
                 store,
@@ -412,6 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 isPatternValid,
                 queryEditorRef,
                 updateTestString,
+                toggleFullScreen
             }
     }
     });
