@@ -3028,6 +3028,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     (newVal, oldVal) => {
+      console.log(
+        "query",
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query,
+        "customQuery",
+      );
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
 
