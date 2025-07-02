@@ -401,7 +401,7 @@ pub async fn write_file(
     Ok(req_stats)
 }
 
-pub fn check_ingestion_allowed(
+pub async fn check_ingestion_allowed(
     org_id: &str,
     stream_type: StreamType,
     stream_name: Option<&str>,
@@ -426,6 +426,15 @@ pub fn check_ingestion_allowed(
         return Err(Error::IngestionError(format!(
             "stream [{stream_name}] is being deleted"
         )));
+    }
+
+    #[cfg(feature = "cloud")]
+    {
+        if !super::organization::is_org_in_free_trial_period(org_id).await? {
+            return Err(Error::IngestionError(format!(
+                "org {org_id} has expired its trial period"
+            )));
+        }
     }
 
     // check memory circuit breaker

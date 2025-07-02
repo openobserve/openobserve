@@ -55,9 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'width: 250px;'
         "
         :src="
-          store?.state?.theme == 'dark'
-            ? getImageURL('images/common/open_observe_logo_2.svg')
-            : getImageURL('images/common/open_observe_logo.svg')
+          store.state.theme == 'dark'
+            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+            : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
       />
     </div>
@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'width: 250px;'
         "
         :src="
-          store?.state?.theme == 'dark'
-            ? getImageURL('images/common/open_observe_logo_2.svg')
-            : getImageURL('images/common/open_observe_logo.svg')
+          store.state.theme == 'dark'
+            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+            : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
       />
     </div>
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="autoRedirectDexLogin">
       <p>
         Redirecting to SSO login page. If you are not redirected, please
-        <a href="#" @click="loginWithSSo">click here</a>.
+        <a href="#" @click="loginWithSSo" class="cursor-pointer tw-underline">click here</a>.
       </p>
     </div>
 
@@ -222,7 +222,7 @@ export default defineComponent({
     onBeforeMount(() => {
       if (
         config.isCloud == "true" &&
-        router.currentRoute.value.query.action == "getstarted"
+        router.currentRoute.value.path != "/cb"
       ) {
         autoRedirectDexLogin.value = true;
         loginWithSSo();

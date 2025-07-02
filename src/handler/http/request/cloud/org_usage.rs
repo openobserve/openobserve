@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,49 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, Responder, get, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, get, web};
+use hashbrown::HashMap;
 use o2_enterprise::enterprise::cloud::billings;
 
 use super::IntoHttpResponse;
-use crate::{
-    common::utils::auth::UserEmail,
-    handler::http::models::billings::{GetOrgUsageResponseBody, GetQuotaThresholdResponseBody},
-    service::org_usage,
-};
-
-/// GetQuotaThreshold
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Billings",
-    operation_id = "GetQuotaThreshold",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = GetQuotaThresholdResponseBody),
-        (status = 404, description = "Organization quota not found", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
-    ),
-)]
-#[get("/{org_id}/billings/quota_threshold")]
-pub async fn get_org_quota_threshold(
-    path: web::Path<String>,
-    user_email: UserEmail,
-) -> impl Responder {
-    let org_id = path.into_inner();
-    let email = user_email.user_id.as_str();
-
-    match org_usage::get_organization_usage_threshold(&org_id, email).await {
-        Err(e) => e.into_http_response(),
-        Ok(org_usage) => {
-            let body: GetQuotaThresholdResponseBody = org_usage.into();
-            HttpResponse::Ok().json(body)
-        }
-    }
-}
+use crate::{handler::http::models::billings::GetOrgUsageResponseBody, service::org_usage};
 
 /// GetUsageData
 #[utoipa::path(
@@ -76,17 +39,23 @@ pub async fn get_org_quota_threshold(
     ),
 )]
 #[get("/{org_id}/billings/data_usage/{usage_date}")]
-pub async fn get_org_usage(path: web::Path<(String, String)>) -> impl Responder {
+pub async fn get_org_usage(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, query_range) = path.into_inner();
     let usage_range = match query_range.parse::<billings::org_usage::UsageRange>() {
         Ok(usage_range) => usage_range,
         Err(e) => return e.into_http_response(),
     };
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let unit = query.get("data_type").map(|h| h.as_str()).unwrap_or("mb");
 
-    match org_usage::get_org_usage(&org_id, usage_range).await {
+    match org_usage::get_org_usage(&org_id, &usage_range).await {
         Err(e) => e.into_http_response(),
         Ok(org_usage) => {
-            let body: GetOrgUsageResponseBody = org_usage.into();
+            let mut body = GetOrgUsageResponseBody {
+                data: org_usage.into_iter().map(From::from).collect(),
+                range: usage_range.to_string(),
+            };
+            body.convert_to_unit(unit);
             HttpResponse::Ok().json(body)
         }
     }

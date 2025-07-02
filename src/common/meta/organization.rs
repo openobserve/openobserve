@@ -111,8 +111,33 @@ pub struct OrgDetails {
 }
 
 #[derive(Serialize, ToSchema)]
+pub struct AllOrgListDetails {
+    pub id: i64,
+    pub identifier: String,
+    pub name: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    #[serde(rename = "type")]
+    pub org_type: String,
+    #[serde(default)]
+    pub plan: i32,
+    pub trial_expires_at: Option<i64>,
+}
+
+#[derive(Serialize, ToSchema)]
 pub struct OrganizationResponse {
     pub data: Vec<OrgDetails>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct AllOrganizationResponse {
+    pub data: Vec<AllOrgListDetails>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ExtendTrialPeriodRequest {
+    pub org_id: String,
+    pub new_end_date: i64,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -247,6 +272,10 @@ pub struct OrganizationSetting {
     pub enable_streaming_search: bool,
     #[serde(default = "default_auto_refresh_interval")]
     pub min_auto_refresh_interval: u32,
+    // we skip this as this is actually stored in another table
+    // and only applicable for cloud
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub free_trial_expiry: Option<i64>,
 }
 
 impl Default for OrganizationSetting {
@@ -259,6 +288,7 @@ impl Default for OrganizationSetting {
             aggregation_cache_enabled: default_enable_aggregation_cache(),
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
+            free_trial_expiry: None,
         }
     }
 }
