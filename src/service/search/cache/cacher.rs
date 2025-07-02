@@ -24,6 +24,8 @@ use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
     meta::ResultCacheMeta,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
 use proto::cluster_rpc::SearchQuery;
 
 use crate::{
@@ -646,10 +648,12 @@ pub fn get_ts_col_order_by(
 #[tracing::instrument]
 pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
+    // Part 1: delete the results cache
     let pattern = format!("{root_dir}/results/{path}");
     let prefix = format!("{root_dir}/");
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
+
     for file in files {
         match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
@@ -659,6 +663,27 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
             }
         }
     }
+
+    // Part 2: delete the aggregation cache
+    #[cfg(feature = "enterprise")]
+    let mut aggs_remove_files: Vec<String> = vec![];
+    #[cfg(feature = "enterprise")]
+    {
+        let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
+        let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
+        aggs_remove_files.extend(aggs_files);
+
+        for file in aggs_remove_files {
+            match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("Error deleting cache: {:?}", e);
+                    return Err(std::io::Error::other("Error deleting cache"));
+                }
+            }
+        }
+    }
+
     for file in remove_files {
         let columns = file
             .strip_prefix(&prefix)
