@@ -22,8 +22,6 @@ export default class DashboardCreate {
 
   //Create Dashboard
   async createDashboard(dashboardName) {
-    const nameInput = this.page.locator('[data-test="add-dashboard-name"]');
-
     await this.dashCreateBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.dashCreateBtn.click();
 

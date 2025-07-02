@@ -20,11 +20,11 @@ export default class DashboardImport {
   }
 
   // Import dashboard file
-  async inputFiles1(fileContentPath) {
+  async uploadDashboardFile(fileContentPath) {
     await this.inputFile.setInputFiles(fileContentPath);
   }
 
-  // Delet the Only imported dashboard
+  // Delete the Only imported dashboard
   async deleteImportedDashboard(prefix, dashboardName) {
     const fullRowName = `${prefix} ${dashboardName}`;
     await this.page

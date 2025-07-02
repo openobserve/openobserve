@@ -38,10 +38,12 @@ export default class DashboardPanel {
     );
     this.saveLayout = page.locator('[data-test="panel-layout-settings-save"]');
     this.cancelLayout = page.locator(
-      'data-test="panel-layout-settings-cancel"]'
+      '[data-test="panel-layout-settings-cancel"]'
     );
     this.goToLogs = page.locator('[data-test="dashboard-move-to-logs-module"]');
-    this.queryInspector = page.locator('[data-test="dashboard-query-inspector-panel"]');
+    this.queryInspector = page.locator(
+      '[data-test="dashboard-query-inspector-panel"]'
+    );
   }
 
   // Duplicate panel
@@ -104,11 +106,15 @@ export default class DashboardPanel {
     await this.page.locator('[data-test="dashboard-panel-container"]').hover();
     await this.fullscreen.waitFor({ state: "visible" });
     await this.fullscreen.click();
-    await this.page.waitForSelector('[data-test="dashboard-viewpanel-close-btn"]'),
+    await this.page.waitForSelector(
+      '[data-test="dashboard-viewpanel-close-btn"]'
+    ),
       { state: "visible" };
-    await this.page.locator('[data-test="dashboard-viewpanel-close-btn"]').click();
+    await this.page
+      .locator('[data-test="dashboard-viewpanel-close-btn"]')
+      .click();
   }
- 
+
   //refresh panel
   async refreshPanel(panelName) {
     await this.page

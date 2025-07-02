@@ -35,7 +35,7 @@ test.describe("dashboard Import testcases", () => {
     const fileContentPath = "../test-data/dashboards-import.json";
 
     // Locate the file input field and set the JSON file
-    await dashboardImport.inputFiles1(fileContentPath);
+    await dashboardImport.uploadDashboardFile(fileContentPath);
 
     await dashboardImport.clickImportButton();
 
@@ -67,7 +67,7 @@ test.describe("dashboard Import testcases", () => {
     //file name to be used for import
     const fileContentPath = "../test-data/dashboard1-import.json";
 
-    await dashboardImport.inputFiles1(fileContentPath);
+    await dashboardImport.uploadDashboardFile(fileContentPath);
 
     await dashboardImport.clickImportButton();
 
@@ -166,7 +166,7 @@ test.describe("dashboard Import testcases", () => {
     // //is used for setting the file to be imported
     // await inputFile.setInputFiles(fileContentPath);
 
-    await dashboardImport.inputFiles1(fileContentPath);
+    await dashboardImport.uploadDashboardFile(fileContentPath);
 
     await page.getByText("close").click();
 
@@ -196,7 +196,7 @@ test.describe("dashboard Import testcases", () => {
     const fileContentPath = "../test-data/dashboard1-import.json";
 
     // Locate the file input field and set the JSON file
-    await dashboardImport.inputFiles1(fileContentPath);
+    await dashboardImport.uploadDashboardFile(fileContentPath);
 
     //is used for setting the file to be imported
 
@@ -223,7 +223,7 @@ test.describe("dashboard Import testcases", () => {
     const fileContentPath = "../test-data/dashboard2-import.json";
 
     // Locate the file input field and set the JSON file
-    await dashboardImport.inputFiles1(fileContentPath);
+    await dashboardImport.uploadDashboardFile(fileContentPath);
 
     await dashboardImport.clickImportButton();
 
@@ -250,7 +250,7 @@ test.describe("dashboard Import testcases", () => {
     // Step 3: Set the JSON file for import
     const fileContentPath = "../test-data/dashboards-import.json";
 
-    await dashboardImport.inputFiles1(fileContentPath);
+    await dashboardImport.uploadDashboardFile(fileContentPath);
 
     // Step 4: Create a unique folder via UI
     function generateUniqueFolderName(prefix = "u") {
@@ -314,7 +314,7 @@ test.describe("dashboard Import testcases", () => {
     const fileContentPath1 = "../test-data/dashboardV3-import.json";
 
     // Locate the file input field and set the JSON file
-    await dashboardImport.inputFiles1(fileContentPath1);
+    await dashboardImport.uploadDashboardFile(fileContentPath1);
 
     await dashboardImport.clickImportButton();
 
@@ -340,7 +340,7 @@ test.describe("dashboard Import testcases", () => {
     const fileContentPath = "../test-data/dashboardAzure.json";
 
     // Locate the file input field and set the JSON file
-    await dashboardImport.inputFiles1(fileContentPath);
+    await dashboardImport.uploadDashboardFile(fileContentPath);
 
     await dashboardImport.clickImportButton();
 

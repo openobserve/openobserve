@@ -56,8 +56,6 @@ test.describe("dashboard general setting", () => {
     // Fix: Use relativeTimeSelection from DashboardSetting POM
     await dashboardSetting.relativeTimeSelection("3", "h");
     await dashboardSetting.saveSetting();
-
-    // await dashboardSetting.saveSetting();
     await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });

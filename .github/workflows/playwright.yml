@@ -123,7 +123,6 @@ jobs:
             # "secondsPrecisionAdded.spec.js",
             # "reportsUpdated.spec.js",
             # "reportsUpdated2.spec.js",
-            # "dashboards/dashboard-filter.spec.js",
             # "join.spec.js",
             #  "alerts.spec.js",
             # "changeOrg.spec.js",
