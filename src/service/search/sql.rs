@@ -42,12 +42,14 @@ use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
-        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
-        VisitMut, VisitorMut, helpers::attached_token::AttachedToken,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, ObjectNamePart,
+        OrderByExpr, OrderByKind, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement,
+        TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
+        helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
+    tokenizer::Span,
 };
 
 #[cfg(feature = "enterprise")]
@@ -735,15 +737,17 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut() {
-            for order in order_by.exprs.iter_mut() {
+        if let Some(order_by) = query.order_by.as_mut()
+            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
+        {
+            for order in exprs.iter_mut() {
                 let mut name_visitor = FieldNameVisitor::new();
                 let _ = order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
                     self.order_by.push((
                         expr_name,
-                        if order.asc.unwrap_or(true) {
+                        if order.options.asc.unwrap_or(true) {
                             OrderBy::Asc
                         } else {
                             OrderBy::Desc
@@ -808,13 +812,16 @@ impl VisitorMut for ColumnVisitor<'_> {
                 }
             }
         }
-        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref()
+        if let Some(limit) = query.limit.as_ref()
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
+            && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
         {
             self.limit = Some(num);
         }
         if let Some(offset) = query.offset.as_ref()
-            && let Expr::Value(Value::Number(n, _)) = &offset.value
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
+            && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
         {
             self.offset = Some(num);
@@ -1545,7 +1552,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 select.sort_by = vec![];
                 select.projection = vec![SelectItem::ExprWithAlias {
                     expr: Expr::Function(Function {
-                        name: ObjectName(vec![Ident::new("count")]),
+                        name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                         parameters: FunctionArguments::None,
                         args: FunctionArguments::List(FunctionArgumentList {
                             args: vec![FunctionArg::Unnamed(field_expr)],
@@ -1571,7 +1578,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     top_before_distinct: false,
                     projection: vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
-                            name: ObjectName(vec![Ident::new("count")]),
+                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                             parameters: FunctionArguments::None,
                             args: FunctionArguments::List(FunctionArgumentList {
                                 args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
@@ -1608,6 +1615,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     window_before_qualify: false,
                     connect_by: None,
                     value_table_mode: None,
+                    flavor: SelectFlavor::Standard,
                 })));
                 *query = Query {
                     with: None,
@@ -1831,6 +1839,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 return ControlFlow::Continue(());
             }
             let fname = names.first().unwrap();
+            let fname = fname.as_ident().unwrap();
             if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
                 let list = match args {
                     FunctionArguments::List(list) => list,
@@ -1853,9 +1862,10 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                     FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
-                    FunctionArgExpr::Expr(Expr::Value(
-                        sqlparser::ast::Value::SingleQuotedString(s),
-                    )) => {
+                    FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
+                        value: Value::SingleQuotedString(s),
+                        span: _,
+                    })) => {
                         self.keys.push(s.to_owned());
                     }
                     _ => {
@@ -1918,12 +1928,14 @@ impl VisitorMut for AddOrderingTermVisitor {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if query.order_by.is_none() {
             query.order_by = Some(sqlparser::ast::OrderBy {
-                exprs: vec![OrderByExpr {
+                kind: OrderByKind::Expressions(vec![OrderByExpr {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
-                    asc: Some(self.is_asc),
-                    nulls_first: None,
                     with_fill: None,
-                }],
+                    options: sqlparser::ast::OrderByOptions {
+                        asc: Some(self.is_asc),
+                        nulls_first: None,
+                    },
+                }]),
                 interpolate: None,
             });
         }
@@ -1972,7 +1984,10 @@ impl AddNewFiltersWithAndOperatorVisitor {
             exprs.push(Expr::BinaryOp {
                 left: Box::new(Expr::Identifier(Ident::new(key.to_string()))),
                 op: BinaryOperator::Eq,
-                right: Box::new(Expr::Value(Value::SingleQuotedString(value.to_string()))),
+                right: Box::new(Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(value.to_string()),
+                    span: Span::empty(),
+                })),
             });
         }
         let exprs = exprs.iter().collect();
@@ -2044,14 +2059,10 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                     | BinaryOperator::Lt,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref()
-                    && *value == placeholder
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
                 {
-                    *expr = Expr::Value(Value::Boolean(true));
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(true));
+                    *expr = expr_boolean(true);
                 }
             }
             // Not equal
@@ -2060,14 +2071,10 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 op: BinaryOperator::NotEq,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref()
-                    && *value == placeholder
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
                 {
-                    *expr = Expr::Value(Value::Boolean(false));
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(false));
+                    *expr = expr_boolean(false);
                 }
             }
             // Like
@@ -2081,10 +2088,8 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: false,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(true));
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(true);
                 }
             }
             // Not Like
@@ -2098,19 +2103,15 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: true,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(false));
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(false);
                 }
             }
             // In list
             Expr::InList { list, negated, .. } if !(*negated) => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item
-                        && *value == placeholder
-                    {
-                        *expr = Expr::Value(Value::Boolean(true));
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(true);
                         break;
                     }
                 }
@@ -2118,10 +2119,8 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             // Not in list
             Expr::InList { list, negated, .. } if *negated => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item
-                        && *value == placeholder
-                    {
-                        *expr = Expr::Value(Value::Boolean(false));
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(false);
                         break;
                     }
                 }
@@ -2137,13 +2136,33 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 {
                     let value = trim_quotes(list.args[1].to_string().as_str());
                     if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
+                        *expr = expr_boolean(true);
                     }
                 }
             }
             _ => {}
         }
         ControlFlow::Continue(())
+    }
+}
+
+fn expr_boolean(value: bool) -> Expr {
+    Expr::Value(ValueWithSpan {
+        value: Value::Boolean(value),
+        span: Span::empty(),
+    })
+}
+
+fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
+    if let Expr::Value(ValueWithSpan {
+        value: Value::SingleQuotedString(value),
+        span: _,
+    }) = expr
+        && value == placeholder
+    {
+        true
+    } else {
+        false
     }
 }
 

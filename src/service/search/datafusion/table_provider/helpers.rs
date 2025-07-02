@@ -150,28 +150,6 @@ pub async fn list_files<'a>(
     ))
 }
 
-/// Partition the list of files into `n` groups
-pub fn split_files(
-    mut partitioned_files: Vec<PartitionedFile>,
-    n: usize,
-) -> Vec<Vec<PartitionedFile>> {
-    if partitioned_files.is_empty() {
-        return vec![];
-    }
-
-    // ObjectStore::list does not guarantee any consistent order and for some
-    // implementations such as LocalFileSystem, it may be inconsistent. Thus
-    // Sort files by path to ensure consistent plans when run more than once.
-    partitioned_files.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // effectively this is div with rounding up instead of truncating
-    let chunk_size = partitioned_files.len().div_ceil(n);
-    partitioned_files
-        .chunks(chunk_size)
-        .map(|c| c.to_vec())
-        .collect()
-}
-
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
     #[allow(deprecated)]
     if config::get_config()
@@ -349,46 +327,6 @@ mod tests {
     use datafusion::logical_expr::{case, col, lit};
 
     use super::*;
-
-    #[test]
-    fn test_split_files() {
-        let new_partitioned_file = |path: &str| PartitionedFile::new(path.to_owned(), 10);
-        let files = vec![
-            new_partitioned_file("a"),
-            new_partitioned_file("b"),
-            new_partitioned_file("c"),
-            new_partitioned_file("d"),
-            new_partitioned_file("e"),
-        ];
-
-        let chunks = split_files(files.clone(), 1);
-        assert_eq!(1, chunks.len());
-        assert_eq!(5, chunks[0].len());
-
-        let chunks = split_files(files.clone(), 2);
-        assert_eq!(2, chunks.len());
-        assert_eq!(3, chunks[0].len());
-        assert_eq!(2, chunks[1].len());
-
-        let chunks = split_files(files.clone(), 5);
-        assert_eq!(5, chunks.len());
-        assert_eq!(1, chunks[0].len());
-        assert_eq!(1, chunks[1].len());
-        assert_eq!(1, chunks[2].len());
-        assert_eq!(1, chunks[3].len());
-        assert_eq!(1, chunks[4].len());
-
-        let chunks = split_files(files, 123);
-        assert_eq!(5, chunks.len());
-        assert_eq!(1, chunks[0].len());
-        assert_eq!(1, chunks[1].len());
-        assert_eq!(1, chunks[2].len());
-        assert_eq!(1, chunks[3].len());
-        assert_eq!(1, chunks[4].len());
-
-        let chunks = split_files(vec![], 2);
-        assert_eq!(0, chunks.len());
-    }
 
     #[test]
     fn test_expr_applicable_for_cols() {

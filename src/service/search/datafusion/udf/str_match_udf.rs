@@ -22,7 +22,9 @@ use datafusion::{
     },
     common::cast::as_string_array,
     error::{DataFusionError, Result},
-    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
+    logical_expr::{
+        ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
+    },
     scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
@@ -72,8 +74,8 @@ impl ScalarUDFImpl for StrMatchUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        str_match_impl(args, false)
+    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
+        str_match_impl(&args.args, false)
     }
 }
 
@@ -113,8 +115,8 @@ impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        str_match_impl(args, true)
+    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
+        str_match_impl(&args.args, true)
     }
 }
 

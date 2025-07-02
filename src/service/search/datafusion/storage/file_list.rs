@@ -52,7 +52,7 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
         values.push(ObjectMeta {
             location: file_name.into(),
             last_modified: modified,
-            size: file.meta.compressed_size as usize,
+            size: file.meta.compressed_size as u64,
             e_tag: None,
             version: None,
         });
