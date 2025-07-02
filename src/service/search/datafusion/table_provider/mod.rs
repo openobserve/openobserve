@@ -553,17 +553,17 @@ fn repartition_sorted_groups(
 
         if !odd_group.is_empty() {
             let file_group = FileGroup::new(odd_group);
-            let statistics =
+            let file_group_with_statistics =
                 compute_file_group_statistics(file_group, Arc::clone(&file_schema), collect_stat)
                     .unwrap();
-            groups.push(statistics);
+            groups.push(file_group_with_statistics);
         }
         if !even_group.is_empty() {
             let file_group = FileGroup::new(even_group);
-            let statistics =
+            let file_group_with_statistics =
                 compute_file_group_statistics(file_group, Arc::clone(&file_schema), collect_stat)
                     .unwrap();
-            groups.push(statistics);
+            groups.push(file_group_with_statistics);
         }
     }
 
