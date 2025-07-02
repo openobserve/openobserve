@@ -27,7 +27,11 @@ use config::{
     },
     utils::sql::AGGREGATE_UDF_LIST,
 };
-use datafusion::{arrow::datatypes::Schema, common::TableReference};
+use datafusion::{
+    arrow::datatypes::Schema,
+    common::{TableReference, tree_node::TreeNode},
+    prelude::SessionContext,
+};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
@@ -62,9 +66,13 @@ use super::{
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 use crate::service::search::{
-    datafusion::udf::{
-        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-        STR_MATCH_UDF_NAME,
+    cluster::flight::register_table,
+    datafusion::{
+        distributed_plan::rewrite::GroupByFieldVisitor,
+        udf::{
+            MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+            STR_MATCH_UDF_NAME,
+        },
     },
     index::get_arg_name,
 };
@@ -332,7 +340,7 @@ impl Sql {
 
         let is_complex = is_complex_query(&mut statement);
 
-        Ok(Sql {
+        let mut sql = Sql {
             sql: statement.to_string(),
             is_complex,
             org_id: org_id.to_string(),
@@ -354,7 +362,25 @@ impl Sql {
             use_inverted_index,
             index_condition,
             index_optimize_mode,
-        })
+        };
+
+        // create plan by sql, used for check group by fields
+        if sql.schemas.len() == 1 {
+            let ctx = SessionContext::new();
+            register_table(&ctx, &sql).await?;
+            let plan = ctx.state().create_logical_plan(&sql.sql).await?;
+            let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+            // visit group by fields
+            let mut group_by_visitor = GroupByFieldVisitor::new();
+            physical_plan.visit(&mut group_by_visitor)?;
+            let group_by_fields = group_by_visitor.get_group_by_fields();
+            if !group_by_fields.is_empty() {
+                sql.group_by = group_by_fields;
+            }
+        }
+
+        Ok(sql)
     }
 }
 
