@@ -306,19 +306,6 @@ pub async fn ingest(
                 );
             }
 
-            // we do not drop the record here, just log error and continue process
-            match pattern_manager.process_at_ingestion(
-                org_id,
-                StreamType::Logs,
-                in_stream_name,
-                &mut local_val,
-            ) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!("error in processing record for patterns : {e}");
-                }
-            }
-
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
                 .or_insert_with(|| (Vec::new(), None));
@@ -455,18 +442,6 @@ pub async fn ingest(
                             );
                         }
 
-                        match pattern_manager.process_at_ingestion(
-                            org_id,
-                            StreamType::Logs,
-                            &destination_stream,
-                            &mut local_val,
-                        ) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::error!("error in processing record for patterns : {e}");
-                            }
-                        }
-
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
                             .or_insert_with(|| (Vec::new(), None));
@@ -499,6 +474,15 @@ pub async fn ingest(
     drop(executable_pipeline);
     drop(original_options);
     drop(user_defined_schema_map);
+
+    for (stream, data) in json_data_by_stream.iter_mut() {
+        match pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0) {
+            Ok(_) => {}
+            Err(e) => {
+                log::error!("error in processing records for patterns for stream {stream} : {e}");
+            }
+        }
+    }
 
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Record(stream_status.status);

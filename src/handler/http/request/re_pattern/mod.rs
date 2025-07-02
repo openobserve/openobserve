@@ -122,7 +122,7 @@ pub async fn save(
             &req.name,
             &req.description,
             &req.pattern,
-            &user_id,
+            user_id,
         ))
         .await
         {

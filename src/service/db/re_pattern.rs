@@ -294,7 +294,7 @@ pub async fn watch_patterns() -> Result<(), anyhow::Error> {
             Event::Delete(ev) => {
                 let pattern_id = ev.key.strip_prefix(prefix).unwrap();
                 let mgr = get_pattern_manager().await?;
-                mgr.remove_pattern(&pattern_id);
+                mgr.remove_pattern(pattern_id);
             }
             Event::Empty => {}
         }
@@ -317,22 +317,21 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
             }
         };
 
-        match ev {
-            Event::Put(ev) => {
-                let combo = ev.key.strip_prefix(prefix).unwrap();
-                let splits = combo.split('/').collect::<Vec<_>>();
-                let org = splits[0];
-                let stype = StreamType::from(splits[1]);
-                let stream = splits[2];
+        // there is no separate delete event for associations,
+        // everything is notified via put event only
 
-                let updates: UpdateSettingsWrapper<PatternAssociation> =
-                    serde_json::from_slice(&ev.value.unwrap()).unwrap();
+        if let Event::Put(ev) = ev {
+            let combo = ev.key.strip_prefix(prefix).unwrap();
+            let splits = combo.split('/').collect::<Vec<_>>();
+            let org = splits[0];
+            let stype = StreamType::from(splits[1]);
+            let stream = splits[2];
 
-                let mgr = get_pattern_manager().await?;
-                mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;
-            }
+            let updates: UpdateSettingsWrapper<PatternAssociation> =
+                serde_json::from_slice(&ev.value.unwrap()).unwrap();
 
-            _ => {}
+            let mgr = get_pattern_manager().await?;
+            mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;
         }
     }
 }
