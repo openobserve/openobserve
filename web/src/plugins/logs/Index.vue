@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
-              :searchResponse="searchObj.data.queryResults"
+              :searchResponse="searchResponseForVisualization"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -1495,11 +1495,37 @@ export default defineComponent({
       showSearchScheduler.value = false;
     };
 
+    const searchResponseForVisualization = ref({});
+
+    const copyLogsQueryToDashboardPanel = () => {
+      // Handle pagination
+      // If pagination is enabled, then set histogram query
+      // else set same query
+      if (searchObj.meta.resultGrid.showPagination) {
+        // set histogram query
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query =
+          searchObj?.data?.histogramQuery?.query?.sql ??
+          (searchObj?.data?.stream?.selectedStream?.[0]
+            ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
+            : "");
+      } else {
+        // set same query
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query =
+          searchObj?.data?.query ??
+          (searchObj?.data?.stream?.selectedStream?.[0]
+            ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
+            : "");
+      }
+    };
+
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
-
           // emit resize event
           // this will rerender/call resize method of already rendered chart to resize
           window.dispatchEvent(new Event("resize"));
@@ -1511,9 +1537,7 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
 
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query = searchObj.data.query;
+          copyLogsQueryToDashboardPanel();
 
           // select chary type as line
           dashboardPanelData.data.type = "line";
@@ -1523,17 +1547,30 @@ export default defineComponent({
           // push on query fields
           setCustomQueryFields();
 
+          // set logs page data to searchResponseForVisualization
+          if (searchObj.meta.resultGrid.showPagination) {
+            // replace hits with histogram query data
+            searchResponseForVisualization.value = {
+              ...searchObj.data.queryResults,
+              hits: searchObj.data.queryResults.aggs,
+            };
+          } else {
+            searchResponseForVisualization.value = searchObj.data.queryResults;
+          }
+
           // run query
-          handleRunQueryFn();
+          visualizeChartData.value = JSON.parse(
+            JSON.stringify(dashboardPanelData.data),
+          );
 
           // TODO: extract custom fields from query
           // above one will be done via query watcher on useDashboardPanelData hook
           // TODO: On visualization toggle, extract which field will go to x axis, y axis and breakdown
-          console.log(
-            "custom fields",
-            dashboardPanelData.meta.stream.customQueryFields,
-          );
-          console.log("logs page query results", searchObj.data.queryResults);
+          // console.log(
+          //   "custom fields",
+          //   dashboardPanelData.meta.stream.customQueryFields,
+          // );
+          // console.log("logs page query results", searchObj.data.queryResults);
         }
       },
     );
@@ -1544,9 +1581,7 @@ export default defineComponent({
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
           // Here, it may go to infinite loop
           // TODO: add check for auto sql mode
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query = searchObj.data.query;
+          copyLogsQueryToDashboardPanel();
         }
       },
     );
@@ -1597,6 +1632,9 @@ export default defineComponent({
         if (!isValid(true, true)) {
           // return;
         }
+
+        // reset searchResponseForVisualization
+        searchResponseForVisualization.value = {};
 
         // refresh the date time
         searchBarRef.value &&
@@ -1792,6 +1830,7 @@ export default defineComponent({
       removeFieldByName,
       setFieldsAndConditions,
       dashboardPanelData
+      searchResponseForVisualization,
     };
   },
   computed: {
