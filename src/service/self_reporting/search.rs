@@ -45,6 +45,7 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
