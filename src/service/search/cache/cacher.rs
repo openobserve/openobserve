@@ -657,8 +657,8 @@ pub fn get_ts_col_order_by(
 pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
-    let pattern = format!("{}/results/{}", root_dir, path);
-    let prefix = format!("{}/", root_dir);
+    let pattern = format!("{root_dir}/results/{path}");
+    let prefix = format!("{root_dir}/");
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
 
