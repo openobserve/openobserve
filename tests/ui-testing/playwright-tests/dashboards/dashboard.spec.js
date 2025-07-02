@@ -323,7 +323,7 @@ test.describe("dashboard UI testcases", () => {
     const tabName = "Default";
     const dashboardName = randomDashboardName;
     await dashboardPanelConfigs.openConfigPanel();
-    await dashboardDrilldown.addDrillownDashboard(
+    await dashboardDrilldown.addDrilldownDashboard(
       folderName,
       drilldownName,
       dashboardName,

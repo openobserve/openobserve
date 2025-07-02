@@ -95,7 +95,7 @@ export default class LogsVisualise {
       .click();
   }
 
-  //stram index list
+  //stream index list
   async streamIndexList() {
     await this.page
       .locator('[data-test="logs-search-index-list"]')
@@ -130,7 +130,6 @@ export default class LogsVisualise {
 
   //remove field
   async removeField(fieldName, target) {
-
     const removeSelectors = {
       x: "dashboard-x-item",
       y: "dashboard-y-item",

@@ -39,7 +39,7 @@ export default class DashboardSetting {
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
-    this.addTabCancel = page.locator('[dashboard-add-cancel"]');
+    this.addTabCancel = page.locator('[data-test="dashboard-add-cancel"]');
     this.EditSave = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
@@ -359,11 +359,6 @@ export default class DashboardSetting {
 
     // Fill new tab name
     await nameEditLocator.fill(updatedTabName);
-
-    // Save changes
-    // await page
-    //   .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
-    //   .click();
   }
 
   //save edited tab name

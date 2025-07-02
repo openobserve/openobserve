@@ -91,8 +91,6 @@ export default class ChartTypeSelector {
   //remove fields from the dashboard
   // Remove field by type (x, y, breakdown, etc.)
   async removeField(fieldName, target) {
-    console.log(`Removing field: ${fieldName} from: ${target}`);
-
     const removeSelectors = {
       x: "dashboard-x-item",
       y: "dashboard-y-item",
@@ -119,6 +117,5 @@ export default class ChartTypeSelector {
 
     await removeButton.waitFor({ state: "visible", timeout: 5000 });
     await removeButton.click();
-    console.log(`Removed field: ${fieldName} from ${target}`);
   }
 }

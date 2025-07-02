@@ -1,5 +1,4 @@
-  //Methods: Drilldown Name, Drilldown by dashboard, Drilldown by URL, Drilldown by logs
-
+//Methods: Drilldown Name, Drilldown by dashboard, Drilldown by URL, Drilldown by logs
 
 export default class DashboardDrilldownPage {
   constructor(page) {
@@ -33,23 +32,21 @@ export default class DashboardDrilldownPage {
   generateUniqueDrilldownName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
   }
-  
+
   // Generate a unique dashboard name
   generatedashboardName(prefix = "dashboard") {
     return `${prefix}_${Date.now()}`;
   }
-  
+
   //Add Drilldown by Dashboard
-  async addDrillownDashboard(
+  async addDrilldownDashboard(
     folderName,
     drilldownName,
     dashboardName,
     tabName
   ) {
     await this.addDrilldownButton.waitFor({ state: "visible" });
-    await this.page
-      .locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]')
-      .click();
+    await this.addDrilldownButton.click();
     await this.drilldownNameInput.waitFor({ state: "visible" });
     await this.drilldownNameInput.fill(drilldownName);
     await this.folderSelect.waitFor({ state: "visible" });
@@ -62,7 +59,7 @@ export default class DashboardDrilldownPage {
     await this.addBtn.click();
   }
 
-  //Add Drilldwon by URL
+  //Add addDrilldownByURL
   async addDrillownByURL(drilldownName, url) {
     await this.addDrilldownButton.waitFor({ state: "visible" });
     await this.addDrilldownButton.click();
@@ -75,7 +72,7 @@ export default class DashboardDrilldownPage {
   }
 
   // AddDrilldown by logs
-  async addDrillownByLogs(drilldownName) {
+  async addDrilldownByLogs(drilldownName) {
     await this.addDrilldownButton.waitFor({ state: "visible" });
     await this.addDrilldownButton.click();
     await this.drilldownNameInput.waitFor({ state: "visible" });
@@ -85,4 +82,3 @@ export default class DashboardDrilldownPage {
     await this.addBtn.click();
   }
 }
-
