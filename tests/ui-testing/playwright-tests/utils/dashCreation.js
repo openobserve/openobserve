@@ -10,9 +10,9 @@ export const waitForDashboardPage = async function (page) {
 
   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/dashboards**");
 
-  await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
-    state: "hidden",
-  });
+  // await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
+  //   state: "hidden",
+  // });
   await dashboardListApi;
   await page.waitForTimeout(500);
 };
