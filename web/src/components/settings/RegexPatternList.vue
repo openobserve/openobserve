@@ -99,7 +99,7 @@
               round
               flat
               @click.stop="exportRegexPattern(props.row)"
-              data-test="regex-pattern-export"
+              :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
             ></q-btn>
               <q-btn
               :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
@@ -303,7 +303,7 @@
         resultTotal.value = regexPatterns.value.length;
       }
     })
-
+    //this is used to filter the regex pattern based on the name using the search input
     const filterData = (rows: any, terms: any) => {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -371,13 +371,13 @@
         $q.notify({
           message: `Regex pattern deleted successfully.`,
           color: "positive",
-          icon: "check",
+          timeout: 1500,
         });
       } catch (error) {
         $q.notify({
-          message: error?.data?.message || "Error deleting regex pattern",
+          message: error?.response?.data?.message || error?.data?.message || "Error deleting regex pattern",
           color: "negative",
-          icon: "error",
+          timeout: 1500,
         });
       }
       finally{

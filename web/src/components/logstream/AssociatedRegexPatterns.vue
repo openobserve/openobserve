@@ -3,7 +3,7 @@
         <div class="tw-flex tw-items-center no-wrap tw-justify-between tw-px-4 tw-py-2">
         <div class="tw-flex tw-items-center">
             <div class="col-auto">
-            <q-btn v-close-popup="true" round flat icon="arrow_back" />
+            <q-btn data-test="associated-regex-patterns-back-btn" v-close-popup="true" round flat icon="arrow_back" />
         </div>
           <div
             class="tw-flex tw-items-center"
@@ -17,7 +17,7 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="close" />
+          <q-btn data-test="associated-regex-patterns-close-btn" v-close-popup="true" round flat icon="close" />
         </div>
       </div>
       <q-separator />
@@ -30,7 +30,7 @@
 
                 <div>
                     <q-input
-                    data-test="schema-field-search-input"
+                    data-test="associated-regex-patterns-search-input"
                     v-model="filterPattern"
                     data-cy="schema-index-field-search-input"
                     filled
@@ -53,11 +53,13 @@
                       ref="appliedPatternsExpandedRef"
                       :label="`Applied Patterns (${appliedPatterns.length})`"
                       class="q-mt-sm tw-text-[14px] tw-font-[600] associated-regex-patterns-table "
+                      data-test="associated-regex-patterns-applied-patterns-expansion-item"
                     >
                       <q-card class="q-pa-none q-ma-none" style="height: 100%;">
                         <q-card-section class="q-pa-none q-ma-none" style="height: 100%;">
                           <q-table
                             style="height: 100%; overflow-y: auto;"
+                            data-test="associated-regex-patterns-applied-patterns-table"
                             :rows="appliedPatterns"
                             :columns="appliedFilterColumns"
                             :visible-columns="['pattern_name']"
@@ -70,8 +72,8 @@
                             @:ilter-method="handleFilterMethod"
                           >
                             <template v-slot:body="props">
-                              <q-tr class="tw-cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
-                                <q-td class="tw-flex tw-justify-between tw-items-center" style="border-bottom: 0px; font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px;" :props="props" key="pattern_name">
+                              <q-tr :data-test="`associated-regex-patterns-applied-patterns-table-row-${props.row.pattern_id}`" class="tw-cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
+                                <q-td :data-test="`associated-regex-patterns-applied-patterns-table-cell-${props.row.pattern_id}`" class="tw-flex tw-justify-between tw-items-center" style="border-bottom: 0px; font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px;" :props="props" key="pattern_name">
                                   <span class="regex-pattern-name">
                                     {{ props.row.pattern_name }}
                                   </span>
@@ -94,12 +96,13 @@
                       ref="allPatternsExpandedRef"
                       :label="`All Patterns (${resultTotal})`"
                       class="q-mt-sm tw-text-[14px] tw-font-[600] associated-regex-patterns-table "
-
+                      data-test="associated-regex-patterns-all-patterns-expansion-item"
                     >
                       <q-card class="q-pa-none q-ma-none" style="height: 100%;">
                         <q-card-section class="q-pa-none q-ma-none" style="height: 100%;">
                           <q-table
                             style="height: 100%; overflow-y: auto;"
+                            data-test="associated-regex-patterns-all-patterns-table"
                             :class="store.state.theme === 'dark' ? 'dark-associated-regex-patterns-table' : 'light-associated-regex-patterns-table'"
                             :rows="allPatterns"
                             :columns="filterColumns"
@@ -112,8 +115,8 @@
                             @:filter-method="handleFilterMethod"
                           >
                           <template v-slot:body="props">
-                              <q-tr style="padding: 8px 0px !important;"  class="tw-cursor-pointer" :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
-                                <q-td  class="tw-flex tw-justify-between tw-items-center " style="border-bottom: 0px;  font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px; " :props="props" key="pattern_name">
+                              <q-tr :data-test="`associated-regex-patterns-all-patterns-table-row-${props.row.pattern_id}`" style="padding: 8px 0px !important;"  class="tw-cursor-pointer" :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
+                                <q-td :data-test="`associated-regex-patterns-all-patterns-table-cell-${props.row.pattern_id}`" class="tw-flex tw-justify-between tw-items-center " style="border-bottom: 0px;  font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px; " :props="props" key="pattern_name">
                                  <span class="regex-pattern-name">{{ props.row.pattern_name }}</span> 
                                   <span v-if="checkIfPatternIsApplied(props.row.pattern_id)">
                                     <q-icon name="check" size="xs" color="primary" />
@@ -140,7 +143,7 @@
               <span class="individual-section-title">
                 Pattern name
               </span>
-              <span class="individual-section-sub-information">
+              <span class="individual-section-sub-information" data-test="associated-regex-patterns-pattern-name">
                 {{ userClickedPattern.pattern_name }}
               </span>
             </div>
@@ -149,7 +152,7 @@
               <span class="individual-section-title">
               Pattern Description
               </span>
-              <span class="individual-section-sub-information">
+              <span class="individual-section-sub-information" data-test="associated-regex-patterns-pattern-description">
                 {{ userClickedPattern.description ? userClickedPattern.description : 'No description available' }}
               </span>
             </div>
@@ -159,7 +162,7 @@
               </span>
               <div class="tw-flex tw-gap-8">
                 <div class="tw-flex tw-items-start">
-                <q-radio v-model="policy" val="Redact">
+                <q-radio v-model="policy" val="Redact" data-test="associated-regex-patterns-redact-radio">
 
                 </q-radio>
                 <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
@@ -171,7 +174,7 @@
 
               </div>
               <div class="tw-flex tw-items-start">
-                <q-radio v-model="policy" val="DropField">
+                <q-radio v-model="policy" val="DropField" data-test="associated-regex-patterns-drop-field-radio">
 
                 </q-radio>
                 <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
@@ -190,10 +193,10 @@
                 Detect at:
               </span>
               <div class="tw-flex tw-gap-8 tw-ml-2">
-                <q-checkbox size="sm" v-model="apply_at" val="AtIngestion" >
+                <q-checkbox size="sm" v-model="apply_at" val="AtIngestion" data-test="associated-regex-patterns-ingestion-checkbox">
                   <span class="individual-section-sub-title">Ingestion</span>
                 </q-checkbox>
-                <q-checkbox size="sm" v-model="apply_at" val="AtSearch">
+                <q-checkbox size="sm" v-model="apply_at" val="AtSearch" data-test="associated-regex-patterns-query-checkbox">
                   <span class="individual-section-sub-title">Query</span>
                 </q-checkbox>
 
@@ -212,7 +215,7 @@
                 <span class="individual-section-sub-title2">
                   Regex Pattern
                 </span>
-                <span class="regex-pattern-text">
+                <span class="regex-pattern-text" data-test="associated-regex-patterns-regex-pattern">
                   {{ userClickedPattern.pattern }}
                 </span>
               </div>
@@ -221,7 +224,7 @@
                   Add Test
                 </span>
                 <query-editor
-                  data-test="regex-pattern-test-string-editor"
+                  data-test="associated-regex-patterns-test-string-editor"
                   ref="queryEditorRef"
                   editor-id="regex-pattern-test-string-editor"
                   class="tw-w-full regex-pattern-associated-test-string-editor"
@@ -253,16 +256,16 @@
           <div v-if="userClickedPattern" :class="store.state.theme === 'dark' ? 'dark-regex-patterns-footer' : 'light-regex-patterns-footer'" class="flex justify-end tw-px-4 tw-py-2" style="position: sticky; bottom: 0; right: 0;">
                 <q-btn
                     v-close-popup="true"
-                    data-test="add-stream-cancel-btn"
                     label="Cancel"
                     class="q-my-sm text-bold q-mr-md"
                     padding="sm md"
                     no-caps
                     style="border: 1px solid #E6E6E6;"
+                    data-test="associated-regex-patterns-cancel-btn"
 
                 />
                 <q-btn
-                    data-test="save-stream-btn"
+                    data-test="associated-regex-patterns-update-btn"
                     label="Update Changes"
                     class="q-my-sm text-bold no-border"
                     padding="sm xl"
@@ -286,9 +289,9 @@
                 :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
                 style="width: 125px; margin: 30vh auto 0rem"
               />
-              <span class="no-pattern-applied-title">No Patterns Applied Yet</span>
-                <span class="no-pattern-applied-subtitle">Browse the pattern library to begin </span> 
-                <span class="no-pattern-applied-subtitle">
+              <span class="no-pattern-applied-title" data-test="associated-regex-patterns-no-pattern-applied-title">No Patterns Applied Yet</span>
+                <span class="no-pattern-applied-subtitle" data-test="associated-regex-patterns-no-pattern-applied-subtitle">Browse the pattern library to begin </span> 
+                <span class="no-pattern-applied-subtitle" data-test="associated-regex-patterns-no-pattern-applied-subtitle">
                   applying regular expressions to your fields.
                 </span>
             </div>
@@ -364,6 +367,8 @@ export default defineComponent({
         };
 
         onMounted( async () => {
+          //if there are no regex patterns then we fetch them from the server
+          //otherwise we use the cached regex patterns from the store
           if(store.state.organizationData.regexPatterns.length == 0){
             await getRegexPatterns();
           }
@@ -377,15 +382,29 @@ export default defineComponent({
             }));
             resultTotal.value = store.state.organizationData.regexPatterns.length;
           }
+          //this is used to sync the applied patterns with the all patterns
+          //so that we can show the applied patterns in the applied patterns list
           makeSyncWithAppliedPatterns();
+          //this is used to toggle the applied patterns and all patterns expansion items
+          //so that we can show the applied patterns and all patterns in the applied patterns and all patterns list
           await nextTick();
           appliedPatternsExpandedRef.value.toggle();
           allPatternsExpandedRef.value.toggle();
           //this is done because we dont want to show the empty page at first when user lands at this page
+          //so we select the first pattern from the applied patterns list if there are any applied patterns
+          //other wise we show no pattern applied yet page
           if(props.data.length > 0){
             userClickedPattern.value = props.data[0];
           }
         })
+
+        // Add cleanup
+        onBeforeUnmount(() => {
+            // Clear references
+            userClickedPattern.value = null;
+            appliedPatternsExpandedRef.value = null;
+            allPatternsExpandedRef.value = null;
+        });
         //reset the values when user clicks on a pattern from the list
         //because we need to reset the values when user clicks on a pattern from the list
         watch(()=> userClickedPattern.value, (newVal) => {
@@ -456,7 +475,7 @@ export default defineComponent({
               resultTotal.value = allPatterns.value.length;
             } catch (error) {
               $q.notify({
-                message: error.data.message || "Error fetching regex patterns",
+                message: error?.response?.data?.message || error?.data?.message || "Error fetching regex patterns",
                 color: "negative",
                 icon: "error",
               });
@@ -482,12 +501,6 @@ export default defineComponent({
             }
         };
 
-        const handlePaste = (event: ClipboardEvent) => {
-            event.preventDefault();
-            const text = event.clipboardData?.getData('text/plain') || '';
-            document.execCommand('insertText', false, text);
-        };
-
         const handleFilterMethod = (rows: any, terms: any) => {
           var filtered = [];
             terms = terms.toLowerCase();
@@ -505,6 +518,9 @@ export default defineComponent({
           isFormDirty.value = false;
         }
 
+        //this is used to add or remove a pattern from the field
+        //if the pattern is already applied then we remove it
+        //otherwise we add it
         const handleAddOrRemovePattern = () => {
           if(checkIfPatternIsApplied(userClickedPattern.value.pattern_id)){
             //remove pattern
@@ -540,7 +556,8 @@ export default defineComponent({
             emit("addPattern", pattern);
           }
         }
-
+        //so when user clicks on any of the pattern from the all patterns list we should show the apply_at and policy values if it is applied pattern
+        //this is done here to make sync with the applied patterns list
         const makeSyncWithAppliedPatterns = () => {
           const appliedMap = new Map(
             props.data.map((p: any) => [p.pattern_id, p])
@@ -575,13 +592,6 @@ export default defineComponent({
           return false;
         }
 
-        // Add cleanup
-        onBeforeUnmount(() => {
-            // Clear references
-            userClickedPattern.value = null;
-            appliedPatternsExpandedRef.value = null;
-            allPatternsExpandedRef.value = null;
-        });
 
         return {
             store,
@@ -606,7 +616,6 @@ export default defineComponent({
             apply_at,
             isPatternValid,
             handleTestStringInput,
-            handlePaste,
             appliedPatternsExpandedRef,
             allPatternsExpandedRef,
             handleFilterMethod,

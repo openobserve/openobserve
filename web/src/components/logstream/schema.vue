@@ -1678,7 +1678,8 @@ export default defineComponent({
       patternAssociationDialog.value.data = patternAssociations.value[field] || [];
       patternAssociationDialog.value.fieldName = field;
     }
-
+    //this is used to add a new pattern to the field
+    //completely new pattern not an update
     const handleAddPattern = (pattern: PatternAssociation) => {
       formDirtyFlag.value = true;
       if(patternAssociations.value[pattern.field]){
@@ -1690,6 +1691,7 @@ export default defineComponent({
       patternAssociationDialog.value.data = patternAssociations.value[pattern.field];
     }
 
+    //this is used to remove a pattern from the field
     const handleRemovePattern = (patternId: string, fieldName: string) => {
       formDirtyFlag.value = true;
       let filteredData = patternAssociations.value[fieldName].filter((pattern: PatternAssociation) => {
@@ -1699,6 +1701,8 @@ export default defineComponent({
       patternAssociationDialog.value.data = [...filteredData];
     }
 
+    //this is used to update an already applied pattern in the field
+    //for suppose user wants to update policy or apply_at for a pattern
     const handleUpdateAppliedPattern = (pattern: PatternAssociation) => {
       patternAssociations.value[pattern.field].forEach((p: PatternAssociation) => {
         if(p.pattern_id === pattern.pattern_id){
