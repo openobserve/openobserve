@@ -599,7 +599,7 @@ async executeQueryWithErrorHandling() {
   await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').first().click();
   
   // Click first line and refresh
-  await this.page.locator('.view-line').first().click();
+  await this.page.locator('.cm-line').first().click();
   await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   
   // Verify no data message
