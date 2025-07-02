@@ -319,7 +319,9 @@ impl<'a> TryFrom<Source<'a>> for String {
         }
 
         match &table.relation {
-            TableFactor::Table { name, .. } => Ok(name.0.first().unwrap().to_string()),
+            TableFactor::Table { name, .. } => {
+                Ok(trim_quotes(name.0.first().unwrap().to_string().as_str()))
+            }
             _ => Err(anyhow::anyhow!("We only support single table")),
         }
     }
@@ -1088,6 +1090,17 @@ impl TryFrom<&BinaryOperator> for SqlOperator {
             )),
         }
     }
+}
+
+fn trim_quotes(s: &str) -> String {
+    let s = s
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(s);
+    s.strip_prefix('\'')
+        .and_then(|s| s.strip_suffix('\''))
+        .unwrap_or(s)
+        .to_string()
 }
 
 #[cfg(test)]
