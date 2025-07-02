@@ -488,7 +488,7 @@ async typeQuery(query) {
   const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
   await expect(queryEditor).toBeVisible();
   await queryEditor.click();
-  await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content').fill(query);
+  await this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.cm-content').fill(query);
   await this.page.waitForTimeout(1000);
   
   
