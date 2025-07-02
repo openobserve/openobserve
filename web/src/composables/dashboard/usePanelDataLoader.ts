@@ -2223,8 +2223,6 @@ export const usePanelDataLoader = (
   onUnmounted(() => {
     // abort on unmount
     if (abortController) {
-      // Only set isPartialData if we're still loading or haven't received complete response
-      // AND we haven't already marked it as complete
       if (
         (state.loading || state.loadingProgressPercentage < 100) &&
         !state.isOperationCancelled
@@ -2237,22 +2235,23 @@ export const usePanelDataLoader = (
       observer.disconnect();
     }
     // cancel http2 queries using http streaming api
-    if (isStreamingEnabled() && state.searchRequestTraceIds?.length > 0) {
+    if (
+      isStreamingEnabled() &&
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
+    ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+        queryService.delete_running_queries(
+          store?.state?.selectedOrganization?.identifier,
+          state.searchRequestTraceIds,
+        );
       } catch (error) {
         console.error("Error during HTTP2 cleanup:", error);
       } finally {
@@ -2261,22 +2260,23 @@ export const usePanelDataLoader = (
     }
 
     // Cancel WebSocket queries
-    if (isWebSocketEnabled() && state.searchRequestTraceIds?.length > 0) {
+    if (
+      isWebSocketEnabled() &&
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
+    ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+        queryService.delete_running_queries(
+          store?.state?.selectedOrganization?.identifier,
+          state.searchRequestTraceIds,
+        );
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {

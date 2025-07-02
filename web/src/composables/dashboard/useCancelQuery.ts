@@ -78,5 +78,4 @@ const useCancelQuery = () => {
   };
 };
 
-
 export default useCancelQuery;
