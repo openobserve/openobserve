@@ -127,16 +127,12 @@ impl RemoteScanExec {
 }
 
 impl DisplayAs for RemoteScanExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(
-                    f,
-                    "RemoteScanExec: input_partitions=output_partitions={}",
-                    self.partitions,
-                )
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "RemoteScanExec: input_partitions=output_partitions={}",
+            self.partitions,
+        )
     }
 }
 

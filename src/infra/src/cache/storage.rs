@@ -28,7 +28,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
     cache::file_data,
-    storage::{self, GetRangeExt, ObjectStoreExt},
+    storage::{self, ObjectStoreExt},
 };
 
 /// File system with cache
@@ -97,13 +97,13 @@ impl ObjectStoreExt for CacheFS {
             let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
-                size: data.len(),
+                size: data.len() as u64,
                 e_tag: None,
                 version: None,
             };
             let range = Range {
                 start: 0,
-                end: data.len(),
+                end: data.len() as u64,
             };
             return Ok(GetResult {
                 payload: GetResultPayload::Stream(
@@ -124,24 +124,23 @@ impl ObjectStoreExt for CacheFS {
         location: &Path,
         options: GetOptions,
     ) -> Result<GetResult> {
-        log::warn!("OOPS: please check cache:storage:get_opts: {:?}", location);
         let path = location.to_string();
         if let Ok(data) = file_data::get_opts(account, &path, None, false).await {
             let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
-                size: data.len(),
+                size: data.len() as u64,
                 e_tag: None,
                 version: None,
             };
             let (range, data) = match options.range {
                 Some(range) => {
                     let r = range
-                        .as_range(data.len())
+                        .as_range(data.len() as u64)
                         .map_err(|e| crate::storage::Error::BadRange(e.to_string()))?;
-                    (r.clone(), data.slice(r))
+                    (r.clone(), data.slice(r.start as usize..r.end as usize))
                 }
-                None => (0..data.len(), data),
+                None => (0..data.len() as u64, data),
             };
             return Ok(GetResult {
                 payload: GetResultPayload::Stream(
@@ -156,12 +155,7 @@ impl ObjectStoreExt for CacheFS {
         storage::get_opts(account, &path, options).await
     }
 
-    async fn get_range(
-        &self,
-        account: &str,
-        location: &Path,
-        range: Range<usize>,
-    ) -> Result<Bytes> {
+    async fn get_range(&self, account: &str, location: &Path, range: Range<u64>) -> Result<Bytes> {
         if range.start > range.end {
             return Err(crate::storage::Error::BadRange(location.to_string()).into());
         }
@@ -174,7 +168,7 @@ impl ObjectStoreExt for CacheFS {
         &self,
         account: &str,
         location: &Path,
-        ranges: &[Range<usize>],
+        ranges: &[Range<u64>],
     ) -> Result<Vec<Bytes>> {
         coalesce_ranges(
             ranges,
@@ -190,7 +184,7 @@ impl ObjectStoreExt for CacheFS {
             return Ok(ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
-                size,
+                size: size as u64,
                 e_tag: None,
                 version: None,
             });
@@ -211,7 +205,11 @@ impl ObjectStoreExt for CacheFS {
         futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
     }
 
-    fn list(&self, _account: &str, _prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(
+        &self,
+        _account: &str,
+        _prefix: Option<&Path>,
+    ) -> BoxStream<'static, Result<ObjectMeta>> {
         futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
     }
 
@@ -220,7 +218,7 @@ impl ObjectStoreExt for CacheFS {
         _account: &str,
         _prefix: Option<&Path>,
         _offset: &Path,
-    ) -> BoxStream<'_, Result<ObjectMeta>> {
+    ) -> BoxStream<'static, Result<ObjectMeta>> {
         futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
     }
 
@@ -257,11 +255,7 @@ pub async fn get_opts(account: &str, path: &Path, options: GetOptions) -> Result
     DEFAULT.get_opts(account, path, options).await
 }
 
-pub async fn get_range(
-    account: &str,
-    location: &Path,
-    range: Range<usize>,
-) -> Result<bytes::Bytes> {
+pub async fn get_range(account: &str, location: &Path, range: Range<u64>) -> Result<bytes::Bytes> {
     DEFAULT.get_range(account, location, range).await
 }
 

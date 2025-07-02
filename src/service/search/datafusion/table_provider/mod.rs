@@ -36,14 +36,13 @@ use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOption
 use async_trait::async_trait;
 use config::get_config;
 use datafusion::{
-    catalog::Session,
-    common::{Result, Statistics, ToDFSchema, plan_err, project_schema},
+    catalog::{Session, memory::DataSourceExec},
+    common::{Result, Statistics, ToDFSchema, plan_err, project_schema, stats::Precision},
     datasource::{
         TableProvider,
         file_format::parquet::ParquetFormat,
-        get_statistics_with_limit,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl, PartitionedFile},
-        physical_plan::{FileScanConfig, ParquetSource},
+        physical_plan::{FileGroup, FileScanConfig, FileScanConfigBuilder, ParquetSource},
     },
     error::DataFusionError,
     execution::{
@@ -55,7 +54,7 @@ use datafusion::{
     physical_plan::{ExecutionPlan, PhysicalExpr, empty::EmptyExec},
 };
 use futures::{
-    StreamExt,
+    Stream, StreamExt,
     future::{self, try_join_all},
     stream,
 };
@@ -159,7 +158,7 @@ impl NewListingTable {
         &'a self,
         ctx: &'a SessionState,
         limit: Option<usize>,
-    ) -> Result<(Vec<Vec<PartitionedFile>>, Statistics)> {
+    ) -> Result<(Vec<FileGroup>, Statistics)> {
         let store = if let Some(url) = self.table_paths.first() {
             ctx.runtime_env().object_store(url)?
         } else {
@@ -176,29 +175,23 @@ impl NewListingTable {
         // collect the statistics if required by the config
         let files = file_list
             .map(|part_file| async {
-                let mut part_file = part_file?;
-                if self.options.collect_stat {
-                    let statistics = self.do_collect_statistics(ctx, &store, &part_file).await?;
-                    part_file.statistics = Some(statistics.clone());
-                    Ok((part_file, Arc::new(statistics)))
-                        as Result<(PartitionedFile, Arc<Statistics>)>
+                let part_file = part_file?;
+                let statistics = if self.options.collect_stat {
+                    self.do_collect_statistics(ctx, &store, &part_file).await?
                 } else {
-                    Ok((
-                        part_file,
-                        Arc::new(Statistics::new_unknown(&self.file_schema)),
-                    )) as Result<(PartitionedFile, Arc<Statistics>)>
-                }
+                    Arc::new(Statistics::new_unknown(&self.file_schema))
+                };
+                Ok(part_file.with_statistics(statistics))
             })
             .boxed()
-            .buffered(ctx.config_options().execution.meta_fetch_concurrency);
+            .buffer_unordered(ctx.config_options().execution.meta_fetch_concurrency);
 
-        let (files, statistics) =
-            get_statistics_with_limit(files, self.schema(), limit, self.options.collect_stat)
-                .await?;
+        let (file_group, inexact_stats) =
+            get_files_with_limit(files, limit, self.options.collect_stat).await?;
 
         let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.cpu_num));
-        let mut tasks = Vec::with_capacity(files.len());
-        for mut file in files.into_iter() {
+        let mut tasks = Vec::with_capacity(file_group.files().len());
+        for mut file in file_group.into_inner().into_iter() {
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
                 let access_plan = generate_access_plan(&file);
@@ -214,10 +207,16 @@ impl NewListingTable {
             .await
             .map_err(|e| DataFusionError::External(Box::new(e)))?;
 
-        Ok((
-            split_files(files, self.options.target_partitions),
-            statistics,
-        ))
+        let file_group = FileGroup::new(files);
+        let file_groups = file_group.split_files(self.options.target_partitions);
+        let (file, stats) = compute_all_files_statistics(
+            file_groups,
+            self.schema(),
+            self.options.collect_stat,
+            inexact_stats,
+        )?;
+
+        Ok((file, stats))
     }
 
     /// Collects statistics for a given partitioned file.
@@ -227,20 +226,25 @@ impl NewListingTable {
     /// If they are not, it infers the statistics from the file and stores them in the cache.
     async fn do_collect_statistics(
         &self,
-        ctx: &SessionState,
+        ctx: &dyn Session,
         store: &Arc<dyn ObjectStore>,
         part_file: &PartitionedFile,
-    ) -> Result<Statistics> {
-        let statistics_cache = self.collected_statistics.clone();
-        match statistics_cache
+    ) -> Result<Arc<Statistics>> {
+        match self
+            .collected_statistics
             .get_with_extra(&part_file.object_meta.location, &part_file.object_meta)
         {
-            Some(statistics) => Ok(statistics.as_ref().clone()),
+            Some(statistics) => Ok(statistics),
             None => {
                 let statistics = self
                     .options
                     .format
-                    .infer_stats(ctx, store, self.file_schema.clone(), &part_file.object_meta)
+                    .infer_stats(
+                        ctx,
+                        store,
+                        Arc::clone(&self.file_schema),
+                        &part_file.object_meta,
+                    )
                     .await
                     .map_err(|e| {
                         log::error!(
@@ -250,9 +254,10 @@ impl NewListingTable {
                         );
                         e
                     })?;
-                statistics_cache.put_with_extra(
+                let statistics = Arc::new(statistics);
+                self.collected_statistics.put_with_extra(
                     &part_file.object_meta.location,
-                    statistics.clone().into(),
+                    Arc::clone(&statistics),
                     &part_file.object_meta,
                 );
                 Ok(statistics)
@@ -297,7 +302,8 @@ impl NewListingTable {
             source = source.with_metadata_size_hint(metadata_size_hint)
         }
 
-        Ok(conf.with_source(Arc::new(source)).build())
+        let conf = FileScanConfigBuilder::from(conf).with_source(Arc::new(source));
+        Ok(DataSourceExec::from_data_source(conf.build()))
     }
 }
 
@@ -357,8 +363,12 @@ impl TableProvider for NewListingTable {
                 }
                 Ordering::Greater => {
                     if self.need_optimize_partition {
-                        partitioned_file_lists =
-                            repartition_sorted_groups(new_groups, self.options.target_partitions);
+                        partitioned_file_lists = repartition_sorted_groups(
+                            new_groups,
+                            self.options.target_partitions,
+                            Arc::clone(&self.file_schema),
+                            self.options.collect_stat,
+                        );
                     } else {
                         partitioned_file_lists = new_groups;
                     }
@@ -433,7 +443,7 @@ impl TableProvider for NewListingTable {
         let parquet_exec = self
             .create_physical_plan(
                 session_state,
-                FileScanConfig::new(
+                FileScanConfigBuilder::new(
                     object_store_url,
                     Arc::clone(&self.file_schema),
                     self.options.format.file_source(),
@@ -443,7 +453,8 @@ impl TableProvider for NewListingTable {
                 .with_projection(parquet_projection.cloned())
                 .with_limit(limit)
                 .with_output_ordering(output_ordering)
-                .with_table_partition_cols(table_partition_cols),
+                .with_table_partition_cols(table_partition_cols)
+                .build(),
                 filters.as_ref(),
             )
             .await?;
@@ -454,7 +465,6 @@ impl TableProvider for NewListingTable {
             parquet_projection,
             parquet_exec,
         )?;
-
         // if the index condition can remove filter, we can skip the config
         // feature_query_remove_filter_with_index
         let can_remove_filter = self
@@ -508,9 +518,11 @@ impl TableProvider for NewListingTable {
 // 2. split larger groups based on odd and even numbers
 // 3. loop until the group reaches the number of partitions
 fn repartition_sorted_groups(
-    mut groups: Vec<Vec<PartitionedFile>>,
+    mut groups: Vec<FileGroup>,
     partition_num: usize,
-) -> Vec<Vec<PartitionedFile>> {
+    file_schema: SchemaRef,
+    collect_stat: bool,
+) -> Vec<FileGroup> {
     if groups.is_empty() {
         return groups;
     }
@@ -521,17 +533,17 @@ fn repartition_sorted_groups(
 
         // if the max group has less than 3 files, we don't split it further
         // less than 3 will cause repartitionExec issue
-        if max_group.len() <= 3 {
+        if max_group.files().len() <= 3 {
             groups.push(max_group);
             break;
         }
 
         // split max_group into odd and even groups
-        let group_cap = max_group.len().div_ceil(2);
+        let group_cap = max_group.files().len().div_ceil(2);
         let mut odd_group = Vec::with_capacity(group_cap);
         let mut even_group = Vec::with_capacity(group_cap);
 
-        for (idx, file) in max_group.into_iter().enumerate() {
+        for (idx, file) in max_group.into_inner().into_iter().enumerate() {
             if idx % 2 == 0 {
                 even_group.push(file);
             } else {
@@ -540,10 +552,18 @@ fn repartition_sorted_groups(
         }
 
         if !odd_group.is_empty() {
-            groups.push(odd_group);
+            let file_group = FileGroup::new(odd_group);
+            let file_group_with_statistics =
+                compute_file_group_statistics(file_group, Arc::clone(&file_schema), collect_stat)
+                    .unwrap();
+            groups.push(file_group_with_statistics);
         }
         if !even_group.is_empty() {
-            groups.push(even_group);
+            let file_group = FileGroup::new(even_group);
+            let file_group_with_statistics =
+                compute_file_group_statistics(file_group, Arc::clone(&file_schema), collect_stat)
+                    .unwrap();
+            groups.push(file_group_with_statistics);
         }
     }
 
@@ -551,7 +571,7 @@ fn repartition_sorted_groups(
 }
 
 // find the index of the group with the most files
-fn find_max_group_index(groups: &[Vec<PartitionedFile>]) -> usize {
+fn find_max_group_index(groups: &[FileGroup]) -> usize {
     groups
         .iter()
         .enumerate()
@@ -598,4 +618,154 @@ fn create_ordering(schema: &Schema, sort_order: &[Vec<SortExpr>]) -> Result<Vec<
         }
     }
     Ok(all_sort_orders)
+}
+
+/// Processes a stream of partitioned files and returns a `FileGroup` containing the files.
+///
+/// This function collects files from the provided stream until either:
+/// 1. The stream is exhausted
+/// 2. The accumulated number of rows exceeds the provided `limit` (if specified)
+///
+/// # Arguments
+/// * `files` - A stream of `Result<PartitionedFile>` items to process
+/// * `limit` - An optional row count limit. If provided, the function will stop collecting files
+///   once the accumulated number of rows exceeds this limit
+/// * `collect_stats` - Whether to collect and accumulate statistics from the files
+///
+/// # Returns
+/// A `Result` containing a `FileGroup` with the collected files
+/// and a boolean indicating whether the statistics are inexact.
+///
+/// # Note
+/// The function will continue processing files if statistics are not available or if the
+/// limit is not provided. If `collect_stats` is false, statistics won't be accumulated
+/// but files will still be collected.
+async fn get_files_with_limit(
+    files: impl Stream<Item = Result<PartitionedFile>>,
+    limit: Option<usize>,
+    collect_stats: bool,
+) -> Result<(FileGroup, bool)> {
+    let mut file_group = FileGroup::default();
+    // Fusing the stream allows us to call next safely even once it is finished.
+    let mut all_files = Box::pin(files.fuse());
+    enum ProcessingState {
+        ReadingFiles,
+        ReachedLimit,
+    }
+
+    let mut state = ProcessingState::ReadingFiles;
+    let mut num_rows = Precision::Absent;
+
+    while let Some(file_result) = all_files.next().await {
+        // Early exit if we've already reached our limit
+        if matches!(state, ProcessingState::ReachedLimit) {
+            break;
+        }
+
+        let file = file_result?;
+
+        // Update file statistics regardless of state
+        if collect_stats && let Some(file_stats) = &file.statistics {
+            num_rows = if file_group.is_empty() {
+                // For the first file, just take its row count
+                file_stats.num_rows
+            } else {
+                // For subsequent files, accumulate the counts
+                num_rows.add(&file_stats.num_rows)
+            };
+        }
+
+        // Always add the file to our group
+        file_group.push(file);
+
+        // Check if we've hit the limit (if one was specified)
+        if let Some(limit) = limit
+            && let Precision::Exact(row_count) = num_rows
+            && row_count > limit
+        {
+            state = ProcessingState::ReachedLimit;
+        }
+    }
+    // If we still have files in the stream, it means that the limit kicked
+    // in, and the statistic could have been different had we processed the
+    // files in a different order.
+    let inexact_stats = all_files.next().await.is_some();
+    Ok((file_group, inexact_stats))
+}
+
+/// Computes statistics for all files across multiple file groups.
+///
+/// This function:
+/// 1. Computes statistics for each individual file group
+/// 2. Summary statistics across all file groups
+/// 3. Optionally marks statistics as inexact
+///
+/// # Parameters
+/// * `file_groups` - Vector of file groups to process
+/// * `table_schema` - Schema of the table
+/// * `collect_stats` - Whether to collect statistics
+/// * `inexact_stats` - Whether to mark the resulting statistics as inexact
+///
+/// # Returns
+/// A tuple containing:
+/// * The processed file groups with their individual statistics attached
+/// * The summary statistics across all file groups, aka all files summary statistics
+pub fn compute_all_files_statistics(
+    file_groups: Vec<FileGroup>,
+    table_schema: SchemaRef,
+    collect_stats: bool,
+    inexact_stats: bool,
+) -> Result<(Vec<FileGroup>, Statistics)> {
+    let file_groups_with_stats = file_groups
+        .into_iter()
+        .map(|file_group| {
+            compute_file_group_statistics(file_group, Arc::clone(&table_schema), collect_stats)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    // Then summary statistics across all file groups
+    let file_groups_statistics = file_groups_with_stats
+        .iter()
+        .filter_map(|file_group| file_group.statistics());
+
+    let mut statistics = Statistics::try_merge_iter(file_groups_statistics, &table_schema)?;
+
+    if inexact_stats {
+        statistics = statistics.to_inexact()
+    }
+
+    Ok((file_groups_with_stats, statistics))
+}
+
+/// Computes the summary statistics for a group of files(`FileGroup` level's statistics).
+///
+/// This function combines statistics from all files in the file group to create
+/// summary statistics. It handles the following aspects:
+/// - Merges row counts and byte sizes across files
+/// - Computes column-level statistics like min/max values
+/// - Maintains appropriate precision information (exact, inexact, absent)
+///
+/// # Parameters
+/// * `file_group` - The group of files to process
+/// * `file_schema` - Schema of the files
+/// * `collect_stats` - Whether to collect statistics (if false, returns original file group)
+///
+/// # Returns
+/// A new file group with summary statistics attached
+pub fn compute_file_group_statistics(
+    file_group: FileGroup,
+    file_schema: SchemaRef,
+    collect_stats: bool,
+) -> Result<FileGroup> {
+    if !collect_stats {
+        return Ok(file_group);
+    }
+
+    let file_group_stats = file_group.iter().filter_map(|file| {
+        let stats = file.statistics.as_ref()?;
+        Some(stats.as_ref())
+    });
+    let statistics = Statistics::try_merge_iter(file_group_stats, &file_schema)?;
+
+    Ok(file_group.with_statistics(Arc::new(statistics)))
 }

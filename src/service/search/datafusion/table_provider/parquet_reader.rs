@@ -23,7 +23,10 @@ use datafusion::{
 use futures::future::BoxFuture;
 use object_store::ObjectStore;
 use parquet::{
-    arrow::async_reader::{AsyncFileReader, ParquetObjectReader},
+    arrow::{
+        arrow_reader::ArrowReaderOptions,
+        async_reader::{AsyncFileReader, ParquetObjectReader},
+    },
     file::metadata::ParquetMetaData,
 };
 
@@ -45,26 +48,31 @@ pub(crate) struct ParquetFileReader {
 }
 
 impl AsyncFileReader for ParquetFileReader {
-    fn get_bytes(&mut self, range: Range<usize>) -> BoxFuture<'_, parquet::errors::Result<Bytes>> {
-        self.file_metrics.bytes_scanned.add(range.end - range.start);
+    fn get_bytes(&mut self, range: Range<u64>) -> BoxFuture<'_, parquet::errors::Result<Bytes>> {
+        self.file_metrics
+            .bytes_scanned
+            .add((range.end - range.start) as usize);
         self.inner.get_bytes(range)
     }
 
     fn get_byte_ranges(
         &mut self,
-        ranges: Vec<Range<usize>>,
+        ranges: Vec<Range<u64>>,
     ) -> BoxFuture<'_, parquet::errors::Result<Vec<Bytes>>>
     where
         Self: Send,
     {
-        let total = ranges.iter().map(|r| r.end - r.start).sum();
+        let total = ranges.iter().map(|r| (r.end - r.start) as usize).sum();
         self.file_metrics.bytes_scanned.add(total);
         self.inner.get_byte_ranges(ranges)
     }
 
-    fn get_metadata(&mut self) -> BoxFuture<'_, parquet::errors::Result<Arc<ParquetMetaData>>> {
+    fn get_metadata<'a>(
+        &'a mut self,
+        options: Option<&'a ArrowReaderOptions>,
+    ) -> BoxFuture<'a, parquet::errors::Result<Arc<ParquetMetaData>>> {
         Box::pin(async move {
-            match self.inner.get_metadata().await {
+            match self.inner.get_metadata(options).await {
                 Ok(meta) => Ok(meta),
                 Err(e) => {
                     log::error!(
@@ -91,7 +99,11 @@ impl ParquetFileReaderFactory for NewParquetFileReaderFactory {
         let file_metrics =
             ParquetFileMetrics::new(partition_index, file_meta.location().as_ref(), metrics);
         let store = Arc::clone(&self.store);
-        let mut inner = ParquetObjectReader::new(store, file_meta.object_meta);
+        // the FileMeta is from PartitionFile, so we can know the file size
+        // also we can don't set the file size, the ParquetObjectReader will get the file size from
+        // the object store use get_opts()
+        let mut inner = ParquetObjectReader::new(store, file_meta.object_meta.location)
+            .with_file_size(file_meta.object_meta.size);
 
         if let Some(hint) = metadata_size_hint {
             inner = inner.with_footer_size_hint(hint);

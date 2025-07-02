@@ -160,16 +160,14 @@ mod tests {
             "      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]",
             "        ProjectionExec: expr=[]",
             "          CoalesceBatchesExec: target_batch_size=8192",
-            "            HashJoinExec: mode=Partitioned, join_type=RightSemi, on=[(name@0, name@0)]",
+            "            HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)]",
             "              AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "                CoalesceBatchesExec: target_batch_size=8192",
             "                  RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "                    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
             "                      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
             "                        DataSourceExec: partitions=1, partition_sizes=[1]",
-            "              CoalesceBatchesExec: target_batch_size=8192",
-            "                RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=1",
-            "                  DataSourceExec: partitions=1, partition_sizes=[1]",
+            "              DataSourceExec: partitions=1, partition_sizes=[1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));

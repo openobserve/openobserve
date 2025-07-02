@@ -211,11 +211,11 @@ async fn handle_file_chunked(
 ) -> Result<(), Status> {
     let start = std::time::Instant::now();
     let filename = path.to_string();
-    let mut offset = 0usize;
-    let total_size = disk::get_size(path).await.unwrap_or(0);
+    let mut offset = 0u64;
+    let total_size = disk::get_size(path).await.unwrap_or(0) as u64;
 
-    while offset < total_size as usize {
-        let chunk_size = std::cmp::min(CHUNK_SIZE, total_size - offset);
+    while offset < total_size {
+        let chunk_size = std::cmp::min(CHUNK_SIZE as u64, total_size - offset);
         let chunk = match infra::cache::file_data::disk::get(
             path,
             Some(Range {
