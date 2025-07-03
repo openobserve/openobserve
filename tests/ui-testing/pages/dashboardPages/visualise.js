@@ -186,12 +186,12 @@ export default class LogsVisualise {
 
   //open query editor
   async openQueryEditor() {
-    await this.page.locator(".view-lines").first().click();
+    await this.page.locator(".cm-line").first().click();
   }
 
   //fill query editor
   async fillQueryEditor(sqlQuery) {
-    const queryEditor = this.page.locator(".view-lines").first();
+    const queryEditor = this.page.locator(".cm-line").first();
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
     await queryEditor.click();
     await queryEditor.type(sqlQuery);

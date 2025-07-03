@@ -208,7 +208,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();
-    await page.locator(".view-line").first().click();
+    // await page.locator(".cm-line").first().click();
 
     // Focus on the first line of the editor
     await page.locator(".cm-line").first().click();

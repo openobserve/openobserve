@@ -279,7 +279,7 @@ test.describe("logs testcases", () => {
 
     // Open the visualization tab
     await logsVisualise.openVisualiseTab();
-    await expect(page.locator(".view-line").first()).toBeVisible();
+    await expect(page.locator(".cm-line").first()).toBeVisible();
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
     ).toBeVisible();
@@ -297,10 +297,9 @@ test.describe("logs testcases", () => {
     await logsVisualise.openLogs();
     await logsVisualise.openQueryEditor();
     await logsVisualise.setRelative("6", "w");
-    const queryEditor = page.locator(
-      '[data-test="logs-search-bar-query-editor"] textarea'
-    );
-
+    const queryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
     // Wait for the query editor to be visible
     await expect(queryEditor).toBeVisible();
 
@@ -445,7 +444,7 @@ test.describe("logs testcases", () => {
     // Reload the page
     await page.reload();
     // Verify the field is empty
-    await expect(page.locator(".view-line").first()).toBeEmpty();
+    await expect(page.locator(".cm-line").first()).toBeEmpty();
   });
 
   test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
