@@ -817,7 +817,7 @@ async verifyLogCountOrderingDescending() {
     await this.page.locator(this.logsSearchBarQueryEditor).click();
     await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
     await this.page.keyboard.press("Backspace");
-    await this.page.locator(this.logsSearchBarQueryEditor).fill(searchText);
+    await this.page.keyboard.type(`str_match_ignore_case('${searchText}')`);
     await this.page.locator(this.searchBarRefreshButton).click();
     await this.page.waitForTimeout(3000);
     await expect(this.page.locator(this.logTableColumnSource)).toBeVisible();
