@@ -151,7 +151,7 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await expect(
-      page.getByRole("code").filter({ hasText: '"dashboardId": "' })
+      page.getByRole(".cm-content").filter({ hasText: '"dashboardId": "' })
     ).toBeVisible();
 
     await dashboardImport.clickImportButton();
@@ -433,10 +433,10 @@ test.describe("dashboard Import testcases", () => {
 
     await expect(
       page
-        .getByRole("code")
-        .locator("div")
+        .getByRole(".cm-content")
+        .locator(".cm-line")
         .filter({ hasText: '"dashboardId": "' })
-        .nth(4)
+        .nth(0)
     ).toBeVisible();
 
     //is used for setting the file to be importedad
