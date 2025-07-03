@@ -259,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
+        @send-to-ai-chat="sendToAiChat"
         @view-trace="redirectToTraces"
       />
 
@@ -299,6 +300,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ],
             )
           "
+          @sendToAiChat="sendToAiChat"
+          @closeTable="closeTable"
         />
       </q-dialog>
     </div>
@@ -346,6 +349,7 @@ export default defineComponent({
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
+    "sendToAiChat",
   ],
   props: {
     expandedLogs: {
@@ -702,6 +706,14 @@ export default defineComponent({
       return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
     });
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
+    const closeTable = () => {
+      searchObj.meta.showDetailTab = false;
+    }
+
     return {
       t,
       store,
@@ -741,6 +753,8 @@ export default defineComponent({
       refreshPagination,
       refreshJobPagination,
       histogramLoader,
+      sendToAiChat,
+      closeTable
     };
   },
   computed: {
