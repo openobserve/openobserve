@@ -740,7 +740,7 @@ export default defineComponent({
         store.dispatch('setCurrentChatTimestamp', currentChatId.value);
         store.dispatch('setChatUpdated', true);
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('AI Chat error:', error);
         // Remove the empty assistant message that was added before the error
         //this will impact in the case of error showing empty message above the error message in the chat
