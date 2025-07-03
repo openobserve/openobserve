@@ -315,14 +315,15 @@ pub async fn search(
                 c_resp.order_by,
             )
         } else {
-            let mut reps = results[0].clone();
-            sort_response(
-                c_resp.is_descending,
-                &mut reps,
-                &c_resp.ts_column,
-                &c_resp.order_by,
-            );
-            reps
+            // let mut reps = results[0].clone();
+            // sort_response(
+            //     c_resp.is_descending,
+            //     &mut reps,
+            //     &c_resp.ts_column,
+            //     &c_resp.order_by,
+            // );
+            // reps
+            results[0].clone()
         }
     };
 
