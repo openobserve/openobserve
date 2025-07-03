@@ -166,8 +166,8 @@ pub async fn update_prompt(
     request: web::Json<UpdatePromptRequest>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, id) = path.into_inner();
-     // Ensure this API is only available for the "_meta" organization
-     if org_id != config::META_ORG_ID {
+    // Ensure this API is only available for the "_meta" organization
+    if org_id != config::META_ORG_ID {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             StatusCode::FORBIDDEN,
             "This API is only available for the _meta organization",
