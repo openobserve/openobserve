@@ -693,6 +693,9 @@ export default defineComponent({
             percentageMemoryUsage: { value: 0 },
             cpuUsage: { value: 0 }
         };
+        //gloabal index is used to assign the id to the node
+        //the global index should continue from the last id of the previous node and previous cluster
+        let globalIndex = 1;
 
         for (const region in data) {
             uniqueValues.regions.add(region);
@@ -722,7 +725,9 @@ export default defineComponent({
                     maxValues.percentageMemoryUsage.value = Math.max(maxValues.percentageMemoryUsage.value, percentageMemoryUsage);
                     maxValues.cpuUsage.value = Math.max(maxValues.cpuUsage.value, cpuUsage);
                     //this is done because the id should be 2 digits to maintain consistency with other tables
-                    node.id = node.id < 10 ? `0${node.id}` : node.id;
+                    node.id = globalIndex < 10 ? `0${globalIndex}` : globalIndex;
+                    //increment the global index
+                    globalIndex++;
 
                     result.push({
                         region,

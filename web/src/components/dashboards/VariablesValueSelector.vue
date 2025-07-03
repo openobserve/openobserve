@@ -195,7 +195,7 @@ export default defineComponent({
 
           changes.forEach((change) => {
             if (change.type === "new_variable") {
-              console.log(`≡ƒåò New variable added: ${change.variable}`);
+              console.log(`🆕 New variable added: ${change.variable}`);
             } else {
               console.groupCollapsed(`Variable: ${change.name}`);
               change.changes.forEach((propertyChange: any) => {
@@ -273,23 +273,26 @@ export default defineComponent({
 
     const cancelTraceId = (field: string) => {
       const traceIds = traceIdMapper.value[field];
-      if (isStreamingEnabled() && traceIds && traceIds.length > 0) {
+      if (isStreamingEnabled(store.state) && traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+
         // Clear the trace IDs after cancellation
         traceIdMapper.value[field] = [];
       }
-      if (isWebSocketEnabled() && traceIds && traceIds.length > 0) {
+
+      if (isWebSocketEnabled(store.state) && traceIds && traceIds.length > 0) {
         traceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+
         // Clear the trace IDs after cancellation
         traceIdMapper.value[field] = [];
       }
@@ -600,7 +603,7 @@ export default defineComponent({
       payload: any,
       variableObject: any,
     ): any => {
-      if (isStreamingEnabled()) {
+      if (isStreamingEnabled(store.state)) {
         fetchQueryDataWithHttpStream(payload, {
           data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
           error: (p: any, r: any) => handleSearchError(p, r, variableObject),
@@ -610,7 +613,7 @@ export default defineComponent({
         return;
       }
 
-      if (isWebSocketEnabled()) {
+      if (isWebSocketEnabled(store.state)) {
         fetchQueryDataWithWebSocket(payload, {
           open: sendSearchMessage,
           close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
@@ -1363,7 +1366,10 @@ export default defineComponent({
               searchText,
             );
 
-            if (isWebSocketEnabled() || isStreamingEnabled()) {
+            if (
+              isWebSocketEnabled(store.state) ||
+              isStreamingEnabled(store.state)
+            ) {
               // For WebSocket, we don't need to wait for the response here
               // as it will be handled by the WebSocket handlers
               fetchFieldValuesWithWebsocket(variableObject, queryContext);
@@ -1947,7 +1953,7 @@ export default defineComponent({
 
         const merged = [
           ...filtered,
-          ...customTypedValues.filter((v: any) => !filtered.includes(v)),
+          ...customTypedValues.filter((v) => !filtered.includes(v)),
         ];
 
         if (merged.length !== currentVariable.value.length) {

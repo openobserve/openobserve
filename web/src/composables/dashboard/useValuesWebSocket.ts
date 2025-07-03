@@ -181,7 +181,7 @@ const useValuesWebSocket = () => {
     payload: any,
     variableObject: any,
   ): any => {
-    if (isStreamingEnabled()) {
+    if (isStreamingEnabled(store.state)) {
       fetchQueryDataWithHttpStream(payload, {
         data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
         error: (p: any, r: any) => handleSearchError(p, r, variableObject),
@@ -190,7 +190,7 @@ const useValuesWebSocket = () => {
       });
       return;
     }
-    if (isWebSocketEnabled()) {
+    if (isWebSocketEnabled(store.state)) {
       fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
@@ -209,7 +209,7 @@ const useValuesWebSocket = () => {
     dashboardPanelData: any,
     name: any,
   ) => {
-    if (isWebSocketEnabled()) {
+    if (isWebSocketEnabled(store.state)) {
       // Use WebSocket
       const wsPayload = {
         queryReq: {
@@ -235,7 +235,7 @@ const useValuesWebSocket = () => {
       });
 
       return res;
-    } else if (isStreamingEnabled()) {
+    } else if (isStreamingEnabled(store.state)) {
       const wsPayload = {
         queryReq: {
           stream_name: queryReq.stream_name,

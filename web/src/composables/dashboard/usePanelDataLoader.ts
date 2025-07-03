@@ -99,6 +99,19 @@ export const usePanelDataLoader = (
     panelSchema.value.id,
   );
 
+  const shouldFetchAnnotations = () => {
+    return [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.value.type);
+  };
+
   const getFallbackOrderByCol = () => {
     // from panelSchema, get first x axis field alias
     if (panelSchema?.value?.queries?.[0]?.fields?.x) {
@@ -322,8 +335,12 @@ export const usePanelDataLoader = (
   const cancelQueryAbort = () => {
     state.loading = false;
     state.isOperationCancelled = true;
+    state.isPartialData = true; // Set to true when cancelled
 
-    if (isStreamingEnabled() && state.searchRequestTraceIds?.length > 0) {
+    if (
+      isStreamingEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
       try {
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
@@ -338,7 +355,10 @@ export const usePanelDataLoader = (
       }
     }
 
-    if (isWebSocketEnabled() && state.searchRequestTraceIds.length > 0) {
+    if (
+      isWebSocketEnabled(store.state) &&
+      state.searchRequestTraceIds?.length > 0
+    ) {
       try {
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
@@ -402,7 +422,14 @@ export const usePanelDataLoader = (
           queryService.partition({
             org_identifier: store.state.selectedOrganization.identifier,
             query: {
-              sql: query,
+              sql: store.state.zoConfig.sql_base64_enabled
+                ? b64EncodeUnicode(query)
+                : query,
+              // pass encodig if enabled,
+              // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+              ...(store.state.zoConfig.sql_base64_enabled
+                ? { encoding: "base64" }
+                : {}),
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
@@ -490,6 +517,11 @@ export const usePanelDataLoader = (
                       streaming_output: res?.data?.streaming_aggs ?? false,
                       streaming_id: res?.data?.streaming_id ?? null,
                     },
+                    // pass encodig if enabled,
+                    // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+                    ...(store.state.zoConfig.sql_base64_enabled
+                      ? { encoding: "base64" }
+                      : {}),
                   },
                   page_type: pageType,
                   traceparent,
@@ -803,6 +835,11 @@ export const usePanelDataLoader = (
               null,
             )),
           },
+          // pass encodig if enabled,
+          // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
@@ -885,7 +922,6 @@ export const usePanelDataLoader = (
     // Log variables for which the API will be skipped
     variablesToSkip.forEach((variableName) => {
       state.loading = false;
-      console.log(`Skipping API for variable: ${variableName}`);
     });
 
     // Return true if there are any variables to skip, indicating loading should be continued
@@ -906,7 +942,7 @@ export const usePanelDataLoader = (
 
       const payload: {
         queryReq: any;
-        type: "search" | "histogram" | "pageCount";
+        type: "search" | "histogram" | "pageCount" | "values";
         isPagination: boolean;
         traceId: string;
         org_id: string;
@@ -919,6 +955,11 @@ export const usePanelDataLoader = (
           startISOTimestamp,
           endISOTimestamp,
           currentQueryIndex,
+          // pass encodig if enabled,
+          // make sure that encoding: null is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
         },
         type: "histogram",
         isPagination: false,
@@ -967,7 +1008,7 @@ export const usePanelDataLoader = (
 
       const payload: {
         queryReq: any;
-        type: "search" | "histogram" | "pageCount" | "values";
+        type: "search" | "histogram" | "pageCount";
         isPagination: boolean;
         traceId: string;
         org_id: string;
@@ -1203,12 +1244,10 @@ export const usePanelDataLoader = (
             }
           },
         );
-
         // get annotations
-        const annotationList = await refreshAnnotations(
-          startISOTimestamp,
-          endISOTimestamp,
-        );
+        const annotationList = shouldFetchAnnotations()
+          ? await refreshAnnotations(startISOTimestamp, endISOTimestamp)
+          : [];
 
         // Wait for all query promises to resolve
         const queryResults: any = await Promise.all(queryPromises);
@@ -1423,10 +1462,12 @@ export const usePanelDataLoader = (
                   }
 
                   // get annotations
-                  const annotationList = await refreshAnnotations(
-                    startISOTimestamp,
-                    endISOTimestamp,
-                  );
+                  const annotationList = shouldFetchAnnotations()
+                    ? await refreshAnnotations(
+                        startISOTimestamp,
+                        endISOTimestamp,
+                      )
+                    : [];
                   state.annotations = annotationList;
 
                   // need to break the loop, save the cache
@@ -1473,14 +1514,15 @@ export const usePanelDataLoader = (
               };
 
               state.metadata.queries[panelQueryIndex] = metadata;
-              const annotations = await refreshAnnotations(
-                Number(startISOTimestamp),
-                Number(endISOTimestamp),
-              );
-
+              const annotations = shouldFetchAnnotations()
+                ? await refreshAnnotations(
+                    Number(startISOTimestamp),
+                    Number(endISOTimestamp),
+                  )
+                : [];
               state.annotations = annotations;
 
-              if (isStreamingEnabled()) {
+              if (isStreamingEnabled(store.state)) {
                 await getDataThroughStreaming(
                   query,
                   it,
@@ -1490,7 +1532,7 @@ export const usePanelDataLoader = (
                   panelQueryIndex,
                   abortControllerRef,
                 );
-              } else if (isWebSocketEnabled()) {
+              } else if (isWebSocketEnabled(store.state)) {
                 await getDataThroughWebSocket(
                   query,
                   it,
@@ -1807,7 +1849,7 @@ export const usePanelDataLoader = (
             : errorDetailValue;
 
         const errorCode =
-          isWebSocketEnabled() || isStreamingEnabled()
+          isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)
             ? error?.response?.data?.code || error?.code || error?.status || ""
             : error?.response?.status ||
               error?.status ||
@@ -2223,6 +2265,8 @@ export const usePanelDataLoader = (
   onUnmounted(() => {
     // abort on unmount
     if (abortController) {
+      // Only set isPartialData if we're still loading or haven't received complete response
+      // AND we haven't already marked it as complete
       if (
         (state.loading || state.loadingProgressPercentage < 100) &&
         !state.isOperationCancelled
@@ -2236,7 +2280,7 @@ export const usePanelDataLoader = (
     }
     // cancel http2 queries using http streaming api
     if (
-      isStreamingEnabled() &&
+      isStreamingEnabled(store.state) &&
       state.searchRequestTraceIds?.length > 0 &&
       state.loading &&
       !state.isOperationCancelled
@@ -2261,7 +2305,7 @@ export const usePanelDataLoader = (
 
     // Cancel WebSocket queries
     if (
-      isWebSocketEnabled() &&
+      isWebSocketEnabled(store.state) &&
       state.searchRequestTraceIds?.length > 0 &&
       state.loading &&
       !state.isOperationCancelled

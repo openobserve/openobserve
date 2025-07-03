@@ -31,8 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round
-flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -54,8 +53,7 @@ flat icon="close" />
         >
           No data available.
         </div>
-        <div v-else
-class="indexDetailsContainer" style="height: 100vh">
+        <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
             class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
           >
@@ -65,7 +63,7 @@ class="indexDetailsContainer" style="height: 100vh">
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title q-pl-xs" > {{ indexData.name }}</span>
+                <span class="title q-pl-xs"> {{ indexData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -109,18 +107,15 @@ class="indexDetailsContainer" style="height: 100vh">
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
-              
+                <span class="q-px-xs">
+                  Start Time:
+                  <span class="title">{{ indexData.stats.doc_time_min }}</span>
+                </span>
 
                 <span class="q-px-xs">
-                      Start Time:
-                 <span class="title">{{ indexData.stats.doc_time_min }}</span>
-                </span>
-                
-                <span class=" q-px-xs">
                   End Time:
                   <span class="title">{{ indexData.stats.doc_time_max }}</span>
                 </span>
-
               </div>
             </div>
           </div>
@@ -197,7 +192,9 @@ class="indexDetailsContainer" style="height: 100vh">
               <q-tabs v-model="activeMainTab" inline-label dense>
                 <!-- Schema Settings Tab with conditional class -->
                 <q-tab
-                  :class="{ 'text-primary': activeMainTab === 'schemaSettings' }"
+                  :class="{
+                    'text-primary': activeMainTab === 'schemaSettings',
+                  }"
                   name="schemaSettings"
                   icon="settings"
                   label="Schema Settings"
@@ -205,13 +202,12 @@ class="indexDetailsContainer" style="height: 100vh">
 
                 <!-- Red Button Tab -->
                 <q-tab
-                :class="{ 'text-primary': activeMainTab === 'redButton' }"
+                  :class="{ 'text-primary': activeMainTab === 'redButton' }"
                   name="redButton"
                   icon="backup"
                   label="Extended Retention"
                 />
               </q-tabs>
-
             </div>
           </div>
           <!-- schema settings tab -->
@@ -301,14 +297,17 @@ class="indexDetailsContainer" style="height: 100vh">
             <div class="q-mb-md" v-if="isDialogOpen">
               <q-card class="add-fields-card">
                 <!-- Header Section -->
-                <q-card-section class="q-pa-none" style="padding: 8px 16px 6px 16px">
+                <q-card-section
+                  class="q-pa-none"
+                  style="padding: 8px 16px 6px 16px"
+                >
                   <div class="tw-flex tw-justify-between tw-items-center">
                     <div class="text-h6">Add Field(s)</div>
                     <div>
                       <q-btn
                         data-test="add-stream-cancel-btn"
                         icon="close"
-                        class=" text-bold q-mr-md"
+                        class="text-bold q-mr-md"
                         text-color="light-text"
                         no-caps
                         dense
@@ -490,27 +489,24 @@ class="indexDetailsContainer" style="height: 100vh">
                 <q-icon name="info" class="q-mr-xs" size="16px" />
 
                 Additional
-                {{ store.state.zoConfig.extended_data_retention_days }} days of extension
-                will be applied to the selected date ranges</span
+                {{ store.state.zoConfig.extended_data_retention_days }} days of
+                extension will be applied to the selected date ranges</span
               >
             </div>
             <div class="q-mt-sm">
-              <div class="text-center q-mt-sm tw-flex items-center ">
+              <div class="text-center q-mt-sm tw-flex items-center">
                 <div class="flex items-center">
                   <span class="text-bold"> Select Date</span>
-                <date-time
-                  class="q-mx-sm"
-                  @on:date-change="dateChangeValue"
-                  disable-relative
-                  hide-relative-time
-                  hide-relative-timezone
-                  :minDate="minDate"
-                />
+                  <date-time
+                    class="q-mx-sm"
+                    @on:date-change="dateChangeValue"
+                    disable-relative
+                    hide-relative-time
+                    hide-relative-timezone
+                    :minDate="minDate"
+                  />
                 </div>
-                <span class="text-bold">
-                  (UTC Timezone)
-                </span>
-
+                <span class="text-bold"> (UTC Timezone) </span>
               </div>
 
               <div class="q-mt-sm" style="margin-bottom: 30px">
@@ -549,7 +545,6 @@ class="indexDetailsContainer" style="height: 100vh">
                     </q-td>
                   </template>
 
-
                   <template #bottom="scope">
                     <QTablePagination
                       :scope="scope"
@@ -581,10 +576,7 @@ class="indexDetailsContainer" style="height: 100vh">
                   selected</span
                 >
                 <q-btn
-                  v-if="
-                    isSchemaUDSEnabled &&
-                    activeMainTab == 'schemaSettings'
-                  "
+                  v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                   data-test="schema-add-field-button"
                   class="q-my-sm no-border text-bold q-mr-md"
                   padding="sm md"
@@ -603,10 +595,9 @@ class="indexDetailsContainer" style="height: 100vh">
                       : t("logStream.addSchemaField")
                   }}
                 </q-btn>
-                {{   }}
                 <q-btn
                   v-bind:disable="
-                  !selectedFields.length &&  (!selectedDateFields.length) 
+                    !selectedFields.length && !selectedDateFields.length
                   "
                   data-test="schema-delete-button"
                   class="q-my-sm text-bold btn-delete"
@@ -616,7 +607,11 @@ class="indexDetailsContainer" style="height: 100vh">
                   dense
                   flat
                   style="border: 1px red solid"
-                  @click="activeMainTab == 'schemaSettings' ? confirmQueryModeChangeDialog = true : confirmDeleteDatesDialog = true"
+                  @click="
+                    activeMainTab == 'schemaSettings'
+                      ? (confirmQueryModeChangeDialog = true)
+                      : (confirmDeleteDatesDialog = true)
+                  "
                 >
                   <span class="flex items-center tw-gap-1">
                     <q-icon size="14px" :name="outlinedDelete" />
@@ -769,7 +764,7 @@ export default defineComponent({
     const isDialogOpen = ref(false);
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
-    const perPageOptions : any = [
+    const perPageOptions: any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
       { label: "20", value: 20 },
@@ -997,16 +992,19 @@ export default defineComponent({
       }
       if (Array.isArray(streamResponse.settings.extended_retention_days)) {
         redBtnRows.value = [];
-        indexData.value.extended_retention_days = streamResponse.settings.extended_retention_days;
-        streamResponse.settings.extended_retention_days.forEach((field, index) => {
-          redBtnRows.value.push({
-            index: index,
-            original_start: field.start,
-            original_end: field.end,
-            start: convertUnixToQuasarFormat(field.start),
-            end: convertUnixToQuasarFormat(field.end),
-          });
-        });
+        indexData.value.extended_retention_days =
+          streamResponse.settings.extended_retention_days;
+        streamResponse.settings.extended_retention_days.forEach(
+          (field, index) => {
+            redBtnRows.value.push({
+              index: index,
+              original_start: field.start,
+              original_end: field.end,
+              start: convertUnixToQuasarFormat(field.start),
+              end: convertUnixToQuasarFormat(field.end),
+            });
+          },
+        );
       }
 
       if (
@@ -1153,12 +1151,12 @@ export default defineComponent({
       if (selectedDateFields.value.length > 0) {
         selectedDateFields.value.forEach((field) => {
           // Filter out the items only if both start and end match
-          settings.extended_retention_days = settings.extended_retention_days.filter((item) => {
-            return !(item.start === field.start && item.end === field.end);
+          settings.extended_retention_days =
+            settings.extended_retention_days.filter((item) => {
+              return !(item.start === field.start && item.end === field.end);
             });
         });
-      };
-
+      }
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -1549,44 +1547,46 @@ export default defineComponent({
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
       return date.formatDate(formattedDate, "DD-MM-YYYY");
-
     }
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object
-      const day = String(date.getDate()).padStart(2, '0'); // Get day with leading zero
-      const month = String(date.getMonth() + 1).padStart(2, '0'); // Get month with leading zero
+      const day = String(date.getDate()).padStart(2, "0"); // Get day with leading zero
+      const month = String(date.getMonth() + 1).padStart(2, "0"); // Get month with leading zero
       const year = date.getFullYear(); // Get the full year
-      
+
       return `${day}-${month}-${year}`; // Return formatted date
     }
 
-
-
-
-
-
-
-
-
     const dateChangeValue = (value) => {
-
-      const selectedFromDate = value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.from)
-      const selectedToDate =value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.to)
+      const selectedFromDate =
+        value.hasOwnProperty("selectedDate") &&
+        formatDate(value.selectedDate.from);
+      const selectedToDate =
+        value.hasOwnProperty("selectedDate") &&
+        formatDate(value.selectedDate.to);
       if (value.relativeTimePeriod == null) {
         try {
-            const startTimestamp = convertDateToTimestamp(selectedFromDate, "00:00", 'UTC').timestamp;
-            const endTimestamp = convertDateToTimestamp(selectedToDate, "00:00", 'UTC').timestamp;
-            
-            if (startTimestamp && endTimestamp) {
-              redDaysList.value.push({
-                start: startTimestamp,
-                end: endTimestamp,
-              });
-              onSubmit();
-            }
-          } catch (error) {
-            console.error('Error processing date selection:', error);
+          const startTimestamp = convertDateToTimestamp(
+            selectedFromDate,
+            "00:00",
+            "UTC",
+          ).timestamp;
+          const endTimestamp = convertDateToTimestamp(
+            selectedToDate,
+            "00:00",
+            "UTC",
+          ).timestamp;
+
+          if (startTimestamp && endTimestamp) {
+            redDaysList.value.push({
+              start: startTimestamp,
+              end: endTimestamp,
+            });
+            onSubmit();
           }
+        } catch (error) {
+          console.error("Error processing date selection:", error);
+        }
       }
     };
     const calculateDateRange = () => {
@@ -1607,7 +1607,6 @@ export default defineComponent({
       );
     };
 
-
     const deleteDates = () => {
       selectedDateFields.value = selectedDateFields.value.map((field) => {
         return {
@@ -1617,7 +1616,7 @@ export default defineComponent({
       });
       formDirtyFlag.value = true;
       onSubmit();
-      };
+    };
 
     return {
       t,

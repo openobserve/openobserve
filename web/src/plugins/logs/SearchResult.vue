@@ -236,6 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :functionErrorMsg="searchObj?.data?.functionError"
         :expandedRows="expandedLogs"
         :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+        :highlight-query="
+          searchObj.meta.sqlMode
+            ? searchObj.data.query.toLowerCase().split('where')[1]
+            : searchObj.data.query.toLowerCase()
+        "
         :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
         :style="{
@@ -256,9 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @expand-row="expandLog"
         @view-trace="redirectToTraces"
       />
-    </div>
-  </div>
-  <q-dialog
+
+      <q-dialog
         data-test="logs-search-result-detail-dialog"
         v-model="searchObj.meta.showDetailTab"
         position="right"
@@ -267,7 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @escap.stop="reDrawChart"
         @hide="reDrawChart"
         @before-hide="reDrawChart"
-        key="search-result-detail-dialog-key"
       >
         <DetailTable
           v-if="searchObj.data.queryResults?.hits?.length"
@@ -298,6 +301,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </q-dialog>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">

@@ -18,5 +18,11 @@
     letter-spacing: 0.0125em;
     margin: revert;
   }
+  .q-menu .q-item .q-item__label{
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    width: auto;
+  }
   /* ... */
 }

@@ -17,1055 +17,989 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="full-height full-width scheduled-pipeline-container">
     <div class="flex items-center justify-between q-pb-sm">
-      <div class="flex items-center">
-        <q-btn
-          icon="close"
-          size="12px"
-          class="q-pt-sm"
-          flat
-          dense
-          @click="$emit('cancel:form')"
-        />
-        <div class="q-pb-sm stream-routing-title q-pl-xs">
-          {{ t("pipeline.query") }}
-        </div>
-      </div>
-      <div class="flex items-center">
         <div class="flex items-center">
-          <q-tabs
-            data-test="scheduled-pipeline-tabs"
-            v-model="tab"
-            no-caps
-            outside-arrows
-            size="sm"
-            mobile-arrows
-            class="bg-white text-primary scheduled-pipeline-tabs q-mr-sm"
-            @update:model-value="updateTab"
-            style="height: 34px !important"
-            :disable="selectedStreamType != 'metrics'"
-          >
-            <q-tab
-              data-test="scheduled-pipeline-sql-tab"
-              name="sql"
-              :label="t('alerts.sql')"
-            />
-            <q-tab
-              data-test="scheduled-pipeline-metrics-tab"
-              name="promql"
-              :disable="selectedStreamType !== 'metrics'"
-              :label="t('alerts.promql')"
-            >
-              <q-tooltip v-if="selectedStreamType !== 'metrics'">
-                Promql is only available for metrics stream type
-              </q-tooltip>
-            </q-tab>
-          </q-tabs>
+          <q-btn icon="close" size="12px" class="q-pt-sm" flat dense   @click="$emit('cancel:form')"/>
+                <div class=" q-pb-sm stream-routing-title  q-pl-xs">
+                  {{ t("pipeline.query") }}
+                </div>
         </div>
-        <DateTime
-          style="height: 34px !important; border-radius: 3px"
-          @on:date-change="updateDateChange"
-          class="q-mr-sm"
-        />
-        <q-btn
-          data-test="logs-search-bar-refresh-btn"
-          data-cy="search-bar-refresh-button"
-          dense
-          flat
-          :title="t('search.runQuery')"
-          class="q-pa-none q-mr-sm search-button-pipeline"
-          @click="
-            {
-              expandState.output = true;
-              expandState.query = false;
-              runQuery();
-            }
-          "
-          >{{ t("search.runQuery") }}</q-btn
-        >
+        
+          <div class="flex items-center">
+            <q-btn
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            dense
+            class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%;"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
 
-        <q-btn
-          data-test="add-function-fullscreen-btn"
-          :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
-          dense
-          style="height: 34px"
-          no-caps
-          :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-          @click="handleFullScreen"
-        />
-      </div>
-    </div>
-    <q-separator />
+          >
+            <div class="row items-center no-wrap tw-gap-2  ">
+              <img  :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
+            <div class="flex items-center">
+              <q-tabs
+                data-test="scheduled-pipeline-tabs"
+                v-model="tab"
+                no-caps
+                outside-arrows
+                size="sm"
+                mobile-arrows
+                class="bg-white text-primary scheduled-pipeline-tabs q-mr-sm"
+                @update:model-value="updateTab"
+                style="height: 34px !important;"
+                :disable="selectedStreamType != 'metrics'"
+              >
+                <q-tab
+                  data-test="scheduled-pipeline-sql-tab"
+                  name="sql"
+                  :label="t('alerts.sql')"
+                />
+                <q-tab
+                  data-test="scheduled-pipeline-metrics-tab"
+                  name="promql"
+                  :disable="selectedStreamType !== 'metrics'"
+                  :label="t('alerts.promql')"
+                >
+                  <q-tooltip v-if="selectedStreamType !== 'metrics'">
+                    Promql is only available for metrics stream type
+                  </q-tooltip>
+                </q-tab>
+              </q-tabs>
+            </div>
+            <DateTime
+            style="height: 34px !important; border-radius: 3px;"
+            @on:date-change="updateDateChange"
+            class="q-mr-sm" />
+              <q-btn
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                dense
+                flat
+                :title="t('search.runQuery')"
+                class="q-pa-none q-mr-sm search-button-pipeline"
+                @click="{
+                  expandState.output = true;
+                  expandState.query = false;
+                  runQuery();
+                }"
+                >{{ t("search.runQuery") }}</q-btn
+              >
 
-    <div class="q-mb-sm stepper-header">
-      <div class="" style="height: 100% !important">
-        <q-splitter
-          v-model="splitterModel"
-          style="width: 100%"
-          class="full-height"
-        >
-          <template #before>
-            <q-splitter
+          <q-btn
+              data-test="add-function-fullscreen-btn"
+              :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
+              dense
+              style="height: 34px;" 
+              no-caps
+              :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+              @click="handleFullScreen"
+            />
+
+         
+          </div>
+
+
+
+  </div>
+  <q-separator />
+
+    <div  class="q-mb-sm stepper-header tw-w-full tw-flex tw-h-full" >
+            <div  :class="store.state.isAiChatEnabled ? 'tw-w-[75%]' : 'tw-w-[100%]'" style="height: 100% !important;">
+  
+           
+  
+           <q-splitter
+              v-model="splitterModel"
+              style="width: 100%;"
+              class="full-height"
+            >
+            <template   #before>
+              <q-splitter
               v-model="sideBarSplitterModel"
-              style="width: 100%; height: calc(100vh - 90px) !important"
+              style="width: 100%; height: calc(100vh - 90px) !important;"
               class="full-height"
               horizontal
             >
-              <template #before>
-                <!-- fieldlist section -->
-                <span
-                  @click.stop="expandState.buildQuery = !expandState.buildQuery"
-                >
-                  <FullViewContainer
-                    name="query"
-                    v-model:is-expanded="expandState.buildQuery"
-                    label="Build Query"
-                    class="tw-mt-1"
-                  />
-                </span>
-                <div class="q-pt-sm" v-show="expandState.buildQuery">
-                  <div>
-                    <q-select
-                      v-model="selectedStreamType"
-                      :options="streamTypes"
-                      option-label="label"
-                      option-value="value"
-                      :label="t('alerts.streamType') + ' *'"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="no-case full-width"
-                      filled
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      input-debounce="300"
-                      @update:model-value="getStreamList"
-                    />
+            <template #before>
+                            <!-- fieldlist section -->
+                <span @click.stop="expandState.buildQuery = !expandState.buildQuery">
+                <FullViewContainer
+                  name="query"
+                  v-model:is-expanded="expandState.buildQuery"
+                  label="Build Query"
+                  class="tw-mt-1"
+                />
+              </span>
+              <div class="q-pt-sm" v-show="expandState.buildQuery"  >
+                
+              <div >
+                <q-select
+                v-model="selectedStreamType"
+                :options="streamTypes"
+                option-label="label"
+                option-value="value"
+                :label="t('alerts.streamType') + ' *'"
+                :popup-content-style="{ textTransform: 'lowercase' }"
+                color="input-border"
+                bg-color="input-bg"
+                class="  no-case full-width"
+                filled
+                stack-label
+                dense
+                use-input
+                hide-selected
+                fill-input
+                input-debounce="300"
+                @update:model-value="getStreamList"
+               />
 
-                    <q-select
-                      v-model="selectedStreamName"
-                      :options="filteredStreams"
-                      option-label="label"
-                      option-value="value"
-                      :label="t('alerts.stream_name')"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-xs no-case full-width"
-                      filled
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      input-debounce="300"
-                      @update:model-value="getStreamFields"
-                      @filter="filterStreams"
-                      @popup-show="getStreamList"
-                      map-options
-                      emit-value
-                    />
-                  </div>
+                <q-select
+                v-model="selectedStreamName"
+                :options="filteredStreams"
+                option-label="label"
+                option-value="value"
+                :label="t('alerts.stream_name') "
+                :popup-content-style="{ textTransform: 'lowercase' }"
+                color="input-border"
+                bg-color="input-bg"
+                class="q-py-xs  no-case full-width"
+                filled
+                stack-label
+                dense
+                use-input
+                hide-selected
+                fill-input
+                input-debounce="300"
+                @update:model-value="getStreamFields"
+                @filter="filterStreams"
+                @popup-show="getStreamList"
+                map-options
+                emit-value
+               />
 
-                  <FieldList
-                    :fields="streamFields"
-                    :stream-name="selectedStreamName"
-                    @event-emitted="handleSidebarEvent"
-                    :time-stamp="{
+              </div>
+                
+                <FieldList 
+                  :fields="streamFields"
+                  :stream-name="selectedStreamName"
+                  @event-emitted="handleSidebarEvent"
+                  :time-stamp="{
                       startTime: dateTime.startTime,
                       endTime: dateTime.endTime,
                     }"
                     :hideIncludeExlcude="true"
                     :hideCopyValue="false"
                     :hideAddSearchTerm="true"
+                />
+               
+                
+              </div>
+            </template>
+            <template #after>
+              <span @click.stop="expandState.setVariables = !expandState.setVariables">
+
+              <!-- set variables part -->
+              <FullViewContainer
+                  name="query"
+                  v-model:is-expanded="expandState.setVariables"
+                  label="Set Variables"
+                  class="tw-mt-1"
+                />
+              </span>
+              <div v-show="expandState.setVariables"  class="flex justify-between q-pl-sm full-height" style="overflow-y: auto !important;">
+              <div>
+              <div
+                v-if="
+                  selectedStreamType === 'metrics' &&
+                  tab === 'promql' &&
+                  promqlCondition
+                "
+                class="flex justify-start items-center text-bold q-mb-sm q-mt-md o2-input"
+              >
+                <div style="width: 130px">Trigger
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                    >
+                      <span style="font-size: 14px"
+                        >Based upon the condition of trigger the pipeline will get trigger <br />
+                        e.g. if the trigger value is >100 and the query returns a value of
+                        101 then the pipeline will trigger.</span
+                      >
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div class="flex justify-start items-center">
+                  <div data-test="scheduled-pipeline-promlq-condition-operator-select">
+                    <q-select
+                      v-model="promqlCondition.operator"
+                      :options="triggerOperators"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="no-case q-py-none q-mr-xs"
+                      filled
+                      borderless
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      style="width: 88px; border-right: none"
+                      @update:model-value="updatePromqlCondition"
+                    />
+                  </div>
+                  <div
+                    data-test="scheduled-pipeline-promlq-condition-value"
+                    style="width: 160px; margin-left: 0 !important"
+                    class="silence-notification-input o2-input"
+                  >
+                    <q-input
+                      v-model="promqlCondition.value"
+                      type="number"
+                      dense
+                      filled
+                      min="0"
+                      style="background: none"
+                      placeholder="Value"
+                      @update:model-value="updatePromqlCondition"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="tab === 'custom'"
+                class="flex justify-start items-center text-bold q-mb-lg"
+              >
+                <div
+                  data-test="scheduled-pipeline-aggregation-title"
+                  style="width: 172px"
+                >
+                  Aggregation
+                </div>
+                <q-toggle
+                  data-test="scheduled-pipeline-aggregation-toggle"
+                  v-model="_isAggregationEnabled"
+                  size="sm"
+                  color="primary"
+                  class="text-bold q-pl-0"
+                  :disable="tab === 'sql' || tab === 'promql'"
+                  @update:model-value="updateAggregation"
+                />
+              </div>
+              <div
+                v-if="_isAggregationEnabled && aggregationData"
+                class="flex items-center no-wrap q-mr-sm q-mb-sm"
+              >
+                <div
+                  data-test="scheduled-pipeline-group-by-title"
+                  class="text-bold"
+                  style="width: 190px"
+                >
+                  {{ t("alerts.groupBy") }}
+                </div>
+                <div
+                  class="flex justify-start items-center flex-wrap"
+                  style="width: calc(100% - 190px)"
+                >
+                  <template
+                    v-for="(group, index) in aggregationData.group_by"
+                    :key="group"
+                  >
+                    <div
+                      :data-test="`scheduled-pipeline-group-by-${index + 1}`"
+                      class="flex justify-start items-center no-wrap o2-input"
+                    >
+                      <div data-test="scheduled-pipeline-group-by-column-select">
+                        <q-select
+                          v-model="aggregationData.group_by[index]"
+                          :options="filteredFields"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="no-case q-py-none q-mb-sm"
+                          filled
+                          borderless
+                          dense
+                          use-input
+                          emit-value
+                          hide-selected
+                          placeholder="Select column"
+                          fill-input
+                          :input-debounce="400"
+                          @filter="filterFields"
+                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          style="width: 200px"
+                          @update:model-value="updateTrigger"
+                        />
+                      </div>
+                      <q-btn
+                        data-test="scheduled-pipeline-group-by-delete-btn"
+                        :icon="outlinedDelete"
+                        class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
+                        :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                        padding="xs"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        :title="t('alert_templates.delete')"
+                        @click="deleteGroupByColumn(index)"
+                        style="min-width: auto"
+                      />
+                    </div>
+                  </template>
+                  <q-btn
+                    data-test="scheduled-pipeline-group-by-add-btn"
+                    icon="add"
+                    class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
+                    :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                    padding="xs"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :title="t('common.add')"
+                    @click="addGroupByColumn()"
+                    style="min-width: auto"
                   />
                 </div>
-              </template>
-              <template #after>
-                <span
-                  @click.stop="
-                    expandState.setVariables = !expandState.setVariables
-                  "
-                >
-                  <!-- set variables part -->
-                  <FullViewContainer
-                    name="query"
-                    v-model:is-expanded="expandState.setVariables"
-                    label="Set Variables"
-                    class="tw-mt-1"
-                  />
-                </span>
+              </div>
+              <div
+                v-if="!disableThreshold"
+                class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
+              >
                 <div
-                  v-show="expandState.setVariables"
-                  class="flex justify-between q-pl-sm full-height"
-                  style="overflow-y: auto !important"
+                  data-test="scheduled-pipeline-threshold-title"
+                  class="text-bold flex items-center"
+                  style="width: 190px"
                 >
-                  <div>
-                    <div
-                      v-if="
-                        selectedStreamType === 'metrics' &&
-                        tab === 'promql' &&
-                        promqlCondition
-                      "
-                      class="flex justify-start items-center text-bold q-mb-sm q-mt-md o2-input"
+                  {{ t("alerts.threshold") + " *" }}
+
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
                     >
-                      <div style="width: 130px">
-                        Trigger
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
-                        >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Based upon the condition of trigger the pipeline
-                              will get trigger <br />
-                              e.g. if the trigger value is >100 and the query
-                              returns a value of 101 then the pipeline will
-                              trigger.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
+                      <span style="font-size: 14px"
+                        >The threshold above/below which the alert will trigger. <br />
+                        e.g. if the threshold is >100 and the query returns a value of
+                        101 then the alert will trigger.</span
+                      >
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div style="width: calc(100% - 190px)" class="position-relative">
+                  <template v-if="_isAggregationEnabled && aggregationData">
+                    <div class="flex justify-start items-center">
+                      <div
+                        data-test="scheduled-pipeline-threshold-function-select"
+                        class="threshould-input q-mr-xs o2-input"
+                      >
+                        <q-select
+                          v-model="aggregationData.function"
+                          :options="aggFunctions"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="no-case q-py-none"
+                          filled
+                          borderless
+                          dense
+                          use-input
+                          hide-selected
+                          fill-input
+                          style="width: 120px"
+                          @update:model-value="updateAggregation"
+                        />
                       </div>
-                      <div class="flex justify-start items-center">
+                      <div
+                        class="threshould-input q-mr-xs o2-input"
+                        data-test="scheduled-pipeline-threshold-column-select"
+                      >
+                        <q-select
+                          v-model="aggregationData.having.column"
+                          :options="filteredNumericColumns"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="no-case q-py-none"
+                          filled
+                          borderless
+                          dense
+                          use-input
+                          emit-value
+                          hide-selected
+                          fill-input
+                          @filter="filterNumericColumns"
+                          style="width: 250px"
+                          @update:model-value="updateAggregation"
+                        />
+                      </div>
+                      <div
+                        data-test="scheduled-pipeline-threshold-operator-select"
+                        class="threshould-input q-mr-xs o2-input q-mt-sm"
+                      >
+                        <q-select
+                          v-model="aggregationData.having.operator"
+                          :options="triggerOperators"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="no-case q-py-none"
+                          filled
+                          borderless
+                          dense
+                          use-input
+                          hide-selected
+                          fill-input
+                          style="width: 120px"
+                          @update:model-value="updateAggregation"
+                        />
+                      </div>
+                      <div class="flex items-center q-mt-sm">
                         <div
-                          data-test="scheduled-pipeline-promlq-condition-operator-select"
-                        >
-                          <q-select
-                            v-model="promqlCondition.operator"
-                            :options="triggerOperators"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="no-case q-py-none q-mr-xs"
-                            filled
-                            borderless
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            style="width: 88px; border-right: none"
-                            @update:model-value="updatePromqlCondition"
-                          />
-                        </div>
-                        <div
-                          data-test="scheduled-pipeline-promlq-condition-value"
-                          style="width: 160px; margin-left: 0 !important"
+                          data-test="scheduled-pipeline-threshold-value-input"
+                          style="width: 250px; margin-left: 0 !important"
                           class="silence-notification-input o2-input"
                         >
                           <q-input
-                            v-model="promqlCondition.value"
+                            v-model="aggregationData.having.value"
                             type="number"
                             dense
                             filled
                             min="0"
                             style="background: none"
                             placeholder="Value"
-                            @update:model-value="updatePromqlCondition"
+                            @update:model-value="updateAggregation"
                           />
                         </div>
                       </div>
                     </div>
                     <div
-                      v-if="tab === 'custom'"
-                      class="flex justify-start items-center text-bold q-mb-lg"
+                      data-test="scheduled-pipeline-threshold-error-text"
+                      v-if="
+                        !aggregationData.function ||
+                        !aggregationData.having.column ||
+                        !aggregationData.having.operator ||
+                        !aggregationData.having.value.toString().trim().length
+                      "
+                      class="text-red-8 q-pt-xs absolute"
+                      style="font-size: 11px; line-height: 12px"
                     >
+                      Field is required!
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="flex justify-start items-center">
                       <div
-                        data-test="scheduled-pipeline-aggregation-title"
-                        style="width: 172px"
+                        class="threshould-input"
+                        data-test="scheduled-pipeline-threshold-operator-select"
                       >
-                        Aggregation
+                        <q-select
+                          v-model="triggerData.operator"
+                          :options="triggerOperators"
+                          color="input-border"
+                          bg-color="input-bg"
+                          class="showLabelOnTop no-case q-py-none"
+                          filled
+                          borderless
+                          dense
+                          use-input
+                          hide-selected
+                          fill-input
+                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
+                          @update:model-value="updateTrigger"
+                        />
                       </div>
-                      <q-toggle
-                        data-test="scheduled-pipeline-aggregation-toggle"
-                        v-model="_isAggregationEnabled"
-                        size="sm"
-                        color="primary"
-                        class="text-bold q-pl-0"
-                        :disable="tab === 'sql' || tab === 'promql'"
-                        @update:model-value="updateAggregation"
-                      />
+                      <div
+                        class="flex items-center"
+                        style="border: 1px solid rgba(0, 0, 0, 0.05); border-left: none"
+                      >
+                        <div
+                          style="width: 89px; margin-left: 0 !important"
+                          class="silence-notification-input"
+                          data-test="scheduled-pipeline-threshold-value-input"
+                        >
+                          <q-input
+                            v-model="triggerData.threshold"
+                            type="number"
+                            dense
+                            filled
+                            min="1"
+                            style="background: none"
+                            @update:model-value="updateTrigger"
+                          />
+                        </div>
+                        <div
+                          data-test="scheduled-pipeline-threshold-unit"
+                          style="
+                            min-width: 90px;
+                            margin-left: 0 !important;
+                            height: 40px;
+                            font-weight: normal;
+                          "
+                          :class="
+                            store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                          "
+                          class="flex justify-center items-center"
+                        >
+                          {{ t("alerts.times") }}
+                        </div>
+                      </div>
                     </div>
                     <div
-                      v-if="_isAggregationEnabled && aggregationData"
-                      class="flex items-center no-wrap q-mr-sm q-mb-sm"
+                      data-test="scheduled-pipeline-threshold-error-text"
+                      v-if="!triggerData.operator || !Number(triggerData.threshold)"
+                      class="text-red-8 q-pt-xs absolute"
+                      style="font-size: 11px; line-height: 12px"
                     >
-                      <div
-                        data-test="scheduled-pipeline-group-by-title"
-                        class="text-bold"
-                        style="width: 190px"
+                      Field is required!
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div class="flex items-center q-mr-sm">
+                <div
+                  data-test="scheduled-pipeline-cron-toggle-title"
+                  class="text-bold flex items-center"
+                  style="width: 130px"
+                >
+                  {{ t("alerts.crontitle") + " *" }}
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                    >
+                      <span style="font-size: 14px"
+                        >Configure the option to enable a cron expression.</span
                       >
-                        {{ t("alerts.groupBy") }}
-                      </div>
-                      <div
-                        class="flex justify-start items-center flex-wrap"
-                        style="width: calc(100% - 190px)"
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div style="min-height: 58px">
+                  <div class="flex items-center q-mr-sm" style="width: fit-content">
+                    <div
+                      data-test="scheduled-pipeline-cron-input"
+                      class="silence-notification-input"
+                    >
+                      <q-toggle
+                        data-test="scheduled-pipeline-cron-toggle-btn"
+                        class="q-mt-sm"
+                        v-model="triggerData.frequency_type"
+                        :true-value="'cron'"
+                        :false-value="'minutes'"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center justify-start q-mr-sm">
+                <div
+                  data-test="scheduled-pipeline-frequency-title"
+                  class="text-bold flex items-center q-mr-xs"
+                  :style="{
+                    width: triggerData.frequency_type == 'minutes' ? '130px' : '100px',
+                  }"
+                >
+                  {{ t("alerts.frequency") + " *" }}
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="auto"
+                    >
+                      <span
+                        style="font-size: 14px"
+                        v-if="triggerData.frequency_type == 'minutes'"
+                        >How often the task should be executed.<br />
+                        e.g., 2 minutes means that the task will run every 2 minutes and
+                        will be processed based on the other parameters provided.</span
                       >
-                        <template
-                          v-for="(group, index) in aggregationData.group_by"
-                          :key="group"
-                        >
-                          <div
-                            :data-test="`scheduled-pipeline-group-by-${index + 1}`"
-                            class="flex justify-start items-center no-wrap o2-input"
-                          >
-                            <div
-                              data-test="scheduled-pipeline-group-by-column-select"
-                            >
-                              <q-select
-                                v-model="aggregationData.group_by[index]"
-                                :options="filteredFields"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none q-mb-sm"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                emit-value
-                                hide-selected
-                                placeholder="Select column"
-                                fill-input
-                                :input-debounce="400"
-                                @filter="filterFields"
-                                :rules="[
-                                  (val: any) => !!val || 'Field is required!',
-                                ]"
-                                style="width: 200px"
-                                @update:model-value="updateTrigger"
-                              />
-                            </div>
-                            <q-btn
-                              data-test="scheduled-pipeline-group-by-delete-btn"
-                              :icon="outlinedDelete"
-                              class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                              :class="
-                                store.state?.theme === 'dark' ? 'icon-dark' : ''
-                              "
-                              padding="xs"
-                              unelevated
-                              size="sm"
-                              round
-                              flat
-                              :title="t('alert_templates.delete')"
-                              @click="deleteGroupByColumn(index)"
-                              style="min-width: auto"
-                            />
-                          </div>
-                        </template>
-                        <q-btn
-                          data-test="scheduled-pipeline-group-by-add-btn"
-                          icon="add"
-                          class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                          :class="
-                            store.state?.theme === 'dark' ? 'icon-dark' : ''
+                      <span style="font-size: 14px" v-else>
+                        Pattern: * * * * * * means every second.
+                        <br />
+                        Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day
+                        of Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0
+                        and 7 for Sunday].
+                        <br />
+                        Use '*' to represent any value, 'L' for the last day/weekday.
+                        <br />
+                        Example: 0 0 12 * * ? - Triggers at 12:00 PM daily. It specifies
+                        second, minute, hour, day of month, month, and day of week,
+                        respectively.</span
+                      >
+                    </q-tooltip>
+                  </q-icon>
+                  <template
+                    v-if="triggerData.frequency_type == 'cron' && showTimezoneWarning"
+                  >
+                    <q-icon
+                      :name="outlinedWarning"
+                      size="18px"
+                      class="cursor-pointer tw-ml-[8px]"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw-text-orange-500'
+                          : 'tw-text-orange-500'
+                      "
+                    >
+                      <q-tooltip
+                        anchor="center right"
+                        self="center left"
+                        max-width="auto"
+                        class="tw-text-[14px]"
+                      >
+                        Warning: The displayed timezone is approximate. Verify and
+                        select the correct timezone manually.
+                      </q-tooltip>
+                    </q-icon>
+                  </template>
+                </div>
+                <div style="max-height: 50px;" class="q-mb-sm">
+                  <div class="flex items-center q-mr-sm" style="width: fit-content">
+                    <div
+                      data-test="scheduled-pipeline-frequency-input"
+                      :style="
+                        triggerData.frequency_type == 'minutes'
+                          ? 'width: 87px; margin-left: 0 !important;margin-top: 10px'
+                          : 'width: fit-content !important'
+                      "
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        data-test="scheduled-pipeline-frequency-input-field"
+                        v-if="triggerData.frequency_type == 'minutes'"
+                        v-model="triggerData.frequency"
+                        type="number"
+                        dense
+                        filled
+                        :min="
+                          Math.ceil(
+                            store.state?.zoConfig?.min_auto_refresh_interval / 60,
+                          ) || 1
+                        "
+                        style="background: none"
+                        @update:model-value="updateFrequency"
+                      />
+                      <div v-else  class="tw-flex tw-items-center o2-input">
+                        <q-input
+                          data-test="scheduled-pipeline-cron-input-field"
+                          v-model="triggerData.cron"
+                          dense
+                          filled
+                          :label="t('reports.cronExpression') + ' *'"
+                          style="background: none; width: 130px;"
+                          class="showLabelOnTop"
+                          stack-label
+                          outlined
+                          @update:model-value="updateCron"
+                          required
+                        />
+                        <q-select
+                          data-test="add-report-schedule-start-timezone-select"
+                          v-model="triggerData.timezone"
+                          :options="filteredTimezone"
+                          @blur="
+                            browserTimezone =
+                              browserTimezone == ''
+                                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                                : browserTimezone
                           "
-                          padding="xs"
-                          unelevated
-                          size="sm"
-                          round
-                          flat
-                          :title="t('common.add')"
-                          @click="addGroupByColumn()"
-                          style="min-width: auto"
+                          use-input
+                          @filter="timezoneFilterFn"
+                          input-debounce="0"
+                          dense
+                          filled
+                          emit-value
+                          fill-input
+                          hide-selected
+                          :title="triggerData.timezone"
+                          :label="t('logStream.timezone') + ' *'"
+                          :display-value="`Timezone: ${browserTimezone}`"
+                          class="timezone-select showLabelOnTop q-ml-sm"
+                          stack-label
+                          outlined
+                          style="width: 200px"
                         />
                       </div>
                     </div>
                     <div
-                      v-if="!disableThreshold"
-                      class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
+                      v-if="triggerData.frequency_type == 'minutes'"
+                      data-test="scheduled-pipeline-frequency-unit"
+                      style="
+                        margin-left: 0 !important;
+                        height: 40px;
+                        font-weight: normal;
+                        margin-top: 10px;
+                        width: 87px
+                      "
+                      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                      class="flex justify-center items-center"
                     >
-                      <div
-                        data-test="scheduled-pipeline-threshold-title"
-                        class="text-bold flex items-center"
-                        style="width: 190px"
-                      >
-                        {{ t("alerts.threshold") + " *" }}
-
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
-                        >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >The threshold above/below which the alert will
-                              trigger. <br />
-                              e.g. if the threshold is >100 and the query
-                              returns a value of 101 then the alert will
-                              trigger.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
-                      </div>
-                      <div
-                        style="width: calc(100% - 190px)"
-                        class="position-relative"
-                      >
-                        <template
-                          v-if="_isAggregationEnabled && aggregationData"
-                        >
-                          <div class="flex justify-start items-center">
-                            <div
-                              data-test="scheduled-pipeline-threshold-function-select"
-                              class="threshould-input q-mr-xs o2-input"
-                            >
-                              <q-select
-                                v-model="aggregationData.function"
-                                :options="aggFunctions"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
-                                style="width: 120px"
-                                @update:model-value="updateAggregation"
-                              />
-                            </div>
-                            <div
-                              class="threshould-input q-mr-xs o2-input"
-                              data-test="scheduled-pipeline-threshold-column-select"
-                            >
-                              <q-select
-                                v-model="aggregationData.having.column"
-                                :options="filteredNumericColumns"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                emit-value
-                                hide-selected
-                                fill-input
-                                @filter="filterNumericColumns"
-                                style="width: 250px"
-                                @update:model-value="updateAggregation"
-                              />
-                            </div>
-                            <div
-                              data-test="scheduled-pipeline-threshold-operator-select"
-                              class="threshould-input q-mr-xs o2-input q-mt-sm"
-                            >
-                              <q-select
-                                v-model="aggregationData.having.operator"
-                                :options="triggerOperators"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
-                                style="width: 120px"
-                                @update:model-value="updateAggregation"
-                              />
-                            </div>
-                            <div class="flex items-center q-mt-sm">
-                              <div
-                                data-test="scheduled-pipeline-threshold-value-input"
-                                style="width: 250px; margin-left: 0 !important"
-                                class="silence-notification-input o2-input"
-                              >
-                                <q-input
-                                  v-model="aggregationData.having.value"
-                                  type="number"
-                                  dense
-                                  filled
-                                  min="0"
-                                  style="background: none"
-                                  placeholder="Value"
-                                  @update:model-value="updateAggregation"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            data-test="scheduled-pipeline-threshold-error-text"
-                            v-if="
-                              !aggregationData.function ||
-                              !aggregationData.having.column ||
-                              !aggregationData.having.operator ||
-                              !aggregationData.having.value.toString().trim()
-                                .length
-                            "
-                            class="text-red-8 q-pt-xs absolute"
-                            style="font-size: 11px; line-height: 12px"
-                          >
-                            Field is required!
-                          </div>
-                        </template>
-                        <template v-else>
-                          <div class="flex justify-start items-center">
-                            <div
-                              class="threshould-input"
-                              data-test="scheduled-pipeline-threshold-operator-select"
-                            >
-                              <q-select
-                                v-model="triggerData.operator"
-                                :options="triggerOperators"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="showLabelOnTop no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
-                                :rules="[
-                                  (val: any) => !!val || 'Field is required!',
-                                ]"
-                                style="
-                                  width: 88px;
-                                  border: 1px solid rgba(0, 0, 0, 0.05);
-                                "
-                                @update:model-value="updateTrigger"
-                              />
-                            </div>
-                            <div
-                              class="flex items-center"
-                              style="
-                                border: 1px solid rgba(0, 0, 0, 0.05);
-                                border-left: none;
-                              "
-                            >
-                              <div
-                                style="width: 89px; margin-left: 0 !important"
-                                class="silence-notification-input"
-                                data-test="scheduled-pipeline-threshold-value-input"
-                              >
-                                <q-input
-                                  v-model="triggerData.threshold"
-                                  type="number"
-                                  dense
-                                  filled
-                                  min="1"
-                                  style="background: none"
-                                  @update:model-value="updateTrigger"
-                                />
-                              </div>
-                              <div
-                                data-test="scheduled-pipeline-threshold-unit"
-                                style="
-                                  min-width: 90px;
-                                  margin-left: 0 !important;
-                                  height: 40px;
-                                  font-weight: normal;
-                                "
-                                :class="
-                                  store.state.theme === 'dark'
-                                    ? 'bg-grey-10'
-                                    : 'bg-grey-2'
-                                "
-                                class="flex justify-center items-center"
-                              >
-                                {{ t("alerts.times") }}
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            data-test="scheduled-pipeline-threshold-error-text"
-                            v-if="
-                              !triggerData.operator ||
-                              !Number(triggerData.threshold)
-                            "
-                            class="text-red-8 q-pt-xs absolute"
-                            style="font-size: 11px; line-height: 12px"
-                          >
-                            Field is required!
-                          </div>
-                        </template>
-                      </div>
+                      {{ t("alerts.minutes") }}
                     </div>
-                    <div class="flex items-center q-mr-sm">
-                      <div
-                        data-test="scheduled-pipeline-cron-toggle-title"
-                        class="text-bold flex items-center"
-                        style="width: 130px"
+                  </div>
+                  <div
+                    data-test="scheduled-pipeline-frequency-error-text"
+                    v-if="
+                      (!Number(triggerData.frequency) &&
+                        triggerData.frequency_type == 'minutes') ||
+                      (triggerData.frequency_type == 'cron' &&
+                        triggerData.cron == '') ||
+                      cronJobError
+                    "
+                    class="text-red-8 q-pt-xs"
+                    style="font-size: 11px; line-height: 12px"
+                  >
+                    {{ cronJobError || "Field is required!" }}
+                  </div>
+                </div>
+              </div>
+              <div class="flex  items-center q-mr-sm q-mt-lg">
+                <div
+                  data-test="scheduled-pipeline-period-title"
+                  class="text-bold flex items-center q-pb-sm"
+                  style="width: 130px"
+                >
+                  {{ t("alerts.period") + " *" }}
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                    >
+                      <span style="font-size: 14px"
+                        >Period for which the query should run.<br />
+                        e.g. 10 minutes means that whenever the query will run it will
+                        use the last 10 minutes of data. If the query runs at 4:00 PM
+                        then it will use the data from 3:50 PM to 4:00 PM.</span
                       >
-                        {{ t("alerts.crontitle") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
-                        >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Configure the option to enable a cron
-                              expression.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
-                      </div>
-                      <div style="min-height: 58px">
-                        <div
-                          class="flex items-center q-mr-sm"
-                          style="width: fit-content"
-                        >
-                          <div
-                            data-test="scheduled-pipeline-cron-input"
-                            class="silence-notification-input"
-                          >
-                            <q-toggle
-                              data-test="scheduled-pipeline-cron-toggle-btn"
-                              class="q-mt-sm"
-                              v-model="triggerData.frequency_type"
-                              :true-value="'cron'"
-                              :false-value="'minutes'"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div style="min-height: 58px">
+                  <div
+                    class="flex items-center q-mr-sm"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+                  >
+                    <div
+                      data-test="scheduled-pipeline-period-input"
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        v-model="triggerData.period"
+                        type="number"
+                        dense
+                        filled
+                        min="1"
+                        style="background: none"
+                        v-bind:readonly="triggerData.frequency_type == 'minutes'"
+                        v-bind:disable="triggerData.frequency_type == 'minutes'"
+                        @update:model-value="updateTrigger"
+                      />
                     </div>
-                    <div class="flex items-center justify-start q-mr-sm">
-                      <div
-                        data-test="scheduled-pipeline-frequency-title"
-                        class="text-bold flex items-center q-mr-xs"
-                        :style="{
-                          width:
-                            triggerData.frequency_type == 'minutes'
-                              ? '130px'
-                              : '100px',
-                        }"
-                      >
-                        {{ t("alerts.frequency") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
-                        >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="auto"
-                          >
-                            <span
-                              style="font-size: 14px"
-                              v-if="triggerData.frequency_type == 'minutes'"
-                              >How often the task should be executed.<br />
-                              e.g., 2 minutes means that the task will run every
-                              2 minutes and will be processed based on the other
-                              parameters provided.</span
-                            >
-                            <span style="font-size: 14px" v-else>
-                              Pattern: * * * * * * means every second.
-                              <br />
-                              Format: [Second (optional) 0-59] [Minute 0-59]
-                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                              [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
-                              <br />
-                              Use '*' to represent any value, 'L' for the last
-                              day/weekday.
-                              <br />
-                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                              daily. It specifies second, minute, hour, day of
-                              month, month, and day of week, respectively.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
-                        <template
-                          v-if="
-                            triggerData.frequency_type == 'cron' &&
-                            showTimezoneWarning
-                          "
-                        >
-                          <q-icon
-                            :name="outlinedWarning"
-                            size="18px"
-                            class="cursor-pointer tw-ml-[8px]"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'tw-text-orange-500'
-                                : 'tw-text-orange-500'
-                            "
-                          >
-                            <q-tooltip
-                              anchor="center right"
-                              self="center left"
-                              max-width="auto"
-                              class="tw-text-[14px]"
-                            >
-                              Warning: The displayed timezone is approximate.
-                              Verify and select the correct timezone manually.
-                            </q-tooltip>
-                          </q-icon>
-                        </template>
-                      </div>
-                      <div style="max-height: 50px" class="q-mb-sm">
-                        <div
-                          class="flex items-center q-mr-sm"
-                          style="width: fit-content"
-                        >
-                          <div
-                            data-test="scheduled-pipeline-frequency-input"
-                            :style="
-                              triggerData.frequency_type == 'minutes'
-                                ? 'width: 87px; margin-left: 0 !important;margin-top: 10px'
-                                : 'width: fit-content !important'
-                            "
-                            class="silence-notification-input"
-                          >
-                            <q-input
-                              data-test="scheduled-pipeline-frequency-input-field"
-                              v-if="triggerData.frequency_type == 'minutes'"
-                              v-model="triggerData.frequency"
-                              type="number"
-                              dense
-                              filled
-                              :min="
-                                Math.ceil(
-                                  store.state?.zoConfig
-                                    ?.min_auto_refresh_interval / 60,
-                                ) || 1
-                              "
-                              style="background: none"
-                              @update:model-value="updateFrequency"
-                            />
-                            <div
-                              v-else
-                              class="tw-flex tw-items-center o2-input"
-                            >
-                              <q-input
-                                data-test="scheduled-pipeline-cron-input-field"
-                                v-model="triggerData.cron"
-                                dense
-                                filled
-                                :label="t('reports.cronExpression') + ' *'"
-                                style="background: none; width: 130px"
-                                class="showLabelOnTop"
-                                stack-label
-                                outlined
-                                @update:model-value="updateCron"
-                                required
-                              />
-                              <q-select
-                                data-test="add-report-schedule-start-timezone-select"
-                                v-model="triggerData.timezone"
-                                :options="filteredTimezone"
-                                @blur="
-                                  browserTimezone =
-                                    browserTimezone == ''
-                                      ? Intl.DateTimeFormat().resolvedOptions()
-                                          .timeZone
-                                      : browserTimezone
-                                "
-                                use-input
-                                @filter="timezoneFilterFn"
-                                input-debounce="0"
-                                dense
-                                filled
-                                emit-value
-                                fill-input
-                                hide-selected
-                                :title="triggerData.timezone"
-                                :label="t('logStream.timezone') + ' *'"
-                                :display-value="`Timezone: ${browserTimezone}`"
-                                class="timezone-select showLabelOnTop q-ml-sm"
-                                stack-label
-                                outlined
-                                style="width: 200px"
-                              />
-                            </div>
-                          </div>
-                          <div
-                            v-if="triggerData.frequency_type == 'minutes'"
-                            data-test="scheduled-pipeline-frequency-unit"
-                            style="
-                              margin-left: 0 !important;
-                              height: 40px;
-                              font-weight: normal;
-                              margin-top: 10px;
-                              width: 87px;
-                            "
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'bg-grey-10'
-                                : 'bg-grey-2'
-                            "
-                            class="flex justify-center items-center"
-                          >
-                            {{ t("alerts.minutes") }}
-                          </div>
-                        </div>
-                        <div
-                          data-test="scheduled-pipeline-frequency-error-text"
-                          v-if="
-                            (!Number(triggerData.frequency) &&
-                              triggerData.frequency_type == 'minutes') ||
-                            (triggerData.frequency_type == 'cron' &&
-                              triggerData.cron == '') ||
-                            cronJobError
-                          "
-                          class="text-red-8 q-pt-xs"
-                          style="font-size: 11px; line-height: 12px"
-                        >
-                          {{ cronJobError || "Field is required!" }}
-                        </div>
-                      </div>
-                    </div>
-                    <div class="flex items-center q-mr-sm q-mt-lg">
-                      <div
-                        data-test="scheduled-pipeline-period-title"
-                        class="text-bold flex items-center q-pb-sm"
-                        style="width: 130px"
-                      >
-                        {{ t("alerts.period") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
-                        >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Period for which the query should run.<br />
-                              e.g. 10 minutes means that whenever the query will
-                              run it will use the last 10 minutes of data. If
-                              the query runs at 4:00 PM then it will use the
-                              data from 3:50 PM to 4:00 PM.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
-                      </div>
-                      <div style="min-height: 58px">
-                        <div
-                          class="flex items-center q-mr-sm"
-                          style="
-                            border: 1px solid rgba(0, 0, 0, 0.05);
-                            width: fit-content;
-                          "
-                        >
-                          <div
-                            data-test="scheduled-pipeline-period-input"
-                            style="width: 87px; margin-left: 0 !important"
-                            class="silence-notification-input"
-                          >
-                            <q-input
-                              v-model="triggerData.period"
-                              type="number"
-                              dense
-                              filled
-                              min="1"
-                              style="background: none"
-                              v-bind:readonly="
-                                triggerData.frequency_type == 'minutes'
-                              "
-                              v-bind:disable="
-                                triggerData.frequency_type == 'minutes'
-                              "
-                              @update:model-value="updateTrigger"
-                            />
-                          </div>
-                          <div
-                            data-test="scheduled-pipeline-period-unit"
-                            style="
-                              min-width: 90px;
-                              margin-left: 0 !important;
-                              height: 40px;
-                              font-weight: normal;
-                            "
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'bg-grey-10'
-                                : 'bg-grey-2'
-                            "
-                            class="flex justify-center items-center"
-                          >
-                            {{ t("alerts.minutes") }}
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        data-test="scheduled-pipeline-period-error-text"
-                        v-if="!Number(triggerData.period)"
-                        class="text-red-8 q-pt-xs"
-                        style="font-size: 11px; line-height: 12px"
-                      >
-                        Field is required!
-                      </div>
-                      <div
-                        data-test="scheduled-pipeline-period-warning-text"
-                        v-else
-                        class="text-primary q-pt-xs"
-                        style="
-                          font-size: 12px;
-                          line-height: 12px;
-                          padding: 2px 0px;
-                        "
-                      >
-                        Note: The period should be the same as frequency.
-                      </div>
-                    </div>
-                    <div class="flex items-center q-mr-sm q-mt-lg">
-                      <div
-                        data-test="scheduled-pipeline-delay-title"
-                        class="text-bold flex items-center q-pb-sm"
-                        style="width: 130px"
-                      >
-                        {{ t("pipeline.delay") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
-                          size="17px"
-                          class="q-ml-xs cursor-pointer"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'text-grey-5'
-                              : 'text-grey-7'
-                          "
-                        >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Delay for which the pipeline is scheduled to
-                              run.<br />
-                              e.g. 10 minutes delay means that the pipeline will
-                              run 10 minutes after its scheduled time.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
-                      </div>
-                      <div style="min-height: 58px">
-                        <div
-                          class="flex items-center q-mr-sm"
-                          style="
-                            border: 1px solid rgba(0, 0, 0, 0.05);
-                            width: fit-content;
-                          "
-                        >
-                          <div
-                            data-test="scheduled-pipeline-delay-input"
-                            style="width: 87px; margin-left: 0 !important"
-                            class="silence-notification-input"
-                          >
-                            <q-input
-                              v-model="delayCondition"
-                              type="number"
-                              dense
-                              filled
-                              min="0"
-                              style="background: none"
-                              @update:model-value="updateDelay"
-                            />
-                          </div>
-                          <div
-                            data-test="scheduled-pipeline-delay-unit"
-                            style="
-                              min-width: 90px;
-                              margin-left: 0 !important;
-                              height: 40px;
-                              font-weight: normal;
-                            "
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'bg-grey-10'
-                                : 'bg-grey-2'
-                            "
-                            class="flex justify-center items-center"
-                          >
-                            {{ t("alerts.minutes") }}
-                          </div>
-                        </div>
-                      </div>
+                    <div
+                      data-test="scheduled-pipeline-period-unit"
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        height: 40px;
+                        font-weight: normal;
+                      "
+                      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
                     </div>
                   </div>
 
-                  <div></div>
-
-                  <div
-                    class="flex justify-start items-end q-mt-lg q-pb-lg full-width"
-                    :class="
-                      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
-                    "
-                  ></div>
                 </div>
-              </template>
+                <div
+                    data-test="scheduled-pipeline-period-error-text"
+                    v-if="!Number(triggerData.period)"
+                    class="text-red-8 q-pt-xs"
+                    style="font-size: 11px; line-height: 12px"
+                  >
+                    Field is required!
+                  </div>
+                  <div
+                    data-test="scheduled-pipeline-period-warning-text"
+                    v-else
+                    class="text-primary q-pt-xs"
+                    style="font-size: 12px; line-height: 12px; padding: 2px 0px"
+                  >
+                    Note: The period should be the same as frequency.
+                  </div>
+                  
+
+
+          
+              </div>
+              <div class="flex items-center q-mr-sm q-mt-lg">
+                <div
+                  data-test="scheduled-pipeline-delay-title"
+                  class="text-bold flex items-center q-pb-sm"
+                  style="width: 130px"
+                >
+                  {{ t("pipeline.delay") + " *" }}
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                    >
+                      <span style="font-size: 14px"
+                        >Delay for which the pipeline is scheduled to run.<br />
+                        e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.</span 
+                      >
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div style="min-height: 58px">
+                  <div
+                    class="flex items-center q-mr-sm"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+                  >
+                    <div
+                      data-test="scheduled-pipeline-delay-input"
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        v-model="delayCondition"
+                        type="number"
+                        dense
+                        filled
+                        min="0"
+                        style="background: none"
+                        @update:model-value="updateDelay"
+                      />
+                    </div>
+                    <div
+                      data-test="scheduled-pipeline-delay-unit"
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        height: 40px;
+                        font-weight: normal;
+                      "
+                      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              </div>
+
+              <div>
+                
+              </div>
+
+                <div
+                  class="flex justify-start items-end q-mt-lg q-pb-lg full-width"
+                  :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+                >
+                
+                </div>
+
+      
+                 </div>
+            </template>
             </q-splitter>
-          </template>
-          <template #separator>
-            <q-btn
-              data-test="logs-search-field-list-collapse-btn"
-              :icon="collapseFields ? 'chevron_right' : 'chevron_left'"
-              :title="collapseFields ? 'Collapse Fields' : 'Open Fields'"
-              dense
-              size="20px"
-              round
-              class="q-mr-xs field-list-collapse-btn"
-              color="primary"
-              style="
-                left: 10px;
-                position: absolute;
-                overflow: auto !important;
-                top: 0px;
-                z-index: 100 !important;
-              "
-              @click="collapseFieldList"
-            ></q-btn>
-          </template>
-          <template #after>
-            <div
-              class="full-width"
-              style="height: calc(100vh - 140px) !important"
-            >
+
+            </template>
+            <template #separator>
+              <q-btn
+                    data-test="logs-search-field-list-collapse-btn"
+                    :icon="
+                      collapseFields
+                        ? 'chevron_right'
+                        : 'chevron_left'
+                    "
+                    :title="
+                     collapseFields
+                        ? 'Collapse Fields'
+                        : 'Open Fields'
+                    "
+                    dense
+                    size="20px"
+                    round
+                    class="q-mr-xs field-list-collapse-btn"
+                    color="primary"
+                    style="left: 10px; position: absolute; overflow: auto !important; top: 0px; z-index: 100 !important;"
+                   
+                    @click="collapseFieldList"
+                  ></q-btn>
+            </template>
+            <template #after>
+             <div class="full-width tw-flex ">
+
+              <div :style="{
+              }" style="height: calc(100vh - 140px) !important; width: 100%;" >
               <div class="query-editor-container scheduled-pipelines">
                 <span @click.stop="expandState.query = !expandState.query">
-                  <FullViewContainer
-                    name="query"
-                    v-model:is-expanded="expandState.query"
-                    :label="tab === 'sql' ? 'Sql Query' : 'PromQL Query'"
-                    class="tw-mt-1"
-                  />
+                <FullViewContainer
+                  name="query"
+                  v-model:is-expanded="expandState.query"
+                  :label="tab === 'sql' ? 'Sql Query' : 'PromQL Query'"
+                  class="tw-mt-1"
+                />
                 </span>
                 <query-editor
                   v-show="expandState.query"
@@ -1075,53 +1009,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :debounceTime="300"
                   class="monaco-editor"
                   v-model:query="query"
-                  :class="
-                    query == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
+                  :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
                   @update:query="updateQueryValue"
                   @focus="focusQueryEditor"
                   @blur="onBlurQueryEditor"
-                  style="height: calc(100vh - 190px) !important"
-                />
+                  style="height: calc(100vh - 190px) !important;"
+              />
+              
+             
               </div>
 
               <div>
                 <span @click.stop="expandState.output = !expandState.output">
-                  <FullViewContainer
-                    name="output"
-                    v-model:is-expanded="expandState.output"
-                    label="Output"
-                    class="tw-mt-1"
-                  />
-                </span>
-                <TenstackTable
-                  style="height: calc(100vh - 190px) !important"
-                  v-show="expandState.output && rows.length > 0 && tab == 'sql'"
-                  ref="searchTableRef"
-                  :columns="getColumns"
-                  :rows="rows"
-                  :jsonpreviewStreamName="selectedStreamName"
-                  :expandedRows="expandedLogs"
-                  @expand-row="expandLog"
-                  @copy="copyLogToClipboard"
+                <FullViewContainer
+                  name="output"
+                  v-model:is-expanded="expandState.output"
+                  label="Output"
+                  class="tw-mt-1"
                 />
-                <div
-                  v-if="loading"
-                  style="height: calc(100vh - 190px) !important"
-                  class="flex justify-center items-center"
-                >
-                  <q-spinner-hourglass color="primary" size="lg" />
-                </div>
+                </span>
+                  <TenstackTable
+                    style="height: calc(100vh - 190px) !important;"
+                    v-show="expandState.output && rows.length > 0 && tab == 'sql'"
+                    ref="searchTableRef"
+                    :columns="getColumns"
+                    :rows="rows"
+                    :jsonpreviewStreamName="selectedStreamName"
+                    :expandedRows="expandedLogs"
+                    @expand-row="expandLog"
+                    @copy="copyLogToClipboard"
 
-                <div
-                  v-else-if="
-                    rows.length == 0 && expandState.output && tab == 'sql'
-                  "
-                  style="height: calc(100vh - 190px) !important"
-                >
-                  <h6
+
+                  />
+                  <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
+                    <q-spinner-hourglass color="primary" size="lg" />
+
+                  </div>
+
+                  <div v-else-if="rows.length == 0 && expandState.output && tab == 'sql'" style="height: calc(100vh - 190px) !important;" >
+                    <h6
                     v-if="selectedStreamName == ''"
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
@@ -1132,67 +1058,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     enhance search.
                   </h6>
                   <h6
-                    v-else
+                  v-else
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.applySearch") }}
+                    
                   </h6>
-                </div>
+                  </div>
 
-                <div v-else-if="tab == 'promql'">
-                  <PreviewPromqlQuery
+                  <div v-else-if="tab == 'promql'">
+                    <PreviewPromqlQuery
                     ref="previewPromqlQueryRef"
                     :query="query"
                     :stream_name="selectedStreamName"
                     :stream_type="selectedStreamType"
                     :dateTime="dateTime"
-                  />
-                </div>
+                    />
+                  </div>
+  
               </div>
-            </div>
-            <div class="flex justify-end q-mt-md">
-              <q-btn
-                data-test="stream-routing-query-cancel-btn"
-                class="text-bold q-ml-md no border"
-                :label="t('alerts.cancel')"
-                text-color="light-text"
-                padding="sm md"
-                no-caps
-                @click="$emit('cancel:form')"
-              />
-              <q-btn
-                data-test="stream-routing-query-save-btn"
-                :label="
-                  validatingSqlQuery ? 'Validating...' : 'Validate and Close'
-                "
-                class="text-bold no-border q-ml-md"
-                color="secondary"
-                padding="sm xl"
-                no-caps
-                type="submit"
-                @click="$emit('submit:form')"
-                :disable="validatingSqlQuery"
-              />
-              <q-btn
-                v-if="pipelineObj.isEditNode"
-                data-test="stream-routing-query-delete-btn"
-                :label="t('pipeline.deleteNode')"
-                class="text-bold no-border q-ml-md"
-                color="negative"
-                padding="sm xl"
-                no-caps
-                @click="$emit('delete:node')"
-              />
-            </div>
-          </template>
-        </q-splitter>
 
-        <!-- query-eidtor-part -->
-      </div>
-    </div>
+             
+            </div>
+
+          </div>
+
+            <div class="flex justify-end q-mt-md">
+
+          <q-btn
+                  data-test="stream-routing-query-cancel-btn"
+                  class="text-bold q-ml-md no border"
+                  :label="t('alerts.cancel')"
+                  text-color="light-text"
+                  padding="sm md"
+                  no-caps
+                  @click="$emit('cancel:form')"
+                />
+                <q-btn
+                  data-test="stream-routing-query-save-btn"
+                  :label="validatingSqlQuery ? 'Validating...' : 'Validate and Close'"
+                  class="text-bold no-border q-ml-md"
+                  color="secondary"
+                  padding="sm xl"
+                  no-caps
+                  type="submit"
+                  @click="$emit('submit:form')"
+                  :disable="validatingSqlQuery"
+                />
+                <q-btn
+                  v-if="pipelineObj.isEditNode"
+                  data-test="stream-routing-query-delete-btn"
+                  :label="t('pipeline.deleteNode')"
+                  class="text-bold no-border q-ml-md"
+                  color="negative"
+                  padding="sm xl"
+                  no-caps
+                  @click="$emit('delete:node')"
+                />
+          </div>   
+
+            
+            </template>
+          
+          </q-splitter>
+
+                
+
+
+
+           <!-- query-eidtor-part -->
+            
+          </div>
+
+          <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width: 25%; max-width: 100%; min-width: 75px; height: calc(100vh - 70px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+              <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
+
+            </div>
+
+
+
+   </div>   
+
   </div>
+  
 </template>
 
 <script setup lang="ts">
@@ -1205,7 +1155,6 @@ import {
   nextTick,
   onMounted,
   onBeforeMount,
-  onBeforeUnmount,
 } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
@@ -1231,16 +1180,22 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import { split } from "postcss/lib/list";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
+import O2AIChat from "@/components/O2AIChat.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
 import useLogs from "@/composables/useLogs";
+
+
 
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
+
+import config from "../../../aws-exports";
+
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -1266,7 +1221,7 @@ const props = defineProps([
   "showTimezoneWarning",
   "streamType",
   "validatingSqlQuery",
-  "delay",
+  "delay"
 ]);
 
 const emits = defineEmits([
@@ -1290,11 +1245,11 @@ const emits = defineEmits([
   "delete:node",
   "update:fullscreen",
   "update:stream_type",
-  "update:delay",
+  "update:delay"
 ]);
-const { pipelineObj } = useDragAndDrop();
+const {  pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
-const { getStream, getStreams } = useStreams();
+const { getStream, getStreams } = useStreams ();
 let parser: any;
 
 const selectedStreamName = ref("");
@@ -1306,18 +1261,16 @@ const getColumns = computed(() => {
     {
       name: "_timestamp",
       id: "_timestamp",
-      accessorFn: (row: any) =>
-        timestampToTimezoneDate(
-          row["_timestamp"] / 1000,
-          store.state.timezone,
-          "yyyy-MM-dd HH:mm:ss.SSS",
-        ),
-      prop: (row: any) =>
-        timestampToTimezoneDate(
-          row["_timestamp"] / 1000,
-          store.state.timezone,
-          "yyyy-MM-dd HH:mm:ss.SSS",
-        ),
+      accessorFn: (row: any) => timestampToTimezoneDate(
+        row["_timestamp"] / 1000,
+        store.state.timezone,
+        "yyyy-MM-dd HH:mm:ss.SSS"
+      ),
+      prop: (row: any) => timestampToTimezoneDate(
+        row["_timestamp"] / 1000,
+        store.state.timezone,
+        "yyyy-MM-dd HH:mm:ss.SSS"
+      ),
       label: t("search.timestamp") + ` (${store.state.timezone})`,
       header: t("search.timestamp") + ` (${store.state.timezone})`,
       align: "left",
@@ -1326,9 +1279,9 @@ const getColumns = computed(() => {
       meta: {
         closable: false,
         showWrap: false,
-        wrapContent: true,
+        wrapContent: true
       },
-      size: 200,
+      size: 200
     },
     {
       name: "source",
@@ -1341,11 +1294,17 @@ const getColumns = computed(() => {
       meta: {
         closable: false,
         showWrap: false,
-        wrapContent: false,
-      },
-    },
+        wrapContent: false
+      }
+    }
   ];
 });
+
+
+
+
+
+
 
 const { t } = useI18n();
 
@@ -1368,23 +1327,25 @@ const store = useStore();
 const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
-const pipelineEditorRef: any = ref(null);
+const  pipelineEditorRef : any = ref(null);
 const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
-const dateTime = ref({
+const dateTime  = ref({
   startTime: null,
   endTime: null,
   relativeTimePeriod: null,
   valueType: "absolute",
 });
 const streamFields: any = ref([]);
-const previewPromqlQueryRef: any = ref(null);
-
+const previewPromqlQueryRef : any = ref(null);
+const isHovered = ref(false);
 const loading = ref(false);
 
+
 const selectedStreamType = ref(props.streamType || "logs");
+
 
 const filteredStreams = ref<any[]>([]);
 const streams = ref([]);
@@ -1392,155 +1353,130 @@ const streams = ref([]);
 // Add a loading state and track stream types that have been loaded
 const loadedStreamTypes = ref(new Set());
 
-watch(
-  () => collapseFields.value,
-  (val) => {
-    if (val == true) {
-      splitterModel.value = 0;
-    }
-  },
-  {
-    immediate: true,
-    deep: true,
-  },
-);
-watch(
-  () => splitterModel.value,
-  (val) => {
-    if (val == 10) {
-      splitterModel.value = 0;
-    }
-  },
-);
+watch(()=> collapseFields.value ,  (val)=>{
+  if(val == true){
+    splitterModel.value = 0;
+  }
+},{
+  immediate: true,
+  deep: true,
+})
+watch(()=> splitterModel.value ,  (val)=>{
+  if(val == 10){
+   splitterModel.value = 0;
+  }
+})
 
-watch(
-  () => selectedStreamName.value,
-  (val) => {
-    searchObj.data.stream.pipelineQueryStream = [val];
-  },
-);
-watch(
-  () => triggerData.value.frequency_type,
-  (val) => {
-    if (val == "minutes") {
-      triggerData.value.period = Number(triggerData.value.frequency) || 15;
-    } else {
-      const periodValue = convertCronToMinutes(triggerData.value.cron);
-      triggerData.value.period =
-        periodValue > 0
-          ? periodValue
-          : Number(triggerData.value.frequency) || 15;
-    }
-  },
-);
+watch(()=> selectedStreamName.value, (val)=>{
+  searchObj.data.stream.pipelineQueryStream = [val];
+})
+watch(()=>triggerData.value.frequency_type, (val)=>{
+  if(val == 'minutes'){
+    triggerData.value.period = Number(triggerData.value.frequency) || 15
+  }else{
+    const periodValue = convertCronToMinutes(triggerData.value.cron) 
+    triggerData.value.period = periodValue > 0 ? periodValue : Number(triggerData.value.frequency) || 15
+  }
+})
 
-onBeforeMount(async () => {
+
+
+onBeforeMount(async ()=>{
   await importSqlParser();
-});
+})
 
-onBeforeUnmount(() => {
-  parser = null;
-});
 
-onMounted(async () => {
+
+
+onMounted(async ()=>{
   await getStreamList();
 
   setTimeout(() => {
-    if (tab.value === "sql" && query.value != "") {
-      const parsedQuery = parser?.parse(query.value);
-      selectedStreamName.value = parsedQuery.ast.from[0].table;
+    if(tab.value === 'sql' && query.value != ""){
+    const parsedQuery = parser?.parse(query.value);
+    selectedStreamName.value = parsedQuery.ast.from[0].table;
 
-      getStreamFields();
-    }
+    getStreamFields();
+  }
   }, 200);
-});
+  
+})
 
 const importSqlParser = async () => {
-  const useSqlParser: any = await import("@/composables/useParser");
-  const { sqlParser }: any = useSqlParser.default();
-  parser = await sqlParser();
-};
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+  };
 
 const filteredTimezone: any = ref([]);
-const expandState = ref({
+const expandState =ref( {
   output: false,
   query: true,
   buildQuery: true,
-  setVariables: true,
-});
+  setVariables: true
+
+})
 
 const sideBarSplitterModel = ref(60);
 
-watch(
-  () => sideBarSplitterModel.value,
-  (val) => {
-    if (val == 10) {
-      sideBarSplitterModel.value = 5;
-    }
-    if (val == 90) {
-      sideBarSplitterModel.value = 95;
-    }
-  },
-);
-watch(
-  () => expandState.value.output,
-  (val) => {
-    if (val == true) {
-      expandState.value.query = false;
-    }
-  },
-);
-watch(
-  () => expandState.value.query,
-  (val) => {
-    if (val == true) {
-      expandState.value.output = false;
-    }
-  },
-);
-watch(
-  () => expandState.value.buildQuery,
-  (val) => {
-    if (val == false && expandState.value.setVariables == true) {
-      sideBarSplitterModel.value = 0;
-    } else if (val == false && expandState.value.setVariables == false) {
-      sideBarSplitterModel.value = 0;
-    } else if (val == true && expandState.value.setVariables == false) {
-      sideBarSplitterModel.value = 99;
-    } else {
-      sideBarSplitterModel.value = 60;
-    }
-  },
-);
-watch(
-  () => expandState.value.setVariables,
-  (val) => {
-    if (val == false && expandState.value.buildQuery == true) {
-      sideBarSplitterModel.value = 99;
-    } else if (val == false && expandState.value.buildQuery == false) {
-      sideBarSplitterModel.value = 0;
-    } else if (val == true && expandState.value.buildQuery == false) {
-      sideBarSplitterModel.value = 0;
-    } else {
-      sideBarSplitterModel.value = 60;
-    }
-  },
-);
-
-watch(
-  () => selectedStreamType.value,
-  (val) => {
-    if (val != "metrics") {
-      tab.value = "sql";
-    }
-    selectedStreamName.value = "";
-    streamFields.value = [];
-    query.value = "";
-    expandState.value.query = true;
+watch(()=> sideBarSplitterModel.value ,  (val)=>{
+  if(val == 10){
+   sideBarSplitterModel.value = 5;
+  }
+  if(val == 90){
+    sideBarSplitterModel.value = 95;
+  }
+})
+watch(()=> expandState.value.output, (val)=>{
+  if(val == true){
+    expandState.value.query = false;
+  }
+})
+watch(()=> expandState.value.query, (val)=>{
+  if(val == true){
     expandState.value.output = false;
-    emits("update:stream_type", val);
-  },
-);
+  }
+})
+watch(()=> expandState.value.buildQuery, (val)=>{
+  if(val == false && expandState.value.setVariables == true){
+    sideBarSplitterModel.value = 0;
+  }
+  else if (val == false && expandState.value.setVariables == false){
+    sideBarSplitterModel.value = 0;
+  }
+  else if (val == true && expandState.value.setVariables == false){
+    sideBarSplitterModel.value = 99;
+  }
+  else{
+    sideBarSplitterModel.value = 60;
+  }
+})
+watch(()=> expandState.value.setVariables, (val)=>{
+  if(val == false && expandState.value.buildQuery == true){
+    sideBarSplitterModel.value = 99;
+  }
+  else if (val == false && expandState.value.buildQuery == false){
+    sideBarSplitterModel.value = 0;
+  }
+  else if (val == true && expandState.value.buildQuery == false){
+    sideBarSplitterModel.value = 0;
+  }
+  else{
+    sideBarSplitterModel.value = 60;
+  }
+})
+  
+watch(()=> selectedStreamType.value, (val)=>{
+  if(val != "metrics"){
+    tab.value = "sql";
+  }
+  selectedStreamName.value = "";
+  streamFields.value = [];
+  query.value = "";
+  expandState.value.query = true;
+  expandState.value.output = false;
+  emits("update:stream_type", val);
+})
 
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
@@ -1584,7 +1520,7 @@ const currentTimezone =
 const browserTimezone = ref(currentTimezone);
 const streamTypes = ["logs", "metrics", "traces"];
 
-const rows = ref([]);
+const rows = ref([])
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -1626,6 +1562,7 @@ const updateQueryValue = (value: string) => {
 };
 
 const updateTrigger = () => {
+
   emits("update:trigger", triggerData.value);
   emits("input:update", "period", triggerData.value);
 };
@@ -1705,6 +1642,8 @@ const updateTab = () => {
   emits("input:update", "query_type", tab.value);
 };
 
+
+
 const onFunctionSelect = (_function: any) => {
   selectedFunction.value = _function.name;
   vrlFunctionContent.value = _function.function;
@@ -1741,7 +1680,7 @@ const isVrlFunctionEnabled = computed({
 
 const updateQuery = () => {
   if (tab.value === "promql") {
-    query.value = `${selectedStreamName.value}{}`;
+    query.value = `${selectedStreamName.value}{}`
   }
 
   if (tab.value === "sql") query.value = props.sql;
@@ -1936,7 +1875,7 @@ const validateFrequency = () => {
 
     if (triggerData.value.frequency < intervalInMins) {
       cronJobError.value =
-        "Minimum frequency should be " + intervalInMins + " minutes";
+        "Minimum frequency should be " + (intervalInMins) + " minutes";
       return;
     }
   }
@@ -1944,7 +1883,7 @@ const validateFrequency = () => {
 const collapseFieldList = () => {
   splitterModel.value = collapseFields.value ? 30 : 0;
   collapseFields.value = !collapseFields.value;
-};
+}
 
 const getStreamFields = () => {
   return new Promise((resolve) => {
@@ -1952,16 +1891,18 @@ const getStreamFields = () => {
       .then((stream: any) => {
         streamFields.value = [];
         stream.schema?.forEach((field: any) => {
-          streamFields.value.push({
-            ...field,
-            showValues: true,
-          });
+            streamFields.value.push({
+              ...field,
+              showValues: true,
+            });
+          
         });
       })
       .finally(() => {
-        if (tab.value === "sql" && query.value == "") {
+        if(tab.value === 'sql' && query.value == ""){
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql" && query.value == "") {
+        }
+        else if (tab.value === 'promql' && query.value == ""){
           query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;
@@ -1973,29 +1914,24 @@ const getStreamFields = () => {
 };
 const filterStreams = (val: string, update: any) => {
   update(() => {
-    if (!val || val === "") {
+    if (!val || val === '') {
       // If value is empty, show all streams
       filteredStreams.value = streams.value.map((stream: any) => ({
         label: stream.name,
-        value: stream.name,
+        value: stream.name
       }));
       // Only fetch if we haven't loaded this stream type yet
-      if (
-        !loadedStreamTypes.value.has(selectedStreamType.value) &&
-        !loading.value
-      ) {
+      if (!loadedStreamTypes.value.has(selectedStreamType.value) && !loading.value) {
         getStreamList();
       }
     } else {
       // Filter existing streams based on the search value
-      filteredStreams.value = streams.value
-        .map((stream: any) => ({
-          label: stream.name,
-          value: stream.name,
-        }))
-        .filter((stream: any) => {
-          return stream.label.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        });
+      filteredStreams.value = streams.value.map((stream: any) => ({
+        label: stream.name,
+        value: stream.name
+      })).filter((stream: any) => {
+        return stream.label.toLowerCase().indexOf(val.toLowerCase()) > -1;
+      });
     }
   });
 };
@@ -2004,68 +1940,70 @@ const filterStreams = (val: string, update: any) => {
 async function getStreamList() {
   if (loading.value) return;
   loading.value = true;
-
+  
   try {
     const res: any = await getStreams(selectedStreamType.value, false);
     streams.value = res.list || [];
     // Set filtered streams to show all streams initially
     filteredStreams.value = streams.value.map((stream: any) => ({
       label: stream.name,
-      value: stream.name,
+      value: stream.name
     }));
     // Mark this stream type as loaded
     loadedStreamTypes.value.add(selectedStreamType.value);
-  } catch (err) {
+  } 
+  catch(err) {
     console.log(err);
     streams.value = [];
     filteredStreams.value = [];
-  } finally {
+  }
+  finally {
     loading.value = false;
   }
 }
 
 // Clear loaded streams when stream type changes
-watch(
-  () => selectedStreamType.value,
-  () => {
-    streams.value = [];
-    filteredStreams.value = [];
-    if (!loadedStreamTypes.value.has(selectedStreamType.value)) {
-      getStreamList();
-    }
-  },
-);
+watch(() => selectedStreamType.value, () => {
+  streams.value = [];
+  filteredStreams.value = [];
+  if (!loadedStreamTypes.value.has(selectedStreamType.value)) {
+    getStreamList();
+  }
+});
 
 const handleSidebarEvent = (event: string, value: any) => {
+  
   if (pipelineEditorRef.value) {
     let cursorIndex = pipelineEditorRef.value?.getCursorIndex();
 
+    
     // Split the value by '=' and take the first part
-    const insertValue = value.split("=")[0].trim();
-
+    const insertValue = value.split('=')[0].trim();
+    
     // Add spaces before and after the value
     const valueToInsert = ` ${insertValue} `;
     // Get current query value
-    const currentQuery: any = pipelineEditorRef.value.getValue();
-    if (cursorIndex != -1) {
+    const currentQuery : any = pipelineEditorRef.value.getValue();
+    if(cursorIndex != -1 ){
       cursorPosition.value = cursorIndex;
-    } else if (cursorIndex == -1 && cursorPosition.value == -1) {
+    }
+    else if (cursorIndex == - 1 && cursorPosition.value == - 1){
       cursorPosition.value = currentQuery.length;
     }
 
     // Insert at cursor position
-    const newQuery =
-      currentQuery.slice(0, cursorPosition.value + 1) +
-      valueToInsert +
-      currentQuery.slice(cursorPosition.value + 1);
-    if (cursorPosition.value != -1) {
-      cursorPosition.value += valueToInsert.length;
-    }
+    const newQuery = 
+      currentQuery.slice(0, cursorPosition.value+1) + 
+      valueToInsert + 
+      currentQuery.slice(cursorPosition.value+1);
+      if(cursorPosition.value != -1){
+        cursorPosition.value += valueToInsert.length;
+      } 
 
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
   } else {
-    console.log("Could not find editor instance");
+    console.log('Could not find editor instance');
   }
 };
 const updateDateChange = (date: any) => {
@@ -2079,67 +2017,67 @@ const updateDateChange = (date: any) => {
 };
 
 const runQuery = async () => {
-  if (tab.value == "sql") {
+
+  if(tab.value == 'sql'){
     loading.value = true;
 
-    const queryReq = {
-      sql: query.value,
-      start_time: dateTime.value.startTime,
-      end_time: dateTime.value.endTime,
-      from: 0,
-      size: 10,
-    };
-    searchService
-      .search(
-        {
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: { query: queryReq },
-          page_type: selectedStreamType.value,
-        },
-        "derived_stream",
-      )
-      .then((res: any) => {
-        if (res.data.hits.length > 0) {
-          rows.value = res.data.hits;
-        } else {
-          rows.value = [];
-        }
-      })
-      .catch((err: any) => {
-        console.log(err, "err");
-      })
-      .finally(() => {
-        loading.value = false;
-      });
-  } else if (tab.value == "promql") {
-    previewPromqlQueryRef.value.refreshData();
+  const queryReq = {
+    sql: query.value,
+    start_time: dateTime.value.startTime,
+    end_time: dateTime.value.endTime,
+    from: 0,
+    size: 10,
   }
-};
+  searchService.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+            query: {query: queryReq},
+            page_type: selectedStreamType.value,
+  }, "derived_stream"
+  ).then((res: any) => {
+    if(res.data.hits.length > 0){
+    rows.value = res.data.hits
+    }
+    else{
+      rows.value = [];
+    }
+
+  }).catch((err: any) => {
+    console.log(err, 'err');
+  }).finally(() => {
+    loading.value = false;
+  })
+}
+else if(tab.value == 'promql'){
+  previewPromqlQueryRef.value.refreshData();
+
+}
+}
+
+
+
+
 
 const isFullscreen = ref(false);
 
 const handleFullScreen = () => {
   q.fullscreen.toggle();
   isFullscreen.value = !isFullscreen.value;
-};
+}
 
-watch(
-  () => q.fullscreen.isActive,
-  (val) => {
-    isFullscreen.value = val;
-    emits("update:fullscreen", val);
-  },
-);
+watch(() => q.fullscreen.isActive, (val) => {
+  isFullscreen.value = val;
+  emits('update:fullscreen', val);
+});
 
 const focusQueryEditor = () => {
   queryEditorPlaceholderFlag.value = false;
-};
+}
 
 const expandLog = (index: any) => {
   if (expandedLogs.value.includes(index))
     expandedLogs.value = expandedLogs.value.filter((item) => item != index);
   else expandedLogs.value.push(index);
-};
+}
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData).then(() =>
@@ -2152,8 +2090,25 @@ const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
 };
 
 const updateDelay = (val: any) => {
-  emits("update:delay", val);
-};
+  emits("update:delay",val)
+}
+
+const toggleAIChat = () => {
+  const isEnabled = !store.state.isAiChatEnabled;
+  store.dispatch("setIsAiChatEnabled", isEnabled);
+}
+
+
+const getBtnLogo = computed(() => {
+      if (isHovered.value || store.state.isAiChatEnabled) {
+        return getImageURL('images/common/ai_icon_dark.svg')
+      }
+
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+
 
 defineExpose({
   tab,
@@ -2186,7 +2141,11 @@ defineExpose({
   copyToClipboard,
   updateDelay,
   delayCondition,
+  toggleAIChat,
+  isHovered,
+  getBtnLogo
 });
+
 </script>
 
 <style lang="scss" scoped>
@@ -2198,9 +2157,14 @@ defineExpose({
   border-radius: 4px;
   overflow: hidden;
 }
+
+
+
+
 </style>
 <style lang="scss">
-.scheduled-pipeline-container {
+
+.scheduled-pipeline-container{
   .q-splitter__before {
     overflow: hidden;
   }
@@ -2211,76 +2175,78 @@ defineExpose({
   .q-table__control {
     width: 100%;
   }
-  .q-table__top {
+  .q-table__top{
     padding: 0px !important;
   }
-  .scheduled-pipeline-tabs {
-    padding: 0px !important;
+.scheduled-pipeline-tabs {
+  padding: 0px !important;
 
-    .q-tab--active {
-      background-color: $primary;
-      color: $white;
-    }
+  .q-tab--active {
+    background-color: $primary;
+    color: $white;
+  }
 
-    .q-tab__indicator {
-      display: none;
-    }
+  .q-tab__indicator {
+    display: none;
+  }
 
-    .q-tab {
-      min-height: 28px;
-      height: 32px;
+  .q-tab {
+    min-height: 28px;
+    height: 32px;
+  }
+}
+.scheduled-pipelines {
+  .monaco-editor {
+  
+    width: 100%;
+  }
+  .query-editor-container {
+    width: 97% !important;
+    border: 1px solid $border-color;
+  }
+
+  .q-btn {
+    &.icon-dark {
+      filter: none !important;
     }
   }
-  .scheduled-pipelines {
-    .monaco-editor {
-      width: 100%;
-    }
-    .query-editor-container {
-      width: 97% !important;
-      border: 1px solid $border-color;
-    }
-
-    .q-btn {
-      &.icon-dark {
-        filter: none !important;
-      }
-    }
-    .empty-query .monaco-editor-background {
-      background-image: url("@/assets/images/common/query-editor.png");
-      background-repeat: no-repeat;
-      background-size: 115px;
-    }
+  .empty-query .monaco-editor-background {
+    background-image: url("@/assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
   }
-  .field-list-collapse-btn {
-    z-index: 11;
-    position: absolute;
-    top: -6px !important;
-    font-size: 12px !important;
-  }
-  .stream-routing-title {
-    font-size: 20px;
-    padding-top: 12px;
-  }
+}
+.field-list-collapse-btn {
+      z-index: 11;
+      position: absolute;
+      top: -6px !important;
+      font-size: 12px !important;
+    }
+    .stream-routing-title {
+  font-size: 20px;
+  padding-top: 12px;
+}
 }
 
 .search-button-pipeline {
   height: 32px !important;
-  min-width: 77px;
-  line-height: 29px;
-  font-weight: bold;
-  text-transform: initial;
-  font-size: 11px;
-  color: white;
+    min-width: 77px;
+    line-height: 29px;
+    font-weight: bold;
+    text-transform: initial;
+    font-size: 11px;
+    color: white;
 
-  .q-btn__content {
-    background: $secondary;
-    border-radius: 3px 3px 3px 3px;
-    padding: 0px 5px;
+    .q-btn__content {
+      background: $secondary;
+      border-radius: 3px 3px 3px 3px;
+      padding: 0px 5px;
 
-    .q-icon {
-      font-size: 15px;
-      color: #ffffff;
+      .q-icon {
+        font-size: 15px;
+        color: #ffffff;
+      }
     }
   }
-}
+
 </style>

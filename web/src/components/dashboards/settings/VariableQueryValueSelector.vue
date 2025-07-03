@@ -250,7 +250,7 @@ export default defineComponent({
         }
         // Remove custom value suffix if present
         val = val.filter(
-          (v: any) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)),
+          (v) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)),
         );
       }
       selectedValue.value = val;

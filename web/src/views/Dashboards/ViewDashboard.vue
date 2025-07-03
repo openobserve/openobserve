@@ -613,6 +613,7 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
+      
     });
 
     const setTimeString = () => {
@@ -1096,7 +1097,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
-
+      
       // Clear all refs
       cleanupRefs();
     });

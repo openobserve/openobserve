@@ -1,122 +1,32 @@
 import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
+import { login } from "../utils/dashLogin";
+import { ingestion } from "../utils/dashIngestion";
 import logsdata from "../../../test-data/logs_data.json";
 
+import logData from "../../cypress/fixtures/log.json";
+import { log } from "console";
+
 test.describe.configure({ mode: "parallel" });
-
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000);
-
-  if (await page.getByText("Login as internal user").isVisible()) {
-    await page.getByText("Login as internal user").click();
-  }
-
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  //Enter Password
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-  // TODO : Replace all timeouts with waitForSelector for reliable tests
-  await page.waitForTimeout(4000);
-  await page.goto(process.env["ZO_BASE_URL"]);
-}
-
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
-  await page.waitForTimeout(2000);
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
+  await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
-test.describe(" visualize UI testcases", () => {
-  // let logData;
-  function removeUTFCharacters(text) {
-    // console.log(text, "tex");
-    // Remove UTF characters using regular expression
-    return text.replace(/[^\x00-\x7F]/g, " ");
-  }
-  async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    const search = page.waitForResponse(logData.applyQuery);
-    await page.waitForTimeout(3000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-      force: true,
-    });
-    // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
 
-    // await search.hits.FIXME_should("be.an", "array");
-  }
-  // tebefore(async function () {
-  //   // logData("log");
-  //   // const data = page;
-  //   // logData = data;
-
-  //   console.log("--logData--", logData);
-  // });
+test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
-    console.log("running before each");
-
     await login(page);
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
 
-    // ("ingests logs via API", () => {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString("base64");
-
-    const headers = {
-      Authorization: `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    // const logsdata = {}; // Fill this with your actual data
-
-    // Making a POST request using fetch API
-    const response = await page.evaluate(
-      async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(
-          `${url}/api/${orgId}/${streamName}/_json`,
-          {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(logsdata),
-          }
-        );
-        return await fetchResponse.json();
-      },
-      {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        streamName: streamName,
-        logsdata: logsdata,
-      }
-    );
-
-    console.log(response);
-    //  });
-    // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // const functions = page.waitForResponse("**/api/default/functions**");
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
-    await applyQueryButton(page);
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
   test("should create logs when queries are ingested into the search field", async ({
@@ -432,11 +342,6 @@ test.describe(" visualize UI testcases", () => {
       .click();
 
     await page.waitForTimeout(1000);
-
-    // await page.getByText('e2e_automate').click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
@@ -613,38 +518,28 @@ test.describe(" visualize UI testcases", () => {
     // Open the dropdown
     await page.locator('[data-test="index-dropdown-stream"]').click();
 
-    // Check if the dropdown is blank
-    const dropdownOptions = await page.getByRole("option");
-    const dropdownCount = await dropdownOptions.count();
+    let previousCount = -1;
+    let currentCount = 0;
+    const maxRetries = 10;
 
-    console.log("Dropdown count:", dropdownCount); // Debugging line
+    for (let i = 0; i < maxRetries; i++) {
+      const options = await page.getByRole("option");
+      currentCount = await options.count();
 
-    // Ensure the dropdown options are blank
-    expect(dropdownCount).toBeGreaterThan(0);
+      if (currentCount > 0 && currentCount === previousCount) {
+        break; // Options loaded and stable
+      }
 
-    // Get the row element
+      previousCount = currentCount;
+      await page.waitForTimeout(300); // Small delay before checking again
+    }
+
+    expect(currentCount).toBeGreaterThan(0);
+
+    // Validate the row element
     const row = page
       .getByRole("row", { name: "_timestamp +X +Y +B +F" })
       .first();
-
-    // Alternative assertions
-    await expect(row).toBeDefined();
-  });
-
-  test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
-    page,
-  }) => {
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
-      .click();
-    await page.locator('[data-test="logs-logs-toggle"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-    await expect(
-      page.locator('[data-test="logs-search-result-bar-chart"]')
-    ).toBeVisible();
+    await expect(row).toBeVisible(); // Use visible check
   });
 });

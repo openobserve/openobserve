@@ -66,8 +66,7 @@ const onMessage = (socketId: string, event: MessageEvent) => {
 };
 
 const onClose = (socketId: string, event: CloseEvent) => {
-  const closeTime = new Date().toLocaleString();
-  console.log("onClose", socketId, event.code, event.reason, closeTime);
+  console.log("onClose", socketId, event.code, event.reason);
   clearInterval(pingIntervals[socketId]);
   delete pingIntervals[socketId];
   delete sockets[socketId];

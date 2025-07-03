@@ -522,7 +522,7 @@ export default defineComponent({
       updateDateTime(selectedDate.value);
     });
 
-    const dateTimeForVariables: any = ref(null);
+    const dateTimeForVariables = ref(null);
     
     const setTimeForVariables = () => {
       const date = dateTimePickerRef.value?.getConsumableDateTime();

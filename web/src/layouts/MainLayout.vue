@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  
   <q-layout
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
@@ -72,9 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :src="getImageURL('images/common/open_observe_logo.svg')"
             @click="goToHome"
           />
-          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
-            >Beta</span
-          >
         </div>
 
         <q-toolbar-title></q-toolbar-title>
@@ -103,7 +101,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="router.replace('/billings/plans')"
             >Upgrade to PRO Plan</q-btn
           >
-        </div>
+        </div>   
+        <q-btn
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          :ripple="false"
+          @click="toggleAIChat"
+          data-test="menu-link-ai-item"
+          no-caps
+          :borderless="true"
+          flat
+          dense
+          class="o2-button ai-hover-btn q-px-sm q-py-sm"
+          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+          style="border-radius: 100%;"
+          @mouseenter="isHovered = true"
+          @mouseleave="isHovered = false"
+        >
+          <div class="row items-center no-wrap tw-gap-2  ">
+            <img  :src="getBtnLogo" class="header-icon ai-icon" />
+          </div>
+        </q-btn>
         <div
           data-test="navbar-organizations-select"
           class="q-mx-sm current-organization"
@@ -113,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
             :options="orgOptions"
-            option-label="identifier"
+            option-label="label"
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
           />
@@ -157,6 +174,8 @@ class="padding-none" />
         </div> -->
 
         <ThemeSwitcher></ThemeSwitcher>
+
+
 
         <q-btn
           round
@@ -299,27 +318,6 @@ class="padding-none" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <div v-if="config.isCloud == 'true'">
-                <q-item
-                  v-ripple="true"
-                  v-close-popup="true"
-                  clickable
-                  :to="{ path: '/settings' }"
-                >
-                  <q-item-section avatar>
-                    <q-avatar
-                      size="md"
-                      icon="settings"
-                      color="red"
-                      text-color="white"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ t("menu.settings") }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-              </div>
               <q-item clickable>
                 <q-item-section avatar>
                   <q-icon size="xs" name="language" class="padding-none" />
@@ -399,8 +397,10 @@ class="padding-none" />
             </q-list>
           </q-menu>
         </q-btn>
+        
       </q-toolbar>
     </q-header>
+    
 
     <q-drawer
       v-model="drawer"
@@ -455,7 +455,6 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
-  getLogoutURL,
 } from "../utils/zincutils";
 
 import {
@@ -505,6 +504,7 @@ import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import O2AIChat from '@/components/O2AIChat.vue';
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -539,6 +539,7 @@ export default defineComponent({
     SlackIcon,
     ManagementIcon,
     ThemeSwitcher,
+    O2AIChat,
   },
   methods: {
     navigateToDocs() {
@@ -560,16 +561,11 @@ export default defineComponent({
       if (config.isEnterprise == "true") {
         invlidateLoginData();
       }
-
-      const logoutURL = getLogoutURL();
       this.store.dispatch("logout");
 
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
 
-      if (config.isCloud == "true") {
-        window.location.href = logoutURL;
-      }
       this.$router.push("/logout");
     },
     goToHome() {
@@ -592,6 +588,7 @@ export default defineComponent({
     const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
+    const isHovered = ref(false);
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -817,7 +814,7 @@ export default defineComponent({
         }
       }
     };
-
+    const splitterModel = ref(100);
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -882,9 +879,9 @@ export default defineComponent({
       // Convert the time difference from milliseconds to seconds
       const timeUntilNextAPICallInSeconds = timeUntilNextAPICall / 1000;
 
-      setTimeout(() => {
-        mainLayoutMixin.setup().getRefreshToken();
-      }, timeUntilNextAPICallInSeconds);
+      // setTimeout(() => {
+      //   mainLayoutMixin.setup().getRefreshToken();
+      // }, timeUntilNextAPICallInSeconds);
     };
 
     //get refresh token for cloud environment
@@ -1056,7 +1053,7 @@ export default defineComponent({
 
               return optiondata;
             },
-          );
+          ).sort((a: any, b: any) => a.label.localeCompare(b.label));
         }
 
         if (localOrgFlag == false) {
@@ -1093,6 +1090,9 @@ export default defineComponent({
         if (router.currentRoute.value.query.action == "subscribe") {
           router.push({
             name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
           });
         }
 
@@ -1210,6 +1210,28 @@ export default defineComponent({
       window.open(slackURL, "_blank");
     };
 
+    const toggleAIChat = () => {
+      const isEnabled = !store.state.isAiChatEnabled;
+      store.dispatch("setIsAiChatEnabled", isEnabled);
+      window.dispatchEvent(new Event("resize"));
+
+    };
+
+    const closeChat = () => {
+      store.dispatch("setIsAiChatEnabled", false);
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    const getBtnLogo = computed(() => {
+      if (isHovered.value || store.state.isAiChatEnabled) {
+        return getImageURL('images/common/ai_icon_dark.svg')
+      }
+
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+
     return {
       t,
       router,
@@ -1237,6 +1259,11 @@ export default defineComponent({
       openSlack,
       outlinedSettings,
       closeSocket,
+      splitterModel,
+      toggleAIChat,
+      closeChat,
+      getBtnLogo,
+      isHovered,
     };
   },
   computed: {
@@ -1273,6 +1300,14 @@ export default defineComponent({
       await this.getOrganizationSettings();
 
       this.isLoading = true;
+      // Find the matching organization from orgOptions
+      const matchingOrg = this.orgOptions.find(org => 
+        org.identifier === this.store.state.selectedOrganization.identifier
+      );
+      
+      if (matchingOrg) {
+        this.selectedOrg = matchingOrg;
+      }
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {
@@ -1556,4 +1591,47 @@ export default defineComponent({
 .header-icon {
   opacity: 0.7;
 }
+
+body.ai-chat-open {
+  .q-layout {
+    width: 75%;
+    transition: width 0.3s ease;
+  }
+}
+
+.q-layout {
+  width: 100%;
+  transition: width 0.3s ease;
+}
+
+.o2-button{
+   border-radius: 4px;
+    padding: 0px 8px;
+     color: white;
+}
+.dark-mode-chat-container{
+  border-left: 1.5px solid #232323FF ;
+}
+.light-mode-chat-container{
+  border-left: 1.5px solid #F7F7F7;
+  }
+
+  .ai-btn-active{
+    background-color: #5960b2 !important;
+  }
+  .ai-hover-btn {
+    transition: background-color 1s ease;
+  }
+
+  .ai-hover-btn:hover {
+    background-color: #5960b2; 
+  }
+
+  .ai-icon {
+    transition: transform 0.6s ease;
+  }
+
+  .ai-hover-btn:hover .ai-icon {
+    transform: rotate(-180deg);
+  }
 </style>

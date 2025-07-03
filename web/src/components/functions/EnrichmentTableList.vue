@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
+              :data-test="`${props.row.name}-explore-btn`"
               icon="search"
               :title="t('logStream.explore')"
               class="q-ml-xs"

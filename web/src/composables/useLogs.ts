@@ -81,6 +81,7 @@ import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
+import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -1528,6 +1529,7 @@ const useLogs = () => {
         for (const [index, item] of partitionDetail.partitions.entries()) {
           total = partitionDetail.partitionTotal[index];
           
+          
           if (!partitionDetail.paginations[pageNumber]) {
             partitionDetail.paginations[pageNumber] = [];
           }
@@ -1682,8 +1684,8 @@ const useLogs = () => {
   }
 
   const setCommunicationMethod = () => {
-    const shouldUseWebSocket = isWebSocketEnabled();
-    const shouldUseStreaming = isStreamingEnabled();
+    const shouldUseWebSocket = isWebSocketEnabled(store.state);
+    const shouldUseStreaming = isStreamingEnabled(store.state);
 
     const isMultiStreamSearch = searchObj.data.stream.selectedStream.length > 1 && !searchObj.meta.sqlMode;
 
@@ -1712,6 +1714,8 @@ const useLogs = () => {
       // if window has use_web_socket property then use that
       // else use organization settings
       searchObj.meta.jobId = "";
+      const shouldUseWebSocket = isWebSocketEnabled(store.state);
+      const shouldUseStreaming = isStreamingEnabled(store.state);
 
       setCommunicationMethod();
 
@@ -2045,6 +2049,7 @@ const useLogs = () => {
       }
       searchObjDebug["queryDataEndTime"] = performance.now();
     } catch (e: any) {
+      console.error(`${notificationMsg.value || "Error occurred during the search operation."}`, e);
       searchObj.loading = false;
       showErrorNotification(
         notificationMsg.value || "Error occurred during the search operation.",
@@ -2503,6 +2508,7 @@ const useLogs = () => {
         searchObj.meta.resultGrid.showPagination = true;
       }
 
+
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
@@ -2531,7 +2537,7 @@ const useLogs = () => {
       if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
         queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
-
+      
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
       const decideSearch = searchObj.meta.jobId
@@ -2655,7 +2661,7 @@ const useLogs = () => {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
+              await chunkedAppend(searchObj.data.queryResults.hits, res.data.hits);
             } else {
               // Replace result
               if(queryReq.query?.streaming_output) {
@@ -2749,7 +2755,7 @@ const useLogs = () => {
             await getPaginatedData(queryReq, true, false);
           }
           if (searchObj.meta.jobId != "") {
-            // searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+            searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
             searchObj.data.queryResults.pagination = [];
             refreshJobPagination(true);
           }
@@ -5422,6 +5428,11 @@ const useLogs = () => {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
+            // pass encodig if enabled,
+            // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+            ...(store.state.zoConfig.sql_base64_enabled
+              ? { encoding: "base64" }
+              : {}),
           } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
@@ -5477,7 +5488,7 @@ const useLogs = () => {
     }
 
     refreshPagination(true);
-    
+
     processPostPaginationData();
   }
 
@@ -5862,7 +5873,7 @@ const useLogs = () => {
     }
   }
 
-  const updateResult = (queryReq: SearchRequestPayload, response: any, isPagination: boolean, appendResult: boolean = false) => {
+  const updateResult = async (queryReq: SearchRequestPayload, response: any, isPagination: boolean, appendResult: boolean = false) => {
     if (
       searchObj.meta.refreshInterval > 0 &&
       router.currentRoute.value.name == "logs"
@@ -5881,13 +5892,11 @@ const useLogs = () => {
         delete response.content.total;
       }
 
-      // Scan-size and took time in histogram title
-      // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
-      // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-      if (appendResult) {
-        searchObj.data.queryResults.hits.push(
-          ...response.content.results.hits,
-        );
+        // Scan-size and took time in histogram title
+        // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+        // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+        if (appendResult) {
+          await chunkedAppend(searchObj.data.queryResults.hits, response.content.results.hits);
 
         searchObj.data.queryResults.total += response.content.results.total;
         searchObj.data.queryResults.took += response.content.results.took;
@@ -5956,6 +5965,13 @@ const useLogs = () => {
         notificationMsg.value || "Error occurred while handling logs response.",
       );
       notificationMsg.value = "";
+    }
+  };
+
+  const chunkedAppend = async (target: any, source: any, chunkSize = 5000) => {
+    for (let i = 0; i < source.length; i += chunkSize) {
+      target.push.apply(target, source.slice(i, i + chunkSize));
+      await new Promise(resolve => setTimeout(resolve, 0)); // Let UI update
     }
   };
 

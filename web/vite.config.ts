@@ -24,7 +24,7 @@ import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfil
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs-extra";
-import visualizer from "rollup-plugin-visualizer";
+import {visualizer} from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
@@ -38,11 +38,9 @@ if (process.env.NODE_ENV === "production") {
   dotenv.config();
 }
 
-const isTesting = process.env.NODE_ENV === "test";
-
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
-  async resolveId(source) {
+  async resolveId(source: string) {
     if (source.startsWith("@zo/")) {
       const fileName = source.replace("@zo/", "");
 
@@ -100,18 +98,17 @@ export default defineConfig({
     process.env.VITE_COVERAGE === "true" &&
       istanbul({
         include: "src/**/*",
-        exclude: ["node_modules", "test/"],
+        exclude: ["node_modules", "test/", "src/**/*.spec.{ts,js}"],
         extension: [".js", ".ts", ".vue"],
         requireEnv: false,
         forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    isTesting,
   ].filter(Boolean),
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": fileURLToPath(new URL('./src', import.meta.url)),
       "@enterprise": fileURLToPath(
         new URL("./src/enterprise", import.meta.url),
       ),
@@ -129,8 +126,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
       plugins: [
-        nodePolyfills(),
-        visualizer.default({
+        nodePolyfills() as any,
+        visualizer({
           open: true,
           gzipSize: true,
           brotliSize: true,
@@ -184,43 +181,5 @@ export default defineConfig({
       plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
       target: "es2020",
     },
-  },
-  test: {
-    enable: true,
-    global: true,
-    setupFiles: "test/unit/helpers/setupTests.ts",
-    deps: {
-      inline: ["vitest-canvas-mock"],
-    },
-    coverage: {
-      reporter: ["text", "json", "html"],
-      all: true,
-      exclude: [
-        "coverage/**",
-        "dist/**",
-        "packages/*/test{,s}/**",
-        "cypress/**",
-        "src/test/**",
-        "test{,s}/**",
-        "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/__tests__/**",
-        "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
-        "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
-        "quasar.conf.js",
-        "env.d.ts",
-      ],
-    },
-    threads: false,
-    environment: "jsdom",
-    cache: false,
-    maxConcurrency: 20,
-    update: false,
-    environmentOptions: {
-      jsdom: {
-        resources: "usable",
-      },
-    },
-  },
+  }
 });

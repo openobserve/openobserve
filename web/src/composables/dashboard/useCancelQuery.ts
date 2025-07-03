@@ -9,7 +9,6 @@ import { useStore } from "vuex";
  * @returns {{
  *   traceIdRef: Ref<any[]>,
  *   searchRequestTraceIds: (data: any) => void,
- *   cancelQuery: () => void,
  * }}
  */
 const useCancelQuery = () => {

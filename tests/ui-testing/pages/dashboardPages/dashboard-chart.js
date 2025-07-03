@@ -1,5 +1,3 @@
-import { expect } from "@playwright/test";
-
 // pages/chartTypeSelector.js
 // Methods : selectChartType, selectStreamType, searchAndAddField,  selectStream
 
@@ -48,6 +46,7 @@ export default class ChartTypeSelector {
   }
 
   // Search field and added for X, Y,Breakdown etc.
+
   async searchAndAddField(fieldName, target) {
     const searchInput = this.page.locator(
       '[data-test="index-field-search-input"]'
@@ -130,7 +129,10 @@ export default class ChartTypeSelector {
       await this.page
         .locator('[data-test="dashboard-add-condition-operator"]')
         .click();
-      await this.page.getByRole("option", { name: operator }).click();
+      await this.page
+        .getByRole("option", { name: operator, exact: true })
+        .nth(0)
+        .click();
     }
 
     // Step 5: Enter value if provided

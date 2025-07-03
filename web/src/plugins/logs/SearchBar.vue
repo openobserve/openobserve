@@ -75,10 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-
+        <!-- moved to dropdown if ai chat is enabled -->
         <div
           style="border: 1px solid #c4c4c4; border-radius: 5px"
           class="q-pr-xs q-ml-xs"
+          v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
             data-test="logs-search-bar-show-histogram-toggle-btn"
@@ -112,8 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-toggle>
         </div>
-
+        <!-- moved to dropdown if ai chat is enabled -->
         <q-btn
+          v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-reset-filters-btn"
           no-caps
           size="13px"
@@ -125,7 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.resetFilters") }}
           </q-tooltip>
         </q-btn>
+        <!-- moved to dropdown if ai chat is enabled -->
         <syntax-guide
+          v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         >
@@ -368,9 +372,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.savedViewsLabel") }}
           </q-tooltip>
         </q-btn-group>
+        <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
+        <q-btn
+          v-if="store.state.isAiChatEnabled"
+          class="tw-text-[12px] tw-font-[500] q-ml-xs q-px-sm"
+          no-caps
+          menu-anchor="bottom left"
+          menu-self="top left"
+          icon="menu"
+          size="sm"
+          dense
+        >
+          <q-menu>
+            <div class="row tw-gap-2">
+              <div class="q-mt-xs">
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-center"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-toggle
+                      data-test="logs-search-bar-show-histogram-toggle-btn"
+                      v-model="searchObj.meta.showHistogram"
+                      dense
+                      class="q-pb-xs"
+                      size="32px"
+                    ></q-toggle>
+                  </div>
+                  <q-item-label>
+                    {{ t("search.showHistogramLabel") }}
+                  </q-item-label>
+                </div>
+
+                <q-separator />
+
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-start"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-toggle
+                      data-test="logs-search-bar-wrap-table-content-toggle-btn"
+                      v-model="searchObj.meta.toggleSourceWrap"
+                      icon="wrap_text"
+                      style="margin: 0px"
+                      size="32px"
+                      class="q-pb-xs"
+                      dense
+                    ></q-toggle>
+                  </div>
+                  <q-item-label> Wrap Content </q-item-label>
+                </div>
+                <q-separator />
+
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-start"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-toggle
+                      data-test="logs-search-bar-quick-mode-toggle-btn"
+                      v-model="searchObj.meta.quickMode"
+                      @click="handleQuickMode"
+                      class="q-pb-xs"
+                      size="32px"
+                      dense
+                    ></q-toggle>
+                  </div>
+                  <q-item-label>
+                    {{ t("search.quickModeLabel") }}
+                  </q-item-label>
+                </div>
+                <q-separator />
+
+                <div
+                  class="row tw-h-[30px] q-pl-sm q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                >
+                  <div class="tw-w-[30%]">
+                    <syntax-guide
+                      data-test="logs-search-bar-sql-mode-toggle-btn"
+                      :sqlmode="searchObj.meta.sqlMode"
+                      size="10px"
+                      style="margin: 0px"
+                      :style="{
+                        border: !searchObj.meta.sqlMode
+                          ? '1px solid #c4c4c4'
+                          : 'none',
+                      }"
+                    >
+                    </syntax-guide>
+                  </div>
+                  <q-item-label> Syntax Guide </q-item-label>
+                </div>
+                <q-separator />
+                <div
+                  class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-btn
+                      data-test="logs-search-bar-reset-filters-btn"
+                      no-caps
+                      icon="restart_alt"
+                      size="10px"
+                      dense
+                      class="q-pa-xs"
+                      @click="resetFilters"
+                    >
+                    </q-btn>
+                  </div>
+                  <q-item-label>
+                    {{ t("search.resetFilters") }}
+                  </q-item-label>
+                </div>
+              </div>
+              <div></div>
+            </div>
+          </q-menu>
+        </q-btn>
+        <!-- moved to dropdown if ai chat is enabled -->
         <div
           style="border: 1px solid #c4c4c4; border-radius: 5px"
           class="q-pr-xs q-ml-xs"
+          v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
             data-test="logs-search-bar-quick-mode-toggle-btn"
@@ -390,7 +510,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="float-right col-auto q-mb-xs">
+        <!-- this is moved to dropdown if ai chat is enabled -->
         <q-toggle
+          v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
           v-model="searchObj.meta.toggleSourceWrap"
           icon="wrap_text"
@@ -1328,7 +1450,8 @@ export default defineComponent({
         return;
       }
       // const queryReq = this.buildSearch();
-      this.searchObj.data.customDownloadQueryObj.query.from = initNumber;
+      this.searchObj.data.customDownloadQueryObj.query.from =
+        initNumber == 0 ? 0 : initNumber - 1;
       this.searchObj.data.customDownloadQueryObj.query.size =
         this.downloadCustomRange;
       searchService
@@ -2515,6 +2638,11 @@ export default defineComponent({
               await updatedLocalLogFilterField();
             }
 
+            if (searchObj.meta.toggleFunction == false) {
+              searchObj.config.fnSplitterModel = 99.5;
+              resetFunctionContent();
+            }
+
             updateEditorWidth();
 
             $q.notify({
@@ -3122,6 +3250,8 @@ export default defineComponent({
       ) {
         confirmLogsVisualizeModeChangeDialog.value = true;
       } else {
+        // cancel all the logs queries
+        cancelQuery();
         searchObj.meta.logsVisualizeToggle = value;
       }
     };
@@ -3141,6 +3271,9 @@ export default defineComponent({
       // change logs visualize toggle
       searchObj.meta.logsVisualizeToggle = "logs";
       confirmLogsVisualizeModeChangeDialog.value = false;
+
+      // cancel all the visualize queries
+      cancelVisualizeQueries();
 
       // store dashboardPanelData meta object
       const dashboardPanelDataMetaObj = dashboardPanelData.meta;

@@ -44,9 +44,6 @@ const useEnterpriseRoutes = () => {
       path: "iam",
       name: "iam",
       component: IdentityAccessManagement,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -67,24 +64,6 @@ const useEnterpriseRoutes = () => {
             routeGuard(to, from, next);
           },
         },
-      ],
-    },
-  ];
-
-  if (config.isCloud == "true" || config.isEnterprise == "true") {
-    routes.push({
-      path: "actions",
-      name: "actionScripts",
-      component: ActionScipts,
-      meta: {
-        keepAlive: true,
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
-    routes[0].children.push(
-      ...[
         {
           path: "organizations",
           name: "organizations",
@@ -93,6 +72,23 @@ const useEnterpriseRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+      ],
+    },
+  ];
+  //the below are the routes that we support for enterprise and cloud
+  //the above are the routes that we support for oss including both enterprise and cloud
+
+  if (config.isCloud == "true" || config.isEnterprise == "true") {
+    routes.push({
+      path: "actions",
+      name: "actionScripts",
+      component: ActionScipts,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+    routes[0].children.push(
+      ...[
         {
           path: "groups",
           name: "groups",

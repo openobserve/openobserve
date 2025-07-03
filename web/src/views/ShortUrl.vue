@@ -1,7 +1,10 @@
 <template>
-  <div class="loading-container">
-    <q-spinner class="tw-mb-2" size="3em" color="primary" />
-    <div class="message">Redirecting...</div>
+  <div
+    data-test="loading-container"
+    class="tw-h-[100vh] tw-flex tw-flex-col tw-items-center tw-justify-center"
+  >
+    <q-spinner data-test="spinner" color="primary" size="3em" :thickness="2" />
+    <div data-test="message" class="message">Redirecting...</div>
   </div>
 </template>
 
@@ -13,7 +16,13 @@ import { useStore } from "vuex";
 
 export default defineComponent({
   name: "ShortUrl",
-  setup() {
+  props: {
+    id: {
+      type: String,
+      required: true,
+    },
+  },
+  setup(props, { emit }) {
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -42,10 +51,9 @@ export default defineComponent({
 
     const fetchAndRedirect = async () => {
       try {
-        const id = route.params.id as string;
         const response = await shortURL.get(
           store.state.selectedOrganization.identifier,
-          id,
+          props.id,
         );
 
         if (typeof response.data === "string") {
@@ -78,8 +86,27 @@ export default defineComponent({
   height: 100vh;
 }
 
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: #09f;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
 .message {
   font-size: 16px;
   color: #666;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

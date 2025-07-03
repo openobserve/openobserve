@@ -87,6 +87,9 @@ export default createStore({
     allApiLimitsByOrgId: {},
     allRoleLimitsByOrgIdByRole: {},
     modulesToDisplay: {},
+    isAiChatEnabled: false,
+    currentChatTimestamp: null,
+    chatUpdated: false,
   },
   mutations: {
     login(state, payload) {
@@ -225,6 +228,15 @@ export default createStore({
     setModulesToDisplay(state, payload) {
       state.modulesToDisplay = payload;
     },
+    setIsAiChatEnabled(state, payload) {
+      state.isAiChatEnabled = payload;
+    },
+    setCurrentChatTimestamp(state, payload) {
+      state.currentChatTimestamp = payload;
+    },
+    setChatUpdated(state, payload) {
+      state.chatUpdated = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -318,9 +330,6 @@ export default createStore({
       context.commit("setQuotaThresholdMsg", payload);
     },
     setConfig(context, payload) {
-      if(Object.hasOwn(payload, "ingestion_url") && payload.ingestion_url != "") {
-        context.commit("endpoint", payload.ingestion_url);  
-      }
       context.commit("setConfig", payload);
     },
     appTheme(context, payload) {
@@ -361,6 +370,15 @@ export default createStore({
     },
     setModulesToDisplay(context, payload) {
       context.commit("setModulesToDisplay", payload);
+    },
+    setIsAiChatEnabled(context, payload) {
+      context.commit("setIsAiChatEnabled", payload);
+    },
+    setCurrentChatTimestamp(context, payload) {
+      context.commit("setCurrentChatTimestamp", payload);
+    },
+    setChatUpdated(context, payload) {
+      context.commit("setChatUpdated", payload);
     },
   },
   modules: {

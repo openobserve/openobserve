@@ -84,9 +84,6 @@ const useManagementRoutes = () => {
           name: "pipelineDestinations",
           component: () =>
             import("@/components/alerts/PipelinesDestinationList.vue"),
-          meta: {
-            keepAlive: true,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

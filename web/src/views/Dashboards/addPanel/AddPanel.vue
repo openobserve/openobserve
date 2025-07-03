@@ -17,8 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
-    <div class="flex justify-between items-center q-pa-sm">
-      <div class="flex items-center q-table__title q-mr-md">
+    <div
+      class="flex items-center q-pa-sm"
+      :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
+    >
+      <div
+        class="flex items-center q-table__title"
+        :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
+      >
         <span>
           {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
         </span>
@@ -577,6 +583,8 @@ import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import useAiChat from "@/composables/useAiChat";
+import useStreams from "@/composables/useStreams";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -650,6 +658,8 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
+    const { getStream } = useStreams();
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -752,6 +762,8 @@ export default defineComponent({
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
+
+      removeAiContextHandler();
       // console.timeEnd("onUnmounted");
 
       // Clear all refs to prevent memory leaks
@@ -814,6 +826,8 @@ export default defineComponent({
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
       loadDashboard();
+
+      registerAiContextHandler();
       // console.timeEnd("add panel loadDashboard");
     });
 
@@ -968,7 +982,7 @@ export default defineComponent({
         // console.timeEnd("watch:dashboardPanelData.data.type");
       },
     );
-    const dateTimeForVariables: any = ref(null);
+    const dateTimeForVariables = ref(null);
 
     const setTimeForVariables = () => {
       const date = dateTimePickerRef.value?.getConsumableDateTime();
@@ -1610,6 +1624,65 @@ export default defineComponent({
       );
       return { width: `${contentWidth}px` };
     });
+
+    // [START] ai chat
+
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const isAddPanelPage = router.currentRoute.value.name === "addPanel";
+
+          const isStreamSelectedInDashboardPage =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
+            resolve("");
+            return;
+          }
+
+          const payload = {};
+
+          const stream =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          const streamType =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type;
+
+          if (!streamType || !stream?.length) {
+            resolve("");
+            return;
+          }
+
+          const schema = await getStream(stream, streamType, true);
+
+          payload["stream_name"] = stream;
+          payload["schema"] = schema.uds_schema || schema.schema || [];
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for add panel page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
 
     return {
       t,

@@ -97,10 +97,6 @@ export const addLabelToSQlQuery = async (
 
   if (operator === "match_all") {
     condition = `match_all(${formatValue(value)})`;
-  } else if (operator === "match_all_raw") {
-    condition = `match_all_raw(${formatValue(value)})`;
-  } else if (operator === "match_all_raw_ignore_case") {
-    condition = `match_all_raw_ignore_case(${formatValue(value)})`;
   } else if (operator === "str_match") {
     condition = `str_match(${label}, ${formatValue(value)})`;
   } else if (operator === "str_match_ignore_case") {
@@ -283,7 +279,7 @@ export const isGivenFieldInOrderBy = async (
 // Function to extract field names, aliases, and aggregation functions
 export function extractFields(parsedAst: any, timeField: string) {
   let fields = parsedAst.columns.map((column: any) => {
-    const field: any = {
+    const field = {
       column: "",
       alias: "",
       aggregationFunction: null,
@@ -546,11 +542,7 @@ function parseCondition(condition: any) {
       ];
 
       // function without field name and with value
-      const conditionsWithoutFieldName = [
-        "match_all",
-        "match_all_raw",
-        "match_all_raw_ignore_case",
-      ];
+      const conditionsWithoutFieldName = ["match_all"];
 
       if (conditionsWithFieldName.includes(conditionName)) {
         return {

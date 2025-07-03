@@ -184,7 +184,7 @@ const useSearchWebSocket = () => {
       socketId: socketId.value as string
     }
 
-    const url = getWebSocketUrl(socketId.value, org_id);
+    const url = getWebSocketUrl(socketId.value, org_id, store.state.API_ENDPOINT);
     // If needed we can store the socketID in global state
     webSocket.connect(socketId.value, url);
 
