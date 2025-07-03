@@ -533,7 +533,6 @@ fn parse_expr_for_field(
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
-    // println!("! parse_expr -> {:?}", expr);
     match expr {
         SqlExpr::Nested(e) => parse_expr_for_field(e, expr_op, field, fields)?,
         SqlExpr::BinaryOp { left, op, right } => {
