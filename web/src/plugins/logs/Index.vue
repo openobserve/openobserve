@@ -1583,7 +1583,23 @@ export default defineComponent({
       () => [searchObj.data.query, searchObj.meta.logsVisualizeToggle],
       async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
+          // emit resize event
+          // this will rerender/call resize method of already rendered chart to resize
+          window.dispatchEvent(new Event("resize"));
+
+          // reset old rendered chart
+          visualizeChartData.value = {};
+
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery = true;
+
           await copyLogsQueryToDashboardPanel();
+
+          // extract custom fields from query
+          // identify x axis, y axis and breakdown fields
+          // push on query fields
+          setCustomQueryFields();
         }
       },
     );
