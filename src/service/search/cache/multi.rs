@@ -187,7 +187,7 @@ async fn recursive_process_multiple_metas(
             });
 
             // Sort the hits by the order
-            sort_response(cache_req.is_descending, &mut cached_response, &cache_req.ts_column);
+            sort_response(cache_req.is_descending, &mut cached_response, &cache_req.ts_column, &vec![]);
 
             cached_response.total = cached_response.hits.len();
             if cache_req.discard_interval < 0 {
