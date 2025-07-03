@@ -151,7 +151,7 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await expect(
-      page.getByRole(".cm-content").filter({ hasText: '"dashboardId": "' })
+      page.locator(".cm-content").filter({ hasText: '"dashboardId": "' })
     ).toBeVisible();
 
     await dashboardImport.clickImportButton();
@@ -431,9 +431,10 @@ test.describe("dashboard Import testcases", () => {
 
     await page.waitForTimeout(2000);
 
+    await page.waitForSelector(".cm-content");
     await expect(
       page
-        .getByRole(".cm-content")
+        .locator(".cm-content")
         .locator(".cm-line")
         .filter({ hasText: '"dashboardId": "' })
         .nth(0)
