@@ -25,7 +25,7 @@ export default class DashboardFilter {
     // Step 2: Select the new field from dropdown
     if (newFieldName) {
       const fieldDropdown = this.page.locator(
-        `[data-test="dashboard-add-condition-column-${idx}"]`
+        `[data-test="dashboard-add-condition-column-${idx}}"]`
       );
       await fieldDropdown.click();
       await fieldDropdown.fill(newFieldName);
