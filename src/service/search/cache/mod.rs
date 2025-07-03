@@ -172,7 +172,6 @@ pub async fn search(
             }
         }
     };
-    println!("c_resp: {:?}", c_resp.order_by);
 
     // No cache data present, add delta for full query
     if !c_resp.has_cached_data && c_resp.deltas.is_empty() {
