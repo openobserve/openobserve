@@ -630,61 +630,11 @@ pub fn merge_response(
 }
 
 fn sort_response(
-    is_descending: bool,
+    _is_descending: bool,
     cache_response: &mut search::Response,
     ts_column: &str,
     order_by: &Vec<(String, OrderBy)>,
 ) {
-    // Single field sorting (backward compatibility)
-    if order_by.len() == 1 {
-        let (field, order) = &order_by[0];
-        if ts_column == field {
-            if is_descending {
-                cache_response
-                    .hits
-                    .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
-            } else {
-                cache_response
-                    .hits
-                    .sort_by_key(|a| get_ts_value(ts_column, a));
-            }
-        } else {
-            cache_response.hits.sort_by(|a, b| {
-                let a_val = a.get(field).unwrap_or(&serde_json::Value::Null);
-                let b_val = b.get(field).unwrap_or(&serde_json::Value::Null);
-
-                let cmp = match (a_val, b_val) {
-                    (serde_json::Value::String(a_str), serde_json::Value::String(b_str)) => {
-                        a_str.cmp(b_str)
-                    }
-                    (serde_json::Value::Number(a_num), serde_json::Value::Number(b_num)) => {
-                        if let (Some(a_f64), Some(b_f64)) = (a_num.as_f64(), b_num.as_f64()) {
-                            a_f64
-                                .partial_cmp(&b_f64)
-                                .unwrap_or(std::cmp::Ordering::Equal)
-                        } else {
-                            std::cmp::Ordering::Equal
-                        }
-                    }
-                    (serde_json::Value::String(_), serde_json::Value::Number(_)) => {
-                        std::cmp::Ordering::Less
-                    }
-                    (serde_json::Value::Number(_), serde_json::Value::String(_)) => {
-                        std::cmp::Ordering::Greater
-                    }
-                    _ => std::cmp::Ordering::Equal,
-                };
-                if order == &OrderBy::Desc {
-                    cmp.reverse()
-                } else {
-                    cmp
-                }
-            });
-        }
-        return;
-    }
-
-    // Multi-field sorting
     cache_response.hits.sort_by(|a, b| {
         for (field, order) in order_by {
             let cmp = if ts_column == field {
