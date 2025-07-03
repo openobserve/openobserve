@@ -641,4 +641,318 @@ export function extractTimestampAndGroupBy(sql: string): {
   return { timestamp, groupBy, yAxisFields };
 }
 
+// /**
+//  * Extracts clean column name from column reference, removing table prefixes
+//  * @param columnRef Column reference object
+//  * @returns Clean column name
+//  */
+// function extractCleanColumnName(columnRef: any): string {
+//   if (typeof columnRef.column === "string") {
+//     // Remove table prefix if present (e.g., "default._timestamp" -> "_timestamp")
+//     const parts = columnRef.column.split('.');
+//     return parts[parts.length - 1];
+//   } else if (
+//     typeof columnRef.column === "object" &&
+//     columnRef.column.expr &&
+//     typeof columnRef.column.expr.value === "string"
+//   ) {
+//     const parts = columnRef.column.expr.value.split('.');
+//     return parts[parts.length - 1];
+//   }
+//   return "column";
+// }
+
+// /**
+//  * Checks if two function expressions are equivalent
+//  * @param func1 First function expression
+//  * @param func2 Second function expression
+//  * @returns True if functions are equivalent
+//  */
+// function areFunctionExpressionsEqual(func1: any, func2: any): boolean {
+//   if (!func1 || !func2 || func1.type !== "function" || func2.type !== "function") {
+//     return false;
+//   }
+
+//   // Compare function names
+//   let name1 = "";
+//   let name2 = "";
+  
+//   if (typeof func1.name === "string") {
+//     name1 = func1.name.toLowerCase();
+//   } else if (func1.name && func1.name.name && Array.isArray(func1.name.name)) {
+//     name1 = func1.name.name.map((n: any) => n.value || n).join("_").toLowerCase();
+//   }
+  
+//   if (typeof func2.name === "string") {
+//     name2 = func2.name.toLowerCase();
+//   } else if (func2.name && func2.name.name && Array.isArray(func2.name.name)) {
+//     name2 = func2.name.name.map((n: any) => n.value || n).join("_").toLowerCase();
+//   }
+
+//   if (name1 !== name2) {
+//     return false;
+//   }
+
+//   // Compare arguments
+//   const args1 = func1.args && func1.args.value ? func1.args.value : [];
+//   const args2 = func2.args && func2.args.value ? func2.args.value : [];
+
+//   if (args1.length !== args2.length) {
+//     return false;
+//   }
+
+//   for (let i = 0; i < args1.length; i++) {
+//     const arg1 = args1[i];
+//     const arg2 = args2[i];
+
+//     if (arg1.type !== arg2.type) {
+//       return false;
+//     }
+
+//     if (arg1.type === "column_ref") {
+//       const col1 = extractCleanColumnName(arg1);
+//       const col2 = extractCleanColumnName(arg2);
+//       if (col1 !== col2) {
+//         return false;
+//       }
+//     } else if (arg1.type === "string" || arg1.type === "number") {
+//       if (arg1.value !== arg2.value) {
+//         return false;
+//       }
+//     }
+//   }
+
+//   return true;
+// }
+
+// /**
+//  * Generates a projection name for an AST expression node
+//  * @param expr The AST expression node
+//  * @returns Generated projection name
+//  */
+// export function generateProjectionName(expr: ASTNode): string {
+//   if (!expr) return "unknown";
+
+//   switch (expr.type) {
+//     case "column_ref": {
+//       const columnRef = expr as ColumnRef;
+//       return extractCleanColumnName(columnRef);
+//     }
+
+//     case "function": {
+//       const funcExpr = expr as any;
+//       let functionName = "";
+      
+//       // Handle different function name structures
+//       if (typeof funcExpr.name === "string") {
+//         functionName = funcExpr.name.toLowerCase();
+//       } else if (funcExpr.name && funcExpr.name.name && Array.isArray(funcExpr.name.name)) {
+//         functionName = funcExpr.name.name.map((n: any) => n.value || n).join("_").toLowerCase();
+//       } else if (funcExpr.name && typeof funcExpr.name === "object") {
+//         functionName = funcExpr.name.value || "function";
+//       }
+
+//       // Generate arguments part - only use meaningful column names
+//       let argsStr = "";
+//       if (funcExpr.args && funcExpr.args.value && Array.isArray(funcExpr.args.value)) {
+//         const argNames = funcExpr.args.value
+//           .map((arg: any) => {
+//             if (arg.type === "column_ref") {
+//               return extractCleanColumnName(arg);
+//             } else if (arg.type === "star") {
+//               return "*";
+//             } else if (arg.type === "number") {
+//               return arg.value;
+//             } else if (arg.type === "string") {
+//               // For string literals, only include simple values, skip complex ones
+//               if (arg.value && typeof arg.value === "string") {
+//                 // Skip complex function arguments like 'Utf8("10 seconds")'
+//                 if (arg.value.includes("(") || arg.value.includes('"')) {
+//                   return null; // Skip this argument
+//                 }
+//                 return arg.value;
+//               }
+//               return null;
+//             }
+//             return null;
+//           })
+//           .filter(Boolean); // Remove null values
+        
+//         argsStr = argNames.join("_");
+//       }
+
+//       // Create meaningful function names
+//       if (functionName === "count" && argsStr === "*") {
+//         return "count";
+//       } else if (functionName === "count" && argsStr) {
+//         return `count_${argsStr}`;
+//       } else if (functionName === "sum" && argsStr) {
+//         return `sum_${argsStr}`;
+//       } else if (functionName === "avg" && argsStr) {
+//         return `avg_${argsStr}`;
+//       } else if (functionName === "min" && argsStr) {
+//         return `min_${argsStr}`;
+//       } else if (functionName === "max" && argsStr) {
+//         return `max_${argsStr}`;
+//       } else if (functionName === "histogram" && argsStr) {
+//         return `histogram_${argsStr}`;
+//       } else if (functionName && argsStr) {
+//         return `${functionName}_${argsStr}`;
+//       } else if (functionName) {
+//         return functionName;
+//       }
+//       return "function";
+//     }
+
+//     case "binary_expr": {
+//       const binaryExpr = expr as any;
+//       const leftName = generateProjectionName(binaryExpr.left);
+//       const rightName = generateProjectionName(binaryExpr.right);
+//       const operator = binaryExpr.operator ? binaryExpr.operator.toLowerCase() : "op";
+//       return `${leftName}_${operator}_${rightName}`;
+//     }
+
+//     case "unary_expr": {
+//       const unaryExpr = expr as any;
+//       const exprName = generateProjectionName(unaryExpr.expr);
+//       const operator = unaryExpr.operator ? unaryExpr.operator.toLowerCase() : "op";
+//       return `${operator}_${exprName}`;
+//     }
+
+//     case "case": {
+//       return "case_expr";
+//     }
+
+//     case "cast": {
+//       const castExpr = expr as any;
+//       const exprName = generateProjectionName(castExpr.expr);
+//       const targetType = castExpr.target && castExpr.target.dataType ? castExpr.target.dataType.toLowerCase() : "unknown";
+//       return `cast_${exprName}_${targetType}`;
+//     }
+
+//     case "interval": {
+//       return "interval_expr";
+//     }
+
+//     case "extract": {
+//       const extractExpr = expr as any;
+//       const field = extractExpr.field ? extractExpr.field.toLowerCase() : "field";
+//       const fromExpr = extractExpr.from ? generateProjectionName(extractExpr.from) : "expr";
+//       return `extract_${field}_${fromExpr}`;
+//     }
+
+//     case "number":
+//     case "string":
+//     case "null":
+//     case "bool": {
+//       const literalExpr = expr as any;
+//       return `literal_${literalExpr.value || expr.type}`;
+//     }
+
+//     default:
+//       return expr.type || "unknown";
+//   }
+// }
+
+// /**
+//  * Extracts field projections with generated names for fields without aliases
+//  * @param sql The SQL query string
+//  * @returns Array of field projections with names
+//  */
+// export function extractFieldProjections(sql: string): Array<{
+//   name: string;
+//   expression: string;
+//   hasAlias: boolean;
+// }> {
+//   const parser = new Parser();
+//   let ast: any;
+//   try {
+//     ast = parser.astify(sql);
+//   } catch (e) {
+//     return [];
+//   }
+  
+//   const query = Array.isArray(ast) ? ast[0] : ast;
+//   if (!query || query.type !== "select") {
+//     return [];
+//   }
+
+//   const projections: Array<{
+//     name: string;
+//     expression: string;
+//     hasAlias: boolean;
+//   }> = [];
+
+//   if (Array.isArray(query.columns)) {
+//     for (const col of query.columns) {
+//       if (col.expr && col.expr.type === "star") {
+//         // Handle wildcard selection
+//         projections.push({
+//           name: "*",
+//           expression: "*",
+//           hasAlias: false
+//         });
+//         continue;
+//       }
+
+//       let fieldName: string;
+//       let hasAlias = false;
+//       let expression = "";
+
+//       if (col.as) {
+//         // Field has an alias
+//         fieldName = col.as;
+//         hasAlias = true;
+//       } else {
+//         // Generate projection name for field without alias
+//         fieldName = generateProjectionName(col.expr);
+//       }
+
+//              // Try to reconstruct expression string for display
+//        try {
+//          if (col.expr.type === "column_ref") {
+//            const columnRef = col.expr as ColumnRef;
+//            expression = extractCleanColumnName(columnRef);
+//          } else if (col.expr.type === "function") {
+//           const funcExpr = col.expr as any;
+//           let funcName = "";
+//           if (typeof funcExpr.name === "string") {
+//             funcName = funcExpr.name;
+//           } else if (funcExpr.name && funcExpr.name.name && Array.isArray(funcExpr.name.name)) {
+//             funcName = funcExpr.name.name.map((n: any) => n.value || n).join(".");
+//           }
+
+//                      if (funcExpr.args && funcExpr.args.value && Array.isArray(funcExpr.args.value)) {
+//              const argStrs = funcExpr.args.value.map((arg: any) => {
+//                if (arg.type === "column_ref") {
+//                  return extractCleanColumnName(arg);
+//                } else if (arg.type === "star") {
+//                  return "*";
+//                } else if (arg.type === "number" || arg.type === "string") {
+//                  return arg.value;
+//                }
+//                return "arg";
+//              });
+//              expression = `${funcName}(${argStrs.join(", ")})`;
+//            } else {
+//              expression = `${funcName}()`;
+//            }
+//         } else {
+//           expression = fieldName;
+//         }
+//       } catch (e) {
+//         expression = fieldName;
+//       }
+
+//       projections.push({
+//         name: fieldName,
+//         expression: expression,
+//         hasAlias: hasAlias
+//       });
+//     }
+//   }
+
+//   return projections;
+// }
+
 // extractTimestampAndGroupBy - returns timestamp field, group by fields, and y-axis fields
