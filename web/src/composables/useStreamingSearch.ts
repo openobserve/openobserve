@@ -276,6 +276,12 @@ const useHttpStreaming = () => {
         (async () => {
           try {
             while (true) {
+              // Check if this trace is still active before reading
+              if (!traceMap.value[traceId]) {
+                // console.log('Trace no longer active, stopping stream reading for traceId:', traceId);
+                break;
+              }
+              
               const { done, value } = await reader.read();
               
               if (done) {
@@ -283,6 +289,12 @@ const useHttpStreaming = () => {
                   action: 'endStream',
                   traceId
                 });
+                break;
+              }
+              
+              // Check again before processing the chunk
+              if (!traceMap.value[traceId]) {
+                // console.log('Trace cancelled during processing, skipping chunk for traceId:', traceId);
                 break;
               }
               
@@ -295,10 +307,22 @@ const useHttpStreaming = () => {
               });
             }
           } catch (error) {
-            console.error('Error reading stream:', error);
-            onError(traceId, error);
+            // Handle AbortError gracefully - this is expected when stream is cancelled
+            if ((error as any).name === 'AbortError') {
+              // console.log('Stream reading was cancelled for traceId:', traceId);
+              // Don't call onError for expected cancellations
+            } else {
+              console.error('Error reading stream:', error);
+              onError(traceId, error);
+            }
           } finally {
-            reader.releaseLock();
+            // Always release the reader lock to prevent resource leaks
+            try {
+              reader.releaseLock();
+            } catch (releaseError) {
+              // Ignore errors when releasing lock on already aborted stream
+              // console.log('Reader lock already released for traceId:', traceId);
+            }
           }
         })();
       } else {
@@ -310,7 +334,7 @@ const useHttpStreaming = () => {
       
     } catch (error) {
       if ((error as any).name === 'AbortError') {
-        console.error('Stream was canceled');
+       // console.error('Stream was canceled');
       } else {
         onError(traceId, error);
       }
@@ -322,6 +346,12 @@ const useHttpStreaming = () => {
     org_id: string;
   }) => {
     const { trace_id } = payload;
+
+    // Check if this trace is still active before attempting cancellation
+    if (!traceMap.value[trace_id]) {
+      // console.log('Trace already cleaned up for traceId:', trace_id);
+      return;
+    }
 
     if (abortControllers.value[trace_id]) {
       abortControllers.value[trace_id].abort();

@@ -22,8 +22,7 @@ export class LogsQueryPage {
   async typeQuery(query) {
     const queryEditor = this.page.locator(this.queryEditor);
     await expect(queryEditor).toBeVisible();
-    await queryEditor.click();
-    await this.page.keyboard.type(query);
+    await queryEditor.locator(".cm-content").fill(query);
   }
 
   async clickRefresh() {

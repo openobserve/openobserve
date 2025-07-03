@@ -290,12 +290,12 @@ test.describe("logs testcases", () => {
   test("should handle an empty query in visualization without displaying an error.", async ({
     page,
   }) => {
-    await page.locator(".view-line").first().click();
+    await page.locator(".cm-line").first().click();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await expect(page.locator(".view-line").first()).toBeVisible();
+    await expect(page.locator(".cm-line").first()).toBeVisible();
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
     ).toBeVisible();
@@ -308,12 +308,12 @@ test.describe("logs testcases", () => {
     page,
   }) => {
     // Click on the line view
-    await page.locator(".view-line").first().click();
+    await page.locator(".cm-line").first().click();
 
     // Enter an invalid query into the search bar
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .locator(".cm-content")
       .fill("select from user whare ID =1");
 
     // Refresh the search
@@ -445,14 +445,14 @@ test.describe("logs testcases", () => {
     await page.reload();
 
     // Verify the field is empty
-    await expect(page.locator(".view-line").first()).toBeEmpty();
+    await expect(page.locator(".cm-line").first()).toBeEmpty();
   });
 
   test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
   }) => {
     // Focus on the text editor and replace existing text with the SQL query
-    const textEditor = page.locator(".view-line").first();
+    const textEditor = page.locator(".cm-line").first();
     await textEditor.click();
 
     const sqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 

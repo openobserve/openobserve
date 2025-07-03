@@ -370,7 +370,7 @@ import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGu
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import { useLoading } from "@/composables/useLoading";
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 export default defineComponent({
