@@ -1,5 +1,5 @@
 //logs visualise page object
-//Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditior, fillQueryEditor
+//Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
 export default class LogsVisualise {
   constructor(page) {
     this.page = page;
@@ -185,7 +185,7 @@ export default class LogsVisualise {
   }
 
   //open query editor
-  async openQueryEditior() {
+  async openQueryEditor() {
     await this.page.locator(".view-lines").first().click();
   }
 

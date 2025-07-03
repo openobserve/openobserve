@@ -80,7 +80,6 @@ test.describe("dashboard UI testcases", () => {
     await dashboardCreate.searchDashboard(randomDashboardName);
 
     await dashboardList.duplicateDashboard(randomDashboardName);
-    console.log("Duplicate dashboard created", randomDashboardName);
 
     //Name of the duplicate dashboard
 
@@ -90,7 +89,7 @@ test.describe("dashboard UI testcases", () => {
     await dashboardCreate.searchDashboard(duplicateDashboardName);
 
     // Delete the duplicate dashboard and original dashboard
-    await dashboardList.deleteDuplicateDashboard(page, duplicateDashboardName);
+    await dashboardList.deleteDuplicateDashboard(duplicateDashboardName);
     await dashboardCreate.searchDashboard(randomDashboardName);
 
     await deleteDashboard(page, randomDashboardName);

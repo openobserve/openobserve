@@ -12,7 +12,8 @@ export default class DashboardactionPage {
 
   // Generate a unique panel name
   generateUniquePanelName(prefix = "panel") {
-    return `${prefix}_${Date.now()}`;
+    const randomStr = Math.random().toString(36).substr(2, 5);
+    return `${prefix}_${Date.now()}_${randomStr}`;
   }
 
   // Add panel name

@@ -160,12 +160,6 @@ test.describe("dashboard Import testcases", () => {
     //file name to be used for import
     const fileContentPath = "../test-data/dashboards-import.json";
 
-    // // Locate the file input field and set the JSON file
-    // const inputFile = await page.locator('input[type="file"]');
-
-    // //is used for setting the file to be imported
-    // await inputFile.setInputFiles(fileContentPath);
-
     await dashboardImport.uploadDashboardFile(fileContentPath);
 
     await page.getByText("close").click();

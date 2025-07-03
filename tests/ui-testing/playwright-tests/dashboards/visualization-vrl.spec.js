@@ -30,7 +30,6 @@ test.describe("visualization VRL testcases", () => {
     await logsVisualise.logsApplyQueryButton();
   });
 
-
   test("should allow adding a VRL function in the visualization chart", async ({
     page,
   }) => {
@@ -67,8 +66,6 @@ test.describe("visualization VRL testcases", () => {
     await expect(vrlField).toBeVisible();
   });
 
-
-
   test.skip('should display an error message when the VRL field is not updated after closing the "Toggle function editor"', async ({
     page,
   }) => {
@@ -94,14 +91,6 @@ test.describe("visualization VRL testcases", () => {
 
     // Run the query and wait for completion
     await logsVisualise.runQueryAndWaitForCompletion();
-
-  
-
-    // await page
-    //   .locator(
-    //     '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
-    //   )
-    //   .waitFor({ state: "visible" });
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
@@ -109,22 +98,20 @@ test.describe("visualization VRL testcases", () => {
       .click();
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion;
+    await logsVisualise.runQueryAndWaitForCompletion();
 
     // Show query toggle
     await logsVisualise.showQueryToggle();
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion;
+    await logsVisualise.runQueryAndWaitForCompletion();
 
     // Remove VRL field from the chart
     await page.locator('[data-test="dashboard-y-item-vrl-remove"]').click();
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion;
+    await logsVisualise.runQueryAndWaitForCompletion();
   });
-
-
 
   test("should not show an error when adding a VRL function field to the Breakdown, X axis, or Y axis fields", async ({
     page,
@@ -195,7 +182,6 @@ test.describe("visualization VRL testcases", () => {
     expect(xAxisField).toBe(true);
   });
 
-
   test("should display an error message if an invalid VRL function is added", async ({
     page,
   }) => {
@@ -226,7 +212,6 @@ test.describe("visualization VRL testcases", () => {
     await page.waitForTimeout(1000);
     await logsVisualise.runQueryAndWaitForCompletion();
 
-
     // Enter a valid VRL function
     await logsVisualise.vrlFunctionEditor(".vrl=123");
     await page.waitForTimeout(1000);
@@ -240,7 +225,6 @@ test.describe("visualization VRL testcases", () => {
       .click();
     await logsVisualise.runQueryAndWaitForCompletion();
   });
-
 
   test("should not update the search query when adding or updating a VRL field", async ({
     page,
@@ -288,11 +272,8 @@ test.describe("visualization VRL testcases", () => {
     ).toBeVisible();
   });
 
-
   test.skip("should display an error if the VRL field is not updated from the Breakdown", async ({
     page,
-
-   
   }) => {
     const logsVisualise = new LogsVisualise(page);
     // Set a relative time range and apply the query
@@ -318,17 +299,15 @@ test.describe("visualization VRL testcases", () => {
     // Apply the query again
     await logsVisualise.applyQueryButtonVisualise();
 
-     await page
+    await page
       .locator("div")
       .filter({ hasText: /^\.vrlsanity=100$/ })
       .nth(3)
       .click();
-      
+
     await page.locator("#fnEditor").locator(".inputarea").press("Control+a");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
-
-
 
   test("should update the data on the chart when changing the time after applying a VRL field", async ({
     page,
@@ -368,7 +347,6 @@ test.describe("visualization VRL testcases", () => {
     await logsVisualise.runQueryAndWaitForCompletion();
   });
 
-
   test("should not show an error when changing the chart type after adding a VRL function field", async ({
     page,
   }) => {
@@ -383,11 +361,10 @@ test.describe("visualization VRL testcases", () => {
     await logsVisualise.openVisualiseTab();
     let errorDetected = false;
 
-
     page.on("console", (msg) => {
       if (msg.type() === "error") {
         const errorText = msg.text();
-     
+
         if (/Error|Failure|Cannot|Invalid/i.test(errorText)) {
           errorDetected = true;
         }
@@ -420,7 +397,7 @@ test.describe("visualization VRL testcases", () => {
     await logsVisualise.runQueryAndWaitForCompletion();
 
     // List of chart types to test
-   
+
     const chartTypes = [
       '[data-test="selected-chart-area-item"] img',
       '[data-test="selected-chart-area-stacked-item"] img',
@@ -444,5 +421,4 @@ test.describe("visualization VRL testcases", () => {
     // Assertion: Fail the test if an error was detected
     expect(errorDetected).toBe(false);
   });
-
 });

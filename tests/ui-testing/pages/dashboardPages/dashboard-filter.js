@@ -25,7 +25,7 @@ export default class DashboardFilter {
     // Step 2: Select the new field from dropdown
     if (newFieldName) {
       const fieldDropdown = this.page.locator(
-        `[data-test="dashboard-add-condition-column-${idx}}"]`
+        `[data-test="dashboard-add-condition-column-${idx}"]`
       );
       await fieldDropdown.click();
       await fieldDropdown.fill(newFieldName);
@@ -91,11 +91,9 @@ export default class DashboardFilter {
     }
   }
 
-  // Select List Filter Items in the test case we have to slect the itesm pass in Array
+  // Select List Filter Items in the test case we have to select the items pass in Array
   //eg   ["ingress-nginx", "kube-system"]
   async selectListFilterItems(index, fieldName, values) {
-    // console.log("Selecting list filter items", values);
-
     const idx = String(index);
 
     const labelLocator = this.page.locator(
@@ -116,13 +114,9 @@ export default class DashboardFilter {
       .waitFor({ state: "visible" });
 
     for (const val of values) {
-      // console.log(`Selecting option: ${val}`, values);
-
       const option = this.page
         .getByRole("option", { name: val, exact: true })
         .locator('[data-test="dashboard-add-condition-list-item"]');
-      // console.log(`Selecting option: ${val}`, option);
-
       await option.waitFor({ state: "visible" });
       await option.click();
     }
@@ -142,9 +136,6 @@ export default class DashboardFilter {
         .map((node) => node.textContent.trim())
         .join("");
     });
-
-    console.log("Dynamic label text content:", textContent);
-    console.log("Index:", index, "Dynamic label text content:", textContent);
 
     await this.page.waitForTimeout(1000); // waits for 1 second
 
