@@ -365,13 +365,30 @@ export default defineComponent({
     const handleCustomValue = async (value: string) => {
       if (!value?.trim()) return;
       const inputValue = value.trim();
-      const customValue = `${inputValue}${CUSTOM_VALUE}`;
-      if (props.variableItem.multiSelect) {
-        selectedValue.value = [customValue];
-        emit("update:modelValue", [customValue]);
+      // Check if value already exists in options (case-sensitive)
+      const existingOption = availableOptions.value.find(
+        (opt: any) =>
+          typeof opt.label === "string" && opt.label.trim() === inputValue,
+      );
+      if (existingOption) {
+        // Select the existing option
+        if (props.variableItem.multiSelect) {
+          selectedValue.value = [existingOption.value];
+          emit("update:modelValue", [existingOption.value]);
+        } else {
+          selectedValue.value = existingOption.value;
+          emit("update:modelValue", existingOption.value);
+        }
       } else {
-        selectedValue.value = customValue;
-        emit("update:modelValue", customValue);
+        // Add as custom value
+        const customValue = `${inputValue}${CUSTOM_VALUE}`;
+        if (props.variableItem.multiSelect) {
+          selectedValue.value = [customValue];
+          emit("update:modelValue", [customValue]);
+        } else {
+          selectedValue.value = customValue;
+          emit("update:modelValue", customValue);
+        }
       }
       await closePopUpWhenValueIsSet();
     };
