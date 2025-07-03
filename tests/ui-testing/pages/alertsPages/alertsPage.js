@@ -437,8 +437,8 @@ export class AlertsPage {
 
         // Add SQL query
         await this.page.getByRole('button', { name: 'View Editor' }).click();
-        await this.page.locator('.view-lines').first().click();
-        await this.page.locator('[data-test="scheduled-alert-sql-editor"]').getByRole('textbox', { name: 'Editor content' })
+        await this.page.locator('.cm-line').first().click();
+        await this.page.locator('[data-test="scheduled-alert-sql-editor"]').locator('.cm-content')
             .fill('SELECT name\n  FROM "auto_playwright_stream"\n  WHERE \n    gender = \'Male\'\n    AND age > 60\n    AND country IN (\'Germany\', \'Japan\', \'USA\')');
         await this.page.getByRole('button', { name: 'Run Query' }).click();
         await this.page.waitForTimeout(2000);

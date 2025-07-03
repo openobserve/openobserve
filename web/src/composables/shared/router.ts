@@ -26,9 +26,9 @@ import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 
-const Search = () => import("@/views/Search.vue");
-const AppMetrics = () => import("@/views/AppMetrics.vue");
-const AppTraces = () => import("@/views/AppTraces.vue");
+const Search = () => import("@/plugins/logs/Index.vue");
+const AppMetrics = () => import("@/plugins/metrics/Index.vue");
+const AppTraces = () => import("@/plugins/traces/Index.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 

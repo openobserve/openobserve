@@ -419,39 +419,11 @@ class="padding-none" />
         />
       </q-list>
     </q-drawer>
-    <div class="row full-height no-wrap">
-    <!-- Left Panel -->
-    <div
-      class="col"
-      v-show="isLoading"
-      :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
-      :key="store.state.selectedOrganization?.identifier"
-    >
-      <q-page-container>
-        <router-view v-slot="{ Component }">
-          <template v-if="$route.meta.keepAlive">
-            <keep-alive>
-              <component :is="Component" />
-            </keep-alive>
-          </template>
-          <template v-else>
-            <component :is="Component" />
-          </template>
-        </router-view>
-      </q-page-container>
-    </div>
-
-    <!-- Right Panel (AI Chat) -->
-
-    <div
-      class="col-auto"
-      v-show="store.state.isAiChatEnabled && isLoading"
-      style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
-      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
-    >
-      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" />
-    </div>
-  </div>
+    <q-page-container v-if="isLoading">
+      <router-view v-slot="{ Component }">
+        <component :is="Component" />
+      </router-view>
+    </q-page-container>
   </q-layout>
 </template>
 
@@ -921,6 +893,7 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       resetStreams();
+      store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =

@@ -86,7 +86,7 @@ export class AlertTemplatesPage {
   "text": "{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script"`;
         
         // Clear the template editor first
-        await this.page.locator(".view-line").click();
+        await this.page.locator(".cm-content").click();
         await this.page.keyboard.press('Control+A');
         await this.page.keyboard.press('Backspace');
         await this.page.waitForTimeout(1000);
