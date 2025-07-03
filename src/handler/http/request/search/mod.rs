@@ -820,8 +820,6 @@ pub async fn build_search_request_per_field(
 
                 query.sql = format!("{default_sql} {sql_where}");
 
-                query.sql = format!("{} {}", default_sql, sql_where);
-
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
                     stream_name,

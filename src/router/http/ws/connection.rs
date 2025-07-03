@@ -165,7 +165,6 @@ impl QuerierConnection {
         &self,
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
     ) {
-        let cfg = get_config();
         let mut querier_conn_error: Option<String> = None;
         loop {
             // Handle incoming messages from querier to router
@@ -195,70 +194,39 @@ impl QuerierConnection {
                                 if let Some(write) = write_guard.as_mut() {
                                     let _ = write.send(pong).await;
                                 }
-                                tungstenite::protocol::Message::Ping(ping) => {
-                                    log::debug!("[WS::Router::QuerierConnection] received ping message: {:?}, router: {}, querier: {}", ping, cfg.common.instance_name, self.querier_name);
-                                    let pong = tungstenite::protocol::Message::Pong(ping);
-                                    let write_clone = self.write.clone();
-                                    let mut write_guard = write_clone.write().await;
-                                    if let Some(write) = write_guard.as_mut() {
-                                        let _ = write.send(pong).await;
-                                    }
-                                    drop(write_guard);
-                                }
-                                tungstenite::protocol::Message::Pong(pong) => {
-                                    log::debug!("[WS::Router::QuerierConnection] received pong message: {:?}, router: {}, querier: {}", pong, cfg.common.instance_name, self.querier_name);
-                                }
-                                tungstenite::protocol::Message::Binary(binary) => {
-                                    log::debug!("[WS::Router::QuerierConnection] received binary message: {:?}, router: {}, querier: {}", binary, cfg.common.instance_name, self.querier_name);
-                                }
-                                tungstenite::protocol::Message::Frame(frame) => {
-                                    log::debug!("[WS::Router::QuerierConnection] received raw frame from querier: {:?}, router: {}, querier: {}", frame, cfg.common.instance_name, self.querier_name);
-                                }
-                                tungstenite::protocol::Message::Text(text) => {
-                                    let svr_event = match json::from_str::<WsServerEvents>(&text) {
-                                        Ok(event) => {
-                                            log::info!("[WS::Router::QuerierConnection] router received message from querier for trace_id: {}, router: {}, querier: {}", event.get_trace_id(), cfg.common.instance_name, self.querier_name);
-                                            event
-                                        },
-                                        Err(e) => {
-                                            log::error!(
-                                                "[WS::Router::QuerierConnection] Error parsing message received from querier: {}, router: {}, querier: {}",
-                                                e,
-                                                cfg.common.instance_name,
-                                                self.querier_name
-                                            );
-                                            match json::from_str::<json::Value>(&text).map(|val| val.get("trace_id").map(ToString::to_string)) {
-                                                Err(e) => {
-                                                    log::error!(
-                                                        "[WS::Router::QuerierConnection] Error parsing trace_id from message received from querier: router: {}, querier: {}, error: {}",
-                                                        cfg.common.instance_name,
-                                                        self.querier_name,
-                                                        e
-                                                    );
-                                                    // scenario 1 where the trace_id & sender are not cleaned up -> left for clean job
-                                                    continue;
-                                                }
-                                                Ok(trace_id) => {
-                                                    WsServerEvents::Error {
-                                                        code: StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                                        message: "Failed to parse event received from querier".to_string(),
-                                                        error_detail: None,
-                                                        trace_id,
-                                                        request_id: None,
-                                                        should_client_retry: true,
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    };
-                                    let remove_trace_id = svr_event.should_clean_trace_id();
-                                    if let Err(e) = self.response_router.route_response(svr_event.clone()).await {
-                                        // scenario 2 where the trace_id & sender are not cleaned up -> left for clean job
-                                        log::error!(
-                                            "[WS::Router::QuerierConnection] Error routing response from querier back to client, trace_id: {}, socket: {}, router: {}, querier: {}",
-                                            svr_event.get_trace_id(),
-                                            e,
-                                            cfg.common.instance_name,
+                                drop(write_guard);
+                            }
+                            tungstenite::protocol::Message::Pong(pong) => {
+                                log::debug!(
+                                    "[WS::Router::QuerierConnection] received pong message: {:?}, router conn id: {}, querier: {}",
+                                    pong,
+                                    self.id,
+                                    self.querier_name
+                                );
+                            }
+                            tungstenite::protocol::Message::Binary(binary) => {
+                                log::debug!(
+                                    "[WS::Router::QuerierConnection] received binary message: {:?}, router conn id: {}, querier: {}",
+                                    binary,
+                                    self.id,
+                                    self.querier_name
+                                );
+                            }
+                            tungstenite::protocol::Message::Frame(frame) => {
+                                log::debug!(
+                                    "[WS::Router::QuerierConnection] received raw frame from querier: {:?}, router conn id: {}, querier: {}",
+                                    frame,
+                                    self.id,
+                                    self.querier_name
+                                );
+                            }
+                            tungstenite::protocol::Message::Text(text) => {
+                                let svr_event = match json::from_str::<WsServerEvents>(&text) {
+                                    Ok(event) => {
+                                        log::info!(
+                                            "[WS::Router::QuerierConnection] router received message from querier for trace_id: {}, router conn id: {}, querier: {}",
+                                            event.get_trace_id(),
+                                            self.id,
                                             self.querier_name
                                         );
                                         event
@@ -324,11 +292,16 @@ impl QuerierConnection {
                                 }
                             }
                         }
-                        Err(e) => {
-                            log::error!("[WS::Router::QuerierConnection] Read error: {}, Querier: {}, router: {}", e, self.querier_name, cfg.common.instance_name);
-                            querier_conn_error = Some(e.to_string());
-                            break;
-                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[WS::Router::QuerierConnection] Read error: {}, Querier: {}, router conn id: {}",
+                            e,
+                            self.querier_name,
+                            self.id
+                        );
+                        querier_conn_error = Some(e.to_string());
+                        break;
                     }
                 }
             } else {
@@ -514,7 +487,7 @@ impl ResponseRouter {
 impl Connection for QuerierConnection {
     async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>> {
         let cfg = get_config();
-        let ws_req = get_default_querier_request(http_url)?;
+        let (ws_req, id) = get_default_querier_request(http_url)?;
         let websocket_config = WebSocketConfig {
             max_message_size: Some(cfg.websocket.max_continuation_size * 1024 * 1024),
             max_frame_size: Some(cfg.websocket.max_continuation_size * 1024 * 1024),
@@ -593,12 +566,16 @@ impl Connection for QuerierConnection {
                 }
                 Err(e) => {
                     log::error!(
-                        "[WS::QuerierConnection] trace_id: {trace_id}, error sending messages via connection {e}. Mark the connection disconnected",
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}",
+                        trace_id,
+                        self.id,
+                        e
                     );
                     drop(write_guard);
                     self.clean_up(true, Some(e.to_string())).await;
                     Err(WsError::ConnectionError(format!(
-                        "[WS::QuerierConnection] trace_id: {trace_id}, error sending messages via connection {e}. Mark the connection disconnected",
+                        "[WS::QuerierConnection] trace_id: {}, error sending messages via querier conn id: {}, error: {}",
+                        trace_id, self.id, e
                     )))
                 }
             }
@@ -633,7 +610,7 @@ fn get_default_querier_request(
         }
         other_schema => {
             return Err(WsError::QuerierWSUrlError(format!(
-                "Unsupported URL scheme: {other_schema}"
+                "Unsupported URL scheme: {other_schema}",
             )));
         }
     }

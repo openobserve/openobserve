@@ -465,7 +465,7 @@ impl TableProvider for NewListingTable {
             parquet_projection,
             parquet_exec,
         )?;
-        
+
         // if the index condition can remove filter, we can skip the config
         // feature_query_remove_filter_with_index
         let can_remove_filter = self

@@ -26,7 +26,7 @@ pub mod meta;
 pub mod pipeline_func;
 pub mod schema;
 
-async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
+pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
     let old_ver = Version::from(old_ver).unwrap();
     let new_ver = Version::from(new_ver).unwrap();
     let zero = Version::from("v0.0.0").unwrap();
@@ -70,7 +70,7 @@ async fn upgrade_130_131() -> Result<(), anyhow::Error> {
 }
 
 #[deprecated(since = "0.14.0", note = "will be removed in 0.17.0")]
-async fn upgrade_resource_names() -> Result<(), anyhow::Error> {
+pub async fn upgrade_resource_names() -> Result<(), anyhow::Error> {
     // The below migration requires ofga init ready, but on Router node,
     // we don't initialize ofga, hence the migration should not run on router
     if !LOCAL_NODE.is_router() {

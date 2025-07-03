@@ -640,7 +640,6 @@ pub async fn merge_by_stream(
                     if !new_file.key.is_empty() {
                         events.push(new_file);
                     }
-                    events.push(new_file);
                 }
 
                 for file in delete_file_list {

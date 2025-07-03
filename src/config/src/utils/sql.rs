@@ -75,7 +75,6 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
             return Ok(false);
         }
 
-
         if let Statement::Query(query) = statement
             && (!is_aggregate_in_select(query)
                 || has_join(query)
@@ -423,11 +422,11 @@ impl Visitor for TimestampVisitor {
 
                         // Handle alias chain: SELECT ts1 FROM (...) where ts1 is alias for
                         // _timestamp
-                        if let Expr::Identifier(ident) = expr {
-                            if self.timestamp_aliases.contains(&ident.value) {
-                                self.timestamp_selected = true;
-                                return ControlFlow::Break(());
-                            }
+                        if let Expr::Identifier(ident) = expr
+                            && self.timestamp_aliases.contains(&ident.value)
+                        {
+                            self.timestamp_selected = true;
+                            return ControlFlow::Break(());
                         }
                     }
 
@@ -444,10 +443,10 @@ impl Visitor for TimestampVisitor {
                         }
 
                         // If the expression is an alias we already know maps to timestamp
-                        if let Expr::Identifier(ident) = expr {
-                            if self.timestamp_aliases.contains(&ident.value) {
-                                self.timestamp_aliases.insert(alias.value.clone());
-                            }
+                        if let Expr::Identifier(ident) = expr
+                            && self.timestamp_aliases.contains(&ident.value)
+                        {
+                            self.timestamp_aliases.insert(alias.value.clone());
                         }
                     }
 

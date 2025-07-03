@@ -501,10 +501,7 @@ impl Response {
     pub fn set_order_by(&mut self, val: Option<OrderBy>) {
         self.order_by = val;
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> main
     pub fn set_result_cache_ratio(&mut self, val: usize) {
         self.result_cache_ratio = val;
     }
@@ -1261,9 +1258,6 @@ pub struct HashFileRequest {
 #[derive(Debug, Default, Deserialize, Clone, Serialize)]
 pub struct HashFileResponse {
     pub files: HashMap<String, HashMap<String, String>>,
-}
-pub fn default_use_cache() -> bool {
-    get_config().common.result_cache_enabled
 }
 
 #[cfg(test)]

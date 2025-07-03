@@ -63,9 +63,13 @@ use super::{
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 use crate::service::search::{
-    datafusion::udf::{
-        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-        STR_MATCH_UDF_NAME,
+    cluster::flight::{generate_context, register_table},
+    datafusion::{
+        distributed_plan::rewrite::GroupByFieldVisitor,
+        udf::{
+            MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+            STR_MATCH_UDF_NAME,
+        },
     },
     index::get_arg_name,
 };
@@ -286,7 +290,7 @@ impl Sql {
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
         }
- 
+
         // use all condition for histogram without filter
         if use_inverted_index && can_optimize && index_condition.is_none() {
             index_condition = Some(IndexCondition {
@@ -294,7 +298,6 @@ impl Sql {
             });
         }
 
-        
         //********************Change the sql here*********************************//
 
         // 13. check `select * from table where match_all()` optimizer
@@ -310,7 +313,6 @@ impl Sql {
             ));
         }
 
- 
         // 14. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
@@ -2154,7 +2156,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
         ControlFlow::Continue(())
     }
 }
- 
+
 // get group by fields from sql, if sql is not a single table query, return empty vector
 #[allow(dead_code)]
 pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {

@@ -28,7 +28,7 @@ use log;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
-    config::get_config as get_o2_config,
+    infra::config::get_config as get_o2_config,
 };
 use tokio::sync::mpsc;
 use tracing::Span;

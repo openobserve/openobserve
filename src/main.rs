@@ -272,10 +272,12 @@ async fn main() -> Result<(), anyhow::Error> {
             }
 
             // check version upgrade
-            let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
+            let old_version = db::metas::version::get()
+                .await
+                .unwrap_or("v0.0.0".to_string());
             if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
                 job_init_tx.send(false).ok();
-                panic!("check upgrade failed: {}", e);
+                panic!("check upgrade failed: {e}");
             }
 
             #[allow(deprecated)]
@@ -286,13 +288,13 @@ async fn main() -> Result<(), anyhow::Error> {
             // migrate infra_sea_orm
             if let Err(e) = infra::table::migrate().await {
                 job_init_tx.send(false).ok();
-                panic!("infra sea_orm migrate failed: {}", e);
+                panic!("infra sea_orm migrate failed: {e}");
             }
 
             // migrate dashboards
             if let Err(e) = migration::dashboards::run().await {
                 job_init_tx.send(false).ok();
-                panic!("migrate dashboards failed: {}", e);
+                panic!("migrate dashboards failed: {e}");
             }
 
             // ingester init

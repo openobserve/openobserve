@@ -107,7 +107,6 @@ pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::
 pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
 pub struct FileData {
-    file_type: FileType,
     max_size: usize,
     cur_size: usize,
     root_dir: String,
@@ -185,7 +184,7 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
-    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
         let file_path = self.get_file_path(file);
         tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
@@ -208,7 +207,7 @@ impl FileData {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[CacheType:{} trace_id: {trace_id}] File disk cache is full, can't cache extra {} bytes",
+                "[CacheType:{}] File disk cache is full, can't cache extra {} bytes",
                 self.file_type,
                 data_size
             );
@@ -261,7 +260,7 @@ impl FileData {
     async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!(
-            "[CacheType:{} trace_id: {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
+            "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
             self.cur_size,
             self.max_size,
@@ -273,7 +272,7 @@ impl FileData {
             let item = self.data.remove();
             if item.is_none() {
                 log::warn!(
-                    "[CacheType:{} trace_id: {trace_id}] File disk cache is corrupt, it shouldn't be none",
+                    "[CacheType:{}] File disk cache is corrupt, it shouldn't be none",
                     self.file_type,
                 );
                 break;
@@ -282,13 +281,13 @@ impl FileData {
             // delete file from local disk
             let file_path = self.get_file_path(key.as_str());
             log::debug!(
-                "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}",
+                "[CacheType:{}] File disk cache gc remove file: {}",
                 self.file_type,
                 key
             );
             if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
-                    "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}, error: {}",
+                    "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
                     self.file_type,
                     file_path,
                     e
@@ -302,7 +301,7 @@ impl FileData {
                 let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
                 if let Err(e) = fs::remove_dir_all(&file_path) {
                     log::error!(
-                        "[CacheType:{} trace_id: {trace_id}] File disk cache gc remove file: {}, error: {}",
+                        "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
                         self.file_type,
                         file_path,
                         e
@@ -356,7 +355,7 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{} trace_id: {trace_id}] File disk cache gc done, released {} bytes",
+            "[CacheType:{}] File disk cache gc done, released {} bytes",
             self.file_type,
             release_size
         );
@@ -364,9 +363,9 @@ impl FileData {
         Ok(())
     }
 
-    async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+    async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
         log::debug!(
-            "[CacheType:{} trace_id: {trace_id}] File disk cache remove file {}",
+            "[CacheType:{}] File disk cache remove file {}",
             self.file_type,
             file
         );
@@ -380,7 +379,7 @@ impl FileData {
         let file_path = self.get_file_path(key.as_str());
         if let Err(e) = fs::remove_file(&file_path) {
             log::error!(
-                "[CacheType:{} trace_id: {trace_id}] File disk cache remove file: {}, error: {}",
+                "[CacheType:{}] File disk cache remove file: {}, error: {}",
                 self.file_type,
                 file_path,
                 e
@@ -501,7 +500,7 @@ fn get_file_reader(file: &str) -> Option<&FileData> {
 }
 
 #[inline]
-pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
     let files = get_file_reader(file)?;
     files.get(file, range).await
 }
@@ -545,7 +544,7 @@ pub async fn exist(file: &str) -> bool {
     }
 
     // file is not exist, need remove it from cache index
-    _ = remove("", file).await;
+    _ = remove(file).await;
 
     // finally return false
     false
@@ -602,7 +601,7 @@ pub async fn set_size(file: &str, data_size: usize) -> Result<(), anyhow::Error>
 }
 
 #[inline]
-pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
     }
@@ -821,7 +820,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc("global", cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
     Ok(())
@@ -883,12 +882,12 @@ pub async fn get_dir() -> String {
 }
 
 pub async fn download(
-    trace_id: &str,
+    account: &str,
     file: &str,
     size: Option<usize>,
 ) -> Result<usize, anyhow::Error> {
-    let (data_len, data_bytes) = super::download_from_storage(file, size).await?;
-    if let Err(e) = set(trace_id, file, data_bytes).await {
+    let (data_len, data_bytes) = super::download_from_storage(account, file, size).await?;
+    if let Err(e) = set(file, data_bytes).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",
             file,
@@ -983,7 +982,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_set_file() {
-        let trace_id = "session_1";
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
@@ -998,7 +996,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let trace_id = "session_2";
         let mut file_data = FileData::with_capacity_and_cache_strategy(
             FileType::Data,
             get_config().disk_cache.max_size,
@@ -1017,7 +1014,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_miss() {
-        let trace_id = "session_3";
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "lru");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
@@ -1034,7 +1030,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
-        let trace_id = "session_4";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
@@ -1053,7 +1048,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let trace_id = "session_5";
         let mut file_data = FileData::with_capacity_and_cache_strategy(
             FileType::Data,
             get_config().disk_cache.max_size,
@@ -1072,7 +1066,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_miss() {
-        let trace_id = "session_6";
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "fifo");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
@@ -1095,7 +1088,6 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
 
-        let trace_id = "session_7";
         let mut file_data = FileData::with_capacity_and_cache_strategy(
             FileType::Data,
             get_config().disk_cache.max_size,

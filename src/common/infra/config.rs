@@ -33,7 +33,7 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::{RwLock as TokioRwLock, mpsc};
+use tokio::sync::mpsc;
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -178,8 +178,9 @@ pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::na
     log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
 }
 
-
 #[cfg(test)]
+mod tests {
+    use super::*;
 
     #[tokio::test]
     async fn test_update_cache() {
@@ -190,4 +191,3 @@ pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::na
             .unwrap();
     }
 }
-

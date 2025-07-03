@@ -38,11 +38,9 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             | errors::ErrorCodes::FullTextSearchFieldNotFound
             | errors::ErrorCodes::SearchFieldNotFound(_)
             | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_)
-            | errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::BadRequest()
+            | errors::ErrorCodes::SearchStreamNotFound(_) => HttpResponse::BadRequest()
                 .append_header((ERROR_HEADER, code.to_json()))
                 .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-
             errors::ErrorCodes::ServerInternalError(_)
             | errors::ErrorCodes::SearchParquetFileNotFound => HttpResponse::InternalServerError()
                 .append_header((ERROR_HEADER, code.to_json()))

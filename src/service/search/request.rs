@@ -113,7 +113,7 @@ impl Request {
     pub fn set_local_mode(&mut self, local_mode: Option<bool>) {
         self.local_mode = local_mode;
     }
-    
+
     pub fn set_use_cache(&mut self, use_cache: bool) {
         self.use_cache = use_cache;
     }

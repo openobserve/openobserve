@@ -47,6 +47,7 @@ pub async fn handle_values_request(
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), infra::errors::Error> {
     let mut start_timer = std::time::Instant::now();
 
@@ -247,6 +248,7 @@ pub async fn handle_values_request(
                     max_query_range,
                     &mut start_timer,
                     &order_by,
+                    response_tx.clone(),
                 )
                 .instrument(ws_values_span.clone())
                 .await?;
@@ -309,6 +311,7 @@ pub async fn handle_values_request(
                 max_query_range,
                 &mut start_timer,
                 &order_by,
+                response_tx.clone(),
             )
             .instrument(ws_values_span.clone())
             .await?;

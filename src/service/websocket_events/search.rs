@@ -28,8 +28,7 @@ use config::{
     utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
+use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
 #[cfg(feature = "enterprise")]
 use {
@@ -120,18 +119,6 @@ pub async fn handle_search_request(
         req.payload.search_type = Some(req.search_type);
     }
 
-    // decode the sql query
-    if let Err(e) = req.payload.decode() {
-        let err_res = WsServerEvents::error_response(
-            &Error::Message(e.to_string()),
-            Some(req_id.to_string()),
-            Some(trace_id),
-            Default::default(),
-        );
-        send_message(req_id, err_res.to_json()).await?;
-        return Ok(());
-    }
-
     // get stream name
     let stream_names = match resolve_stream_names(&req.payload.query.sql) {
         Ok(v) => v.clone(),
@@ -209,14 +196,14 @@ pub async fn handle_search_request(
     );
 
     // Send initial progress update
-    send_message(
+    send_message_2(
         req_id,
         WsServerEvents::EventProgress {
             trace_id: trace_id.to_string(),
             percent: 0,
             event_type: req.event_type().to_string(),
-        }
-        .to_json(),
+        },
+        response_tx.clone(),
     )
     .await?;
 
@@ -306,6 +293,7 @@ pub async fn handle_search_request(
                 max_query_range,
                 &mut start_timer,
                 &req_order_by,
+                response_tx.clone(),
             )
             .instrument(ws_search_span.clone())
             .await?;
@@ -340,6 +328,7 @@ pub async fn handle_search_request(
             max_query_range,
             &mut start_timer,
             &req_order_by,
+            response_tx.clone(),
         )
         .instrument(ws_search_span)
         .await?;
@@ -494,6 +483,7 @@ pub async fn handle_cache_responses_and_deltas(
                     cached_search_duration,
                     start_timer,
                     cache_order_by,
+                    response_tx.clone(),
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -534,6 +524,7 @@ pub async fn handle_cache_responses_and_deltas(
                 cached_search_duration,
                 start_timer,
                 cache_order_by,
+                response_tx.clone(),
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -584,6 +575,7 @@ async fn process_delta(
     cache_req_duration: i64,
     start_timer: &mut Instant,
     cache_order_by: &OrderBy,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -749,14 +741,14 @@ async fn process_delta(
                 original_req_end_time,
                 cache_order_by,
             );
-            send_message(
+            send_message_2(
                 req_id,
                 WsServerEvents::EventProgress {
                     trace_id: trace_id.to_string(),
                     percent,
                     event_type: req.event_type().to_string(),
-                }
-                .to_json(),
+                },
+                response_tx.clone(),
             )
             .await?;
         }
@@ -907,27 +899,6 @@ async fn send_cached_responses(
         .await?;
     }
 
-    // Send progress update
-    {
-        let percent = calculate_progress_percentage(
-            cached.response_start_time,
-            cached.response_end_time,
-            req.payload.query.start_time,
-            req.payload.query.end_time,
-            cache_order_by,
-        );
-        send_message(
-            req_id,
-            WsServerEvents::EventProgress {
-                trace_id: trace_id.to_string(),
-                percent,
-                event_type: req.event_type().to_string(),
-            }
-            .to_json(),
-        )
-        .await?;
-    }
-
     Ok(())
 }
 
@@ -944,6 +915,7 @@ pub async fn do_partitioned_search(
     max_query_range: i64, // hours
     start_timer: &mut Instant,
     req_order_by: &OrderBy,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -954,8 +926,7 @@ pub async fn do_partitioned_search(
         req.payload.query.start_time =
             req.payload.query.end_time - max_query_range * 3600 * 1_000_000;
         log::info!(
-            "[WS_SEARCH] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
-            max_query_range,
+            "[WS_SEARCH] Query duration is modified due to query range restriction of {max_query_range} hours, new start_time: {}",
             req.payload.query.start_time
         );
         range_error = format!(
@@ -1089,27 +1060,6 @@ pub async fn do_partitioned_search(
                     event_type: "search".to_string(),
                 },
                 response_tx.clone(),
-            )
-            .await?;
-        }
-
-        // Send progress update
-        {
-            let percent = calculate_progress_percentage(
-                start_time,
-                end_time,
-                modified_start_time,
-                modified_end_time,
-                partition_order_by,
-            );
-            send_message(
-                req_id,
-                WsServerEvents::EventProgress {
-                    trace_id: trace_id.to_string(),
-                    percent,
-                    event_type: "search".to_string(),
-                }
-                .to_json(),
             )
             .await?;
         }

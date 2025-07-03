@@ -35,7 +35,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
+        sql::{is_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -54,15 +54,23 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client,
-    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup,
-    o2_enterprise::enterprise::search::cache::streaming_agg::{
-        create_aggregation_cache_file_path, generate_aggregation_cache_interval,
-        get_aggregation_cache_key_from_request,
+    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
+    config::utils::sql::is_simple_aggregate_query,
+    o2_enterprise::enterprise::{
+        common::infra::config::get_config as get_o2_config,
+        search::{
+            TaskStatus, WorkGroup,
+            cache::{
+                CardinalityLevel,
+                streaming_agg::{
+                    create_aggregation_cache_file_path, generate_aggregation_cache_interval,
+                    get_aggregation_cache_key_from_request,
+                },
+            },
+            cache_aggs_util,
+            datafusion::distributed_plan::streaming_aggs_exec,
+        },
     },
-    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
     std::collections::HashSet,
     tracing::info_span,
 };
@@ -195,10 +203,6 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
-<<<<<<< HEAD
-=======
-
->>>>>>> main
     let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
@@ -389,7 +393,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {e}")));
+            return Err(Error::Message(format!("decode sql error: {e:?}")));
         }
     }
     let queries_len = queries.len();
@@ -451,7 +455,7 @@ pub async fn search_multi(
                 }
             }
             Err(e) => {
-                log::error!("search_multi: search error: {e}");
+                log::error!("search_multi: search error: {e:?}");
                 if index == 0 {
                     // Error in the first query, return the error
                     return Err(e); // TODO: return partial results
@@ -671,46 +675,6 @@ pub async fn search_partition(
     // if http distinct, we should skip file list
     if is_http_distinct {
         skip_get_file_list = true;
-    }
-
-    // check if we need to use streaming_output
-    let streaming_id = if req.streaming_output && is_streaming_aggregate {
-        Some(ider::uuid())
-    } else {
-        None
-    };
-
-    #[cfg(feature = "enterprise")]
-    if let Some(id) = &streaming_id {
-        log::info!(
-            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
-        );
-
-        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
-            // TODO: cache don't not support multiple stream names
-            Ok(v) => (v[0].clone(), v.join(",")),
-            Err(e) => {
-                return Err(Error::Message(e.to_string()));
-            }
-        };
-
-        let cache_interval =
-            generate_aggregation_cache_interval(query.start_time, query.end_time) as i64;
-        let hashed_query = get_aggregation_cache_key_from_request(req);
-        let cache_file_path = create_aggregation_cache_file_path(
-            org_id,
-            &stream_type.to_string(),
-            &stream_name,
-            hashed_query,
-            cache_interval,
-        );
-        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
-        log::info!(
-            "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
-            trace_id,
-            id,
-            cache_file_path
-        );
     }
 
     #[cfg(feature = "enterprise")]

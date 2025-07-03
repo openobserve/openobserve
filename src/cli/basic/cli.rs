@@ -530,14 +530,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "upgrade-db" => {
             crate::migration::init_db().await?;
         }
-        "consistent-hash" => {
-            let files = command
-                .get_many::<String>("file")
-                .unwrap()
-                .collect::<Vec<_>>();
-            let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
-            super::http::consistent_hash(files).await?;
-        }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
         }
