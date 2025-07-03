@@ -39,6 +39,7 @@ pub mod reports;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
+pub mod system_prompts;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;

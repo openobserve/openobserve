@@ -57,6 +57,7 @@ mod m20250422_000001_add_alert_align_time;
 mod m20250611_000001_create_reports_table;
 mod m20250611_000002_populate_reports_table;
 mod m20250611_000003_populate_reports_scheduled_jobs;
+mod m20250703_000001_create_system_prompts_table;
 
 pub struct Migrator;
 
@@ -106,6 +107,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250611_000001_create_reports_table::Migration),
             Box::new(m20250611_000002_populate_reports_table::Migration),
             Box::new(m20250611_000003_populate_reports_scheduled_jobs::Migration),
+            Box::new(m20250703_000001_create_system_prompts_table::Migration),
         ]
     }
 }
