@@ -182,33 +182,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div class="row">
               <div
-                class="col scroll tw-p-1"
+                class="col scroll"
                 style="height: calc(100vh - 99px); overflow-y: auto"
               >
-                <q-splitter
-                  class="query-editor-splitter"
-                  v-model="dashboardPanelData.layout.querySplitter"
-                  horizontal
-                  @update:model-value="querySplitterUpdated"
-                  reverse
-                  unit="px"
-                  :limits="[600, 900]"
-                  :disable="!dashboardPanelData.layout.showQueryBar"
-                >
-                  <template #before>
                     <div
                       class="layout-panel-container col"
-                      style="height: 100%"
                     >
                       <DashboardQueryBuilder
                         :dashboardData="currentDashboardData.data"
                       />
                       <q-separator />
                       <VariablesValueSelector
-                        v-if="dateTimeForVariables ||
-                          (dashboardPanelData.meta.dateTime 
-                            && dashboardPanelData.meta.dateTime.start_time 
-                            && dashboardPanelData.meta.dateTime.end_time)"
+                        v-if="
+                          dateTimeForVariables ||
+                          (dashboardPanelData.meta.dateTime &&
+                            dashboardPanelData.meta.dateTime.start_time &&
+                            dashboardPanelData.meta.dateTime.end_time)
+                        "
                         :variablesConfig="currentDashboardData.data?.variables"
                         :showDynamicFilters="
                           currentDashboardData.data?.variables
@@ -256,8 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </div>
                       <div
-                        class="col tw-h-[500px] tw-border-4 tw-border-black"
-                        style="flex: 1"
+                        class=" tw-h-[calc(100vh-500px)]"
                       >
                         <PanelSchemaRenderer
                           v-if="chartData"
@@ -293,23 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="flex-shrink: 0"
                       />
                     </div>
-                  </template>
-                  <template #separator>
-                    <div
-                      class="splitter"
-                      :class="
-                        dashboardPanelData.layout.showQueryBar
-                          ? 'splitter-enabled'
-                          : ''
-                      "
-                    ></div>
-                  </template>
-                  <template #after>
-                    <div style="height: 100%; width: 100%" class="row column">
+                    <div class="row column tw-h-[calc(100vh-350px)]">
                       <DashboardQueryEditor />
                     </div>
-                  </template>
-                </q-splitter>
               </div>
               <q-separator vertical />
               <div class="col-auto">
