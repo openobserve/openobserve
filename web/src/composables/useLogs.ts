@@ -6621,7 +6621,8 @@ const useLogs = () => {
     getStream,
     initialLogsState,
     clearSearchObj,
-    setCommunicationMethod
+    setCommunicationMethod,
+    hasAggregation,
   };
 };
 

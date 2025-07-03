@@ -288,7 +288,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="
             streamType !== 'enrichment_tables' &&
-            searchObj.data.stream.selectedStream.length <= 1
+            searchObj.data.stream.selectedStream.length <= 1 &&
+            hasAggregationQuery == false
           "
           class="col-8 row justify-center align-center q-gutter-sm"
         >
@@ -335,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -414,9 +415,14 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const { searchObj } = useLogs();
+    const { searchObj, fnParsedSQL, hasAggregation } = useLogs();
     const $q = useQuasar();
     let multiStreamFields: any = ref([]);
+    let hasAggregationQuery: any = computed(() => {
+      let parsedSQL = fnParsedSQL();
+      // nodesql parser does not support query where default keyword used without quotation marks so adding additional check for group by clause
+      return hasAggregation(parsedSQL?.columns) || searchObj.data.query.includes("group by");
+    });
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -493,6 +499,7 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
+      hasAggregationQuery,
     };
   },
   async created() {
