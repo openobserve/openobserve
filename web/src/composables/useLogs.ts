@@ -4521,6 +4521,8 @@ const useLogs = () => {
     try {
       searchObj.loadingStream = true;
 
+      await cancelQuery();
+
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
 
@@ -4679,55 +4681,69 @@ const useLogs = () => {
     }
   };
 
-  const cancelQuery = () => {
-    if (searchObj.communicationMethod === "ws") {
-      sendCancelSearchMessage([
-        ...searchObj.data.searchWebSocketTraceIds,
-      ]);
-      return;
-    }
-
-    const tracesIds = [...searchObj.data.searchRequestTraceIds];
-
-    if (!searchObj.data.searchRequestTraceIds.length) {
-      searchObj.data.isOperationCancelled = false;
-      return;
-    }
-
-    searchObj.data.isOperationCancelled = true;
-
-    searchService
-      .delete_running_queries(
-        store.state.selectedOrganization.identifier,
-        searchObj.data.searchRequestTraceIds,
-      )
-      .then((res) => {
-        const isCancelled = res.data.some((item: any) => item.is_success);
-        if (isCancelled) {
-          searchObj.data.isOperationCancelled = false;
-          $q.notify({
-            message: "Running query cancelled successfully",
-            color: "positive",
-            position: "bottom",
-            timeout: 4000,
-          });
+  const cancelQuery = async () : Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      try {
+        if (searchObj.communicationMethod === "ws") {
+          sendCancelSearchMessage([
+            ...searchObj.data.searchWebSocketTraceIds,
+          ]);
+          resolve(true);
+          return;
         }
-      })
-      .catch((error: any) => {
+
+        const tracesIds = [...searchObj.data.searchRequestTraceIds];
+
+        if (!searchObj.data.searchRequestTraceIds.length) {
+          searchObj.data.isOperationCancelled = false;
+          return;
+        }
+
+        searchObj.data.isOperationCancelled = true;
+
+        searchService
+          .delete_running_queries(
+            store.state.selectedOrganization.identifier,
+            searchObj.data.searchRequestTraceIds,
+          )
+          .then((res) => {
+            const isCancelled = res.data.some((item: any) => item.is_success);
+            if (isCancelled) {
+              searchObj.data.isOperationCancelled = false;
+              $q.notify({
+                message: "Running query cancelled successfully",
+                color: "positive",
+                position: "bottom",
+                timeout: 4000,
+              });
+            }
+          })
+          .catch((error: any) => {
+            $q.notify({
+              message:
+                error.response?.data?.message || "Failed to cancel running query",
+              color: "negative",
+              position: "bottom",
+              timeout: 1500,
+            });
+          })
+          .finally(() => {
+            searchObj.data.searchRequestTraceIds =
+              searchObj.data.searchRequestTraceIds.filter(
+                (id: string) => !tracesIds.includes(id),
+              );
+            resolve(true);
+          });
+      } catch (error) {
         $q.notify({
-          message:
-            error.response?.data?.message || "Failed to cancel running query",
+          message: "Failed to cancel running query",
           color: "negative",
           position: "bottom",
           timeout: 1500,
         });
-      })
-      .finally(() => {
-        searchObj.data.searchRequestTraceIds =
-          searchObj.data.searchRequestTraceIds.filter(
-            (id: string) => !tracesIds.includes(id),
-          );
-      });
+        resolve(true);
+      }
+    });
   };
 
   const reorderArrayByReference = (arr1: string[], arr2: string[]) => {
