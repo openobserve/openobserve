@@ -57,6 +57,16 @@ struct PatternListResponse {
     pub patterns: Vec<PatternInfo>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+struct PatternTestRequest {
+    pattern: String,
+    test_records: Vec<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+struct PatternTestResponse {
+    results: Vec<String>,
+}
+
 /// Store a re_pattern in db
 #[utoipa::path(
     post,
@@ -375,6 +385,64 @@ pub async fn update(
     {
         drop(in_req);
         drop(path);
+        drop(body);
+        Ok(MetaHttpResponse::forbidden("not supported"))
+    }
+}
+
+/// Store a re_pattern in db
+#[utoipa::path(
+    post,
+    context_path = "/api",
+    request_body(
+        content = PatternTestRequest,
+        description = "re_pattern to test and strings to test against",
+        content_type = "application/json",
+    ),
+    responses(
+        (
+            status = 200,
+            description = "array of strings",
+            body = PatternTestResponse,
+            content_type = "application/json",
+        ),
+        (status = 400, description = "Invalid request", content_type = "application/json")
+    ),
+    tag = "RePattern"
+)]
+#[post("/{org_id}/re_patterns/test")]
+pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use infra::table::re_pattern_stream_map::PatternPolicy;
+        use o2_enterprise::enterprise::re_patterns::PatternManager;
+
+        let req: PatternTestRequest = match serde_json::from_slice(&body) {
+            Ok(v) => v,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        };
+
+        let pattern = req.pattern;
+        let inputs = req.test_records;
+        let mut ret = Vec::with_capacity(inputs.len());
+        for i in inputs {
+            match PatternManager::test_pattern(pattern.clone(), i, PatternPolicy::Redact) {
+                Ok(v) => {
+                    ret.push(v);
+                }
+                Err(e) => {
+                    return Ok(MetaHttpResponse::bad_request(format!(
+                        "error in testing pattern for input : {e}"
+                    )));
+                }
+            }
+        }
+
+        Ok(HttpResponse::Ok().json(PatternTestResponse { results: ret }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
         drop(body);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
