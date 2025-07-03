@@ -36,13 +36,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
-        class="col"
+        v-if="
+          !['html', 'markdown', 'custom_chart'].includes(
+            dashboardPanelData.data.type,
+          )
+        "
+        class="col flex column"
         style="width: 100%; height: 100%"
       >
+      <!-- collapse field list bar -->
+      <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
           @update:model-value="layoutSplitterUpdated"
+          :limits="[0, 100]"
           style="width: 100%; height: 100%"
         >
           <template #before>
@@ -59,12 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-avatar
+            <q-btn
               color="primary"
-              text-color="white"
-              size="20px"
-              icon="drag_indicator"
-              style="top: 10px; left: 3.5px"
+              size="sm"
+              :icon="
+                dashboardPanelData.layout.showFieldList
+                  ? 'chevron_left'
+                  : 'chevron_right'
+              "
+              dense
+              round
+              style="top: 14px; z-index: 100"
+              @click.stop="collapseFieldList"
             />
           </template>
           <template #after>
@@ -485,9 +510,7 @@ export default defineComponent({
     );
 
     const layoutSplitterUpdated = () => {
-      if (!dashboardPanelData.layout.showFieldList) {
-        dashboardPanelData.layout.splitter = 0;
-      }
+      dashboardPanelData.layout.showFieldList = dashboardPanelData.layout.splitter > 0;
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -553,6 +576,10 @@ export default defineComponent({
 
     onActivated(() => {
       dashboardPanelData.layout.querySplitter = 20;
+
+      // keep field list closed for visualization
+      dashboardPanelData.layout.showFieldList = false;
+      dashboardPanelData.layout.splitter = 0;
     });
 
     const updateVrlFunctionFieldList = (fieldList: any) => {
@@ -714,11 +741,11 @@ export default defineComponent({
     };
     const collapseFieldList = () => {
       if (dashboardPanelData.layout.showFieldList) {
-        dashboardPanelData.layout.splitter = 0;
         dashboardPanelData.layout.showFieldList = false;
+        dashboardPanelData.layout.splitter = 0;
       } else {
-        dashboardPanelData.layout.splitter = 20;
         dashboardPanelData.layout.showFieldList = true;
+        dashboardPanelData.layout.splitter = 20;
       }
     };
 
@@ -772,5 +799,27 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
+}
+
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
 }
 </style>
