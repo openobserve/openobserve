@@ -573,6 +573,7 @@ export default defineComponent({
       initialLogsState,
       clearSearchObj,
       setCommunicationMethod,
+      cancelQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -668,7 +669,8 @@ export default defineComponent({
       if (store.state.refreshIntervalID)
         clearInterval(store.state.refreshIntervalID);
 
-      cancelOnGoingSearchQueries();
+      cancelQuery();
+
       removeAiContextHandler();
 
       try {
