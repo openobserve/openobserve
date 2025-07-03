@@ -45,6 +45,10 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+// for DDL commands and migrations
+pub const DB_SCHEMA_VERSION: u64 = 5;
+pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
+
 // global version variables
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -86,6 +90,9 @@ pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
+pub const MESSAGE_COL_NAME: &str = "message";
+pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
+pub const DEFAULT_STREAM_NAME: &str = "default";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
@@ -380,13 +387,12 @@ pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
 }
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    let blocked_streams = get_config()
+    get_config()
         .common
         .blocked_streams
         .split(',')
         .map(|x| x.to_string())
-        .collect();
-    blocked_streams
+        .collect()
 });
 
 #[derive(EnvConfig)]
@@ -454,7 +460,7 @@ pub struct WebSocket {
     pub streaming_response_chunk_size: usize,
     #[env_config(
         name = "ZO_STREAMING_ENABLED",
-        default = false,
+        default = true,
         help = "Enable streaming"
     )]
     pub streaming_enabled: bool,
@@ -652,6 +658,14 @@ pub struct TCP {
     pub tcp_port: u16,
     #[env_config(name = "ZO_UDP_PORT", default = 5514)]
     pub udp_port: u16,
+    #[env_config(name = "ZO_TCP_TLS_ENABLED", default = false)]
+    pub tcp_tls_enabled: bool,
+    #[env_config(name = "ZO_TCP_TLS_CERT_PATH", default = "")]
+    pub tcp_tls_cert_path: String,
+    #[env_config(name = "ZO_TCP_TLS_KEY_PATH", default = "")]
+    pub tcp_tls_key_path: String,
+    #[env_config(name = "ZO_TCP_TLS_CA_CERT_PATH", default = "")]
+    pub tcp_tls_ca_cert_path: String,
 }
 
 #[derive(EnvConfig)]
@@ -686,6 +700,8 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
     pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
+    #[env_config(name = "ZO_META_DDL_DSN", default = "")]
+    pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -792,7 +808,7 @@ pub struct Common {
         help = "Comma separated list of fields to use for search around"
     )]
     pub search_around_default_fields: String,
-    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
+    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = true)]
     pub wal_fsync_disabled: bool,
     #[env_config(
         name = "ZO_WAL_WRITE_QUEUE_ENABLED",
@@ -999,6 +1015,8 @@ pub struct Common {
     pub report_server_skip_tls_verify: bool,
     #[env_config(name = "ZO_SKIP_FORMAT_STREAM_NAME", default = false)]
     pub skip_formatting_stream_name: bool,
+    #[env_config(name = "ZO_FORMAT_STREAM_NAME_TO_LOWERCASE", default = true)]
+    pub format_stream_name_to_lower: bool,
     #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
@@ -1079,6 +1097,24 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub websocket_enabled: bool,
+    #[env_config(name = "ZO_ES_VERSION", default = "")]
+    pub es_version: String,
+    #[env_config(
+        name = "ZO_CREATE_ORG_THROUGH_INGESTION",
+        default = true,
+        help = "If true (default true), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
+    )]
+    pub create_org_through_ingestion: bool,
+    #[env_config(
+        name = "ZO_ORG_INVITE_EXPIRY",
+        default = 7,
+        help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
+    )]
+    pub org_invite_expiry: u32,
+    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
+    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,
@@ -1087,6 +1123,14 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
+    pub file_list_dump_enabled: bool,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
+    pub file_list_dump_dual_write: bool,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
+    pub file_list_dump_min_hour: usize,
+    #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
+    pub file_list_dump_debug_check: bool,
     #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
@@ -1118,10 +1162,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1154,7 +1198,7 @@ pub struct Limit {
         help = "MemTable bucket num, default is 1"
     )] // default is 1
     pub mem_table_bucket_num: usize,
-    #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
+    #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
@@ -1442,7 +1486,7 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
@@ -1473,7 +1517,7 @@ pub struct Compact {
     pub data_retention_history: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 500,
+        default = 0,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,
@@ -1507,6 +1551,10 @@ pub struct CacheLatestFiles {
     pub cache_index: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DELETE_MERGE_FILES", default = false)]
     pub delete_merge_files: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
+    pub download_from_node: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_NODE_SIZE", default = 100)] // MB
+    pub download_node_size: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1558,6 +1606,10 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
+    #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
+    pub aggregation_max_size: usize,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1571,8 +1623,6 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
-    #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
-    pub aggregation_max_size: usize,
     #[env_config(
         name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
         default = 10,
@@ -1685,8 +1735,20 @@ pub struct Nats {
     pub queue_max_age: u64,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, Default, EnvConfig)]
 pub struct S3 {
+    #[env_config(
+        name = "ZO_S3_ACCOUNTS",
+        default = "",
+        help = "comma separated list of accounts"
+    )]
+    pub accounts: String,
+    #[env_config(
+        name = "ZO_S3_STREAM_STRATEGY",
+        default = "",
+        help = "stream strategy, default is: empty, only use default account, other value is: file_hash, stream_hash, stream1:account1,stream2:account2"
+    )]
+    pub stream_strategy: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
@@ -1906,6 +1968,10 @@ pub fn init() -> Config {
     // check http config
     if let Err(e) = check_http_config(&mut cfg) {
         panic!("common config error: {e}")
+    }
+
+    if let Err(e) = check_tcp_tls_config(&mut cfg) {
+        panic!("syslog config error: {e}")
     }
 
     // check data path config
@@ -2221,6 +2287,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
 
+    // debug check is useful only when dual write is enabled. Otherwise it will raise error
+    // incorrectly each time
+    cfg.common.file_list_dump_debug_check =
+        cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
+
     Ok(())
 }
 
@@ -2469,12 +2540,19 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10% 
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10%
+        if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
+
     if cfg.disk_cache.aggregation_max_size == 0 {
-        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10% 
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10%
+        if cfg.disk_cache.aggregation_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.aggregation_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
     } else {
         cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
     }
@@ -2591,7 +2669,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = 100;
+        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
@@ -2729,16 +2807,29 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             Ok(v) => v,
             Err(e) => {
                 return Err(anyhow::anyhow!(
-                    "master encryption key is not properly base64 encoded : {e}"
+                    "master encryption key is not properly base64 encoded: {e}"
                 ));
             }
         };
         match Aes256Siv::new_from_slice(&key) {
             Ok(_) => {}
             Err(e) => {
-                return Err(anyhow::anyhow!("invalid master encryption key : {e}"));
+                return Err(anyhow::anyhow!("invalid master encryption key: {e}"));
             }
         }
+    }
+    Ok(())
+}
+
+fn check_tcp_tls_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.tcp.tcp_tls_enabled
+        && (cfg.tcp.tcp_tls_cert_path.is_empty()
+            || cfg.tcp.tcp_tls_key_path.is_empty()
+            || cfg.tcp.tcp_tls_ca_cert_path.is_empty())
+    {
+        return Err(anyhow::anyhow!(
+            "ZO_TCP_TLS_CERT_PATH, ZO_TCP_TLS_KEY_PATH and ZO_TCP_TLS_CA_CERT_PATH must be set when ZO_TCP_TLS_ENABLED is true"
+        ));
     }
     Ok(())
 }

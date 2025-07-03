@@ -40,7 +40,7 @@ use {
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
-        infra::config::get_config as get_o2_config,
+        config::get_config as get_o2_config,
     },
 };
 
@@ -86,6 +86,7 @@ async fn audit_middleware(
     if get_o2_config().common.audit_enabled
         && !(path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
         || path_columns.get(1).unwrap_or(&"").to_string().ends_with("_stream") // skip for http2 streams
+        || path.ends_with("ai/chat_stream") // skip for ai
         || (method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1])))
     {
         let query_params = req.query_string().to_string();
@@ -226,13 +227,11 @@ async fn proxy(
         .request(method, &path.target_url)
         .send()
         .await
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Request failed: {}", e))
-        })?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Request failed: {e}")))?;
 
     let status = forwarded_resp.status().as_u16();
     let body = forwarded_resp.bytes().await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
+        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {e}"))
     })?;
 
     Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap()).body(body))
@@ -243,6 +242,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     svc.service(status::healthz)
         .service(status::healthz_head)
         .service(status::schedulez);
+
+    #[cfg(feature = "cloud")]
+    svc.service(web::scope("/webhook").service(billings::handle_stripe_event));
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -372,6 +375,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
+        .service(users::list_invitations)
+        .service(users::list_roles)
         .service(organization::org::organizations)
         .service(organization::settings::get)
         .service(organization::settings::create)
@@ -406,7 +411,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(logs::ingest::bulk)
         .service(logs::ingest::multi)
         .service(logs::ingest::json)
+        .service(logs::ingest::hec)
         .service(logs::ingest::otlp_logs_write)
+        .service(logs::loki::loki_push)
         .service(traces::traces_write)
         .service(traces::otlp_traces_write)
         .service(traces::get_latest_traces)
@@ -427,7 +434,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(promql::label_values)
         .service(promql::format_query_get)
         .service(promql::format_query_post)
-        .service(enrichment_table::save_enrichment_table)
         .service(search::search)
         .service(search::search_partition)
         .service(search::around_v1)
@@ -515,17 +521,11 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(syslog::update_route)
         .service(syslog::toggle_state)
         .service(enrichment_table::save_enrichment_table)
-        .service(metrics::ingest::otlp_metrics_write)
-        .service(logs::ingest::otlp_logs_write)
-        .service(traces::otlp_traces_write)
-        .service(dashboards::move_dashboard)
-        .service(traces::get_latest_traces)
-        .service(logs::ingest::multi)
-        .service(logs::ingest::json)
         .service(logs::ingest::handle_kinesis_request)
         .service(logs::ingest::handle_gcp_request)
         .service(organization::org::create_org)
         .service(authz::fga::create_role)
+        .service(organization::org::rename_org)
         .service(authz::fga::get_roles)
         .service(authz::fga::update_role)
         .service(authz::fga::get_role_permissions)
@@ -535,9 +535,10 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(authz::fga::get_group_details)
         .service(authz::fga::get_resources)
         .service(authz::fga::get_users_with_role)
+        .service(authz::fga::get_roles_for_user)
+        .service(authz::fga::get_groups_for_user)
         .service(authz::fga::delete_role)
         .service(authz::fga::delete_group)
-        .service(users::list_roles)
         .service(clusters::list_clusters)
         .service(pipeline::save_pipeline)
         .service(pipeline::update_pipeline)
@@ -585,7 +586,23 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::list_role_ratelimit)
         .service(ratelimit::update_ratelimit)
         .service(ratelimit::api_modules)
-        .service(actions::operations::test_action);
+        .service(actions::operations::test_action)
+        .service(ai::chat)
+        .service(ai::chat_stream);
+
+    #[cfg(feature = "cloud")]
+    let service = service
+        .service(organization::org::get_org_invites)
+        .service(organization::org::generate_org_invite)
+        .service(organization::org::accept_org_invite)
+        .service(billings::create_checkout_session)
+        .service(billings::process_session_detail)
+        .service(billings::list_subscription)
+        .service(billings::list_invoices)
+        .service(billings::unsubscribe)
+        .service(billings::create_billing_portal_session)
+        .service(billings::org_usage::get_org_quota_threshold)
+        .service(billings::org_usage::get_org_usage);
 
     svc.service(service);
 }
@@ -637,14 +654,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_proxy_routes() {
-        let mut app =
+        let app =
             init_service(App::new().configure(|cfg| get_proxy_routes_inner(cfg, false))).await;
 
         // Test GET request to /proxy/{org_id}/{target_url}
         let req = TestRequest::get()
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
-        let resp = call_service(&mut app, req).await;
+        let resp = call_service(&app, req).await;
         assert_eq!(resp.status().as_u16(), 404);
     }
 }

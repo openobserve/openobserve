@@ -32,12 +32,11 @@ use config::{
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
     },
-    utils::{json, schema_ext::SchemaExt},
+    utils::{base64, json, schema_ext::SchemaExt},
 };
 use hashbrown::HashMap;
 use infra::{
-    cache::{self, file_data::disk::FileType},
-    file_list,
+    cache, file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
@@ -50,23 +49,19 @@ use {
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
-    config::{
-        ider,
-        utils::{base64, time::now_micros},
-    },
+    config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
-        infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
+        config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_text},
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
-    std::io::ErrorKind,
 };
 
 use crate::{
@@ -136,8 +131,9 @@ struct ConfigResponse<'a> {
     max_dashboard_series: usize,
     actions_enabled: bool,
     streaming_enabled: bool,
-    max_query_range: i64,
     histogram_enabled: bool,
+    max_query_range: i64,
+    ai_enabled: bool,
     dashboard_placeholder: String,
 }
 
@@ -270,6 +266,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = false;
 
     #[cfg(feature = "enterprise")]
+    let ai_enabled = o2cfg.ai.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let ai_enabled = false;
+
+    #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
@@ -332,8 +333,9 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
         streaming_enabled: cfg.websocket.streaming_enabled,
-        max_query_range: cfg.limit.default_max_query_range_days * 24,
         histogram_enabled: cfg.limit.histogram_enabled,
+        max_query_range: cfg.limit.default_max_query_range_days * 24,
+        ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
     }))
 }
@@ -360,11 +362,13 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let mem_file_num = cache::file_data::memory::len().await;
     let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len(FileType::Data).await;
-    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats(FileType::Data).await;
-    let disk_result_file_num = cache::file_data::disk::len(FileType::Result).await;
+    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::Data).await;
+    let (disk_max_size, disk_cur_size) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Data).await;
+    let disk_result_file_num =
+        cache::file_data::disk::len(cache::file_data::disk::FileType::Result).await;
     let (disk_result_max_size, disk_result_cur_size) =
-        cache::file_data::disk::stats(FileType::Result).await;
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Result).await;
     stats.insert(
         "FILE_DATA",
         json::json!({
@@ -380,9 +384,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         "FILE_LIST",
         json::json!({"num":file_list_num,"max_id": file_list_max_id}),
     );
-
-    let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
-    stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
 
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
     stats.insert(
@@ -478,13 +479,15 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::{AuthTokens, UserRole};
+    use config::meta::user::UserRole;
+
+    use crate::common::meta::user::AuthTokens;
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
         Some(code) => code,
         None => {
-            return Err(Error::new(ErrorKind::Other, "no code in request"));
+            return Err(Error::other("no code in request"));
         }
     };
     let mut audit_message = AuditMessage {
@@ -512,7 +515,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
-                return Err(Error::new(ErrorKind::Other, "invalid state in request"));
+                return Err(Error::other("invalid state in request"));
             }
         },
 
@@ -520,7 +523,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // Bad Request
             audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
-            return Err(Error::new(ErrorKind::Other, "no state in request"));
+            return Err(Error::other("no state in request"));
         }
     };
 
@@ -543,15 +546,14 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
-                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await {
-                        if db_user
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
+                        && db_user
                             .organizations
                             .iter()
                             .any(|org| org.role.eq(&UserRole::ServiceAccount))
-                        {
-                            return Ok(HttpResponse::Unauthorized()
-                                .json("Service accounts are not allowed to login".to_string()));
-                        }
+                    {
+                        return Ok(HttpResponse::Unauthorized()
+                            .json("Service accounts are not allowed to login".to_string()));
                     }
 
                     audit_message.user_email = res.0.user_email.clone();
@@ -592,7 +594,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
@@ -600,6 +602,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             })
             .unwrap();
             let cfg = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -694,7 +697,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
@@ -702,6 +705,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             })
             .unwrap();
             let conf = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -721,6 +725,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
         Err(_) => {
             let conf = get_config();
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -749,6 +754,7 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     conf: &Arc<Config>,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
+    let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(
         cookie::time::OffsetDateTime::now_utc()
@@ -777,7 +783,9 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let user_email = get_user_email_from_auth_str(&auth_str).await;
 
     if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
 
         if access_token.starts_with("session") {

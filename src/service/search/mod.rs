@@ -35,7 +35,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_distinct_query},
+        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -54,23 +54,15 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
-    config::utils::sql::is_simple_aggregate_query,
-    o2_enterprise::enterprise::{
-        common::infra::config::get_config as get_o2_config,
-        search::{
-            TaskStatus, WorkGroup,
-            cache::{
-                CardinalityLevel,
-                streaming_agg::{
-                    create_aggregation_cache_file_path, generate_aggregation_cache_interval,
-                    get_aggregation_cache_key_from_request,
-                },
-            },
-            cache_aggs_util,
-            datafusion::distributed_plan::streaming_aggs_exec,
-        },
+    crate::service::grpc::make_grpc_search_client,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup,
+    o2_enterprise::enterprise::search::cache::streaming_agg::{
+        create_aggregation_cache_file_path, generate_aggregation_cache_interval,
+        get_aggregation_cache_key_from_request,
     },
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
     std::collections::HashSet,
     tracing::info_span,
 };
@@ -203,6 +195,10 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
     let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
@@ -240,13 +236,13 @@ pub async fn search(
     let mut _work_group = None;
     #[cfg(feature = "enterprise")]
     {
-        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
-            if let Some((_, stat)) = status.first() {
-                match stat.work_group.as_ref() {
-                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                    None => _work_group = None,
-                }
+        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
+            && let Some((_, stat)) = status.first()
+        {
+            match stat.work_group.as_ref() {
+                Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                None => _work_group = None,
             }
         };
     }
@@ -271,6 +267,9 @@ pub async fn search(
                             | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
+                            // Alerts search now uses grpc cache::search which does report usage
+                            | search::SearchEventType::Alerts
+                            | search::SearchEventType::DerivedStream
                     ) {
                         (false, None, None)
                     } else {
@@ -376,7 +375,7 @@ pub async fn search_multi(
             per_query_resp = true;
         }
         if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
+            query_fn = Some(format!("{vrl_function} \n ."));
         }
     }
 
@@ -390,7 +389,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+            return Err(Error::Message(format!("decode sql error: {e}")));
         }
     }
     let queries_len = queries.len();
@@ -412,7 +411,7 @@ pub async fn search_multi(
         }
 
         for fn_name in get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -452,7 +451,7 @@ pub async fn search_multi(
                 }
             }
             Err(e) => {
-                log::error!("search_multi: search error: {:?}", e);
+                log::error!("search_multi: search error: {e}");
                 if index == 0 {
                     // Error in the first query, return the error
                     return Err(e); // TODO: return partial results
@@ -674,6 +673,46 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
+    // check if we need to use streaming_output
+    let streaming_id = if req.streaming_output && is_streaming_aggregate {
+        Some(ider::uuid())
+    } else {
+        None
+    };
+
+    #[cfg(feature = "enterprise")]
+    if let Some(id) = &streaming_id {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
+        );
+
+        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
+            // TODO: cache don't not support multiple stream names
+            Ok(v) => (v[0].clone(), v.join(",")),
+            Err(e) => {
+                return Err(Error::Message(e.to_string()));
+            }
+        };
+
+        let cache_interval =
+            generate_aggregation_cache_interval(query.start_time, query.end_time) as i64;
+        let hashed_query = get_aggregation_cache_key_from_request(req);
+        let cache_file_path = create_aggregation_cache_file_path(
+            org_id,
+            &stream_type.to_string(),
+            &stream_name,
+            hashed_query,
+            cache_interval,
+        );
+        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
+        log::info!(
+            "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
+            trace_id,
+            id,
+            cache_file_path
+        );
+    }
+
     #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
     let (streaming_id, streaming_interval_micros) = if req.streaming_output
@@ -770,6 +809,7 @@ pub async fn search_partition(
 
         if !skip_get_file_list && !use_stream_stats_for_partition {
             let stream_files = crate::service::file_list::query_ids(
+                trace_id,
                 &sql.org_id,
                 stream_type,
                 &stream_name,
@@ -906,7 +946,7 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(1);
+        let hist_int = sql.histogram_interval.unwrap_or(0);
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
@@ -1373,10 +1413,10 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
     /// Set a key and value in the MetadataMap.  Does nothing if the key or
     /// value are not valid inputs
     fn set(&mut self, key: &str, value: String) {
-        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes()) {
-            if let Ok(val) = tonic::metadata::MetadataValue::try_from(&value) {
-                self.0.insert(key, val);
-            }
+        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes())
+            && let Ok(val) = tonic::metadata::MetadataValue::try_from(&value)
+        {
+            self.0.insert(key, val);
         }
     }
 }
@@ -1390,10 +1430,10 @@ pub fn generate_search_schema_diff(
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = latest_schema_map.get(field.name()) {
-            if field.data_type() != latest_field.data_type() {
-                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-            }
+        if let Some(latest_field) = latest_schema_map.get(field.name())
+            && field.data_type() != latest_field.data_type()
+        {
+            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
         }
     }
 

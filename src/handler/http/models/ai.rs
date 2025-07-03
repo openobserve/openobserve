@@ -13,21 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::db;
+use o2_enterprise::enterprise::ai::meta::AiMessage;
+use serde::{Deserialize, Serialize};
 
-pub async fn get() -> Result<String, anyhow::Error> {
-    let ret = db::get("/meta/kv/version").await?;
-    let version = std::str::from_utf8(&ret).unwrap();
-    Ok(version.to_string())
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromptRequest {
+    pub messages: Vec<AiMessage>,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default)]
+    pub provider: String,
 }
 
-pub async fn set() -> Result<(), anyhow::Error> {
-    db::put(
-        "/meta/kv/version",
-        bytes::Bytes::from(config::VERSION),
-        db::NO_NEED_WATCH,
-        None,
-    )
-    .await?;
-    Ok(())
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromptResponse {
+    pub role: String,
+    pub content: String,
+}
+
+impl From<AiMessage> for PromptResponse {
+    fn from(message: AiMessage) -> Self {
+        Self {
+            role: message.role,
+            content: message.content,
+        }
+    }
 }

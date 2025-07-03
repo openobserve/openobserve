@@ -141,7 +141,7 @@ async fn delete(msg: Message) -> Result<()> {
 
 async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
     // Return if the module_key is in new format (alert_id only)
-    if !trigger.module_key.contains("/") {
+    if !trigger.module_key.contains("/") || trigger.module != TriggerModule::Alert {
         return Ok(());
     }
     let parts = trigger.module_key.split("/").collect::<Vec<&str>>();

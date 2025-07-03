@@ -78,6 +78,7 @@ static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     files
 });
 
+// aggregation cache
 static AGGREGATION_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
@@ -111,6 +112,7 @@ pub struct FileData {
     cur_size: usize,
     root_dir: String,
     multi_dir: Vec<String>,
+    file_type: FileType,
     data: CacheStrategy,
 }
 
@@ -202,7 +204,7 @@ impl FileData {
         }
     }
 
-    async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+    async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
@@ -215,7 +217,7 @@ impl FileData {
                 self.max_size,
                 max(get_config().disk_cache.release_size, data_size * 100),
             );
-            self.gc(trace_id, need_release_size).await?;
+            self.gc(need_release_size).await?;
         }
 
         // write file into local disk
@@ -256,7 +258,7 @@ impl FileData {
         Ok(())
     }
 
-    async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+    async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!(
             "[CacheType:{} trace_id: {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
@@ -550,7 +552,7 @@ pub async fn exist(file: &str) -> bool {
 }
 
 #[inline]
-pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
     }
@@ -571,7 +573,7 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     if files.exist(file).await {
         return Ok(());
     }
-    files.set(trace_id, file, data).await
+    files.set(file, data).await
 }
 
 #[inline]
@@ -614,7 +616,7 @@ pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
     } else {
         RESULT_FILES[idx].write().await
     };
-    files.remove(trace_id, file).await
+    files.remove(file).await
 }
 
 #[async_recursion]
@@ -786,7 +788,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc("global", cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
     for file in RESULT_FILES.iter() {
@@ -797,7 +799,18 @@ async fn gc() -> Result<(), anyhow::Error> {
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc("global", cfg.disk_cache.gc_size).await?;
+        w.gc(cfg.disk_cache.gc_size).await?;
+        drop(w);
+    }
+    for file in AGGREGATION_FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + cfg.disk_cache.release_size < r.max_size {
+            drop(r);
+            continue;
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
     for file in AGGREGATION_FILES.iter() {
@@ -978,7 +991,7 @@ mod tests {
                 "files/default/logs/disk/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let resp = file_data.set(&file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
@@ -994,16 +1007,10 @@ mod tests {
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
         assert!(file_data.size().0 > 0);
     }
@@ -1016,16 +1023,10 @@ mod tests {
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
-        file_data
-            .set(trace_id, file_key1, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key1, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key1).await);
         // set another key, will release first key
-        file_data
-            .set(trace_id, file_key2, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key2, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key2).await);
         // get first key, should get error
         assert!(!file_data.exist(file_key1).await);
@@ -1042,7 +1043,7 @@ mod tests {
                 "files/default/logs/disk/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let resp = file_data.set(&file_key, content.clone()).await;
             if let Some(e) = resp.as_ref().err() {
                 println!("set file_key: {} error: {:?}", file_key, e);
             }
@@ -1061,16 +1062,10 @@ mod tests {
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
         assert!(file_data.size().0 > 0);
     }
@@ -1083,16 +1078,10 @@ mod tests {
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
-        file_data
-            .set(trace_id, file_key1, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key1, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key1).await);
         // set another key, will release first key
-        file_data
-            .set(trace_id, file_key2, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key2, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key2).await);
         // get first key, should get error
         assert!(!file_data.exist(file_key1).await);
@@ -1116,16 +1105,10 @@ mod tests {
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
 
-        file_data
-            .set(trace_id, file_key, content.clone())
-            .await
-            .unwrap();
+        file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
         assert!(file_data.size().0 > 0);
 
@@ -1146,7 +1129,21 @@ mod tests {
         );
         assert_eq!(meta.start_time, 1744081170000000);
         assert_eq!(meta.end_time, 1744081170000000);
-        assert_eq!(meta.is_aggregate, true);
+        assert!(meta.is_aggregate);
         assert_eq!(meta.is_descending, false);
+    }
+
+    #[tokio::test]
+    async fn test_parse_aggregation_cache_key() {
+        let file_key = "aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
+        let Some((org_id, stream_type, query_key, meta)) = parse_aggregation_cache_key(file_key)
+        else {
+            panic!("parse aggregation cache key error");
+        };
+        assert_eq!(org_id, "default");
+        assert_eq!(stream_type, "logs");
+        assert_eq!(query_key, "default_logs_default_16042959487540176184");
+        assert_eq!(meta.start_time, 1744081170000000);
+        assert_eq!(meta.end_time, 1744081170000000);
     }
 }

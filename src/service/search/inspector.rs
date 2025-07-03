@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::get_config;
+use config::{cluster::LOCAL_NODE, get_config, meta::cluster::NodeInfo};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -34,6 +34,10 @@ pub struct SearchInspectorFields {
     pub sql: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_range: Option<(String, String)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<String>,
 }
 
 impl SearchInspectorFields {
@@ -55,7 +59,11 @@ impl Default for SearchInspectorFieldsBuilder {
 impl SearchInspectorFieldsBuilder {
     pub fn new() -> Self {
         Self {
-            fields: Default::default(),
+            fields: SearchInspectorFields {
+                region: Some(LOCAL_NODE.get_region()),
+                cluster: Some(LOCAL_NODE.get_cluster()),
+                ..Default::default()
+            },
         }
     }
 
@@ -94,6 +102,16 @@ impl SearchInspectorFieldsBuilder {
         self
     }
 
+    pub fn region(mut self, value: String) -> Self {
+        self.fields.region = Some(value);
+        self
+    }
+
+    pub fn cluster(mut self, value: String) -> Self {
+        self.fields.cluster = Some(value);
+        self
+    }
+
     pub fn build(self) -> SearchInspectorFields {
         self.fields
     }
@@ -121,12 +139,12 @@ fn search_inspector_fields_inner(msg: String, kvs: SearchInspectorFields) -> Str
 }
 
 pub fn extract_search_inspector_fields(msg: &str) -> Option<SearchInspectorFields> {
-    if let Some(start) = msg.find(" #{\"") {
-        if let Some(end) = msg[start..].find("}#") {
-            let json_str = &msg[start + 2..start + end + 1];
-            if let Ok(fields) = serde_json::from_str::<SearchInspectorFields>(json_str) {
-                return Some(fields);
-            }
+    if let Some(start) = msg.find(" #{\"")
+        && let Some(end) = msg[start..].find("}#")
+    {
+        let json_str = &msg[start + 2..start + end + 1];
+        if let Ok(fields) = serde_json::from_str::<SearchInspectorFields>(json_str) {
+            return Some(fields);
         }
     }
     None

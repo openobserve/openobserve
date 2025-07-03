@@ -63,7 +63,7 @@ impl JsonEncoder {
 
             // Write `# TYPE` header.
             let metric_type: MetricType = mf.get_field_type();
-            let lowercase_type = json!(format!("{:?}", metric_type).to_lowercase());
+            let lowercase_type = json!(format!("{metric_type:?}").to_lowercase());
             mf_map.insert("__type__".to_string(), lowercase_type);
 
             for m in mf.get_metric() {
@@ -238,5 +238,131 @@ impl WriteUtf8 for StringBuf<'_> {
     fn write_all(&mut self, text: &[u8]) -> io::Result<()> {
         self.0.push_str(std::str::from_utf8(text).unwrap());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use prometheus::{Counter, Gauge, Histogram, HistogramOpts, core::Collector};
+
+    use super::*;
+
+    #[test]
+    fn test_encode_counter() {
+        let counter = Counter::new("test_counter", "test counter help").unwrap();
+        counter.inc();
+        counter.inc_by(2.0);
+
+        let encoder = JsonEncoder::new();
+        let mut buf = String::new();
+        encoder.encode_utf8(&counter.collect(), &mut buf).unwrap();
+        let json: Value = serde_json::from_str(&buf).unwrap();
+
+        assert!(json.is_array());
+        let metrics = json.as_array().unwrap();
+        assert!(!metrics.is_empty());
+
+        let metric = &metrics[0];
+        assert_eq!(metric["__name__"], "test_counter");
+        assert_eq!(metric["help"], "test counter help");
+        assert_eq!(metric["__type__"], "counter");
+        assert_eq!(metric["value"], 3.0);
+    }
+
+    #[test]
+    fn test_encode_gauge() {
+        let gauge = Gauge::new("test_gauge", "test gauge help").unwrap();
+        gauge.set(42.0);
+
+        let encoder = JsonEncoder::new();
+        let mut buf = String::new();
+        encoder.encode_utf8(&gauge.collect(), &mut buf).unwrap();
+        let json: Value = serde_json::from_str(&buf).unwrap();
+
+        let metrics = json.as_array().unwrap();
+        let metric = &metrics[0];
+        assert_eq!(metric["__name__"], "test_gauge");
+        assert_eq!(metric["help"], "test gauge help");
+        assert_eq!(metric["__type__"], "gauge");
+        assert_eq!(metric["value"], 42.0);
+    }
+
+    #[test]
+    fn test_encode_histogram() {
+        let histogram = Histogram::with_opts(
+            HistogramOpts::new("test_histogram", "test histogram help")
+                .buckets(vec![1.0, 2.0, 5.0]),
+        )
+        .unwrap();
+        histogram.observe(1.5);
+        histogram.observe(2.5);
+        histogram.observe(3.5);
+
+        let encoder = JsonEncoder::new();
+        let mut buf = String::new();
+        encoder.encode_utf8(&histogram.collect(), &mut buf).unwrap();
+        let json: Value = serde_json::from_str(&buf).unwrap();
+
+        let metrics = json.as_array().unwrap();
+        assert!(metrics.len() > 1); // Should have multiple entries for buckets, sum, and count
+
+        // Find the sum metric
+        let sum_metric = metrics
+            .iter()
+            .find(|m| m["__name__"] == "test_histogram_sum")
+            .unwrap();
+        assert_eq!(sum_metric["__type__"], "counter");
+        assert!(sum_metric["value"].as_f64().unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_encode_multiple_metrics() {
+        let counter = Counter::new("test_counter", "test counter help").unwrap();
+        let gauge = Gauge::new("test_gauge", "test gauge help").unwrap();
+        counter.inc();
+        gauge.set(42.0);
+
+        let encoder = JsonEncoder::new();
+        let mut buf = String::new();
+        encoder.encode_utf8(&counter.collect(), &mut buf).unwrap();
+        let json: Value = serde_json::from_str(&buf).unwrap();
+
+        let metrics = json.as_array().unwrap();
+        assert_eq!(metrics.len(), 1);
+
+        let counter_metric = metrics
+            .iter()
+            .find(|m| m["__name__"] == "test_counter")
+            .unwrap();
+
+        let encoder = JsonEncoder::new();
+        let mut buf = String::new();
+        encoder.encode_utf8(&gauge.collect(), &mut buf).unwrap();
+        let json: Value = serde_json::from_str(&buf).unwrap();
+
+        let metrics = json.as_array().unwrap();
+        assert_eq!(metrics.len(), 1);
+        let gauge_metric = metrics
+            .iter()
+            .find(|m| m["__name__"] == "test_gauge")
+            .unwrap();
+
+        assert_eq!(counter_metric["value"], 1.0);
+        assert_eq!(gauge_metric["value"], 42.0);
+    }
+
+    #[test]
+    fn test_encode_to_string() {
+        let counter = Counter::new("test_counter", "test counter help").unwrap();
+        counter.inc();
+
+        let encoder = JsonEncoder::new();
+        let result = encoder.encode_to_string(&counter.collect()).unwrap();
+        let json: Value = serde_json::from_str(&result).unwrap();
+
+        assert!(json.is_array());
+        let metrics = json.as_array().unwrap();
+        assert!(!metrics.is_empty());
+        assert_eq!(metrics[0]["__name__"], "test_counter");
     }
 }

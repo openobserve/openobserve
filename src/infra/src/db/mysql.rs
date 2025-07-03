@@ -32,20 +32,25 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(|| connect(false));
-pub static CLIENT_RO: Lazy<Pool<MySql>> = Lazy::new(|| connect(true));
+pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(|| connect(false, false));
+pub static CLIENT_RO: Lazy<Pool<MySql>> = Lazy::new(|| connect(true, false));
+pub static CLIENT_DDL: Lazy<Pool<MySql>> = Lazy::new(|| connect(false, true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
-fn connect(readonly: bool) -> Pool<MySql> {
-    let mut dsn = if readonly {
-        config::get_config().common.meta_mysql_ro_dsn.clone()
-    } else {
-        config::get_config().common.meta_mysql_dsn.clone()
-    };
-    if dsn.is_empty() {
-        dsn = config::get_config().common.meta_mysql_dsn.clone();
-    }
+fn connect(readonly: bool, ddl: bool) -> Pool<MySql> {
     let cfg = config::get_config();
+    let mut dsn = match (readonly, ddl) {
+        // readonly non-ddl
+        (true, false) => cfg.common.meta_mysql_ro_dsn.clone(),
+        // read-write non-ddl
+        (false, false) => cfg.common.meta_mysql_dsn.clone(),
+        // ddl
+        (_, true) => cfg.common.meta_ddl_dsn.clone(),
+    };
+    // the default fallback is original dsn, which is checked in config.rs to be non-empty
+    if dsn.is_empty() {
+        dsn = cfg.common.meta_mysql_dsn.clone();
+    }
     let db_opts = MySqlConnectOptions::from_str(&dsn).expect("mysql connect options create failed");
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
@@ -130,8 +135,7 @@ impl super::Db for MysqlDb {
             .with_label_values(&["select", "meta", ""])
             .inc();
         let query = format!(
-            "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
-            module, key1, key2
+            "SELECT value FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
         );
         let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
             Ok(v) => v,
@@ -234,14 +238,13 @@ impl super::Db for MysqlDb {
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let lock_pool = CLIENT.clone();
-        let lock_key = format!("get_for_update_{}", key);
+        let lock_key = format!("get_for_update_{key}");
         let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
         let lock_sql = format!(
-            "SELECT GET_LOCK('{}', {})",
-            lock_id,
+            "SELECT GET_LOCK('{lock_id}', {})",
             config::get_config().limit.meta_transaction_lock_timeout
         );
-        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{lock_id}')");
         let mut lock_tx = lock_pool.begin().await?;
         DB_QUERY_NUMS.with_label_values(&["get_lock", "", ""]).inc();
         match sqlx::query_scalar::<_, i64>(&lock_sql)
@@ -251,7 +254,7 @@ impl super::Db for MysqlDb {
             Ok(v) => {
                 if v != 1 {
                     if let Err(e) = lock_tx.rollback().await {
-                        log::error!("[MYSQL] rollback lock for get_for_update error: {}", e);
+                        log::error!("[MYSQL] rollback lock for get_for_update error: {e}");
                     }
                     return Err(Error::from(DbError::DBOperError(
                         "LockTimeout".to_string(),
@@ -261,7 +264,7 @@ impl super::Db for MysqlDb {
             }
             Err(e) => {
                 if let Err(e) = lock_tx.rollback().await {
-                    log::error!("[MYSQL] rollback lock for get_for_update error: {}", e);
+                    log::error!("[MYSQL] rollback lock for get_for_update error: {e}");
                 }
                 return Err(e.into());
             }
@@ -272,10 +275,10 @@ impl super::Db for MysqlDb {
             Ok(tx) => tx,
             Err(e) => {
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] unlock get_for_update error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
                 }
                 return Err(e.into());
             }
@@ -301,14 +304,14 @@ impl super::Db for MysqlDb {
                         None
                     } else {
                         if let Err(e) = tx.rollback().await {
-                            log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                            log::error!("[MYSQL] rollback get_for_update error: {e}");
                         }
                         DB_QUERY_NUMS.with_label_values(&["release_lock", "", ""]).inc();
                         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                            log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                            log::error!("[MYSQL] unlock get_for_update error: {e}");
                         }
                         if let Err(e) = lock_tx.commit().await {
-                            log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                            log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
                         }
                         return Err(e.into());
                     }
@@ -333,14 +336,14 @@ impl super::Db for MysqlDb {
                         None
                     } else {
                         if let Err(e) = tx.rollback().await {
-                            log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                            log::error!("[MYSQL] rollback get_for_update error: {e}");
                         }
                         DB_QUERY_NUMS.with_label_values(&["release_lock", "", ""]).inc();
                         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                            log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                            log::error!("[MYSQL] unlock get_for_update error: {e}");
                         }
                         if let Err(e) = lock_tx.commit().await {
-                            log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                            log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
                         }
                         return Err(e.into());
                     }
@@ -353,31 +356,31 @@ impl super::Db for MysqlDb {
         let (value, new_value) = match update_fn(value) {
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                    log::error!("[MYSQL] rollback get_for_update error: {e}");
                 }
                 DB_QUERY_NUMS
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] unlock get_for_update error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
                 }
                 return Err(e);
             }
             Ok(None) => {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                    log::error!("[MYSQL] rollback get_for_update error: {e}");
                 }
                 DB_QUERY_NUMS
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] unlock get_for_update error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
                 }
                 return Ok(());
             }
@@ -412,16 +415,16 @@ impl super::Db for MysqlDb {
             };
             if let Err(e) = ret {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                    log::error!("[MYSQL] rollback get_for_update error: {e}");
                 }
                 DB_QUERY_NUMS
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] unlock get_for_update error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
                 }
                 return Err(e.into());
             }
@@ -446,7 +449,7 @@ impl super::Db for MysqlDb {
             .await
             {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                    log::error!("[MYSQL] rollback get_for_update error: {e}");
                 }
                 DB_QUERY_NUMS
                     .with_label_values(&["release_lock", "", ""])
@@ -469,10 +472,10 @@ impl super::Db for MysqlDb {
             .with_label_values(&["release_lock", "", ""])
             .inc();
         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-            log::error!("[MYSQL] unlock get_for_update error: {}", e);
+            log::error!("[MYSQL] unlock get_for_update error: {e}");
         }
         if let Err(e) = lock_tx.commit().await {
-            log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+            log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
         }
 
         // event watch
@@ -513,7 +516,7 @@ impl super::Db for MysqlDb {
                         .delete(&key, false, true, start_dt)
                         .await
                     {
-                        log::error!("[MYSQL] send event error: {}", e);
+                        log::error!("[MYSQL] send event error: {e}");
                     }
                 }
             });
@@ -524,27 +527,22 @@ impl super::Db for MysqlDb {
         let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
         let sql = if with_prefix {
             if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
+                format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
             } else if key2.is_empty() {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
-                    module, key1
-                )
+                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND (key2 = '{}' OR key2 LIKE '{}/%');"#,
-                    module, key1, key2, key2
+                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
                 )
             }
         } else {
             format!(
-                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
-                module, key1, key2
+                r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}';"#
             )
         };
 
         let sql = if let Some(start_dt) = start_dt {
-            sql.replace(';', &format!(" AND start_dt = {};", start_dt))
+            sql.replace(';', &format!(" AND start_dt = {start_dt};"))
         } else {
             sql
         };
@@ -562,15 +560,15 @@ impl super::Db for MysqlDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -594,16 +592,16 @@ impl super::Db for MysqlDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
 
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "meta", ""])
@@ -642,19 +640,16 @@ impl super::Db for MysqlDb {
         let mut sql =
             "SELECT id, module, key1, key2, start_dt, value AS value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!(
-            "{} AND start_dt >= {} AND start_dt <= {}",
-            sql, min_dt, max_dt
-        );
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
+        sql = format!("{sql} ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "meta", ""])
@@ -672,13 +667,13 @@ impl super::Db for MysqlDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -704,7 +699,7 @@ impl super::Db for MysqlDb {
 }
 
 pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     DB_QUERY_NUMS
         .with_label_values(&["create", "meta", ""])
         .inc();
@@ -762,7 +757,7 @@ CREATE TABLE IF NOT EXISTS meta
 }
 
 async fn add_start_dt_column() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
 
     DB_QUERY_NUMS
@@ -772,18 +767,17 @@ async fn add_start_dt_column() -> Result<()> {
         sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;"#)
             .execute(&mut *tx)
             .await
+        && !e.to_string().contains("Duplicate column name")
     {
-        if !e.to_string().contains("Duplicate column name") {
-            // Check for the specific MySQL error code for duplicate column
-            log::error!("[MYSQL] Unexpected error in adding column: {}", e);
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-            }
-            return Err(e.into());
+        // Check for the specific MySQL error code for duplicate column
+        log::error!("[MYSQL] Unexpected error in adding column: {e}");
+        if let Err(e) = tx.rollback().await {
+            log::error!("[MYSQL] Error in rolling back transaction: {e}");
         }
+        return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {}", e);
+        log::info!("[MYSQL] Error in committing transaction: {e}");
         return Err(e.into());
     };
 
@@ -802,7 +796,7 @@ async fn add_start_dt_column() -> Result<()> {
 }
 
 async fn create_meta_backup() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
     DB_QUERY_NUMS
         .with_label_values(&["create", "meta_backup_20240330", ""])
@@ -813,10 +807,7 @@ async fn create_meta_backup() -> Result<()> {
         .await
     {
         if let Err(e) = tx.rollback().await {
-            log::error!(
-                "[MYSQL] rollback create table meta_backup_20240330 error: {}",
-                e
-            );
+            log::error!("[MYSQL] rollback create table meta_backup_20240330 error: {e}");
         }
         return Err(e.into());
     }
@@ -839,17 +830,14 @@ async fn create_meta_backup() -> Result<()> {
             .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!(
-                    "[MYSQL] rollback insert into meta_backup_20240330 error: {}",
-                    e
-                );
+                log::error!("[MYSQL] rollback insert into meta_backup_20240330 error: {e}");
             }
             return Err(e.into());
         }
     }
 
     if let Err(e) = tx.commit().await {
-        log::error!("[MYSQL] commit transaction error: {}", e);
+        log::error!("[MYSQL] commit transaction error: {e}");
         return Err(e.into());
     }
 
@@ -857,7 +845,7 @@ async fn create_meta_backup() -> Result<()> {
 }
 
 pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
-    let client = CLIENT.clone();
+    let client = CLIENT_DDL.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
         name: index.idx_name.into(),
@@ -892,7 +880,7 @@ pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
 }
 
 pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
-    let client = CLIENT.clone();
+    let client = CLIENT_DDL.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),
@@ -902,7 +890,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     }
     log::info!("[MYSQL] deleting index {} on table {}", idx_name, table);
     DB_QUERY_NUMS.with_label_values(&["drop", table, ""]).inc();
-    let sql = format!("DROP INDEX {} ON {};", idx_name, table);
+    let sql = format!("DROP INDEX {idx_name} ON {table};");
     let start = std::time::Instant::now();
     sqlx::query(&sql).execute(&client).await?;
     let time = start.elapsed().as_secs_f64();

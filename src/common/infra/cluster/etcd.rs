@@ -45,7 +45,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let ttl_keep_alive = max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
@@ -194,7 +194,7 @@ async fn register() -> Result<()> {
     let opt = PutOptions::new().with_lease(id);
     if let Err(e) = client.put(key, val, Some(opt)).await {
         dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(format!("register node error: {}", e)));
+        return Err(Error::Message(format!("register node error: {e}")));
     }
 
     // 7. register ok, release lock
@@ -273,7 +273,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.put(key, val, Some(opt)).await {
-        return Err(Error::Message(format!("online node error: {}", e)));
+        return Err(Error::Message(format!("online node error: {e}")));
     }
 
     Ok(())
@@ -284,7 +284,7 @@ pub(crate) async fn leave() -> Result<()> {
     let key = format!("{}nodes/{}", get_config().etcd.prefix, LOCAL_NODE.uuid);
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.delete(key, None).await {
-        return Err(Error::Message(format!("leave node error: {}", e)));
+        return Err(Error::Message(format!("leave node error: {e}")));
     }
 
     Ok(())
@@ -296,7 +296,45 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let val = json::to_string(&node).unwrap();
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.put(key, val, Some(opt)).await {
-        return Err(Error::Message(format!("update node error: {}", e)));
+        return Err(Error::Message(format!("update node error: {e}")));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_etcd_update_local_node() {
+        let node = Node::default();
+        let _ = update_local_node(&node).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_set_status() {
+        let _ = set_status(NodeStatus::Online, true).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_set_offline() {
+        let _ = set_offline(true).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_leave() {
+        let _ = leave().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_register_and_keep_alive() {
+        config::cache_instance_id("instance");
+        let _ = register_and_keep_alive().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_register() {
+        config::cache_instance_id("instance");
+        let _ = register().await.is_err();
+    }
 }

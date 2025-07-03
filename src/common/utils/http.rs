@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    io::{Error, ErrorKind},
+    io::Error,
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
@@ -52,8 +52,7 @@ pub(crate) fn get_search_type_from_request(
         Some(s) => match SearchEventType::try_from(s.as_str()) {
             Ok(search_type) => Some(search_type),
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed",
                 ));
             }
@@ -200,54 +199,199 @@ pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use actix_web::{http::header::HeaderValue, web::Query};
+
     use super::*;
 
     #[test]
     fn test_get_stream_type_from_request() {
-        let key = "type".to_string();
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("type".to_string(), "logs".to_string());
+        assert_eq!(get_stream_type_from_request(&query), Some(StreamType::Logs));
 
-        let mut map: HashMap<String, String> = HashMap::default();
-        map.insert(key.clone(), key.clone());
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("type".to_string(), "metrics".to_string());
+        assert_eq!(
+            get_stream_type_from_request(&query),
+            Some(StreamType::Metrics)
+        );
 
-        let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp, Some(StreamType::default()));
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("type".to_string(), "traces".to_string());
+        assert_eq!(
+            get_stream_type_from_request(&query),
+            Some(StreamType::Traces)
+        );
 
-        map.insert(key.clone(), "LOGS".to_string());
-        let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp, Some(StreamType::Logs));
-
-        map.insert(key.clone(), "METRICS".to_string());
-        let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp, Some(StreamType::Metrics));
-
-        map.insert(key.clone(), "TRACES".to_string());
-        let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp, Some(StreamType::Traces));
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert_eq!(get_stream_type_from_request(&query), None);
     }
 
-    /// Test logic for IP parsing
     #[test]
-    fn test_ip_parsing() {
-        let valid_addresses = vec![
-            "127.0.0.1",
-            "127.0.0.1:8080",
-            "::1",
-            "192.168.0.1:8080",
-            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
-            "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080",
-        ];
-
-        let parsed_addresses: Vec<IpAddr> = valid_addresses
-            .iter()
-            .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
-            .collect();
-
-        assert!(
-            parsed_addresses
-                .iter()
-                .zip(valid_addresses)
-                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
-                .fold(true, |acc, x| { acc | x })
+    fn test_get_fallback_order_by_col_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("fallback_order_by_col".to_string(), "timestamp".to_string());
+        assert_eq!(
+            get_fallback_order_by_col_from_request(&query),
+            Some("timestamp".to_string())
         );
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert_eq!(get_fallback_order_by_col_from_request(&query), None);
+    }
+
+    #[test]
+    fn test_get_search_type_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("search_type".to_string(), "ui".to_string());
+        assert_eq!(
+            get_search_type_from_request(&query).unwrap(),
+            Some(SearchEventType::UI)
+        );
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("search_type".to_string(), "dashboards".to_string());
+        assert_eq!(
+            get_search_type_from_request(&query).unwrap(),
+            Some(SearchEventType::Dashboards)
+        );
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("search_type".to_string(), "invalid".to_string());
+        assert!(get_search_type_from_request(&query).is_err());
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert_eq!(get_search_type_from_request(&query).unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_search_event_context_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("dashboard_id".to_string(), "123".to_string());
+        query.insert("dashboard_name".to_string(), "Test Dashboard".to_string());
+        query.insert("folder_id".to_string(), "456".to_string());
+        query.insert("folder_name".to_string(), "Test Folder".to_string());
+
+        let context =
+            get_search_event_context_from_request(&SearchEventType::Dashboards, &query).unwrap();
+        assert_eq!(context.dashboard_id, Some("123".to_string()));
+        assert_eq!(context.dashboard_name, Some("Test Dashboard".to_string()));
+        assert_eq!(context.dashboard_folder_id, Some("456".to_string()));
+        assert_eq!(
+            context.dashboard_folder_name,
+            Some("Test Folder".to_string())
+        );
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("alert_key".to_string(), "alert123".to_string());
+
+        let context =
+            get_search_event_context_from_request(&SearchEventType::Alerts, &query).unwrap();
+        assert_eq!(context.alert_key, Some("alert123".to_string()));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("report_id".to_string(), "report123".to_string());
+
+        let context =
+            get_search_event_context_from_request(&SearchEventType::Reports, &query).unwrap();
+        assert_eq!(context.report_key, Some("report123".to_string()));
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert_eq!(
+            get_search_event_context_from_request(&SearchEventType::UI, &query),
+            None
+        );
+    }
+
+    #[test]
+    fn test_get_use_cache_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("use_cache".to_string(), "true".to_string());
+        assert!(get_use_cache_from_request(&query));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("use_cache".to_string(), "false".to_string());
+        assert!(!get_use_cache_from_request(&query));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("use_cache".to_string(), "invalid".to_string());
+        assert!(get_use_cache_from_request(&query));
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(get_use_cache_from_request(&query));
+    }
+
+    #[test]
+    fn test_get_folder() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("folder".to_string(), "custom_folder".to_string());
+        assert_eq!(get_folder(&query), "custom_folder");
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert_eq!(get_folder(&query), config::meta::folder::DEFAULT_FOLDER);
+    }
+
+    #[test]
+    fn test_parse_ip_addr() {
+        // Test IPv4
+        let (ip, port) = parse_ip_addr("192.168.1.1").unwrap();
+        assert_eq!(ip, "192.168.1.1".parse::<IpAddr>().unwrap());
+        assert_eq!(port, None);
+
+        // Test IPv4 with port
+        let (ip, port) = parse_ip_addr("192.168.1.1:8080").unwrap();
+        assert_eq!(ip, "192.168.1.1".parse::<IpAddr>().unwrap());
+        assert_eq!(port, Some(8080));
+
+        // Test IPv6
+        let (ip, port) = parse_ip_addr("2001:db8::1").unwrap();
+        assert_eq!(ip, "2001:db8::1".parse::<IpAddr>().unwrap());
+        assert_eq!(port, None);
+
+        // Test IPv6 with port
+        let (ip, port) = parse_ip_addr("[2001:db8::1]:8080").unwrap();
+        assert_eq!(ip, "2001:db8::1".parse::<IpAddr>().unwrap());
+        assert_eq!(port, Some(8080));
+
+        // Test invalid IP
+        assert!(parse_ip_addr("invalid").is_err());
+    }
+
+    #[test]
+    fn test_request_header_extractor() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("content-type"),
+            HeaderValue::from_static("application/json"),
+        );
+        headers.insert(
+            HeaderName::from_static("authorization"),
+            HeaderValue::from_static("Bearer token"),
+        );
+
+        let extractor = RequestHeaderExtractor::new(&headers);
+
+        assert_eq!(extractor.get("content-type"), Some("application/json"));
+        assert_eq!(extractor.get("authorization"), Some("Bearer token"));
+        assert_eq!(extractor.get("nonexistent"), None);
+
+        let keys = extractor.keys();
+        assert!(keys.contains(&"content-type"));
+        assert!(keys.contains(&"authorization"));
+    }
+
+    #[test]
+    fn test_get_work_group() {
+        let work_groups = vec![Some("long".to_string()), Some("short".to_string()), None];
+        assert_eq!(get_work_group(work_groups), Some("long".to_string()));
+
+        let work_groups = vec![Some("short".to_string()), None];
+        assert_eq!(get_work_group(work_groups), Some("short".to_string()));
+
+        let work_groups = vec![Some("other".to_string()), None];
+        assert_eq!(get_work_group(work_groups), None);
+
+        let work_groups = vec![None];
+        assert_eq!(get_work_group(work_groups), None);
     }
 }

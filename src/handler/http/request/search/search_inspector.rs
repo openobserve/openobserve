@@ -77,6 +77,8 @@ use crate::{
               ],
               "node_name": "usertest-openobserve-ingester-0",
               "search_role": "follower",
+              "region": "us-east-1",
+              "cluster": "cluster-0",
               "duration": 0,
               "component": "wal:memtable load",
               "desc": "wal mem search load groups 1, files 6, scan_size 16.01 MB, compressed_size 16.85 MB"
@@ -151,13 +153,11 @@ pub async fn get_search_profile(
         }
     };
 
-    // let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = config::meta::search::Request {
         query: Query {
             sql: format!(
-                "SELECT _timestamp, events FROM default WHERE trace_id = '{}' ORDER BY start_time",
-                query_trace_id
+                "SELECT _timestamp, events FROM default WHERE trace_id = '{query_trace_id}' ORDER BY start_time"
             ),
             start_time,
             end_time,
@@ -183,8 +183,7 @@ pub async fn get_search_profile(
         {
             req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
             range_error = format!(
-                "Query duration is modified due to query range restriction of {} hours",
-                max_query_range
+                "Query duration is modified due to query range restriction of {max_query_range} hours"
             );
         }
     }
@@ -201,12 +200,8 @@ pub async fn get_search_profile(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(
-                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                        StatusCode::BAD_REQUEST.into(),
-                        e.to_string(),
-                    )),
-                );
+                return Ok(HttpResponse::BadRequest()
+                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
         if !keys_used.is_empty() {
@@ -215,6 +210,7 @@ pub async fn get_search_profile(
         for key in keys_used {
             // Check permissions on keys
             {
+                use config::meta::user::DBUser;
                 use o2_openfga::meta::mapping::OFGA_MODELS;
 
                 use crate::common::{
@@ -223,10 +219,17 @@ pub async fn get_search_profile(
                 };
 
                 if !is_root_user(&user_id) {
-                    let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
-                        Some(u) => u.clone(),
-                        None => return Ok(meta::http::HttpResponse::forbidden("User not found")),
-                    };
+                    let user =
+                        match USERS
+                            .get(&format!("{org_id}/{user_id}"))
+                            .and_then(|user_record| {
+                                DBUser::from(&(user_record.clone())).get_user(org_id.clone())
+                            }) {
+                            Some(user) => user,
+                            None => {
+                                return Ok(meta::http::HttpResponse::forbidden("User not found"));
+                            }
+                        };
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         &user_id,
@@ -283,33 +286,33 @@ pub async fn get_search_profile(
             };
 
             for hit in res.hits {
-                if let Some(events_str) = hit.get("events") {
-                    if let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
+                if let Some(events_str) = hit.get("events")
+                    && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
                         events_str.as_str().unwrap_or("[]"),
-                    ) {
-                        let mut inspectors = vec![];
-                        let _: Vec<_> = parsed_events
-                            .into_iter()
-                            .map(|event| {
-                                if let Some(mut fields) =
-                                    extract_search_inspector_fields(event.name.as_str())
-                                {
-                                    if fields.component == Some("summary".to_string()) {
-                                        si.sql = fields.sql.unwrap();
-                                        let time_range = fields.time_range.unwrap_or_default();
-                                        si.start_time = time_range.0;
-                                        si.end_time = time_range.1;
-                                        si.total_duration = fields.duration.unwrap_or_default();
-                                    } else {
-                                        fields.timestamp = Some(event._timestamp.to_string());
-                                        inspectors.push(fields);
-                                    }
+                    )
+                {
+                    let mut inspectors = vec![];
+                    let _: Vec<_> = parsed_events
+                        .into_iter()
+                        .map(|event| {
+                            if let Some(mut fields) =
+                                extract_search_inspector_fields(event.name.as_str())
+                            {
+                                if fields.component == Some("summary".to_string()) {
+                                    si.sql = fields.sql.unwrap();
+                                    let time_range = fields.time_range.unwrap_or_default();
+                                    si.start_time = time_range.0;
+                                    si.end_time = time_range.1;
+                                    si.total_duration = fields.duration.unwrap_or_default();
+                                } else {
+                                    fields.timestamp = Some(event._timestamp.to_string());
+                                    inspectors.push(fields);
                                 }
-                            })
-                            .collect();
+                            }
+                        })
+                        .collect();
 
-                        events.extend(inspectors);
-                    }
+                    events.extend(inspectors);
                 }
             }
 

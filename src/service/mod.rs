@@ -26,6 +26,7 @@ pub mod enrichment;
 pub mod enrichment_table;
 pub mod exporter;
 pub mod file_list;
+pub mod file_list_dump;
 pub mod folders;
 pub mod functions;
 pub mod grpc;
@@ -35,6 +36,8 @@ pub mod logs;
 pub mod metadata;
 pub mod metrics;
 pub mod node;
+#[cfg(feature = "cloud")]
+pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;

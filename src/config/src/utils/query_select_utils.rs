@@ -15,9 +15,13 @@
 
 use std::ops::ControlFlow;
 
-use sqlparser::ast::{
-    Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList, FunctionArguments, Ident,
-    ObjectName, Query, Select, SetExpr, Statement, TableFactor, Value, VisitorMut,
+use sqlparser::{
+    ast::{
+        Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList, FunctionArguments,
+        Ident, ObjectName, ObjectNamePart, Query, Select, SetExpr, Statement, TableFactor, Value,
+        ValueWithSpan, VisitorMut,
+    },
+    tokenizer::Span,
 };
 
 pub const O2_CUSTOM_SUFFIX: &str = "::_o2_custom";
@@ -36,12 +40,12 @@ impl StringMatchReplacer {
 
     /// Check if a value ends with "::_o2_custom" suffix
     fn has_o2_custom_suffix(value: &Value) -> Option<String> {
-        if let Value::SingleQuotedString(s) = value {
-            if s.ends_with(O2_CUSTOM_SUFFIX) {
-                // Extract the prefix before "::_o2_custom"
-                let prefix = s.trim_end_matches(O2_CUSTOM_SUFFIX);
-                return Some(prefix.to_string());
-            }
+        if let Value::SingleQuotedString(s) = value
+            && s.ends_with(O2_CUSTOM_SUFFIX)
+        {
+            // Extract the prefix before "::_o2_custom"
+            let prefix = s.trim_end_matches(O2_CUSTOM_SUFFIX);
+            return Some(prefix.to_string());
         }
         None
     }
@@ -49,14 +53,15 @@ impl StringMatchReplacer {
     /// Create a str_match function call
     fn create_str_match_function(field_expr: Expr, match_value: String) -> Expr {
         Expr::Function(Function {
-            name: ObjectName(vec![Ident::new("str_match")]),
+            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("str_match"))]),
             args: FunctionArguments::List(FunctionArgumentList {
                 duplicate_treatment: None,
                 args: vec![
                     FunctionArg::Unnamed(FunctionArgExpr::Expr(field_expr)),
-                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
-                        Value::SingleQuotedString(match_value),
-                    ))),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
+                        value: Value::SingleQuotedString(match_value),
+                        span: Span::empty(),
+                    }))),
                 ],
                 clauses: vec![],
             }),
@@ -91,14 +96,14 @@ impl StringMatchReplacer {
             return None;
         }
 
-        if let Expr::Value(value) = &list[0] {
-            if let Some(match_value) = Self::has_o2_custom_suffix(value) {
-                self.replacements_made += 1;
-                return Some(Self::create_str_match_function(
-                    field_expr.clone(),
-                    match_value,
-                ));
-            }
+        if let Expr::Value(value) = &list[0]
+            && let Some(match_value) = Self::has_o2_custom_suffix(&value.value)
+        {
+            self.replacements_made += 1;
+            return Some(Self::create_str_match_function(
+                field_expr.clone(),
+                match_value,
+            ));
         }
 
         None
@@ -107,19 +112,19 @@ impl StringMatchReplacer {
     /// Process equality expression and replace if it matches our pattern
     fn process_equality_expression(&mut self, left: &Expr, right: &Expr) -> Option<Expr> {
         // Check if right side is a value with _o2_custom suffix
-        if let Expr::Value(value) = right {
-            if let Some(match_value) = Self::has_o2_custom_suffix(value) {
-                self.replacements_made += 1;
-                return Some(Self::create_str_match_function(left.clone(), match_value));
-            }
+        if let Expr::Value(value) = right
+            && let Some(match_value) = Self::has_o2_custom_suffix(&value.value)
+        {
+            self.replacements_made += 1;
+            return Some(Self::create_str_match_function(left.clone(), match_value));
         }
 
         // Check if left side is a value with _o2_custom suffix
-        if let Expr::Value(value) = left {
-            if let Some(match_value) = Self::has_o2_custom_suffix(value) {
-                self.replacements_made += 1;
-                return Some(Self::create_str_match_function(right.clone(), match_value));
-            }
+        if let Expr::Value(value) = left
+            && let Some(match_value) = Self::has_o2_custom_suffix(&value.value)
+        {
+            self.replacements_made += 1;
+            return Some(Self::create_str_match_function(right.clone(), match_value));
         }
 
         None
@@ -147,11 +152,11 @@ impl VisitorMut for StringMatchReplacer {
             }
             Expr::BinaryOp { left, right, op } => {
                 // Handle equality expressions
-                if matches!(op, sqlparser::ast::BinaryOperator::Eq) {
-                    if let Some(replacement) = self.process_equality_expression(left, right) {
-                        *expr = replacement;
-                        return ControlFlow::Continue(());
-                    }
+                if matches!(op, sqlparser::ast::BinaryOperator::Eq)
+                    && let Some(replacement) = self.process_equality_expression(left, right)
+                {
+                    *expr = replacement;
+                    return ControlFlow::Continue(());
                 }
                 // Continue with normal traversal
                 self.pre_visit_expr(left)?;
@@ -176,17 +181,14 @@ impl VisitorMut for StringMatchReplacer {
             Expr::Case {
                 operand,
                 conditions,
-                results,
                 else_result,
             } => {
                 if let Some(op) = operand {
                     self.pre_visit_expr(op)?;
                 }
                 for cond in conditions.iter_mut() {
-                    self.pre_visit_expr(cond)?;
-                }
-                for res in results.iter_mut() {
-                    self.pre_visit_expr(res)?;
+                    self.pre_visit_expr(&mut cond.condition)?;
+                    self.pre_visit_expr(&mut cond.result)?;
                 }
                 if let Some(e) = else_result {
                     self.pre_visit_expr(e)?;
@@ -299,7 +301,7 @@ pub fn replace_o2_custom_patterns(sql: &str) -> Result<String, String> {
 
     let dialect = GenericDialect {};
     let mut statements =
-        Parser::parse_sql(&dialect, sql).map_err(|e| format!("Parse error: {}", e))?;
+        Parser::parse_sql(&dialect, sql).map_err(|e| format!("Parse error: {e}"))?;
 
     if statements.is_empty() {
         return Err("No statements found".to_string());

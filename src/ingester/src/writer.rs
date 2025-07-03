@@ -31,7 +31,7 @@ use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{RwLock, mpsc};
-use wal::Writer as WalWriter;
+use wal::{Writer as WalWriter, build_file_path};
 
 use crate::{
     ReadRecordBatchEntry, WriterSignal,
@@ -92,7 +92,7 @@ fn get_table_idx(thread_id: usize, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
     } else {
-        let hash_key = format!("{}_{}", thread_id, stream_name);
+        let hash_key = format!("{thread_id}_{stream_name}");
         let hash_id = gxhash::new().sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     }
@@ -164,10 +164,10 @@ pub async fn read_from_memtable(
         }
         visited.insert(idx);
         let w = WRITERS[idx].read().await;
-        if let Some(r) = w.get(&key) {
-            if let Ok(data) = r.read(stream_name, time_range, partition_filters).await {
-                batches.extend(data);
-            }
+        if let Some(r) = w.get(&key)
+            && let Ok(data) = r.read(stream_name, time_range, partition_filters).await
+        {
+            batches.extend(data);
         }
     }
     Ok(batches)
@@ -227,14 +227,13 @@ impl Writer {
             key: key.clone(),
             wal: Arc::new(RwLock::new(
                 WalWriter::new(
-                    wal_dir,
-                    &key.org_id,
-                    &key.stream_type,
-                    wal_id.to_string(),
+                    build_file_path(wal_dir, &key.org_id, &key.stream_type, wal_id.to_string()),
                     cfg.limit.max_file_size_on_disk as u64,
                     cfg.limit.wal_write_buffer_size,
+                    None,
                 )
-                .expect("wal file create error"),
+                .expect("wal file create error")
+                .0,
             )),
             memtable: Arc::new(RwLock::new(MemTable::new())),
             next_seq,
@@ -429,13 +428,16 @@ impl Writer {
             &self.key.stream_type,
             wal_id
         );
-        let new_wal = WalWriter::new(
-            wal_dir,
-            &self.key.org_id,
-            &self.key.stream_type,
-            wal_id.to_string(),
+        let (new_wal, _header_size) = WalWriter::new(
+            build_file_path(
+                wal_dir,
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id.to_string(),
+            ),
             cfg.limit.max_file_size_on_disk as u64,
             cfg.limit.wal_write_buffer_size,
+            None,
         )
         .context(WalSnafu)?;
         wal.sync().context(WalSnafu)?; // sync wal before rotation

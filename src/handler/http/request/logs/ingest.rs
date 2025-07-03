@@ -16,19 +16,20 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, http, http::header, post, web};
+use config::meta::otlp::OtlpRequestType;
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+use prost::Message;
 
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
         ingestion::{
-            GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
+            GCPIngestionRequest, HecResponse, HecStatus, IngestionRequest,
+            KinesisFHIngestionResponse, KinesisFHRequest,
         },
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::{
-        logs,
-        logs::otlp_http::{logs_json_handler, logs_proto_handler},
-    },
+    service::logs::{self, otlp::handle_request},
 };
 
 /// _bulk ES compatible ingestion API
@@ -69,16 +70,14 @@ pub async fn bulk(
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/_bulk: {e}");
-            if e.to_string().contains("MemoryCircuitBreakerError") {
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                    e.to_string(),
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
                 ))
             } else {
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
             }
         }
     };
@@ -144,16 +143,14 @@ pub async fn multi(
         },
         Err(e) => {
             log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
-            if e.to_string().contains("MemoryCircuitBreakerError") {
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                    e.to_string(),
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
                 ))
             } else {
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
             }
         }
     };
@@ -219,16 +216,14 @@ pub async fn json(
         },
         Err(e) => {
             log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
-            if e.to_string().contains("MemoryCircuitBreakerError") {
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                    e.to_string(),
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
                 ))
             } else {
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
             }
         }
     };
@@ -292,11 +287,19 @@ pub async fn handle_kinesis_request(
             }),
             Err(e) => {
                 log::error!("Error processing kinesis request: {e}");
-                HttpResponse::BadRequest().json(KinesisFHIngestionResponse {
-                    request_id,
-                    timestamp: request_time,
-                    error_message: e.to_string().into(),
-                })
+                if matches!(e, infra::errors::Error::ResourceError(_)) {
+                    HttpResponse::ServiceUnavailable().json(KinesisFHIngestionResponse {
+                        request_id,
+                        timestamp: request_time,
+                        error_message: e.to_string().into(),
+                    })
+                } else {
+                    HttpResponse::BadRequest().json(KinesisFHIngestionResponse {
+                        request_id,
+                        timestamp: request_time,
+                        error_message: e.to_string().into(),
+                    })
+                }
             }
         },
     )
@@ -324,11 +327,19 @@ pub async fn handle_gcp_request(
         {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
-                log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e}");
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+                log::error!(
+                    "Error processing request {org_id}/{stream_name}/_gcp: {:?}",
+                    e
+                );
+                if matches!(e, infra::errors::Error::ResourceError(_)) {
+                    HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                        http::StatusCode::SERVICE_UNAVAILABLE,
+                        e,
+                    ))
+                } else {
+                    HttpResponse::BadRequest()
+                        .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+                }
             }
         },
     )
@@ -359,40 +370,130 @@ pub async fn otlp_logs_write(
         .headers()
         .get(&config::get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
-    if content_type.eq(CONTENT_TYPE_PROTO) {
-        // log::info!("otlp::logs_proto_handler");
-        match logs_proto_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
-            Ok(v) => Ok(v),
+
+    let (request, request_type) = match content_type {
+        CONTENT_TYPE_PROTO => match ExportLogsServiceRequest::decode(body) {
+            Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
-                log::error!(
-                    "Error processing otlp pb logs write request {org_id}/{:?}: {e}",
-                    in_stream_name
-                );
-                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )))
+                log::error!("[LOGS:OTLP] Invalid proto: {}", e);
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    format!("Invalid proto: {e}"),
+                )));
+            }
+        },
+        CONTENT_TYPE_JSON => {
+            match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
+                Ok(req) => (req, OtlpRequestType::HttpJson),
+                Err(e) => {
+                    log::error!("[LOGS:OTLP] Invalid json: {}", e);
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST,
+                        format!("Invalid json: {e}"),
+                    )));
+                }
             }
         }
-    } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        // log::info!("otlp::logs_json_handler");
-        match logs_json_handler(**thread_id, &org_id, body, in_stream_name, user_email).await {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                log::error!(
-                    "Error processing otlp json logs write request {org_id}/{:?}: {e}",
-                    in_stream_name
-                );
-                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )))
+        _ => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                "Bad Request",
+            )));
+        }
+    };
+
+    let resp = match handle_request(
+        **thread_id,
+        &org_id,
+        request,
+        in_stream_name,
+        user_email,
+        request_type,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "Error processing otlp {} logs write request {org_id}/{:?}: {:?}",
+                content_type,
+                in_stream_name,
+                e
+            );
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                ))
+            } else {
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
             }
         }
+    };
+
+    Ok(resp)
+}
+
+/// HEC format compatible ingestion API
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Logs",
+    operation_id = "LogsIngestionHec",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = String, description = "Ingest data (hec)"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HecResponse, example = json!({"text":"Success","code": 200})),
+        (status = 200, description = "Failure", content_type = "application/json", body = HecResponse, example = json!({"text":"Invalid data format","code": 400})),
+    )
+)]
+#[post("/{org_id}/_hec")]
+pub async fn hec(
+    thread_id: web::Data<usize>,
+    org_id: web::Path<String>,
+    body: web::Bytes,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+
+    // log start processing time
+    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
     } else {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Bad Request".to_string(),
-        )))
+        0
+    };
+
+    let mut resp = match logs::hec::ingest(**thread_id, &org_id, body, user_email).await {
+        Ok(v) => {
+            if v.code > 299 {
+                HttpResponse::BadRequest().json(v)
+            } else {
+                MetaHttpResponse::json(v)
+            }
+        }
+        Err(e) => {
+            log::error!("Error processing request {org_id}/_hec: {e}");
+            let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
+                HttpResponse::ServiceUnavailable().json(res)
+            } else {
+                HttpResponse::BadRequest().json(res)
+            }
+        }
+    };
+
+    if process_time > 0 {
+        resp.headers_mut().insert(
+            header::HeaderName::from_static("o2_process_time"),
+            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        );
     }
+
+    Ok(resp)
 }

@@ -20,7 +20,7 @@ use config::{
     metrics,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::sync::mpsc;
 
 use crate::service::compact;

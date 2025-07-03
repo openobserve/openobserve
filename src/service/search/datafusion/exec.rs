@@ -55,8 +55,8 @@ use {
     arrow::array::Int64Array,
     config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
     o2_enterprise::enterprise::{
-        common::downsampling::get_largest_downsampling_rule,
-        common::infra::config::get_config as get_o2_config, search::WorkGroup,
+        common::config::get_config as get_o2_config,
+        common::downsampling::get_largest_downsampling_rule, search::WorkGroup,
     },
 };
 
@@ -116,8 +116,7 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let sql = if stream_type == StreamType::Index {
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
-            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {TIMESTAMP_COL_NAME} DESC) ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -131,13 +130,15 @@ pub async fn merge_parquet_files(
             .collect::<Vec<_>>();
         let fields_str = fields.join(", ");
         format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
-            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, fields_str, fields_str, TIMESTAMP_COL_NAME
+            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, SUM(count) as count, {fields_str} FROM tbl GROUP BY {fields_str} ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
+    } else if stream_type == StreamType::Filelist {
+        // for file list we do not have timestamp, so we instead sort by min ts of entries
+        "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
     } else {
-        format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
+        format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
     };
-    log::debug!("merge_parquet_files sql: {}", sql);
+    log::debug!("merge_parquet_files sql: {sql}");
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -168,7 +169,7 @@ pub async fn merge_parquet_files(
         println!("+---------------------------+--------------------------+");
         println!("merge_parquet_files");
         println!("+---------------------------+--------------------------+");
-        println!("{}", plan);
+        println!("{plan}");
     }
 
     // write result to parquet file
@@ -453,10 +454,6 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let wal_url = url::Url::parse("wal:///").unwrap();
     object_store_registry.register_store(&wal_url, Arc::new(wal));
 
-    let tmpfs = super::storage::tmpfs::Tmpfs::new();
-    let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
-    object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
-
     let cfg = get_config();
     let mut builder =
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
@@ -471,7 +468,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_limit);
     let mem_pool = super::MemoryPoolType::from_str(&cfg.memory_cache.datafusion_memory_pool)
         .map_err(|e| {
-            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
+            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {e}"))
         })?;
     match mem_pool {
         super::MemoryPoolType::Greedy => {
@@ -489,7 +486,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
             builder = builder.with_memory_pool(Arc::new(track_memory_pool));
         }
-    }
+    };
     builder.build()
 }
 
@@ -556,8 +553,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
-    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
@@ -694,8 +689,6 @@ pub async fn create_parquet_table(
     } else if session.storage_type == StorageType::Wal {
         file_list::set(&session.id, &schema_key, files).await;
         format!("wal:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Tmpfs {
-        format!("tmpfs:///{}/", session.id)
     } else {
         return Err(DataFusionError::Execution(format!(
             "Unsupported storage_type {:?}",
@@ -741,7 +734,7 @@ pub async fn create_parquet_table(
         fst_fields,
         need_optimize_partition,
     )?;
-    if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
+    if file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))
@@ -771,6 +764,10 @@ async fn get_cpu_and_mem_limit(
                 memory_size
             );
         }
+        memory_size = memory_size * mem as usize / 100;
+        log::info!(
+            "[trace_id: {trace_id}]datafusion work_group: {wg}, target_partition: {target_partitions}, memory_size: {memory_size}"
+        );
     }
     Ok((target_partitions, memory_size))
 }

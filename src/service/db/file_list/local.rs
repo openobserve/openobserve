@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::FileListDeleted;
+use config::meta::stream::{FileKey, FileListDeleted};
 use hashbrown::HashSet;
 use infra::errors::Result;
 use once_cell::sync::Lazy;
@@ -28,7 +28,7 @@ pub async fn exist_pending_delete(file: &str) -> bool {
     PENDING_DELETE_FILES.read().await.contains(file)
 }
 
-pub async fn add_pending_delete(org_id: &str, file: &str) -> Result<()> {
+pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Result<()> {
     // add to local db for persistence
     let ts = config::utils::time::now_micros();
     infra::file_list::LOCAL_CACHE
@@ -36,6 +36,8 @@ pub async fn add_pending_delete(org_id: &str, file: &str) -> Result<()> {
             org_id,
             ts,
             &[FileListDeleted {
+                id: 0,
+                account: account.to_string(),
                 file: file.to_string(),
                 index_file: false,
                 flattened: false,
@@ -50,7 +52,7 @@ pub async fn add_pending_delete(org_id: &str, file: &str) -> Result<()> {
 pub async fn remove_pending_delete(file: &str) -> Result<()> {
     // remove from local db for persistence
     infra::file_list::LOCAL_CACHE
-        .batch_remove_deleted(&[file.to_string()])
+        .batch_remove_deleted(&[FileKey::from_file_name(file)])
         .await?;
     // remove from memory cache
     PENDING_DELETE_FILES.write().await.remove(file);

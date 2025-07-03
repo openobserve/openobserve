@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod actions;
+#[cfg(feature = "enterprise")]
+pub mod ai;
 pub mod alerts;
 pub mod authz;
+#[cfg(feature = "cloud")]
+pub mod billings;
 pub mod clusters;
 pub mod dashboards;
 pub mod enrichment_table;

@@ -53,7 +53,7 @@ async fn store_short_url(
 fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
     match timestamp {
         Some(ts) => {
-            let input = format!("{}{}", original_url, ts);
+            let input = format!("{original_url}{ts}");
             md5::short_hash(&input)
         }
         None => md5::short_hash(original_url),
@@ -64,10 +64,10 @@ fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
 pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
     let mut short_id = generate_short_id(original_url, None);
 
-    if let Ok(existing_url) = db::short_url::get(&short_id).await {
-        if existing_url == original_url {
-            return Ok(construct_short_url(org_id, &short_id));
-        }
+    if let Ok(existing_url) = db::short_url::get(&short_id).await
+        && existing_url == original_url
+    {
+        return Ok(construct_short_url(org_id, &short_id));
     }
 
     let result = store_short_url(org_id, &short_id, original_url).await;
@@ -136,5 +136,16 @@ mod tests {
 
         // Should return the same short_id
         assert_eq!(short_url1, short_url2);
+    }
+
+    #[tokio::test]
+    async fn test_generate_short_id() {
+        let original_url = "https://www.example.com/some/long/url";
+        let short_id = generate_short_id(original_url, None);
+        assert_eq!(short_id.len(), 16);
+        let timestamp = Utc::now().timestamp_micros();
+        let short_id2 = generate_short_id(original_url, Some(timestamp));
+        assert_eq!(short_id2.len(), 16);
+        assert_ne!(short_id, short_id2);
     }
 }

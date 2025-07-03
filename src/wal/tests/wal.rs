@@ -19,22 +19,21 @@ use std::{
 };
 
 use tempfile::tempdir;
-use wal::{Reader, Writer, build_file_path};
+use wal::{ReadFrom, Reader, Writer, build_file_path};
 
 #[test]
 fn test_wal_new() {
     let entry_num = 100;
     let dir = tempdir().unwrap();
     let dir = dir.path();
-    let mut writer =
-        Writer::new(dir, "org", "stream", "1".to_string(), 1024_1024, 8 * 1024).unwrap();
+    let path = build_file_path(dir, "org", "stream", "1".to_string());
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
 
-    let path = build_file_path(dir, "org", "stream", "1".to_string());
     let mut reader = Reader::from_path(path).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
@@ -51,24 +50,14 @@ fn test_wal_build() {
     let mut header = wal::FileHeader::new();
     header.insert("key1".into(), "value1".into());
     header.insert("key2".into(), "value2".into());
-
-    let (mut writer, _) = Writer::build(
-        dir,
-        "org",
-        "stream",
-        "1".to_string(),
-        1024_1024,
-        8 * 1024,
-        Some(header),
-    )
-    .unwrap();
+    let path = build_file_path(dir, "org", "stream", "1".to_string());
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, Some(header)).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
 
-    let path = build_file_path(dir, "org", "stream", "1".to_string());
     let mut reader = Reader::from_path(path).unwrap();
     let header = reader.header();
     assert_eq!(header.get("key1"), Some(&"value1".to_string()));
@@ -87,15 +76,14 @@ fn test_position() {
     let entry_num = 100;
     let dir = tempdir().unwrap();
     let dir = dir.path();
-    let mut writer =
-        Writer::new(dir, "org", "stream", "1".to_string(), 1024_1024, 8 * 1024).unwrap();
+    let path = build_file_path(dir, "org", "stream", "1".to_string());
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
 
-    let path = build_file_path(dir, "org", "stream", "1".to_string());
     let mut reader = Reader::from_path(path).unwrap();
     let mut pos = wal::FILE_TYPE_IDENTIFIER_LEN as u64 + wal::WAL_FILE_HEADER_LEN as u64;
     for _ in 0..entry_num {
@@ -111,8 +99,8 @@ fn test_metadata() {
     let entry_num = 5;
     let dir = tempdir().unwrap();
     let dir = dir.path();
-    let mut writer =
-        Writer::new(dir, "org", "stream", "1".to_string(), 1024_1024, 8 * 1024).unwrap();
+    let path = build_file_path(dir, "org", "stream", "1".to_string());
+    let (mut writer, _) = Writer::new(path, 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes()).unwrap();
@@ -138,17 +126,8 @@ fn test_realtime_write_and_read() {
     let mut header = wal::FileHeader::new();
     header.insert("key1".into(), "value1".into());
     header.insert("key2".into(), "value2".into());
-
-    let (mut writer, _) = Writer::build(
-        dir,
-        "org",
-        "stream",
-        "1".to_string(),
-        0,
-        8 * 1024,
-        Some(header),
-    )
-    .unwrap();
+    let path = build_file_path(dir, "org", "stream", "1".to_string());
+    let (mut writer, _) = Writer::new(path, 0, 8 * 1024, Some(header)).unwrap();
 
     std::thread::spawn(move || {
         for i in 0..entry_num {
@@ -196,4 +175,61 @@ fn test_realtime_write_and_read() {
             }
         }
     }
+}
+
+#[test]
+fn test_reader_from_path_position_and_metadata() {
+    let entry_num = 5;
+    let dir = tempdir().unwrap();
+    let dir = dir.path();
+    let path = build_file_path(dir, "org", "stream", "1".to_string());
+    let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
+
+    for i in 0..entry_num {
+        let data = format!("hello {}", i);
+        writer.write(data.as_bytes()).unwrap();
+    }
+    writer.close().unwrap();
+
+    let fs_metadata = std::fs::metadata(&path).unwrap();
+
+    let mut reader = Reader::from_path_position(path.clone(), ReadFrom::Beginning).unwrap();
+    let entry = reader.read_entry().unwrap().unwrap();
+    assert_eq!(entry, b"hello 0");
+
+    let mut reader = Reader::from_path_position(path.clone(), ReadFrom::End).unwrap();
+
+    for _ in 0..entry_num {
+        let entry = reader.read_entry().unwrap();
+        assert!(entry.is_none());
+    }
+
+    let start_pos = wal::FILE_TYPE_IDENTIFIER_LEN as u64 + wal::WAL_FILE_HEADER_LEN as u64;
+    let mut reader = Reader::from_path_position(path, ReadFrom::Checkpoint(start_pos)).unwrap();
+
+    for i in 0..entry_num {
+        let entry = reader.read_entry().unwrap().unwrap();
+        assert_eq!(entry, format!("hello {}", i).as_bytes());
+    }
+    assert!(reader.read_entry().unwrap().is_none());
+
+    let reader_metadata = reader.metadata().unwrap();
+    assert_eq!(reader_metadata.len(), fs_metadata.len());
+}
+
+#[test]
+fn test_build_file_path() {
+    // Test with string path
+    let root_dir = "/tmp/wal";
+    let org_id = "test_org";
+    let stream_type = "logs";
+    let id = "stream_123";
+
+    let path = build_file_path(root_dir, org_id, stream_type, id.to_string());
+
+    // Verify the path structure
+    assert_eq!(
+        path.to_string_lossy(),
+        "/tmp/wal/test_org/logs/stream_123.wal"
+    );
 }

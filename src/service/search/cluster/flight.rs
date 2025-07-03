@@ -103,6 +103,7 @@ pub async fn search(
 
     // 1. get file id list
     let file_id_list = get_file_id_lists(
+        trace_id,
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
@@ -124,7 +125,7 @@ pub async fn search(
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_num))
+                .desc(format!("get files {file_id_list_num} ids"))
                 .build()
         )
     );
@@ -593,13 +594,19 @@ pub async fn get_online_querier_nodes(
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     nodes.sort_by_key(|x| x.id);
-    let nodes = nodes;
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
+
+    // use enterprise scheduler to filter nodes
+    #[cfg(feature = "enterprise")]
+    {
+        nodes = o2_enterprise::enterprise::search::scheduler::filter_nodes_by_cpu(nodes);
+    }
+
     Ok(nodes)
 }
 
@@ -614,7 +621,7 @@ pub async fn check_work_group(
     let cfg = get_config();
     let work_group_str = "global".to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
@@ -667,7 +674,7 @@ pub async fn check_work_group(
 
     let work_group_str = work_group.as_ref().unwrap().to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     // 2. get a cluster search queue lock
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
@@ -723,10 +730,7 @@ pub async fn check_work_group(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] search: wait in queue took: {} ms",
-                took_wait
-            ),
+            format!("[trace_id {trace_id}] search: wait in queue took: {took_wait} ms"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())
@@ -933,6 +937,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
 
 #[tracing::instrument(name = "service:search:cluster:flight:get_file_id_lists", skip_all)]
 pub async fn get_file_id_lists(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[TableReference],
@@ -944,16 +949,17 @@ pub async fn get_file_id_lists(
         let name = stream.stream_name();
         let stream_type = stream.get_stream_type(stream_type);
         // if stream is enrich, rewrite the time_range
-        if let Some(schema) = stream.schema() {
-            if schema == "enrich" || schema == "enrichment_tables" {
-                let start = enrichment_table::get_start_time(org_id, &name).await;
-                let end = now_micros();
-                time_range = Some((start, end));
-            }
+        if let Some(schema) = stream.schema()
+            && (schema == "enrich" || schema == "enrichment_tables")
+        {
+            let start = enrichment_table::get_start_time(org_id, &name).await;
+            let end = now_micros();
+            time_range = Some((start, end));
         }
         // get file list
         let file_id_list =
-            crate::service::file_list::query_ids(org_id, stream_type, &name, time_range).await?;
+            crate::service::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range)
+                .await?;
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)
@@ -1057,15 +1063,9 @@ pub async fn get_inverted_index_file_list(
     let fts_condition = if fts_condition.is_empty() {
         fts_condition
     } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
-        format!(
-            "((field = '{}' OR field IS NULL) AND ({}))",
-            INDEX_FIELD_NAME_FOR_ALL, fts_condition
-        )
+        format!("((field = '{INDEX_FIELD_NAME_FOR_ALL}' OR field IS NULL) AND ({fts_condition}))")
     } else {
-        format!(
-            "(field = '{}' AND ({}))",
-            INDEX_FIELD_NAME_FOR_ALL, fts_condition
-        )
+        format!("(field = '{INDEX_FIELD_NAME_FOR_ALL}' AND ({fts_condition}))")
     };
 
     // Process index terms
@@ -1091,7 +1091,7 @@ pub async fn get_inverted_index_file_list(
         (true, false) => fts_condition,
         (false, true) => index_condition,
         _ => {
-            format!("{} OR {}", fts_condition, index_condition)
+            format!("{fts_condition} OR {index_condition}")
         }
     };
 
@@ -1100,11 +1100,10 @@ pub async fn get_inverted_index_file_list(
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
         } else {
-            format!("{}_{}", stream_name, stream_type)
+            format!("{stream_name}_{stream_type}")
         };
     let sql = format!(
-        "SELECT file_name, segment_ids FROM \"{}\" WHERE {}",
-        index_stream_name, search_condition
+        "SELECT file_name, segment_ids FROM \"{index_stream_name}\" WHERE {search_condition}"
     );
 
     req.stream_type = StreamType::Index;
@@ -1169,5 +1168,5 @@ pub fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     println!("+---------------------------+----------+");
     println!("leader physical plan {stage} rewrite");
     println!("+---------------------------+----------+");
-    println!("{}", plan);
+    println!("{plan}");
 }

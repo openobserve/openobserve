@@ -13,24 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use actix_web::HttpResponse;
 use arrow::array::{Int64Array, RecordBatch};
 use config::{
     FILE_EXT_JSON, TIMESTAMP_COL_NAME, get_config,
-    meta::stream::{FileMeta, StreamType},
+    meta::{
+        stream::{FileMeta, StreamType},
+        user::{User, UserRole},
+    },
 };
 
-use crate::{
-    common::meta::user::{User, UserRole},
-    service::users,
-};
+use crate::service::users;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
-    Err(Error::new(
-        ErrorKind::Other,
+    Err(Error::other(
         "only 'type' query param with value 'logs' or 'metrics' allowed",
     ))
 }

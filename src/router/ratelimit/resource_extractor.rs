@@ -291,15 +291,14 @@ async fn find_matching_rule(
                 }
             }
             Some(type_str) if type_str == RatelimitRuleType::Regex.to_string() => {
-                if let Ok(re) = Regex::new(&rule.get_resource()) {
-                    if re.is_match(resource) {
-                        log::debug!(
-                            "Matching resource: {} with regex rule: {}",
-                            resource,
-                            rule.get_resource()
-                        );
-                        return Some(rule);
-                    }
+                if let Ok(re) = Regex::new(&rule.get_resource())
+                    && re.is_match(resource)
+                {
+                    log::debug!(
+                        "Matching resource: {resource} with regex rule: {}",
+                        rule.get_resource()
+                    );
+                    return Some(rule);
                 }
             }
             _ => continue,
@@ -312,7 +311,7 @@ async fn find_matching_rule(
 fn path_to_regex(path: &str) -> Regex {
     let re = Regex::new(r"\{[^}]+\}").unwrap();
     let replaced = re.replace_all(path, r"([^/]+)");
-    Regex::new(&format!("^{}$", replaced)).unwrap()
+    Regex::new(&format!("^{replaced}$")).unwrap()
 }
 
 fn extract_openapi_path(path: &str, method: &Method) -> Option<String> {
@@ -358,7 +357,7 @@ fn extract_openapi_path(path: &str, method: &Method) -> Option<String> {
                     path,
                     method
                 );
-                return Some(format!("{}:{}", openapi_path, method));
+                return Some(format!("{openapi_path}:{method}"));
             } else {
                 log::debug!(
                     "Path matched but method {} not supported for OpenAPI path: {}",

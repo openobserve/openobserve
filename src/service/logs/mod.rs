@@ -20,7 +20,6 @@ use std::{
     time::Instant,
 };
 
-use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
@@ -37,7 +36,10 @@ use config::{
         time::now_micros,
     },
 };
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::{
+    errors::{Error, Result},
+    schema::{SchemaCache, unwrap_partition_time_level},
+};
 
 use super::{
     db::organization::get_org_setting,
@@ -58,9 +60,10 @@ use crate::{
 };
 
 pub mod bulk;
+pub mod hec;
 pub mod ingest;
-pub mod otlp_grpc;
-pub mod otlp_http;
+pub mod loki;
+pub mod otlp;
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
@@ -233,8 +236,8 @@ async fn write_logs_by_stream(
                     s.items
                         .iter()
                         .map(|i| {
-                            i.iter()
-                                .map(|(_, res)| if res.error.is_some() { 1 } else { 0 })
+                            i.values()
+                                .map(|res| if res.error.is_some() { 1 } else { 0 })
                                 .sum::<i64>()
                         })
                         .sum()
@@ -290,10 +293,9 @@ async fn write_logs(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            return Err(anyhow::anyhow!(
-                "Schema not found for stream: {}",
-                stream_name
-            ));
+            return Err(Error::IngestionError(format!(
+                "Schema not found for stream: {stream_name}"
+            )));
         }
     };
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
@@ -426,32 +428,32 @@ async fn write_logs(
         }
 
         // start check for alert trigger
-        if let Some(alerts) = cur_stream_alerts {
-            if triggers.len() < alerts.len() {
-                let end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Logs,
-                        alert.stream_name,
-                        alert.get_unique_key()
-                    );
-                    // For one alert, only one trigger per request
-                    // Trigger for this alert is already added.
-                    if evaluated_alerts.contains(&key) {
-                        continue;
+        if let Some(alerts) = cur_stream_alerts
+            && triggers.len() < alerts.len()
+        {
+            let end_time = now_micros();
+            for alert in alerts {
+                let key = format!(
+                    "{}/{}/{}/{}",
+                    org_id,
+                    StreamType::Logs,
+                    alert.stream_name,
+                    alert.get_unique_key()
+                );
+                // For one alert, only one trigger per request
+                // Trigger for this alert is already added.
+                if evaluated_alerts.contains(&key) {
+                    continue;
+                }
+                match alert
+                    .evaluate(Some(&record_val), (None, end_time), None)
+                    .await
+                {
+                    Ok(trigger_results) if trigger_results.data.is_some() => {
+                        triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                        evaluated_alerts.insert(key);
                     }
-                    match alert
-                        .evaluate(Some(&record_val), (None, end_time), None)
-                        .await
-                    {
-                        Ok(trigger_results) if trigger_results.data.is_some() => {
-                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                            evaluated_alerts.insert(key);
-                        }
-                        _ => {}
-                    }
+                    _ => {}
                 }
             }
         }
@@ -530,10 +532,11 @@ async fn write_logs(
     .await?;
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
+    if !distinct_values.is_empty()
+        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
+    {
+        log::error!("Error while writing distinct values: {}", e);
     }
 
     // only one trigger per request

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 23] = [
+const QUERIER_ROUTES: [(&str, usize); 24] = [
     ("config", 0),                            // /config
     ("summary", 2),                           // /api/{org_id}/summary
     ("organizations", 1),                     // /api/organizations
@@ -37,7 +37,8 @@ const QUERIER_ROUTES: [(&str, usize); 23] = [
     ("prometheus/api/v1/query_exemplars", 2), // /api/{org_id}/prometheus/api/v1/query_exemplars
     ("prometheus/api/v1/metadata", 2),        // /api/{org_id}/prometheus/api/v1/metadata
     ("prometheus/api/v1/labels", 2),          // /api/{org_id}/prometheus/api/v1/labels
-    ("prometheus/api/v1/label/", 2),          /* /api/{org_id}/prometheus/api/v1/label/
+    ("prometheus/api/v1/label/", 2),          // /api/{org_id}/prometheus/api/v1/label/
+    ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
 ];
@@ -50,13 +51,14 @@ const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
     "/prometheus/api/v1/query_exemplars",
 ];
 const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
-pub const INGESTER_ROUTES: [&str; 11] = [
+pub const INGESTER_ROUTES: [&str; 12] = [
     "/_json",
     "/_bulk",
     "/_multi",
     "/_kinesis_firehose",
     "/_sub",
     "/v1/logs",
+    "/loki/api/v1/push",
     "/ingest/metrics/_json",
     "/v1/metrics",
     "/traces",
@@ -66,17 +68,18 @@ pub const INGESTER_ROUTES: [&str; 11] = [
 
 #[inline]
 pub fn is_querier_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
     QUERIER_ROUTES.iter().any(|(route, skip_segments)| {
         if path.contains(route) {
-            let segments = path
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>();
-            // check if we have enough segments
-            if segments.len() <= *skip_segments {
-                return false;
+            let mut segments = path.split('/').filter(|s| !s.is_empty());
+            // Skip the required number of segments
+            for _ in 0..*skip_segments {
+                if segments.next().is_none() {
+                    return false;
+                }
             }
-            let route_part = segments[*skip_segments..].join("/");
+            // Join remaining segments without collecting into a Vec
+            let route_part = segments.collect::<Vec<_>>().join("/");
             route_part.starts_with(route)
                 && INGESTER_ROUTES
                     .iter()
@@ -89,10 +92,101 @@ pub fn is_querier_route(path: &str) -> bool {
 
 #[inline]
 pub fn is_querier_route_by_body(path: &str) -> bool {
+    let path = remove_base_uri(path);
     QUERIER_ROUTES_BY_BODY.iter().any(|x| path.contains(x))
 }
 
 #[inline]
 pub fn is_fixed_querier_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
     FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
+}
+
+#[inline]
+pub fn is_ws_route(path: &str) -> bool {
+    let path = remove_base_uri(path);
+    let mut segments = path.split('/').filter(|s| !s.is_empty());
+    // Skip first 3 segments
+    for _ in 0..3 {
+        if segments.next().is_none() {
+            return false;
+        }
+    }
+    segments.next() == Some("ws")
+        && INGESTER_ROUTES
+            .iter()
+            .all(|ingest_route| !path.ends_with(ingest_route))
+}
+
+#[inline]
+fn remove_base_uri(path: &str) -> &str {
+    let base_uri = &crate::get_config().common.base_uri;
+    if base_uri.is_empty() {
+        return path;
+    }
+    if let Some(stripped) = path.strip_prefix(base_uri) {
+        stripped
+    } else {
+        path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_querier_route() {
+        // Test config route
+        assert!(is_querier_route("/config"));
+        assert!(!is_querier_route("/api/org1/config"));
+
+        // Test summary route
+        assert!(is_querier_route("/api/org1/summary"));
+        assert!(!is_querier_route("/summary")); // Should fail as it needs org_id
+
+        // Test streams route
+        assert!(is_querier_route("/api/org1/streams"));
+        assert!(is_querier_route("/api/org1/streams/mystream"));
+
+        // Test prometheus routes
+        assert!(is_querier_route("/api/org1/prometheus/api/v1/query"));
+        assert!(is_querier_route("/api/org1/prometheus/api/v1/query_range"));
+    }
+
+    #[test]
+    fn test_is_querier_route_by_body() {
+        assert!(is_querier_route_by_body("/_search"));
+        assert!(is_querier_route_by_body("/_search_stream"));
+        assert!(is_querier_route_by_body("/_values_stream"));
+        assert!(is_querier_route_by_body("/prometheus/api/v1/query_range"));
+        assert!(is_querier_route_by_body(
+            "/prometheus/api/v1/query_exemplars"
+        ));
+
+        assert!(!is_querier_route_by_body("/other_route"));
+        assert!(is_querier_route_by_body("/_search_other"));
+    }
+
+    #[test]
+    fn test_is_fixed_querier_route() {
+        assert!(is_fixed_querier_route("/summary"));
+        assert!(is_fixed_querier_route("/schema"));
+        assert!(is_fixed_querier_route("/streams"));
+
+        assert!(!is_fixed_querier_route("/other_route"));
+        assert!(is_fixed_querier_route("/summary_other"));
+    }
+
+    #[test]
+    fn test_is_ws_route() {
+        // Valid WS routes
+        assert!(is_ws_route("/api/org1/stream1/ws"));
+        assert!(is_ws_route("/api/org1/stream1/ws/"));
+
+        // Invalid WS routes
+        assert!(!is_ws_route("/ws")); // Missing org and stream
+        assert!(!is_ws_route("/api/org1/ws")); // Missing stream
+        assert!(!is_ws_route("/api/org1/stream1/ws/_json")); // Contains ingester route
+    }
 }

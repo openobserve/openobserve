@@ -15,13 +15,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use actix_web::{HttpResponse, http, web};
-use anyhow::Result;
+use actix_web::{HttpResponse, http};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
+        otlp::OtlpRequestType,
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
@@ -31,6 +31,8 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
+use infra::errors::Result;
+use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -39,81 +41,42 @@ use prost::Message;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionStatus, StreamStatus},
-    },
-    handler::http::request::CONTENT_TYPE_JSON,
+    common::meta::ingestion::{IngestionStatus, StreamStatus},
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{
         format_stream_name,
-        ingestion::{check_ingestion_allowed, get_val_for_attr},
+        ingestion::{
+            check_ingestion_allowed,
+            grpc::{get_val, get_val_with_type_retained},
+        },
         logs::bulk::TRANSFORM_FAILED,
         schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
-const SERVICE_NAME: &str = "service.name";
-const SERVICE: &str = "service";
-
-pub async fn logs_proto_handler(
+pub async fn handle_request(
     thread_id: usize,
     org_id: &str,
-    body: web::Bytes,
+    request: ExportLogsServiceRequest,
     in_stream_name: Option<&str>,
     user_email: &str,
-) -> Result<HttpResponse> {
-    let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
-    match super::otlp_grpc::handle_grpc_request(
-        thread_id,
-        org_id,
-        request,
-        false,
-        in_stream_name,
-        user_email,
-    )
-    .await
-    {
-        Ok(res) => Ok(res),
-        Err(e) => {
-            log::error!("error while handling request: {}", e);
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
-        }
-    }
-}
-
-// example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
-// otel collector handling json request for logs https://github.com/open-telemetry/opentelemetry-collector/blob/main/pdata/plog/json.go
-pub async fn logs_json_handler(
-    thread_id: usize,
-    org_id: &str,
-    body: web::Bytes,
-    in_stream_name: Option<&str>,
-    user_email: &str,
+    req_type: OtlpRequestType,
 ) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+
+    // check stream
+    let stream_name = in_stream_name.map_or_else(|| "default".to_owned(), format_stream_name);
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name))?;
+
     let cfg = get_config();
     let log_ingestion_errors = ingestion_log_enabled().await;
 
-    // check stream
-    let stream_name = match in_stream_name {
-        Some(name) => format_stream_name(name),
-        None => "default".to_owned(),
-    };
-    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name))?;
-
-    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-        .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
-        .timestamp_micros();
+    let min_ts = (Utc::now() - Duration::hours(cfg.limit.ingest_allowed_upto)).timestamp_micros();
+    let max_ts =
+        (Utc::now() + Duration::hours(cfg.limit.ingest_allowed_in_future)).timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
-
     // Start retrieve associated pipeline and construct pipeline components
     let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
         org_id,
@@ -142,6 +105,7 @@ pub async fn logs_json_handler(
         &mut streams_need_all_values_map,
     )
     .await;
+
     // with pipeline, we need to store original if any of the destinations requires original
     let store_original_when_pipeline_exists =
         executable_pipeline.is_some() && streams_need_original_map.values().any(|val| *val);
@@ -151,175 +115,41 @@ pub async fn logs_json_handler(
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
 
-    let body: json::Value = match json::from_slice(body.as_ref()) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Invalid json: {}", e),
-            )));
-        }
-    };
-
-    let logs = match body.get("resourceLogs") {
-        Some(v) => match v.as_array() {
-            Some(v) => v,
-            None => {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Invalid json: the structure must be {{\"resourceLogs\":[]}}".to_string(),
-                )));
-            }
-        },
-        None => match body.get("resource_logs") {
-            Some(v) => match v.as_array() {
-                Some(v) => v,
-                None => {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Invalid json: the structure must be {{\"resource_logs\":[]}}".to_string(),
-                    )));
-                }
-            },
-            None => {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Invalid json: the structure must be {{\"resourceLogs\":[]}} or {{\"resource_logs\":[]}}".to_string(),
-                )));
-            }
-        },
-    };
-
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
     };
+    for resource_log in request.resource_logs {
+        if resource_log.scope_logs.is_empty() {
+            continue;
+        }
 
-    for res_log in logs.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
-        if res_log.get("resource").is_some() {
-            let resource = res_log.get("resource").unwrap().as_object().unwrap();
-            if resource.get("attributes").is_some() {
-                let attributes = resource.get("attributes").unwrap().as_array().unwrap();
-                for res_attr in attributes {
-                    let local_attr = res_attr.as_object().unwrap();
-                    if local_attr
-                        .get("key")
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .eq(SERVICE_NAME)
-                    {
-                        let loc_service_name =
-                            local_attr.get("value").unwrap().as_object().unwrap();
-                        for item in loc_service_name {
-                            service_att_map.insert(SERVICE_NAME.to_string(), item.1.clone());
-                        }
-                    } else {
-                        service_att_map.insert(
-                            format!(
-                                "{}_{}",
-                                SERVICE,
-                                local_attr.get("key").unwrap().as_str().unwrap()
-                            ),
-                            get_val_for_attr(local_attr.get("value").unwrap()),
-                        );
-                    }
-                }
+        if let Some(resource) = resource_log.resource {
+            for res_attr in resource.attributes {
+                service_att_map.insert(
+                    res_attr.key.to_string(),
+                    get_val_with_type_retained(&res_attr.value.as_ref()),
+                );
             }
         }
-        let scope_resources = res_log.get("scopeLogs");
-        let inst_resources = if let Some(v) = scope_resources {
-            v.as_array().unwrap()
-        } else {
-            res_log.get("scope_logs").unwrap().as_array().unwrap()
-        };
-        for inst_log in inst_resources {
-            let log_records = if inst_log.get("logRecords").is_some() {
-                inst_log.get("logRecords").unwrap().as_array().unwrap()
-            } else {
-                inst_log.get("log_records").unwrap().as_array().unwrap()
-            };
 
-            for log in log_records {
-                let start_time: i64 = if log.get("timeUnixNano").is_some() {
-                    json::get_int_value(log.get("timeUnixNano").unwrap())
+        for instrumentation_logs in &resource_log.scope_logs {
+            for log_record in &instrumentation_logs.log_records {
+                let timestamp = if log_record.time_unix_nano != 0 {
+                    log_record.time_unix_nano as i64 / 1000
                 } else {
-                    json::get_int_value(log.get("time_unix_nano").unwrap())
+                    log_record.observed_time_unix_nano as i64 / 1000
                 };
-
-                let timestamp = if start_time > 0 {
-                    start_time / 1000
-                } else {
-                    Utc::now().timestamp_micros()
-                };
-
-                let mut value: json::Value = json::to_value(log).unwrap();
-
-                // get json object
-                let local_val = value.as_object_mut().unwrap();
-
-                if log.get("attributes").is_some() {
-                    let attributes = log.get("attributes").unwrap().as_array().unwrap();
-                    for res_attr in attributes {
-                        let local_attr = res_attr.as_object().unwrap();
-                        let mut key = local_attr.get("key").unwrap().as_str().unwrap().to_string();
-                        flatten::format_key(&mut key);
-                        local_val.insert(key, get_val_for_attr(local_attr.get("value").unwrap()));
-                    }
-                }
-                // remove attributes after adding
-                local_val.remove("attributes");
-
-                // remove body before adding
-                local_val.remove("body_stringvalue");
-
-                // process trace id
-                if log.get("trace_id").is_some() {
-                    local_val.remove("trace_id");
-                    let trace_id = log.get("trace_id").unwrap();
-                    let trace_id_str = trace_id.as_str().unwrap();
-                    let trace_id_bytes = hex::decode(trace_id_str).unwrap().try_into().unwrap();
-                    let trace_id = TraceId::from_bytes(trace_id_bytes).to_string();
-                    local_val.insert("trace_id".to_owned(), trace_id.into());
-                } else if log.get("traceId").is_some() {
-                    local_val.remove("traceId");
-                    let trace_id = log.get("traceId").unwrap();
-                    let trace_id_str = trace_id.as_str().unwrap();
-                    let trace_id_bytes = hex::decode(trace_id_str).unwrap().try_into().unwrap();
-                    let trace_id = TraceId::from_bytes(trace_id_bytes).to_string();
-                    local_val.insert("trace_id".to_owned(), trace_id.into());
-                };
-
-                // process span id
-                if log.get("span_id").is_some() {
-                    local_val.remove("span_id");
-                    let span_id = log.get("span_id").unwrap();
-                    let span_id_str = span_id.as_str().unwrap();
-                    let span_id_bytes = hex::decode(span_id_str).unwrap().try_into().unwrap();
-                    let span_id = SpanId::from_bytes(span_id_bytes).to_string();
-                    local_val.insert("span_id".to_owned(), span_id.into());
-                } else if log.get("spanId").is_some() {
-                    local_val.remove("spanId");
-                    let span_id = log.get("spanId").unwrap();
-                    let span_id_str = span_id.as_str().unwrap();
-                    let span_id_bytes = hex::decode(span_id_str).unwrap().try_into().unwrap();
-                    let span_id = SpanId::from_bytes(span_id_bytes).to_string();
-                    local_val.insert("span_id".to_owned(), span_id.into());
-                };
-
-                if log.get("body").is_some() {
-                    let body = log.get("body").unwrap().get("stringValue").unwrap();
-                    local_val.insert("body".to_owned(), body.clone());
-                }
 
                 // check ingestion time
                 if timestamp < min_ts || timestamp > max_ts {
                     stream_status.status.failed += 1; // to old data, just discard
                     stream_status.status.error = if timestamp < min_ts {
-                        get_upto_discard_error().to_string()
+                        get_upto_discard_error()
                     } else {
-                        get_future_discard_error().to_string()
-                    };
+                        get_future_discard_error()
+                    }
+                    .to_string();
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
                             org_id,
@@ -330,35 +160,81 @@ pub async fn logs_json_handler(
                         .inc();
                     log_failed_record(
                         log_ingestion_errors,
-                        &log_records,
+                        log_record,
                         &stream_status.status.error,
                     );
                     continue;
                 }
-                local_val.insert(
-                    TIMESTAMP_COL_NAME.to_string(),
-                    json::Value::Number(timestamp.into()),
-                );
 
-                local_val.append(&mut service_att_map.clone());
+                let mut rec = json::json!({});
+                rec.as_object_mut().unwrap().extend(service_att_map.clone());
 
-                value = json::to_value(local_val)?;
+                if let Some(lib) = &instrumentation_logs.scope {
+                    let library_name = lib.name.to_owned();
+                    if !library_name.is_empty() {
+                        rec["instrumentation_library_name"] =
+                            serde_json::Value::String(library_name);
+                    }
+                    let lib_version = lib.version.to_owned();
+                    if !lib_version.is_empty() {
+                        rec["instrumentation_library_version"] =
+                            serde_json::Value::String(lib_version);
+                    }
+                }
+
+                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
+                rec["severity"] = if !log_record.severity_text.is_empty() {
+                    log_record.severity_text.to_owned().into()
+                } else {
+                    log_record.severity_number.into()
+                };
+
+                rec["body"] = get_val(&log_record.body.as_ref());
+                rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
+
+                log_record.attributes.iter().for_each(|local_attr| {
+                    rec[local_attr.key.as_str()] =
+                        get_val_with_type_retained(&local_attr.value.as_ref());
+                });
+
+                match TraceId::from_bytes(
+                    log_record
+                        .trace_id
+                        .as_slice()
+                        .try_into()
+                        .ok()
+                        .unwrap_or_default(),
+                ) {
+                    TraceId::INVALID => {}
+                    trace_id => {
+                        rec["trace_id"] = trace_id.to_string().into();
+                    }
+                };
+
+                match SpanId::from_bytes(
+                    log_record.span_id.as_slice().try_into().unwrap_or_default(),
+                ) {
+                    SpanId::INVALID => {}
+                    span_id => {
+                        rec["span_id"] = span_id.to_string().into();
+                    }
+                };
 
                 // store a copy of original data before it's modified, when
                 // 1. original data is an object
-                let original_data = if value.is_object() {
+                let original_data = if rec.is_object() {
                     // 2. current stream does not have pipeline
                     if executable_pipeline.is_none() {
                         // current stream requires original
                         streams_need_original_map
                             .get(&stream_name)
                             .is_some_and(|v| *v)
-                            .then(|| value.to_string())
+                            .then(|| rec.to_string())
                     } else {
                         // 3. with pipeline, storing original as long as streams_need_original_set
                         //    is not empty
                         // because not sure the pipeline destinations
-                        store_original_when_pipeline_exists.then(|| value.to_string())
+                        store_original_when_pipeline_exists.then(|| rec.to_string())
                     }
                 } else {
                     None // `item` won't be flattened, no need to store original
@@ -366,18 +242,17 @@ pub async fn logs_json_handler(
 
                 if executable_pipeline.is_some() {
                     // buffer the records and originals for pipeline batch processing
-                    pipeline_inputs.push(value);
+                    pipeline_inputs.push(rec);
                     original_options.push(original_data);
                     timestamps.push(timestamp);
                 } else {
                     let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *_size += estimate_json_bytes(&value);
+                    *_size += estimate_json_bytes(&rec);
                     // JSON Flattening
-                    value =
-                        flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
+                    rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
                     // get json object
-                    let mut local_val = match value.take() {
+                    let mut local_val = match rec.take() {
                         json::Value::Object(v) => v,
                         _ => unreachable!(),
                     };
@@ -390,21 +265,17 @@ pub async fn logs_json_handler(
                     if streams_need_original_map
                         .get(&stream_name)
                         .is_some_and(|v| *v)
-                        && original_data.is_some()
+                        && let Some(original_data) = original_data
                     {
-                        local_val.insert(
-                            ORIGINAL_DATA_COL_NAME.to_string(),
-                            original_data.unwrap().into(),
-                        );
+                        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
+
                         let record_id = crate::service::ingestion::generate_record_id(
                             org_id,
                             &stream_name,
                             &StreamType::Logs,
                         );
-                        local_val.insert(
-                            ID_COL_NAME.to_string(),
-                            json::Value::String(record_id.to_string()),
-                        );
+
+                        local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
                     }
 
                     // add `_all_values` if required by StreamSettings
@@ -412,24 +283,21 @@ pub async fn logs_json_handler(
                         .get(&stream_name)
                         .is_some_and(|v| *v)
                     {
-                        let mut values = Vec::with_capacity(local_val.len());
-                        for (k, value) in local_val.iter() {
-                            if [
-                                TIMESTAMP_COL_NAME,
-                                ID_COL_NAME,
-                                ORIGINAL_DATA_COL_NAME,
-                                ALL_VALUES_COL_NAME,
-                            ]
-                            .contains(&k.as_str())
-                            {
-                                continue;
-                            }
-                            values.push(value.to_string());
-                        }
-                        local_val.insert(
-                            ALL_VALUES_COL_NAME.to_string(),
-                            json::Value::String(values.join(" ")),
-                        );
+                        let values = local_val
+                            .iter()
+                            .filter(|(k, _)| {
+                                ![
+                                    TIMESTAMP_COL_NAME,
+                                    ID_COL_NAME,
+                                    ORIGINAL_DATA_COL_NAME,
+                                    ALL_VALUES_COL_NAME,
+                                ]
+                                .contains(&k.as_str())
+                            })
+                            .map(|(_, v)| v)
+                            .join(" ");
+                        local_val
+                            .insert(ALL_VALUES_COL_NAME.to_string(), json::Value::String(values));
                     }
 
                     let (ts_data, fn_num) = json_data_by_stream
@@ -451,13 +319,10 @@ pub async fn logs_json_handler(
         {
             Err(e) => {
                 log::error!(
-                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                    org_id,
-                    stream_name,
-                    e
+                    "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}."
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -510,40 +375,36 @@ pub async fn logs_json_handler(
                                 ORIGINAL_DATA_COL_NAME.to_string(),
                                 original_options[idx].clone().unwrap().into(),
                             );
+
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,
                                 &destination_stream,
                                 &StreamType::Logs,
                             );
-                            local_val.insert(
-                                ID_COL_NAME.to_string(),
-                                json::Value::String(record_id.to_string()),
-                            );
+                            local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
                         }
 
                         // add `_all_values` if required by StreamSettings
                         if streams_need_all_values_map
                             .get(&destination_stream)
-                            .is_some_and(|v| *v)
+                            .copied()
+                            .unwrap_or_default()
                         {
-                            let mut values = Vec::with_capacity(local_val.len());
-                            for (k, value) in local_val.iter() {
-                                if [
-                                    TIMESTAMP_COL_NAME,
-                                    ID_COL_NAME,
-                                    ORIGINAL_DATA_COL_NAME,
-                                    ALL_VALUES_COL_NAME,
-                                ]
-                                .contains(&k.as_str())
-                                {
-                                    continue;
-                                }
-                                values.push(value.to_string());
-                            }
-                            local_val.insert(
-                                ALL_VALUES_COL_NAME.to_string(),
-                                json::Value::String(values.join(" ")),
-                            );
+                            let values = local_val
+                                .iter()
+                                .filter(|(k, _)| {
+                                    ![
+                                        TIMESTAMP_COL_NAME,
+                                        ID_COL_NAME,
+                                        ORIGINAL_DATA_COL_NAME,
+                                        ALL_VALUES_COL_NAME,
+                                    ]
+                                    .contains(&k.as_str())
+                                })
+                                .map(|(_, v)| v)
+                                .join(" ");
+
+                            local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
                         }
 
                         let _size = size_by_stream
@@ -577,13 +438,19 @@ pub async fn logs_json_handler(
         });
     }
 
+    let (content_type, endpoint) = match req_type {
+        OtlpRequestType::HttpJson => (CONTENT_TYPE_JSON, "/api/otlp/v1/logs"),
+        OtlpRequestType::HttpProtobuf => (CONTENT_TYPE_PROTO, "/api/otlp/v1/logs"),
+        OtlpRequestType::Grpc => (CONTENT_TYPE_PROTO, "/grpc/otlp/logs"),
+    };
+
     // if no data, fast return
     if json_data_by_stream.is_empty() {
         let mut out = BytesMut::with_capacity(res.encoded_len());
         res.encode(&mut out).expect("Out of memory");
         return Ok(HttpResponse::Ok()
             .status(http::StatusCode::OK)
-            .content_type(CONTENT_TYPE_JSON)
+            .content_type(content_type)
             .body(out)); // just return
     }
 
@@ -623,29 +490,103 @@ pub async fn logs_json_handler(
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
+    let label_values = [
+        endpoint,
+        metric_rpt_status_code,
+        org_id,
+        StreamType::Logs.as_str(),
+        "",
+        "",
+    ];
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/api/otlp/v1/logs",
-            metric_rpt_status_code,
-            org_id,
-            StreamType::Logs.as_str(),
-            "",
-            "",
-        ])
+        .with_label_values(&label_values)
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/api/otlp/v1/logs",
-            metric_rpt_status_code,
-            org_id,
-            StreamType::Logs.as_str(),
-            "",
-            "",
-        ])
+        .with_label_values(&label_values)
         .inc();
 
     Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
-        .content_type(CONTENT_TYPE_JSON)
+        .content_type(content_type)
         .body(response_body))
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::otlp::OtlpRequestType;
+    use opentelemetry_proto::tonic::{
+        collector::logs::v1::ExportLogsServiceRequest,
+        common::v1::{
+            AnyValue, InstrumentationScope, KeyValue,
+            any_value::Value::{IntValue, StringValue},
+        },
+        logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+    };
+
+    use crate::service::logs::otlp::handle_request;
+
+    #[tokio::test]
+    async fn test_handle_logs_request() {
+        let org_id = "test_org_id";
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 9,
+            severity_text: "Info".to_string(),
+            // name: "logA".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("This is a log message".to_string())),
+            }),
+            attributes: vec![
+                KeyValue {
+                    key: "app".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(StringValue("server".to_string())),
+                    }),
+                },
+                KeyValue {
+                    key: "instance_num".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(IntValue(1)),
+                    }),
+                },
+            ],
+            dropped_attributes_count: 1,
+            trace_id: "".as_bytes().to_vec(),
+            span_id: "".as_bytes().to_vec(),
+            ..Default::default()
+        };
+
+        let ins = ScopeLogs {
+            scope: Some(InstrumentationScope {
+                name: "test".to_string(),
+                version: "1.0.0".to_string(),
+                attributes: vec![],
+                dropped_attributes_count: 0,
+            }),
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            scope_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = handle_request(
+            0,
+            org_id,
+            request,
+            Some("test_stream"),
+            "a@a.com",
+            OtlpRequestType::Grpc,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
 }

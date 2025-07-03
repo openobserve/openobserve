@@ -178,7 +178,7 @@ async fn get_wal_batches(
             idx_file_list: vec![], // not needed for wal
             start_time: time_range.0,
             end_time: time_range.1,
-            timeout: cfg.limit.query_timeout as u64,
+            timeout: cfg.limit.query_timeout,
             use_cache: false,
             histogram_interval: 0, // not needed for wal
         },

@@ -73,9 +73,7 @@ async fn validate_ratelimit_updater(
     update_type: &str,
     rules: &RatelimitRuleUpdater,
 ) -> Result<(), anyhow::Error> {
-    let global_default_rules = get_default_rules()
-        .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let global_default_rules = get_default_rules().await.map_err(std::io::Error::other)?;
 
     // module-level is org-level
     let org_level_rules = infra::table::ratelimit::fetch_rules(
@@ -84,7 +82,7 @@ async fn validate_ratelimit_updater(
         Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
     )
     .await
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    .map_err(std::io::Error::other)?;
 
     let org_level_thresholds: HashMap<(String, ApiGroupOperation), i32> = org_level_rules
         .into_iter()
@@ -128,8 +126,9 @@ async fn validate_ratelimit_updater(
             if update_type == "role" {
                 let compare_threshold =
                     org_level_thresholds.get(&(api_group_name.to_string(), operation));
-                if compare_threshold.is_some() && *compare_threshold.unwrap() < *threshold {
-                    let compare_threshold = compare_threshold.unwrap();
+                if let Some(compare_threshold) = compare_threshold
+                    && *compare_threshold < *threshold
+                {
                     return Err(anyhow::anyhow!(
                         "{}:{} threshold must be lower than or equal to {:?}, got {}, because module-level rule limit {}:{} is {:?}",
                         api_group_name,
@@ -183,8 +182,7 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
         let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
             return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {} has no access",
-                org_id,
+                "org_id: {org_id} has no access",
             )));
         }
 
@@ -235,8 +233,7 @@ pub async fn list_module_ratelimit(
         let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
             return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {} has no access",
-                org_id,
+                "org_id: {org_id} has no access",
             )));
         }
 
@@ -248,9 +245,7 @@ pub async fn list_module_ratelimit(
                 .await;
         }
 
-        let global_default_rules = get_default_rules()
-            .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let global_default_rules = get_default_rules().await.map_err(std::io::Error::other)?;
         // module-level is org-level
         let all_rules = infra::table::ratelimit::fetch_rules(
             global_default_rules.clone(),
@@ -258,7 +253,7 @@ pub async fn list_module_ratelimit(
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
         )
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
 
         let info = get_ratelimit_global_default_api_info().await;
         let api_group_info = info.api_groups(Some(org_id.as_str()), all_rules).await;
@@ -304,8 +299,7 @@ pub async fn list_role_ratelimit(
         let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
             return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {} has no access",
-                org_id,
+                "org_id: {org_id} has no access",
             )));
         }
 
@@ -333,7 +327,7 @@ pub async fn list_role_ratelimit(
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
         )
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
 
         let role_level_rules = infra::table::ratelimit::fetch_rules(
             org_level_rules,
@@ -341,7 +335,7 @@ pub async fn list_role_ratelimit(
             Some(user_role),
         )
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
 
         let info = get_ratelimit_global_default_api_info().await;
         let api_group_info = info
@@ -392,16 +386,13 @@ pub async fn update_ratelimit(
         let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
             return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {} has no access",
-                org_id,
+                "org_id: {org_id} has no access",
             )));
         }
 
         let mut bytes = web::BytesMut::new();
         while let Some(item) = payload.next().await {
-            bytes.extend_from_slice(
-                &item.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
-            );
+            bytes.extend_from_slice(&item.map_err(std::io::Error::other)?);
         }
 
         let updater = match parse_and_validate_ratelimit_payload(bytes).await {
@@ -424,8 +415,7 @@ pub async fn update_ratelimit(
             validate_ratelimit_updater(org_id.as_str(), &query.get_update_type(), &updater).await
         {
             return Ok(MetaHttpResponse::bad_request(format!(
-                "validate ratelimit updater error: {}",
-                e,
+                "validate ratelimit updater error: {e}"
             )));
         }
 
@@ -443,7 +433,7 @@ pub async fn update_ratelimit(
             _ => {
                 return Ok(MetaHttpResponse::bad_request(format!(
                     "update_type is incorrect: {}, only support module or role",
-                    query.get_update_type(),
+                    query.get_update_type()
                 )));
             }
         };
@@ -452,8 +442,8 @@ pub async fn update_ratelimit(
         log::debug!("RatelimitRule::from_updater rules: {:?}", rules);
         match ratelimit::rule::update(RuleEntry::UpsertBatch(rules)).await {
             Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "Ratelimit rule updated successfully".to_string(),
+                http::StatusCode::OK,
+                "Ratelimit rule updated successfully",
             ))),
             Err(e) => Ok(e.into()),
         }
@@ -473,7 +463,7 @@ async fn parse_and_validate_ratelimit_payload(
     bytes: web::BytesMut,
 ) -> Result<RatelimitRuleUpdater, String> {
     let value: serde_json::Value =
-        serde_json::from_slice(&bytes).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        serde_json::from_slice(&bytes).map_err(|e| format!("Failed to parse JSON: {e}"))?;
 
     let obj = value
         .as_object()
@@ -484,24 +474,18 @@ async fn parse_and_validate_ratelimit_payload(
     for (outer_key, outer_value) in obj {
         let inner_obj = outer_value
             .as_object()
-            .ok_or_else(|| format!("Value for key '{}' must be an object", outer_key))?;
+            .ok_or_else(|| format!("Value for key '{outer_key}' must be an object"))?;
 
         let mut inner_map = HashMap::new();
 
         for (inner_key, inner_value) in inner_obj {
             let number = inner_value.as_i64().ok_or_else(|| {
-                format!(
-                    "Value for key '{}' in group '{}' must be an i32",
-                    inner_key, outer_key
-                )
+                format!("Value for key '{inner_key}' in group '{outer_key}' must be an i32")
             })?;
 
             if number > i32::MAX as i64 || number < 0 {
                 return Err(format!(
-                    "The Rate limit value of {} for the key '{}' in group '{}' exceeds the allowed integer range of [{}, {}]",
-                    number,
-                    inner_key,
-                    outer_key,
+                    "The Rate limit value of {number} for the key '{inner_key}' in group '{outer_key}' exceeds the allowed integer range of [{}, {}]",
                     0,
                     i32::MAX
                 ));

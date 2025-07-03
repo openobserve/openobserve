@@ -48,10 +48,7 @@ impl Context for Export {
             .as_ref()
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query_map));
         let query = search::Query {
-            sql: format!(
-                "select * from {} ORDER BY {} ASC",
-                table, TIMESTAMP_COL_NAME
-            ),
+            sql: format!("select * from {table} ORDER BY {TIMESTAMP_COL_NAME} ASC"),
             from: 0,
             size: cfg.limit.query_default_limit,
             quick_mode: false,
@@ -89,8 +86,8 @@ impl Context for Export {
                 serde_json::to_writer_pretty(file, &res.hits)?;
                 Ok(true)
             }
-            Err(err) => {
-                eprintln!("search error: {:?}", err);
+            Err(e) => {
+                eprintln!("search error: {e:?}");
                 Ok(false)
             }
         }

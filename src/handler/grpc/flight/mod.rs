@@ -42,7 +42,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::SEARCH_SERVER,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::TaskStatus,
 };
 
@@ -158,12 +158,9 @@ impl FlightService for FlightServiceImpl {
                 .indent(false)
                 .to_string();
             println!("+---------------------------+--------------------------+");
-            println!(
-                "follow physical plan, is_super_cluster_follower_leader: {}",
-                is_super_cluster
-            );
+            println!("follow physical plan, is_super_cluster_follower_leader: {is_super_cluster}");
             println!("+---------------------------+--------------------------+");
-            println!("{}", plan);
+            println!("{plan}");
         }
 
         schema = add_scan_stats_to_schema(schema, scan_stats);
@@ -328,9 +325,9 @@ impl Stream for FlightSenderStream {
                     e.to_string(),
                     self.start.elapsed().as_millis()
                 );
-                Poll::Ready(Some(Err(FlightError::Tonic(Status::internal(
-                    e.to_string(),
-                )))))
+                Poll::Ready(Some(Err(FlightError::Tonic(
+                    Status::internal(e.to_string()).into(),
+                ))))
             }
         }
     }

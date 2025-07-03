@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 use config::{
     cluster::*,
@@ -56,7 +56,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let ttl_keep_alive = max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
@@ -200,7 +200,7 @@ async fn register() -> Result<()> {
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
         dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(format!("register node error: {}", e)));
+        return Err(Error::Message(format!("register node error: {e}")));
     }
 
     // 7. register ok, release lock
@@ -268,7 +268,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
-        return Err(Error::Message(format!("online node error: {}", e)));
+        return Err(Error::Message(format!("online node error: {e}")));
     }
 
     Ok(())
@@ -279,7 +279,7 @@ pub(crate) async fn leave() -> Result<()> {
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.delete(&key, false, NEED_WATCH, None).await {
-        return Err(Error::Message(format!("leave node error: {}", e)));
+        return Err(Error::Message(format!("leave node error: {e}")));
     }
 
     Ok(())
@@ -290,7 +290,45 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let val = json::to_vec(&node).unwrap();
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
-        return Err(Error::Message(format!("update node error: {}", e)));
+        return Err(Error::Message(format!("update node error: {e}")));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_nats_update_local_node() {
+        let node = Node::default();
+        let _ = update_local_node(&node).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_set_status() {
+        let _ = set_status(NodeStatus::Online).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_set_offline() {
+        let _ = set_offline().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_leave() {
+        let _ = leave().await.is_err();
+    }
+
+    // #[tokio::test]
+    // async fn test_nats_register_and_keep_alive() {
+    //     config::cache_instance_id("instance");
+    //     let _ = register_and_keep_alive().await.is_err();
+    // }
+
+    #[tokio::test]
+    async fn test_nats_register() {
+        config::cache_instance_id("instance");
+        let _ = register().await.is_err();
+    }
 }

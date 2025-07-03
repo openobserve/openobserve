@@ -17,7 +17,10 @@ use config::{cluster::LOCAL_NODE, meta::stream::StreamStats};
 use hashbrown::HashMap;
 use infra::{dist_lock, file_list as infra_file_list};
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::db};
+use crate::{
+    common::infra::cluster::get_node_by_uuid,
+    service::{db, file_list_dump},
+};
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
     let latest_pk = infra_file_list::get_max_pk_value()
@@ -74,13 +77,21 @@ async fn update_stats_from_file_list_inner(
     for org_id in orgs {
         let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false)
             .await
-            .map_err(|e| anyhow::anyhow!("get add stream stats error: {:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
+        let dumped_add_stats = file_list_dump::stats(&org_id, None, None, pk_value)
+            .await
+            .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
         let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true)
             .await
-            .map_err(|e| anyhow::anyhow!("get del stream stats error: {:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("get del stream stats error: {e}"))?;
+        // dump never store deleted files, so we do not have to consider deleted here
         let mut stream_stats = HashMap::new();
         for (stream, stats) in add_stream_stats {
             stream_stats.insert(stream, stats);
+        }
+        for (stream, stats) in dumped_add_stats {
+            let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
+            *entry = &*entry + &stats;
         }
         for (stream, stats) in del_stream_stats {
             let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
@@ -90,7 +101,7 @@ async fn update_stats_from_file_list_inner(
             let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
             infra_file_list::set_stream_stats(&org_id, &stream_stats, pk_value)
                 .await
-                .map_err(|e| anyhow::anyhow!("set stream stats error: {:?}", e))?;
+                .map_err(|e| anyhow::anyhow!("set stream stats error: {e}"))?;
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
@@ -98,7 +109,7 @@ async fn update_stats_from_file_list_inner(
     // update offset
     db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE.uuid.clone()))
         .await
-        .map_err(|e| anyhow::anyhow!("set offset error: {:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("set offset error: {e}"))?;
 
     Ok(pk_value)
 }
@@ -122,5 +133,28 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
         Err(e)
     } else {
         Ok(Some(offset))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn setup() {
+        infra::db::init().await.unwrap();
+        // setup the offset
+        _ = db::compact::stats::set_offset(1024, Some(&LOCAL_NODE.uuid.clone())).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_stats_from_file_list() {
+        setup().await;
+        let latest_pk = 1002000;
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, Some((1024, 1001024)));
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, Some((1001024, 1002000)));
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, None);
     }
 }

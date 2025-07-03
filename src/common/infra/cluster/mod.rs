@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::max,
     collections::HashMap,
     ops::Bound,
     sync::{Arc, atomic::Ordering},
@@ -205,12 +204,11 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     // check node heatbeat
     tokio::task::spawn(async move {
-        let cfg = get_config();
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
-        let ttl_keep_alive = max(1, (cfg.limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
@@ -376,10 +374,10 @@ async fn watch_node_list() -> Result<()> {
                 log::info!("[CLUSTER] join {:?}", item_value);
                 item_value.broadcasted = true;
                 // check if the same node is already in the cluster
-                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
-                    if node.uuid.ne(&item_value.uuid) {
-                        NODES.write().await.remove(&node.uuid);
-                    }
+                if let Some(node) = get_cached_node_by_name(&item_value.name).await
+                    && node.uuid.ne(&item_value.uuid)
+                {
+                    NODES.write().await.remove(&node.uuid);
                 }
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(
@@ -690,6 +688,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_set_online() {
+        register_and_keep_alive().await.unwrap();
+        set_online(true).await.unwrap();
+        assert!(get_cached_online_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_offline() {
+        register_and_keep_alive().await.unwrap();
+        set_offline(true).await.unwrap();
+        // doesn't work for local mode
+        assert!(get_cached_online_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_unschedulable() {
+        register_and_keep_alive().await.unwrap();
+        set_unschedulable().await.unwrap();
+        // doesn't work for local mode
+        assert!(get_cached_online_ingester_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_schedulable() {
+        register_and_keep_alive().await.unwrap();
+        set_schedulable().await.unwrap();
+        assert!(get_cached_online_ingester_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_update_local_node() {
+        let node = LOCAL_NODE.clone();
+        register_and_keep_alive().await.unwrap();
+        update_local_node(&node).await.unwrap();
+        assert!(get_cached_node_by_name(&node.name).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_nodes() {
+        let node = LOCAL_NODE.clone();
+        register_and_keep_alive().await.unwrap();
+        assert!(get_node_by_addr(&node.grpc_addr).await.is_some());
+        assert!(get_node_by_uuid(&node.uuid).await.is_some());
+        assert!(get_cached_node_by_name(&node.name).await.is_some());
+        assert!(get_cached_online_nodes().await.is_some());
+        assert!(get_cached_online_query_nodes(None).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_node_status_metrics() {
+        let node = LOCAL_NODE.clone();
+        register_and_keep_alive().await.unwrap();
+        update_local_node(&node).await.unwrap();
+        set_node_status_metrics(&node).await;
+        assert!(get_cached_node_by_name(&node.name).await.is_some());
+        assert!(get_cached_online_nodes().await.is_some());
+    }
+
+    #[tokio::test]
     async fn test_cluster() {
         register_and_keep_alive().await.unwrap();
         set_online(false).await.unwrap();
@@ -718,6 +775,9 @@ mod tests {
                 role: [Role::Compactor].to_vec(),
                 ..node.clone()
             };
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Interactive))
+                .await;
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Background)).await;
             add_node_to_consistent_hash(&node_q, &Role::Querier, None).await;
             add_node_to_consistent_hash(&node_c, &Role::Compactor, None).await;
             add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor, None).await;
@@ -763,5 +823,12 @@ mod tests {
                 Some(key.get(2).unwrap().to_string())
             );
         }
+
+        let ret = print_consistent_hash().await;
+        assert_eq!(ret.len(), 4);
+        assert_eq!(ret["querier_interactive"].len(), 10);
+        assert_eq!(ret["querier_background"].len(), 10);
+        assert_eq!(ret["compactor"].len(), 10);
+        assert_eq!(ret["flatten_compactor"].len(), 10);
     }
 }

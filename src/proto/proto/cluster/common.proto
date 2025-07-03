@@ -42,17 +42,23 @@ message ScanStats {
 
 message FileList {
     repeated FileKey items = 1;
+    string node_addr = 2;
 }
 
 message FileKey {
     int64          id          = 1;
-    string         key         = 2;
-    FileMeta       meta        = 3;
-    bool           deleted     = 4;
-    optional bytes segment_ids = 5;
+    string         account     = 2;
+    string         key         = 3;
+    FileMeta       meta        = 4;
+    bool           deleted     = 5;
+    optional bytes segment_ids = 6;
 }
 
 message IdxFileName {
     string         key         = 1;
     optional bytes segment_ids = 2;
+}
+
+message SimpleFileList {
+    repeated string files = 1;
 }

@@ -14,13 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
         search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
     },
-    router::{INGESTER_ROUTES, is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
+    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body, is_ws_route},
     utils::{json, rand::get_rand_element},
 };
 use actix_web::{
@@ -148,6 +148,25 @@ async fn dispatch(
         .unwrap_or("")
         .to_string();
 
+    // HACK: node list api need return by itself
+    if path.contains("/api/_meta/node/list") {
+        let query =
+            web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
+                .ok()
+                .map(|x| x.into_inner())
+                .unwrap_or_default();
+        return crate::handler::http::request::organization::org::node_list_impl(
+            META_ORG_ID,
+            query,
+        )
+        .await
+        .map_err(|e| {
+            Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                format!("Failed to parse node list request: {e}").as_str(),
+            )))
+        });
+    }
+
     let new_url = get_url(&path).await;
     if new_url.is_error {
         log::error!(
@@ -163,12 +182,7 @@ async fn dispatch(
     }
 
     // check if the request is a websocket request
-    let path_columns: Vec<&str> = path.split('/').collect();
-    if *path_columns.get(3).unwrap_or(&"") == "ws"
-        && INGESTER_ROUTES
-            .iter()
-            .all(|ingest_route| !path.ends_with(ingest_route))
-    {
+    if is_ws_route(&path) {
         return proxy_ws(req, payload, start).await;
     }
 
@@ -350,7 +364,7 @@ async fn proxy_querier_by_body(
         }
         s if s.ends_with("/_values_stream") => {
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse values stream request data: {:?}", e);
+                log::error!("Failed to parse values stream request data: {e}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
                     "Failed to parse values stream request data",
                 )))
@@ -368,9 +382,9 @@ async fn proxy_querier_by_body(
             let request_type = if is_stream { "stream" } else { "search" };
 
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse {} request data: {:?}", request_type, e);
+                log::error!("Failed to parse {request_type} request data: {e:?}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                    format!("Failed to parse {} request data", request_type).as_str(),
+                    format!("Failed to parse {request_type} request data").as_str(),
                 )))
             })?;
             let Ok(query) = json::from_slice::<SearchRequest>(&body) else {
@@ -387,7 +401,7 @@ async fn proxy_querier_by_body(
         }
         s if s.ends_with("/_search_partition") => {
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse search partition request data: {:?}", e);
+                log::error!("Failed to parse search partition request data: {e}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
                     "Failed to parse search partition request data",
                 )))
@@ -622,6 +636,7 @@ mod tests {
         assert!(!is_querier_route("/api/clusters/_bulk"));
         assert!(!is_querier_route("/api/clusters/ws/_multi"));
         assert!(!is_querier_route("/api/default/config/_json"));
+        assert!(is_querier_route("/api/default/ai/chat_stream"));
     }
 
     #[test]

@@ -277,10 +277,11 @@ pub async fn flush() {
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
 pub async fn run_audit_publish() {
-    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
     if !o2cfg.common.audit_enabled {
         return;
     }
+
     let mut audit_interval = tokio::time::interval(tokio::time::Duration::from_secs(
         o2cfg.common.audit_publish_interval.try_into().unwrap(),
     ));
@@ -310,7 +311,9 @@ pub async fn flush_audit() {
 async fn publish_audit(
     req: cluster_rpc::IngestionRequest,
 ) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
-    crate::service::ingestion::ingestion_service::ingest(req).await
+    crate::service::ingestion::ingestion_service::ingest(req)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
 #[inline]
@@ -324,7 +327,7 @@ pub fn http_report_metrics(
     search_group: &str,
 ) {
     let time = start.elapsed().as_secs_f64();
-    let uri = format!("/api/org/{}", uri);
+    let uri = format!("/api/org/{uri}");
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             &uri,

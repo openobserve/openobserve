@@ -19,7 +19,6 @@ use std::{
 };
 
 use actix_web::{HttpResponse, http};
-use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -33,6 +32,7 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
+use infra::errors::Result;
 use syslog_loose::{Message, ProcId, Protocol, Variant};
 
 use super::{
@@ -71,8 +71,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     "Syslogs from the IP are not allowed".to_string(),
                 ))
                 .json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    "Syslogs from the IP are not allowed".to_string(),
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Syslogs from the IP are not allowed",
                 )));
         }
     };
@@ -85,7 +85,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let stream_name = format_stream_name(in_stream_name);
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)) {
         log::error!("Syslogs ingestion error: {e}");
-        return Ok(map_error_to_http_response(&e.into(), None));
+        return Ok(map_error_to_http_response(&e, None));
     };
 
     let cfg = get_config();
@@ -201,12 +201,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         if streams_need_original_map
             .get(&stream_name)
             .is_some_and(|v| *v)
-            && original_data.is_some()
+            && let Some(original_data) = original_data
         {
-            local_val.insert(
-                ORIGINAL_DATA_COL_NAME.to_string(),
-                original_data.unwrap().into(),
-            );
+            local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
             let record_id = crate::service::ingestion::generate_record_id(
                 org_id,
                 &stream_name,
@@ -259,13 +256,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         {
             Err(e) => {
                 log::error!(
-                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                    org_id,
-                    stream_name,
-                    e
+                    "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}.",
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,

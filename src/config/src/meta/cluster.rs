@@ -160,6 +160,10 @@ impl NodeInfo for Node {
     fn get_grpc_addr(&self) -> String {
         self.grpc_addr.clone()
     }
+
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 pub trait IntoArcVec {

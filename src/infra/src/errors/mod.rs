@@ -18,9 +18,10 @@ use config::utils::json;
 use thiserror::Error as ThisError;
 pub mod grpc;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(ThisError, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("IoError# {0}")]
     IoError(#[from] std::io::Error),

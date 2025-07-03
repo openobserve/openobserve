@@ -122,7 +122,23 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
         if s.len() == 19 {
             let fmt = "%Y-%m-%dT%H:%M:%S";
             NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+        } else if s.contains('.') {
+            // Handle formats with decimal seconds: "2025-05-14T01:15:25.047"
+            // First check if it has milliseconds (3 decimal places)
+            if s.split('.').next_back().unwrap_or("").len() == 3 {
+                let fmt = "%Y-%m-%dT%H:%M:%S%.3f";
+                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+            } else if s.split('.').next_back().unwrap_or("").len() == 6 {
+                // Handle microseconds (6 decimal places)
+                let fmt = "%Y-%m-%dT%H:%M:%S%.6f";
+                NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
+            } else {
+                // Fall back to RFC3339 parsing for other decimal formats
+                let t = DateTime::parse_from_rfc3339(s)?;
+                t.into()
+            }
         } else {
+            // Other formats with 'T' but no spaces or decimal points
             let t = DateTime::parse_from_rfc3339(s)?;
             t.into()
         }
@@ -267,16 +283,16 @@ pub fn format_duration(ms: u64) -> String {
     let remaining_hours = hours % 24;
     let mut parts = Vec::new();
     if days > 0 {
-        parts.push(format!("{}d", days));
+        parts.push(format!("{days}d"));
     }
     if remaining_hours > 0 {
-        parts.push(format!("{}h", remaining_hours));
+        parts.push(format!("{remaining_hours}h"));
     }
     if remaining_minutes > 0 {
-        parts.push(format!("{}m", remaining_minutes));
+        parts.push(format!("{remaining_minutes}m"));
     }
     if remaining_seconds > 0 {
-        parts.push(format!("{}s", remaining_seconds));
+        parts.push(format!("{remaining_seconds}s"));
     }
     parts.join("")
 }
@@ -341,6 +357,36 @@ mod tests {
         let s = "Wed, 8 Mar 2023 16:46:51 CST";
         let t = parse_str_to_time(s).unwrap();
         assert_eq!(t.timestamp_micros(), 1678315611000000);
+
+        // Test milliseconds format (3 decimal places)
+        let s = "2021-01-01T00:00:00.123";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123000);
+
+        // Test microseconds format (6 decimal places)
+        let s = "2021-01-01T00:00:00.123456";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123456);
+
+        // Test other decimal places (fallback to RFC3339)
+        let s = "2021-01-01T00:00:00.123456789";
+        let t = parse_str_to_time(s);
+        assert!(t.is_err());
+
+        // Test with timezone and milliseconds
+        let s = "2021-01-01T00:00:00.123Z";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200123000);
+
+        // Test with timezone and microseconds
+        let s = "2021-01-01T00:00:00.123456+08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609430400123456);
+
+        // Test with timezone and other decimal places
+        let s = "2021-01-01T00:00:00.123456789-08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609488000123456);
     }
 
     #[test]

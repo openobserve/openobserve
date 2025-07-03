@@ -73,7 +73,7 @@ impl IngestionResponse {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct StreamSchemaChk {
     pub conforms: bool,
     pub has_fields: bool,
@@ -81,7 +81,7 @@ pub struct StreamSchemaChk {
     pub has_metadata: bool,
 }
 
-pub const INGESTION_EP: [&str; 14] = [
+pub const INGESTION_EP: [&str; 16] = [
     "_bulk",
     "_json",
     "_multi",
@@ -96,6 +96,8 @@ pub const INGESTION_EP: [&str; 14] = [
     "logs",
     "metrics",
     "_json_arrow",
+    "_hec",
+    "push",
 ];
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -321,6 +323,8 @@ pub struct GCPIngestionResponse {
 pub enum IngestionRequest<'a> {
     JSON(&'a web::Bytes),
     Multi(&'a web::Bytes),
+    Hec(&'a Vec<json::Value>),
+    Loki(&'a Vec<json::Value>),
     GCP(&'a GCPIngestionRequest),
     KinesisFH(&'a KinesisFHRequest),
     RUM(&'a web::Bytes),
@@ -365,4 +369,285 @@ pub enum IngestionDataIter<'a> {
         std::vec::IntoIter<json::Value>,
         Option<KinesisFHIngestionResponse>,
     ),
+}
+
+pub enum HecStatus {
+    Success,
+    InvalidFormat,
+    InvalidIndex,
+    Custom(String, u16),
+}
+
+impl From<HecStatus> for HecResponse {
+    fn from(value: HecStatus) -> Self {
+        let (text, code) = match value {
+            HecStatus::Success => ("Success".to_string(), 200),
+            HecStatus::InvalidFormat => ("Invalid data format".to_string(), 400),
+            HecStatus::InvalidIndex => ("Incorrect index".to_string(), 400),
+            HecStatus::Custom(s, c) => (s, c),
+        };
+        Self { text, code }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct HecResponse {
+    pub text: String,
+    pub code: u16,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_record_status() {
+        let status = RecordStatus {
+            successful: 10,
+            failed: 2,
+            error: "test error".to_string(),
+        };
+
+        assert_eq!(status.successful, 10);
+        assert_eq!(status.failed, 2);
+        assert_eq!(status.error, "test error");
+    }
+
+    #[test]
+    fn test_record_status_default() {
+        let status = RecordStatus::default();
+        assert_eq!(status.successful, 0);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.error, "");
+    }
+
+    #[test]
+    fn test_stream_status() {
+        let status = StreamStatus::new("test-stream");
+        assert_eq!(status.name, "test-stream");
+        assert_eq!(status.status.successful, 0);
+        assert_eq!(status.status.failed, 0);
+        assert_eq!(status.status.error, "");
+    }
+
+    #[test]
+    fn test_ingestion_response() {
+        let status = StreamStatus::new("test-stream");
+        let response = IngestionResponse::new(200, vec![status]);
+
+        assert_eq!(response.code, 200);
+        assert_eq!(response.status.len(), 1);
+        assert_eq!(response.error, None);
+    }
+
+    #[test]
+    fn test_stream_schema_chk() {
+        let chk = StreamSchemaChk {
+            conforms: true,
+            has_fields: true,
+            has_partition_keys: true,
+            has_metadata: true,
+        };
+
+        assert!(chk.conforms);
+        assert!(chk.has_fields);
+        assert!(chk.has_partition_keys);
+        assert!(chk.has_metadata);
+    }
+
+    #[test]
+    fn test_bulk_response() {
+        let response = BulkResponse {
+            took: 100,
+            errors: false,
+            items: vec![HashMap::new()],
+        };
+
+        assert_eq!(response.took, 100);
+        assert!(!response.errors);
+        assert_eq!(response.items.len(), 1);
+    }
+
+    #[test]
+    fn test_bulk_response_item() {
+        let item = BulkResponseItem {
+            _index: "test-index".to_string(),
+            _id: "test-id".to_string(),
+            _version: Some(1),
+            result: Some("created".to_string()),
+            _shards: Some(ShardResponse {
+                total: 1,
+                successful: 1,
+                failed: 0,
+            }),
+            _seq_no: Some(1),
+            _primary_term: Some(1),
+            status: 201,
+            error: None,
+            original_record: None,
+        };
+
+        assert_eq!(item._index, "test-index");
+        assert_eq!(item._id, "test-id");
+        assert_eq!(item._version, Some(1));
+        assert_eq!(item.result, Some("created".to_string()));
+        assert_eq!(item.status, 201);
+    }
+
+    #[test]
+    fn test_bulk_response_item_new() {
+        let item = BulkResponseItem::new(
+            "test-index".to_string(),
+            "test-id".to_string(),
+            None,
+            "test-stream".to_string(),
+        );
+
+        assert_eq!(item._index, "test-stream");
+        assert_eq!(item._id, "test-id");
+        assert_eq!(item._version, Some(1));
+        assert_eq!(item.result, Some("created".to_string()));
+        assert_eq!(item.status, 200);
+    }
+
+    #[test]
+    fn test_bulk_response_item_new_failed() {
+        let error = BulkResponseError::new(
+            "test-error".to_string(),
+            "test-index".to_string(),
+            "test-reason".to_string(),
+            "test-uuid".to_string(),
+        );
+
+        let item = BulkResponseItem::new_failed(
+            "test-index".to_string(),
+            "test-id".to_string(),
+            error,
+            None,
+            "test-stream".to_string(),
+        );
+
+        assert_eq!(item._index, "test-stream");
+        assert_eq!(item._id, "test-id");
+        assert_eq!(item.status, 422);
+        assert!(item.error.is_some());
+    }
+
+    #[test]
+    fn test_shard_response() {
+        let shard = ShardResponse {
+            total: 2,
+            successful: 1,
+            failed: 1,
+        };
+
+        assert_eq!(shard.total, 2);
+        assert_eq!(shard.successful, 1);
+        assert_eq!(shard.failed, 1);
+    }
+
+    #[test]
+    fn test_bulk_response_error() {
+        let error = BulkResponseError::new(
+            "test-error".to_string(),
+            "test-index".to_string(),
+            "test-reason".to_string(),
+            "test-uuid".to_string(),
+        );
+
+        assert_eq!(error.err_type, "test-error");
+        assert_eq!(error.index, "test-index");
+        assert_eq!(error.reason, "test-reason");
+        assert_eq!(error.index_uuid, "test-uuid");
+        assert_eq!(error.shard, "1");
+    }
+
+    #[test]
+    fn test_kinesis_fh_request() {
+        let request = KinesisFHRequest {
+            records: vec![KFHRecordRequest {
+                data: "test-data".to_string(),
+            }],
+            request_id: "test-request".to_string(),
+            timestamp: Some(1234567890),
+        };
+
+        assert_eq!(request.records.len(), 1);
+        assert_eq!(request.request_id, "test-request");
+        assert_eq!(request.timestamp, Some(1234567890));
+    }
+
+    #[test]
+    fn test_kinesis_fh_log_data() {
+        let log_data = KinesisFHLogData {
+            log_events: vec![KinesisFHLogEvent {
+                message: json::json!({"test": "value"}),
+                id: "test-id".to_string(),
+                timestamp: Some(1234567890),
+            }],
+            log_group: "test-group".to_string(),
+            log_stream: "test-stream".to_string(),
+            message_type: "test-type".to_string(),
+            owner: "test-owner".to_string(),
+            subscription_filters: vec!["test-filter".to_string()],
+        };
+
+        assert_eq!(log_data.log_events.len(), 1);
+        assert_eq!(log_data.log_group, "test-group");
+        assert_eq!(log_data.log_stream, "test-stream");
+        assert_eq!(log_data.message_type, "test-type");
+        assert_eq!(log_data.owner, "test-owner");
+        assert_eq!(log_data.subscription_filters.len(), 1);
+    }
+
+    #[test]
+    fn test_kinesis_fh_metric_data() {
+        let metric_data = KinesisFHMetricData {
+            metric_stream_name: "test-stream".to_string(),
+            account_id: "test-account".to_string(),
+            region: "test-region".to_string(),
+            namespace: "test-namespace".to_string(),
+            metric_name: "test-metric".to_string(),
+            dimensions: json::json!({"test": "value"}),
+            timestamp: 1234567890,
+            value: KinesisFHMetricValue {
+                count: 1.0,
+                sum: 10.0,
+                max: 10.0,
+                min: 10.0,
+            },
+            unit: "test-unit".to_string(),
+        };
+
+        assert_eq!(metric_data.metric_stream_name, "test-stream");
+        assert_eq!(metric_data.account_id, "test-account");
+        assert_eq!(metric_data.region, "test-region");
+        assert_eq!(metric_data.namespace, "test-namespace");
+        assert_eq!(metric_data.metric_name, "test-metric");
+        assert_eq!(metric_data.timestamp, 1234567890);
+        assert_eq!(metric_data.unit, "test-unit");
+    }
+
+    #[test]
+    fn test_gcp_ingestion_request() {
+        let request = GCPIngestionRequest {
+            message: GCPMessage {
+                attributes: GCPAttributes {
+                    logging_googleapis_com_timestamp: "2023-01-01T00:00:00Z".to_string(),
+                },
+                data: "test-data".to_string(),
+                message_id: "test-id".to_string(),
+                message_id_dup: "test-id".to_string(),
+                publish_time: "2023-01-01T00:00:00Z".to_string(),
+                publish_time_dup: "2023-01-01T00:00:00Z".to_string(),
+            },
+            subscription: "test-subscription".to_string(),
+        };
+
+        assert_eq!(request.message.data, "test-data");
+        assert_eq!(request.message.message_id, "test-id");
+        assert_eq!(request.subscription, "test-subscription");
+    }
 }

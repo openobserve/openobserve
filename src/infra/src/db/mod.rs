@@ -41,6 +41,7 @@ static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 pub const SQLITE_STORE: &str = "sqlite";
 
 pub static ORM_CLIENT: OnceCell<DatabaseConnection> = OnceCell::const_new();
+pub static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
 pub async fn connect_to_orm() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
@@ -53,6 +54,24 @@ pub async fn connect_to_orm() -> DatabaseConnection {
             SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
         }
         _ => {
+            let pool = { sqlite::CLIENT_RW.lock().await.clone() };
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
+        }
+    }
+}
+
+pub async fn connect_to_orm_ddl() -> DatabaseConnection {
+    match get_config().common.meta_store.as_str().into() {
+        MetaStore::MySQL => {
+            let pool = mysql::CLIENT_DDL.clone();
+            SqlxMySqlConnector::from_sqlx_mysql_pool(pool)
+        }
+        MetaStore::PostgreSQL => {
+            let pool = postgres::CLIENT_DDL.clone();
+            SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
+        }
+        _ => {
+            // for sqlite, there is no separate ddl client, use the common one
             let pool = { sqlite::CLIENT_RW.lock().await.clone() };
             SqlxSqliteConnector::from_sqlx_sqlite_pool(pool)
         }
@@ -117,6 +136,36 @@ async fn init_cluster_coordinator() -> Box<dyn Db> {
             _ => Box::<etcd::Etcd>::default(),
         }
     }
+}
+
+pub async fn put_into_db_coordinator(
+    key: &str,
+    value: Bytes,
+    need_watch: bool,
+    start_dt: Option<i64>,
+) -> Result<()> {
+    let cfg = get_config();
+    let value = if cfg.common.local_mode {
+        value
+    } else {
+        Bytes::from("")
+    };
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .put(key, value, need_watch, start_dt)
+        .await
+}
+
+pub async fn delete_from_db_coordinator(
+    key: &str,
+    with_prefix: bool,
+    need_watch: bool,
+    start_dt: Option<i64>,
+) -> Result<()> {
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .delete(key, with_prefix, need_watch, start_dt)
+        .await
 }
 
 async fn init_super_cluster() -> Box<dyn Db> {

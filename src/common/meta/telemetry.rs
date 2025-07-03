@@ -30,7 +30,6 @@ use crate::common::infra::{cluster::get_cached_online_nodes, config::*};
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
     pub instance_id: String,
-    pub event: Track,
     pub base_info: HashMap<String, json::Value>,
 }
 
@@ -38,35 +37,38 @@ impl Telemetry {
     pub fn new() -> Self {
         Telemetry {
             instance_id: "".to_string(),
-            event: Track::default(),
             base_info: get_base_info(&mut HashMap::new()),
         }
     }
 
-    pub fn add_event(&mut self, track: Track) {
-        self.event = track;
-    }
-
-    pub async fn event(
+    pub async fn send_track_event(
         &mut self,
         event: &str,
         data: Option<HashMap<String, json::Value>>,
+        send_base_info: bool,
         send_zo_data: bool,
     ) {
+        #[cfg(not(feature = "cloud"))]
         if !get_config().common.telemetry_enabled {
             return;
         }
-        log::info!("sending event {}", event);
-        let mut props = self.base_info.clone();
-        if data.is_some() {
-            for item in data.unwrap() {
-                props.insert(item.0, item.1);
-            }
+
+        log::info!("sending a track event {}", event);
+        let mut props = if send_base_info {
+            self.base_info.clone()
+        } else {
+            HashMap::new()
+        };
+
+        if let Some(data) = data {
+            props.extend(data);
         }
+
         if send_zo_data {
-            props = add_zo_info(props).await;
+            add_zo_info(&mut props).await;
         }
-        self.add_event(Track {
+
+        let track_event = Track {
             user: segment::message::User::UserId {
                 user_id: segment::message::User::AnonymousId {
                     anonymous_id: get_instance_id(),
@@ -77,10 +79,10 @@ impl Telemetry {
             properties: json::to_value(props).unwrap(),
             timestamp: Some(time::OffsetDateTime::now_utc()),
             ..Default::default()
-        });
+        };
 
         let res = TELEMETRY_CLIENT
-            .send(get_instance_id(), Message::from(self.event.clone()))
+            .send(get_instance_id(), Message::from(track_event))
             .await;
 
         if res.is_err() {
@@ -89,7 +91,7 @@ impl Telemetry {
     }
 
     pub async fn heart_beat(&mut self, event: &str, data: Option<HashMap<String, json::Value>>) {
-        self.event(event, data, true).await;
+        self.send_track_event(event, data, true, true).await;
     }
 }
 
@@ -116,12 +118,24 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
         "meta_store".to_string(),
         cfg.common.meta_store.clone().into(),
     );
+    data.insert(
+        "cluster_coordinator".to_string(),
+        cfg.common.cluster_coordinator.clone().into(),
+    );
     data.insert("zo_version".to_string(), config::VERSION.to_owned().into());
+    data.insert(
+        "deployment_type".to_string(),
+        match cfg!(feature = "enterprise") {
+            false => "open_source".to_string(),
+            true => "enterprise".to_string(),
+        }
+        .into(),
+    );
 
     data.clone()
 }
 
-pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<String, json::Value> {
+pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     let mut num_streams = 0;
     let mut logs_streams = 0;
     let mut metrics_streams = 0;
@@ -278,7 +292,6 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
     drop(alert_cacher);
     data.insert("real_time_alerts".to_string(), rt_alerts.into());
     data.insert("scheduled_alerts".to_string(), scheduled_alerts.into());
-    data
 }
 
 #[cfg(test)]
@@ -288,8 +301,8 @@ mod test_telemetry {
     #[tokio::test]
     async fn test_telemetry_new() {
         let tel = Telemetry::new();
-        let props = tel.base_info.clone();
-        add_zo_info(props).await;
+        let mut props = tel.base_info.clone();
+        add_zo_info(&mut props).await;
         assert!(!tel.base_info.is_empty())
     }
 }

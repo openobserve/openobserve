@@ -88,7 +88,7 @@ pub async fn search(
     // handle query function
     #[cfg(feature = "enterprise")]
     let ret = if _need_super_cluster
-        && o2_enterprise::enterprise::common::infra::config::get_config()
+        && o2_enterprise::enterprise::common::config::get_config()
             .super_cluster
             .enabled
         && !local_cluster_search
@@ -111,7 +111,7 @@ pub async fn search(
     let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
+            log::error!("[trace_id {trace_id}] http->search: err: {e}");
             return Err(e);
         }
     };

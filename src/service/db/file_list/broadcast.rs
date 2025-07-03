@@ -70,11 +70,10 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 Some(RoleGroup::Interactive),
             )
             .await
+                && node_name.eq(&node.name)
             {
-                if node_name.eq(&node.name) {
-                    node_items.push(item.clone());
-                    continue;
-                }
+                node_items.push(item.clone());
+                continue;
             }
             // check if the item is for background node
             if let Some(node_name) = cluster::get_node_from_consistent_hash(
@@ -83,11 +82,10 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 Some(RoleGroup::Background),
             )
             .await
+                && node_name.eq(&node.name)
             {
-                if node_name.eq(&node.name) {
-                    node_items.push(item.clone());
-                    continue;
-                }
+                node_items.push(item.clone());
+                continue;
             }
         }
         if node_items.is_empty() {
@@ -213,7 +211,11 @@ async fn send_to_node(
                     return Ok(());
                 }
             };
-            let mut req_query = cluster_rpc::FileList::default();
+            let mut req_query = proto::cluster_rpc::FileList {
+                node_addr: LOCAL_NODE.grpc_addr.clone(),
+                ..Default::default()
+            };
+            log::debug!("[broadcast] req_query created: {:?}", req_query);
             for item in items.iter() {
                 req_query.items.push(cluster_rpc::FileKey::from(item));
             }
@@ -255,5 +257,17 @@ async fn send_to_node(
                 }
             }
         }
+    }
+}
+
+// write test for parse_item_key
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_send() {
+        let items: Vec<FileKey> = vec![];
+        assert!(send(&items).await.is_ok());
     }
 }

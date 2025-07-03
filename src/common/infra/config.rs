@@ -19,13 +19,13 @@ use config::{
     RwAHashMap, RwHashMap,
     meta::{
         alerts::alert::Alert,
-        dashboards::reports,
         destinations::{Destination, Template},
         folder::Folder,
         function::Transform,
         promql::ClusterLeader,
         ratelimit::CachedUserRoles,
         stream::StreamParams,
+        user::User,
     },
 };
 use dashmap::DashMap;
@@ -33,12 +33,14 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::mpsc;
+use tokio::sync::{RwLock as TokioRwLock, mpsc};
 use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        maxmind::MaxmindClient, organization::OrganizationSetting, syslog::SyslogRoute, user::User,
+        maxmind::MaxmindClient,
+        organization::{Organization, OrganizationSetting},
+        syslog::SyslogRoute,
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
@@ -49,11 +51,16 @@ use crate::{
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
-pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
-pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
+pub static USERS: Lazy<RwHashMap<String, infra::table::users::UserRecord>> =
+    Lazy::new(DashMap::default);
+pub static ORG_USERS: Lazy<RwHashMap<String, infra::table::org_users::OrgUserRecord>> =
+    Lazy::new(DashMap::default);
+pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, infra::table::org_users::OrgUserRecord>>> =
     Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+pub static ORGANIZATIONS: Lazy<Arc<RwAHashMap<String, Organization>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
@@ -67,8 +74,6 @@ pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigge
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
-pub static DASHBOARD_REPORTS: Lazy<RwHashMap<String, reports::Report>> =
-    Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
@@ -172,3 +177,17 @@ pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::na
 
     log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
 }
+
+
+#[cfg(test)]
+
+    #[tokio::test]
+    async fn test_update_cache() {
+        let (tx, rx) = mpsc::channel(100);
+        tokio::spawn(async move { update_cache(rx).await });
+        tx.send(infra::db::nats::NatsEvent::Connected)
+            .await
+            .unwrap();
+    }
+}
+

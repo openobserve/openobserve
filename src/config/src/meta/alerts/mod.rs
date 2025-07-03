@@ -53,13 +53,19 @@ pub struct TriggerCondition {
     /// (seconds)
     #[serde(default)]
     pub tolerance_in_secs: Option<i64>,
+    #[serde(default = "default_align_time")]
+    pub align_time: bool,
+}
+
+pub fn default_align_time() -> bool {
+    true
 }
 
 impl TriggerCondition {
     // TODO: Currently, the frequency for alert is in seconds, but the
     // frequency for derived stream is in minutes. This needs to be fixed for alert.
     /// freq_in_secs is true if the frequency is in seconds, false if it is in minutes
-    pub fn get_next_trigger_time(
+    pub fn get_next_trigger_time_non_aligned(
         &self,
         freq_in_secs: bool,
         timezone_offset: i32,
@@ -154,6 +160,7 @@ impl TriggerCondition {
                 // Convert frequency from seconds to minutes
                 let mut frequency_minutes = freq / 60;
 
+                // in case received frequency is less than 60 s
                 if frequency_minutes == 0 {
                     frequency_minutes = 1;
                 }
@@ -195,8 +202,12 @@ impl TriggerCondition {
         apply_silence: bool,
         start_from: Option<i64>,
     ) -> Result<i64, anyhow::Error> {
-        let next_run_at =
-            self.get_next_trigger_time(freq_in_secs, timezone_offset, apply_silence, start_from)?;
+        let next_run_at = self.get_next_trigger_time_non_aligned(
+            freq_in_secs,
+            timezone_offset,
+            apply_silence,
+            start_from,
+        )?;
         // Cron frequency is handled by the cron library, so we don't need to align it
         if self.frequency_type != FrequencyType::Cron {
             // `align_time` expects frequency in seconds, so convert if necessary
@@ -212,6 +223,30 @@ impl TriggerCondition {
             ))
         } else {
             Ok(next_run_at)
+        }
+    }
+
+    pub fn get_next_trigger_time(
+        &self,
+        freq_in_secs: bool,
+        timezone_offset: i32,
+        apply_silence: bool,
+        start_from: Option<i64>,
+    ) -> Result<i64, anyhow::Error> {
+        if self.align_time {
+            self.get_aligned_next_trigger_time(
+                freq_in_secs,
+                timezone_offset,
+                apply_silence,
+                start_from,
+            )
+        } else {
+            self.get_next_trigger_time_non_aligned(
+                freq_in_secs,
+                timezone_offset,
+                apply_silence,
+                start_from,
+            )
         }
     }
 }
@@ -238,12 +273,12 @@ pub enum FrequencyType {
     Minutes,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
-    pub conditions: Option<Vec<Condition>>,
+    pub conditions: Option<ConditionList>,
     pub sql: Option<String>,
     pub promql: Option<String>,              // (cpu usage / cpu total)
     pub promql_condition: Option<Condition>, // value >= 80
@@ -254,6 +289,123 @@ pub struct QueryCondition {
     pub search_event_type: Option<SearchEventType>,
     #[serde(default)]
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+#[serde(untagged)]
+pub enum ConditionList {
+    OrNode {
+        or: Vec<ConditionList>,
+    },
+    AndNode {
+        and: Vec<ConditionList>,
+    },
+    NotNode {
+        not: Box<ConditionList>,
+    },
+    /// This variant handles data serialized in `Vec<Condition>`
+    /// where all conditions are evaluated as conjunction
+    #[serde(serialize_with = "serialize_legacy_conditions")]
+    LegacyConditions(Vec<Condition>),
+    EndCondition(Condition),
+}
+
+// Custom serializer function to serialize LegacyConditions as AndNode
+fn serialize_legacy_conditions<S>(
+    conditions: &[Condition],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+
+    // Transform the Vec<Condition> into EndCondition variants
+    let end_conditions: Vec<ConditionList> = conditions
+        .iter()
+        .map(|condition| ConditionList::EndCondition(condition.clone()))
+        .collect();
+
+    // If there are no conditions, serialize as an empty "and" array
+    if end_conditions.is_empty() {
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("and", &Vec::<ConditionList>::new())?;
+        map.end()
+    } else {
+        // Serialize as an AndNode
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("and", &end_conditions)?;
+        map.end()
+    }
+}
+
+impl ConditionList {
+    /// Calculates the depth of the condition list tree
+    /// An EndCondition has depth 1
+    /// Other nodes have depth 1 + max depth of their children
+    pub fn depth(&self) -> usize {
+        match self {
+            ConditionList::OrNode { or } => {
+                let mut max_child_depth = 0;
+                for child in or {
+                    let child_depth = child.depth();
+                    max_child_depth = max_child_depth.max(child_depth);
+                }
+                max_child_depth + 1
+            }
+            ConditionList::LegacyConditions(_) => 1,
+            ConditionList::AndNode { and } => {
+                let mut max_child_depth = 0;
+                for child in and {
+                    let child_depth = child.depth();
+                    max_child_depth = max_child_depth.max(child_depth);
+                }
+                max_child_depth + 1
+            }
+            ConditionList::NotNode { not } => not.depth() + 1,
+            ConditionList::EndCondition(_) => 1,
+        }
+    }
+}
+
+// Define a separate iterator struct for ConditionList
+pub struct ConditionListIterator {
+    inner: Vec<ConditionList>,
+    index: usize,
+}
+
+impl Iterator for ConditionListIterator {
+    type Item = ConditionList;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.inner.len() {
+            let item = self.inner[self.index].clone();
+            self.index += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+}
+
+// Implement IntoIterator for ConditionList
+impl IntoIterator for ConditionList {
+    type Item = ConditionList;
+    type IntoIter = ConditionListIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let inner = match self {
+            ConditionList::OrNode { or } => or,
+            ConditionList::AndNode { and } => and,
+            ConditionList::LegacyConditions(conditions) => conditions
+                .into_iter()
+                .map(ConditionList::EndCondition)
+                .collect(),
+            ConditionList::NotNode { not } => vec![*not],
+            ConditionList::EndCondition(condition) => vec![ConditionList::EndCondition(condition)],
+        };
+        ConditionListIterator { inner, index: 0 }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -383,7 +535,11 @@ pub enum Operator {
     LessThan,
     #[serde(rename = "<=")]
     LessThanEquals,
+    #[serde(rename = "contains")]
+    #[serde(alias = "Contains")]
     Contains,
+    #[serde(rename = "not_contains")]
+    #[serde(alias = "NotContains")]
     NotContains,
 }
 
@@ -468,7 +624,7 @@ mod test {
     }
 
     #[test]
-    fn test_get_next_trigger_time() {
+    fn test_get_next_trigger_time_non_aligned() {
         // Test case 1: Regular frequency (5 minutes)
         let condition = TriggerCondition {
             frequency: 300, // 5 minutes in seconds
@@ -476,7 +632,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time(true, 0, false, None)
+            .get_next_trigger_time_non_aligned(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         let after_5_minutes = Utc::now() + Duration::minutes(5);
@@ -490,7 +646,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time(true, 0, false, None)
+            .get_next_trigger_time_non_aligned(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         assert_eq!(dt.minute() % 5, 0);
@@ -503,7 +659,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time(true, 0, true, None)
+            .get_next_trigger_time_non_aligned(true, 0, true, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         // The next trigger should be after the silence period
@@ -518,7 +674,7 @@ mod test {
             ..Default::default()
         };
         let result = condition
-            .get_next_trigger_time(true, 0, false, None)
+            .get_next_trigger_time_non_aligned(true, 0, false, None)
             .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         // The next trigger should be within the tolerance range
@@ -571,5 +727,302 @@ mod test {
         // handled by the cron library, not our alignment function
         assert_eq!(dt.minute() % 5, 0);
         assert_eq!(dt.second(), 0);
+    }
+
+    #[test]
+    fn test_deserialize_backcompat_condition_list() {
+        let test_cases = vec![
+            (
+                r#"[{"value": "10", "column": "e2e", "operator": "=", "ignore_case": false}]"#,
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "e2e".into(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("10".into()),
+                    ignore_case: false,
+                }]),
+            ),
+            (
+                r#"[{"value": "monitor", "column": "k8s_namespace_name", "operator": "not_contains", "ignore_case": false}]"#,
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "k8s_namespace_name".into(),
+                    operator: Operator::NotContains,
+                    value: Value::String("monitor".into()),
+                    ignore_case: false,
+                }]),
+            ),
+            (
+                r#"[{"value": "something", "column": "body", "operator": "contains", "ignore_case": false}]"#,
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "body".into(),
+                    operator: Operator::Contains,
+                    value: Value::String("something".into()),
+                    ignore_case: false,
+                }]),
+            ),
+            (
+                r#"[{"value": "error", "column": "level", "operator": "=", "ignore_case": false}]"#,
+                ConditionList::LegacyConditions(vec![Condition {
+                    column: "level".into(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".into()),
+                    ignore_case: false,
+                }]),
+            ),
+            (r#"[]"#, ConditionList::LegacyConditions(vec![])),
+        ];
+
+        for (json, expected) in test_cases {
+            println!("Testing: {}", json);
+            let deserialized: ConditionList = serde_json::from_str(json).unwrap_or_else(|e| {
+                panic!("Failed to deserialize '{}': {}", json, e);
+            });
+
+            // Use pattern matching to verify enum variant
+            assert!(
+                matches!(deserialized, ConditionList::LegacyConditions(_)),
+                "Expected LegacyConditions variant for '{}'",
+                json
+            );
+
+            // Then verify equality with the expected value
+            assert_eq!(deserialized, expected, "Value mismatch for '{}'", json);
+        }
+
+        // Test the full backcompat case
+        let backcompat_condition_list = r#"[
+        {
+            "column": "level",
+            "operator": "=",
+            "value": "error",
+            "ignore_case": false
+        },
+        {
+            "column": "job",
+            "operator": "=",
+            "value": "something",
+            "ignore_case": false
+        }
+        ]"#;
+
+        let expected_legacy_condition_list: ConditionList =
+            serde_json::from_str(backcompat_condition_list).unwrap();
+        assert_eq!(
+            expected_legacy_condition_list,
+            ConditionList::LegacyConditions(vec![
+                Condition {
+                    column: "level".into(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".into()),
+                    ignore_case: false,
+                },
+                Condition {
+                    column: "job".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("something".into()),
+                    ignore_case: false,
+                }
+            ])
+        );
+    }
+
+    #[test]
+    fn test_deserialize_not_condition_list() {
+        let and_condition_list = r#"{
+            "not": {
+                "and": [
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error",
+                        "ignore_case": false
+                    },
+                    {
+                        "column": "job",
+                        "operator": "=",
+                        "value": "something",
+                        "ignore_case": false
+                    }
+                ]
+            }
+        }"#;
+        let expected_not_condition_list: ConditionList =
+            serde_json::from_str(and_condition_list).unwrap();
+        assert_eq!(
+            expected_not_condition_list,
+            ConditionList::NotNode {
+                not: {
+                    Box::new(ConditionList::AndNode {
+                        and: vec![
+                            ConditionList::EndCondition(Condition {
+                                column: "level".into(),
+                                operator: Operator::EqualTo,
+                                value: Value::String("error".into()),
+                                ignore_case: false,
+                            }),
+                            ConditionList::EndCondition(Condition {
+                                column: "job".to_string(),
+                                operator: Operator::EqualTo,
+                                value: Value::String("something".into()),
+                                ignore_case: false,
+                            }),
+                        ],
+                    })
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_simple_condition_list() {
+        let and_condition_list = r#"{
+        "and": [
+        {
+            "column": "level",
+            "operator": "=",
+            "value": "error",
+            "ignore_case": false
+        },
+        {
+            "column": "job",
+            "operator": "=",
+            "value": "something",
+            "ignore_case": false
+        }
+        ]}"#;
+        let expected_and_condition_list: ConditionList =
+            serde_json::from_str(and_condition_list).unwrap();
+        assert_eq!(
+            expected_and_condition_list,
+            ConditionList::AndNode {
+                and: vec![
+                    ConditionList::EndCondition(Condition {
+                        column: "level".into(),
+                        operator: Operator::EqualTo,
+                        value: Value::String("error".into()),
+                        ignore_case: false,
+                    }),
+                    ConditionList::EndCondition(Condition {
+                        column: "job".to_string(),
+                        operator: Operator::EqualTo,
+                        value: Value::String("something".into()),
+                        ignore_case: false,
+                    })
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_complex_condition_list() {
+        let complex_condition_list = r#"{
+        "or": [
+            {
+                "and": [
+                    {
+                        "column": "column1",
+                        "operator": "=",
+                        "value": "value1",
+                        "ignore_case": true
+                    },
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error",
+                        "ignore_case": false
+                    }
+                ]
+            },
+            {
+                "column": "column3",
+                "operator": ">",
+                "value": "value3",
+                "ignore_case": false
+            }
+        ]
+        }"#;
+        let expected_complex_condition_list: ConditionList =
+            serde_json::from_str(complex_condition_list).unwrap();
+        assert_eq!(
+            expected_complex_condition_list,
+            ConditionList::OrNode {
+                or: vec![
+                    ConditionList::AndNode {
+                        and: vec![
+                            ConditionList::EndCondition(Condition {
+                                column: "column1".into(),
+                                operator: Operator::EqualTo,
+                                value: Value::String("value1".into()),
+                                ignore_case: true,
+                            }),
+                            ConditionList::EndCondition(Condition {
+                                column: "level".to_string(),
+                                operator: Operator::EqualTo,
+                                value: Value::String("error".into()),
+                                ignore_case: false,
+                            })
+                        ]
+                    },
+                    ConditionList::EndCondition(Condition {
+                        column: "column3".to_string(),
+                        operator: Operator::GreaterThan,
+                        value: Value::String("value3".into()),
+                        ignore_case: false,
+                    })
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn test_serialize_legacy_conditions() {
+        // Create a LegacyConditions variant with some test conditions
+        let legacy_conditions = ConditionList::LegacyConditions(vec![
+            Condition {
+                column: "level".into(),
+                operator: Operator::EqualTo,
+                value: Value::String("error".into()),
+                ignore_case: false,
+            },
+            Condition {
+                column: "job".into(),
+                operator: Operator::EqualTo,
+                value: Value::String("something".into()),
+                ignore_case: false,
+            },
+        ]);
+
+        // Serialize to JSON
+        let serialized =
+            serde_json::to_string_pretty(&legacy_conditions).expect("Failed to serialize");
+
+        // Expected format is an AndNode structure
+        let expected_json = r#"{
+  "and": [
+    {
+      "column": "level",
+      "operator": "=",
+      "value": "error",
+      "ignore_case": false
+    },
+    {
+      "column": "job",
+      "operator": "=",
+      "value": "something",
+      "ignore_case": false
+    }
+  ]
+}"#;
+
+        // Compare the serialized JSON with the expected format
+        assert_eq!(serialized, expected_json);
+
+        // Verify empty array case
+        let empty_legacy_conditions = ConditionList::LegacyConditions(vec![]);
+        let serialized =
+            serde_json::to_string_pretty(&empty_legacy_conditions).expect("Failed to serialize");
+        let expected_json = r#"{
+  "and": []
+}"#;
+        assert_eq!(serialized, expected_json);
     }
 }

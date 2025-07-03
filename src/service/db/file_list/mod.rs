@@ -23,11 +23,10 @@ use dashmap::{DashMap, DashSet};
 use infra::errors::Result;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
+    common::config::get_config as get_o2_config,
     super_cluster::stream::client::super_cluster_cache_stats,
 };
 use once_cell::sync::Lazy;
-
 pub mod broadcast;
 pub mod local;
 
@@ -46,9 +45,10 @@ pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
+pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
     let mut file_data = FileKey::new(
         0,
+        account.to_string(),
         key.to_string(),
         meta.clone().unwrap_or_default(),
         deleted,
@@ -57,9 +57,9 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()>
     // write into file_list storage
     // retry 5 times
     for _ in 0..5 {
-        match progress(key, meta.as_ref(), deleted).await {
-            Ok(v) => {
-                file_data.id = v;
+        match progress(account, key, meta.as_ref(), deleted).await {
+            Ok(id) => {
+                file_data.id = id;
                 break;
             }
             Err(e) => {
@@ -80,28 +80,30 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()>
     Ok(())
 }
 
-async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i64> {
+async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i64> {
     let mut id = 0;
     if delete {
         if let Err(e) = infra::file_list::remove(key).await {
             log::error!("service:db:file_list: delete {}, remove error: {}", key, e);
         }
     } else if let Some(data) = data {
-        match infra::file_list::add(key, data).await {
-            Ok(v) => id = v,
+        match infra::file_list::add(account, key, data).await {
+            Ok(v) => {
+                id = v;
+            }
             Err(e) => {
                 log::error!("service:db:file_list: add {}, add error: {}", key, e);
             }
         }
         // update stream stats realtime
-        if config::get_config().common.local_mode {
-            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data) {
-                log::error!(
-                    "service:db:file_list: add {}, incr_stream_stats error: {}",
-                    key,
-                    e
-                );
-            }
+        if config::get_config().common.local_mode
+            && let Err(e) = infra::cache::stats::incr_stream_stats(key, data)
+        {
+            log::error!(
+                "service:db:file_list: add {}, incr_stream_stats error: {}",
+                key,
+                e
+            );
         }
     }
 
@@ -139,9 +141,10 @@ async fn single_cache_stats() -> Result<()> {
     for org_id in orgs {
         let ret = infra::file_list::get_stream_stats(&org_id, None, None).await;
         if ret.is_err() {
-            log::error!("Load stream stats error: {}", ret.err().unwrap());
+            log::error!("Load stream stats from db  error: {}", ret.err().unwrap());
             continue;
         }
+
         for (stream, stats) in ret.unwrap() {
             let columns = stream.split('/').collect::<Vec<&str>>();
             let org_id = columns[0];

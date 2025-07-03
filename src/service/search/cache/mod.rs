@@ -132,10 +132,7 @@ pub async fn search(
 
     let mut should_exec_query = true;
 
-    let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let mut c_resp: MultiCachedQueryResponse = if use_cache {
         // cache layer
         check_cache(
@@ -167,7 +164,7 @@ pub async fn search(
                 }
             }
             Err(e) => {
-                log::error!("Error parsing sql: {:?}", e);
+                log::error!("Error parsing sql: {e}");
                 MultiCachedQueryResponse::default()
             }
         }
@@ -209,15 +206,15 @@ pub async fn search(
             c_resp.order_by,
         )
     } else {
-        if let Some(vrl_function) = &query_fn {
-            if !vrl_function.trim().ends_with('.') {
-                query_fn = Some(format!("{} \n .", vrl_function));
-            }
+        if let Some(vrl_function) = &query_fn
+            && !vrl_function.trim().ends_with('.')
+        {
+            query_fn = Some(format!("{vrl_function} \n ."));
         }
         req.query.query_fn = query_fn;
 
         for fn_name in functions::get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -467,6 +464,7 @@ pub async fn search(
 
     // result cache save changes start
     if cfg.common.result_cache_enabled
+        && !is_http2_streaming
         && should_exec_query
         && c_resp.cache_query_response
         && should_cache_results
@@ -713,8 +711,10 @@ pub async fn _write_results(
         local_resp.hits.first()
     };
 
-    if !local_resp.hits.is_empty() && remove_hit.is_some() {
-        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+    if !local_resp.hits.is_empty()
+        && let Some(remove_hit) = remove_hit
+    {
+        let ts_value_to_remove = remove_hit.get(ts_column).cloned();
 
         if let Some(ts_value) = ts_value_to_remove {
             local_resp
@@ -768,7 +768,6 @@ pub async fn _write_results(
         let file_path_local = file_path.clone();
 
         match SearchService::cache::cacher::cache_results_to_disk(
-            &trace_id,
             &file_path_local,
             &file_name,
             res_cache,
@@ -788,7 +787,7 @@ pub async fn _write_results(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });
@@ -860,13 +859,13 @@ pub async fn write_results_v2(
                 // Retain only the hits that do NOT fall within the
                 // same date, hour, minute as the hit to remove
                 local_resp.hits.retain(|hit| {
-                    if let Some(hit_ts) = hit.get(ts_column) {
-                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
-                            // Extract the date, hour, minute, and second for the current hit
-                            let hit_date_hour_minute_second =
-                                hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
-                            return hit_date_hour_minute_second != target_date_hour_minute_second;
-                        }
+                    if let Some(hit_ts) = hit.get(ts_column)
+                        && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
+                    {
+                        // Extract the date, hour, minute, and second for the current hit
+                        let hit_date_hour_minute_second =
+                            hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
+                        return hit_date_hour_minute_second != target_date_hour_minute_second;
                     }
                     false
                 });
@@ -921,12 +920,10 @@ pub async fn write_results_v2(
 
     let res_cache = json::to_string(&local_resp).unwrap();
     let query_key = file_path.replace('/', "_");
-    let trace_id = trace_id.to_string();
     tokio::spawn(async move {
         let file_path_local = file_path.clone();
 
         match SearchService::cache::cacher::cache_results_to_disk(
-            &trace_id,
             &file_path_local,
             &file_name,
             res_cache,
@@ -946,7 +943,7 @@ pub async fn write_results_v2(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });
@@ -1081,10 +1078,7 @@ pub async fn check_cache_v2(
 
     let mut should_exec_query = true;
 
-    let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     Ok(if use_cache {
         let mut resp = check_cache(
             trace_id,

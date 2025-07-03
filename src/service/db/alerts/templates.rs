@@ -79,20 +79,18 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
     infra::cluster_coordinator::destinations::emit_put_event(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
             &event_key,
             saved.clone(),
         )
         .await
-        {
-            log::error!(
-                "[Template] error triggering super cluster event to add template to cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Template] error triggering super cluster event to add template to cache: {e}"
+        );
     }
 
     Ok(saved)
@@ -119,19 +117,17 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_delete(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_delete(
             &event_key, org_id, name,
         )
         .await
-        {
-            log::error!(
-                "[Template] error triggering super cluster event to remove template from cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Template] error triggering super cluster event to remove template from cache: {e}"
+        );
     }
 
     Ok(())

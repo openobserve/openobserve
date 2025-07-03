@@ -23,9 +23,11 @@ use crate::{
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> HttpResponse {
     match err {
         errors::Error::ErrorCode(code) => match code {
-            errors::ErrorCodes::RatelimitExceeded(_) => HttpResponse::TooManyRequests()
-                .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
+                HttpResponse::TooManyRequests()
+                    .append_header((ERROR_HEADER, code.to_json()))
+                    .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id))
+            }
             errors::ErrorCodes::SearchTimeout(_) => HttpResponse::RequestTimeout()
                 .append_header((ERROR_HEADER, code.to_json()))
                 .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
@@ -46,11 +48,17 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
                 .append_header((ERROR_HEADER, code.to_json()))
                 .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
         },
+        errors::Error::ResourceError(_) => HttpResponse::ServiceUnavailable()
+            .append_header((ERROR_HEADER, err.to_string()))
+            .json(MetaHttpResponse::error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                err,
+            )),
         _ => HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, err.to_string()))
             .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                err.to_string(),
+                StatusCode::INTERNAL_SERVER_ERROR,
+                err,
             )),
     }
 }

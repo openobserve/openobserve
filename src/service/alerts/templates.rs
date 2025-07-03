@@ -23,7 +23,11 @@ use crate::{
     service::db::{self, alerts::templates::TemplateError},
 };
 
-pub async fn save(name: &str, mut template: Template, create: bool) -> Result<(), TemplateError> {
+pub async fn save(
+    name: &str,
+    mut template: Template,
+    create: bool,
+) -> Result<Template, TemplateError> {
     if template.body.is_empty() {
         return Err(TemplateError::EmptyBody);
     }
@@ -38,10 +42,10 @@ pub async fn save(name: &str, mut template: Template, create: bool) -> Result<()
     if template.name.contains('/') || is_ofga_unsupported(&template.name) {
         return Err(TemplateError::InvalidName);
     }
-    if let TemplateType::Email { title } = &template.template_type {
-        if title.is_empty() {
-            return Err(TemplateError::EmptyTitle);
-        }
+    if let TemplateType::Email { title } = &template.template_type
+        && title.is_empty()
+    {
+        return Err(TemplateError::EmptyTitle);
     }
 
     match db::alerts::templates::get(&template.org_id, &template.name).await {
@@ -64,7 +68,7 @@ pub async fn save(name: &str, mut template: Template, create: bool) -> Result<()
     if name.is_empty() {
         set_ownership(&saved.name, "templates", Authz::new(&saved.name)).await;
     }
-    Ok(())
+    Ok(saved)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
@@ -87,7 +91,7 @@ pub async fn list(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("template:_all_{}", org_id))
+                    .contains(&format!("template:_all_{org_id}"))
         })
         .collect())
 }

@@ -20,7 +20,7 @@ use actix_web::{
     http::{self},
     post, put, web,
 };
-use config::utils::rand::generate_random_string;
+use config::{meta::user::UserRole, utils::rand::generate_random_string};
 use hashbrown::HashMap;
 
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
             self,
             http::HttpResponse as MetaHttpResponse,
             service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
-            user::{UpdateUser, UserRequest, UserRole},
+            user::{UpdateUser, UserRequest},
         },
         utils::auth::UserEmail,
     },
@@ -56,8 +56,7 @@ use crate::{
 #[get("/{org_id}/service_accounts")]
 pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user_id = req.headers().get("user_id").unwrap();
-    let user_id = user_id.to_str().unwrap();
+    let user_id = req.headers().get("user_id").unwrap().to_str().unwrap();
     let mut _user_list_from_rbac = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -86,6 +85,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
         &org_id,
         Some(UserRole::ServiceAccount),
         _user_list_from_rbac,
+        false,
     )
     .await
 }
@@ -122,7 +122,10 @@ pub async fn save(
         first_name: service_account.first_name.trim().to_string(),
         last_name: service_account.last_name.trim().to_string(),
         password: generate_random_string(16),
-        role: meta::user::UserRole::ServiceAccount,
+        role: meta::user::UserOrgRole {
+            base_role: UserRole::ServiceAccount,
+            custom_role: None,
+        },
         is_external: false,
         token: None,
     };
@@ -157,13 +160,13 @@ pub async fn update(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    let email_id = email_id.trim().to_string();
+    let email_id = email_id.trim().to_lowercase();
     let query = match web::Query::<HashMap<String, String>>::from_query(req.query_string()) {
         Ok(query) => query,
         Err(e) => {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("Invalid query string: {}", e),
+                format!("Invalid query string: {e}"),
             ));
         }
     };
@@ -173,8 +176,7 @@ pub async fn update(
             "true" => true,
             "false" => false,
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     " 'rotateToken' query param with value 'true' or 'false' allowed",
                 ));
             }
@@ -188,10 +190,8 @@ pub async fn update(
                 token: passcode.passcode,
                 user: passcode.user,
             })),
-            Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                e.to_string(),
-            ))),
+            Err(e) => Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e))),
         };
     };
     let service_account = service_account.into_inner();
@@ -266,9 +266,9 @@ pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResp
             token: passcode.passcode,
             user: passcode.user,
         })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }

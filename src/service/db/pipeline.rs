@@ -15,9 +15,12 @@
 
 use std::sync::Arc;
 
-use config::meta::{
-    pipeline::{Pipeline, components::PipelineSource},
-    stream::StreamParams,
+use config::{
+    cluster::LOCAL_NODE,
+    meta::{
+        pipeline::{Pipeline, components::PipelineSource},
+        stream::StreamParams,
+    },
 };
 use infra::{
     cluster_coordinator::pipelines::PIPELINES_WATCH_PREFIX,
@@ -141,6 +144,9 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
 
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
+    if LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
     let pipelines = list().await?;
     if pipelines
         .iter()
@@ -160,23 +166,23 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     stream_exec_pl.clear();
 
     for pipeline in pipelines.into_iter() {
-        if pipeline.enabled {
-            if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                match ExecutablePipeline::new(&pipeline).await {
-                    Err(e) => {
-                        log::error!(
-                            "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
-                            pipeline.org,
-                            pipeline.id,
-                            e
-                        )
-                    }
-                    Ok(exec_pl) => {
-                        pipeline_stream_mapping_cache.insert(pipeline.id, stream_params.clone());
-                        stream_exec_pl.insert(stream_params.clone(), exec_pl);
-                    }
-                };
-            }
+        if pipeline.enabled
+            && let PipelineSource::Realtime(stream_params) = &pipeline.source
+        {
+            match ExecutablePipeline::new(&pipeline).await {
+                Err(e) => {
+                    log::error!(
+                        "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
+                        pipeline.org,
+                        pipeline.id,
+                        e
+                    )
+                }
+                Ok(exec_pl) => {
+                    pipeline_stream_mapping_cache.insert(pipeline.id, stream_params.clone());
+                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                }
+            };
         }
     }
 
@@ -195,7 +201,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
             }
 
             #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::infra::config::get_config()
+            if o2_enterprise::enterprise::common::config::get_config()
                 .super_cluster
                 .enabled
             {
@@ -218,7 +224,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
 
             // super cluster
             #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::infra::config::get_config()
+            if o2_enterprise::enterprise::common::config::get_config()
                 .super_cluster
                 .enabled
             {

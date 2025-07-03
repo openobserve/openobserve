@@ -47,7 +47,6 @@ pub async fn handle_values_request(
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
-    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), infra::errors::Error> {
     let mut start_timer = std::time::Instant::now();
 
@@ -154,8 +153,13 @@ pub async fn handle_values_request(
                 // `max_query_range` is used initialize `remaining_query_range`
                 // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
                 // for cache only search
-                let max_query_range =
-                    get_max_query_range(&[stream_name.clone()], org_id, user_id, stream_type).await; // hours
+                let max_query_range = get_max_query_range(
+                    std::slice::from_ref(&stream_name),
+                    org_id,
+                    user_id,
+                    stream_type,
+                )
+                .await; // hours
                 let remaining_query_range = if max_query_range == 0 {
                     i64::MAX
                 } else {
@@ -206,8 +210,13 @@ pub async fn handle_values_request(
                     "[WS_VALUES] trace_id: {} No cache found, processing search request",
                     trace_id
                 );
-                let max_query_range =
-                    get_max_query_range(&[stream_name.clone()], org_id, user_id, stream_type).await; // hours
+                let max_query_range = get_max_query_range(
+                    std::slice::from_ref(&stream_name),
+                    org_id,
+                    user_id,
+                    stream_type,
+                )
+                .await; // hours
 
                 // Convert SearchRequest to SearchEventReq for compatibility with search functions
                 let mut search_event_req = config::meta::websocket::SearchEventReq {
@@ -238,7 +247,6 @@ pub async fn handle_values_request(
                     max_query_range,
                     &mut start_timer,
                     &order_by,
-                    response_tx.clone(),
                 )
                 .instrument(ws_values_span.clone())
                 .await?;
@@ -264,8 +272,13 @@ pub async fn handle_values_request(
             }
         } else {
             // Step 4: Search without cache for req with from > 0
-            let max_query_range =
-                get_max_query_range(&[stream_name.clone()], org_id, user_id, stream_type).await; // hours
+            let max_query_range = get_max_query_range(
+                std::slice::from_ref(&stream_name),
+                org_id,
+                user_id,
+                stream_type,
+            )
+            .await; // hours
 
             // Convert SearchRequest to SearchEventReq for compatibility with search functions
             let mut search_event_req = config::meta::websocket::SearchEventReq {
@@ -296,7 +309,6 @@ pub async fn handle_values_request(
                 max_query_range,
                 &mut start_timer,
                 &order_by,
-                response_tx.clone(),
             )
             .instrument(ws_values_span.clone())
             .await?;

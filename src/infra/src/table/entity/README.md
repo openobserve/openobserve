@@ -14,13 +14,19 @@ sea-orm-cli generate entity \
   --ignore-tables file_list_history \
   --ignore-tables file_list_jobs \
   --ignore-tables file_list \
+  --ignore-tables legacy_records \
   --ignore-tables meta \
   --ignore-tables pipeline \
+  --ignore-tables records \
   --ignore-tables scheduled_jobs \
   --ignore-tables schema_history \
   --ignore-tables seaql_migrations \
+  --ignore-tables seaql_migrations_cloud \
   --ignore-tables short_urls \
   --ignore-tables stream_stats \
+  --ignore-tables org_invites \
+  --ignore-tables organization_usage \
+  --ignore-tables customer_billings \
   --database-url YOUR_DATABASE_URL
 ```
 

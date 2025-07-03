@@ -216,7 +216,7 @@ pub async fn get_node_list(
                     }
                 }
                 Err(e) => {
-                    log::error!("Error getting nodes from cluster node: {:?}", e);
+                    log::error!("Error getting nodes from cluster node: {e}");
                     return Err(anyhow::anyhow!(
                         "Error getting nodes from cluster node: {:?}",
                         e
@@ -225,10 +225,71 @@ pub async fn get_node_list(
             }
         }
         Err(e) => {
-            log::error!("Error awaiting task: {:?}", e);
-            return Err(anyhow::anyhow!("Error awaiting task: {:?}", e));
+            log::error!("Error awaiting task: {e}");
+            return Err(anyhow::anyhow!("Error awaiting task: {e}"));
         }
     }
 
     Ok(nodes)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::sysinfo::NodeMetrics;
+
+    use super::*;
+
+    #[test]
+    fn test_config_node_to_proto() {
+        let config_node = ConfigNode {
+            id: 1,
+            uuid: "test_uuid".to_string(),
+            name: "Test Node".to_string(),
+            http_addr: "127.0.0.1:8080".to_string(),
+            grpc_addr: "127.0.0.1:9090".to_string(),
+            role: vec![Role::Ingester, Role::Querier],
+            role_group: RoleGroup::Interactive,
+            cpu_num: 4,
+            status: NodeStatus::Online,
+            scheduled: true,
+            broadcasted: true,
+            version: "1.0.0".to_string(),
+            metrics: NodeMetrics::default(),
+        };
+
+        let proto_node = config_node_to_proto(config_node);
+        assert_eq!(proto_node.id, 1);
+        assert_eq!(proto_node.uuid, "test_uuid");
+        assert_eq!(proto_node.name, "Test Node");
+        assert_eq!(proto_node.roles.len(), 2);
+        assert_eq!(proto_node.role_group, ProtoRoleGroup::Interactive as i32);
+        assert_eq!(proto_node.status, ProtoNodeStatus::Online as i32);
+    }
+
+    #[test]
+    fn test_proto_node_to_config() {
+        let proto_node = NodeDetails {
+            id: 1,
+            uuid: "test_proto_uuid".to_string(),
+            name: "Test Proto Node".to_string(),
+            http_addr: "127.0.0.1:8081".to_string(),
+            grpc_addr: "127.0.0.1:9091".to_string(),
+            roles: vec![ProtoRole::Compactor as i32, ProtoRole::Router as i32],
+            role_group: ProtoRoleGroup::Background as i32,
+            cpu_num: 8,
+            status: ProtoNodeStatus::Offline as i32,
+            scheduled: false,
+            broadcasted: false,
+            version: "2.0.0".to_string(),
+            metrics: Some(ProtoNodeMetrics::default()),
+        };
+
+        let config_node = proto_node_to_config(proto_node);
+        assert_eq!(config_node.id, 1);
+        assert_eq!(config_node.uuid, "test_proto_uuid");
+        assert_eq!(config_node.name, "Test Proto Node");
+        assert_eq!(config_node.role.len(), 2);
+        assert_eq!(config_node.role_group, RoleGroup::Background);
+        assert_eq!(config_node.status, NodeStatus::Offline);
+    }
 }

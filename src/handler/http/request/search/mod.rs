@@ -21,7 +21,7 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse},
+        search::{SearchEventType, SearchHistoryHitResponse, default_use_cache},
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -223,7 +223,6 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-    // let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -272,8 +271,7 @@ pub async fn search(
             {
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
                 range_error = format!(
-                    "Query duration is modified due to query range restriction of {} hours",
-                    max_query_range
+                    "Query duration is modified due to query range restriction of {max_query_range} hours"
                 );
             }
         }
@@ -295,12 +293,8 @@ pub async fn search(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(
-                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                        StatusCode::BAD_REQUEST.into(),
-                        e.to_string(),
-                    )),
-                );
+                return Ok(HttpResponse::BadRequest()
+                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
         if !keys_used.is_empty() {
@@ -311,15 +305,14 @@ pub async fn search(
             {
                 use o2_openfga::meta::mapping::OFGA_MODELS;
 
-                use crate::common::{
-                    infra::config::USERS,
-                    meta,
-                    utils::auth::{AuthExtractor, is_root_user},
+                use crate::{
+                    common::utils::auth::{AuthExtractor, is_root_user},
+                    service::users::get_user,
                 };
 
                 if !is_root_user(&user_id) {
-                    let user: meta::user::User =
-                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+                    let user: config::meta::user::User =
+                        get_user(Some(&org_id), &user_id).await.unwrap();
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         &user_id,
@@ -721,7 +714,7 @@ pub async fn build_search_request_per_field(
         .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl| {
             if !vrl.trim().ends_with('.') {
-                format!("{} \n .", vrl)
+                format!("{vrl} \n .")
             } else {
                 vrl
             }
@@ -786,12 +779,12 @@ pub async fn build_search_request_per_field(
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| decoded_sql.contains(&format!("{}(", fn_name)));
+                    .any(|fn_name| decoded_sql.contains(&format!("{fn_name}(")));
 
                 // pick up where clause from sql
                 let sql_where_from_query =
                     match SearchService::sql::pickup_where(&decoded_sql, None) {
-                        Ok(Some(v)) => format!("WHERE {}", v),
+                        Ok(Some(v)) => format!("WHERE {v}"),
                         Ok(None) => "".to_string(),
                         Err(e) => {
                             return Err(Error::other(e));
@@ -820,10 +813,12 @@ pub async fn build_search_request_per_field(
                     return Err(Error::other("Invalid filter format"));
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                let sql_where = format!("WHERE {} IN ('{}')", columns[0], vals);
+                let sql_where = format!("WHERE {} IN ('{vals}')", columns[0]);
 
                 // Define the default_sql here
-                let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
+                let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
+
+                query.sql = format!("{default_sql} {sql_where}");
 
                 query.sql = format!("{} {}", default_sql, sql_where);
 
@@ -911,7 +906,6 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    // let cfg = get_config();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -923,13 +917,13 @@ async fn values_v1(
         .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl_function| {
             if !vrl_function.trim().ends_with('.') {
-                format!("{} \n .", vrl_function)
+                format!("{vrl_function} \n .")
             } else {
                 vrl_function
             }
         });
 
-    let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
+    let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
@@ -941,7 +935,7 @@ async fn values_v1(
                     return Ok(MetaHttpResponse::bad_request("Invalid filter format"));
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                format!("{} WHERE {} IN ('{}')", default_sql, columns[0], vals)
+                format!("{default_sql} WHERE {} IN ('{vals}')", columns[0])
             }
         }
     };
@@ -961,14 +955,14 @@ async fn values_v1(
         }
     };
 
-    if let Some(v) = query.get("sql") {
-        if let Ok(sql) = base64::decode_url(v) {
-            uses_fn = functions::get_all_transform_keys(org_id)
-                .await
-                .iter()
-                .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-            query_sql = sql;
-        }
+    if let Some(v) = query.get("sql")
+        && let Ok(sql) = base64::decode_url(v)
+    {
+        uses_fn = functions::get_all_transform_keys(org_id)
+            .await
+            .iter()
+            .any(|fn_name| sql.contains(&format!("{fn_name}(")));
+        query_sql = sql;
     };
 
     // pick up where clause from sql
@@ -1050,7 +1044,7 @@ async fn values_v1(
     )
     .await;
 
-    let req = config::meta::search::Request {
+    let mut req = config::meta::search::Request {
         query: req_query,
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
@@ -1058,9 +1052,11 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: get_use_cache_from_request(query),
+        use_cache: default_use_cache(),
         local_mode: None,
     };
+
+    req.use_cache = get_use_cache_from_request(query);
 
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
@@ -1071,7 +1067,7 @@ async fn values_v1(
     let sql_where = if where_str.is_empty() {
         "".to_string()
     } else {
-        format!("WHERE {}", where_str)
+        format!("WHERE {where_str}")
     };
     for field in &fields {
         let http_span = http_span.clone();

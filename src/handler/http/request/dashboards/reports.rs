@@ -15,13 +15,45 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
-use config::meta::dashboards::reports::{Report, ReportListFilters};
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use config::meta::{
+    dashboards::reports::{Report, ReportListFilters},
+    triggers::{Trigger, TriggerModule},
+};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    service::dashboards::reports,
+    handler::http::models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+    service::{
+        dashboards::reports::{self, ReportError},
+        db::scheduler,
+    },
 };
+
+impl From<ReportError> for HttpResponse {
+    fn from(value: ReportError) -> Self {
+        match &value {
+            ReportError::SmtpNotEnabled => MetaHttpResponse::internal_error(value),
+            ReportError::ChromeNotEnabled => MetaHttpResponse::internal_error(value),
+            ReportError::ReportUsernamePasswordNotSet => MetaHttpResponse::bad_request(value),
+            ReportError::NameContainsOpenFgaUnsupportedCharacters => {
+                MetaHttpResponse::bad_request(value)
+            }
+            ReportError::NameIsEmpty => MetaHttpResponse::bad_request(value),
+            ReportError::NameContainsForwardSlash => MetaHttpResponse::bad_request(value),
+            ReportError::CreateReportNameAlreadyUsed => MetaHttpResponse::bad_request(value),
+            ReportError::ReportNotFound => MetaHttpResponse::not_found(value),
+            ReportError::NoDashboards => MetaHttpResponse::bad_request(value),
+            ReportError::NoDashboardTabs => MetaHttpResponse::bad_request(value),
+            ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
+            ReportError::DashboardTabNotFound => MetaHttpResponse::not_found(value),
+            ReportError::ParseCronError(e) => MetaHttpResponse::bad_request(e),
+            ReportError::DbError(e) => MetaHttpResponse::internal_error(e),
+            ReportError::SendReportError(e) => MetaHttpResponse::internal_error(e),
+            ReportError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
+        }
+    }
+}
 
 /// CreateReport
 ///
@@ -164,10 +196,38 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
         // Get List of allowed objects ends
     }
 
-    match reports::list(&org_id, filters, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-    }
+    let scheduled_jobs = scheduler::list_by_org(&org_id, Some(TriggerModule::Report))
+        .await
+        .unwrap_or_default();
+    let mut scheduled_jobs: HashMap<String, Trigger> = scheduled_jobs
+        .into_iter()
+        .map(|t| (t.module_key.clone(), t))
+        .collect();
+    let data = match reports::list(&org_id, filters, _permitted).await {
+        Ok(data) => ListReportsResponseBody(
+            data.into_iter()
+                .map(|d| {
+                    let scheduled_job = scheduled_jobs.remove(&d.report_id);
+                    match ListReportsResponseBodyItem::try_from(d) {
+                        Ok(mut item) => {
+                            item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
+                            Some(item)
+                        }
+                        Err(e) => {
+                            log::error!("Error converting report to response body: {}", e);
+                            None
+                        }
+                    }
+                })
+                .collect::<Option<Vec<_>>>()
+                .unwrap_or_default(),
+        ),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+
+    Ok(MetaHttpResponse::json(data))
 }
 
 /// GetReport
@@ -224,9 +284,8 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
     match reports::delete(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report deleted")),
         Err(e) => match e {
-            (http::StatusCode::CONFLICT, e) => Ok(MetaHttpResponse::conflict(e)),
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
+            e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
 }
@@ -268,8 +327,8 @@ async fn enable_report(
     match reports::enable(&org_id, &name, enable).await {
         Ok(_) => Ok(MetaHttpResponse::json(resp)),
         Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
+            e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
 }
@@ -300,8 +359,8 @@ async fn trigger_report(path: web::Path<(String, String)>) -> Result<HttpRespons
     match reports::trigger(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report triggered")),
         Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
+            e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
 }

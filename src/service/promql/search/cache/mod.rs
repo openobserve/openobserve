@@ -257,13 +257,8 @@ pub async fn set(
     let need_gc = r.cacher.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
     drop(r);
 
-    if need_gc {
-        if let Err(err) = gc(bucket_id).await {
-            log::error!(
-                "[trace_id {trace_id}] promql->search->cache: gc err: {:?}",
-                err
-            );
-        }
+    if need_gc && let Err(e) = gc(bucket_id).await {
+        log::error!("[trace_id {trace_id}] promql->search->cache: gc err: {e}");
     }
 
     // filter the samples
@@ -333,7 +328,7 @@ pub async fn set(
 
     // store the series to disk cache
     let cache_key = get_cache_item_key(&key, org, start, new_end);
-    infra::cache::file_data::disk::set(trace_id, &cache_key, bytes_data.into())
+    infra::cache::file_data::disk::set(&cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
@@ -388,7 +383,7 @@ async fn gc(bucket_id: usize) -> Result<()> {
 }
 
 fn get_hash_key(query: &str, step: i64) -> String {
-    config::utils::md5::hash(&format!("{}-{}", query, step))
+    config::utils::md5::hash(&format!("{query}-{step}"))
 }
 
 fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {

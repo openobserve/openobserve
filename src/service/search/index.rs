@@ -115,6 +115,7 @@ pub enum Condition {
     Regex(String, String),
     MatchAll(String),
     FuzzyMatchAll(String, u8),
+    All(),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
 }
@@ -208,21 +209,21 @@ impl Condition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
         match self {
-            Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::Equal(field, value) => format!("{field}={value}"),
             Condition::StrMatch(field, value, case_sensitive) => {
                 if *case_sensitive {
-                    format!("str_match({}, '{}')", field, value)
+                    format!("str_match({field}, '{value}')")
                 } else {
-                    format!("str_match_ignore_case({}, '{}')", field, value)
+                    format!("str_match_ignore_case({field}, '{value}')")
                 }
             }
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
-            Condition::Regex(field, value) => format!("{}=~{}", field, value),
-            Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
-            Condition::FuzzyMatchAll(value, distance) => format!(
-                "{}:fuzzy({}, {})",
-                INDEX_FIELD_NAME_FOR_ALL, value, distance
-            ),
+            Condition::Regex(field, value) => format!("{field}=~{value}"),
+            Condition::MatchAll(value) => format!("{INDEX_FIELD_NAME_FOR_ALL}:{value}"),
+            Condition::FuzzyMatchAll(value, distance) => {
+                format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
+            }
+            Condition::All() => "ALL".to_string(),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
@@ -368,6 +369,11 @@ impl Condition {
                     let value = format!(".*{}.*", value.trim_matches('*'));
                     Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else {
+                    if value.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "The value of match_all() function can't be empty"
+                        ));
+                    }
                     let mut tokens = o2_collect_tokens(value);
                     let last_prefix = if value.ends_with("*") {
                         tokens.pop()
@@ -414,6 +420,7 @@ impl Condition {
                 let term = Term::from_field_text(default_field, value);
                 Box::new(FuzzyTermQuery::new(term, *distance, false))
             }
+            Condition::All() => Box::new(AllQuery {}),
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_field)?;
                 let right_query = right.to_tantivy_query(schema, default_field)?;
@@ -466,6 +473,7 @@ impl Condition {
             Condition::FuzzyMatchAll(..) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
+            Condition::All() => {}
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_tantivy_fields());
                 fields.extend(right.get_tantivy_fields());
@@ -495,6 +503,7 @@ impl Condition {
             Condition::FuzzyMatchAll(..) => {
                 fields.extend(fst_fields.iter().cloned());
             }
+            Condition::All() => {}
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_schema_fields(fst_fields));
                 fields.extend(right.get_schema_fields(fst_fields));
@@ -581,9 +590,9 @@ impl Condition {
             Condition::FuzzyMatchAll(value, distance) => {
                 let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
                 let term = if get_config().common.utf8_view_enabled {
-                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.clone()))))
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
                 } else {
-                    Arc::new(Literal::new(ScalarValue::Utf8(Some(value.clone()))))
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))))
                 };
                 let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
@@ -608,6 +617,7 @@ impl Condition {
                 }
                 Ok(disjunction(expr_list))
             }
+            Condition::All() => Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true))))),
             Condition::Or(left, right) => {
                 let left = left.to_physical_expr(schema, fst_fields)?;
                 let right = right.to_physical_expr(schema, fst_fields)?;
@@ -629,6 +639,7 @@ impl Condition {
             Condition::Regex(..) => false,
             Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
+            Condition::All() => true,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
         }
@@ -857,6 +868,14 @@ mod tests {
     }
 
     #[test]
+    fn test_condition_get_tantivy_fields_all() {
+        let condition = Condition::All();
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 0);
+    }
+
+    #[test]
     fn test_condition_get_tantivy_fields_or_simple() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Equal("field2".to_string(), "value2".to_string());
@@ -927,6 +946,33 @@ mod tests {
     }
 
     #[test]
+    fn test_condition_get_tantivy_fields_all_types_mixed() {
+        // Test with all different condition types mixed together
+        let equal_cond = Condition::Equal("equal_field".to_string(), "value".to_string());
+        let in_cond = Condition::In("in_field".to_string(), vec!["val1".to_string()]);
+        let regex_cond = Condition::Regex("regex_field".to_string(), "pattern.*".to_string());
+        let match_all_cond = Condition::MatchAll("search_term".to_string());
+        let fuzzy_match_cond = Condition::FuzzyMatchAll("fuzzy_term".to_string(), 1);
+        let all_cond = Condition::All();
+
+        // Create nested structure: ((equal OR in) AND (regex OR match_all)) OR (fuzzy_match_all AND
+        // all)
+        let left_or = Condition::Or(Box::new(equal_cond), Box::new(in_cond));
+        let right_or = Condition::Or(Box::new(regex_cond), Box::new(match_all_cond));
+        let left_and = Condition::And(Box::new(left_or), Box::new(right_or));
+        let right_and = Condition::And(Box::new(fuzzy_match_cond), Box::new(all_cond));
+        let condition = Condition::Or(Box::new(left_and), Box::new(right_and));
+
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 4); // equal_field, in_field, regex_field, _all (match_all and fuzzy_match_all both use _all, so deduplicated)
+        assert!(fields.contains("equal_field"));
+        assert!(fields.contains("in_field"));
+        assert!(fields.contains("regex_field"));
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
     fn test_condition_get_tantivy_fields_empty_field_names() {
         let condition = Condition::Equal("".to_string(), "value".to_string());
         let fields = condition.get_tantivy_fields();
@@ -992,6 +1038,16 @@ mod tests {
         let fields = index_condition.get_tantivy_fields();
 
         // Should deduplicate the field names
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    // add some test for str_match
+    #[test]
+    fn test_str_match() {
+        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string(), true);
+        let fields = condition.get_tantivy_fields();
+
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
     }

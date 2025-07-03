@@ -69,6 +69,17 @@ impl PartitionGenerator {
             self.generate_partitions_aligned_with_histogram_interval(
                 start_time, end_time, step, order_by,
             )
+        } else if is_streaming_aggregate {
+            #[cfg(feature = "enterprise")]
+            {
+                self.generate_partitions_with_streaming_aggregate_partition_window(
+                    start_time, end_time, order_by,
+                )
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
+            }
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
@@ -216,6 +227,41 @@ impl PartitionGenerator {
         }
 
         // We need to reverse partitions if query is ASC order
+        if order_by == OrderBy::Asc {
+            partitions.reverse();
+        }
+
+        partitions
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn generate_partitions_with_streaming_aggregate_partition_window(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
+        // Generate partitions by DESC order
+        let interval =
+            o2_enterprise::enterprise::search::cache::streaming_agg::generate_aggregation_cache_interval(
+                start_time, end_time,
+            );
+        let interval_micros = interval.get_interval_microseconds();
+        let mut end_window = end_time - (end_time % interval_micros);
+
+        let mut partitions = Vec::new();
+
+        // Only add the first partition if it's not empty (end_time != end_window_hour)
+        if end_time != end_window {
+            partitions.push([end_window, end_time]);
+        }
+
+        while end_window > start_time {
+            let start = std::cmp::max(end_window - interval_micros, start_time);
+            partitions.push([start, end_window]);
+            end_window = start;
+        }
+
         if order_by == OrderBy::Asc {
             partitions.reverse();
         }
