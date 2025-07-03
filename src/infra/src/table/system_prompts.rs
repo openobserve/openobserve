@@ -13,19 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
-use chrono::{DateTime, Utc};
-use config::meta::actions::action::{Action, ActionStatus, ExecutionDetailsType};
+use config::meta::ai::SystemPrompt;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Schema, Set, Unchanged,
 };
 
-use super::{
-    entity::system_prompts::{ActiveModel, Model},
-    get_lock,
-};
+use super::{entity::system_prompts::Model, get_lock};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{self, DbError, Error},
@@ -44,6 +38,7 @@ impl TryFrom<Model> for SystemPrompt {
             created_at: model.created_at,
             updated_at: model.updated_at,
             is_active: model.is_active,
+            tags: model.tags,
         })
     }
 }
@@ -71,6 +66,7 @@ pub async fn add(prompt: &SystemPrompt) -> Result<String, errors::Error> {
         created_at: Set(prompt.created_at.timestamp_micros()),
         updated_at: Set(prompt.updated_at.timestamp_micros()),
         is_active: Set(prompt.is_active),
+        tags: Set(prompt.tags.clone()),
     };
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -91,6 +87,7 @@ pub async fn update(prompt: &SystemPrompt) -> Result<String, errors::Error> {
         created_at: Set(prompt.created_at.timestamp_micros()),
         updated_at: Set(prompt.updated_at.timestamp_micros()),
         is_active: Set(prompt.is_active),
+        tags: Set(prompt.tags.clone()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
