@@ -20,7 +20,7 @@ export const getAnnotationsData = (annotations: any, timezone: string) => {
       ]);
     } else if (annotation.start_time) {
       markLines.push({
-        symbol: ["circle", "arrow"],
+        symbol: ["circle", "triangle"],
         name: annotation.title,
         type: "xAxis",
         xAxis: toZonedTime(new Date(annotation.start_time / 1000), timezone),
