@@ -784,7 +784,7 @@ export const convertPromQLData = async (
       data: [[convertedTimeStampToDataFormat, null]],
       markLine: {
         itemStyle: {
-          color: "rgba(0, 191, 255, 0.5)",
+          color: "rgba(132, 151, 154, 1)",
         },
         silent: false,
         animation: false,
