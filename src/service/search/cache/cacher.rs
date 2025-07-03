@@ -108,13 +108,16 @@ pub async fn check_cache(
 
     // skip the queries with no timestamp column
     let ts_result = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
+    let order_by = sql.order_by;
     let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
     if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
-        return MultiCachedQueryResponse::default();
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
     }
 
     // skip the count queries & queries first order by is not _timestamp field
-    let order_by = sql.order_by;
     if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
@@ -122,7 +125,10 @@ pub async fn check_cache(
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
     {
-        return MultiCachedQueryResponse::default();
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
     }
 
     // Hack select for _timestamp
@@ -265,6 +271,7 @@ pub async fn check_cache(
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
+        multi_resp.order_by = order_by;
         multi_resp
     } else {
         let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -350,6 +357,7 @@ pub async fn check_cache(
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.file_path = file_path.to_string();
+        multi_resp.order_by = order_by;
         multi_resp
     }
 }
