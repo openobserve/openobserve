@@ -1163,6 +1163,7 @@ pub async fn write_results_to_cache(
         c_resp.limit,
         c_resp.is_descending,
         c_resp.took,
+        c_resp.order_by,
     );
 
     // There are 3 types of partial responses:
