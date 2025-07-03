@@ -1568,6 +1568,8 @@ import Smooth from "@/components/icons/dashboards/Smooth.vue";
 import StepBefore from "@/components/icons/dashboards/StepBefore.vue";
 import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
+import { useStore } from "vuex";
+
 import { markRaw } from "vue";
 
 export default defineComponent({
@@ -1597,6 +1599,7 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
+    const store = useStore();
 
     const basemapTypeOptions = [
       {
@@ -1685,7 +1688,9 @@ export default defineComponent({
       // by default, set show_symbol as false
       if (dashboardPanelData.data.config.show_symbol === undefined) {
         const isNewPanel = !dashboardPanelData.data.id;
-        dashboardPanelData.data.config.show_symbol = isNewPanel;
+        // if new panel, use config env
+        // else always false
+        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
       }
 
       // by default, set line interpolation as smooth
