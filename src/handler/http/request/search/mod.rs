@@ -1018,8 +1018,6 @@ async fn values_v1(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    // let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
-
     // search
     let req_query = config::meta::search::Query {
         sql: query_sql,
