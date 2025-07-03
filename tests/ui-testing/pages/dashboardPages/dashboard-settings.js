@@ -139,14 +139,14 @@ export default class DashboardSetting {
     await this.page.locator('[data-test="dashboard-add-cancel"]').click();
   }
 
-  //Cabcel edit tab name//
+  //Cancel edit tab name
   async cancelEditedtab() {
     await this.page
       .locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]')
       .click();
   }
 
-  //Veribales Settings//
+  //Variables Settings
   //Open Variables tab
 
   async openVariables() {
@@ -185,10 +185,6 @@ export default class DashboardSetting {
       .locator('[data-test="dashboard-variable-stream-select"]')
       .click();
     await this.page.getByText(Stream, { exact: true }).click();
-    //  await this.page
-    //       .locator('[data-test="dashboard-variable-stream-select"]')
-    //       .click();
-    //     await this.page.getByText(Stream, { exact: true }).click();
     await this.page
       .locator('[data-test="dashboard-variable-field-select"]')
       .click();

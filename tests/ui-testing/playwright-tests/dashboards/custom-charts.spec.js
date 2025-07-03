@@ -39,10 +39,6 @@ test.describe("Custom Charts Tests", () => {
   });
 
   test("Add Pictorial JSON in Monaco Editor", async ({ page }) => {
-    dashboardPanel = new DashboardPanel(page);
-    dashboardPage = new DashboardPage(page);
-    dashboardPageActions = new DashboardactionPage(page);
-
     if (!pictorialJSON) {
       console.error("Skipping test: pictorial.json not found");
       return;
@@ -69,11 +65,7 @@ test.describe("Custom Charts Tests", () => {
     ).toBeVisible();
   });
 
-test("Add line JSON in Monaco Editor", async ({ page }) => {
-    dashboardPanel = new DashboardPanel(page);
-    dashboardPage = new DashboardPage(page);
-    dashboardPageActions = new DashboardactionPage(page);
-
+  test("Add line JSON in Monaco Editor", async ({ page }) => {
     if (!lineJSON) {
       console.error("Skipping test: line.json not found");
       return;

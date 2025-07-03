@@ -273,7 +273,7 @@ test.describe("logs testcases", () => {
 
     // Open the logs page and the query editor and apply a relative time
     await logsVisualise.openLogs();
-    await logsVisualise.openQueryEditior();
+    await logsVisualise.openQueryEditor();
     await logsVisualise.setRelative("6", "w");
     await logsVisualise.logsApplyQueryButton();
 
@@ -295,7 +295,7 @@ test.describe("logs testcases", () => {
 
     // Open the logs page and the query editor
     await logsVisualise.openLogs();
-    await logsVisualise.openQueryEditior();
+    await logsVisualise.openQueryEditor();
     await logsVisualise.setRelative("6", "w");
     const queryEditor = page.locator(
       '[data-test="logs-search-bar-query-editor"] textarea'

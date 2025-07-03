@@ -1,10 +1,7 @@
 //Methods: Duplicate dashboard, Delete duplicate dashboard, Move dashboard, Menu Items(dashboards)
 
 import { expect } from "@playwright/test";
-import {
-  deleteDashboard,
-  waitForDashboardPage,
-} from "../../playwright-tests/utils/dashCreation";
+import { deleteDashboard } from "../../playwright-tests/utils/dashCreation";
 
 export default class DashboardListPage {
   constructor(page) {
@@ -12,14 +9,12 @@ export default class DashboardListPage {
   }
 
   // Duplicate dashboard
-  async duplicateDashboard(dashboardName) {
+  async duplicateDashboard() {
     await this.page.locator('[data-test="dashboard-duplicate"]').click();
   }
 
   //Delete duplicate dashboard
   async deleteDuplicateDashboard(page, dashboardName) {
-    console.log(`Deleting dashboard with name: ${dashboardName}`);
-
     const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
     const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
     await deleteButton.click();
@@ -33,7 +28,28 @@ export default class DashboardListPage {
     await expect(
       page.getByText("Dashboard deleted successfully")
     ).toBeVisible();
+  } // ...existing code...
+
+  //Delete duplicate dashboard
+  async deleteDuplicateDashboard(dashboardName) {
+    const dashboardRow = this.page.locator(
+      `//tr[.//td[text()="${dashboardName}"]]`
+    );
+    const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
+    await deleteButton.click();
+
+    // Wait for the confirmation popup and confirm deletion
+    const confirmButton = this.page.locator('[data-test="confirm-button"]');
+    await expect(confirmButton).toBeVisible();
+    await confirmButton.click();
+
+    // Ensure the dashboard is removed
+    await expect(
+      this.page.getByText("Dashboard deleted successfully")
+    ).toBeVisible();
   }
+
+  // ...existing code...
 
   // Move dashboard
   async moveDashboardToAnotherFolder(folder) {

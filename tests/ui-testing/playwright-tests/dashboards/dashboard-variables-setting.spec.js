@@ -12,7 +12,7 @@ const dashboardName = `Dashboard_${Date.now()}`;
 
 test.describe.configure({ mode: "parallel" });
 
-test.describe("dashboard varibale settings", () => {
+test.describe("dashboard variables settings", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(1000);
