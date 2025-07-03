@@ -202,24 +202,14 @@ pub async fn ingest(
                     .is_none()
                 {
                     // current stream requires original
-                    // OPTIMIZATION: Only serialize if actually needed
-                    if streams_need_original_map
+                    streams_need_original_map
                         .get(&stream_name)
                         .is_some_and(|v| *v)
-                    {
-                        Some(value.to_string())
-                    } else {
-                        None
-                    }
+                        .then(|| value.to_string())
                 } else {
                     // 3. with pipeline, storing original as long as streams_need_original_set is
                     //    not empty
-                    // OPTIMIZATION: Only serialize if actually needed
-                    if store_original_when_pipeline_exists {
-                        Some(value.to_string())
-                    } else {
-                        None
-                    }
+                    store_original_when_pipeline_exists.then(|| value.to_string())
                 }
             } else {
                 None // `item` won't be flattened, no need to store original
