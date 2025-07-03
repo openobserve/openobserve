@@ -738,10 +738,10 @@ mod tests {
         let searcher = reader.searcher();
 
         let mut terms_grouped_by_field = HashbrownHashMap::new();
-        let mut field_terms = HashbrownHashMap::new();
+        let mut field_terms = HashbrownHashMap::with_capacity(10);
         // Add multiple terms
         for i in 0..10 {
-            let term = Term::from_field_text(text_field, &format!("document {}", i));
+            let term = Term::from_field_text(text_field, &format!("document {i}"));
             field_terms.insert(term, false);
         }
         terms_grouped_by_field.insert(text_field, field_terms);

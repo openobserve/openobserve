@@ -217,8 +217,7 @@ mod tests {
 
         for &suffix in &suffix_nums {
             let new_suffix = increment_stream_file_num_v1(&format!(
-                "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_{}.json",
-                suffix
+                "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_{suffix}.json"
             ));
             assert_eq!(new_suffix as usize, suffix + 1);
         }

@@ -881,14 +881,13 @@ mod tests {
             query_end_time,
             histogram_interval,
         );
-        println!("Deltas: {:?}", deltas);
+        println!("Deltas: {deltas:?}");
 
         // All deltas should have start <= end
         for delta in &deltas {
             assert!(
                 delta.delta_start_time <= delta.delta_end_time,
-                "delta_start_time > delta_end_time: {:?}",
-                delta
+                "delta_start_time > delta_end_time: {delta:?}"
             );
         }
 

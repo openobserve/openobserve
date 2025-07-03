@@ -1853,7 +1853,7 @@ mod tests {
         let cron_exp = "* * * * * * *";
         let now = Utc::now().second();
         let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{} * * * * * *", now);
+        let updated = format!("{now} * * * * * *");
         assert_eq!(new_cron_exp, updated);
     }
 
@@ -1870,7 +1870,7 @@ mod tests {
         let cron_exp = "**/15 21-23,0-8 * * *";
         let now = Utc::now().second();
         let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{} */15 21-23,0-8 * * *", now);
+        let updated = format!("{now} */15 21-23,0-8 * * *");
         assert_eq!(new_cron_exp, updated);
     }
 
@@ -1879,7 +1879,7 @@ mod tests {
         let cron_exp = "*10*****";
         let now = Utc::now().second();
         let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{} 10*****", now);
+        let updated = format!("{now} 10*****");
         assert_eq!(new_cron_exp, updated);
     }
 
@@ -1888,7 +1888,7 @@ mod tests {
         let cron_exp = "* */10 2 * * * *";
         let now = Utc::now().second();
         let new_cron_exp = update_cron_expression(cron_exp, now);
-        let updated = format!("{} */10 2 * * * *", now);
+        let updated = format!("{now} */10 2 * * * *");
         assert_eq!(new_cron_exp, updated);
     }
 }

@@ -255,7 +255,7 @@ mod tests {
         let data = vec![MetadataItem::TraceListIndexer(TraceListItem::default())];
 
         let res = t.write("default", data).await;
-        assert_eq!((), res.unwrap());
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -305,6 +305,6 @@ mod tests {
             );
         }
         let r = ingestion::write_file(&writer, STREAM_NAME, buf, false).await;
-        println!("r: {:?}", r);
+        println!("r: {r:?}");
     }
 }
