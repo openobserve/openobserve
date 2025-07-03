@@ -505,6 +505,7 @@ pub async fn search(
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
 #[tracing::instrument(name = "service:search:cache:merge_response", skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub fn merge_response(
     trace_id: &str,
     cache_responses: &mut Vec<config::meta::search::Response>,

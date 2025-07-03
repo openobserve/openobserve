@@ -111,9 +111,10 @@ pub async fn check_cache(
     let order_by = sql.order_by;
     let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
     if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
-        let mut resp = MultiCachedQueryResponse::default();
-        resp.order_by = order_by;
-        return resp;
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
     }
 
     // skip the count queries & queries first order by is not _timestamp field
@@ -124,9 +125,10 @@ pub async fn check_cache(
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
     {
-        let mut resp = MultiCachedQueryResponse::default();
-        resp.order_by = order_by;
-        return resp;
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
     }
 
     // Hack select for _timestamp
