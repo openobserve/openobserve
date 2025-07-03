@@ -2247,6 +2247,11 @@ const useLogs = () => {
         }
       }
     }
+
+    if(searchObj.data.query.toLowerCase().includes("group by")) {
+      return true;
+    }
+
     return false; // No aggregation function or non-null groupby property found
   }
 
@@ -6621,7 +6626,8 @@ const useLogs = () => {
     getStream,
     initialLogsState,
     clearSearchObj,
-    setCommunicationMethod
+    setCommunicationMethod,
+    hasAggregation,
   };
 };
 
