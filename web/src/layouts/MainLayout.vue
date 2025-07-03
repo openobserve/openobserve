@@ -419,11 +419,33 @@ class="padding-none" />
         />
       </q-list>
     </q-drawer>
+    <div class="row full-height no-wrap">
+    <!-- Left Panel -->
+    <div
+      class="col"
+      v-show="isLoading"
+      :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
+      :key="store.state.selectedOrganization?.identifier"
+    >
     <q-page-container v-if="isLoading">
       <router-view v-slot="{ Component }">
-        <component :is="Component" />
+        <component :is="Component"  @sendToAiChat="sendToAiChat" />
       </router-view>
     </q-page-container>
+    </div>
+
+    <!-- Right Panel (AI Chat) -->
+
+    <div
+      class="col-auto"
+      v-show="store.state.isAiChatEnabled && isLoading"
+      style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
+      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
+    >
+      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat"   :aiChatInputContext="aiChatInputContext"  />
+    </div>
+  </div>
+
   </q-layout>
 </template>
 
@@ -589,6 +611,7 @@ export default defineComponent({
 
     const isMonacoEditorLoaded = ref(false);
     const isHovered = ref(false);
+    const aiChatInputContext = ref("");
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -1231,6 +1254,10 @@ export default defineComponent({
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
+    const sendToAiChat = (value: any) => {
+      store.dispatch("setIsAiChatEnabled", true);
+      aiChatInputContext.value = value;
+    }
 
     return {
       t,
@@ -1264,6 +1291,8 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
+      sendToAiChat,
+      aiChatInputContext
     };
   },
   computed: {

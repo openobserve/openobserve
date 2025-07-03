@@ -36,6 +36,22 @@
         <NotEqualIcon></NotEqualIcon>
       </q-icon>
     </q-btn>
+    <q-btn
+    class="q-ml-xs"
+      :ripple="false"
+      @click.prevent.stop="sendToAiChat(JSON.stringify(row[column.id]))"
+      data-test="menu-link-ai-item"
+      no-caps
+      :borderless="true"
+      flat
+      size="6px"
+      dense
+      style="border-radius: 100%; border: 1px solid #fff;"
+    >
+      <div class="row items-center no-wrap">
+        <img height="14px" width="14px" :src="getBtnLogo" class="header-icon ai-icon" />
+      </div>
+    </q-btn>
   </div>
 </template>
 
@@ -44,6 +60,7 @@ import { defineProps, defineEmits, computed } from "vue";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import { getImageURL } from "@/utils/zincutils";
 
 defineProps({
   column: {
@@ -58,7 +75,7 @@ defineProps({
 
 const store = useStore();
 
-const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable"]);
+const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
 const copyLogToClipboard = (value: any) => {
   emit("copy", value, false);
@@ -74,4 +91,12 @@ const addSearchTerm = (
 const backgroundClass = computed(() =>
   store.state.theme === "dark" ? "tw-bg-black" : "tw-bg-white",
 );
+const sendToAiChat = (value: any) => {
+  emit("sendToAiChat", value);
+};
+const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
 </script>

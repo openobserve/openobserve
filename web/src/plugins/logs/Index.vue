@@ -243,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:scroll="getMoreData"
                     @update:recordsPerPage="getMoreDataRecordsPerPage"
                     @expandlog="toggleExpandLog"
+                    @send-to-ai-chat="sendToAiChat"
                   />
                 </div>
                 <div class="text-center col-10 q-ma-none">
@@ -406,6 +407,7 @@ export default defineComponent({
     SearchHistory,
   },
   mixins: [MainLayoutCloudMixin],
+  emits: ["sendToAiChat"],
   methods: {
     setHistogramDate(date: any) {
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
@@ -529,7 +531,7 @@ export default defineComponent({
       this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
     },
   },
-  setup() {
+  setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
@@ -1670,6 +1672,10 @@ export default defineComponent({
 
     // [END] O2 AI Context Handler
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
     return {
       t,
       store,
@@ -1727,6 +1733,7 @@ export default defineComponent({
       isWithQuery,
       isStreamingEnabled,
       setCommunicationMethod,
+      sendToAiChat,
     };
   },
   computed: {
