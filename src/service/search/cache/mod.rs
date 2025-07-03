@@ -635,6 +635,10 @@ fn sort_response(
     ts_column: &str,
     order_by: &Vec<(String, OrderBy)>,
 ) {
+    if order_by.is_empty() {
+        return;
+    }
+
     cache_response.hits.sort_by(|a, b| {
         for (field, order) in order_by {
             let cmp = if ts_column == field {
