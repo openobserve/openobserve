@@ -360,7 +360,7 @@ impl FromRequest for AuthExtractor {
             } else if path_columns[1] == "re_patterns" && path_columns[2] == "test" {
                 // specifically for testing re_patterns we need get permissions
                 // on re patterns
-                method = "GET".to_string();
+                method = "LIST".to_string();
                 format!(
                     "{}:{}",
                     OFGA_MODELS
