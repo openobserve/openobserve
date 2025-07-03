@@ -353,12 +353,12 @@ pub async fn logs_json_handler(
                         streams_need_original_map
                             .get(&stream_name)
                             .is_some_and(|v| *v)
-                            .then_some(value.to_string())
+                            .then(|| value.to_string())
                     } else {
                         // 3. with pipeline, storing original as long as streams_need_original_set
                         //    is not empty
                         // because not sure the pipeline destinations
-                        store_original_when_pipeline_exists.then_some(value.to_string())
+                        store_original_when_pipeline_exists.then(|| value.to_string())
                     }
                 } else {
                     None // `item` won't be flattened, no need to store original
