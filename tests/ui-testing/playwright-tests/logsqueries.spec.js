@@ -322,8 +322,6 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should verify logcount ordering in ascending and descending order", async ({ page }) => {
-    const logsPage = new LogsPage(page);
-    
     // Verify descending order
     await logsPage.verifyLogCountOrderingDescending();
     

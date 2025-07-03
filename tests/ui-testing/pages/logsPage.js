@@ -809,7 +809,7 @@ async verifyLogCountOrderingDescending() {
 }
 
   async verifyLogCountOrderingAscending() {
-    await this.verifyLogCountOrdering('ascending');
+    await this.verifyLogCountOrdering('asc');
   }
 
   // String match ignore case methods
