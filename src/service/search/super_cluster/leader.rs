@@ -35,10 +35,7 @@ use datafusion::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-use o2_enterprise::enterprise::{
-    search::{WorkGroup, datafusion::distributed_plan::rewrite::StreamingAggsRewriter},
-    super_cluster::search::get_cluster_nodes,
-};
+use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;

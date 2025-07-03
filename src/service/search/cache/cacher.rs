@@ -682,14 +682,11 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
         aggs_remove_files.extend(aggs_files);
 
         for file in aggs_remove_files {
-            match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
+            match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("Error deleting cache: {:?}", e);
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "Error deleting cache",
-                    ));
+                    return Err(std::io::Error::other("Error deleting cache"));
                 }
             }
         }

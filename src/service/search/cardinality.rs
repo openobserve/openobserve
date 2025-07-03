@@ -110,10 +110,7 @@ fn generate_cache_key(
     stream_name: &str,
     field_name: &str,
 ) -> String {
-    format!(
-        "cardinality/{}/{}/{}/{}",
-        org_id, stream_type, stream_name, field_name
-    )
+    format!("cardinality/{org_id}/{stream_type}/{stream_name}/{field_name}")
 }
 
 /// Check if cache entry is expired

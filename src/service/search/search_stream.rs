@@ -29,16 +29,17 @@ use config::{
     utils::json::{Value, get_string_value},
 };
 use log;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::{
-    auditor::{AuditMessage, Protocol, ResponseMeta},
-    infra::config::get_config as get_o2_config,
-};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use serde_json::Map;
 use tokio::sync::mpsc;
 use tracing::Instrument;
+#[cfg(feature = "enterprise")]
+use {
+    o2_enterprise::enterprise::common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config as get_o2_config,
+    },
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
+};
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::search::MultiCachedQueryResponse;

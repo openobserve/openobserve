@@ -446,29 +446,16 @@ pub async fn search(
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
 
-    // let should_cache_results =
-    //     res.new_start_time.is_some() || res.new_end_time.is_some() ||
-    // res.function_error.is_empty();
-
-    // Cache partial results only if there is a range error
-    // if !res.function_error.is_empty() && !range_error.is_empty() {
-    //     res.function_error.retain(|err| !err.contains(&range_error));
-    //     should_cache_results = should_cache_results && res.function_error.is_empty();
-    // }
-
-    // Update: Don't cache any partial results
-    let should_cache_results = res.new_start_time.is_none()
-        && res.new_end_time.is_none()
-        && res.function_error.is_empty()
-        && !res.hits.is_empty();
-
     // result cache save changes start
-    if cfg.common.result_cache_enabled
+    let should_cache_results = cfg.common.result_cache_enabled
         && !is_http2_streaming
         && should_exec_query
         && c_resp.cache_query_response
-        && should_cache_results
-        && !is_http2_streaming
+        && res.new_start_time.is_none()
+        && res.new_end_time.is_none()
+        && res.function_error.is_empty()
+        && !res.hits.is_empty();
+    if should_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {

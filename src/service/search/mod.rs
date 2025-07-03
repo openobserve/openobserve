@@ -57,7 +57,7 @@ use {
     crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
     config::utils::sql::is_simple_aggregate_query,
     o2_enterprise::enterprise::{
-        common::infra::config::get_config as get_o2_config,
+        common::config::get_config as get_o2_config,
         search::{
             TaskStatus, WorkGroup,
             cache::{
