@@ -16,7 +16,6 @@
 use std::{ops::ControlFlow, sync::Arc};
 
 use arrow_schema::{DataType, Field, FieldRef};
-use chrono::Duration;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -1497,19 +1496,20 @@ impl VisitorMut for HistogramIntervalVisitor {
                 let _ = args.next();
                 // second is interval
                 let interval = if let Some(interval) = args.next() {
-                    let interval = interval
+                    interval
                         .to_string()
                         .trim_matches(|v| v == '\'' || v == '"')
-                        .to_string();
-                    match interval.parse::<u16>() {
-                        Ok(v) => generate_histogram_interval(self.time_range, v),
-                        Err(_) => interval,
-                    }
+                        .to_string()
                 } else {
-                    generate_histogram_interval(self.time_range, 0)
+                    generate_histogram_interval(self.time_range)
                 };
-                self.interval =
-                    Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
+                self.interval = match convert_histogram_interval_to_seconds(&interval) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        log::error!("{e:?}");
+                        Some(0)
+                    }
+                };
             }
             return ControlFlow::Break(());
         }
@@ -1701,41 +1701,39 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
     }
 }
 
-pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
+/// Utility macro to generate microsecond-duration pairs concisely
+macro_rules! intervals {
+    ($(($unit:tt, $amount:expr, $label:expr)),+ $(,)?) => {
+        [
+            $((intervals!(@unit $unit)($amount).num_microseconds().unwrap(), $label)),+
+        ]
+    };
+
+    (@unit h) => { chrono::Duration::hours };
+    (@unit m) => { chrono::Duration::minutes };
+}
+
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
     }
-    let time_range = time_range.unwrap();
-    if num > 0 {
-        return format!(
-            "{} second",
-            std::cmp::max(
-                (time_range.1 - time_range.0)
-                    / Duration::try_seconds(1)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-                    / num as i64,
-                1
-            )
-        );
-    }
+    let duration = time_range.map(|r| r.1 - r.0).unwrap();
 
-    let intervals = [
-        (Duration::try_hours(24 * 60), "1 day"),
-        (Duration::try_hours(24 * 30), "12 hour"),
-        (Duration::try_hours(24 * 28), "6 hour"),
-        (Duration::try_hours(24 * 21), "3 hour"),
-        (Duration::try_hours(24 * 15), "2 hour"),
-        (Duration::try_hours(6), "1 hour"),
-        (Duration::try_hours(2), "1 minute"),
-        (Duration::try_hours(1), "30 second"),
-        (Duration::try_minutes(30), "15 second"),
-        (Duration::try_minutes(15), "10 second"),
+    const INTERVALS: [(i64, &str); 10] = intervals![
+        (h, 24 * 60, "1 day"),
+        (h, 24 * 30, "12 hour"),
+        (h, 24 * 28, "6 hour"),
+        (h, 24 * 21, "3 hour"),
+        (h, 24 * 15, "2 hour"),
+        (h, 6, "1 hour"),
+        (h, 2, "1 minute"),
+        (h, 1, "30 second"),
+        (m, 30, "15 second"),
+        (m, 15, "10 second"),
     ];
-    for (time, interval) in intervals.iter() {
-        let time = time.unwrap().num_microseconds().unwrap();
-        if (time_range.1 - time_range.0) >= time {
+
+    for (time, interval) in INTERVALS.iter() {
+        if duration >= *time {
             return interval.to_string();
         }
     }
@@ -1747,7 +1745,7 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
     let (num, unit) = interval
         .find(|c: char| !c.is_numeric())
         .map(|pos| interval.split_at(pos))
-        .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
+        .ok_or_else(|| Error::Message(format!("Invalid interval format: '{interval}'")))?;
 
     let seconds = match unit.trim().to_lowercase().as_str() {
         "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
@@ -3053,7 +3051,7 @@ mod tests {
     #[test]
     fn test_histogram_interval_visitor_with_zero_time_range() {
         // Test with zero time range
-        let sql = "SELECT histogram(_timestamp, 20) FROM logs";
+        let sql = "SELECT histogram(_timestamp) FROM logs";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
