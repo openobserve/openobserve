@@ -420,8 +420,7 @@ export default defineComponent({
     let multiStreamFields: any = ref([]);
     let hasAggregationQuery: any = computed(() => {
       let parsedSQL = fnParsedSQL();
-      // nodesql parser does not support query where default keyword used without quotation marks so adding additional check for group by clause
-      return hasAggregation(parsedSQL?.columns) || searchObj.data.query.includes("group by");
+      return hasAggregation(parsedSQL?.columns);
     });
 
     onBeforeMount(() => {
