@@ -2976,6 +2976,9 @@ export default defineComponent({
 
     const shareLink = useLoading(async () => {
       const queryObj = generateURLQuery(true);
+      // Removed the 'type' property from the object to avoid issues when navigating from the stream to the logs page,
+      // especially when the user performs multi-select on streams and shares the URL.
+      delete queryObj?.type;
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
