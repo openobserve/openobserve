@@ -164,19 +164,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :o2AIicon="false"
                     />
                     <div v-if="expandState.regexTestString" class="regex-pattern-input" >
-                        <query-editor
-                        data-test="add-regex-pattern-test-string-editor"
-                        ref="queryEditorRef"
-                        editor-id="regex-pattern-test-string-editor"
-                        class="tw-w-full regex-pattern-test-string-editor"
-                        :debounceTime="300"
-                        v-model:query="testString"
-                        @update:query="updateTestString"
-                        style="height: 100px !important;"
-                        language="markdown"
-                        :showLineNumbers="false"
+                        <q-input
+                        data-test="add-regex-test-string-input"
+                        v-model="testString"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="regex-test-string-input"
                         :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                         />
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                        style="width: 100%; resize: none;"
+                        type="textarea"
+                        placeholder="Eg. 1234567890"
+                        rows="5"
+                        />
                     </div>
                 </div>
                 </div>
@@ -232,7 +236,6 @@ import FullViewContainer from "../functions/FullViewContainer.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
-import QueryEditor from "../QueryEditor.vue";
 export default defineComponent({
     name: "AddRegexPattern",
     props: {
@@ -248,8 +251,7 @@ export default defineComponent({
     emit: ["close", "update:list"],
     components: {
         FullViewContainer,
-        O2AIChat,
-        QueryEditor
+        O2AIChat
     },
 setup(props, {emit}) {
     const { t } = useI18n();
@@ -487,7 +489,7 @@ setup(props, {emit}) {
     resize: none !important;
     }
 
-    .dark-mode-regex-test-string-input  { 
+    .dark-mode-regex-test-string-input .q-field__control  { 
         background-color:#181A1B !important;
         border-left: 2px solid #212121 !important;
         border-right: 2px solid #212121 !important;

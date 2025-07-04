@@ -223,19 +223,23 @@
                 <span class="individual-section-sub-title2">
                   Add Test
                 </span>
-                <query-editor
-                  data-test="associated-regex-patterns-test-string-editor"
-                  ref="queryEditorRef"
-                  editor-id="regex-pattern-test-string-editor"
-                  class="tw-w-full regex-pattern-associated-test-string-editor"
-                  :debounceTime="300"
-                  v-model:query="testString"
-                  @update:query="handleTestStringInput"
-                  style="height: 100px !important;"
-                  language="markdown"
-                  :showLineNumbers="false"
-                  :class="store.state.theme === 'dark' ? 'dark-mode-regex-associated-test-string-input' : 'light-mode-regex-associated-test-string-input'"
-                />
+                  <q-input
+                    data-test="associated-regex-patterns-test-string-input"
+                    v-model="testString"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="regex-test-string-input"
+                    :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
+                    stack-label
+                    outlined
+                    filled
+                    dense
+                    tabindex="0"
+                    style="width: 100%; resize: none;"
+                    type="textarea"
+                    placeholder="Eg. 1234567890"
+                    rows="5"
+                    />
               </div>
               <q-separator />
             </div>
@@ -309,7 +313,6 @@ import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
 import { debounce, useQuasar } from 'quasar';
 import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
-import QueryEditor from '@/components/QueryEditor.vue';
 
 export interface PatternAssociation {
     field: string;
@@ -321,7 +324,6 @@ export interface PatternAssociation {
 export default defineComponent({
     name: "AssociatedRegexPatterns",
     components: {
-        QueryEditor
     },
     props: {
         data: {
@@ -496,11 +498,8 @@ export default defineComponent({
           return userClickedPattern.value?.pattern_name === patternName;
         }
 
-        const handleTestStringInput = (value: string) => {
-            testString.value = value;
-            if (queryEditorRef.value && userClickedPattern.value?.pattern) {
-                queryEditorRef.value.highlightRegexMatches(userClickedPattern.value.pattern);
-            }
+        const handleTestStringInput = () => {
+            console.log(testString.value,'test string')
         };
 
         const handleFilterMethod = (rows: any, terms: any) => {
@@ -759,14 +758,14 @@ export default defineComponent({
       padding-left: 12px !important;
     }
   }
-  .dark-mode-regex-associated-test-string-input  { 
+  .dark-mode-regex-test-string-input .q-field__control  { 
         background-color:#181A1B !important;
         border-top: 1px solid #666666 !important;
         border-left: 1px solid #666666 !important;
         border-right: 1px solid #666666 !important;
         border-bottom: 1px solid #666666 !important;
     }
-    .light-mode-regex-associated-test-string-input { 
+    .light-mode-regex-test-string-input .q-field__control { 
     background-color:#ffffff !important;
     border-top: 1px solid #E6E6E6 !important;
     border-left: 1px solid #E6E6E6 !important;
