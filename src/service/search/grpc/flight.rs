@@ -23,7 +23,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         inverted_index::InvertedIndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
@@ -42,7 +41,6 @@ use infra::{
     },
 };
 use itertools::Itertools;
-use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
@@ -220,7 +218,6 @@ pub async fn search(
             &stream_settings.partition_keys,
             &search_partition_keys,
             &req.search_info.file_id_list,
-            &req.search_info.idx_file_list,
         )
         .await?;
         log::info!(
@@ -421,7 +418,6 @@ async fn get_file_list_by_ids(
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
     ids: &[i64],
-    idx_file_list: &[cluster_rpc::IdxFileName],
 ) -> Result<(Vec<FileKey>, usize), Error> {
     let start = std::time::Instant::now();
     let file_list = crate::service::file_list::query_by_ids(
@@ -433,26 +429,6 @@ async fn get_file_list_by_ids(
         time_range,
     )
     .await?;
-    // if there are any files in idx_files_list, use them to filter the files we got from ids,
-    // otherwise use all the files we got from ids
-    let file_list = if idx_file_list.is_empty() {
-        file_list
-    } else {
-        let mut files = Vec::with_capacity(idx_file_list.len());
-        let file_list_map: HashMap<_, _> =
-            file_list.into_iter().map(|f| (f.key.clone(), f)).collect();
-        for idx_file in idx_file_list.iter() {
-            if let Some(file) = file_list_map.get(&idx_file.key) {
-                let mut new_file = file.clone();
-                if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
-                    let segment_ids = BitVec::from_slice(segment_ids);
-                    new_file.with_segment_ids(segment_ids);
-                }
-                files.push(new_file);
-            }
-        }
-        files
-    };
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {

@@ -74,10 +74,8 @@ use crate::{
     },
     service::{
         db,
-        search::{
-            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-            tantivy::puffin_directory::reader_cache,
-        },
+        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+        tantivy::puffin_directory::reader_cache,
     },
 };
 

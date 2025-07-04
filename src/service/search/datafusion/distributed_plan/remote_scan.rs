@@ -239,7 +239,7 @@ async fn get_remote_batch(
     request.search_info.timeout = timeout as i64;
 
     log::info!(
-        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}, idx_files: {}",
+        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}",
         trace_id,
         &node.get_grpc_addr(),
         search_type.unwrap_or(SearchEventType::UI),
@@ -247,7 +247,6 @@ async fn get_remote_batch(
         is_querier,
         timeout,
         request.search_info.file_id_list.len(),
-        request.search_info.idx_file_list.len(),
     );
 
     let request: cluster_rpc::FlightSearchRequest = request.into();
