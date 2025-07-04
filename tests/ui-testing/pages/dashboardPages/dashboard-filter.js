@@ -40,7 +40,7 @@ export default class DashboardFilter {
       const conditionLocator = this.page.locator(
         `[data-test="dashboard-add-condition-condition-${idx}"]`
       );
-      await conditionLocator.click();
+      await conditionLocator.waitFor({ state: "visible" });
       await conditionLocator.click(); // double click for stability
     }
 
@@ -69,6 +69,7 @@ export default class DashboardFilter {
           ? this.page.locator('[data-test="common-auto-complete"]').first()
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
+      await valueInput.waitFor({ state: "visible", timeout: 10000 });
       // await expect(valueInput).toBeVisible({ timeout: 10000 });
       await valueInput.click();
       await valueInput.fill(value);
@@ -77,6 +78,8 @@ export default class DashboardFilter {
         .locator('[data-test="common-auto-complete-option"]')
         .first();
       // await expect(suggestion).toBeVisible({ timeout: 10000 });
+      await suggestion.waitFor({ state: "visible", timeout: 10000 });
+
       await suggestion.click();
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
@@ -137,7 +140,8 @@ export default class DashboardFilter {
         .join("");
     });
 
-    await this.page.waitForTimeout(1000); // waits for 1 second
+    // await this.page.waitForTimeout(1000); // waits for 1 second
+    await dynamicLabelLocator.waitFor({ state: "visible" });
 
     const fieldLabelLocator = this.page.locator(
       `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`

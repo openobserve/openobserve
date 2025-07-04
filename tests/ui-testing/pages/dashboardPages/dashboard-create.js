@@ -35,7 +35,7 @@ export default class DashboardCreate {
 
   //back to dashboard list
   async backToDashboardList() {
-    await this.backBtn.waitFor({ state: "visible" });
+    await this.backBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.backBtn.click();
   }
 
@@ -50,7 +50,7 @@ export default class DashboardCreate {
   }
 
   //Delete Dashboard
-  async deleteDashboard(dashboardName) {
+  async deleteDashboard() {
     await this.page
       .locator('[data-test="dashboard-folder-tab-default"]')
       .waitFor({ state: "visible" });
@@ -70,12 +70,13 @@ export default class DashboardCreate {
 
   //Add Panel to dashboard
   async addPanel() {
-    await this.addPanelIfEmptyBtn.waitFor({ state: "visible" });
+    await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.addPanelIfEmptyBtn.click();
   }
 
   //Apply dashboard button
   async applyButton() {
+    await this.applyQueryBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.applyQueryBtn.click();
   }
 }
