@@ -1034,7 +1034,7 @@ pub struct Common {
     pub self_metrics_consumption_whitelist: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = false,
+        default = true,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
