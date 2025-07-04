@@ -391,6 +391,10 @@ export default defineComponent({
         const allPatternsExpanded = ref(true);
         const appliedPatternsExpanded = ref(true);
         const appliedPatternsMap = ref(new Map());
+        // Add a debounced emit function
+        const debouncedEmit = debounce((pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
+          emit("updateAppliedPattern", pattern, fieldName, patternId, attribute);
+        }, 300);
         const $q = useQuasar();
         const userClickedPattern = ref<any>(null);
         const isPatternValid = ref(false);
@@ -506,7 +510,8 @@ export default defineComponent({
               ...userClickedPattern.value,
               policy: newVal,
             }
-            emit("updateAppliedPattern", updatedPattern , props.fieldName, userClickedPattern.value.pattern_id, "policy");
+            // Use debounced emit for policy changes
+            debouncedEmit(updatedPattern, props.fieldName, userClickedPattern.value.pattern_id, "policy");
           }
         })
         watch(()=> apply_at.value, (newVal) => {
@@ -522,7 +527,8 @@ export default defineComponent({
               ...userClickedPattern.value,
               apply_at: apply_at_value
             }
-            emit("updateAppliedPattern", updatedPattern, props.fieldName, userClickedPattern.value.pattern_id, "apply_at");
+            // Use debounced emit for apply_at changes
+            debouncedEmit(updatedPattern, props.fieldName, userClickedPattern.value.pattern_id, "apply_at");
           }
         })
 
@@ -555,7 +561,8 @@ export default defineComponent({
             }
           }
         const checkIfPatternIsApplied = (patternId: string) => {
-          return appliedPatterns.value.some((pattern: any) => pattern.pattern_id === patternId);
+          // Use Map for O(1) lookup instead of array search
+          return appliedPatternsMap.value.has(patternId);
         }
         const handlePatternClick = (pattern: any) => {
           userClickedPattern.value = pattern;
@@ -593,6 +600,7 @@ export default defineComponent({
             //remove pattern
             emit("removePattern", userClickedPattern.value.pattern_id, props.fieldName);
             appliedPatterns.value = appliedPatterns.value.filter((pattern: any) => pattern.pattern_id !== userClickedPattern.value.pattern_id);
+            appliedPatternsMap.value.delete(userClickedPattern.value.pattern_id);
           }
           else{
             if(apply_at.value.length == 0){
@@ -621,6 +629,8 @@ export default defineComponent({
               description: userClickedPattern.value.description
             }
             emit("addPattern", pattern);
+            appliedPatterns.value.push(pattern);
+            appliedPatternsMap.value.set(pattern.pattern_id, pattern);
           }
         }
         //why this check because user might update the policy or apply_at value of already applied pattern 
@@ -628,7 +638,8 @@ export default defineComponent({
         //so that the user can see the update changes button
         //after this we need to add the logic to add this to add array
         const checkIfPatternIsAppliedAndUpdate = (patternId: string) => {
-          let applied_pattern = appliedPatterns.value.find((pattern: any) => pattern.pattern_id === patternId);
+          // Use Map for O(1) lookup instead of array search
+          const applied_pattern = appliedPatternsMap.value.get(patternId);
           let apply_at_value = "";
           if(apply_at.value.length == 2){
             apply_at_value = 'Both';
@@ -642,6 +653,11 @@ export default defineComponent({
           }
           return false;
         }
+
+        // Keep appliedPatternsMap in sync with appliedPatterns
+        watch(() => props.data, (newVal) => {
+          appliedPatternsMap.value = new Map(newVal.map(p => [p.pattern_id, p]));
+        }, { immediate: true })
 
 
         return {

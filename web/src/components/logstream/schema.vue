@@ -1713,6 +1713,7 @@ export default defineComponent({
     //this is used to update an already applied pattern in the field
     //for suppose user wants to update policy or apply_at for a pattern
     const handleUpdateAppliedPattern = (pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
+      console.log(pattern,'pattern')
       patternAssociations.value[pattern.field] && patternAssociations.value[fieldName].forEach((p: PatternAssociation) => {
         if(p.pattern_id === pattern.pattern_id && p.pattern_name === pattern.pattern_name){
           if(attribute === "policy"){
