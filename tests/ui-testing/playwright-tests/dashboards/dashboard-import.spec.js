@@ -128,7 +128,7 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await expect(
-      page.getByRole(".cm-content").filter({ hasText: '"dashboardId": "' })
+      page.locator(".cm-content").filter({ hasText: '"dashboardId": "' })
     ).toBeVisible();
 
     await dashboardImport.clickImportButton();
