@@ -786,24 +786,22 @@ function hasAggregation(columns: any) {
   return false; // No aggregation function or non-null groupby property found
 }
 
-const isLimitQuery = (parsedSQL: any = null) => {
-  return parsedSQL?.limit && parsedSQL?.limit.value?.length > 0;
-};
-
 export const shouldUseHistogramQuery = async (query: any) => {
   try {
+    // If query is empty, use histogram query
+    if (!query) return true;
+
     await importSqlParser();
     const ast: any = parser.astify(query);
 
-    if (!query) return true;
-
-    if (isLimitQuery(ast)) return false;
-
+    // If able to parse and has aggregation, use same query (original)
     if (hasAggregation(ast.columns)) return false;
 
+    // If able to parse and no aggregation, use histogram query
     return true;
   } catch (error) {
-    return true;
+    // If not able to parse, do not do anything (return null)
+    return null;
   }
 };
 
