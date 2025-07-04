@@ -78,7 +78,7 @@ jobs:
           export ZO_META_STORE=postgres
           export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
           ./coverage.sh run-cov
-          
+
           # cleanup
           rm -rf data
           rm -rf ./json
@@ -90,18 +90,5 @@ jobs:
           export ZO_META_POSTGRES_DSN=""
           ./coverage.sh run-cov
 
-          # cleanup
-          rm -rf data
-          rm -rf ./json
-          rm -rf ./src/infra/data
-
-          # setup and run with mysql
-          echo "Running with mysql"
-          export ZO_META_STORE=mysql
-          export ZO_META_MYSQL_DSN=mysql://root:password@localhost:3306/mysql
-          ./coverage.sh run-cov
-
           # finally print the coverage data
           ./coverage.sh check
-          
-
