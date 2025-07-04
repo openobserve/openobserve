@@ -329,7 +329,13 @@ mod tests {
         if include_index_field {
             fields.push(Field::new("status", DataType::Utf8, false));
             let status: Vec<String> = (0..num_rows)
-                .map(|i| if i % 2 == 0 { "success".to_string() } else { "error".to_string() })
+                .map(|i| {
+                    if i % 2 == 0 {
+                        "success".to_string()
+                    } else {
+                        "error".to_string()
+                    }
+                })
                 .collect();
             columns.push(Arc::new(StringArray::from(status)));
         }
@@ -345,7 +351,7 @@ mod tests {
         // Create a simple parquet file from the batches
         let schema = batches[0].schema();
         let mut buffer = Vec::new();
-        
+
         // Use the parquet writer utilities from config
         let file_meta = config::meta::stream::FileMeta {
             min_ts: 1000,
@@ -424,14 +430,9 @@ mod tests {
         let batch = create_test_batch(10, true, true, false);
         let stream = create_test_stream(vec![batch.clone()]).await;
 
-        let result = generate_tantivy_index(
-            dir,
-            stream,
-            &["content".to_string()],
-            &[],
-            batch.schema(),
-        )
-        .await;
+        let result =
+            generate_tantivy_index(dir, stream, &["content".to_string()], &[], batch.schema())
+                .await;
 
         assert!(result.is_ok());
         let index = result.unwrap();
@@ -450,14 +451,8 @@ mod tests {
         let batch = create_test_batch(10, true, false, true);
         let stream = create_test_stream(vec![batch.clone()]).await;
 
-        let result = generate_tantivy_index(
-            dir,
-            stream,
-            &[],
-            &["status".to_string()],
-            batch.schema(),
-        )
-        .await;
+        let result =
+            generate_tantivy_index(dir, stream, &[], &["status".to_string()], batch.schema()).await;
 
         assert!(result.is_ok());
         let index = result.unwrap();
@@ -516,8 +511,9 @@ mod tests {
         assert!(result.is_ok());
         let index = result.unwrap();
         assert!(index.is_some()); // Returns Some because index fields are not filtered by existence
-        
-        // Verify the index has the timestamp field and requested fields (even if they don't exist in data)
+
+        // Verify the index has the timestamp field and requested fields (even if they don't exist
+        // in data)
         let index = index.unwrap();
         let schema = index.schema();
         assert!(schema.get_field("another_nonexistent_field").is_ok());
@@ -537,7 +533,10 @@ mod tests {
             dir,
             stream,
             &["content".to_string(), "nonexistent_field".to_string()],
-            &["status".to_string(), "another_nonexistent_field".to_string()],
+            &[
+                "status".to_string(),
+                "another_nonexistent_field".to_string(),
+            ],
             batch.schema(),
         )
         .await;
@@ -601,7 +600,8 @@ mod tests {
         let index = result.unwrap();
         assert!(index.is_some());
 
-        // Verify the index has the expected schema (including timestamp field added by the function)
+        // Verify the index has the expected schema (including timestamp field added by the
+        // function)
         let index = index.unwrap();
         let schema = index.schema();
         assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
@@ -679,7 +679,7 @@ mod tests {
         let schema = index.schema();
         assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
         assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
-        
+
         // Verify that the timestamp field is indexed as Int64, not as text
         let ts_field = schema.get_field(TIMESTAMP_COL_NAME).unwrap();
         assert!(matches!(
