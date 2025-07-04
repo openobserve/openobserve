@@ -1215,7 +1215,39 @@ mod tests {
     };
 
     use super::*;
-    use crate::common::infra::config::USERS;
+    use crate::common::{infra::config::USERS, meta::user::get_default_user_role};
+
+    #[test]
+    fn test_is_user_from_org() {
+        let target_org = "org1".to_string();
+
+        let user_org = UserOrg {
+            name: "org2".to_string(),
+            token: "token2".to_string(),
+            rum_token: Some("rum2".to_string()),
+            role: get_default_user_role(),
+        };
+
+        let matched_org = UserOrg {
+            name: target_org.clone(),
+            token: "token1".to_string(),
+            rum_token: Some("rum1".to_string()),
+            role: get_default_user_role(),
+        };
+
+        let (found, org) = is_user_from_org(vec![], &target_org);
+        assert!(!found);
+        assert_eq!(org.name, "");
+
+        let (found, org) = is_user_from_org(vec![matched_org.clone()], &target_org);
+        assert!(!found);
+        assert_eq!(org.name, "");
+
+        let (found, org) =
+            is_user_from_org(vec![matched_org.clone(), user_org.clone()], &target_org);
+        assert!(found);
+        assert_eq!(org.name, "org2");
+    }
 
     async fn set_up() {
         let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
