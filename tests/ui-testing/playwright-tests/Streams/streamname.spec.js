@@ -17,7 +17,7 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-test.describe("Stream multiselect testcases", () => {
+test.describe("Stream name casing preservation tests", () => {
   let streamsPage;
 
   test.beforeEach(async ({ page }) => {
