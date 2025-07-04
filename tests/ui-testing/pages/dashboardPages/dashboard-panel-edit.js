@@ -25,7 +25,7 @@ export default class DashboardPanel {
     this.moveTab = page.locator(
       '[data-test="dashboard-move-to-another-panel"]'
     );
-    this.deleteconfrimBtn = page.locator('[data-test="confirm-button"]');
+    this.deleteConfirmBtn = page.locator('[data-test="confirm-button"]');
     this.fullscreen = page.locator(
       '[data-test="dashboard-panel-fullscreen-btn"]'
     );
@@ -72,8 +72,8 @@ export default class DashboardPanel {
       .click();
     await this.delete.waitFor({ state: "visible" });
     await this.delete.click();
-    await this.deleteconfrimBtn.waitFor({ state: "visible" });
-    await this.deleteconfrimBtn.click();
+    await this.deleteConfirmBtn.waitFor({ state: "visible" });
+    await this.deleteConfirmBtn.click();
   }
 
   //Download json
@@ -107,9 +107,9 @@ export default class DashboardPanel {
     await this.fullscreen.waitFor({ state: "visible" });
     await this.fullscreen.click();
     await this.page.waitForSelector(
-      '[data-test="dashboard-viewpanel-close-btn"]'
-    ),
-      { state: "visible" };
+      '[data-test="dashboard-viewpanel-close-btn"]',
+      { state: "visible" }
+    );
     await this.page
       .locator('[data-test="dashboard-viewpanel-close-btn"]')
       .click();

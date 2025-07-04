@@ -734,7 +734,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Configure drilldown
     await dashboardPanelConfigs.openConfigPanel();
-    await dashboardDrilldown.addDrillownByURL(
+    await dashboardDrilldown.addDrilldownByURL(
       drilldownName,
       "https://google.com"
     );

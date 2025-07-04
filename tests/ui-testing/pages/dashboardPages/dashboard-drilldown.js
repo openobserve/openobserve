@@ -34,7 +34,7 @@ export default class DashboardDrilldownPage {
   }
 
   // Generate a unique dashboard name
-  generatedashboardName(prefix = "dashboard") {
+  generateDashboardName(prefix = "dashboard") {
     return `${prefix}_${Date.now()}`;
   }
 
@@ -60,7 +60,7 @@ export default class DashboardDrilldownPage {
   }
 
   //Add addDrilldownByURL
-  async addDrillownByURL(drilldownName, url) {
+  async addDrilldownByURL(drilldownName, url) {
     await this.addDrilldownButton.waitFor({ state: "visible" });
     await this.addDrilldownButton.click();
     await this.drilldownNameInput.waitFor({ state: "visible" });

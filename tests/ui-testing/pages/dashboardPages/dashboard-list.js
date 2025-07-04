@@ -48,9 +48,6 @@ export default class DashboardListPage {
       this.page.getByText("Dashboard deleted successfully")
     ).toBeVisible();
   }
-
-  // ...existing code...
-
   // Move dashboard
   async moveDashboardToAnotherFolder(folder) {
     await this.page
