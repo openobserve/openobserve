@@ -638,7 +638,7 @@ export default defineComponent({
               description: userClickedPattern.value.description
             }
             emit("addPattern", pattern);
-            appliedPatterns.value.push(pattern);
+            // Let the watcher handle updating appliedPatterns
             appliedPatternsMap.value.set(pattern.pattern_id, pattern);
             // Set flag when pattern is added
             hasPatternChanges.value = true;
