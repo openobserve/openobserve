@@ -1504,8 +1504,11 @@ export default defineComponent({
     const copyLogsQueryToDashboardPanel = async () => {
       // Check should use histogram query
       // If true, then set histogram query
-      // else set logs page query
-      if (await shouldUseHistogramQuery(searchObj.data.query)) {
+      // If false, set logs page query
+      // If null, do not do anything
+      const shouldUseHistogram = await shouldUseHistogramQuery(searchObj.data.query);
+
+      if (shouldUseHistogram === true) {
         // set histogram query
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1514,7 +1517,7 @@ export default defineComponent({
           (searchObj?.data?.stream?.selectedStream?.[0]
             ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
             : "");
-      } else {
+      } else if (shouldUseHistogram === false) {
         // set same query
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1524,24 +1527,28 @@ export default defineComponent({
             ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
             : "");
       }
+      // If shouldUseHistogram === null, do not do anything (no query assignment)
+      return shouldUseHistogram;
     };
 
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
-          // emit resize event
-          // this will rerender/call resize method of already rendered chart to resize
-          window.dispatchEvent(new Event("resize"));
-
-          // reset old rendered chart
-          visualizeChartData.value = {};
 
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
 
-          await copyLogsQueryToDashboardPanel();
+          const shouldUseHistogram = await copyLogsQueryToDashboardPanel();
+
+          // if not able to parse query, do not do anything
+          if (shouldUseHistogram === null) {
+            return;
+          }
+
+          // reset old rendered chart
+          visualizeChartData.value = {};
 
           // select chary type as line
           dashboardPanelData.data.type = "line";
@@ -1552,7 +1559,7 @@ export default defineComponent({
           setCustomQueryFields();
 
           // set logs page data to searchResponseForVisualization
-          if (await shouldUseHistogramQuery(searchObj.data.query)) {
+          if (shouldUseHistogram === true) {
             // replace hits with histogram query data
             searchResponseForVisualization.value = {
               ...searchObj.data.queryResults,
@@ -1567,6 +1574,10 @@ export default defineComponent({
             JSON.stringify(dashboardPanelData.data),
           );
 
+          // emit resize event
+          // this will rerender/call resize method of already rendered chart to resize
+          window.dispatchEvent(new Event("resize"));
+
           // TODO: extract custom fields from query
           // above one will be done via query watcher on useDashboardPanelData hook
           // TODO: On visualization toggle, extract which field will go to x axis, y axis and breakdown
@@ -1579,27 +1590,49 @@ export default defineComponent({
       },
     );
 
+    // Create debounced function for visualization updates
+    const debouncedVisualizeUpdate = debounce(async () => {
+      if (searchObj?.meta?.logsVisualizeToggle == "visualize") {
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery = true;
+
+        const shouldUseHistogram = await copyLogsQueryToDashboardPanel();
+
+        // if not able to parse query, do not do anything
+        if (shouldUseHistogram === null) {
+          return;
+        }
+
+        // reset old rendered chart
+        // visualizeChartData.value = {};
+
+        // extract custom fields from query
+        // identify x axis, y axis and breakdown fields
+        // push on query fields
+        setCustomQueryFields();
+
+        // run query
+        // visualizeChartData.value = JSON.parse(
+        //   JSON.stringify(dashboardPanelData.data),
+        // );
+
+        // emit resize event
+        // this will rerender/call resize method of already rendered chart to resize
+        window.dispatchEvent(new Event("resize"));
+      }
+    }, 15000); // 15 seconds debounce
+
     watch(
-      () => [searchObj.data.query, searchObj.meta.logsVisualizeToggle],
+      () => [searchObj.data.query, searchObj.meta.logsVisualizeToggle, searchObj?.meta?.queryEditorPlaceholderFlag],
       async () => {
-        if (searchObj.meta.logsVisualizeToggle == "visualize") {
-          // emit resize event
-          // this will rerender/call resize method of already rendered chart to resize
-          window.dispatchEvent(new Event("resize"));
-
-          // reset old rendered chart
-          visualizeChartData.value = {};
-
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery = true;
-
-          await copyLogsQueryToDashboardPanel();
-
-          // extract custom fields from query
-          // identify x axis, y axis and breakdown fields
-          // push on query fields
-          setCustomQueryFields();
+        // If queryEditorPlaceholderFlag becomes true, flush the debounced function immediately
+        if (searchObj?.meta?.queryEditorPlaceholderFlag == true) {
+          debouncedVisualizeUpdate.flush();
+        } else {
+          // Otherwise, call the debounced function
+          debouncedVisualizeUpdate();
         }
       },
     );

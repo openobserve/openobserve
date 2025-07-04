@@ -511,6 +511,8 @@ export default defineComponent({
 
     const layoutSplitterUpdated = () => {
       dashboardPanelData.layout.showFieldList = dashboardPanelData.layout.splitter > 0;
+      // emit resize event
+      // this will rerender/call resize method of already rendered chart to resize
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -747,6 +749,9 @@ export default defineComponent({
         dashboardPanelData.layout.showFieldList = true;
         dashboardPanelData.layout.splitter = 20;
       }
+      // emit resize event
+      // this will rerender/call resize method of already rendered chart to resize
+      window.dispatchEvent(new Event("resize"));
     };
 
     return {
