@@ -25,7 +25,7 @@ use bytes::Bytes;
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
     utils::{
-        inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+        inverted_index::convert_parquet_file_name_to_tantivy_file,
         tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
     },
 };
@@ -63,8 +63,7 @@ pub(crate) async fn create_tantivy_index(
     let index_size = puffin_bytes.len();
 
     // write fst bytes into disk
-    let Some(idx_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
-    else {
+    let Some(idx_file_name) = convert_parquet_file_name_to_tantivy_file(parquet_file_name) else {
         return Ok(0);
     };
 
