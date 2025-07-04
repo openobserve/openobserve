@@ -1287,7 +1287,7 @@ export default defineComponent({
           modifiedSettings,
         )
         .then(async (res) => {
-          if(store.state.logs.logs.data.stream.selectedStream.includes(indexData.value.name)) {
+          if(store.state.logs.logs.data?.stream?.selectedStream?.includes(indexData.value.name)) {
             store.dispatch("logs/setIsInitialized", false);
           }
           

@@ -390,6 +390,7 @@ export default defineComponent({
         const appliedPatterns = ref(props.data ? props.data : []);
         const allPatternsExpanded = ref(true);
         const appliedPatternsExpanded = ref(true);
+        const appliedPatternsMap = ref(new Map());
         const $q = useQuasar();
         const userClickedPattern = ref<any>(null);
         const isPatternValid = ref(false);
@@ -441,9 +442,8 @@ export default defineComponent({
             }));
             resultTotal.value = store.state.organizationData.regexPatterns.length;
           }
-          //this is used to sync the applied patterns with the all patterns
-          //so that we can show the applied patterns in the applied patterns list
-          makeSyncWithAppliedPatterns();
+          // Initialize the applied patterns map
+          appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
           //this is used to toggle the applied patterns and all patterns expansion items
           //so that we can show the applied patterns and all patterns in the applied patterns and all patterns list
           await nextTick();
@@ -466,29 +466,39 @@ export default defineComponent({
         });
         //reset the values when user clicks on a pattern from the list
         //because we need to reset the values when user clicks on a pattern from the list
+        //here we are doing one optimization to check if the pattern is applied or not 
+        //if not applied then we will not show the apply_at and policy values
+        //if applied then we will show the apply_at and policy values that we will find in the applied patterns map that we have created in the onMounted function
         watch(()=> userClickedPattern.value, (newVal) => {
-          let applied_at_value = newVal.apply_at;
-          if(applied_at_value == 'Both'){
-            apply_at.value = ['AtIngestion', 'AtSearch'];
-          }
-          else{
-            apply_at.value = applied_at_value ? [applied_at_value] : [];
-          }
-          policy.value = newVal.policy || "Redact";
-          testString.value = "";
-          // Update highlighting when pattern changes
-          nextTick(() => {
-            if (queryEditorRef.value && newVal?.pattern) {
-                queryEditorRef.value.highlightRegexMatches(newVal.pattern);
+          if (!newVal) return;
+          
+          // Check if this pattern has applied settings in our map
+          const appliedPattern = appliedPatternsMap.value.get(newVal.pattern_id);
+          
+          if (appliedPattern) {
+            // Use the applied pattern's settings
+            let applied_at_value = appliedPattern.apply_at;
+            if(applied_at_value == 'Both'){
+              apply_at.value = ['AtIngestion', 'AtSearch'];
+            } else {
+              apply_at.value = applied_at_value ? [applied_at_value] : [];
             }
-          });
+            policy.value = appliedPattern.policy || "Redact";
+          } else {
+            // Reset to defaults if pattern is not applied
+            apply_at.value = [];
+            policy.value = "Redact";
+          }
+          testString.value = "";
         })
         //this runs when users clicks on add / remove pattern button 
         //to update the applied patterns list
         watch(()=> props.data.length, (newVal) => {
           isFormDirty.value = true;
           appliedPatterns.value = [...props.data];
-          makeSyncWithAppliedPatterns();
+          // Update our map when applied patterns change
+          //because we need to check further if the pattern is applied or not
+          appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
         })
         watch(()=> policy.value, (newVal) => {
           if(checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)){
@@ -613,22 +623,6 @@ export default defineComponent({
             emit("addPattern", pattern);
           }
         }
-        //so when user clicks on any of the pattern from the all patterns list we should show the apply_at and policy values if it is applied pattern
-        //this is done here to make sync with the applied patterns list
-        const makeSyncWithAppliedPatterns = () => {
-          const appliedMap = new Map(
-            props.data.map((p: any) => [p.pattern_id, p])
-          );
-
-          allPatterns.value.forEach((pattern: any) => {
-            const applied = appliedMap.get(pattern.id);
-            if (applied) {
-              pattern.policy = applied.policy;
-              pattern.apply_at = applied.apply_at;
-            }
-          });
-        };
-
         //why this check because user might update the policy or apply_at value of already applied pattern 
         //so we need to check if the policy or apply_at value is changed and if it is then we need to update the isFormDirty value
         //so that the user can see the update changes button
