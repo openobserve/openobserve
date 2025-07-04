@@ -35,6 +35,7 @@ use config::{
 };
 use flate2::read::GzDecoder;
 use infra::errors::{Error, Result};
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
@@ -72,6 +73,7 @@ pub async fn ingest(
     let cfg = config::get_config();
     let mut need_usage_report = true;
     let log_ingestion_errors = ingestion_log_enabled().await;
+    #[cfg(feature = "enterprise")]
     let pattern_manager = get_pattern_manager().await?;
 
     // check stream
@@ -469,11 +471,21 @@ pub async fn ingest(
     drop(original_options);
     drop(user_defined_schema_map);
 
-    for (stream, data) in json_data_by_stream.iter_mut() {
-        match pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0) {
-            Ok(_) => {}
-            Err(e) => {
-                log::error!("error in processing records for patterns for stream {stream} : {e}");
+    #[cfg(feature = "enterprise")]
+    {
+        for (stream, data) in json_data_by_stream.iter_mut() {
+            match pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Logs,
+                stream,
+                &mut data.0,
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "error in processing records for patterns for stream {stream} : {e}"
+                    );
+                }
             }
         }
     }

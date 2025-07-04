@@ -38,9 +38,12 @@ use infra::{
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use super::db::enrichment_table;
+#[cfg(feature = "enterprise")]
+use crate::service::db::re_pattern::process_association_changes;
 use crate::{
     common::meta::{
         authz::Authz,
@@ -49,7 +52,7 @@ use crate::{
     },
     handler::http::router::ERROR_HEADER,
     service::{
-        db::{self, distinct_values, re_pattern::process_association_changes},
+        db::{self, distinct_values},
         metrics::get_prom_metadata_from_schema,
     },
 };
@@ -152,8 +155,9 @@ pub async fn get_streams(
     indices_res
 }
 
+// org_id is only for pattern associations, which is ent only
 pub fn stream_res(
-    org_id: &str,
+    _org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     schema: Schema,
@@ -210,7 +214,7 @@ pub fn stream_res(
     // we get the patterns, otherwise report them as empty
     #[cfg(feature = "enterprise")]
     let pattern_associations = match PATTERN_MANAGER.get() {
-        Some(m) => m.get_associations(org_id, stream_type, stream_name),
+        Some(m) => m.get_associations(_org_id, stream_type, stream_name),
         None => vec![],
     };
 
