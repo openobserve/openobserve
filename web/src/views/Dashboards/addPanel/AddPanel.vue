@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="flex-shrink: 0"
                   />
                 </div>
-                <div class="row column tw-h-[calc(100vh-350px)]">
+                <div class="row column tw-h-[calc(100vh-180px)]">
                   <DashboardQueryEditor />
                 </div>
               </div>
@@ -447,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="flex-shrink: 0"
                   />
                 </div>
-                <div class="row column tw-h-[calc(100vh-350px)]">
+                <div class="row column tw-h-[calc(100vh-180px)]">
                   <DashboardQueryEditor />
                 </div>
               </div>
