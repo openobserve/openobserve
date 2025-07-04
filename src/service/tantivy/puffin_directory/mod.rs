@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Write, path::PathBuf, sync::LazyLock};
+use std::{path::PathBuf, sync::LazyLock};
 
 use anyhow::Result;
-use reader::PuffinDirReader;
 use tantivy::{
     directory::{Directory, OwnedBytes},
     doc,
@@ -80,61 +79,4 @@ pub fn get_file_from_empty_puffin_dir_with_ext(file_ext: &str) -> Result<OwnedBy
     let file_path = format!("{}.{}", seg_id.as_str(), file_ext);
     let file_data = empty_puffin_dir.open_read(&PathBuf::from(file_path))?;
     Ok(file_data.read_bytes()?)
-}
-
-pub async fn convert_puffin_file_to_tantivy_dir<T: Into<PathBuf>>(
-    puffin_dir: PuffinDirReader,
-    dest_path: T,
-) -> Result<usize> {
-    let dest_path = dest_path.into();
-    // Check if the folder already exists
-    if !dest_path.exists() {
-        std::fs::create_dir_all(&dest_path)?;
-    }
-
-    let mut total = 0;
-    let mut filename = "".to_string();
-    for file in puffin_dir.list_files() {
-        if file.extension().is_none() {
-            continue;
-        }
-        let file_data = puffin_dir.open_read(&file.clone())?;
-        let mut file_handle = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(dest_path.join(&file))?;
-        let data = file_data.read_bytes_async().await?;
-        file_handle.write_all(&data)?;
-        file_handle.flush()?;
-        total += data.len();
-        if filename.is_empty() && !file.to_string_lossy().to_string().ends_with(".json") {
-            filename = file.to_string_lossy().to_string();
-        }
-    }
-
-    // Ensure filename is not empty
-    if filename.is_empty() {
-        return Err(anyhow::anyhow!(
-            "No valid segment files found in 'puffin_dir' to determine filename."
-        ));
-    }
-
-    // remove file ext from filename
-    filename = filename.split('.').next().unwrap_or_default().to_string();
-
-    // add other files from the empty tantivy directory
-    for file_ext in EMPTY_FILE_EXT {
-        let data = get_file_from_empty_puffin_dir_with_ext(file_ext)?;
-        let mut h = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(dest_path.join(format!("{filename}.{file_ext}")))?;
-        h.write_all(&data)?;
-        h.flush()?;
-        total += data.len();
-    }
-
-    Ok(total)
 }

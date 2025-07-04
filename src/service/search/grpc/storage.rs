@@ -18,19 +18,18 @@ use std::{collections::HashSet, sync::Arc};
 use anyhow::Context;
 use arrow_schema::Schema;
 use config::{
-    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
+    INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::{InvertedIndexOptimizeMode, InvertedIndexTantivyMode},
+        inverted_index::InvertedIndexOptimizeMode,
         search::{ScanStats, StorageType},
         stream::{FileKey, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::{
-        file::is_exists,
-        inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+        inverted_index::convert_parquet_file_name_to_tantivy_file,
         size::bytes_to_human_readable,
         tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
@@ -56,13 +55,12 @@ use crate::service::{
         grpc::utils,
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        tantivy::puffin_directory::{
-            caching_directory::CachingDirectory,
-            convert_puffin_file_to_tantivy_dir,
-            footer_cache::FooterCache,
-            reader::{PuffinDirReader, warm_up_terms},
-            reader_cache,
-        },
+    },
+    tantivy::puffin_directory::{
+        caching_directory::CachingDirectory,
+        footer_cache::FooterCache,
+        reader::{PuffinDirReader, warm_up_terms},
+        reader_cache,
     },
 };
 
@@ -128,11 +126,7 @@ pub async fn search(
     );
 
     // check inverted index
-    let cfg = get_config();
-    #[allow(deprecated)]
-    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
-    let use_inverted_index =
-        query.use_inverted_index && inverted_index_type == "tantivy" && index_condition.is_some();
+    let use_inverted_index = query.use_inverted_index && index_condition.is_some();
     if use_inverted_index {
         log::info!(
             "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
@@ -156,12 +150,11 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {}] search->storage: stream {}/{}/{}, {} inverted index reduced file_list num to {} in {} ms",
+                    "[trace_id {}] search->storage: stream {}/{}/{}, inverted index reduced file_list num to {} in {} ms",
                     query.trace_id,
                     query.org_id,
                     query.stream_type,
                     query.stream_name,
-                    inverted_index_type,
                     files.len(),
                     idx_took
                 ),
@@ -553,7 +546,7 @@ pub async fn filter_file_list_by_tantivy_index(
         .filter_map(|(_, f)| {
             scan_stats.compressed_size += f.meta.index_size;
             if f.meta.index_size > 0 {
-                convert_parquet_idx_file_name_to_tantivy_file(&f.key)
+                convert_parquet_file_name_to_tantivy_file(&f.key)
                     .map(|ttv_file| (ttv_file, f.clone()))
             } else {
                 None
@@ -915,8 +908,7 @@ async fn search_tantivy_index(
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, Option<BitVec>, usize, Vec<u64>)> {
     let file_account = parquet_file.account.clone();
-    let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(&parquet_file.key)
-    else {
+    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
             parquet_file.key.clone()
@@ -937,40 +929,19 @@ async fn search_tantivy_index(
                 "[trace_id {trace_id}] init cache for tantivy file: {}",
                 ttv_file_name
             );
-            let reader_directory: Box<dyn Directory> = if cfg.common.inverted_index_tantivy_mode
-                == InvertedIndexTantivyMode::Mmap.to_string()
-            {
-                let puffin_dir_path = format!(
-                    "{}{}",
-                    cfg.common.data_cache_dir,
-                    ttv_file_name.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER)
-                );
-                if !is_exists(&puffin_dir_path) {
-                    let read_dir = get_tantivy_directory(
-                        trace_id,
-                        &file_account,
-                        &ttv_file_name,
-                        parquet_file.meta.index_size,
-                    )
-                    .await?;
-                    let _ = convert_puffin_file_to_tantivy_dir(read_dir, &puffin_dir_path).await?;
-                }
-                Box::new(tantivy::directory::MmapDirectory::open(&puffin_dir_path)?)
-            } else {
-                let puffin_dir = Arc::new(
-                    get_tantivy_directory(
-                        trace_id,
-                        &file_account,
-                        &ttv_file_name,
-                        parquet_file.meta.index_size,
-                    )
-                    .await?,
-                );
-                let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
-                let cache_dir =
-                    CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
-                Box::new(cache_dir)
-            };
+
+            let puffin_dir = Arc::new(
+                get_tantivy_directory(
+                    trace_id,
+                    &file_account,
+                    &ttv_file_name,
+                    parquet_file.meta.index_size,
+                )
+                .await?,
+            );
+            let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
+            let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+            let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
 
             let index = tantivy::Index::open(reader_directory)?;
             index
@@ -1006,26 +977,24 @@ async fn search_tantivy_index(
         .collect::<Vec<_>>();
 
     // warm up the terms in the query
-    if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Puffin.to_string() {
-        let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
-            HashMap::new();
-        query.query_terms(&mut |term, need_position| {
-            let field = term.field();
-            let entry = warm_terms.entry(field).or_default();
-            entry.insert(term.clone(), need_position);
-        });
+    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
+        HashMap::new();
+    query.query_terms(&mut |term, need_position| {
+        let field = term.field();
+        let entry = warm_terms.entry(field).or_default();
+        entry.insert(term.clone(), need_position);
+    });
 
-        let need_fast_field = idx_optimize_rule
-            .as_ref()
-            .is_some_and(|rule| matches!(rule, InvertedIndexOptimizeMode::SimpleHistogram(..)));
-        warm_up_terms(
-            &tantivy_searcher,
-            &warm_terms,
-            need_all_term_fields,
-            need_fast_field,
-        )
-        .await?;
-    }
+    let need_fast_field = idx_optimize_rule
+        .as_ref()
+        .is_some_and(|rule| matches!(rule, InvertedIndexOptimizeMode::SimpleHistogram(..)));
+    warm_up_terms(
+        &tantivy_searcher,
+        &warm_terms,
+        need_all_term_fields,
+        need_fast_field,
+    )
+    .await?;
 
     // search the index
     let file_in_range =

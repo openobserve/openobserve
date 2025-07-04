@@ -24,9 +24,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, RwAHashMap, get_config,
-    meta::inverted_index::InvertedIndexTantivyMode,
-    metrics,
+    RwAHashMap, get_config, metrics,
     utils::{
         file::*,
         hash::{Sum64, gxhash},
@@ -258,7 +256,6 @@ impl FileData {
     }
 
     async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
-        let cfg = get_config();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
@@ -292,21 +289,6 @@ impl FileData {
                     file_path,
                     e
                 );
-            }
-
-            // Handle for tantivy index
-            if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Mmap.to_string()
-                && file_path.ends_with(FILE_EXT_TANTIVY)
-            {
-                let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
-                if let Err(e) = fs::remove_dir_all(&file_path) {
-                    log::error!(
-                        "[CacheType:{}] File disk cache gc remove file: {}, error: {}",
-                        self.file_type,
-                        file_path,
-                        e
-                    );
-                }
             }
 
             if key.starts_with("results/") {
