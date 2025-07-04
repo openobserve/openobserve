@@ -549,7 +549,7 @@ async fn move_files(
                 PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Ok(());
-        }
+        };
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {

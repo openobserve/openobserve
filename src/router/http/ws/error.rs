@@ -41,8 +41,8 @@ pub enum WsError {
     #[error("Response channel registered for trace_id {0} not found")]
     ResponseChannelClosed(String),
 
-    #[error("Querier not available: {0}")]
-    QuerierNotAvailable(String),
+    #[error("Querier WS connection not available: {0}")]
+    QuerierWsConnNotAvailable(String),
 
     #[error("Querier http url {0} not valid")]
     QuerierUrlInvalid(String),
@@ -63,7 +63,7 @@ impl ResponseError for WsError {
             WsError::SessionNotFound(_) => StatusCode::BAD_REQUEST,
             WsError::QuerierUrlInvalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::QuerierWSUrlError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            WsError::QuerierNotAvailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            WsError::QuerierWsConnNotAvailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::ResponseChannelNotFound(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::ResponseChannelClosed(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -120,10 +120,11 @@ impl ErrorMessage {
 impl WsError {
     /// Disconnect the ws conn to client from router
     pub fn should_disconnect(&self) -> bool {
-        matches!(
-            self,
-            WsError::ProtocolError(_) | WsError::QuerierNotAvailable(_)
-        )
+        false
+        // matches!(
+        //     self,
+        //     WsError::ProtocolError(_) | WsError::QuerierWsConnNotAvailable(_)
+        // )
     }
 
     pub fn should_client_retry(&self) -> bool {
