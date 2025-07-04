@@ -16,12 +16,12 @@
 use std::collections::HashSet;
 
 use config::meta::folder::DEFAULT_FOLDER;
-use o2_openfga::{authorizer, config::get_config as get_o2_config, meta::mapping::OFGA_MODELS};
+use o2_openfga::{authorizer, config::get_config as get_ofga_config, meta::mapping::OFGA_MODELS};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
 pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), anyhow::Error> {
     log::info!("Migrating alert folders");
-    if !get_o2_config().enabled {
+    if !get_ofga_config().enabled {
         return Ok(());
     }
 

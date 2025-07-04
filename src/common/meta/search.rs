@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use config::meta::search::Response;
+use config::meta::{search::Response, sql::OrderBy};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -65,6 +65,7 @@ pub struct MultiCachedQueryResponse {
     pub is_aggregate: bool,
     pub file_path: String,
     pub trace_id: String,
+    pub order_by: Vec<(String, OrderBy)>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -185,6 +186,7 @@ mod tests {
             cache_query_response: true,
             ts_column: "timestamp".to_string(),
             is_descending: false,
+            order_by: vec![],
             limit: 100,
             took: 50,
             histogram_interval: 1000,

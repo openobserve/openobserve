@@ -90,18 +90,6 @@ impl SessionManager {
         drop(session_write);
     }
 
-    pub async fn reached_max_idle_time(&self, client_id: &ClientId) -> bool {
-        let r = self.sessions.read().await;
-        let session_info = r.get(client_id).cloned();
-        drop(r);
-        session_info.is_none_or(|session_info| {
-            Utc::now()
-                .signed_duration_since(session_info.last_active)
-                .num_seconds()
-                > config::get_config().websocket.session_idle_timeout_secs
-        })
-    }
-
     pub async fn unregister_client(&self, client_id: &ClientId) {
         let mut session_write = self.sessions.write().await;
         session_write.remove(client_id);

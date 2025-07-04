@@ -28,7 +28,7 @@ use sqlparser::{
 
 use crate::TIMESTAMP_COL_NAME;
 
-pub const AGGREGATE_UDF_LIST: [&str; 16] = [
+pub const AGGREGATE_UDF_LIST: [&str; 18] = [
     "min",
     "max",
     "avg",
@@ -45,6 +45,8 @@ pub const AGGREGATE_UDF_LIST: [&str; 16] = [
     "approx_median",
     "approx_percentile_cont",
     "approx_percentile_cont_with_weight",
+    "approx_topk",
+    "approx_topk_distinct",
 ];
 
 pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
@@ -72,6 +74,7 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
         if has_subquery(statement) || has_window_functions(statement) {
             return Ok(false);
         }
+
         if let Statement::Query(query) = statement
             && (!is_aggregate_in_select(query)
                 || has_join(query)

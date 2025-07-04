@@ -21,14 +21,15 @@ use datafusion::{
         Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
-    physical_expr::LexOrdering,
+    physical_expr::{LexOrdering, utils::collect_columns},
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        aggregates::AggregateExec,
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use proto::cluster_rpc::KvItem;
 
 use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
@@ -182,6 +183,47 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
             let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
             self.table_name = Some(TableReference::from(table.name()));
             Ok(TreeNodeRecursion::Continue)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
+    }
+}
+
+pub struct GroupByFieldVisitor {
+    group_by_fields: HashSet<String>,
+}
+
+impl GroupByFieldVisitor {
+    pub fn new() -> Self {
+        Self {
+            group_by_fields: HashSet::new(),
+        }
+    }
+
+    pub fn get_group_by_fields(&self) -> Vec<String> {
+        self.group_by_fields.iter().cloned().collect()
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for GroupByFieldVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let name = node.name();
+        if name == "AggregateExec" {
+            let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+            let group_by = aggregate.group_expr();
+            let fields = group_by
+                .expr()
+                .iter()
+                .flat_map(|(expr, _)| {
+                    collect_columns(expr)
+                        .into_iter()
+                        .map(|field| field.name().to_string())
+                })
+                .collect::<HashSet<_>>();
+            self.group_by_fields.extend(fields);
+            Ok(TreeNodeRecursion::Stop)
         } else {
             Ok(TreeNodeRecursion::Continue)
         }

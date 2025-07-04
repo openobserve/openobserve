@@ -45,7 +45,6 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             folder_id,
             alert,
         } => {
-            log::debug!("Creating alert: {:?}", alert);
             if table::alerts::get_by_id(conn, &org_id, alert.id.expect("alert id cannot be none"))
                 .await?
                 .is_some()

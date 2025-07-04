@@ -35,7 +35,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
+        sql::{is_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -54,15 +54,23 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client,
-    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup,
-    o2_enterprise::enterprise::search::cache::streaming_agg::{
-        create_aggregation_cache_file_path, generate_aggregation_cache_interval,
-        get_aggregation_cache_key_from_request,
+    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
+    config::utils::sql::is_simple_aggregate_query,
+    o2_enterprise::enterprise::{
+        common::config::get_config as get_o2_config,
+        search::{
+            TaskStatus, WorkGroup,
+            cache::{
+                CardinalityLevel,
+                streaming_agg::{
+                    create_aggregation_cache_file_path, generate_aggregation_cache_interval,
+                    get_aggregation_cache_key_from_request,
+                },
+            },
+            cache_aggs_util,
+            datafusion::distributed_plan::streaming_aggs_exec,
+        },
     },
-    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
     std::collections::HashSet,
     tracing::info_span,
 };
@@ -81,6 +89,8 @@ use crate::{
 };
 
 pub(crate) mod cache;
+#[cfg(feature = "enterprise")]
+pub(crate) mod cardinality;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -193,7 +203,6 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
-
     let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
@@ -322,7 +331,13 @@ pub async fn search(
             }
             Ok(res)
         }
-        Err(e) => Err(e),
+        Err(e) => {
+            #[cfg(feature = "enterprise")]
+            if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
+                streaming_aggs_exec::remove_cache(streaming_id)
+            }
+            Err(e)
+        }
     }
 }
 
@@ -378,7 +393,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {e}")));
+            return Err(Error::Message(format!("decode sql error: {e:?}")));
         }
     }
     let queries_len = queries.len();
@@ -440,7 +455,7 @@ pub async fn search_multi(
                 }
             }
             Err(e) => {
-                log::error!("search_multi: search error: {e}");
+                log::error!("search_multi: search error: {e:?}");
                 if index == 0 {
                     // Error in the first query, return the error
                     return Err(e); // TODO: return partial results
@@ -624,12 +639,33 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
-    let is_streaming_aggregate = ts_column.is_none()
-        && is_simple_aggregate_query(&req.sql).unwrap_or(false)
-        && cfg.common.feature_query_streaming_aggs;
+
+    #[cfg(feature = "enterprise")]
+    let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
+
+    #[cfg(feature = "enterprise")]
+    {
+        let res: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
+            cache_aggs_util::analyze_count_aggregation_pattern(&req.sql);
+        if let Ok(result) = res {
+            is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
+        }
+    }
+
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
     let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct && is_http_req;
+
+    #[cfg(feature = "enterprise")]
+    let mut is_streaming_aggregate = ts_column.is_none()
+        && is_cachable_aggs
+        && cfg.common.feature_query_streaming_aggs
+        && !is_http_distinct;
+
+    #[cfg(not(feature = "enterprise"))]
+    let is_streaming_aggregate = false;
+    #[cfg(not(feature = "enterprise"))]
+    let streaming_interval_micros = 0;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
@@ -641,19 +677,11 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
-    // check if we need to use streaming_output
-    let streaming_id = if req.streaming_output && is_streaming_aggregate {
-        Some(ider::uuid())
-    } else {
-        None
-    };
-
     #[cfg(feature = "enterprise")]
-    if let Some(id) = &streaming_id {
-        log::info!(
-            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
-        );
-
+    // check if we need to use streaming_output
+    let (streaming_id, streaming_interval_micros) = if req.streaming_output
+        && is_streaming_aggregate
+    {
         let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
             // TODO: cache don't not support multiple stream names
             Ok(v) => (v[0].clone(), v.join(",")),
@@ -662,24 +690,70 @@ pub async fn search_partition(
             }
         };
 
-        let cache_interval =
-            generate_aggregation_cache_interval(query.start_time, query.end_time) as i64;
-        let hashed_query = get_aggregation_cache_key_from_request(req);
-        let cache_file_path = create_aggregation_cache_file_path(
+        // check cardinality for group by fields
+        let group_by_fields = get_group_by_fields(&sql).await?;
+        let cardinality_map = crate::service::search::cardinality::check_cardinality(
             org_id,
-            &stream_type.to_string(),
+            stream_type,
             &stream_name,
-            hashed_query,
-            cache_interval,
+            &group_by_fields,
+            query.end_time,
+        )
+        .await?;
+
+        let cardinality_value = cardinality_map.values().product::<f64>();
+        let cardinality_level = CardinalityLevel::from(cardinality_value);
+        let cache_interval = generate_aggregation_cache_interval(
+            query.start_time,
+            query.end_time,
+            cardinality_level,
         );
-        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time, &cache_file_path);
+
         log::info!(
-            "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
+            "[trace_id {}] search_partition: using streaming_output, group by fields: {:?}, cardinality level: {:?}, interval: {:?}",
             trace_id,
-            id,
-            cache_file_path
+            cardinality_map,
+            cardinality_level,
+            cache_interval
         );
-    }
+
+        let cache_interval_mins = cache_interval.get_duration_minutes();
+        if cache_interval_mins == 0 {
+            // this query can't use streaming_agg cache,
+            // so we set is_streaming_aggregate to false and return None
+            is_streaming_aggregate = false;
+            skip_get_file_list = true;
+            (None, 0)
+        } else {
+            let streaming_id = ider::uuid();
+            let hashed_query = get_aggregation_cache_key_from_request(req);
+            let cache_file_path = create_aggregation_cache_file_path(
+                org_id,
+                &stream_type.to_string(),
+                &stream_name,
+                hashed_query,
+                cache_interval_mins,
+            );
+            streaming_aggs_exec::init_cache(
+                &streaming_id,
+                query.start_time,
+                query.end_time,
+                &cache_file_path,
+            );
+            log::info!(
+                "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
+                trace_id,
+                streaming_id,
+                cache_file_path
+            );
+            (
+                Some(streaming_id),
+                cache_interval.get_interval_microseconds(),
+            )
+        }
+    } else {
+        (None, 0)
+    };
 
     let mut files = Vec::new();
 
@@ -801,6 +875,9 @@ pub async fn search_partition(
         (records + f.records, original_size + f.original_size)
     });
 
+    #[cfg(feature = "enterprise")]
+    let streaming_aggs = is_streaming_aggregate && req.streaming_output;
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -812,8 +889,19 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        streaming_output: req.streaming_output && is_streaming_aggregate,
-        streaming_aggs: req.streaming_output && is_streaming_aggregate,
+        // non enterprise - diabled
+        #[cfg(not(feature = "enterprise"))]
+        streaming_output: false,
+        #[cfg(not(feature = "enterprise"))]
+        streaming_aggs: false,
+        #[cfg(not(feature = "enterprise"))]
+        streaming_id: None,
+        // enterprise
+        #[cfg(feature = "enterprise")]
+        streaming_output: streaming_aggs,
+        #[cfg(feature = "enterprise")]
+        streaming_aggs,
+        #[cfg(feature = "enterprise")]
         streaming_id: streaming_id.clone(),
     };
 
@@ -910,6 +998,7 @@ pub async fn search_partition(
         step,
         sql_order_by,
         is_streaming_aggregate,
+        streaming_interval_micros,
     );
 
     if sql_order_by == OrderBy::Asc {

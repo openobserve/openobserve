@@ -432,10 +432,6 @@ pub struct WebSocket {
     pub enabled: bool,
     #[env_config(name = "ZO_WEBSOCKET_SESSION_IDLE_TIMEOUT_SECS", default = 300)]
     pub session_idle_timeout_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_MAX_LIFETIME_SECS", default = 3600)]
-    pub session_max_lifetime_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
-    pub session_gc_interval_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
     pub ping_interval_secs: i64,
     #[env_config(
@@ -1143,6 +1139,8 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
@@ -1882,6 +1880,36 @@ pub struct Pipeline {
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_ENABLED",
+        default = true,
+        help = "Enable batching of entries before sending HTTP requests"
+    )]
+    pub batch_enabled: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE",
+        default = 100,
+        help = "Maximum number of entries to batch together"
+    )]
+    pub batch_size: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_TIMEOUT_MS",
+        default = 1000,
+        help = "Maximum time to wait for a batch to fill up (in milliseconds)"
+    )]
+    pub batch_timeout_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE_BYTES",
+        default = 10485760, // 10MB
+        help = "Maximum size of a batch in bytes"
+    )]
+    pub batch_size_bytes: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
+        default = false,
+        help = "Use shared HTTP client instances for better connection pooling"
+    )]
+    pub use_shared_http_client: bool,
 }
 
 #[derive(EnvConfig)]
@@ -2087,7 +2115,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.file_list_id_batch_size = 5000;
     }
 
-    if cfg.limit.consistent_hash_vnodes == 0 {
+    if cfg.limit.consistent_hash_vnodes < 1 {
         cfg.limit.consistent_hash_vnodes = 1000;
     }
 
@@ -2480,6 +2508,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
         && !cfg.common.metrics_cache_enabled
+        && !cfg.common.aggregation_cache_enabled
     {
         cfg.disk_cache.enabled = false;
     }
@@ -2488,6 +2517,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
+        cfg.common.aggregation_cache_enabled = false;
         cfg.cache_latest_files.enabled = false;
         cfg.cache_latest_files.delete_merge_files = false;
     }

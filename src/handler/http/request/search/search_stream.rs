@@ -306,6 +306,10 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
+    // Hack for limit in query
+    if sql.limit != 0 {
+        req.query.size = sql.limit;
+    }
 
     if let Some(interval) = sql.histogram_interval {
         req.query.histogram_interval = interval;
