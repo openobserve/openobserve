@@ -275,12 +275,7 @@ impl Sql {
         // 12. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
-        #[allow(deprecated)]
-        if cfg.common.inverted_index_search_format.eq("tantivy")
-            && stream_names.len() == 1
-            && cfg.common.inverted_index_enabled
-            && use_inverted_index
-        {
+        if stream_names.len() == 1 && cfg.common.inverted_index_enabled && use_inverted_index {
             let mut index_visitor = IndexVisitor::new(
                 &used_schemas,
                 cfg.common.feature_query_remove_filter_with_index,

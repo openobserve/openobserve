@@ -78,7 +78,7 @@ jobs:
           export ZO_META_STORE=postgres
           export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
           ./coverage.sh run-cov
-          
+
           # cleanup
           rm -rf data
           rm -rf ./json
@@ -103,5 +103,3 @@ jobs:
 
           # finally print the coverage data
           ./coverage.sh check
-          
-
