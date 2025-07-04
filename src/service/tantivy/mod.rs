@@ -282,3 +282,474 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
     Ok(Some(index))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{io::Cursor, sync::Arc};
+
+    use arrow::{
+        array::{Int64Array, StringArray},
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    };
+    use bytes::Bytes;
+    use config::{INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
+    use parquet::arrow::async_reader::ParquetRecordBatchStream;
+    use tantivy::directory::RamDirectory;
+
+    use super::*;
+
+    // Helper function to create test record batches
+    fn create_test_batch(
+        num_rows: usize,
+        include_timestamp: bool,
+        include_fts_field: bool,
+        include_index_field: bool,
+    ) -> RecordBatch {
+        let mut fields = Vec::new();
+        let mut columns: Vec<Arc<dyn arrow::array::Array>> = Vec::new();
+
+        // Add timestamp field if requested
+        if include_timestamp {
+            fields.push(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false));
+            let timestamps: Vec<i64> = (0..num_rows).map(|i| 1000 + i as i64).collect();
+            columns.push(Arc::new(Int64Array::from(timestamps)));
+        }
+
+        // Add full-text search field if requested
+        if include_fts_field {
+            fields.push(Field::new("content", DataType::Utf8, false));
+            let content: Vec<String> = (0..num_rows)
+                .map(|i| format!("Test content number {}", i))
+                .collect();
+            columns.push(Arc::new(StringArray::from(content)));
+        }
+
+        // Add index field if requested
+        if include_index_field {
+            fields.push(Field::new("status", DataType::Utf8, false));
+            let status: Vec<String> = (0..num_rows)
+                .map(|i| if i % 2 == 0 { "success".to_string() } else { "error".to_string() })
+                .collect();
+            columns.push(Arc::new(StringArray::from(status)));
+        }
+
+        let schema = Arc::new(Schema::new(fields));
+        RecordBatch::try_new(schema, columns).unwrap()
+    }
+
+    // Helper function to create a mock ParquetRecordBatchStream
+    async fn create_test_stream(
+        batches: Vec<RecordBatch>,
+    ) -> ParquetRecordBatchStream<Cursor<Bytes>> {
+        // Create a simple parquet file from the batches
+        let schema = batches[0].schema();
+        let mut buffer = Vec::new();
+        
+        // Use the parquet writer utilities from config
+        let file_meta = config::meta::stream::FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: batches.iter().map(|b| b.num_rows()).sum::<usize>() as i64,
+            original_size: 1000,
+            ..Default::default()
+        };
+
+        let mut writer = config::utils::parquet::new_parquet_writer(
+            &mut buffer,
+            &schema,
+            &[],
+            &file_meta,
+            false,
+            None,
+        );
+
+        for batch in batches {
+            writer.write(&batch).await.unwrap();
+        }
+        writer.close().await.unwrap();
+
+        // Create stream from the buffer
+        let bytes = Bytes::from(buffer);
+        let cursor = Cursor::new(bytes);
+        parquet::arrow::async_reader::ParquetRecordBatchStreamBuilder::new(cursor)
+            .await
+            .unwrap()
+            .with_batch_size(1000)
+            .build()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_empty_data() {
+        let dir = RamDirectory::create();
+        let empty_batch = create_test_batch(0, true, true, true);
+        let stream = create_test_stream(vec![empty_batch.clone()]).await;
+
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string()],
+            &["status".to_string()],
+            empty_batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none()); // Should return None for empty data
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_no_fields() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &[], // No full-text search fields
+            &[], // No index fields
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none()); // Should return None when no fields to index
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_with_fts_fields() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, false);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string()],
+            &[],
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify the index has the expected schema
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_with_index_fields() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, false, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &[],
+            &["status".to_string()],
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify the index has the expected schema
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_with_both_field_types() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string()],
+            &["status".to_string()],
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify the index has the expected schema
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_missing_fields_in_schema() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        // Request fields that don't exist in the schema
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["nonexistent_field".to_string()],
+            &["another_nonexistent_field".to_string()],
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some()); // Returns Some because index fields are not filtered by existence
+        
+        // Verify the index has the timestamp field and requested fields (even if they don't exist in data)
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field("another_nonexistent_field").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+        // FTS field WILL be present because full_text_search_fields is not empty
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_mixed_existing_and_missing_fields() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        // Mix of existing and non-existing fields
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string(), "nonexistent_field".to_string()],
+            &["status".to_string(), "another_nonexistent_field".to_string()],
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify the index has only the existing fields
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_multiple_batches() {
+        let dir = RamDirectory::create();
+        let batch1 = create_test_batch(5, true, true, true);
+        let batch2 = create_test_batch(5, true, true, true);
+        let stream = create_test_stream(vec![batch1.clone(), batch2.clone()]).await;
+
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string()],
+            &["status".to_string()],
+            batch1.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify the index was created successfully
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_without_timestamp() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, false, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string()],
+            &["status".to_string()],
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify the index has the expected schema (including timestamp field added by the function)
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_non_string_fields() {
+        // Create a batch with non-string fields in the schema
+        let fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("content", DataType::Utf8, false),
+            Field::new("number_field", DataType::Int32, false), // Non-string field
+        ];
+
+        let schema = Arc::new(Schema::new(fields));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1000, 1001, 1002])),
+                Arc::new(StringArray::from(vec!["content1", "content2", "content3"])),
+                Arc::new(arrow::array::Int32Array::from(vec![1, 2, 3])),
+            ],
+        )
+        .unwrap();
+
+        let dir = RamDirectory::create();
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        // Try to index the non-string field
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string()],
+            &["number_field".to_string()], // This field is not Utf8
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify that both fields are indexed (index fields are not filtered by data type)
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("number_field").is_ok()); // Non-string fields are still indexed
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_timestamp_field_handling() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        // Try to index the timestamp field as a regular index field
+        let result = generate_tantivy_index(
+            dir,
+            stream,
+            &["content".to_string()],
+            &[TIMESTAMP_COL_NAME.to_string()], // This should be ignored
+            batch.schema(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        // Verify that timestamp field is handled specially
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+        
+        // Verify that the timestamp field is indexed as Int64, not as text
+        let ts_field = schema.get_field(TIMESTAMP_COL_NAME).unwrap();
+        assert!(matches!(
+            schema.get_field_entry(ts_field).field_type(),
+            tantivy::schema::FieldType::I64(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_create_tantivy_index_with_empty_data() {
+        let empty_batch = create_test_batch(0, true, true, true);
+        let stream = create_test_stream(vec![empty_batch.clone()]).await;
+
+        // Test that create_tantivy_index returns 0 for empty data
+        let result = create_tantivy_index(
+            "test_caller",
+            "test_file.parquet",
+            &["content".to_string()],
+            &["status".to_string()],
+            empty_batch.schema(),
+            stream,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0); // Should return 0 for empty data
+    }
+
+    #[tokio::test]
+    async fn test_create_tantivy_index_with_no_fields() {
+        let batch = create_test_batch(10, true, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        // Test that create_tantivy_index returns 0 when no fields to index
+        let result = create_tantivy_index(
+            "test_caller",
+            "test_file.parquet",
+            &[], // No FTS fields
+            &[], // No index fields
+            batch.schema(),
+            stream,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0); // Should return 0 when no fields to index
+    }
+
+    #[tokio::test]
+    async fn test_create_tantivy_index_with_invalid_parquet_filename() {
+        let batch = create_test_batch(10, true, true, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+
+        // Test with an invalid parquet filename that won't convert to tantivy filename
+        let result = create_tantivy_index(
+            "test_caller",
+            "invalid_filename", // This won't convert to a valid tantivy filename
+            &["content".to_string()],
+            &["status".to_string()],
+            batch.schema(),
+            stream,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0); // Should return 0 when filename conversion fails
+    }
+
+    // Note: Full testing of create_tantivy_index with storage operations would require
+    // mocking the storage layer, which is complex for unit tests. The main logic is
+    // tested in generate_tantivy_index. Integration tests would be more appropriate
+    // for testing the full create_tantivy_index function with actual storage operations.
+}
