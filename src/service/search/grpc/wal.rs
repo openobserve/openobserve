@@ -278,7 +278,6 @@ pub async fn search_parquet(
             .clone()
             .with_metadata(Default::default());
         let schema = utils::change_schema_to_utf8_view(schema);
-
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
@@ -473,7 +472,13 @@ pub async fn search_memtable(
         }
         let record_batches = merge_groupes
             .into_iter()
-            .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
+            .map(|mut group| {
+                if group.len() == 1 {
+                    group.remove(0)
+                } else {
+                    concat_batches(group[0].schema().clone(), group).unwrap()
+                }
+            })
             .collect::<Vec<_>>();
 
         tokio::task::coop::consume_budget().await;

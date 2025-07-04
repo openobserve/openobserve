@@ -400,7 +400,6 @@ pub async fn search(
                 .build()
         )
     );
-
     Ok((tables, scan_stats))
 }
 

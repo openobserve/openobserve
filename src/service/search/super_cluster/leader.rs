@@ -29,16 +29,13 @@ use config::{
     utils::json,
 };
 use datafusion::{
-    common::{DataFusionError, tree_node::TreeNode},
+    common::tree_node::TreeNode,
     physical_plan::{displayable, visit_execution_plan},
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-use o2_enterprise::enterprise::{
-    search::{WorkGroup, datafusion::distributed_plan::rewrite::StreamingAggsRewriter},
-    super_cluster::search::get_cluster_nodes,
-};
+use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -162,31 +159,26 @@ pub async fn search(
                 Ok(ret) => Ok(ret),
                 Err(err) => {
                     log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {}", err);
-                    Err(DataFusionError::Execution(err.to_string()))
+                    Err(Error::Message(err.to_string()))
                 }
             }
         },
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
             log::error!("[trace_id {trace_id}] super cluster leader: search timeout");
-            Err(DataFusionError::ResourcesExhausted("super cluster leader: search timeout".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchTimeout("super cluster leader: search timeout".to_string())))
         },
         _ = abort_receiver => {
             query_task.abort();
             log::info!("[trace_id {trace_id}] super cluster leader: search canceled");
-            Err(DataFusionError::ResourcesExhausted("super cluster leader: search canceled".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("super cluster leader: search canceled".to_string())))
         }
     };
 
     let data = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
-        Err(err) => match err {
-            DataFusionError::ResourcesExhausted(err) => Err(Error::ErrorCode(
-                ErrorCodes::SearchCancelQuery(err.to_string()),
-            )),
-            _ => Err(Error::Message(err.to_string())),
-        },
+        Err(err) => Err(err),
     };
     let (data, mut scan_stats, partial_err) = match data {
         Ok(v) => v,
@@ -317,20 +309,20 @@ async fn run_datafusion(
 
         // NOTE: temporary check
         let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
-        let aggregation_cache_enabled = org_settings.aggregation_cache_enabled && use_cache;
-
-        let mut rewriter = StreamingAggsRewriter::new(
+        let use_cache = use_cache && org_settings.aggregation_cache_enabled;
+        let target_partitions = ctx.state().config().target_partitions();
+        let (plan,is_complete_cache_hit) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
             streaming_id,
             start_time,
             end_time,
-            aggregation_cache_enabled,
+            use_cache,
+            target_partitions,
+            physical_plan,
         )
-        .await;
-
-        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
-
+        .await?;
+        physical_plan = plan;
         // Check for aggs cache hit
-        if rewriter.is_complete_cache_hit {
+        if is_complete_cache_hit {
             aggs_cache_ratio = 100;
         }
     }
@@ -365,7 +357,6 @@ async fn run_datafusion(
                     .build()
             )
         );
-        // Update scan stats to include aggregation cache ratio
         visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
             .map_err(|e| e.into())

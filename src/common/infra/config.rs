@@ -33,7 +33,7 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::{RwLock as TokioRwLock, mpsc};
+use tokio::sync::mpsc;
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -42,7 +42,6 @@ use crate::{
         organization::{Organization, OrganizationSetting},
         syslog::SyslogRoute,
     },
-    handler::http::request::ws::session::WsSession,
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
@@ -100,10 +99,6 @@ pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
     Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
-// TODO: Implement rate limiting for maximum number of sessions
-// Querier Connection Pool
-pub static WS_SESSIONS: Lazy<RwAHashMap<String, Arc<TokioRwLock<WsSession>>>> =
-    Lazy::new(Default::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
 

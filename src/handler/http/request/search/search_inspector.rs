@@ -172,7 +172,6 @@ pub async fn get_search_profile(
     if let Err(e) = req.decode() {
         return Ok(meta::http::HttpResponse::bad_request(e));
     }
-
     req.use_cache = get_use_cache_from_request(&query);
 
     // get stream settings

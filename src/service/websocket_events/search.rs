@@ -28,13 +28,15 @@ use config::{
     utils::json::{Map, Value, get_string_value},
 };
 use infra::errors::Error;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
+use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
+#[cfg(feature = "enterprise")]
+use {
+    crate::service::websocket_events::enterprise_utils,
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
+};
 
 use super::sort::order_search_results;
-#[allow(unused_imports)]
-use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
@@ -45,7 +47,7 @@ use crate::{
             },
         },
     },
-    handler::http::request::ws::session::send_message,
+    handler::http::request::ws::session::send_message_2,
     service::{
         search::{self as SearchService, cache, sql::Sql},
         setup_tracing_with_trace_id,
@@ -88,6 +90,7 @@ pub async fn handle_search_request(
     org_id: &str,
     user_id: &str,
     mut req: SearchEventReq,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     let mut start_timer = Instant::now();
 
@@ -116,18 +119,6 @@ pub async fn handle_search_request(
         req.payload.search_type = Some(req.search_type);
     }
 
-    // decode the sql query
-    if let Err(e) = req.payload.decode() {
-        let err_res = WsServerEvents::error_response(
-            &Error::Message(e.to_string()),
-            Some(req_id.to_string()),
-            Some(trace_id),
-            Default::default(),
-        );
-        send_message(req_id, err_res.to_json()).await?;
-        return Ok(());
-    }
-
     // get stream name
     let stream_names = match resolve_stream_names(&req.payload.query.sql) {
         Ok(v) => v.clone(),
@@ -135,10 +126,10 @@ pub async fn handle_search_request(
             let err_res = WsServerEvents::error_response(
                 &Error::Message(e.to_string()),
                 Some(req_id.to_string()),
-                Some(trace_id),
+                Some(trace_id.clone()),
                 Default::default(),
             );
-            send_message(req_id, err_res.to_json()).await?;
+            send_message_2(req_id, err_res, response_tx.clone()).await?;
             return Ok(());
         }
     };
@@ -152,10 +143,10 @@ pub async fn handle_search_request(
             let err_res = WsServerEvents::error_response(
                 &Error::Message(e),
                 Some(req_id.to_string()),
-                Some(trace_id),
+                Some(trace_id.clone()),
                 Default::default(),
             );
-            send_message(req_id, err_res.to_json()).await?;
+            send_message_2(req_id, err_res, response_tx.clone()).await?;
             return Ok(());
         }
     }
@@ -205,14 +196,14 @@ pub async fn handle_search_request(
     );
 
     // Send initial progress update
-    send_message(
+    send_message_2(
         req_id,
         WsServerEvents::EventProgress {
             trace_id: trace_id.to_string(),
             percent: 0,
             event_type: req.event_type().to_string(),
-        }
-        .to_json(),
+        },
+        response_tx.clone(),
     )
     .await?;
 
@@ -278,6 +269,7 @@ pub async fn handle_search_request(
                 remaining_query_range,
                 &req_order_by,
                 &mut start_timer,
+                response_tx.clone(),
             )
             .instrument(ws_search_span.clone())
             .await?;
@@ -301,6 +293,7 @@ pub async fn handle_search_request(
                 max_query_range,
                 &mut start_timer,
                 &req_order_by,
+                response_tx.clone(),
             )
             .instrument(ws_search_span.clone())
             .await?;
@@ -335,6 +328,7 @@ pub async fn handle_search_request(
             max_query_range,
             &mut start_timer,
             &req_order_by,
+            response_tx.clone(),
         )
         .instrument(ws_search_span)
         .await?;
@@ -345,7 +339,7 @@ pub async fn handle_search_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(req_id, end_res.to_json()).await?;
+    send_message_2(req_id, end_res, response_tx.clone()).await?;
 
     Ok(())
 }
@@ -403,6 +397,7 @@ pub async fn handle_cache_responses_and_deltas(
     remaining_query_range: i64,
     req_order_by: &OrderBy,
     start_timer: &mut Instant,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -488,6 +483,7 @@ pub async fn handle_cache_responses_and_deltas(
                     cached_search_duration,
                     start_timer,
                     cache_order_by,
+                    response_tx.clone(),
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -504,6 +500,7 @@ pub async fn handle_cache_responses_and_deltas(
                     req.fallback_order_by_col.clone(),
                     cache_order_by,
                     start_timer,
+                    response_tx.clone(),
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -527,6 +524,7 @@ pub async fn handle_cache_responses_and_deltas(
                 cached_search_duration,
                 start_timer,
                 cache_order_by,
+                response_tx.clone(),
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -543,6 +541,7 @@ pub async fn handle_cache_responses_and_deltas(
                 req.fallback_order_by_col.clone(),
                 cache_order_by,
                 start_timer,
+                response_tx.clone(),
             )
             .await?;
         }
@@ -576,6 +575,7 @@ async fn process_delta(
     cache_req_duration: i64,
     start_timer: &mut Instant,
     cache_order_by: &OrderBy,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -692,9 +692,9 @@ async fn process_delta(
                 streaming_aggs: is_streaming_aggs,
             };
             log::info!(
-                "[WS_SEARCH]: Processing deltas for trace_id: {}, hits: {:?}",
+                "[WS_SEARCH]: Processing deltas for trace_id: {}, hits len: {}",
                 trace_id,
-                search_res.hits
+                search_res.hits.len()
             );
             log::debug!(
                 "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}, accumulated_results len: {}",
@@ -704,7 +704,7 @@ async fn process_delta(
                 result_cache_ratio,
                 accumulated_results.len()
             );
-            send_message(req_id, ws_search_res.to_json()).await?;
+            send_message_2(req_id, ws_search_res, response_tx.clone()).await?;
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -726,6 +726,7 @@ async fn process_delta(
                 new_end_time,
                 search_res.order_by,
                 is_streaming_aggs,
+                response_tx.clone(),
             )
             .await;
             break;
@@ -740,14 +741,14 @@ async fn process_delta(
                 original_req_end_time,
                 cache_order_by,
             );
-            send_message(
+            send_message_2(
                 req_id,
                 WsServerEvents::EventProgress {
                     trace_id: trace_id.to_string(),
                     percent,
                     event_type: req.event_type().to_string(),
-                }
-                .to_json(),
+                },
+                response_tx.clone(),
             )
             .await?;
         }
@@ -818,6 +819,7 @@ async fn send_cached_responses(
     fallback_order_by_col: Option<String>,
     cache_order_by: &OrderBy,
     start_timer: &mut Instant,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing cached response for trace_id: {}",
@@ -874,7 +876,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
-    send_message(req_id, ws_search_res.to_json()).await?;
+    send_message_2(req_id, ws_search_res, response_tx.clone()).await?;
 
     // Send progress update
     {
@@ -885,14 +887,14 @@ async fn send_cached_responses(
             req.payload.query.end_time,
             cache_order_by,
         );
-        send_message(
+        send_message_2(
             req_id,
             WsServerEvents::EventProgress {
                 trace_id: trace_id.to_string(),
                 percent,
                 event_type: req.event_type().to_string(),
-            }
-            .to_json(),
+            },
+            response_tx.clone(),
         )
         .await?;
     }
@@ -913,6 +915,7 @@ pub async fn do_partitioned_search(
     max_query_range: i64, // hours
     start_timer: &mut Instant,
     req_order_by: &OrderBy,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -923,8 +926,7 @@ pub async fn do_partitioned_search(
         req.payload.query.start_time =
             req.payload.query.end_time - max_query_range * 3600 * 1_000_000;
         log::info!(
-            "[WS_SEARCH] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
-            max_query_range,
+            "[WS_SEARCH] Query duration is modified due to query range restriction of {max_query_range} hours, new start_time: {}",
             req.payload.query.start_time
         );
         range_error = format!(
@@ -1038,7 +1040,7 @@ pub async fn do_partitioned_search(
                 },
                 streaming_aggs: is_streaming_aggs,
             };
-            send_message(req_id, ws_search_res.to_json()).await?;
+            send_message_2(req_id, ws_search_res, response_tx.clone()).await?;
         }
 
         // Send progress update
@@ -1050,14 +1052,14 @@ pub async fn do_partitioned_search(
                 modified_end_time,
                 partition_order_by,
             );
-            send_message(
+            send_message_2(
                 req_id,
                 WsServerEvents::EventProgress {
                     trace_id: trace_id.to_string(),
                     percent,
                     event_type: "search".to_string(),
-                }
-                .to_json(),
+                },
+                response_tx.clone(),
             )
             .await?;
         }
@@ -1080,6 +1082,7 @@ pub async fn do_partitioned_search(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
     req_id: &str,
     trace_id: &str,
@@ -1088,6 +1091,7 @@ async fn send_partial_search_resp(
     new_end_time: i64,
     order_by: Option<OrderBy>,
     is_streaming_aggs: bool,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -1118,7 +1122,7 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    send_message(req_id, ws_search_res.to_json()).await?;
+    send_message_2(req_id, ws_search_res, response_tx.clone()).await?;
 
     Ok(())
 }

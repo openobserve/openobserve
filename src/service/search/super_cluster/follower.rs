@@ -200,7 +200,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] super->follower_leader: get nodes num: {}, querier num: {}",
+                "[trace_id {trace_id}] flight->follower_leader: get nodes num: {}, querier num: {}",
                 nodes.len(),
                 querier_num,
             ),

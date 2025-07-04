@@ -154,7 +154,7 @@ pub async fn merge_parquet_files(
     )
     .await?;
     // register union table
-    let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
+    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
 
     let plan = ctx.state().create_logical_plan(&sql).await?;
@@ -270,7 +270,7 @@ pub async fn merge_parquet_files_with_downsampling(
     )
     .await?;
     // register union table
-    let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
+    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
 
     let plan = ctx.state().create_logical_plan(&sql).await?;
@@ -554,10 +554,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
@@ -569,6 +565,18 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     let udf_list = get_all_transform(org_id)?;
     for udf in udf_list {
         ctx.register_udf(udf.clone());
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
+        ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
+        ctx.register_udaf(AggregateUDF::from(
+            o2_enterprise::enterprise::search::datafusion::udaf::approx_topk::ApproxTopK::new(),
+        ));
+        ctx.register_udaf(AggregateUDF::from(
+            o2_enterprise::enterprise::search::datafusion::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
+        ));
     }
 
     Ok(())
@@ -749,10 +757,10 @@ async fn get_cpu_and_mem_limit(
             target_partitions = target_partitions * cpu as usize / 100;
         }
         memory_size = memory_size * mem as usize / 100;
-        log::info!(
-            "[trace_id: {trace_id}]datafusion work_group: {wg}, target_partition: {target_partitions}, memory_size: {memory_size}"
-        );
     }
+    log::info!(
+        "[trace_id: {trace_id}] datafusion work_group: {wg}, target_partition: {target_partitions}, memory_size: {memory_size}"
+    );
     Ok((target_partitions, memory_size))
 }
 

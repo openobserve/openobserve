@@ -186,6 +186,7 @@ mod tests {
             cache_query_response: true,
             ts_column: "timestamp".to_string(),
             is_descending: false,
+            order_by: vec![],
             limit: 100,
             took: 50,
             histogram_interval: 1000,
