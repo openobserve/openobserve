@@ -747,6 +747,7 @@ export default defineComponent({
         if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant' && !chatMessages.value[chatMessages.value.length - 1].content) {
           chatMessages.value.pop();
         }
+        let errorMessage = 'Error: Unable to get response from the server. Please try again later.';
         //we need to handle the 403 error seperately and show the error message to the user
         if (error.status === 403) {
           chatMessages.value.push({
@@ -754,11 +755,11 @@ export default defineComponent({
             content: 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.'
           });
         } else if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant') {
-          chatMessages.value[chatMessages.value.length - 1].content = 'Error: Unable to get response from the server. Please try again later.';
+          chatMessages.value[chatMessages.value.length - 1].content = errorMessage;
         } else {
           chatMessages.value.push({
             role: 'assistant',
-            content: 'Error: Unable to get response from the server. Please try again later.'
+            content: errorMessage
           });
         }
         await saveToHistory(); // Save after error
