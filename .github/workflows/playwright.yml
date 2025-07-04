@@ -100,9 +100,9 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: [
-            "Alerts/alerts-e2e-flow.spec.js",
-            "Alerts/alerts-ui-operations.spec.js",
-            "Alerts/alerts-import.spec.js",
+            "alerts/alerts-e2e-flow.spec.js",
+            "alerts/alerts-ui-operations.spec.js",
+            "alerts/alerts-import.spec.js",
             "changeOrg.spec.js",
             "dashboards/custom-charts.spec.js",
             "dashboards/dashboard.spec.js",
