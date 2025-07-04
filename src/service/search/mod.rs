@@ -54,20 +54,12 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
+    crate::service::grpc::make_grpc_search_client,
     config::utils::sql::is_simple_aggregate_query,
     o2_enterprise::enterprise::{
         common::infra::config::get_config as get_o2_config,
         search::{
-            TaskStatus, WorkGroup,
-            cache::{
-                CardinalityLevel,
-                streaming_agg::{
-                    create_aggregation_cache_file_path, generate_aggregation_cache_interval,
-                    get_aggregation_cache_key_from_request,
-                },
-            },
-            cache_aggs_util,
+            TaskStatus, WorkGroup, cache_aggs_util,
             datafusion::distributed_plan::streaming_aggs_exec,
         },
     },
@@ -101,6 +93,8 @@ pub(crate) mod partition;
 pub(crate) mod request;
 pub(crate) mod search_stream;
 pub(crate) mod sql;
+#[cfg(feature = "enterprise")]
+pub(crate) mod streaming_aggs;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod tantivy;
@@ -676,81 +670,31 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
-    let (streaming_id, streaming_interval_micros) = if req.streaming_output
-        && is_streaming_aggregate
-    {
-        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
-            // TODO: cache don't not support multiple stream names
-            Ok(v) => (v[0].clone(), v.join(",")),
-            Err(e) => {
-                return Err(Error::Message(e.to_string()));
-            }
-        };
-
-        // check cardinality for group by fields
-        let group_by_fields = get_group_by_fields(&sql).await?;
-        let cardinality_map = crate::service::search::cardinality::check_cardinality(
-            org_id,
-            stream_type,
-            &stream_name,
-            &group_by_fields,
-            query.end_time,
-        )
-        .await?;
-
-        let cardinality_value = cardinality_map.values().product::<f64>();
-        let cardinality_level = CardinalityLevel::from(cardinality_value);
-        let cache_interval = generate_aggregation_cache_interval(
-            query.start_time,
-            query.end_time,
-            cardinality_level,
-        );
-
-        log::info!(
-            "[trace_id {}] search_partition: using streaming_output, group by fields: {:?}, cardinality level: {:?}, interval: {:?}",
-            trace_id,
-            cardinality_map,
-            cardinality_level,
-            cache_interval
-        );
-
-        let cache_interval_mins = cache_interval.get_duration_minutes();
-        if cache_interval_mins == 0 {
-            // this query can't use streaming_agg cache,
-            // so we set is_streaming_aggregate to false and return None
-            is_streaming_aggregate = false;
-            skip_get_file_list = true;
-            (None, 0)
-        } else {
-            let streaming_id = ider::uuid();
-            let hashed_query = get_aggregation_cache_key_from_request(req);
-            let cache_file_path = create_aggregation_cache_file_path(
-                org_id,
-                &stream_type.to_string(),
-                &stream_name,
-                hashed_query,
-                cache_interval_mins,
-            );
-            streaming_aggs_exec::init_cache(
-                &streaming_id,
-                query.start_time,
-                query.end_time,
-                &cache_file_path,
-            );
-            log::info!(
-                "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
+    let (streaming_id, streaming_interval_micros) =
+        if req.streaming_output && is_streaming_aggregate {
+            match streaming_aggs::check_eligibility_for_streaming_aggs(
                 trace_id,
-                streaming_id,
-                cache_file_path
-            );
-            (
-                Some(streaming_id),
-                cache_interval.get_interval_microseconds(),
+                &query,
+                &sql,
+                &req.regions,
+                &req.clusters,
             )
-        }
-    } else {
-        (None, 0)
-    };
+            .await?
+            {
+                (Some(streaming_id), streaming_interval_micros) => {
+                    (Some(streaming_id), streaming_interval_micros)
+                }
+                _ => {
+                    // this query can't use streaming_agg cache,
+                    // so we set is_streaming_aggregate to false and return None
+                    is_streaming_aggregate = false;
+                    skip_get_file_list = true;
+                    (None, 0)
+                }
+            }
+        } else {
+            (None, 0)
+        };
 
     let mut files = Vec::new();
 
