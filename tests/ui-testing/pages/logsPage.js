@@ -60,6 +60,11 @@ export class LogsPage {
     this.partitionActiveIndicator = page.locator('[data-test="logs-search-partition-active"]');
     this.resultText = '[data-test="logs-search-search-result"]';
 
+    // String match ignore case locators
+    this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
+    this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"] > .q-btn__content';
+    this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
+
   }
 
   async selectOrganization() {
@@ -254,16 +259,14 @@ export class LogsPage {
 
   async kubernetesContainerNameJoin() {
     await this.page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameJoinLimit() {
     await this.page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
     await this.page.waitForTimeout(5000);
   }
@@ -271,32 +274,28 @@ export class LogsPage {
 
   async kubernetesContainerNameJoinLike() {
     await this.page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameLeftJoin() {
     await this.page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameRightJoin() {
     await this.page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameFullJoin() {
     await this.page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
       .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
@@ -369,9 +368,10 @@ export class LogsPage {
     await this.page.waitForTimeout(2000);
     await this.page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true, });
     await this.page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({ force: true, });
+    await this.page.waitForTimeout(2000);
     await this.page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true, });
-    await expect(this.page.locator('[data-test="logs-search-bar-query-editor"]')).not.toHaveText(/job/);
-
+    await this.page.waitForTimeout(2000);
+    await expect(this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')).not.toHaveText(/job/);
   }
 
 
@@ -483,7 +483,7 @@ async selectIndexStream(streamName) {
 }
 
 async clearAndFillQueryEditor(query) {
-  const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').locator(".inputarea");
+  const editor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox');
   await editor.fill(''); // Clear the editor
   await this.page.waitForTimeout(1000); // Optional: adjust or remove as per your needs
   await editor.fill(query); // Fill with the new query
@@ -493,7 +493,7 @@ async typeQuery(query) {
   const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
   await expect(queryEditor).toBeVisible();
   await queryEditor.click();
-  await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByLabel('Editor content').fill(query);
+  await this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.cm-content').fill(query);
   await this.page.waitForTimeout(1000);
   
   
@@ -604,7 +604,7 @@ async executeQueryWithErrorHandling() {
   await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').first().click();
   
   // Click first line and refresh
-  await this.page.locator('.view-line').first().click();
+  await this.page.locator('.cm-line').first().click();
   await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   
   // Verify no data message
@@ -616,7 +616,7 @@ async executeQueryWithErrorHandling() {
 
 // New methods for histogram query test
 async executeHistogramQuery(query) {
-  await this.page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+  await this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.cm-content').click();
   await this.page.keyboard.type(query);
   await this.page.waitForTimeout(2000);
 }
@@ -757,5 +757,74 @@ async pageNotVisible() {
   await expect(fastRewindElement).not.toBeVisible();
 }
 
+async verifyLogCountOrdering(orderType) {
+  // Type and execute the query
+  const query = orderType === 'desc' 
+    ? `SELECT MAX(_timestamp) as ts, count(_timestamp) as logcount,kubernetes_container_name FROM 'e2e_automate' where log is not null GROUP BY kubernetes_container_name order by logcount desc`
+    : `SELECT MAX(_timestamp) as ts, count(_timestamp) as logcount,kubernetes_container_name FROM 'e2e_automate' where log is not null GROUP BY kubernetes_container_name order by logcount asc`;
 
+  await this.clearAndFillQueryEditor(query);
+  await this.page.waitForTimeout(2000);
+
+  // Enable SQL mode if not already enabled
+  const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' });
+  const isSqlEnabled = await sqlModeSwitch.isChecked();
+  if (!isSqlEnabled) {
+    await sqlModeSwitch.click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  // Run the query
+  await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+  await this.page.waitForTimeout(2000);
+
+  // Get all table rows and verify order
+  const rows = await this.page.locator('[data-test^="logs-search-result-detail-"]').all();
+  let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+
+  for (const row of rows) {
+    const sourceCell = await row.locator('[data-test^="log-table-column-"][data-test$="-source"]').textContent();
+    try {
+      const logcountMatch = sourceCell.match(/logcount":(\d+)/);
+      const currentValue = logcountMatch ? parseInt(logcountMatch[1]) : 0;
+
+      if (orderType === 'desc') {
+        expect(currentValue).toBeLessThanOrEqual(previousValue);
+      } else {
+        expect(currentValue).toBeGreaterThanOrEqual(previousValue);
+      }
+      previousValue = currentValue;
+    } catch (error) {
+      console.error('Error parsing cell content:', sourceCell);
+      throw error;
+    }
+  }
+
+  // Verify we have results
+  expect(rows.length).toBeGreaterThan(0);
+}
+
+async verifyLogCountOrderingDescending() {
+  await this.verifyLogCountOrdering('desc');
+}
+
+  async verifyLogCountOrderingAscending() {
+    await this.verifyLogCountOrdering('asc');
+  }
+
+  // String match ignore case methods
+  async searchWithStringMatchIgnoreCase(searchText) {
+    await this.page.locator(this.logsSearchBarQueryEditor).click();
+    await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await this.page.keyboard.press("Backspace");
+    await this.page.keyboard.type(`str_match_ignore_case('${searchText}')`);
+    await this.page.locator(this.searchBarRefreshButton).click();
+    await this.page.waitForTimeout(3000);
+    await expect(this.page.locator(this.logTableColumnSource)).toBeVisible();
+  }
+
+  async setDateTimeTo15Minutes() {
+    await this.page.locator(this.dateTimeButton).click();
+    await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click();
+  }
 }

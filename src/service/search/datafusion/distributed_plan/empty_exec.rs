@@ -149,38 +149,34 @@ impl NewEmptyExec {
 }
 
 impl DisplayAs for NewEmptyExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                let name = format!("name={:?}", self.name);
-                let projection = format!(
-                    ", projection={:?}",
-                    self.schema
-                        .fields()
-                        .iter()
-                        .map(|f| f.name())
-                        .collect::<Vec<_>>()
-                );
-                let filters = format!(
-                    ", filters={:?}",
-                    self.filters
-                        .iter()
-                        .map(|f| f.to_string())
-                        .collect::<Vec<_>>()
-                );
-                let limit = self
-                    .limit
-                    .map_or_else(|| "".to_string(), |l| format!(", limit={l}"));
-                let sorted_by_time = if self.sorted_by_time {
-                    ", sorted_by_time=true"
-                } else {
-                    ""
-                };
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let name = format!("name={:?}", self.name);
+        let projection = format!(
+            ", projection={:?}",
+            self.schema
+                .fields()
+                .iter()
+                .map(|f| f.name())
+                .collect::<Vec<_>>()
+        );
+        let filters = format!(
+            ", filters={:?}",
+            self.filters
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<_>>()
+        );
+        let limit = self
+            .limit
+            .map_or_else(|| "".to_string(), |l| format!(", limit={l}"));
+        let sorted_by_time = if self.sorted_by_time {
+            ", sorted_by_time=true"
+        } else {
+            ""
+        };
 
-                write!(f, "NewEmptyExec: ")?;
-                write!(f, "{name}{projection}{filters}{limit}{sorted_by_time}",)
-            }
-        }
+        write!(f, "NewEmptyExec: ")?;
+        write!(f, "{name}{projection}{filters}{limit}{sorted_by_time}",)
     }
 }
 

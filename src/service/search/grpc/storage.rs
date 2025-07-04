@@ -400,7 +400,6 @@ pub async fn search(
                 .build()
         )
     );
-
     Ok((tables, scan_stats))
 }
 
@@ -901,7 +900,7 @@ pub async fn get_tantivy_directory(
     let source = object_store::ObjectMeta {
         location: file_name.into(),
         last_modified: *BASE_TIME,
-        size: file_size as usize,
+        size: file_size as u64,
         e_tag: None,
         version: None,
     };

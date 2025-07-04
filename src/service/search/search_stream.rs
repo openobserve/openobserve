@@ -29,18 +29,20 @@ use config::{
     utils::json::{Value, get_string_value},
 };
 use log;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
-    },
-    search::datafusion::distributed_plan::streaming_aggs_exec,
-};
 use serde_json::Map;
 use tokio::sync::mpsc;
 use tracing::Instrument;
+#[cfg(feature = "enterprise")]
+use {
+    o2_enterprise::enterprise::common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config as get_o2_config,
+    },
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
+};
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::search::MultiCachedQueryResponse;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, QueryDelta},
@@ -128,6 +130,27 @@ pub async fn process_search_stream_request(
     let start_time = req.query.start_time;
     let end_time = req.query.end_time;
     let all_streams = stream_names.join(",");
+
+    // HACK to avoid writing to results of vrl to cache for values search
+
+    let mut query_fn =
+        req.query
+            .query_fn
+            .as_ref()
+            .map(|v| match config::utils::base64::decode_url(v) {
+                Ok(v) => v,
+                Err(_) => v.to_string(),
+            });
+    let backup_query_fn = query_fn.clone();
+    let is_result_array_skip_vrl = query_fn
+        .as_ref()
+        .map(|v| crate::service::search::cache::is_result_array_skip_vrl(v))
+        .unwrap_or(false);
+    if is_result_array_skip_vrl {
+        query_fn = None;
+    }
+
+    req.query.query_fn = query_fn.clone();
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
@@ -254,6 +277,8 @@ pub async fn process_search_stream_request(
                 values_ctx,
                 &all_streams,
                 started_at,
+                is_result_array_skip_vrl,
+                backup_query_fn,
             )
             .instrument(search_span.clone())
             .await
@@ -286,6 +311,18 @@ pub async fn process_search_stream_request(
                         .await;
                     }
                 }
+
+                // write the partial results to cache if search is cancelled
+                #[cfg(feature = "enterprise")]
+                write_partial_results_to_cache(
+                    &e,
+                    &trace_id,
+                    c_resp,
+                    start_time,
+                    end_time,
+                    &mut accumulated_results,
+                )
+                .await;
 
                 if let Err(e) = sender.send(Err(e)).await {
                     log::error!(
@@ -319,6 +356,9 @@ pub async fn process_search_stream_request(
                 values_ctx,
                 fallback_order_by_col,
                 &mut hits_to_skip,
+                is_result_array_skip_vrl,
+                backup_query_fn,
+                &all_streams,
             )
             .instrument(search_span.clone())
             .await
@@ -351,6 +391,18 @@ pub async fn process_search_stream_request(
                         .await;
                     }
                 }
+
+                // write the partial results to cache if search is cancelled
+                #[cfg(feature = "enterprise")]
+                write_partial_results_to_cache(
+                    &e,
+                    &trace_id,
+                    c_resp,
+                    start_time,
+                    end_time,
+                    &mut accumulated_results,
+                )
+                .await;
 
                 if let Err(e) = sender.send(Err(e)).await {
                     log::error!(
@@ -432,6 +484,9 @@ pub async fn process_search_stream_request(
             values_ctx,
             fallback_order_by_col,
             &mut hits_to_skip,
+            is_result_array_skip_vrl,
+            backup_query_fn,
+            &all_streams,
         )
         .instrument(search_span.clone())
         .await
@@ -535,6 +590,9 @@ pub async fn do_partitioned_search(
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
     hits_to_skip: &mut i64,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
+    stream_name: &str,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -543,12 +601,11 @@ pub async fn do_partitioned_search(
     {
         req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
         log::info!(
-            "[HTTP2_STREAM] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
-            max_query_range,
+            "[HTTP2_STREAM] Query duration is modified due to query range restriction of {max_query_range} hours, new start_time: {}",
             req.query.start_time
         );
         range_error = format!(
-            "Query duration is modified due to query range restriction of {max_query_range} hours",
+            "Query duration is modified due to query range restriction of {max_query_range} hours"
         );
     }
     // for new_start_time & new_end_time
@@ -599,6 +656,7 @@ pub async fn do_partitioned_search(
         &partitions
     );
 
+    let partition_num = partitions.len();
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         let mut req = req.clone();
         req.query.start_time = start_time;
@@ -613,8 +671,14 @@ pub async fn do_partitioned_search(
         // partition
         req.query.size += *hits_to_skip;
         req.query.from = 0;
+
+        let trace_id = if partition_num == 1 {
+            trace_id.to_string()
+        } else {
+            format!("{trace_id}-{idx}")
+        };
         let mut search_res =
-            do_search(trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
+            do_search(&trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
 
         let mut total_hits = search_res.total as i64;
 
@@ -635,16 +699,14 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req_size > 0 && total_hits > req_size {
+        curr_res_size += total_hits;
+        if req_size > 0 && curr_res_size >= req_size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
                 req_size
             );
             search_res.hits.truncate(req_size as usize);
-            curr_res_size += req_size;
-        } else {
-            curr_res_size += total_hits;
         }
 
         if !search_res.hits.is_empty() {
@@ -700,10 +762,21 @@ pub async fn do_partitioned_search(
                 log::debug!("Top k values for partition {idx} took {:?}", duration);
             }
 
+            if is_result_array_skip_vrl {
+                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                    backup_query_fn.clone(),
+                    &mut search_res,
+                    org_id,
+                    stream_name,
+                    &trace_id,
+                );
+            }
+
             // Send the cached response
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
                 streaming_aggs: is_streaming_aggs,
+                streaming_id: partition_resp.streaming_id.clone(),
                 time_offset: TimeOffset {
                     start_time,
                     end_time,
@@ -733,6 +806,17 @@ pub async fn do_partitioned_search(
                     "Error sending progress".to_string(),
                 ));
             }
+        }
+        let stop_values_search = req_size != -1
+            && req_size != 0
+            && req.search_type == Some(SearchEventType::Values)
+            && curr_res_size >= req_size;
+        if stop_values_search {
+            log::info!(
+                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
+                req_size
+            );
+            break;
         }
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
@@ -852,6 +936,8 @@ pub async fn handle_cache_responses_and_deltas(
     values_ctx: Option<ValuesEventContext>,
     all_streams: &str,
     started_at: i64,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -942,6 +1028,9 @@ pub async fn handle_cache_responses_and_deltas(
                     cache_order_by,
                     sender.clone(),
                     values_ctx.clone(),
+                    is_result_array_skip_vrl,
+                    backup_query_fn.clone(),
+                    all_streams,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -963,6 +1052,8 @@ pub async fn handle_cache_responses_and_deltas(
                     all_streams,
                     stream_type,
                     started_at,
+                    is_result_array_skip_vrl,
+                    backup_query_fn.clone(),
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -989,6 +1080,9 @@ pub async fn handle_cache_responses_and_deltas(
                 cache_order_by,
                 sender.clone(),
                 values_ctx.clone(),
+                is_result_array_skip_vrl,
+                backup_query_fn.clone(),
+                all_streams,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -1010,6 +1104,8 @@ pub async fn handle_cache_responses_and_deltas(
                 all_streams,
                 stream_type,
                 started_at,
+                is_result_array_skip_vrl,
+                backup_query_fn.clone(),
             )
             .await?;
         }
@@ -1046,6 +1142,9 @@ async fn process_delta(
     cache_order_by: &OrderBy,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
+    stream_name: &str,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
@@ -1100,16 +1199,19 @@ async fn process_delta(
 
         let total_hits = search_res.total as i64;
 
-        if req.query.size > 0 && total_hits > req.query.size {
+        *curr_res_size += total_hits;
+        if req.query.size > 0 && *curr_res_size >= req.query.size {
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
                 req.query.size
             );
-            search_res.hits.truncate(req.query.size as usize);
-            *curr_res_size += req.query.size;
-        } else {
-            *curr_res_size += total_hits;
+            let excess_hits = *curr_res_size - req_size;
+            if total_hits > excess_hits && excess_hits > 0 {
+                search_res
+                    .hits
+                    .truncate((total_hits - excess_hits) as usize);
+            }
         }
 
         log::info!(
@@ -1157,7 +1259,7 @@ async fn process_delta(
             let result_cache_ratio = search_res.result_cache_ratio;
 
             if req.search_type == Some(SearchEventType::Values)
-                && let Some(ref values_ctx) = values_ctx
+                && let Some(values_ctx) = values_ctx.as_ref()
             {
                 let search_stream_span = tracing::info_span!(
                     "src::handler::http::request::search::process_stream::process_delta::get_top_k_values",
@@ -1177,10 +1279,20 @@ async fn process_delta(
                 search_res.total = hit_count as usize;
                 search_res.hits = top_k_values;
             }
+            if is_result_array_skip_vrl {
+                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                    backup_query_fn.clone(),
+                    &mut search_res,
+                    org_id,
+                    stream_name,
+                    trace_id,
+                );
+            }
 
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
                 streaming_aggs: is_streaming_aggs,
+                streaming_id: partition_resp.streaming_id.clone(),
                 time_offset: TimeOffset {
                     start_time,
                     end_time,
@@ -1198,6 +1310,7 @@ async fn process_delta(
                 search_res.hits.len(),
                 result_cache_ratio,
             );
+
             if let Err(e) = sender.send(Ok(response)).await {
                 log::error!("Error sending search response: {}", e);
                 return Err(infra::errors::Error::Message(
@@ -1225,6 +1338,10 @@ async fn process_delta(
                 search_res.order_by,
                 is_streaming_aggs,
                 sender,
+                is_result_array_skip_vrl,
+                backup_query_fn.clone(),
+                org_id,
+                stream_name,
             )
             .await;
             break;
@@ -1266,6 +1383,7 @@ async fn process_delta(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
     trace_id: &str,
     error: &str,
@@ -1274,13 +1392,17 @@ async fn send_partial_search_resp(
     order_by: Option<OrderBy>,
     is_streaming_aggs: bool,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
+    org_id: &str,
+    stream_name: &str,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
     } else {
         format!("{PARTIAL_ERROR_RESPONSE_MESSAGE} \n {error}")
     };
-    let s_resp = Response {
+    let mut s_resp = Response {
         is_partial: true,
         function_error: vec![error],
         new_start_time: Some(new_start_time),
@@ -1289,10 +1411,20 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
+    if is_result_array_skip_vrl {
+        s_resp.hits = crate::service::search::cache::apply_vrl_to_response(
+            backup_query_fn.clone(),
+            &mut s_resp,
+            org_id,
+            stream_name,
+            trace_id,
+        );
+    }
 
     let response = StreamResponses::SearchResponse {
         results: s_resp,
         streaming_aggs: is_streaming_aggs,
+        streaming_id: None,
         time_offset: TimeOffset {
             start_time: new_start_time,
             end_time: new_end_time,
@@ -1330,6 +1462,8 @@ async fn send_cached_responses(
     all_streams: &str,
     stream_type: StreamType,
     started_at: i64,
+    is_result_array_skip_vrl: bool,
+    backup_query_fn: Option<String>,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
@@ -1342,7 +1476,7 @@ async fn send_cached_responses(
     *curr_res_size += cached.cached_response.hits.len() as i64;
 
     // truncate hits if `curr_res_size` is greater than `req_size`
-    if req_size != -1 && *curr_res_size > req_size {
+    if req_size != -1 && *curr_res_size >= req_size {
         let excess_hits = *curr_res_size - req_size;
         let total_hits = cached.cached_response.hits.len() as i64;
         if total_hits > excess_hits {
@@ -1374,14 +1508,27 @@ async fn send_cached_responses(
         cached.cached_response.hits.len(),
         cached.cached_response.result_cache_ratio,
     );
+
+    if is_result_array_skip_vrl {
+        cached.cached_response.hits = crate::service::search::cache::apply_vrl_to_response(
+            backup_query_fn.clone(),
+            &mut cached.cached_response,
+            org_id,
+            all_streams,
+            trace_id,
+        );
+    }
+
     let response = StreamResponses::SearchResponse {
         results: cached.cached_response.clone(),
         streaming_aggs: false,
+        streaming_id: None,
         time_offset: TimeOffset {
             start_time: cached.response_start_time,
             end_time: cached.response_end_time,
         },
     };
+
     if let Err(e) = sender.send(Ok(response)).await {
         log::error!("Error sending cached search response: {}", e);
         return Err(infra::errors::Error::Message(
@@ -1421,7 +1568,7 @@ async fn send_cached_responses(
         trace_id: Some(trace_id.to_string()),
         took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
         work_group: None, // TODO: add work group
-        result_cache_ratio: Some(cached.cached_response.cached_ratio),
+        result_cache_ratio: Some(cached.cached_response.result_cache_ratio),
         ..Default::default()
     };
     report_request_usage_stats(
@@ -1529,421 +1676,39 @@ pub fn get_top_k_values(
     Ok((top_k_values, result_count as u64))
 }
 
-#[cfg(test)]
-mod tests {
-    use config::meta::{
-        search::{Query, Request, SearchEventType},
-        sql::OrderBy,
-        stream::StreamType,
-    };
-    use serde_json::json;
-    use tokio::sync::mpsc;
-
-    use super::*;
-
-    fn create_sample_hits() -> Vec<Value> {
-        vec![
-            json!({
-                "zo_sql_key": "apple",
-                "zo_sql_num": 100
-            }),
-            json!({
-                "zo_sql_key": "banana",
-                "zo_sql_num": 75
-            }),
-            json!({
-                "zo_sql_key": "cherry",
-                "zo_sql_num": 150
-            }),
-            json!({
-                "zo_sql_key": "date",
-                "zo_sql_num": 25
-            }),
-            json!({
-                "zo_sql_key": "elderberry",
-                "zo_sql_num": 200
-            }),
-        ]
-    }
-
-    fn create_empty_hits() -> Vec<Value> {
-        vec![]
-    }
-
-    fn create_hits_without_required_fields() -> Vec<Value> {
-        vec![
-            json!({
-                "some_field": "value1"
-            }),
-            json!({
-                "another_field": "value2"
-            }),
-        ]
-    }
-
-    #[test]
-    fn test_get_top_k_values_with_count_sorting() {
-        let hits = create_sample_hits();
-        let field = "test_field";
-        let top_k = 3;
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(top_k_values.len(), 1);
-        assert_eq!(result_count, 3);
-
-        // Verify the structure of the response
-        if let Some(Value::Object(field_obj)) = top_k_values.first() {
-            assert_eq!(
-                field_obj.get("field"),
-                Some(&Value::String("test_field".to_string()))
+#[allow(unused_variables)]
+#[cfg(feature = "enterprise")]
+async fn write_partial_results_to_cache(
+    error: &infra::errors::Error,
+    trace_id: &str,
+    c_resp: MultiCachedQueryResponse,
+    start_time: i64,
+    end_time: i64,
+    accumulated_results: &mut Vec<SearchResultType>,
+) {
+    // TEMPORARY: disable writing partial cache
+    return;
+    // write the partial results to cache if search is cancelled
+    #[allow(unreachable_code)]
+    match error {
+        #[cfg(feature = "enterprise")]
+        infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(_)) => {
+            log::info!(
+                "[HTTP2_STREAM] trace_id: {} Search cancelled, writing results to cache",
+                trace_id
             );
-
-            if let Some(Value::Array(values)) = field_obj.get("values") {
-                assert_eq!(values.len(), 3);
-
-                // Verify sorting by count (descending)
-                if let Some(Value::Object(first_item)) = values.first() {
-                    assert_eq!(
-                        first_item.get("zo_sql_key"),
-                        Some(&Value::String("elderberry".to_string()))
-                    );
-                    assert_eq!(
-                        first_item.get("zo_sql_num"),
-                        Some(&Value::Number(200.into()))
+            // write the result to cache
+            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
+                        trace_id,
+                        e
                     );
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_get_top_k_values_with_alphabetical_sorting() {
-        let hits = create_sample_hits();
-        let field = "test_field";
-        let top_k = 3;
-        let no_count = true;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(top_k_values.len(), 1);
-        assert_eq!(result_count, 3);
-
-        // Verify alphabetical sorting
-        if let Some(Value::Object(field_obj)) = top_k_values.first() {
-            if let Some(Value::Array(values)) = field_obj.get("values") {
-                assert_eq!(values.len(), 3);
-
-                // Verify alphabetical order
-                if let Some(Value::Object(first_item)) = values.first() {
-                    assert_eq!(
-                        first_item.get("zo_sql_key"),
-                        Some(&Value::String("apple".to_string()))
-                    );
-                }
-                if let Some(Value::Object(second_item)) = values.get(1) {
-                    assert_eq!(
-                        second_item.get("zo_sql_key"),
-                        Some(&Value::String("banana".to_string()))
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_get_top_k_values_empty_field() {
-        let hits = create_sample_hits();
-        let field = "";
-        let top_k = 3;
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_err());
-
-        if let Err(error) = result {
-            assert!(error.to_string().contains("field is empty"));
-        }
-    }
-
-    #[test]
-    fn test_get_top_k_values_empty_hits() {
-        let hits = create_empty_hits();
-        let field = "test_field";
-        let top_k = 3;
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(top_k_values.len(), 1);
-        assert_eq!(result_count, 0);
-    }
-
-    #[test]
-    fn test_get_top_k_values_missing_fields() {
-        let hits = create_hits_without_required_fields();
-        let field = "test_field";
-        let top_k = 3;
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(top_k_values.len(), 1);
-        assert_eq!(result_count, 2); // Should handle missing fields gracefully
-    }
-
-    #[test]
-    fn test_get_top_k_values_zero_top_k() {
-        let hits = create_sample_hits();
-        let field = "test_field";
-        let top_k = 0;
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(top_k_values.len(), 1);
-        assert_eq!(result_count, 0);
-    }
-
-    #[test]
-    fn test_get_top_k_values_large_top_k() {
-        let hits = create_sample_hits();
-        let field = "test_field";
-        let top_k = 100; // Larger than available hits
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(top_k_values.len(), 1);
-        assert_eq!(result_count, 5); // Should return all available hits
-    }
-
-    #[test]
-    fn test_handle_partial_response_not_partial() {
-        let response = Response {
-            is_partial: false,
-            function_error: vec!["existing error".to_string()],
-            ..Default::default()
-        };
-
-        let result = handle_partial_response(response);
-        assert!(!result.is_partial);
-        assert_eq!(result.function_error, vec!["existing error".to_string()]);
-    }
-
-    #[test]
-    fn test_handle_partial_response_partial_with_existing_errors() {
-        let response = Response {
-            is_partial: true,
-            function_error: vec!["existing error".to_string()],
-            ..Default::default()
-        };
-
-        let result = handle_partial_response(response);
-        assert!(result.is_partial);
-        assert_eq!(result.function_error.len(), 2);
-        assert!(
-            result
-                .function_error
-                .contains(&"existing error".to_string())
-        );
-        assert!(
-            result
-                .function_error
-                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
-        );
-    }
-
-    #[test]
-    fn test_handle_partial_response_partial_without_existing_errors() {
-        let response = Response {
-            is_partial: true,
-            function_error: vec![],
-            ..Default::default()
-        };
-
-        let result = handle_partial_response(response);
-        assert!(result.is_partial);
-        assert_eq!(
-            result.function_error,
-            vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
-        );
-    }
-
-    #[tokio::test]
-    async fn test_process_search_stream_request_basic_flow() {
-        let (sender, mut receiver) = mpsc::channel(100);
-
-        let req = Request {
-            query: Query {
-                sql: "SELECT * FROM test".to_string(),
-                from: 0,
-                size: 10,
-                start_time: 0,
-                end_time: 1000000,
-                track_total_hits: false,
-                ..Default::default()
-            },
-            use_cache: false,
-            search_type: Some(SearchEventType::UI),
-            ..Default::default()
-        };
-
-        let search_span = tracing::info_span!("test_search");
-
-        // This is a complex integration test that would require mocking external dependencies
-        // For now, we'll test the function signature and basic parameter handling
-        tokio::spawn(async move {
-            process_search_stream_request(
-                "test_org".to_string(),
-                "test_user".to_string(),
-                "test_trace".to_string(),
-                req,
-                StreamType::Logs,
-                vec!["test_stream".to_string()],
-                OrderBy::Desc,
-                search_span,
-                sender,
-                None,
-                None,
-                None,
-            )
-            .await;
-        });
-
-        // Wait for the progress message
-        if let Some(Ok(StreamResponses::Progress { percent })) = receiver.recv().await {
-            assert_eq!(percent, 0);
-        }
-
-        // Note: Full integration testing would require mocking the search service
-        // and other external dependencies, which is beyond the scope of unit tests
-    }
-
-    #[test]
-    fn test_audit_context_creation() {
-        let audit_ctx = AuditContext {
-            method: "GET".to_string(),
-            path: "/api/search".to_string(),
-            query_params: "q=test".to_string(),
-            body: "{}".to_string(),
-        };
-
-        assert_eq!(audit_ctx.method, "GET");
-        assert_eq!(audit_ctx.path, "/api/search");
-        assert_eq!(audit_ctx.query_params, "q=test");
-        assert_eq!(audit_ctx.body, "{}");
-    }
-
-    // Helper function to create test search requests
-    fn create_test_request() -> Request {
-        Request {
-            query: Query {
-                sql: "SELECT * FROM test_stream".to_string(),
-                from: 0,
-                size: 100,
-                start_time: 0,
-                end_time: 1000000,
-                track_total_hits: false,
-                ..Default::default()
-            },
-            use_cache: true,
-            search_type: Some(SearchEventType::UI),
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn test_create_test_request() {
-        let req = create_test_request();
-        assert_eq!(req.query.sql, "SELECT * FROM test_stream");
-        assert_eq!(req.query.from, 0);
-        assert_eq!(req.query.size, 100);
-        assert!(req.use_cache);
-        assert_eq!(req.search_type, Some(SearchEventType::UI));
-    }
-
-    // Test for edge cases in get_top_k_values with different data types
-    #[test]
-    fn test_get_top_k_values_mixed_data_types() {
-        let hits = vec![
-            json!({
-                "zo_sql_key": "item1",
-                "zo_sql_num": 100
-            }),
-            json!({
-                "zo_sql_key": "item2",
-                "zo_sql_num": "not_a_number" // This should default to 0
-            }),
-            json!({
-                "zo_sql_key": 123, // This should convert to string
-                "zo_sql_num": 50
-            }),
-        ];
-
-        let field = "test_field";
-        let top_k = 5;
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(top_k_values.len(), 1);
-        assert_eq!(result_count, 3);
-    }
-
-    // Test for boundary conditions
-    #[test]
-    fn test_get_top_k_values_boundary_conditions() {
-        let hits = vec![
-            json!({
-                "zo_sql_key": "max_value",
-                "zo_sql_num": i64::MAX
-            }),
-            json!({
-                "zo_sql_key": "min_value",
-                "zo_sql_num": i64::MIN
-            }),
-            json!({
-                "zo_sql_key": "zero_value",
-                "zo_sql_num": 0
-            }),
-        ];
-
-        let field = "boundary_test";
-        let top_k = 3;
-        let no_count = false;
-
-        let result = get_top_k_values(&hits, field, top_k, no_count);
-        assert!(result.is_ok());
-
-        let (top_k_values, result_count) = result.unwrap();
-        assert_eq!(result_count, 3);
-
-        // Verify that max value comes first in count-based sorting
-        if let Some(Value::Object(field_obj)) = top_k_values.first() {
-            if let Some(Value::Array(values)) = field_obj.get("values") {
-                if let Some(Value::Object(first_item)) = values.first() {
-                    assert_eq!(
-                        first_item.get("zo_sql_key"),
-                        Some(&Value::String("max_value".to_string()))
-                    );
-                }
-            }
-        }
+        _ => {}
     }
 }

@@ -28,7 +28,7 @@ use sqlparser::{
 
 use crate::TIMESTAMP_COL_NAME;
 
-pub const AGGREGATE_UDF_LIST: [&str; 16] = [
+pub const AGGREGATE_UDF_LIST: [&str; 18] = [
     "min",
     "max",
     "avg",
@@ -45,6 +45,8 @@ pub const AGGREGATE_UDF_LIST: [&str; 16] = [
     "approx_median",
     "approx_percentile_cont",
     "approx_percentile_cont_with_weight",
+    "approx_topk",
+    "approx_topk_distinct",
 ];
 
 pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
@@ -72,6 +74,7 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
         if has_subquery(statement) || has_window_functions(statement) {
             return Ok(false);
         }
+
         if let Statement::Query(query) = statement
             && (!is_aggregate_in_select(query)
                 || has_join(query)
@@ -137,14 +140,14 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
             is_aggregate_expression(left) || is_aggregate_expression(right)
         }
         Expr::Case {
+            operand,
             conditions,
-            results,
             else_result,
-            ..
         } => {
             // Check if any part of the CASE expression is an aggregate function
-            conditions.iter().any(is_aggregate_expression)
-                || results.iter().any(is_aggregate_expression)
+            conditions.iter().any(|c| {
+                is_aggregate_expression(&c.condition) || is_aggregate_expression(&c.result)
+            }) || operand.as_ref().is_some_and(|e| is_aggregate_expression(e))
                 || else_result
                     .as_ref()
                     .is_some_and(|e| is_aggregate_expression(e))

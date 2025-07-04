@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, onMounted, ref } from "vue";
+import { computed, onBeforeMount, onMounted, ref, onBeforeUnmount } from "vue";
 import { date as qDate } from "quasar";
 import {
   timestampToTimezoneDate,
@@ -104,6 +104,10 @@ const importMoment = async () => {
 onBeforeMount(async () => {
   await importMoment();
   getFormattedDate();
+});
+
+onBeforeUnmount(() => {
+  moment = null;
 });
 
 const formattedDate = ref({

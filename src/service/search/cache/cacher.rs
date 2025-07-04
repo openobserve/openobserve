@@ -24,6 +24,8 @@ use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
     meta::ResultCacheMeta,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
 use proto::cluster_rpc::SearchQuery;
 
 use crate::{
@@ -105,13 +107,16 @@ pub async fn check_cache(
 
     // skip the queries with no timestamp column
     let ts_result = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
+    let order_by = sql.order_by;
     let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
     if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
-        return MultiCachedQueryResponse::default();
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
     }
 
     // skip the count queries & queries first order by is not _timestamp field
-    let order_by = sql.order_by;
     if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
@@ -119,7 +124,10 @@ pub async fn check_cache(
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
     {
-        return MultiCachedQueryResponse::default();
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
     }
 
     // Hack select for _timestamp
@@ -259,6 +267,7 @@ pub async fn check_cache(
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
+        multi_resp.order_by = order_by;
         multi_resp
     } else {
         let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -344,6 +353,7 @@ pub async fn check_cache(
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.file_path = file_path.to_string();
+        multi_resp.order_by = order_by;
         multi_resp
     }
 }
@@ -646,10 +656,12 @@ pub fn get_ts_col_order_by(
 #[tracing::instrument]
 pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
+    // Part 1: delete the results cache
     let pattern = format!("{root_dir}/results/{path}");
     let prefix = format!("{root_dir}/");
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
+
     for file in files {
         match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
@@ -659,6 +671,27 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
             }
         }
     }
+
+    // Part 2: delete the aggregation cache
+    #[cfg(feature = "enterprise")]
+    let mut aggs_remove_files: Vec<String> = vec![];
+    #[cfg(feature = "enterprise")]
+    {
+        let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
+        let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
+        aggs_remove_files.extend(aggs_files);
+
+        for file in aggs_remove_files {
+            match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("Error deleting cache: {:?}", e);
+                    return Err(std::io::Error::other("Error deleting cache"));
+                }
+            }
+        }
+    }
+
     for file in remove_files {
         let columns = file
             .strip_prefix(&prefix)
@@ -693,13 +726,10 @@ fn handle_histogram(
             .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
             .collect::<Vec<&str>>();
 
-        match attrs.get(1) {
-            Some(v) => match v.parse::<u16>() {
-                Ok(v) => generate_histogram_interval(q_time_range, v),
-                Err(_) => v.to_string(),
-            },
-            None => generate_histogram_interval(q_time_range, 0),
-        }
+        attrs.get(1).map_or_else(
+            || generate_histogram_interval(q_time_range),
+            |v| v.to_string(),
+        )
     };
 
     *origin_sql = origin_sql.replace(

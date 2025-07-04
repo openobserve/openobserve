@@ -16,7 +16,6 @@
 use std::{ops::ControlFlow, sync::Arc};
 
 use arrow_schema::{DataType, Field, FieldRef};
-use chrono::Duration;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -27,7 +26,10 @@ use config::{
     },
     utils::sql::AGGREGATE_UDF_LIST,
 };
-use datafusion::{arrow::datatypes::Schema, common::TableReference};
+use datafusion::{
+    arrow::datatypes::Schema,
+    common::{TableReference, tree_node::TreeNode},
+};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
@@ -42,12 +44,14 @@ use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
-        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
-        VisitMut, VisitorMut, helpers::attached_token::AttachedToken,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, ObjectNamePart,
+        OrderByExpr, OrderByKind, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement,
+        TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
+        helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
+    tokenizer::Span,
 };
 
 #[cfg(feature = "enterprise")]
@@ -59,9 +63,13 @@ use super::{
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 use crate::service::search::{
-    datafusion::udf::{
-        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-        STR_MATCH_UDF_NAME,
+    cluster::flight::{generate_context, register_table},
+    datafusion::{
+        distributed_plan::rewrite::GroupByFieldVisitor,
+        udf::{
+            MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+            STR_MATCH_UDF_NAME,
+        },
     },
     index::get_arg_name,
 };
@@ -121,12 +129,12 @@ impl Sql {
         let sql =
             config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
         // 1. get table name
-        let stream_names =
-            resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
+        let stream_names = resolve_stream_names_with_type(&sql)
+            .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
         if stream_names.len() > 1 && stream_names.iter().any(|s| s.schema() == Some("index")) {
-            return Err(Error::Message(
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Index stream is not supported in multi-stream query".to_string(),
-            ));
+            )));
         }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
@@ -139,7 +147,7 @@ impl Sql {
         }
 
         let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
-            .map_err(|e| Error::Message(e.to_string()))?
+            .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
             .unwrap();
 
@@ -205,10 +213,10 @@ impl Sql {
                 .into_iter()
                 .all(|field| !schema.contains_field(&field))
             {
-                return Err(Error::Message(
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                     "Using match_all() function in a stream that don't have full text search field"
                         .to_string(),
-                ));
+                )));
             }
         }
 
@@ -282,12 +290,14 @@ impl Sql {
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
         }
+
         // use all condition for histogram without filter
         if use_inverted_index && can_optimize && index_condition.is_none() {
             index_condition = Some(IndexCondition {
                 conditions: vec![Condition::All()],
             });
         }
+
         //********************Change the sql here*********************************//
 
         // 13. check `select * from table where match_all()` optimizer
@@ -735,15 +745,17 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut() {
-            for order in order_by.exprs.iter_mut() {
+        if let Some(order_by) = query.order_by.as_mut()
+            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
+        {
+            for order in exprs.iter_mut() {
                 let mut name_visitor = FieldNameVisitor::new();
                 let _ = order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
                     self.order_by.push((
                         expr_name,
-                        if order.asc.unwrap_or(true) {
+                        if order.options.asc.unwrap_or(true) {
                             OrderBy::Asc
                         } else {
                             OrderBy::Desc
@@ -808,13 +820,16 @@ impl VisitorMut for ColumnVisitor<'_> {
                 }
             }
         }
-        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref()
+        if let Some(limit) = query.limit.as_ref()
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
+            && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
         {
             self.limit = Some(num);
         }
         if let Some(offset) = query.offset.as_ref()
-            && let Expr::Value(Value::Number(n, _)) = &offset.value
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
+            && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
         {
             self.offset = Some(num);
@@ -1490,19 +1505,20 @@ impl VisitorMut for HistogramIntervalVisitor {
                 let _ = args.next();
                 // second is interval
                 let interval = if let Some(interval) = args.next() {
-                    let interval = interval
+                    interval
                         .to_string()
                         .trim_matches(|v| v == '\'' || v == '"')
-                        .to_string();
-                    match interval.parse::<u16>() {
-                        Ok(v) => generate_histogram_interval(self.time_range, v),
-                        Err(_) => interval,
-                    }
+                        .to_string()
                 } else {
-                    generate_histogram_interval(self.time_range, 0)
+                    generate_histogram_interval(self.time_range)
                 };
-                self.interval =
-                    Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
+                self.interval = match convert_histogram_interval_to_seconds(&interval) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        log::error!("{e:?}");
+                        Some(0)
+                    }
+                };
             }
             return ControlFlow::Break(());
         }
@@ -1545,7 +1561,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 select.sort_by = vec![];
                 select.projection = vec![SelectItem::ExprWithAlias {
                     expr: Expr::Function(Function {
-                        name: ObjectName(vec![Ident::new("count")]),
+                        name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                         parameters: FunctionArguments::None,
                         args: FunctionArguments::List(FunctionArgumentList {
                             args: vec![FunctionArg::Unnamed(field_expr)],
@@ -1571,7 +1587,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     top_before_distinct: false,
                     projection: vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
-                            name: ObjectName(vec![Ident::new("count")]),
+                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                             parameters: FunctionArguments::None,
                             args: FunctionArguments::List(FunctionArgumentList {
                                 args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
@@ -1608,6 +1624,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     window_before_qualify: false,
                     connect_by: None,
                     value_table_mode: None,
+                    flavor: SelectFlavor::Standard,
                 })));
                 *query = Query {
                     with: None,
@@ -1693,41 +1710,39 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
     }
 }
 
-pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
+/// Utility macro to generate microsecond-duration pairs concisely
+macro_rules! intervals {
+    ($(($unit:tt, $amount:expr, $label:expr)),+ $(,)?) => {
+        [
+            $((intervals!(@unit $unit)($amount).num_microseconds().unwrap(), $label)),+
+        ]
+    };
+
+    (@unit h) => { chrono::Duration::hours };
+    (@unit m) => { chrono::Duration::minutes };
+}
+
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
     }
-    let time_range = time_range.unwrap();
-    if num > 0 {
-        return format!(
-            "{} second",
-            std::cmp::max(
-                (time_range.1 - time_range.0)
-                    / Duration::try_seconds(1)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-                    / num as i64,
-                1
-            )
-        );
-    }
+    let duration = time_range.map(|r| r.1 - r.0).unwrap();
 
-    let intervals = [
-        (Duration::try_hours(24 * 60), "1 day"),
-        (Duration::try_hours(24 * 30), "12 hour"),
-        (Duration::try_hours(24 * 28), "6 hour"),
-        (Duration::try_hours(24 * 21), "3 hour"),
-        (Duration::try_hours(24 * 15), "2 hour"),
-        (Duration::try_hours(6), "1 hour"),
-        (Duration::try_hours(2), "1 minute"),
-        (Duration::try_hours(1), "30 second"),
-        (Duration::try_minutes(30), "15 second"),
-        (Duration::try_minutes(15), "10 second"),
+    const INTERVALS: [(i64, &str); 10] = intervals![
+        (h, 24 * 60, "1 day"),
+        (h, 24 * 30, "12 hour"),
+        (h, 24 * 28, "6 hour"),
+        (h, 24 * 21, "3 hour"),
+        (h, 24 * 15, "2 hour"),
+        (h, 6, "1 hour"),
+        (h, 2, "1 minute"),
+        (h, 1, "30 second"),
+        (m, 30, "15 second"),
+        (m, 15, "10 second"),
     ];
-    for (time, interval) in intervals.iter() {
-        let time = time.unwrap().num_microseconds().unwrap();
-        if (time_range.1 - time_range.0) >= time {
+
+    for (time, interval) in INTERVALS.iter() {
+        if duration >= *time {
             return interval.to_string();
         }
     }
@@ -1739,7 +1754,7 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
     let (num, unit) = interval
         .find(|c: char| !c.is_numeric())
         .map(|pos| interval.split_at(pos))
-        .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
+        .ok_or_else(|| Error::Message(format!("Invalid interval format: '{interval}'")))?;
 
     let seconds = match unit.trim().to_lowercase().as_str() {
         "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
@@ -1747,12 +1762,16 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
         "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
         "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
         _ => {
-            return Err(Error::Message(
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Unsupported histogram interval unit".to_string(),
-            ));
+            )));
         }
     };
-    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
+    seconds.map_err(|_| {
+        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "Invalid number format".to_string(),
+        ))
+    })
 }
 
 pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
@@ -1831,6 +1850,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 return ControlFlow::Continue(());
             }
             let fname = names.first().unwrap();
+            let fname = fname.as_ident().unwrap();
             if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
                 let list = match args {
                     FunctionArguments::List(list) => list,
@@ -1853,9 +1873,10 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                     FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
-                    FunctionArgExpr::Expr(Expr::Value(
-                        sqlparser::ast::Value::SingleQuotedString(s),
-                    )) => {
+                    FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
+                        value: Value::SingleQuotedString(s),
+                        span: _,
+                    })) => {
                         self.keys.push(s.to_owned());
                     }
                     _ => {
@@ -1918,12 +1939,14 @@ impl VisitorMut for AddOrderingTermVisitor {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if query.order_by.is_none() {
             query.order_by = Some(sqlparser::ast::OrderBy {
-                exprs: vec![OrderByExpr {
+                kind: OrderByKind::Expressions(vec![OrderByExpr {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
-                    asc: Some(self.is_asc),
-                    nulls_first: None,
                     with_fill: None,
-                }],
+                    options: sqlparser::ast::OrderByOptions {
+                        asc: Some(self.is_asc),
+                        nulls_first: None,
+                    },
+                }]),
                 interpolate: None,
             });
         }
@@ -1972,7 +1995,10 @@ impl AddNewFiltersWithAndOperatorVisitor {
             exprs.push(Expr::BinaryOp {
                 left: Box::new(Expr::Identifier(Ident::new(key.to_string()))),
                 op: BinaryOperator::Eq,
-                right: Box::new(Expr::Value(Value::SingleQuotedString(value.to_string()))),
+                right: Box::new(Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(value.to_string()),
+                    span: Span::empty(),
+                })),
             });
         }
         let exprs = exprs.iter().collect();
@@ -2044,14 +2070,10 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                     | BinaryOperator::Lt,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref()
-                    && *value == placeholder
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
                 {
-                    *expr = Expr::Value(Value::Boolean(true));
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(true));
+                    *expr = expr_boolean(true);
                 }
             }
             // Not equal
@@ -2060,14 +2082,10 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 op: BinaryOperator::NotEq,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref()
-                    && *value == placeholder
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
                 {
-                    *expr = Expr::Value(Value::Boolean(false));
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(false));
+                    *expr = expr_boolean(false);
                 }
             }
             // Like
@@ -2081,10 +2099,8 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: false,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(true));
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(true);
                 }
             }
             // Not Like
@@ -2098,19 +2114,15 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: true,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref()
-                    && *value == placeholder
-                {
-                    *expr = Expr::Value(Value::Boolean(false));
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(false);
                 }
             }
             // In list
             Expr::InList { list, negated, .. } if !(*negated) => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item
-                        && *value == placeholder
-                    {
-                        *expr = Expr::Value(Value::Boolean(true));
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(true);
                         break;
                     }
                 }
@@ -2118,10 +2130,8 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             // Not in list
             Expr::InList { list, negated, .. } if *negated => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item
-                        && *value == placeholder
-                    {
-                        *expr = Expr::Value(Value::Boolean(false));
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(false);
                         break;
                     }
                 }
@@ -2137,13 +2147,51 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 {
                     let value = trim_quotes(list.args[1].to_string().as_str());
                     if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
+                        *expr = expr_boolean(true);
                     }
                 }
             }
             _ => {}
         }
         ControlFlow::Continue(())
+    }
+}
+
+// get group by fields from sql, if sql is not a single table query, return empty vector
+#[allow(dead_code)]
+pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
+    if sql.schemas.len() != 1 {
+        return Ok(vec![]);
+    }
+    let sql_arc = Arc::new(sql.clone());
+    let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
+    register_table(&ctx, &sql_arc).await?;
+    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+    // visit group by fields
+    let mut group_by_visitor = GroupByFieldVisitor::new();
+    physical_plan.visit(&mut group_by_visitor)?;
+    Ok(group_by_visitor.get_group_by_fields())
+}
+
+fn expr_boolean(value: bool) -> Expr {
+    Expr::Value(ValueWithSpan {
+        value: Value::Boolean(value),
+        span: Span::empty(),
+    })
+}
+
+fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
+    if let Expr::Value(ValueWithSpan {
+        value: Value::SingleQuotedString(value),
+        span: _,
+    }) = expr
+        && value == placeholder
+    {
+        true
+    } else {
+        false
     }
 }
 
@@ -3034,7 +3082,7 @@ mod tests {
     #[test]
     fn test_histogram_interval_visitor_with_zero_time_range() {
         // Test with zero time range
-        let sql = "SELECT histogram(_timestamp, 20) FROM logs";
+        let sql = "SELECT histogram(_timestamp) FROM logs";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
