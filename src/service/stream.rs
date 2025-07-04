@@ -205,15 +205,13 @@ pub fn stream_res(
 
     #[cfg(not(feature = "enterprise"))]
     let pattern_associations = vec![];
+    // because this fn cannot be async, we cannot await on initializing the pattern
+    // manager. So instead we do it in best-effort-way, where if it is already initialized,
+    // we get the patterns, otherwise report them as empty
     #[cfg(feature = "enterprise")]
-    let pattern_associations = {
-        loop {
-            let mgr = match PATTERN_MANAGER.get() {
-                Some(m) => m,
-                None => continue,
-            };
-            break mgr.get_associations(org_id, stream_type, stream_name);
-        }
+    let pattern_associations = match PATTERN_MANAGER.get() {
+        Some(m) => m.get_associations(org_id, stream_type, stream_name),
+        None => vec![],
     };
 
     Stream {
