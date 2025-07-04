@@ -23,7 +23,7 @@ use config::{
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
-        sql::resolve_stream_names,
+        sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
@@ -145,9 +145,12 @@ pub async fn search(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
+                let order_by = v.order_by;
+
                 MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
+                    order_by,
                     ..Default::default()
                 }
             }
@@ -191,6 +194,7 @@ pub async fn search(
             c_resp.limit,
             c_resp.is_descending,
             c_resp.took,
+            c_resp.order_by,
         )
     } else {
         if let Some(vrl_function) = &query_fn {
@@ -291,11 +295,18 @@ pub async fn search(
                 c_resp.limit,
                 c_resp.is_descending,
                 c_resp.took,
+                c_resp.order_by,
             )
         } else {
-            let mut reps = results[0].clone();
-            sort_response(c_resp.is_descending, &mut reps, &c_resp.ts_column);
-            reps
+            // let mut reps = results[0].clone();
+            // sort_response(
+            //     c_resp.is_descending,
+            //     &mut reps,
+            //     &c_resp.ts_column,
+            //     &c_resp.order_by,
+            // );
+            // reps
+            results[0].clone()
         }
     };
 
@@ -458,6 +469,7 @@ pub async fn search(
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
 #[tracing::instrument(name = "service:search:cache:merge_response", skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub fn merge_response(
     trace_id: &str,
     cache_responses: &mut Vec<config::meta::search::Response>,
@@ -466,6 +478,7 @@ pub fn merge_response(
     limit: i64,
     is_descending: bool,
     cache_took: usize,
+    order_by: Vec<(String, OrderBy)>,
 ) -> config::meta::search::Response {
     cache_responses.retain(|res| !res.hits.is_empty());
 
@@ -552,7 +565,7 @@ pub fn merge_response(
 
         cache_response.hits.extend(res.hits.clone());
     }
-    sort_response(is_descending, &mut cache_response, ts_column);
+    sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
     if cache_response.hits.len() > (limit as usize) {
         cache_response.hits.truncate(limit as usize);
@@ -581,16 +594,66 @@ pub fn merge_response(
     cache_response
 }
 
-fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_column: &str) {
-    if is_descending {
-        cache_response
-            .hits
-            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
-    } else {
-        cache_response
-            .hits
-            .sort_by_key(|a| get_ts_value(ts_column, a));
+fn sort_response(
+    _is_descending: bool,
+    cache_response: &mut search::Response,
+    ts_column: &str,
+    order_by: &Vec<(String, OrderBy)>,
+) {
+    if order_by.is_empty() {
+        return;
     }
+
+    cache_response.hits.sort_by(|a, b| {
+        for (field, order) in order_by {
+            let cmp = if ts_column == field {
+                let a_ts = get_ts_value(ts_column, a);
+                let b_ts = get_ts_value(ts_column, b);
+                a_ts.partial_cmp(&b_ts).unwrap_or(std::cmp::Ordering::Equal)
+            } else {
+                let a_val = a.get(field).unwrap_or(&serde_json::Value::Null);
+                let b_val = b.get(field).unwrap_or(&serde_json::Value::Null);
+
+                match (a_val, b_val) {
+                    (serde_json::Value::String(a_str), serde_json::Value::String(b_str)) => {
+                        a_str.cmp(b_str)
+                    }
+                    (serde_json::Value::Number(a_num), serde_json::Value::Number(b_num)) => {
+                        if let (Some(a_f64), Some(b_f64)) = (a_num.as_f64(), b_num.as_f64()) {
+                            a_f64
+                                .partial_cmp(&b_f64)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        } else {
+                            std::cmp::Ordering::Equal
+                        }
+                    }
+                    (serde_json::Value::String(_), serde_json::Value::Number(_)) => {
+                        std::cmp::Ordering::Less
+                    }
+                    (serde_json::Value::Number(_), serde_json::Value::String(_)) => {
+                        std::cmp::Ordering::Greater
+                    }
+                    _ => std::cmp::Ordering::Equal,
+                }
+            };
+
+            // Apply order direction
+            let final_cmp = if order == &OrderBy::Desc {
+                cmp.reverse()
+            } else {
+                cmp
+            };
+
+            // If this field comparison is not equal, return the result
+            // Otherwise, continue to the next field
+            if final_cmp != std::cmp::Ordering::Equal {
+                return final_cmp;
+            }
+        }
+
+        // If all fields are equal, maintain stable sort
+        std::cmp::Ordering::Equal
+    });
 }
 
 #[allow(clippy::too_many_arguments, unused_variables)]
