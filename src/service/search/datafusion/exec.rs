@@ -747,8 +747,8 @@ async fn get_cpu_and_mem_limit(
     mut target_partitions: usize,
     mut memory_size: usize,
 ) -> Result<(usize, usize)> {
-    if let Some(wg) = work_group
-        && let Ok(wg) = WorkGroup::from_str(&wg)
+    if let Some(wg) = work_group.as_ref()
+        && let Ok(wg) = WorkGroup::from_str(wg)
     {
         let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
             DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
@@ -759,7 +759,7 @@ async fn get_cpu_and_mem_limit(
         memory_size = memory_size * mem as usize / 100;
     }
     log::info!(
-        "[trace_id: {trace_id}] datafusion work_group: {wg}, target_partition: {target_partitions}, memory_size: {memory_size}"
+        "[trace_id: {trace_id}] datafusion work_group: {work_group:?}, target_partition: {target_partitions}, memory_size: {memory_size}",
     );
     Ok((target_partitions, memory_size))
 }

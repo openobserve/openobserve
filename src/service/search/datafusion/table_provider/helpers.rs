@@ -35,7 +35,7 @@
 use std::sync::Arc;
 
 use arrow_schema::{DataType, Schema, SchemaRef};
-use config::{INDEX_SEGMENT_LENGTH, PARQUET_MAX_ROW_GROUP_SIZE};
+use config::PARQUET_MAX_ROW_GROUP_SIZE;
 use datafusion::{
     common::{
         Column, DataFusionError, Result, project_schema,
@@ -151,63 +151,6 @@ pub async fn list_files<'a>(
 }
 
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
-    #[allow(deprecated)]
-    if config::get_config()
-        .common
-        .inverted_index_search_format
-        .eq("tantivy")
-    {
-        return generate_access_plan_row_level(file);
-    };
-    let index_segment_length = INDEX_SEGMENT_LENGTH;
-    let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
-    let stats = file.statistics.as_ref()?;
-    let Precision::Exact(num_rows) = stats.num_rows else {
-        return None;
-    };
-    let row_group_count = num_rows.div_ceil(PARQUET_MAX_ROW_GROUP_SIZE);
-    let segment_count = num_rows.div_ceil(index_segment_length);
-    let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-    let mut selection = Vec::with_capacity(segment_ids.len());
-    let mut last_group_id = 0;
-    for (segment_id, val) in segment_ids.iter().enumerate() {
-        if segment_id >= segment_count {
-            break;
-        }
-        let row_group_id = (segment_id * index_segment_length) / PARQUET_MAX_ROW_GROUP_SIZE;
-        if row_group_id != last_group_id && !selection.is_empty() {
-            if selection.iter().any(|s: &RowSelector| !s.skip) {
-                access_plan.scan(last_group_id);
-                access_plan.scan_selection(last_group_id, RowSelection::from(selection.clone()));
-            }
-            selection.clear();
-            last_group_id = row_group_id;
-        }
-        let length = if (segment_id + 1) * index_segment_length > num_rows {
-            num_rows % index_segment_length
-        } else {
-            index_segment_length
-        };
-        if *val {
-            selection.push(RowSelector::select(length));
-        } else {
-            selection.push(RowSelector::skip(length));
-        }
-    }
-    if !selection.is_empty() && selection.iter().any(|s: &RowSelector| !s.skip) {
-        access_plan.scan(last_group_id);
-        access_plan.scan_selection(last_group_id, RowSelection::from(selection));
-    }
-    log::debug!(
-        "file path: {:?}, row_group_count: {}, access_plan: {:?}",
-        file.path().as_ref(),
-        row_group_count,
-        access_plan
-    );
-    Some(Arc::new(access_plan))
-}
-
-pub fn generate_access_plan_row_level(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
     let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {

@@ -25,7 +25,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
-        inverted_index::InvertedIndexFormat,
         search::StorageType,
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamType,
@@ -60,7 +59,6 @@ use tokio::{
 use super::worker::{MergeBatch, MergeSender};
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::{create_tantivy_index, generate_index_on_compactor},
     service::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
@@ -68,6 +66,7 @@ use crate::{
             DATAFUSION_RUNTIME,
             datafusion::exec::{self, MergeParquetResult},
         },
+        tantivy::create_tantivy_index,
     },
 };
 
@@ -984,9 +983,6 @@ pub async fn merge_files(
             if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                 // generate inverted index
                 generate_inverted_index(
-                    org_id,
-                    stream_type,
-                    stream_name,
                     &new_file_key,
                     &full_text_search_fields,
                     &index_fields,
@@ -1025,9 +1021,6 @@ pub async fn merge_files(
                 if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                     // generate inverted index
                     generate_inverted_index(
-                        org_id,
-                        stream_type,
-                        stream_name,
                         &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
@@ -1057,11 +1050,7 @@ pub async fn merge_files(
     Ok((new_files, retain_file_list))
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn generate_inverted_index(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
@@ -1069,91 +1058,26 @@ async fn generate_inverted_index(
     new_file_meta: &mut FileMeta,
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-
-    // generate parquet format inverted index
-    #[allow(deprecated)]
-    let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
-    if matches!(
-        index_format,
-        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
-    ) {
-        let (schema, mut reader) = get_recordbatch_reader_from_bytes(buf).await?;
-        let files = generate_index_on_compactor(
-            retain_file_list,
+    let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
+    let index_size = create_tantivy_index(
+        "COMPACTOR",
+        new_file_key,
+        full_text_search_fields,
+        index_fields,
+        schema,
+        reader,
+    )
+    .await
+    .map_err(|e| {
+        anyhow::anyhow!(
+            "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
             new_file_key,
-            org_id,
-            stream_type,
-            stream_name,
-            full_text_search_fields,
-            index_fields,
-            schema,
-            &mut reader,
+            e,
+            retain_file_list
         )
-        .await
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "generate_index_on_compactor for file: {}, err: {}, need delete files: {:?}",
-                new_file_key,
-                e,
-                retain_file_list
-            )
-        })?;
-        for (account, file_name, filemeta) in files {
-            if file_name.is_empty() {
-                continue;
-            }
-            log::info!(
-                "created parquet index file during compaction: {}",
-                file_name
-            );
-            // Notify that we wrote the index file to the db.
-            if let Err(e) = write_file_list(
-                org_id,
-                &[FileKey {
-                    id: 0,
-                    account,
-                    key: file_name.clone(),
-                    meta: filemeta,
-                    deleted: false,
-                    segment_ids: None,
-                }],
-            )
-            .await
-            {
-                log::error!(
-                    "generate_index_on_compactor write to file list: {}, err: {}, need delete files: {:?}",
-                    file_name,
-                    e.to_string(),
-                    retain_file_list
-                );
-            }
-        }
-    }
+    })?;
+    new_file_meta.index_size = index_size as i64;
 
-    if matches!(
-        index_format,
-        InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
-    ) {
-        let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
-        let index_size =  create_tantivy_index(
-                "COMPACTOR",
-                new_file_key,
-                full_text_search_fields,
-                index_fields,
-                schema,
-                reader,
-            )
-            .await.map_err(|e| {
-                anyhow::anyhow!(
-                    "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
-                    new_file_key,
-                    e,
-                    retain_file_list
-                )
-            })?;
-        new_file_meta.index_size = index_size as i64;
-    }
     Ok(())
 }
 

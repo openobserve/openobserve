@@ -38,6 +38,10 @@ impl ReaderCache {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.readers.is_empty()
+    }
+
     pub fn len(&self) -> usize {
         self.readers.len()
     }

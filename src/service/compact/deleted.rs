@@ -15,7 +15,7 @@
 
 use config::{
     meta::stream::{FileKey, FileMeta},
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::inverted_index::convert_parquet_file_name_to_tantivy_file,
 };
 use infra::{file_list as infra_file_list, storage};
 
@@ -57,7 +57,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
         .iter()
         .filter_map(|file| {
             if file.index_file {
-                convert_parquet_idx_file_name_to_tantivy_file(&file.file)
+                convert_parquet_file_name_to_tantivy_file(&file.file)
                     .map(|f| (file.account.to_string(), f))
             } else {
                 None
