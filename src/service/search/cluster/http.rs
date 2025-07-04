@@ -103,7 +103,7 @@ pub async fn search(
         )
         .await
     } else {
-        flight::search(&trace_id, sql.clone(), req, query).await
+        flight::search(&trace_id, sql.clone(), req).await
     };
     #[cfg(not(feature = "enterprise"))]
     let ret = flight::search(&trace_id, sql.clone(), req).await;

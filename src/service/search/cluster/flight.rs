@@ -125,6 +125,13 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let use_inverted_index = super::super::is_use_inverted_index(&sql);
     req.set_use_inverted_index(use_inverted_index);
 
+    #[cfg(feature = "enterprise")]
+    let scan_stats = ScanStats {
+        files: file_id_list_num as i64,
+        original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        ..Default::default()
+    };
+
     // 3. get nodes
     let get_node_start = std::time::Instant::now();
     let role_group = req
