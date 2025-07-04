@@ -247,9 +247,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col column"
         style="height: 100% "
       >
+      <!-- collapse field list bar -->
+      <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
           @update:model-value="layoutSplitterUpdated"
+          :limits="[0, 100]"
           style="width: 100%; height: 100%"
         >
           <template #before>
