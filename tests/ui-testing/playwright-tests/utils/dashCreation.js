@@ -1,5 +1,5 @@
 import { expect } from "playwright/test";
-import logData from "../../cypress/fixtures/log.json"
+import logData from "../../cypress/fixtures/log.json";
 
 // fuction of Dashboard page and Apply query button
 export const waitForDashboardPage = async function (page) {
@@ -10,9 +10,9 @@ export const waitForDashboardPage = async function (page) {
 
   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/dashboards**");
 
-  await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
-    state: "hidden",
-  });
+  // await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
+  //   state: "hidden",
+  // });
   await dashboardListApi;
   await page.waitForTimeout(500);
 };

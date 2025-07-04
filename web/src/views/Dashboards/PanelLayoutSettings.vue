@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             ]"
             style="min-width: 220px"
+            data-test="panel-layout-settings-height-input"
           />
 
           <div class="tw-text-[12px]">
@@ -95,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           text-color="light-text"
           padding="sm md"
           no-caps
+          data-test="panel-layout-settings-cancel"
         />
         <q-btn
           :label="t('dashboard.save')"
@@ -103,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           type="submit"
           no-caps
+          data-test="panel-layout-settings-save"
         />
       </div>
     </q-form>
