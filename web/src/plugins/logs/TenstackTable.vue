@@ -853,7 +853,6 @@ const getBtnLogo = computed(() => {
         : getImageURL('images/common/ai_icon.svg')
     })
 const sendToAiChat = (value: any) => {
-  console.log("here")
   emits("sendToAiChat", value);
 };
 
@@ -954,21 +953,9 @@ td {
     .table-cell-actions {
       display: block !important;
     }
-    .copy-btn {
-      visibility: visible !important;
-    }
   }
 }
 
-.copy-btn {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  width: 24px;
-  height: 24px;
-  justify-content: center;
-  border-radius: 4px;
-}
 
 .table-row-hover {
   &:hover {
