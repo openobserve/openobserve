@@ -391,6 +391,8 @@ export default defineComponent({
         const allPatternsExpanded = ref(true);
         const appliedPatternsExpanded = ref(true);
         const appliedPatternsMap = ref(new Map());
+        // Add a flag to track if patterns were added or removed
+        const hasPatternChanges = ref(false);
         // Add a debounced emit function
         const debouncedEmit = debounce((pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
           emit("updateAppliedPattern", pattern, fieldName, patternId, attribute);
@@ -426,6 +428,8 @@ export default defineComponent({
         }
 
         const closeDialog = () => {
+            hasPatternChanges.value = false;
+            isFormDirty.value = false;
             emit("closeDialog");
         };
 
@@ -590,6 +594,8 @@ export default defineComponent({
         const updateRegexPattern = () => {
           emit("updateSettings");
           isFormDirty.value = false;
+          // Reset the pattern changes flag after update
+          hasPatternChanges.value = false;
         }
 
         //this is used to add or remove a pattern from the field
@@ -601,6 +607,9 @@ export default defineComponent({
             emit("removePattern", userClickedPattern.value.pattern_id, props.fieldName);
             appliedPatterns.value = appliedPatterns.value.filter((pattern: any) => pattern.pattern_id !== userClickedPattern.value.pattern_id);
             appliedPatternsMap.value.delete(userClickedPattern.value.pattern_id);
+            // Set flag when pattern is removed
+            hasPatternChanges.value = true;
+            isFormDirty.value = true;
           }
           else{
             if(apply_at.value.length == 0){
@@ -631,6 +640,9 @@ export default defineComponent({
             emit("addPattern", pattern);
             appliedPatterns.value.push(pattern);
             appliedPatternsMap.value.set(pattern.pattern_id, pattern);
+            // Set flag when pattern is added
+            hasPatternChanges.value = true;
+            isFormDirty.value = true;
           }
         }
         //why this check because user might update the policy or apply_at value of already applied pattern 
@@ -648,7 +660,10 @@ export default defineComponent({
             apply_at_value = apply_at.value[0] || "";
           }
           if(applied_pattern){
-            applied_pattern.policy !== policy.value || applied_pattern.apply_at !== apply_at_value ? isFormDirty.value = true : isFormDirty.value = false;
+            // Only update isFormDirty if there are no pattern add/remove changes
+            if (!hasPatternChanges.value) {
+              isFormDirty.value = applied_pattern.policy !== policy.value || applied_pattern.apply_at !== apply_at_value;
+            }
             return true;
           }
           return false;
