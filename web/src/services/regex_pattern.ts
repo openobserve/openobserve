@@ -50,6 +50,13 @@ const regexPatterns = {
     return http().delete(
       `/api/${org_identifier}/re_patterns/${id}`
     );
+  },
+  test: (
+    org_identifier: string,
+    pattern: string,
+    test_records: Array<string>,
+  ) => {
+    return http().post(`/api/${org_identifier}/re_patterns/test`, { pattern, test_records });
   }
 };
 

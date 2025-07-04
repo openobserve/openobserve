@@ -125,9 +125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         label="Regular Expression*"
                         class="tw-mt-1 tw-py-md"
                         labelClass="tw-py-md"
-                        :o2AIicon="true"
-                        @toggleO2Ai="toggleAIChat"
-                    />
+                    >
+                    <template #right>
+                        <q-btn class="tw-px-2 tw-py-1"
+                        :class="store.state.theme === 'dark' ? 'tw-bg-[#529DFF80] ' : 'tw-bg-[#8369B61C]'"
+                        style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
+                        <q-icon  :name="outlinedLightbulb" />
+                            <span class="import-button-text">Try O2 AI to write expressions</span>
+                            </q-btn>
+                    </template>
+                </FullViewContainer>
                     <div v-if="expandState.regexPattern" class="regex-pattern-input">
                         <q-input
                         data-test="add-regex-pattern-input"
@@ -149,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                     </div>
                 </div>
-                <div class="regex-pattern-test-string-container">
+                <div class="regex-pattern-test-string-container q-mb-md">
                     <FullViewContainer
                         style="padding: 12px 8px; "
                         :style="{
@@ -161,8 +168,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         label="Test String"
                         class="tw-mt-1 tw-py-md"
                         labelClass="tw-py-md"
-                        :o2AIicon="false"
-                    />
+                    >
+                    <template #right>
+                        <q-btn  class="tw-px-2 tw-py-1 tw-bg-[#5ca380]"
+                        style="border-radius: 4px;" dense no-caps flat  @click="testStringOutput"
+                        :disable="testLoading || !testString"
+                        >
+                            <span v-if="!testLoading ">Test String</span>
+                            <span v-else>Testing...</span>
+                        </q-btn>
+                    </template>
+                </FullViewContainer>
                     <div v-if="expandState.regexTestString" class="regex-pattern-input" >
                         <q-input
                         data-test="add-regex-test-string-input"
@@ -179,6 +195,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%; resize: none;"
                         type="textarea"
                         placeholder="Eg. 1234567890"
+                        rows="5"
+                        />
+                    </div>
+                </div>
+                <div class="regex-pattern-test-string-container">
+                    <FullViewContainer
+                        style="padding: 12px 8px; "
+                        :style="{
+                            'background-color': store.state.theme === 'dark' ? '#2A2929' : '#fafafa',
+                            'border': store.state.theme === 'dark' ? '' : '1px solid #E6E6E6'
+                        }"
+                        name="query"
+                        v-model:is-expanded="expandState.outputString"
+                        label="Output String"
+                        class="tw-mt-1 tw-py-md"
+                        labelClass="tw-py-md"
+                        :o2AIicon="false"
+                    />
+                    <div v-if="expandState.outputString" class="regex-pattern-input" >
+                        <q-input
+                        data-test="add-regex-test-string-input"
+                        v-model="outputString"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="regex-test-string-input"
+                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                        style="width: 100%; resize: none;"
+                        type="textarea"
+                        placeholder="Output String"
                         rows="5"
                         />
                     </div>
@@ -214,7 +264,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width:35%; max-width: 100%; min-width: 75px; height: calc(100vh - 90px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
               <O2AIChat style="height: calc(100vh - 90px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
-
             </div>
        </div>
 
@@ -236,6 +285,8 @@ import FullViewContainer from "../functions/FullViewContainer.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
+import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
+
 export default defineComponent({
     name: "AddRegexPattern",
     props: {
@@ -268,17 +319,18 @@ setup(props, {emit}) {
 
 
     const testString = ref("");
-    const highlightedText = ref("");
-    const editableDiv = ref<HTMLElement | null>(null);
-    let savedSelection: { start: number; end: number } | null = null;
 
     const isFormEmpty = ref(props.isEdit ? false : true);
+
+    const testLoading = ref(false);
 
     const isPatternValid = ref(false);
 
     const queryEditorRef = ref<any>(null);
 
     const isSaving = ref(false);
+
+    const outputString = ref("");
 
     const regexPatternInputs: any = ref({
         name: "",
@@ -289,6 +341,7 @@ setup(props, {emit}) {
     const expandState = ref({
         regexPattern: true,
         regexTestString: true,
+        outputString: false,
     });
 
 
@@ -313,11 +366,6 @@ setup(props, {emit}) {
         }
     })
 
-
-    onBeforeUnmount(() => {
-        // Cancel any pending debounced calls
-        updateTestString.cancel();
-    });
 
     // Form validation watcher
     watch([() => regexPatternInputs.value.name, () => regexPatternInputs.value.pattern], () => {
@@ -391,19 +439,30 @@ setup(props, {emit}) {
         }
     }
 
-    const updateTestString = debounce((value: string) => {
-        testString.value = value;
-
-        if (queryEditorRef.value) {
-            queryEditorRef.value.highlightRegexMatches(regexPatternInputs.value.pattern?.trim());
-        }
-    }, 300);
-
-
     const toggleFullScreen = () => {
         isFullScreen.value = !isFullScreen.value;
         window.dispatchEvent(new Event("resize"));
     }
+
+    const testStringOutput = async () => {
+        try{
+            testLoading.value = true;
+            const response = await regexPatternService.test(store.state.selectedOrganization.identifier, regexPatternInputs.value.pattern, [testString.value]);
+            outputString.value = response.data.results[0];
+            expandState.value.regexTestString = false;
+            expandState.value.outputString = true;
+        } catch (error) {
+            q.notify({
+                color: "negative",
+                message: error.response?.data?.message || "Failed to test string",
+                timeout: 4000,
+            });
+        }
+        finally{
+            testLoading.value = false;
+        }
+    }
+
 
     return {
         t,
@@ -422,9 +481,12 @@ setup(props, {emit}) {
         isSaving,
         isPatternValid,
         queryEditorRef,
-        updateTestString,
-        toggleFullScreen
-    }
+        toggleFullScreen,
+        outputString,
+        testStringOutput,
+        outlinedLightbulb,
+        testLoading
+        }
 }
 });
 
