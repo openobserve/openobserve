@@ -741,7 +741,6 @@ export default defineComponent({
         store.dispatch('setChatUpdated', true);
         
       } catch (error: any) {
-        console.error('AI Chat error:', error);
         // Remove the empty assistant message that was added before the error
         //this will impact in the case of error showing empty message above the error message in the chat
         if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant' && !chatMessages.value[chatMessages.value.length - 1].content) {
