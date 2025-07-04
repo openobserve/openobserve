@@ -173,9 +173,8 @@ async fn get_wal_batches(
             job_id: "".to_string(), // set in FlightSearchRequest
         },
         search_infos: SearchInfos {
-            plan: vec![],          // set in RemoteScanNode
-            file_id_list: vec![],  // not needed for wal
-            idx_file_list: vec![], // not needed for wal
+            plan: vec![],         // set in RemoteScanNode
+            file_id_list: vec![], // not needed for wal
             start_time: time_range.0,
             end_time: time_range.1,
             timeout: cfg.limit.query_timeout,

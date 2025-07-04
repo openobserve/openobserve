@@ -106,7 +106,7 @@ pub async fn search(
         flight::search(&trace_id, sql.clone(), req, query).await
     };
     #[cfg(not(feature = "enterprise"))]
-    let ret = flight::search(&trace_id, sql.clone(), req, query).await;
+    let ret = flight::search(&trace_id, sql.clone(), req).await;
 
     let (merge_batches, scan_stats, took_wait, is_partial, partial_err) = match ret {
         Ok(v) => v,

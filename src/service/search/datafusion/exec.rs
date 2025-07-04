@@ -759,7 +759,7 @@ async fn get_cpu_and_mem_limit(
         memory_size = memory_size * mem as usize / 100;
     }
     log::info!(
-        "[trace_id: {trace_id}] datafusion work_group: {wg}, target_partition: {target_partitions}, memory_size: {memory_size}"
+        "[trace_id: {trace_id}] datafusion work_group: {work_group}, target_partition: {target_partitions}, memory_size: {memory_size}"
     );
     Ok((target_partitions, memory_size))
 }
