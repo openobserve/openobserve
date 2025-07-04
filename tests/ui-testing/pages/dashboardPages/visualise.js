@@ -11,9 +11,10 @@ export default class LogsVisualise {
     this.functionEditor = page.locator(
       '[data-test="logs-vrl-function-editor"]'
     );
-
-    this.queryEditor = page.locator("#fnEditor").locator(".inputarea");
-
+    this.queryEditor = page
+      .locator("#fnEditor")
+      .getByRole("textbox")
+      .locator("div");
     //Functions
   }
   async openLogs() {
