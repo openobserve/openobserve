@@ -216,3 +216,440 @@ pub(crate) fn build_footer_cache<D: Directory>(directory: Arc<D>) -> tantivy::Re
     let buf = cache_dir.cacher().to_bytes()?;
     Ok(buf)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{ops::Range, path::PathBuf, sync::Arc};
+
+    use tantivy::{
+        directory::RamDirectory,
+        schema::{STORED, Schema, TEXT},
+        *,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_footer_cache_new() {
+        let cache = FooterCache::new();
+        assert_eq!(cache.file_num(), 0);
+    }
+
+    #[test]
+    fn test_footer_cache_put_and_get_slice() {
+        let cache = FooterCache::new();
+        let path = PathBuf::from("test_file.txt");
+        let range = 0..10;
+        let data = OwnedBytes::new(b"hello world".to_vec());
+
+        // Put data into cache
+        cache.put_slice(path.clone(), range.clone(), data.clone());
+        assert_eq!(cache.file_num(), 1);
+
+        // Get exact range
+        let result = cache.get_slice(&path, range.clone());
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().as_slice(), data.as_slice());
+
+        // Get non-existent file
+        let other_path = PathBuf::from("non_existent.txt");
+        let result = cache.get_slice(&other_path, range);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_footer_cache_get_slice_within_range() {
+        let cache = FooterCache::new();
+        let path = PathBuf::from("test_file.txt");
+        let full_range = 0..20;
+        let data = OwnedBytes::new(b"hello world test data".to_vec());
+
+        // Put larger data into cache
+        cache.put_slice(path.clone(), full_range, data);
+
+        // Get subset range
+        let subset_range = 6..11; // "world"
+        let result = cache.get_slice(&path, subset_range);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().as_slice(), b"world");
+
+        // Get range that extends beyond cached range
+        let extended_range = 15..25;
+        let result = cache.get_slice(&path, extended_range);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_footer_cache_get_slice_exact_and_subset() {
+        let cache = FooterCache::new();
+        let path = PathBuf::from("test_file.txt");
+        let range1 = 0..10;
+        let range2 = 15..25;
+        let data1 = OwnedBytes::new(b"hello_test".to_vec());
+        let data2 = OwnedBytes::new(b"world_data".to_vec());
+
+        // Put multiple ranges
+        cache.put_slice(path.clone(), range1.clone(), data1.clone());
+        cache.put_slice(path.clone(), range2.clone(), data2.clone());
+
+        // Get exact ranges
+        assert_eq!(
+            cache.get_slice(&path, range1).unwrap().as_slice(),
+            data1.as_slice()
+        );
+        assert_eq!(
+            cache.get_slice(&path, range2).unwrap().as_slice(),
+            data2.as_slice()
+        );
+
+        // Get subset of first range
+        let subset = 2..7; // "llo_t"
+        let result = cache.get_slice(&path, subset);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().as_slice(), b"llo_t");
+    }
+
+    #[test]
+    fn test_footer_cache_multiple_files() {
+        let cache = FooterCache::new();
+        let path1 = PathBuf::from("file1.txt");
+        let path2 = PathBuf::from("file2.txt");
+        let range = 0..5;
+        let data1 = OwnedBytes::new(b"file1".to_vec());
+        let data2 = OwnedBytes::new(b"file2".to_vec());
+
+        cache.put_slice(path1.clone(), range.clone(), data1.clone());
+        cache.put_slice(path2.clone(), range.clone(), data2.clone());
+
+        assert_eq!(cache.file_num(), 2);
+        assert_eq!(
+            cache.get_slice(&path1, range.clone()).unwrap().as_slice(),
+            data1.as_slice()
+        );
+        assert_eq!(
+            cache.get_slice(&path2, range.clone()).unwrap().as_slice(),
+            data2.as_slice()
+        );
+    }
+
+    #[test]
+    fn test_footer_cache_to_bytes_empty() {
+        let cache = FooterCache::new();
+        let result = cache.to_bytes();
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        // Should contain at least version and offset
+        assert!(bytes.len() >= FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN);
+    }
+
+    #[test]
+    fn test_footer_cache_to_bytes_with_data() {
+        let cache = FooterCache::new();
+        let path = PathBuf::from("test.term");
+        let range = 0..10;
+        let data = OwnedBytes::new(b"test_data_".to_vec());
+
+        cache.put_slice(path, range, data);
+
+        let result = cache.to_bytes();
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        assert!(bytes.len() > FOOTER_VERSION_LEN + FOOTER_OFFSET_LEN);
+    }
+
+    #[test]
+    fn test_footer_cache_from_bytes_empty() {
+        let cache = FooterCache::new();
+        let bytes = cache.to_bytes().unwrap();
+
+        let reconstructed = FooterCache::from_bytes(OwnedBytes::new(bytes.to_vec()));
+        assert!(reconstructed.is_ok());
+
+        let reconstructed_cache = reconstructed.unwrap();
+        assert_eq!(reconstructed_cache.file_num(), 0);
+    }
+
+    #[test]
+    fn test_footer_cache_roundtrip_serialization() {
+        let cache = FooterCache::new();
+        let path1 = PathBuf::from("test1.term");
+        let path2 = PathBuf::from("test2.idx");
+        let range1 = 0..10;
+        let range2 = 10..21;
+        let data1 = OwnedBytes::new(b"test_data1".to_vec());
+        let data2 = OwnedBytes::new(b"more_data23".to_vec());
+
+        cache.put_slice(path1.clone(), range1.clone(), data1.clone());
+        cache.put_slice(path2.clone(), range2.clone(), data2.clone());
+
+        // Serialize
+        let bytes = cache.to_bytes().unwrap();
+
+        // Deserialize
+        let reconstructed = FooterCache::from_bytes(OwnedBytes::new(bytes.to_vec())).unwrap();
+
+        // Verify data
+        assert_eq!(reconstructed.file_num(), 2);
+        assert_eq!(
+            reconstructed.get_slice(&path1, range1).unwrap().as_slice(),
+            data1.as_slice()
+        );
+        assert_eq!(
+            reconstructed.get_slice(&path2, range2).unwrap().as_slice(),
+            data2.as_slice()
+        );
+    }
+
+    #[test]
+    fn test_footer_cache_from_bytes_invalid_size() {
+        let invalid_bytes = OwnedBytes::new(vec![1, 2, 3]); // Too small
+        let result = FooterCache::from_bytes(invalid_bytes);
+        assert!(result.is_err());
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("Invalid footer cache size")
+        );
+    }
+
+    #[test]
+    fn test_footer_cache_from_bytes_invalid_version() {
+        let cache = FooterCache::new();
+        let mut bytes = cache.to_bytes().unwrap().to_vec();
+
+        // Corrupt the version
+        let version_start = bytes.len() - FOOTER_VERSION_LEN;
+        bytes[version_start] = 99; // Invalid version
+
+        let result = FooterCache::from_bytes(OwnedBytes::new(bytes));
+        assert!(result.is_err());
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("Invalid footer version")
+        );
+    }
+
+    #[test]
+    fn test_footer_cache_from_bytes_invalid_offset() {
+        let cache = FooterCache::new();
+        let mut bytes = cache.to_bytes().unwrap().to_vec();
+
+        // Set an offset that's too large
+        let offset_start = bytes.len() - FOOTER_OFFSET_LEN - FOOTER_VERSION_LEN;
+        let offset_end = bytes.len() - FOOTER_VERSION_LEN;
+        let large_offset = (bytes.len() + 1000) as u64;
+        bytes[offset_start..offset_end].copy_from_slice(&large_offset.to_le_bytes());
+
+        let result = FooterCache::from_bytes(OwnedBytes::new(bytes));
+        assert!(result.is_err());
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("Invalid footer offset")
+        );
+    }
+
+    #[test]
+    fn test_footer_cache_skips_empty_file_extensions() {
+        let cache = FooterCache::new();
+
+        // Add files with allowed and disallowed extensions
+        let allowed_path = PathBuf::from("test.term");
+        let disallowed_path1 = PathBuf::from("test.fieldnorm");
+        let disallowed_path2 = PathBuf::from("test.store");
+
+        let range = 0..10;
+        let data = OwnedBytes::new(b"test_data_".to_vec());
+
+        cache.put_slice(allowed_path, range.clone(), data.clone());
+        cache.put_slice(disallowed_path1, range.clone(), data.clone());
+        cache.put_slice(disallowed_path2, range, data);
+
+        let bytes = cache.to_bytes().unwrap();
+        let reconstructed = FooterCache::from_bytes(OwnedBytes::new(bytes.to_vec())).unwrap();
+
+        // Only the allowed file should be in the serialized cache
+        assert_eq!(reconstructed.file_num(), 1);
+    }
+
+    #[test]
+    fn test_footer_cache_meta_new() {
+        let meta = FooterCacheMeta::new();
+        assert!(meta.files.is_empty());
+    }
+
+    #[test]
+    fn test_footer_cache_meta_push() {
+        let mut meta = FooterCacheMeta::new();
+        let path = PathBuf::from("test.term");
+        let range = Range { start: 0, end: 10 };
+
+        meta.push(&path, 100, &range);
+
+        assert_eq!(meta.files.len(), 1);
+        let items = meta.files.get("test.term").unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].offset, 100);
+        assert_eq!(items[0].start, 0);
+        assert_eq!(items[0].len, 10);
+    }
+
+    #[test]
+    fn test_footer_cache_meta_multiple_items() {
+        let mut meta = FooterCacheMeta::new();
+        let path = PathBuf::from("test.term");
+        let range1 = Range { start: 0, end: 10 };
+        let range2 = Range { start: 20, end: 30 };
+
+        meta.push(&path, 100, &range1);
+        meta.push(&path, 200, &range2);
+
+        let items = meta.files.get("test.term").unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].offset, 100);
+        assert_eq!(items[1].offset, 200);
+    }
+
+    #[test]
+    fn test_build_footer_cache_empty_directory() {
+        // Create an empty index
+        let schema = Schema::builder().build();
+        let ram_directory = RamDirectory::create();
+        let index_writer: SingleSegmentIndexWriter<TantivyDocument> = IndexBuilder::new()
+            .schema(schema.clone())
+            .single_segment_index_writer(ram_directory.clone(), 50_000_000)
+            .unwrap();
+        index_writer.finalize().unwrap();
+
+        let result = build_footer_cache(ram_directory.into());
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_build_footer_cache_with_data() {
+        // Create an index with some data
+        let mut schema_builder = Schema::builder();
+        let text_field = schema_builder.add_text_field("text", TEXT | STORED);
+        let schema = schema_builder.build();
+
+        let ram_directory = RamDirectory::create();
+        let mut index_writer = IndexBuilder::new()
+            .schema(schema.clone())
+            .single_segment_index_writer(ram_directory.clone(), 50_000_000)
+            .unwrap();
+
+        // Add some documents
+        index_writer
+            .add_document(doc!(text_field => "hello world"))
+            .unwrap();
+        index_writer
+            .add_document(doc!(text_field => "test document"))
+            .unwrap();
+        index_writer.finalize().unwrap();
+
+        let result = build_footer_cache(ram_directory.into());
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        assert!(!bytes.is_empty());
+
+        // The cache should contain data from reading the index
+        assert!(bytes.len() > 100); // Should have meaningful content
+    }
+
+    #[test]
+    fn test_footer_cache_constants() {
+        assert_eq!(FOOTER_CACHE_VERSION, 1);
+        assert_eq!(FOOTER_VERSION_LEN, 4);
+        assert_eq!(FOOTER_OFFSET_LEN, 8);
+    }
+
+    #[test]
+    fn test_footer_cache_item_serialization() {
+        let item = FooterCacheMetaItem {
+            offset: 100,
+            start: 50,
+            len: 25,
+        };
+
+        let serialized = serde_json::to_string(&item).unwrap();
+        let deserialized: FooterCacheMetaItem = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.offset, 100);
+        assert_eq!(deserialized.start, 50);
+        assert_eq!(deserialized.len, 25);
+    }
+
+    #[test]
+    fn test_footer_cache_concurrent_access() {
+        use std::thread;
+
+        let cache = Arc::new(FooterCache::new());
+        let mut handles = vec![];
+
+        // Spawn multiple threads to test concurrent access
+        for i in 0..10 {
+            let cache_clone = cache.clone();
+            let handle = thread::spawn(move || {
+                let path = PathBuf::from(format!("file_{}.term", i));
+                let range = 0..10;
+                let data = OwnedBytes::new(format!("data_{:04}", i).into_bytes());
+
+                cache_clone.put_slice(path.clone(), range.clone(), data.clone());
+                let retrieved = cache_clone.get_slice(&path, range);
+                assert!(retrieved.is_some());
+                assert_eq!(retrieved.unwrap().as_slice(), data.as_slice());
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert_eq!(cache.file_num(), 10);
+    }
+
+    #[tokio::test]
+    async fn test_footer_cache_from_directory_nonexistent() {
+        let ram_directory = Arc::new(RamDirectory::create());
+
+        let result = FooterCache::from_directory(ram_directory).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_footer_cache_from_directory_success() {
+        let ram_directory = Arc::new(RamDirectory::create());
+
+        // Create and write a footer cache
+        let cache = FooterCache::new();
+        let path = PathBuf::from("test.term");
+        let range = 0..10;
+        let data = OwnedBytes::new(b"test_data_".to_vec());
+        cache.put_slice(path, range, data);
+
+        let cache_bytes = cache.to_bytes().unwrap();
+        ram_directory
+            .atomic_write(std::path::Path::new(FOOTER_CACHE), &cache_bytes)
+            .unwrap();
+
+        let result = FooterCache::from_directory(ram_directory).await;
+        assert!(result.is_ok());
+
+        let loaded_cache = result.unwrap();
+        assert_eq!(loaded_cache.file_num(), 1);
+    }
+}
