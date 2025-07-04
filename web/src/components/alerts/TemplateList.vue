@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-td :props="props">
             <q-btn
               icon="download"
-              title="Export Destination"
+              title="Export Template"
               class="q-ml-xs"
               padding="sm"
               unelevated

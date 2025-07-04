@@ -38,6 +38,7 @@ use infra::{
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
+use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use super::db::enrichment_table;
 use crate::{
@@ -48,7 +49,7 @@ use crate::{
     },
     handler::http::router::ERROR_HEADER,
     service::{
-        db::{self, distinct_values},
+        db::{self, distinct_values, re_pattern::process_association_changes},
         metrics::get_prom_metadata_from_schema,
     },
 };
@@ -68,7 +69,13 @@ pub async fn get_stream(
     if schema != Schema::empty() {
         let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
         transform_stats(&mut stats, org_id, stream_name, stream_type).await;
-        Some(stream_res(stream_name, stream_type, schema, Some(stats)))
+        Some(stream_res(
+            org_id,
+            stream_name,
+            stream_type,
+            schema,
+            Some(stats),
+        ))
     } else {
         None
     }
@@ -119,6 +126,7 @@ pub async fn get_streams(
             && stream_loc.stream_type != StreamType::EnrichmentTables
         {
             indices_res.push(stream_res(
+                org_id,
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
                 stream_loc.schema,
@@ -133,6 +141,7 @@ pub async fn get_streams(
             )
             .await;
             indices_res.push(stream_res(
+                org_id,
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
                 stream_loc.schema,
@@ -144,6 +153,7 @@ pub async fn get_streams(
 }
 
 pub fn stream_res(
+    org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     schema: Schema,
@@ -193,6 +203,19 @@ pub fn stream_res(
         stream_type,
     ));
 
+    #[cfg(not(feature = "enterprise"))]
+    let pattern_associations = vec![];
+    #[cfg(feature = "enterprise")]
+    let pattern_associations = {
+        loop {
+            let mgr = match PATTERN_MANAGER.get() {
+                Some(m) => m,
+                None => continue,
+            };
+            break mgr.get_associations(org_id, stream_type, stream_name);
+        }
+    };
+
     Stream {
         name: stream_name.to_string(),
         storage_type: storage_type.to_string(),
@@ -203,6 +226,7 @@ pub fn stream_res(
         stats,
         settings,
         metrics_meta,
+        pattern_associations,
     }
 }
 
@@ -585,6 +609,28 @@ pub async fn update_stream_settings(
             if let Some(partition_time_level) = new_settings.partition_time_level {
                 settings.partition_time_level = Some(partition_time_level);
             }
+
+            #[cfg(feature = "enterprise")]
+            {
+                if let Err(e) = process_association_changes(
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    new_settings.pattern_associations,
+                )
+                .await
+                {
+                    return Ok(
+                        HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                            format!(
+                                "Internal server error while updating pattern associations {e}",
+                            ),
+                        )),
+                    );
+                }
+            }
+
             save_stream_settings(org_id, stream_name, stream_type, settings).await
         }
         None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -763,7 +809,13 @@ mod tests {
     fn test_stream_res() {
         let stats = StreamStats::default();
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
-        let res = stream_res("Test", StreamType::Logs, schema, Some(stats.clone()));
+        let res = stream_res(
+            "default",
+            "Test",
+            StreamType::Logs,
+            schema,
+            Some(stats.clone()),
+        );
         assert_eq!(res.stats, stats);
     }
 }
