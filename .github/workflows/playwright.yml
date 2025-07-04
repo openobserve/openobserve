@@ -130,7 +130,6 @@ jobs:
             # "enrichment.spec.js",
             # "sanity2.spec.js",
             # "schemaload.spec.js",
-            # "websocket.spec.js",
             # "pagination.spec.js",
             # "alertImportTDA.spec.js",
             # "streamname.spec.js",
