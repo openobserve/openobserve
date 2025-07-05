@@ -69,7 +69,7 @@ impl FooterCache {
             .insert(byte_range, bytes);
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn file_num(&self) -> usize {
         self.data.read().len()
     }

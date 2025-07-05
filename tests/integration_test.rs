@@ -891,7 +891,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("post user resp: {:?}", resp);
+        println!("post user resp: {resp:?}");
         assert!(resp.status().is_success());
     }
 

@@ -744,7 +744,7 @@ mod tests {
             Err(e) => {
                 // Expected to fail due to missing infrastructure
                 // Just verify it's a proper error
-                assert!(e.to_string().len() > 0);
+                assert!(!e.to_string().is_empty());
             }
         }
     }

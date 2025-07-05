@@ -206,8 +206,7 @@ impl WsHandler {
                                             break;
                                         }
                                     }
-                                    #[allow(unused_mut)]
-                                    Ok(mut message) => {
+                                    Ok(message) => {
                                         #[cfg(feature = "enterprise")]
                                         {
                                             let auth_str =

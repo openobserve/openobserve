@@ -110,7 +110,7 @@ mod tests {
             }
             Err(e) => {
                 // If it fails with an error, that's also acceptable
-                assert!(e.to_string().len() > 0);
+                assert!(!e.to_string().is_empty());
             }
         }
     }

@@ -110,7 +110,7 @@ mod tests {
     async fn test_get_all_transform_keys() {
         // Setup test data
         let test_org = "test_org";
-        let test_key = format!("{}/test_transform", test_org);
+        let test_key = format!("{test_org}/test_transform");
         crate::common::infra::config::QUERY_FUNCTIONS.insert(
             test_key.clone(),
             config::meta::function::Transform {
