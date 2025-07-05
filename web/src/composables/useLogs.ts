@@ -2991,7 +2991,14 @@ const useLogs = () => {
               }
             }
 
-            searchObj.data.queryResults.aggs.push(...res.data.hits);
+            const order_by = res?.data?.order_by ?? "desc"
+
+            if (order_by?.toLowerCase() === "desc") {
+              searchObj.data.queryResults.aggs.push(...res.data.hits);
+            } else {
+              searchObj.data.queryResults.aggs.unshift(...res.data.hits);
+            }
+
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
@@ -5658,7 +5665,13 @@ const useLogs = () => {
       }
     }
     
-    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    // if order by is desc, append new partition response at end
+    if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
+      searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    } else {
+      // else append new partition response at start
+      searchObj.data.queryResults.aggs.unshift(...response.content.results.hits);
+    }
 
     (async () => {
       try {
@@ -5698,6 +5711,7 @@ const useLogs = () => {
     searchObj.data.queryResults.took += response.content.results.took;
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
+    searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
@@ -5755,6 +5769,7 @@ const useLogs = () => {
     }
 
     if(payload.type === "histogram" && response?.type === "search_response_hits") {
+      console.log("histogram streaming hits", response);
       handleHistogramStreamingHits(payload, response, payload.isPagination);
       return;
     }
