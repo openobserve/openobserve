@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :vrlFunction="formData"
               @function-error="handleFunctionError"
               :heightOffset="heightOffset"
+              @sendToAiChat="sendToAiChat"
             />
           </div>
         </template>
@@ -118,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
       <O2AIChat :style="{
         height: `calc(100vh - (112px + ${heightOffset}px))`
-      }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
+      }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
     </div>
   </div>
   </div>
@@ -191,7 +192,7 @@ export default defineComponent({
     ConfirmDialog,
     O2AIChat,
   },
-  emits: ["update:list", "cancel:hideform"],
+  emits: ["update:list", "cancel:hideform", "sendToAiChat"],
   setup(props, { emit }) {
     const store: any = useStore();
     const router = useRouter();
@@ -216,6 +217,7 @@ export default defineComponent({
     const testFunctionRef = ref<typeof TestFunction>();
     const functionsToolbarRef = ref<typeof FunctionsToolbar>();
     const splitterModel = ref(50);
+    const aiChatInputContext = ref("");
     const confirmDialogMeta = ref({
       title: "",
       message: "",
@@ -462,6 +464,14 @@ end`;
         store.dispatch("setIsAiChatEnabled", val);
     };
 
+    const sendToAiChat = (value: any) => {
+      //this is for when user in pipeline add function page and click on ai chat button
+      aiChatInputContext.value = value;
+      store.dispatch("setIsAiChatEnabled", true);
+      //this is for when user in functions page and click on ai chat button
+      emit("sendToAiChat", value);
+    };
+
     return {
       t,
       $q,
@@ -496,7 +506,9 @@ end`;
       resetConfirmDialog,
       cancelAddFunction,
       openChat,
-      isAddFunctionComponent
+      isAddFunctionComponent,
+      sendToAiChat,
+      aiChatInputContext
     };
   },
   created() {
