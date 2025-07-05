@@ -139,13 +139,11 @@
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
               "
+              data-test="log-details-include-field-btn"
+              @click.stop="addSearchTerm(key, value[key], 'include')"
             >
               <q-item-section>
-                <q-item-label
-                  data-test="log-details-include-field-btn"
-                  @click.stop="addSearchTerm(key, value[key], 'include')"
-                  v-close-popup
-                  ><q-btn
+                <q-item-label><q-btn
                     title="Add to search query"
                     size="6px"
                     round
@@ -167,13 +165,11 @@
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
               "
+              data-test="log-details-exclude-field-btn"
+              @click.stop="addSearchTerm(key, value[key], 'exclude')"
             >
               <q-item-section>
-                <q-item-label
-                  data-test="log-details-exclude-field-btn"
-                  @click.stop="addSearchTerm(key, value[key], 'exclude')"
-                  v-close-popup
-                  ><q-btn
+                <q-item-label><q-btn
                     title="Add to search query"
                     size="6px"
                     round
@@ -186,13 +182,14 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item clickable v-close-popup>
+            <q-item 
+              clickable 
+              v-close-popup 
+              data-test="log-details-add-field-btn"
+              @click.stop="addFieldToTable(key)"
+            >
               <q-item-section>
-                <q-item-label
-                  data-test="log-details-add-field-btn"
-                  @click.stop="addFieldToTable(key)"
-                  v-close-popup
-                  ><q-btn
+                <q-item-label><q-btn
                     title="Add field to table"
                     icon="visibility"
                     size="6px"
