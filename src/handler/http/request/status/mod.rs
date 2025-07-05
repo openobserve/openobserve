@@ -138,6 +138,7 @@ struct ConfigResponse<'a> {
     max_query_range: i64,
     histogram_enabled: bool,
     ai_enabled: bool,
+    dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -338,6 +339,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         histogram_enabled: cfg.limit.histogram_enabled,
         ai_enabled,
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
     }))
 }
 
@@ -504,7 +506,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
             Ok(_) => {
                 let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
-            }
+            // }
             Err(_) => {
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
