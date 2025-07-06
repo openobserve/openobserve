@@ -401,6 +401,9 @@ pub async fn stats(
 
     let mut ret = HashMap::new();
     for stream_type in stream_types {
+        if stream_type == StreamType::Filelist {
+            continue;
+        }
         let stream_names = match stream_name {
             Some(name) => vec![name.to_string()],
             None => crate::service::db::schema::list_streams_from_cache(org_id, stream_type).await,
