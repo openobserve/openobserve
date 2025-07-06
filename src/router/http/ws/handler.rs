@@ -206,6 +206,7 @@ impl WsHandler {
                                             break;
                                         }
                                     }
+                                    #[cfg_attr(not(feature = "enterprise"), allow(clippy::unused_mut))]
                                     Ok(mut message) => {
                                         #[cfg(feature = "enterprise")]
                                         {
