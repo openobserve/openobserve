@@ -361,7 +361,7 @@ pub async fn search_http2_stream(
             Ok(v) => v.to_chunks(),
             Err(err) => {
                 log::error!(
-                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
+                    "[HTTP2_STREAM] trace_id: {} Error in search stream: {}",
                     trace_id,
                     err
                 );
@@ -664,7 +664,7 @@ pub async fn values_http2_stream(
             Ok(v) => v.to_chunks(),
             Err(err) => {
                 log::error!(
-                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
+                    "[HTTP2_STREAM] trace_id: {} Error in values stream: {}",
                     trace_id,
                     err
                 );
