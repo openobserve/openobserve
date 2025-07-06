@@ -207,8 +207,8 @@ mod tests {
 
         for query in &[query_string_oo_tags, query_string_o2_tags] {
             // Create a mock ServiceRequest with the query string
-            let req = actix_web::test::TestRequest::with_uri(&format!("/path?{query}"))
-                .to_srv_request();
+            let req =
+                actix_web::test::TestRequest::with_uri(&format!("/path?{query}")).to_srv_request();
 
             // Call the from_query function
             let query_data =

@@ -507,10 +507,7 @@ mod tests {
                 .unwrap()
                 .with_timezone(&chrono::Local);
             println!("start: {start_time}, end: {end_time}");
-            println!(
-                "Partition {}: {partition_start} - {partition_end}",
-                i + 1
-            );
+            println!("Partition {}: {partition_start} - {partition_end}", i + 1);
         }
 
         // Verify histogram alignment

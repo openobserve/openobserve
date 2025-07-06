@@ -28,6 +28,7 @@ use crate::handler::http::request::search::error_utils::map_error_to_http_respon
 #[cfg(feature = "enterprise")]
 pub mod enterprise_utils {
     use config::meta::stream::StreamType;
+
     use crate::common::meta;
 
     pub async fn check_permissions(
