@@ -258,7 +258,7 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res = crate::service::websocket_events::sort::order_search_results(res, None);
+                res = crate::service::search::search_stream::order_search_results(res, None);
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();

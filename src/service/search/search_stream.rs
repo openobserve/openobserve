@@ -24,7 +24,6 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         sql::OrderBy,
         stream::StreamType,
-        websocket::SearchResultType,
     },
     utils::json::{Value, get_string_value},
 };
@@ -41,20 +40,15 @@ use {
     o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
 };
 
-#[cfg(feature = "enterprise")]
 use crate::common::meta::search::MultiCachedQueryResponse;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, QueryDelta},
-        utils::{stream::get_max_query_range, websocket::calc_queried_range},
+        utils::stream::get_max_query_range,
     },
     service::{
         search::{self as SearchService, cache},
         self_reporting::report_request_usage_stats,
-        websocket_events::{
-            search::write_results_to_cache, sort::order_search_results,
-            utils::calculate_progress_percentage,
-        },
     },
 };
 #[cfg(feature = "enterprise")]
@@ -63,6 +57,128 @@ use crate::{
     service::self_reporting::audit,
 };
 
+pub enum SearchResultType {
+    Cached(Response),
+    Search(Response),
+}
+
+#[tracing::instrument(
+    name = "service:websocket_events:search::write_results_to_cache",
+    skip_all
+)]
+pub async fn write_results_to_cache(
+    c_resp: MultiCachedQueryResponse,
+    start_time: i64,
+    end_time: i64,
+    accumulated_results: &mut Vec<SearchResultType>,
+) -> Result<(), infra::errors::Error> {
+    if accumulated_results.is_empty() {
+        return Ok(());
+    }
+
+    log::info!(
+        "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
+        c_resp.trace_id,
+        c_resp.file_path,
+        accumulated_results.len()
+    );
+
+    let cfg = config::get_config();
+    let mut cached_responses = Vec::new();
+    let mut search_responses = Vec::new();
+
+    for result in accumulated_results {
+        match result {
+            SearchResultType::Cached(resp) => cached_responses.push(resp.clone()),
+            SearchResultType::Search(resp) => search_responses.push(resp.clone()),
+        }
+    }
+
+    let merged_response = cache::merge_response(
+        &c_resp.trace_id,
+        &mut cached_responses,
+        &mut search_responses,
+        &c_resp.ts_column,
+        c_resp.limit,
+        c_resp.is_descending,
+        c_resp.took,
+        c_resp.order_by,
+    );
+
+    // There are 3 types of partial responses:
+    // 1. VRL error
+    // 2. Super cluster error
+    // 3. Range error (max_query_limit)
+    // Cache partial results only if there is a range error
+    // let skip_cache_results = (merged_response.is_partial
+    //     && (merged_response.new_start_time.is_none() || merged_response.new_end_time.is_none()))
+    //     || (!merged_response.function_error.is_empty()
+    //         && merged_response.function_error.contains("vrl"));
+
+    // let mut should_cache_results = merged_response.new_start_time.is_some()
+    //     || merged_response.new_end_time.is_some()
+    //     || merged_response.function_error.is_empty();
+
+    // merged_response.function_error.retain(|err| {
+    //     !err.contains("Query duration is modified due to query range restriction of")
+    // });
+
+    // should_cache_results = should_cache_results && merged_response.function_error.is_empty();
+
+    // Update: Don't cache any partial results
+    let should_cache_results = merged_response.new_start_time.is_none()
+        && merged_response.new_end_time.is_none()
+        && merged_response.function_error.is_empty()
+        && !merged_response.hits.is_empty();
+
+    if cfg.common.result_cache_enabled && should_cache_results {
+        cache::write_results_v2(
+            &c_resp.trace_id,
+            &c_resp.ts_column,
+            start_time,
+            end_time,
+            &merged_response,
+            c_resp.file_path.clone(),
+            c_resp.is_aggregate,
+            c_resp.is_descending,
+        )
+        .await;
+        log::info!(
+            "[WS_SEARCH]: Results written to file for trace_id: {}, file_path: {}",
+            c_resp.trace_id,
+            c_resp.file_path,
+        );
+    }
+
+    Ok(())
+}
+
+
+/// Calculate the progress percentage based on the search type and current partition
+pub fn calculate_progress_percentage(
+    partition_start_time: i64,
+    partition_end_time: i64,
+    req_start_time: i64,
+    req_end_time: i64,
+    partition_order_by: &OrderBy,
+) -> usize {
+    if req_end_time <= req_start_time {
+        return 0;
+    }
+
+    let percentage = if *partition_order_by == OrderBy::Desc {
+        // For dashboards/histograms partitions processed newest to oldest
+        (req_end_time - partition_start_time) as f32 / (req_end_time - req_start_time) as f32
+    } else {
+        // For regular searches partitions processed oldest to newest
+        (partition_end_time - req_start_time) as f32 / (req_end_time - req_start_time) as f32
+    };
+    if percentage < 0.5 {
+        ((percentage * 100.0).ceil() as usize).min(100)
+    } else {
+        ((percentage * 100.0).floor() as usize).min(100)
+    }
+}
 // #[derive(Debug, Clone)]
 // pub struct SearchStreamerBuilder {
 //     pub org_id: String,
@@ -1189,8 +1305,11 @@ async fn process_delta(
         if !search_res.hits.is_empty() {
             // search_res = order_search_results(search_res, req.fallback_order_by_col.clone());
             // for every partition, compute the queried range omitting the result cache ratio
-            let queried_range =
-                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            let queried_range = calc_queried_range(
+                start_time,
+                end_time,
+                search_res.result_cache_ratio,
+            );
             *remaining_query_range -= queried_range;
 
             // set took
@@ -1345,6 +1464,24 @@ async fn process_delta(
     }
 
     Ok(())
+}
+
+/// Calculates the actual queried range for a search request, adjusted for the result cache ratio.
+///
+/// This function computes the effective queried time range in hours by considering the total time
+/// range (in microseconds) and reducing it based on the percentage of results cached.
+///
+/// # Parameters
+/// - `start_time` (`i64`): Start time in microseconds since the epoch.
+/// - `end_time` (`i64`): End time in microseconds since the epoch.
+/// - `result_cache_ratio` (`usize`): Percentage of results cached (0 to 100).
+///
+/// # Returns
+/// - `f64`: The effective queried range in hours, reduced by the cache ratio.
+pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ratio: usize) -> f64 {
+    let result_cache_ratio = result_cache_ratio.min(100); // ensure ratio in between 0 and 100
+    let range = (end_time - start_time) as f64 / 3_600_000_000.0; // convert microseconds to hours
+    range * (1.0 - result_cache_ratio as f64 / 100.0)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1664,4 +1801,197 @@ async fn write_partial_results_to_cache(
         }
         _ => {}
     }
+}
+
+enum SortStrategy {
+    SqlOrderBy,
+    FallbackColumn(String, OrderBy),
+    AutoDetermine(String, bool), // (column, is_string)
+    NoSort,
+}
+
+/// Determines and applies sorting to search results
+pub(crate) fn order_search_results(
+    mut search_res: Response,
+    fallback_order_by_col: Option<String>,
+) -> Response {
+    if search_res.hits.is_empty() {
+        return search_res;
+    }
+
+    let strategy = determine_sort_strategy(&search_res, fallback_order_by_col);
+    apply_sort_strategy(&mut search_res, strategy);
+
+    search_res
+}
+
+/// Applies the chosen sort strategy to results
+fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
+    match strategy {
+        SortStrategy::FallbackColumn(col, order) => {
+            // Auto-detect column type from first hit
+            let is_string = search_res
+                .hits
+                .first()
+                .and_then(|hit| hit.get(&col))
+                .map(|v| !v.is_number())
+                .unwrap_or(true);
+
+            // Sorting behavior:
+            // - String columns: Always sort ascending (A->Z)
+            // - Numeric columns: Respect the specified order (ASC/DESC)
+            let is_descending = if is_string {
+                false // Strings always sort ascending
+            } else {
+                order == OrderBy::Desc // Numbers follow specified order
+            };
+
+            sort_by_column(search_res, &col, is_string, is_descending);
+            if search_res.order_by.is_none() {
+                search_res.order_by = Some(order);
+            }
+        }
+        SortStrategy::AutoDetermine(col, is_string) => {
+            sort_by_column(search_res, &col, is_string, !is_string);
+        }
+        _ => (),
+    }
+}
+
+/// Determines which sorting strategy to use
+fn determine_sort_strategy(
+    search_res: &Response,
+    fallback_order_by_col: Option<String>,
+) -> SortStrategy {
+    // Check SQL ORDER BY first
+    if let Some(order_by) = search_res.order_by {
+        log::info!(
+            "[trace_id: {}] Using user-specified ORDER BY: {:?}",
+            &search_res.trace_id,
+            order_by
+        );
+        return SortStrategy::SqlOrderBy;
+    }
+
+    // Check fallback column
+    // Default to descending order
+    if let Some(col) = find_fallback_column(search_res, fallback_order_by_col) {
+        return SortStrategy::FallbackColumn(col, OrderBy::Desc);
+    }
+
+    // Auto-determine as last resort
+    if let Some((col, is_string)) = determine_sort_column(&search_res.hits[0]) {
+        log::info!(
+            "[trace_id: {}] Auto-sorting by column: {}, type: {}",
+            &search_res.trace_id,
+            col,
+            if is_string { "string" } else { "numeric" }
+        );
+        return SortStrategy::AutoDetermine(col, is_string);
+    }
+
+    SortStrategy::NoSort
+}
+
+/// Finds and validates fallback column in results
+fn find_fallback_column(search_res: &Response, fallback_col: Option<String>) -> Option<String> {
+    let fallback_col = fallback_col?;
+    let first_hit = search_res.hits.first()?.as_object()?;
+
+    // Find case-insensitive match
+    first_hit
+        .keys()
+        .find(|k| k.eq_ignore_ascii_case(&fallback_col))
+        .map(|k| {
+            log::info!(
+                "[trace_id: {}] Using fallback ORDER BY: {}",
+                &search_res.trace_id,
+                k
+            );
+            k.to_string()
+        })
+}
+
+/// Sorts results by a specific column
+fn sort_by_column(search_res: &mut Response, column: &str, is_string: bool, descending: bool) {
+    search_res.hits.sort_by(|a, b| {
+        let ordering = if is_string {
+            compare_string_values(a, b, column)
+        } else {
+            compare_numeric_values(a, b, column)
+        };
+        if descending {
+            ordering.reverse()
+        } else {
+            ordering
+        }
+    });
+}
+
+/// Compares string values with null handling
+fn compare_string_values(a: &Value, b: &Value, column: &str) -> std::cmp::Ordering {
+    let a_val = a.get(column).and_then(|v| v.as_str());
+    let b_val = b.get(column).and_then(|v| v.as_str());
+    match (a_val, b_val) {
+        // When both values exist: "apple" vs "banana" -> normal alphabetical order
+        (Some(a), Some(b)) => a.cmp(b),
+
+        // When first value is null and second exists: null vs "apple" -> null goes last
+        // Example: [apple, banana, null] in ascending order
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+
+        // When first value exists and second is null: "apple" vs null -> non-null goes first
+        // Example: [apple, banana, null] in ascending order
+        (Some(_), None) => std::cmp::Ordering::Less,
+
+        // When both values are null: null vs null -> treat as equal
+        // Example: [null, null] -> order doesn't change
+        (None, None) => std::cmp::Ordering::Equal,
+    }
+}
+
+/// Compares numeric values with null handling
+fn compare_numeric_values(a: &Value, b: &Value, column: &str) -> std::cmp::Ordering {
+    let a_val = a.get(column).and_then(|v| v.as_f64());
+    let b_val = b.get(column).and_then(|v| v.as_f64());
+    match (a_val, b_val) {
+        // When both are numbers: 1 vs 2 -> normal numeric order
+        // If NaN encountered, treat values as equal
+        // Example: [1, 2, 3] in ascending order
+        (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
+
+        // When first is null and second is a number: null vs 1 -> null goes last
+        // Example: [1, 2, null] in ascending order
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+
+        // When first is a number and second is null: 1 vs null -> number goes first
+        // Example: [1, 2, null] in ascending order
+        (Some(_), None) => std::cmp::Ordering::Less,
+
+        // When both are null: null vs null -> treat as equal
+        // Example: [null, null] -> order doesn't change
+        (None, None) => std::cmp::Ordering::Equal,
+    }
+}
+
+fn determine_sort_column(first_hit: &config::utils::json::Value) -> Option<(String, bool)> {
+    if let Some(obj) = first_hit.as_object() {
+        // First try to find non-numeric columns
+        for (key, value) in obj {
+            if !value.is_number() {
+                log::debug!("Using string column for sorting: {}", key);
+                return Some((key.clone(), true)); // (column, is_string)
+            }
+        }
+
+        // If no non-numeric column found, take first numeric column
+        for (key, value) in obj {
+            if value.is_number() {
+                log::debug!("Using numeric column for sorting: {}", key);
+                return Some((key.clone(), false)); // (column, is_string)
+            }
+        }
+    }
+    log::warn!("No suitable sort column found in results");
+    None
 }

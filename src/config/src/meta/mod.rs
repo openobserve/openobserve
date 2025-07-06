@@ -37,4 +37,3 @@ pub mod stream;
 pub mod timed_annotations;
 pub mod triggers;
 pub mod user;
-pub mod websocket;
