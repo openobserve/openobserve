@@ -202,7 +202,7 @@ pub async fn handle_values_request(
             } else {
                 // Step 2: Search without cache
                 // no caches found process req directly
-                log::info!(
+                log::debug!(
                     "[WS_VALUES] trace_id: {} No cache found, processing search request",
                     trace_id
                 );
