@@ -206,7 +206,7 @@ impl WsHandler {
                                             break;
                                         }
                                     }
-                                    Ok(message) => {
+                                    Ok(mut message) => {
                                         #[cfg(feature = "enterprise")]
                                         {
                                             let auth_str =
