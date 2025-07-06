@@ -25,17 +25,14 @@ use tokio_tungstenite::tungstenite;
 
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 
+#[cfg(feature = "enterprise")]
 pub mod enterprise_utils {
-    #[allow(unused_imports)]
     use config::meta::stream::StreamType;
-
-    #[allow(unused_imports)]
     use crate::common::meta;
 
-    #[cfg(feature = "enterprise")]
     pub async fn check_permissions(
         stream_name: &str,
-        stream_type: StreamType,
+        stream_type: config::meta::stream::StreamType,
         user_id: &str,
         org_id: &str,
     ) -> Result<(), String> {
