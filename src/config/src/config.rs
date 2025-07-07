@@ -1114,6 +1114,12 @@ pub struct Common {
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
     pub utf8_view_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_SYMBOL_ENABLED",
+        default = false,
+        help = "Enable to show symbol in dashboard"
+    )]
+    pub dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(EnvConfig)]

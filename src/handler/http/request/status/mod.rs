@@ -133,6 +133,7 @@ struct ConfigResponse<'a> {
     max_query_range: i64,
     ai_enabled: bool,
     dashboard_placeholder: String,
+    dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -335,6 +336,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
     }))
 }
 

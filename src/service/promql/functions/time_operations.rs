@@ -134,10 +134,7 @@ mod tests {
             let got = op.get_component_from_ts(timestamp_micros);
             assert!(
                 got == expected,
-                "operation type: {:?} expected {} got {}",
-                op,
-                expected,
-                got
+                "operation type: {op:?} expected {expected} got {got}"
             );
         }
     }

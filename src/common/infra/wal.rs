@@ -437,7 +437,7 @@ mod tests {
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);
         assert_eq!(file.size().await, data.len() as i64);
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
     }
 
     #[tokio::test]
@@ -453,7 +453,7 @@ mod tests {
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);
         assert_eq!(file.size().await, data.len() as i64);
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
     }
 
     #[tokio::test]
@@ -572,8 +572,8 @@ mod tests {
         assert_eq!(file.read().await.unwrap(), data);
 
         // Test file names
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
-        assert!(file.wal_name().contains(&format!("{}/{}", thread_id, key)));
-        assert!(file.full_name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
+        assert!(file.wal_name().contains(&format!("{thread_id}/{key}")));
+        assert!(file.full_name().contains(&format!("{thread_id}/{key}")));
     }
 }

@@ -28,7 +28,6 @@ pub mod cipher;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
-#[allow(unused_imports)]
 pub mod entity;
 pub mod folders;
 mod migration;

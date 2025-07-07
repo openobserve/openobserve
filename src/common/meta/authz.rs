@@ -90,7 +90,7 @@ mod tests {
             parent: "test-parent".to_string(),
         };
 
-        let debug_str = format!("{:?}", authz);
+        let debug_str = format!("{authz:?}");
         assert!(debug_str.contains("test-obj"));
         assert!(debug_str.contains("test-type"));
         assert!(debug_str.contains("test-parent"));
