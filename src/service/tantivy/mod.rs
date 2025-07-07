@@ -320,7 +320,7 @@ mod tests {
         if include_fts_field {
             fields.push(Field::new("content", DataType::Utf8, false));
             let content: Vec<String> = (0..num_rows)
-                .map(|i| format!("Test content number {}", i))
+                .map(|i| format!("Test content number {i}"))
                 .collect();
             columns.push(Arc::new(StringArray::from(content)));
         }

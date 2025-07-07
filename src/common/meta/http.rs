@@ -312,4 +312,34 @@ mod tests {
         let response = HttpResponse::json(payload);
         assert_eq!(response.status(), http::StatusCode::OK);
     }
+
+    #[test]
+    fn test_optional_fields_not_serialized_when_none() {
+        let response = HttpResponse {
+            code: 200,
+            message: "ok".to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+        };
+        let serialized = serde_json::to_string(&response).unwrap();
+        assert!(!serialized.contains("id"));
+        assert!(!serialized.contains("name"));
+        assert!(!serialized.contains("error_detail"));
+        assert!(!serialized.contains("trace_id"));
+    }
+
+    #[test]
+    fn test_http_response_builder_chaining() {
+        let mut response = HttpResponse::message(http::StatusCode::OK, "test");
+        response
+            .with_id("id-1".into())
+            .with_name("name-1".into())
+            .with_trace_id("trace-1".into());
+
+        assert_eq!(response.id, Some("id-1".into()));
+        assert_eq!(response.name, Some("name-1".into()));
+        assert_eq!(response.trace_id, Some("trace-1".into()));
+    }
 }

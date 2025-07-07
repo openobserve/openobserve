@@ -603,9 +603,9 @@ mod tests {
         for i in 0..10 {
             let cache_clone = cache.clone();
             let handle = thread::spawn(move || {
-                let path = PathBuf::from(format!("file_{}.term", i));
+                let path = PathBuf::from(format!("file_{i}.term"));
                 let range = 0..10;
-                let data = OwnedBytes::new(format!("data_{:04}", i).into_bytes());
+                let data = OwnedBytes::new(format!("data_{i:04}").into_bytes());
 
                 cache_clone.put_slice(path.clone(), range.clone(), data.clone());
                 let retrieved = cache_clone.get_slice(&path, range);

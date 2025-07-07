@@ -153,7 +153,7 @@ mod tests {
 
         for i in 0..5 {
             let (index, reader) = create_test_index();
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             cache.put(key.clone(), (index, reader));
         }
 
@@ -161,7 +161,7 @@ mod tests {
 
         // Verify all entries can be retrieved
         for i in 0..5 {
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             assert!(cache.get(&key).is_some());
         }
     }
@@ -173,7 +173,7 @@ mod tests {
         // Fill cache beyond capacity
         for i in 0..15 {
             let (index, reader) = create_test_index();
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             cache.put(key, (index, reader));
         }
 
@@ -190,7 +190,7 @@ mod tests {
         // Fill cache to capacity
         for i in 0..20 {
             let (index, reader) = create_test_index();
-            let key = format!("key_{}", i);
+            let key = format!("key_{i}");
             cache.put(key, (index, reader));
         }
 
@@ -245,7 +245,7 @@ mod tests {
             let cache_clone = cache.clone();
             let handle = thread::spawn(move || {
                 let (index, reader) = create_test_index();
-                let key = format!("concurrent_key_{}", i);
+                let key = format!("concurrent_key_{i}");
 
                 // Put entry
                 cache_clone.put(key.clone(), (index.clone(), reader.clone()));
@@ -278,7 +278,7 @@ mod tests {
             let cache_clone = cache.clone();
             let handle = thread::spawn(move || {
                 let (index, reader) = create_test_index();
-                let key = format!("eviction_key_{}", i);
+                let key = format!("eviction_key_{i}");
                 cache_clone.put(key, (index, reader));
 
                 // Small delay to increase chance of concurrent operations
@@ -318,7 +318,7 @@ mod tests {
         // Add many entries
         for i in 0..200 {
             let (index, reader) = create_test_index();
-            let key = format!("stress_key_{}", i);
+            let key = format!("stress_key_{i}");
             cache.put(key, (index, reader));
         }
 
@@ -393,7 +393,7 @@ mod tests {
         // Add many entries without triggering eviction
         for i in 0..500 {
             let (index, reader) = create_test_index();
-            let key = format!("large_key_{}", i);
+            let key = format!("large_key_{i}");
             cache.put(key, (index, reader));
         }
 

@@ -442,8 +442,8 @@ mod tests {
         ];
 
         for (i, blob_type) in blob_types.iter().enumerate() {
-            let blob_data = format!("blob data {}", i).into_bytes();
-            let blob_tag = format!("blob_{}", i);
+            let blob_data = format!("blob data {i}").into_bytes();
+            let blob_tag = format!("blob_{i}");
 
             writer
                 .add_blob(&blob_data, blob_type.clone(), blob_tag.clone())
@@ -456,7 +456,7 @@ mod tests {
             assert_eq!(writer.blobs_metadata[i].blob_type, *expected_type);
             assert_eq!(
                 writer.blobs_metadata[i].properties.get("blob_tag"),
-                Some(&format!("blob_{}", i))
+                Some(&format!("blob_{i}"))
             );
         }
 
