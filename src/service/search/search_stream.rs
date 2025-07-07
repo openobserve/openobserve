@@ -838,7 +838,7 @@ pub async fn do_partitioned_search(
     Ok(())
 }
 
-async fn get_partitions(
+pub async fn get_partitions(
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -901,7 +901,7 @@ async fn do_search(
     res.map(handle_partial_response)
 }
 
-fn handle_partial_response(mut res: Response) -> Response {
+pub fn handle_partial_response(mut res: Response) -> Response {
     if res.is_partial {
         res.function_error = if res.function_error.is_empty() {
             vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]

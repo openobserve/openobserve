@@ -672,7 +672,7 @@ pub async fn search_partition(
     // check if we need to use streaming_output
     let (streaming_id, streaming_interval_micros) =
         if req.streaming_output && is_streaming_aggregate {
-            match streaming_aggs::check_eligibility_for_streaming_aggs(
+            match streaming_aggs::get_streaming_id_and_interval(
                 trace_id,
                 &query,
                 &sql,
