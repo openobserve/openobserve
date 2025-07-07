@@ -786,10 +786,11 @@ pub async fn do_partitioned_search(
             };
 
             if let Err(e) = sender.send(Ok(response)).await {
-                log::error!("Error sending response: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Error sending response".to_string(),
-                ));
+                log::warn!(
+                    "[trace_id {}] Sender is closed, stopping do_partitioned_search",
+                    trace_id
+                );
+                return Ok(());
             }
         }
 
