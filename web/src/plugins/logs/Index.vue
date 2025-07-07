@@ -1536,6 +1536,10 @@ export default defineComponent({
       async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
 
+          // close field list and splitter
+          dashboardPanelData.layout.splitter = 0;
+          dashboardPanelData.layout.showFieldList = false;
+
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
