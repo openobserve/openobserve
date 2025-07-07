@@ -446,6 +446,9 @@ export const usePanelDataLoader = (
         abortControllerRef.signal,
       );
 
+      if (shouldSkipSearchDueToEmptyVariables()) {
+        return;
+      }
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
         // Set partial data when partition API call is interrupted
@@ -1512,7 +1515,9 @@ export const usePanelDataLoader = (
                   periodAsStr: "",
                 },
               };
-
+              if (shouldSkipSearchDueToEmptyVariables()) {
+                return;
+              }
               state.metadata.queries[panelQueryIndex] = metadata;
               const annotations = shouldFetchAnnotations()
                 ? await refreshAnnotations(
