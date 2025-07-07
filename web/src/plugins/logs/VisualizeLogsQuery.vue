@@ -37,15 +37,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- for query related chart only -->
       <div
         v-if="
-          !['html', 'markdown', 'custom_chart'].includes(
+          !['html', 'markdown', '6custom_chart'].includes(
             dashboardPanelData.data.type,
           )
         "
         class="col flex column"
         style="width: 100%; height: 100%"
       >
-      <!-- collapse field list bar -->
-      <div
+        <!-- collapse field list bar -->
+        <div
           v-if="!dashboardPanelData.layout.showFieldList"
           class="field-list-sidebar-header-collapsed"
           @click="collapseFieldList"
@@ -93,7 +93,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div class="row" style="height: 100%">
+            <div
+              class="row"
+              :style="{
+                height: '100%',
+                width: dashboardPanelData.layout.showFieldList
+                  ? '100%'
+                  : 'calc(100% - 50px)',
+              }"
+            >
               <div class="col" style="height: 100%">
                 <q-splitter
                   class="query-editor-splitter"
@@ -241,14 +249,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
-      
+
       <div
         v-if="dashboardPanelData.data.type == 'custom_chart'"
         class="col column"
-        style="height: 100% "
+        style="height: 100%"
       >
-      <!-- collapse field list bar -->
-      <div
+        <!-- collapse field list bar -->
+        <div
           v-if="!dashboardPanelData.layout.showFieldList"
           class="field-list-sidebar-header-collapsed"
           @click="collapseFieldList"
@@ -268,10 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div
-              class="col scroll"
-              style="height: 100%; overflow-y: auto"
-            >
+            <div class="col scroll" style="height: 100%; overflow-y: auto">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
                 class="column"
@@ -310,21 +315,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div
-              class="row"
-              style="height:100% ; overflow-y: auto"
-            >
+            <div class="row" style="height: 100%; overflow-y: auto">
               <div class="col" style="height: 100%">
-                    <div
-                      class="layout-panel-container col"
-                      style="height: 100%"
-                    >
-                    <q-splitter
-                      class="query-editor-splitter"
-                      v-model="splitterModel"    
-                      style="height: 100%"
-                      @update:model-value="layoutSplitterUpdated"
-                    >
+                <div class="layout-panel-container col" style="height: 100%">
+                  <q-splitter
+                    class="query-editor-splitter"
+                    v-model="splitterModel"
+                    style="height: 100%"
+                    @update:model-value="layoutSplitterUpdated"
+                  >
                     <template #before>
                       <CustomChartEditor
                         v-model="dashboardPanelData.data.customChartContent"
@@ -343,29 +342,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                     <template #after>
-                        <PanelSchemaRenderer
-                            @metadata-update="metaDataValue"
-                            :key="dashboardPanelData.data.type"
-                            :panelSchema="chartData"
-                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                            :variablesData="{}"
-                            @updated:vrl-function-field-list="
-                              updateVrlFunctionFieldList
-                            "
-                            :width="6"
-                            @error="handleChartApiError"
-                            :searchResponse="searchResponse"
-                          />
-
-                    </template>
-                     </q-splitter> 
-                      <DashboardErrorsComponent
-                        :errors="errorData"
-                        class="col-auto"
-                        style="flex-shrink: 0"
+                      <PanelSchemaRenderer
+                        @metadata-update="metaDataValue"
+                        :key="dashboardPanelData.data.type"
+                        :panelSchema="chartData"
+                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                        :variablesData="{}"
+                        @updated:vrl-function-field-list="
+                          updateVrlFunctionFieldList
+                        "
+                        :width="6"
+                        @error="handleChartApiError"
+                        :searchResponse="searchResponse"
                       />
-                    </div>
-
+                    </template>
+                  </q-splitter>
+                  <DashboardErrorsComponent
+                    :errors="errorData"
+                    class="col-auto"
+                    style="flex-shrink: 0"
+                  />
+                </div>
               </div>
               <q-separator vertical />
               <div class="col-auto">
@@ -465,7 +462,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs"
+      "logs",
     );
     const { t } = useI18n();
     const store = useStore();
@@ -489,7 +486,7 @@ export default defineComponent({
       async () => {
         // await nextTick();
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
-      }
+      },
     );
 
     const isOutDated = computed(() => {
@@ -506,7 +503,7 @@ export default defineComponent({
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     // resize the chart when query editor is opened and closed
@@ -521,11 +518,12 @@ export default defineComponent({
               expandedSplitterHeight.value;
           }
         }
-      }
+      },
     );
 
     const layoutSplitterUpdated = () => {
-      dashboardPanelData.layout.showFieldList = dashboardPanelData.layout.splitter > 0;
+      dashboardPanelData.layout.showFieldList =
+        dashboardPanelData.layout.splitter > 0;
       // emit resize event
       // this will rerender/call resize method of already rendered chart to resize
       window.dispatchEvent(new Event("resize"));
@@ -557,7 +555,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -573,13 +571,13 @@ export default defineComponent({
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
-      validatePanel(errors,true);
+      validatePanel(errors, true);
 
       if (errors.length) {
         // set errors into errorData
         props.errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
         return;
       } else {
@@ -803,10 +801,12 @@ export default defineComponent({
   height: 4px;
   width: 100%;
 }
+
 .splitter-vertical {
   width: 4px;
   height: 100%;
 }
+
 .splitter-enabled {
   background-color: #ffffff00;
   transition: 0.3s;
