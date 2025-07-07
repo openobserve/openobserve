@@ -374,7 +374,7 @@ test.describe("dashboard UI testcases", () => {
 
     await chartTypeSelector.searchAndAddField("kubernetes_container_hash", "b");
 
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     await page
       .locator('[data-test="dashboard-variable-adhoc-add-selector"]')
@@ -783,7 +783,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Listen for the dialog and assert its message
     page.once("dialog", async (dialog) => {
-      console.log(`Dialog message: ${dialog.message()}`);
+      // console.log(`Dialog message: ${dialog.message()}`);
       await dialog.accept();
     });
     await dashboardList.menuItem("logs-item");

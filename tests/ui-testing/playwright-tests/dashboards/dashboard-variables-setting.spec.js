@@ -484,9 +484,7 @@ test.describe("dashboard variables settings", () => {
 
     // Save the variable
     await dashboardSetting.saveVariable();
-    // await page
-    //   .locator('[data-test="dashboard-variable-add-btn"]')
-    //   .waitFor({ state: "visible" });
+
     await dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
@@ -532,9 +530,7 @@ test.describe("dashboard variables settings", () => {
 
     // Save the variable
     await dashboardSetting.saveVariable();
-    // await page
-    //   .locator('[data-test="dashboard-variable-add-btn"]')
-    //   .waitFor({ state: "visible" });
+
     await dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')

@@ -288,7 +288,6 @@ test.describe("dashboard UI testcases", () => {
 
     // Handle dialog and verify no data is visible
     page.once("dialog", (dialog) => {
-      console.log(`Dialog message: ${dialog.message()}`);
       dialog.dismiss().catch(() => {});
     });
     await expect(page.locator('[data-test="no-data"]')).toBeVisible();
