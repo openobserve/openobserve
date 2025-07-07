@@ -346,7 +346,7 @@ test.describe("dashboard Import testcases", () => {
     await dashboardImport.deleteImportedDashboard("01", "Frontdoor");
   });
 
-  test("should import the 'Azure Loadblance' dashbaord using URL import", async ({
+  test("should import the 'Azure Loadblance' dashboard using URL import", async ({
     page,
   }) => {
     // Set up listener to catch console errors

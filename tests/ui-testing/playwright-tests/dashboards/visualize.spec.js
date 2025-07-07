@@ -36,8 +36,6 @@ test.describe("logs testcases", () => {
 
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await logsVisualise.logsApplyQueryButton();
-    // await applyQueryButton(page);
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
   test("should create logs when queries are ingested into the search field", async ({

@@ -90,9 +90,11 @@ export default class LogsVisualise {
   //enable SQL Mode
   async enableSQLMode() {
     await this.page
+      // .getByRole("switch", { name: "SQL Mode" })
+      // .locator("div")
+      // .nth(2)
+      // .click();
       .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
       .click();
   }
 

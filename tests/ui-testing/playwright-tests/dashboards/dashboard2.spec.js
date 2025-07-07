@@ -458,7 +458,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Configure no value replacement
     await dashboardPanelConfigs.openConfigPanel();
-    await dashboardPanelConfigs.selectNoValeuReplace("2");
+    await dashboardPanelConfigs.selectNoValueReplace("2");
     await dashboardActions.applyDashboardBtn();
 
     // Save the dashboard panel

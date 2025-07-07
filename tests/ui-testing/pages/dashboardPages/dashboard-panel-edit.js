@@ -126,11 +126,15 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
+    // await this.page
+    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+    //   .waitFor({ state: "visible" });
+    // await this.page
+    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+    //   .click();
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-      .waitFor({ state: "visible" });
-    await this.page
-      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .waitFor({ state: "visible" })
       .click();
     await this.editLayout.waitFor({ state: "visible" });
     await this.editLayout.click();

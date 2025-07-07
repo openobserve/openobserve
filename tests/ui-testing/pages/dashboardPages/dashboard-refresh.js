@@ -11,7 +11,9 @@ export default class DashboardTimeRefresh {
     );
     this.timeTab = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
-    this.absTime = page.locator('[data-test="date-time-absolute-tab"]');
+    this.absolutetimeTime = page.locator(
+      '[data-test="date-time-absolute-tab"]'
+    );
     this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
     this.selectTime = page.locator('[data-test="date-time-relative-10-m-btn"]');
     this.refreshBtnManual = page.locator(
@@ -46,7 +48,7 @@ export default class DashboardTimeRefresh {
     await this.timeTab.click();
 
     // Switch to the absolute tab
-    await this.absTime.click();
+    await this.absolutetimeTime.click();
 
     // Click the left chevron button (if needed)
     await this.page

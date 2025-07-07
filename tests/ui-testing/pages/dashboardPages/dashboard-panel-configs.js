@@ -117,7 +117,7 @@ export default class DashboardPanelConfigs {
   }
 
   //No value replacement
-  async selectNoValeuReplace(replacement) {
+  async selectNoValueReplace(replacement) {
     await this.noValueReplacement.waitFor({ state: "visible" });
     await this.noValueReplacement.click();
     await this.noValueReplacement.fill(replacement);

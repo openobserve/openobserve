@@ -28,9 +28,8 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardAction = new DashboardactionPage(page);
+    const dashboardActions = new DashboardactionPage(page);
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -41,20 +40,20 @@ test.describe("dashboard UI testcases", () => {
     // Create a new dashboard and add a panel
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
     await chartTypeSelector.selectChartType("table");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Open the configuration panel and toggle the transpose button
     await dashboardPanelConfigs.openConfigPanel();
     await dashboardPanelConfigs.selectTranspose();
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardAction.savePanel();
+    await dashboardActions.savePanel();
 
     // Delete the created dashboard
     await dashboardCreate.backToDashboardList();
@@ -66,9 +65,8 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardAction = new DashboardactionPage(page);
+    const dashboardActions = new DashboardactionPage(page);
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -79,20 +77,20 @@ test.describe("dashboard UI testcases", () => {
     // Create a new dashboard and add a panel
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
     await chartTypeSelector.selectChartType("table");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
     await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Open the configuration panel and toggle the transpose button
     await dashboardPanelConfigs.openConfigPanel();
     await dashboardPanelConfigs.selectTranspose();
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardAction.savePanel();
+    await dashboardActions.savePanel();
 
     // Delete the created dashboard
     await dashboardCreate.backToDashboardList();
@@ -104,9 +102,8 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardAction = new DashboardactionPage(page);
+    const dashboardActions = new DashboardactionPage(page);
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -117,7 +114,7 @@ test.describe("dashboard UI testcases", () => {
     // Create a new dashboard and add a panel
     await dashboardCreate.createDashboard(randomDashboardName);
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
     await chartTypeSelector.selectChartType("table");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
@@ -127,10 +124,10 @@ test.describe("dashboard UI testcases", () => {
     // Open the configuration panel and enable dynamic columns
     await dashboardPanelConfigs.openConfigPanel();
     await dashboardPanelConfigs.selectDynamicColumns();
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardAction.savePanel();
+    await dashboardActions.savePanel();
 
     // Delete the created dashboard
     await dashboardCreate.backToDashboardList();
@@ -142,9 +139,8 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     const dashboardCreate = new DashboardCreate(page);
     const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
     const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardAction = new DashboardactionPage(page);
+    const dashboardActions = new DashboardactionPage(page);
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
@@ -157,7 +153,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Create a new dashboard and add a panel
     await dashboardCreate.addPanel();
-    await dashboardAction.addPanelName(panelName);
+    await dashboardActions.addPanelName(panelName);
     await chartTypeSelector.selectChartType("table");
     await chartTypeSelector.selectStreamType("logs");
     await chartTypeSelector.selectStream("e2e_automate");
@@ -168,10 +164,10 @@ test.describe("dashboard UI testcases", () => {
     await dashboardPanelConfigs.openConfigPanel();
     await dashboardPanelConfigs.selectTranspose();
     await dashboardPanelConfigs.selectDynamicColumns();
-    await dashboardAction.applyDashboardBtn();
+    await dashboardActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardAction.savePanel();
+    await dashboardActions.savePanel();
 
     // Delete the created dashboard
     await dashboardCreate.backToDashboardList();

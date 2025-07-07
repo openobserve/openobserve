@@ -152,7 +152,7 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(2000);
 
-    await await page
+    await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
 
@@ -619,7 +619,7 @@ test.describe("dashboard filter testcases", () => {
     await dashboardActions.waitForChartToRender();
 
     // Save panel
-    await dashboardActions.addPanelName("Dashbaord_test");
+    await dashboardActions.addPanelName("Dashboard_test");
     await dashboardActions.savePanel();
 
     // Delete dashboard
