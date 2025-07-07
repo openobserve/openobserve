@@ -1564,7 +1564,30 @@ export default defineComponent({
             value: value.zo_sql_key.toString(),
           }));
 
-        // Update options with new values
+        // Efficiently add the selected value to options if not present
+        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
+          const val = variableObject.value[0];
+          if (
+            val !== undefined &&
+            val !== null &&
+            !newOptions.some((opt) => opt.value === val) &&
+            val !== SELECT_ALL_VALUE
+          ) {
+            newOptions.push({ label: val, value: val });
+          }
+        } else if (
+          !variableObject.multiSelect &&
+          variableObject.value !== null &&
+          variableObject.value !== undefined &&
+          !newOptions.some((opt) => opt.value === variableObject.value) &&
+          variableObject.value !== SELECT_ALL_VALUE
+        ) {
+          newOptions.push({
+            label: variableObject.value,
+            value: variableObject.value,
+          });
+        }
+
         variableObject.options = newOptions;
 
         // Set default value
