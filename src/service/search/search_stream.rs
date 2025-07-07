@@ -105,18 +105,19 @@ pub async fn process_search_stream_request(
     fallback_order_by_col: Option<String>,
     _audit_ctx: Option<AuditContext>,
 ) {
-    log::info!(
-        "[HTTP2_STREAM] trace_id: {} Received test HTTP/2 stream request for org_id: {}",
-        trace_id,
-        org_id
+    log::debug!(
+        "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
     );
 
     // Send a progress: 0 event as an indiciator of search initiation
-    if let Err(e) = sender
+    if sender
         .send(Ok(StreamResponses::Progress { percent: 0 }))
         .await
+        .is_err()
     {
-        log::error!("[HTTP2_STREAM] Error sending progress event: {}", e);
+        log::warn!(
+            "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending progress event to client",
+        );
     }
 
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
@@ -170,11 +171,7 @@ pub async fn process_search_stream_request(
         {
             Ok(v) => v,
             Err(e) => {
-                log::error!(
-                    "[HTTP2_STREAM] trace_id: {}; Failed to check cache: {}",
-                    trace_id,
-                    e.to_string()
-                );
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Failed to check cache: {e}");
 
                 // send audit response first
                 #[cfg(feature = "enterprise")]
@@ -206,10 +203,9 @@ pub async fn process_search_stream_request(
                 }
 
                 // send error message to client
-                if let Err(e) = sender.send(Err(e)).await {
-                    log::error!(
-                        "[HTTP2_STREAM] Error sending error message to client: {}",
-                        e
+                if sender.send(Err(e)).await.is_err() {
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending message to client",
                     );
                 }
                 return;
@@ -236,9 +232,8 @@ pub async fn process_search_stream_request(
             .unwrap_or_default();
 
         log::info!(
-            "[HTTP2_STREAM] trace_id: {}, found cache responses len:{}, with hits: {},
+            "[HTTP2_STREAM trace_id {trace_id}] found cache responses len:{}, with hits: {},
         cache_start_time: {:#?}, cache_end_time: {:#?}",
-            trace_id,
             cached_resp.len(),
             cached_hits,
             c_start_time,
@@ -324,10 +319,9 @@ pub async fn process_search_stream_request(
                 )
                 .await;
 
-                if let Err(e) = sender.send(Err(e)).await {
-                    log::error!(
-                        "[HTTP2_STREAM] Error sending error message to client: {}",
-                        e
+                if sender.send(Err(e)).await.is_err() {
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending message to client",
                     );
                 }
                 return;
@@ -335,9 +329,8 @@ pub async fn process_search_stream_request(
         } else {
             // Step 2: Search without cache
             // no caches found process req directly
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {} No cache found, processing search request",
-                trace_id
+            log::debug!(
+                "[HTTP2_STREAM trace_id {trace_id}] No cache found, processing search request",
             );
 
             let size = req.query.size;
@@ -404,10 +397,9 @@ pub async fn process_search_stream_request(
                 )
                 .await;
 
-                if let Err(e) = sender.send(Err(e)).await {
-                    log::error!(
-                        "[HTTP2_STREAM] Error sending error message to client: {}",
-                        e
+                if sender.send(Err(e)).await.is_err() {
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending message to client",
                     );
                 }
                 return;
@@ -416,18 +408,20 @@ pub async fn process_search_stream_request(
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.query.from == 0
-            && let Err(e) =
-                write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
-                    .instrument(search_span.clone())
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
-                            trace_id,
-                            e
-                        );
-                        e
-                    })
+            && let Err(e) = write_results_to_cache(
+                c_resp,
+                start_time,
+                end_time,
+                &mut accumulated_results,
+            )
+            .instrument(search_span.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Error writing results to cache: {e}",
+                );
+                e
+            })
         {
             // send audit response first
             #[cfg(feature = "enterprise")]
@@ -458,10 +452,9 @@ pub async fn process_search_stream_request(
                 }
             }
 
-            if let Err(e) = sender.send(Err(e)).await {
-                log::error!(
-                    "[HTTP2_STREAM] Error sending error message to client: {}",
-                    e
+            if sender.send(Err(e)).await.is_err() {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending message to client",
                 );
             }
             return;
@@ -520,10 +513,9 @@ pub async fn process_search_stream_request(
                 }
             }
 
-            if let Err(e) = sender.send(Err(e)).await {
-                log::error!(
-                    "[HTTP2_STREAM] Error sending error message to client: {}",
-                    e
+            if sender.send(Err(e)).await.is_err() {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending message to client",
                 );
             }
             return;
@@ -532,9 +524,8 @@ pub async fn process_search_stream_request(
 
     // Once all searches are complete, write the accumulated results to a file
     log::info!(
-        "[HTTP2_STREAM] trace_id {} stream took {:?}",
-        trace_id,
-        start.elapsed()
+        "[HTTP2_STREAM trace_id {trace_id}] stream done, took {:?} ms",
+        start.elapsed().as_millis()
     );
 
     #[cfg(feature = "enterprise")]
@@ -561,13 +552,13 @@ pub async fn process_search_stream_request(
     }
 
     // Send a completion signal
-    if let Err(e) = sender
+    if sender
         .send(Ok(config::meta::search::StreamResponses::Done))
         .await
+        .is_err()
     {
-        log::error!(
-            "[HTTP2_STREAM] Error sending completion message to client: {}",
-            e
+        log::warn!(
+            "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending completion message to client",
         );
     }
 }
@@ -601,7 +592,7 @@ pub async fn do_partitioned_search(
     {
         req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
         log::info!(
-            "[HTTP2_STREAM] Query duration is modified due to query range restriction of {max_query_range} hours, new start_time: {}",
+            "[HTTP2_STREAM trace_id {trace_id}] Query duration is modified due to query range restriction of {max_query_range} hours, new start_time: {}",
             req.query.start_time
         );
         range_error = format!(
@@ -690,9 +681,7 @@ pub async fn do_partitioned_search(
             total_hits = search_res.total as i64;
             *hits_to_skip -= skip_hits;
             log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Skipped {} hits, remaining hits to skip: {}, total hits for partition {}: {}",
-                trace_id,
-                skip_hits,
+                "[HTTP2_STREAM trace_id {trace_id}] Skipped {skip_hits} hits, remaining hits to skip: {}, total hits for partition {}: {}",
                 *hits_to_skip,
                 idx,
                 total_hits
@@ -702,9 +691,7 @@ pub async fn do_partitioned_search(
         curr_res_size += total_hits;
         if req_size > 0 && curr_res_size >= req_size {
             log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
-                trace_id,
-                req_size
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
             );
             search_res.hits.truncate(req_size as usize);
         }
@@ -783,11 +770,9 @@ pub async fn do_partitioned_search(
                 },
             };
 
-            if let Err(e) = sender.send(Ok(response)).await {
-                log::error!("Error sending response: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Error sending response".to_string(),
-                ));
+            if sender.send(Ok(response)).await.is_err() {
+                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response",);
+                return Ok(());
             }
         }
 
@@ -800,11 +785,16 @@ pub async fn do_partitioned_search(
                 modified_end_time,
                 partition_order_by,
             );
-            if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
-                log::error!("Error sending progress: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Error sending progress".to_string(),
-                ));
+            if sender
+                .send(Ok(StreamResponses::Progress { percent }))
+                .await
+                .is_err()
+            {
+                log::warn!(
+                    "[trace_id {}] Sender is closed, stop sending progress",
+                    trace_id
+                );
+                return Ok(());
             }
         }
         let stop_values_search = req_size != -1
@@ -813,16 +803,14 @@ pub async fn do_partitioned_search(
             && curr_res_size >= req_size;
         if stop_values_search {
             log::info!(
-                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
-                req_size
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), stopping search",
             );
             break;
         }
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
             log::info!(
-                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
-                req_size
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), stopping search",
             );
             break;
         }
@@ -980,14 +968,8 @@ pub async fn handle_cache_responses_and_deltas(
     let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
 
     log::info!(
-        "[HTTP2_STREAM] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}",
-        trace_id,
-        curr_res_size,
-        cached_search_duration,
-        remaining_query_range,
+        "[HTTP2_STREAM trace_id {trace_id}] Handling cache response and deltas, curr_res_size: {curr_res_size}, cached_search_duration: {cached_search_duration}, remaining_query_duration: {remaining_query_range}, deltas_len: {}, cache_start_time: {cache_start_time}, cache_end_time: {cache_end_time}",
         deltas.len(),
-        cache_start_time,
-        cache_end_time,
     );
 
     // Process cached responses and deltas in sorted order
@@ -995,7 +977,7 @@ pub async fn handle_cache_responses_and_deltas(
         if let (Some(&delta), Some(cached)) = (delta_iter.peek(), cached_resp_iter.peek()) {
             // If the delta is before the current cached response time, fetch partitions
             log::info!(
-                "[HTTP2_STREAM] checking delta: {:?} with cached start_time: {:?}, end_time:{}",
+                "[HTTP2_STREAM trace_id {trace_id}] checking delta: {:?} with cached start_time: {:?}, end_time:{}",
                 delta,
                 cached.response_start_time,
                 cached.response_end_time,
@@ -1008,8 +990,7 @@ pub async fn handle_cache_responses_and_deltas(
 
             if process_delta_first {
                 log::info!(
-                    "[HTTP2_STREAM] trace_id: {} Processing delta before cached response, order_by: {:#?}",
-                    trace_id,
+                    "[HTTP2_STREAM trace_id {trace_id}] Processing delta before cached response, order_by: {:#?}",
                     cache_order_by
                 );
                 process_delta(
@@ -1060,10 +1041,7 @@ pub async fn handle_cache_responses_and_deltas(
             }
         } else if let Some(&delta) = delta_iter.peek() {
             // Process remaining deltas
-            log::info!(
-                "[HTTP2_STREAM] trace_id: {} Processing remaining delta",
-                trace_id
-            );
+            log::info!("[HTTP2_STREAM trace_id {trace_id}] Processing remaining delta",);
             process_delta(
                 req,
                 trace_id,
@@ -1113,9 +1091,7 @@ pub async fn handle_cache_responses_and_deltas(
         // Stop if reached the requested result size
         if req_size != -1 && curr_res_size >= req_size {
             log::info!(
-                "[HTTP2_STREAM] trace_id: {} Reached requested result size: {}, stopping search",
-                trace_id,
-                req_size
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size: {req_size}, stopping search",
             );
             break;
         }
@@ -1202,8 +1178,7 @@ async fn process_delta(
         *curr_res_size += total_hits;
         if req.query.size > 0 && *curr_res_size >= req.query.size {
             log::info!(
-                "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
-                trace_id,
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({}), truncating results",
                 req.query.size
             );
             let excess_hits = *curr_res_size - req_size;
@@ -1215,9 +1190,8 @@ async fn process_delta(
         }
 
         log::info!(
-            "[HTTP2_STREAM]: Found {} hits, for trace_id: {}",
+            "[HTTP2_STREAM trace_id {trace_id}] Found {} hits",
             search_res.hits.len(),
-            trace_id
         );
 
         if !search_res.hits.is_empty() {
@@ -1311,19 +1285,16 @@ async fn process_delta(
                 result_cache_ratio,
             );
 
-            if let Err(e) = sender.send(Ok(response)).await {
-                log::error!("Error sending search response: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Failed to send search response".to_string(),
-                ));
+            if sender.send(Ok(response)).await.is_err() {
+                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending search response",);
+                return Ok(());
             }
         }
 
         // Stop if `remaining_query_range` is less than 0
         if *remaining_query_range <= 0.00 {
             log::info!(
-                "[HTTP2_STREAM]: trace_id: {} Remaining query range is less than 0, stopping search",
-                trace_id
+                "[HTTP2_STREAM trace_id {trace_id}] Remaining query range is less than 0, stopping search",
             );
             let (new_start_time, new_end_time) = (
                 original_req_end_time - cache_req_duration,
@@ -1356,19 +1327,23 @@ async fn process_delta(
                 original_req_end_time,
                 cache_order_by,
             );
-            if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
-                log::error!("Error sending progress update: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Failed to send progress update".to_string(),
-                ));
+            if sender
+                .send(Ok(StreamResponses::Progress { percent }))
+                .await
+                .is_err()
+            {
+                log::warn!(
+                    "[trace_id {}] Sender is closed, stop sending progress",
+                    trace_id
+                );
+                return Ok(());
             }
         }
 
         // Stop if reached the request result size
         if req_size != -1 && *curr_res_size >= req_size {
             log::info!(
-                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
-                req_size
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), stopping search",
             );
             break;
         }
@@ -1435,11 +1410,9 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    if let Err(e) = sender.send(Ok(response)).await {
-        log::error!("Error sending partial search response: {}", e);
-        return Err(infra::errors::Error::Message(
-            "Error sending partial search response".to_string(),
-        ));
+    if sender.send(Ok(response)).await.is_err() {
+        log::warn!("[trace_id {trace_id}] Sender is closed, stop sending partial search response",);
+        return Ok(());
     }
 
     Ok(())
@@ -1529,11 +1502,9 @@ async fn send_cached_responses(
         },
     };
 
-    if let Err(e) = sender.send(Ok(response)).await {
-        log::error!("Error sending cached search response: {}", e);
-        return Err(infra::errors::Error::Message(
-            "Error sending cached search response".to_string(),
-        ));
+    if sender.send(Ok(response)).await.is_err() {
+        log::warn!("[trace_id {trace_id}] Sender is closed, stop sending cached search response",);
+        return Ok(());
     }
 
     {
@@ -1544,11 +1515,13 @@ async fn send_cached_responses(
             req.query.end_time,
             cache_order_by,
         );
-        if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
-            log::error!("Error sending progress update: {}", e);
-            return Err(infra::errors::Error::Message(
-                "Error sending progress update".to_string(),
-            ));
+        if sender
+            .send(Ok(StreamResponses::Progress { percent }))
+            .await
+            .is_err()
+        {
+            log::warn!("[trace_id {trace_id}] Sender is closed, stop sending progress");
+            return Ok(());
         }
     }
 
@@ -1694,17 +1667,14 @@ async fn write_partial_results_to_cache(
         #[cfg(feature = "enterprise")]
         infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(_)) => {
             log::info!(
-                "[HTTP2_STREAM] trace_id: {} Search cancelled, writing results to cache",
-                trace_id
+                "[HTTP2_STREAM trace_id {trace_id}] Search cancelled, writing results to cache",
             );
             // write the result to cache
             match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(
-                        "[HTTP2_STREAM] trace_id: {}, Error writing results to cache: {:?}",
-                        trace_id,
-                        e
+                        "[HTTP2_STREAM trace_id {trace_id}] Error writing results to cache: {e}",
                     );
                 }
             }
