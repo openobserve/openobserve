@@ -203,6 +203,26 @@
                 >
               </q-item-section>
             </q-item>
+            <q-item  clickable v-close-popup>
+              <q-item-section>
+                <q-item-label
+                  data-test="send-to-ai-chat-btn"
+                  @click.stop="sendToAiChat(JSON.stringify({
+                    [key]: value[key],
+                  }))"
+                  v-close-popup
+                  ><q-btn
+                    title="Send to AI Chat"
+                    size="6px"
+                    round
+                    class="q-mr-sm pointer"
+                  >
+                  <q-img height="14px" width="14px" :src="getBtnLogo" />
+                  </q-btn
+                  >Send to AI Chat</q-item-label
+                >
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-btn-dropdown>
 
@@ -274,7 +294,7 @@ export default {
       () => import("@/components/QueryEditor.vue"),
     ),
   },
-  emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
+  emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace", "sendToAiChat","closeTable"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
@@ -489,6 +509,17 @@ export default {
       return t("common.addFieldToTable");
     };
 
+    const sendToAiChat = (key: string, value: string) => {
+      emit("closeTable");
+      emit("sendToAiChat", key, value);
+    };
+
+    const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+
     return {
       t,
       copyLogToClipboard,
@@ -517,6 +548,8 @@ export default {
       setViewTraceBtn,
       getOriginalData,
       addOrRemoveLabel,
+      sendToAiChat,
+      getBtnLogo
     };
   },
 };

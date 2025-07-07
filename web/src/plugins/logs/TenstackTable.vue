@@ -248,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'tw-bg-zinc-700'
                   : 'tw-bg-zinc-300'
                 : '',
+              'table-row-hover'
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
@@ -280,6 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 
                 "
                 :streamName="jsonpreviewStreamName"
+                @send-to-ai-chat="sendToAiChat"
               />
             </td>
             <template v-else>
@@ -337,9 +339,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
+                    @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
                 {{ cell.renderValue() }}
+                <q-btn
+                v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
+                    :ripple="false"
+                    @click.stop="sendToAiChat(JSON.stringify(cell.row.original))"
+                    data-test="menu-link-ai-item"
+                    no-caps
+                    :borderless="true"
+                    flat
+                    size="xs"
+                    dense
+                    class="tw-absolute tw-right-[16px] tw-top-1/2 tw-transform tw--translate-y-1/2"
+                    :class="[
+                      'tw-invisible ai-btn'
+                    ]"
+                    style="border-radius: 100%;"
+                  >
+                    <div class="row items-center no-wrap">
+                      <img height="20px" width="20px"  :src="getBtnLogo" class="header-icon ai-icon" />
+                    </div>
+                  </q-btn>
               </td>
             </template>
           </tr>
@@ -366,6 +389,7 @@ import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
+import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps({
   rows: {
@@ -427,6 +451,7 @@ const emits = defineEmits([
   "update:columnOrder",
   "expandRow",
   "view-trace",
+  "sendToAiChat",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -793,9 +818,20 @@ const handleCellMouseLeave = () => {
 const viewTrace = (row: any) => {
   emits("view-trace", row);
 };
+const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+const sendToAiChat = (value: any) => {
+  emits("sendToAiChat", value);
+};
+
 
 defineExpose({
   parentRef,
+  getBtnLogo,
+  sendToAiChat
 });
 </script>
 <style scoped lang="scss">
@@ -886,6 +922,16 @@ td {
   &:hover {
     .table-cell-actions {
       display: block !important;
+    }
+  }
+}
+
+
+.table-row-hover {
+  &:hover {
+    .ai-btn {
+      visibility: visible !important;
+      z-index: 2;
     }
   }
 }

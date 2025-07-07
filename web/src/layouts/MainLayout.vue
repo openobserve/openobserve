@@ -455,11 +455,11 @@ class="padding-none" />
         <router-view v-slot="{ Component }">
           <template v-if="$route.meta.keepAlive">
             <keep-alive>
-              <component :is="Component" />
+              <component :is="Component"  @sendToAiChat="sendToAiChat" />
             </keep-alive>
           </template>
           <template v-else>
-            <component :is="Component" />
+            <component :is="Component"  @sendToAiChat="sendToAiChat" />
           </template>
         </router-view>
       </q-page-container>
@@ -647,6 +647,7 @@ export default defineComponent({
 
     const isMonacoEditorLoaded = ref(false);
     const isHovered = ref(false);
+    const aiChatInputContext = ref("");
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -1283,6 +1284,10 @@ export default defineComponent({
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
+    const sendToAiChat = (value: any) => {
+      store.dispatch("setIsAiChatEnabled", true);
+      aiChatInputContext.value = value;
+    }
 
     return {
       t,
@@ -1316,6 +1321,8 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
+      sendToAiChat,
+      aiChatInputContext
     };
   },
   computed: {
