@@ -13,31 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc};
+use std::{cmp::max, path::PathBuf, sync::Arc};
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    TIMESTAMP_COL_NAME,
-    cluster::LOCAL_NODE,
-    get_config, ider,
-    meta::{
+    cluster::LOCAL_NODE, get_config, ider, meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
         search,
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
+        sql::{resolve_stream_names, OrderBy, SqlOperator, TableReferenceExt},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
-    },
-    metrics,
-    utils::{
+    }, metrics, utils::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_distinct_query},
         time::now_micros,
-    },
+    }, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME
 };
 use hashbrown::HashMap;
 use infra::{
@@ -45,6 +40,8 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
+use liquid_cache_common::LiquidCacheMode;
+use liquid_cache_parquet::{cache::policies::LruPolicy, LiquidCache};
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
@@ -124,13 +121,13 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
 
 pub static LIQUID_CACHE: Lazy<Arc<LiquidCache>> = Lazy::new(|| {
     Arc::new(LiquidCache::new(
-        PARQUET_BATCH_SIZE,
+        PARQUET_BATCH_SIZE * 2,
         1024 * 1024 * 1024 * 1024,
         PathBuf::from("/tmp/liquid-cache"),
         LiquidCacheMode::Liquid {
-            transcode_in_background: true,
+            transcode_in_background: false,
         },
-        Box::new(policies::LruPolicy::new()),
+        Box::new(LruPolicy::new()),
     ))
 });
 

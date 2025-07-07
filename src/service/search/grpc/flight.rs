@@ -41,11 +41,13 @@ use infra::{
     },
 };
 use itertools::Itertools;
+use liquid_cache_parquet::rewrite_data_source_plan;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
     db,
     search::{
+        LIQUID_CACHE,
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor, ReplaceTableScanExec,
@@ -390,8 +392,10 @@ pub async fn search(
         physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
     }
 
-    // replace with liquid-cache
-    let physical_plan = rewrite_data_source_plan(physical_plan, &LIQUID_CACHE);
+    if cfg.common.liquid_cache_enabled {
+        // replace with liquid-cache
+        physical_plan = rewrite_data_source_plan(physical_plan, &LIQUID_CACHE);
+    }
 
     log::info!(
         "{}",

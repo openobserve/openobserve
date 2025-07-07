@@ -1120,6 +1120,8 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_LIQUID_CACHE_ENABLED", default = false)]
+    pub liquid_cache_enabled: bool,
 }
 
 #[derive(EnvConfig)]
