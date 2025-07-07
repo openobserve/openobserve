@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div
       class="q-pt-md"
-      
       :class="[store.state.theme === 'dark' ? 'bg-dark add-regex-pattern-dark' : 'bg-white add-regex-pattern-light',
       ]"
           :style="{
@@ -80,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator class="q-mb-md q-mt-sm" />
       <!-- form inputs starts here -->
        <div class="tw-flex tw-w-[100%]">
-            <div class=" "
+            <div
             :class="store.state.isAiChatEnabled ? isFullScreen ? 'tw-w-[75%] q-pl-sm' : 'tw-w-[65%] q-pl-sm' : 'tw-w-[100%] q-px-md'"
             >
             <q-form @submit="saveRegexPattern" class="tw-flex tw-flex-col tw-gap-4" style="overflow: auto; height: calc(100vh - 150px);">
@@ -99,7 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         filled
                         dense
                         :lazy-rules="true"
+                        :hide-bottom-space="true"
                         :rules="[val => val !== '' || '* Name is required']"
+                        placeholder="Eg. Internal Passwords"
                         />
                     <q-input
                         v-model="regexPatternInputs.description"
@@ -112,30 +113,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         filled
                         dense
                         data-test="add-regex-pattern-description-input"
+                        placeholder="Describe your pattern to help users understand"
                         />
                 <div class="regex-pattern-input-container">
-                    <FullViewContainer
-                        style="padding: 12px 8px;"
-                        :style="{
-                            'background-color': store.state.theme === 'dark' ? '#2A2929' : '#fafafa',
-                            'border': store.state.theme === 'dark' ? '' : '1px solid #E6E6E6'
-                        }"
-                        name="query"
-                        v-model:is-expanded="expandState.regexPattern"
-                        label="Regular Expression*"
-                        class="tw-mt-1 tw-py-md"
-                        labelClass="tw-py-md"
-                    >
-                    <template #right>
-                        <q-btn class="tw-px-2 tw-py-1"
-                        :class="store.state.theme === 'dark' ? 'tw-bg-[#529DFF80] ' : 'tw-bg-[#8369B61C]'"
+                    <div class="tw-flex tw-items-center tw-justify-between">
+                        <span class="regex-pattern-input-label">
+                            Regex Pattern
+                        </span>
+                        <q-btn class="tw-px-2 tw-py-1 tw-flex tw-items-center"
                         style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
-                        <q-icon  :name="outlinedLightbulb" />
-                            <span class="import-button-text">Try O2 AI to write expressions</span>
+                        <img :src="goToAILogo" class="tw-w-[20px] tw-h-[20px] tw-mr-1" />
+                        <span class="tw-text-[#5960B2] tw-text-sm tw-flex tw-items-center tw-gap-1">
+                            Try O2 AI to write expressions 
+                        </span>
+                        <q-icon size="sm" name="arrow_right_alt" class="tw-text-[#5960B2] tw-w-[20px] tw-h-[20px] tw-ml-1" />
+
                             </q-btn>
-                    </template>
-                </FullViewContainer>
-                    <div v-if="expandState.regexPattern" class="regex-pattern-input">
+                    </div>
+                    <div class="regex-pattern-input">
+                        <div
+                            class="tw-py-[2px] tw-h-[24px]"
+                            :class="store.state.theme === 'dark' ? 'tw-bg-gray-500' : 'tw-bg-gray-200 '"
+                        >
+                                <div
+                                class="tw-text-[12px] tw-font-[500] tw-px-2"
+                                :class="[
+                                    store.state.theme === 'dark'
+                                    ? 'tw-text-[#ffffff]'
+                                    : 'tw-text-[#6B7280]',
+                                ]"
+                                >
+                                Write Pattern
+                                </div>    
+                        </div>
                         <q-input
                         data-test="add-regex-pattern-input"
                         v-model="regexPatternInputs.pattern"
@@ -153,30 +163,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         placeholder="Eg. \d....\d "
                         rows="5"
                         :rules="[val => val !== '' || '* Pattern is required']"
+                        :hide-bottom-space="true"
                         />
                     </div>
                 </div>
-                <div class="regex-pattern-test-string-container q-mb-md">
+                <q-separator class="tw-my-2" />
+                <div>
+                    <div class="tw-flex tw-items-center tw-justify-between">
+                        <span class="regex-pattern-test-string-label">
+                            Test Regex Pattern
+                        </span>
+                    </div>
+                </div>
+                <div class="regex-pattern-test-string-container q-mb-sm">
                     <FullViewContainer
-                        style="padding: 12px 8px; "
-                        :style="{
-                            'background-color': store.state.theme === 'dark' ? '#2A2929' : '#fafafa',
-                            'border': store.state.theme === 'dark' ? '' : '1px solid #E6E6E6'
-                        }"
                         name="query"
                         v-model:is-expanded="expandState.regexTestString"
-                        label="Test String"
-                        class="tw-mt-1 tw-py-md"
-                        labelClass="tw-py-md"
+                        label="Input string"
+                        class="tw-mt-1 tw-py-md tw-h-[24px]"
+                        :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
                     <template #right>
-                        <q-btn  class="tw-px-2 tw-py-1 tw-bg-[#5ca380]"
-                        style="border-radius: 4px;" dense no-caps flat  @click="testStringOutput"
-                        :disable="testLoading || !testString"
-                        >
-                            <span v-if="!testLoading ">Test String</span>
-                            <span v-else>Testing...</span>
-                        </q-btn>
+                        <div class="tw-h-[19px] tw-flex tw-items-center tw-mt-[1px] tw-justify-center">
+                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw-px-2 tw-h-[19px] tw-min-h-[19px] tw-mr-1 tw-bg-[#5960B2] tw-text-white tw-flex tw-items-center tw-justify-center"
+                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
+                        <span>
+                            Test Input
+                        </span>
+                    </q-btn>
+                        </div>
+
                     </template>
                 </FullViewContainer>
                     <div v-if="expandState.regexTestString" class="regex-pattern-input" >
@@ -201,20 +217,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="regex-pattern-test-string-container">
                     <FullViewContainer
-                        style="padding: 12px 8px; "
-                        :style="{
-                            'background-color': store.state.theme === 'dark' ? '#2A2929' : '#fafafa',
-                            'border': store.state.theme === 'dark' ? '' : '1px solid #E6E6E6'
-                        }"
-                        name="query"
+                        name="output"
                         v-model:is-expanded="expandState.outputString"
-                        label="Output String"
-                        class="tw-mt-1 tw-py-md"
-                        labelClass="tw-py-md"
-                        :o2AIicon="false"
-                    />
+                        label="Output"
+                        class="tw-mt-1 tw-py-md tw-h-[24px]"
+                        :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
+                    >
+                </FullViewContainer>
                     <div v-if="expandState.outputString" class="regex-pattern-input" >
                         <q-input
+                        v-if="outputString.length > 0"
                         data-test="add-regex-test-string-input"
                         v-model="outputString"
                         color="input-border"
@@ -231,6 +243,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         placeholder="Output String"
                         rows="5"
                         />
+                        <div v-else class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-[111px] " 
+                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'"
+
+                        >
+                            <div v-if="!testLoading && outputString.length === 0">
+                                <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#A8A8A8]'" />
+                            <span class="tw-text-[12px] tw-font-[400] tw-text-center" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#4B5563]'">
+                                Please click Test Input to see the results
+                            </span>
+                            </div>
+                            <div v-else-if="testLoading">
+                                <span class="tw-flex tw-items-center tw-justify-center tw-h-[111px]">
+                                    <q-spinner-hourglass color="primary" size="24px" />
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 </div>
@@ -252,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-my-sm text-bold no-border"
                     :style="{
                         'background-color': isFormEmpty ? '#aeaeae' : '#5ca380',
-                        'color': isFormEmpty  ? store.state.theme === 'dark' ? '#ffffff' : '#000000' : '#ffffff'
+                        'color': isFormEmpty  ? store.state.theme === 'dark' ? '#ffffff ' : '#000000' : '#ffffff'
                         }"
                     padding="sm xl"
                     type="submit"
@@ -263,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width:35%; max-width: 100%; min-width: 75px; height: calc(100vh - 90px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-              <O2AIChat style="height: calc(100vh - 90px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
+                <O2AIChat style="height: calc(100vh - 90px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
             </div>
        </div>
 
@@ -396,12 +424,14 @@ setup(props, {emit}) {
             ? getImageURL('images/common/ai_icon_dark.svg')
             : getImageURL('images/common/ai_icon.svg')
     })
+    const goToAILogo = computed(() => {
+        return getImageURL('images/common/ai_icon_primary.svg')
+    })
     const toggleAIChat = () => {
         const isEnabled = !store.state.isAiChatEnabled;
         store.dispatch("setIsAiChatEnabled", isEnabled);
         window.dispatchEvent(new Event("resize"));
     };
-
 
     const saveRegexPattern = async () => {
         isSaving.value = true;
@@ -446,11 +476,11 @@ setup(props, {emit}) {
 
     const testStringOutput = async () => {
         try{
+            expandState.value.outputString = true;
+            outputString.value = "";
             testLoading.value = true;
             const response = await regexPatternService.test(store.state.selectedOrganization.identifier, regexPatternInputs.value.pattern, [testString.value]);
             outputString.value = response.data.results[0];
-            expandState.value.regexTestString = false;
-            expandState.value.outputString = true;
         } catch (error) {
             q.notify({
                 color: "negative",
@@ -485,7 +515,8 @@ setup(props, {emit}) {
         outputString,
         testStringOutput,
         outlinedLightbulb,
-        testLoading
+        testLoading,
+        goToAILogo
         }
 }
 });
@@ -591,6 +622,61 @@ setup(props, {emit}) {
         .monaco-editor-background{
             background-color: #181a1b !important;
         }
+    }
+    .regex-pattern-input-label{
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 21px;
+    }
+    .add-regex-pattern-dark{
+        .regex-pattern-input-label{
+            color: #ffffff;
+        }
+    }
+    .add-regex-pattern-light{
+        .regex-pattern-input-label{
+            color: #6B7280;
+        }
+    }
+    .regex-pattern-test-string-label{
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 21px;
+    }
+    .add-regex-pattern-dark{
+        .regex-pattern-test-string-label{
+            color: #ffffff;
+        }
+    }
+    .add-regex-pattern-light{
+        .regex-pattern-test-string-label{
+            color: #6B7280;
+        }
+    }
+    .dark-test-string-container-label{
+        color: #ffffff;
+        font-weight: 500;
+        font-size: 12px;
+        line-height: 21px;
+    }
+    .light-test-string-container-label{
+        color: #6B7280;
+        font-weight: 500;
+        font-size: 12px;
+        line-height: 21px;
+        margin-left: -4px;
+    }
+    .dark-mode-regex-no-output{
+        background-color:#181A1B !important;
+        border-left: 2px solid #212121 !important;
+        border-right: 2px solid #212121 !important;
+        border-bottom: 2px solid #212121 !important;
+    }
+    .light-mode-regex-no-output{
+        background-color:#ffffff !important;
+        border-left: 1px solid #E6E6E6 !important;
+        border-right: 1px solid #E6E6E6 !important;
+        border-bottom: 1px solid #E6E6E6 !important;
     }
 </style>
 

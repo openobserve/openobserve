@@ -32,7 +32,7 @@
         <slot name="left" />
       </div>
       <div>
-        <slot name="right" />
+        <slot name="right" />  
       </div>
     </div>
     <slot v-if="expanded" />

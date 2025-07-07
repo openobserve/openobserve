@@ -38,6 +38,7 @@
                     dense
                     debounce="1"
                     placeholder="Search"
+                    clearable
                 >
                   <template #prepend>
                     <q-icon name="search" />
@@ -220,67 +221,95 @@
                     {{ userClickedPattern.pattern }}
                   </span>
                 </div>
-                <div>
-                  <div class="tw-flex tw-justify-between tw-items-center tw-mb-2">
-                    <span class="individual-section-sub-title2">
-                    Add Test
-                  </span>
-                  <span>
-                    <q-btn  class="tw-px-2 tw-py-1 tw-bg-[#5ca380]"
-                        style="border-radius: 4px;" dense no-caps flat  @click="testStringOutput"
-                        :disable="testLoading || !testString"
-                        >
-                        <span v-if="!testLoading">Test String</span>
-                        <span v-else>Testing...</span>
-                        </q-btn>
-                  </span>
-                  </div>
+                <div class="regex-pattern-test-string-container">
+                    <FullViewContainer
+                        name="query"
+                        v-model:is-expanded="expandState.regexTestString"
+                        label="Input string"
+                        class="tw-mt-1 tw-py-md tw-h-[24px]"
+                        :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
+                    >
+                    <template #right>
+                        <div class="tw-h-[19px] tw-flex tw-items-center tw-mt-[1px] tw-justify-center">
+                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-h-[19px] tw-min-h-[19px] tw-mr-1 tw-bg-[#5960B2] tw-text-white tw-flex tw-items-center tw-justify-center"
+                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
+                        <span>
+                            Test Input
+                        </span>
+                    </q-btn>
+                        </div>
 
-                    <q-input
-                      data-test="associated-regex-patterns-test-string-input"
-                      v-model="testString"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="regex-test-string-input"
-                      :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      tabindex="0"
-                      style="width: 100%; resize: none;"
-                      type="textarea"
-                      placeholder="Eg. 1234567890"
-                      rows="5"
-                      />
+                    </template>
+                </FullViewContainer>
+                    <div v-if="expandState.regexTestString" class="regex-pattern-input" >
+                        <q-input
+                        data-test="add-regex-test-string-input"
+                        v-model="testString"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="regex-test-string-input"
+                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                        style="width: 100%; resize: none;"
+                        type="textarea"
+                        placeholder="Eg. 1234567890"
+                        rows="5"
+                        />
+                    </div>
                 </div>
-                <div>
-                    <span class="individual-section-sub-title2">
-                      Output String
-                  </span>
+                <div class="regex-pattern-test-string-container">
+                    <FullViewContainer
+                        name="output"
+                        v-model:is-expanded="expandState.outputString"
+                        label="Output"
+                        class="tw-mt-1 tw-py-md tw-h-[24px]"
+                        :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
+                    >
+                </FullViewContainer>
+                    <div v-if="expandState.outputString" class="regex-pattern-input" >
+                        <q-input
+                        v-if="outputString.length > 0"
+                        data-test="add-regex-test-string-input"
+                        v-model="outputString"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="regex-test-string-input"
+                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
+                        stack-label
+                        outlined
+                        filled
+                        dense
+                        tabindex="0"
+                        style="width: 100%; resize: none;"
+                        type="textarea"
+                        placeholder="Output String"
+                        rows="5"
+                        />
+                        <div v-else class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-[111px] " 
+                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'"
 
-                  </div>
-
-                    <q-input
-                      data-test="associated-regex-patterns-test-string-input"
-                      v-model="outputString"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="regex-test-string-input"
-                      :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      tabindex="0"
-                      style="width: 100%; resize: none;"
-                      type="textarea"
-                      placeholder="Eg. 1234567890"
-                      rows="5"
-                      />
-                      <q-separator />
-                  
+                        >
+                            <div v-if="!testLoading && outputString.length === 0">
+                                <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#A8A8A8]'" />
+                            <span class="tw-text-[12px] tw-font-[400] tw-text-center" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#4B5563]'">
+                                Please click Test Input to see the results
+                            </span>
+                            </div>
+                            <div v-else-if="testLoading">
+                                <span class="tw-flex tw-items-center tw-justify-center tw-h-[111px]">
+                                    <q-spinner-hourglass color="primary" size="24px" />
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <q-separator />
               </div>
+
 
               <!-- remove or add pattern button  -->
                <div class="add-remove-pattern-button tw-mb-4">
@@ -350,6 +379,8 @@ import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
 import { debounce, useQuasar } from 'quasar';
 import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
+import FullViewContainer from '../functions/FullViewContainer.vue';
+import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 
 export interface PatternAssociation {
     field: string;
@@ -361,6 +392,7 @@ export interface PatternAssociation {
 export default defineComponent({
     name: "AssociatedRegexPatterns",
     components: {
+        FullViewContainer
     },
     props: {
         data: {
@@ -409,9 +441,15 @@ export default defineComponent({
         const queryEditorRef = ref<any>(null);
         const testLoading = ref(false);
         const outputString = ref("");
+        const expandState = ref({
+          regexTestString: true,
+          outputString: false
+        });
 
         const testStringOutput = async () => {
           try{
+            expandState.value.outputString = true;
+            outputString.value = "";
             testLoading.value = true;
             const response = await regexPatternsService.test(store.state.selectedOrganization.identifier, userClickedPattern.value.pattern, [testString.value]);
             outputString.value = response.data.results[0];
@@ -497,7 +535,7 @@ export default defineComponent({
             apply_at.value = [];
             policy.value = "Redact";
           }
-          testString.value = "";
+          resetInputValues();
         })
         //this runs when users clicks on add / remove pattern button 
         //to update the applied patterns list
@@ -672,7 +710,14 @@ export default defineComponent({
         // Keep appliedPatternsMap in sync with appliedPatterns
         watch(() => props.data, (newVal) => {
           appliedPatternsMap.value = new Map(newVal.map(p => [p.pattern_id, p]));
-        }, { immediate: true })
+        }, { immediate: true });
+
+        const resetInputValues = () => {
+          testString.value = "";
+          outputString.value = "";
+          expandState.value.outputString = false;
+          expandState.value.regexTestString = true;
+        }
 
 
         return {
@@ -709,7 +754,10 @@ export default defineComponent({
             queryEditorRef,
             testLoading,
             testStringOutput,
-            outputString
+            outputString,
+            expandState,
+            outlinedLightbulb,
+            resetInputValues
         }
     }
 })
@@ -756,7 +804,7 @@ export default defineComponent({
     }
     .individual-section-sub-title2{
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       line-height: 24px;
     }
     .individual-section-sub-information{
@@ -862,6 +910,18 @@ export default defineComponent({
     }
     .dark-mode-regex-associated-test-string-input .monaco-editor-background{
       background-color: #1f1f1f !important;
+    }
+    .dark-mode-regex-no-output{
+        background-color:#181A1B !important;
+        border-left: 2px solid #212121 !important;
+        border-right: 2px solid #212121 !important;
+        border-bottom: 2px solid #212121 !important;
+    }
+    .light-mode-regex-no-output{
+        background-color:#ffffff !important;
+        border-left: 1px solid #E6E6E6 !important;
+        border-right: 1px solid #E6E6E6 !important;
+        border-bottom: 1px solid #E6E6E6 !important;
     }
 
 </style>
