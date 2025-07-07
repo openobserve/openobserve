@@ -27,6 +27,7 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
+use serde_json::Value;
 
 use crate::cipher::registry::REGISTRY;
 
@@ -40,7 +41,7 @@ pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         DECRYPT_UDF_NAME,
         // expects two arguments : field and key_name
-        vec![DataType::Utf8, DataType::Utf8],
+        vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
         // returns string
         DataType::Utf8,
         Volatility::Stable,
@@ -53,7 +54,7 @@ pub(crate) static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ENCRYPT_UDF_NAME,
         // expects two arguments : field and key_name
-        vec![DataType::Utf8, DataType::Utf8],
+        vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
         // returns string
         DataType::Utf8,
         Volatility::Stable,
@@ -64,10 +65,11 @@ pub(crate) static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 /// decrypt function
 fn decrypt() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
-        if args.len() != 2 {
+        if args.len() != 3 {
             return Err(DataFusionError::SQL(
                 ParserError::ParserError(
-                    "decrypt requires tow params : decrypt(field_name, key_name)".to_string(),
+                    "decrypt requires three params : decrypt(field_name, key_name, path)"
+                        .to_string(),
                 ),
                 None,
             ));
@@ -79,6 +81,17 @@ fn decrypt() -> ScalarFunctionImplementation {
                 return Err(DataFusionError::SQL(
                     ParserError::ParserError(
                         "second argument to decrypt must be a key-name string".to_string(),
+                    ),
+                    None,
+                ));
+            }
+        };
+        let path = match &args[2] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
+            _ => {
+                return Err(DataFusionError::SQL(
+                    ParserError::ParserError(
+                        "third argument to decrypt must be a path string".to_string(),
                     ),
                     None,
                 ));
@@ -119,12 +132,77 @@ fn decrypt() -> ScalarFunctionImplementation {
         let ret = values
             .iter()
             .map(|v| {
-                v.map(|s| match cipher.decrypt(s) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        err_count += 1;
-                        last_error = Some(e);
-                        s.to_owned()
+                v.map(|original_str| {
+                    // if path is just '.', it means we simply have to decrypt
+                    // the given value, so we directly do that
+                    if path == "." {
+                        match cipher.decrypt(original_str) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                err_count += 1;
+                                last_error = Some(e);
+                                original_str.to_owned()
+                            }
+                        }
+                    } else {
+                        // first try to parse json, if fails, return original value
+                        let v: Value = match serde_json::from_str(original_str) {
+                            Ok(v) => v,
+                            Err(_) => {
+                                return original_str.to_owned();
+                            }
+                        };
+                        // try to get the path given from parsed json, if fails, return original
+                        // value
+                        let v = match config::utils::json::get_value_from_path(&v, &path) {
+                            Some(v) => v,
+                            None => {
+                                // technically this is not error, simply the given path is not
+                                // present
+                                return original_str.to_owned();
+                            }
+                        };
+                        // given path must either be a string, in which case directly decrypt it
+                        // or is must be an array of string, in which case we basically .map() it
+                        // and re-stringify
+                        match v {
+                            Value::String(s) => match cipher.decrypt(&s) {
+                                Ok(v) => v,
+                                Err(e) => {
+                                    err_count += 1;
+                                    last_error = Some(e);
+                                    s.to_owned()
+                                }
+                            },
+                            Value::Array(arr) => {
+                                let mut ret = Vec::with_capacity(arr.len());
+                                // we only consider the string values from the array,
+                                // anything else gets silently ignored
+                                arr.into_iter().for_each(|v| {
+                                    if let Value::String(s) = v {
+                                        let t = match cipher.decrypt(&s) {
+                                            Ok(v) => v,
+                                            Err(e) => {
+                                                err_count += 1;
+                                                last_error = Some(e);
+                                                s.to_owned()
+                                            }
+                                        };
+                                        ret.push(t);
+                                    }
+                                });
+                                // if there is not a single string value in given array,
+                                // user probably has given incorrect path, we we return original
+                                // value
+                                if ret.is_empty() {
+                                    original_str.to_owned()
+                                } else {
+                                    // we can unwrap because vec of strings should be serializable
+                                    serde_json::to_string(&ret).unwrap()
+                                }
+                            }
+                            _ => original_str.to_owned(),
+                        }
                     }
                 })
             })
@@ -143,10 +221,11 @@ fn decrypt() -> ScalarFunctionImplementation {
 /// decrypt function
 fn encrypt() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
-        if args.len() != 2 {
+        if args.len() != 3 {
             return Err(DataFusionError::SQL(
                 ParserError::ParserError(
-                    "encrypt requires tow params : encrypt(field_name, key_name)".to_string(),
+                    "encrypt requires three params : encrypt(field_name, key_name, path)"
+                        .to_string(),
                 ),
                 None,
             ));
@@ -158,6 +237,18 @@ fn encrypt() -> ScalarFunctionImplementation {
                 return Err(DataFusionError::SQL(
                     ParserError::ParserError(
                         "second argument to encrypt must be a key-name string".to_string(),
+                    ),
+                    None,
+                ));
+            }
+        };
+
+        let path = match &args[2] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
+            _ => {
+                return Err(DataFusionError::SQL(
+                    ParserError::ParserError(
+                        "third argument to encrypt must be a path string".to_string(),
                     ),
                     None,
                 ));
@@ -198,12 +289,77 @@ fn encrypt() -> ScalarFunctionImplementation {
         let ret = values
             .iter()
             .map(|v| {
-                v.map(|s| match cipher.encrypt(s) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        err_count += 1;
-                        last_error = Some(e);
-                        s.to_owned()
+                v.map(|original_str| {
+                    // if path is just '.', it means we simply have to decrypt
+                    // the given value, so we directly do that
+                    if path == "." {
+                        match cipher.encrypt(original_str) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                err_count += 1;
+                                last_error = Some(e);
+                                original_str.to_owned()
+                            }
+                        }
+                    } else {
+                        // first try to parse json, if fails, return original value
+                        let v: Value = match serde_json::from_str(original_str) {
+                            Ok(v) => v,
+                            Err(_) => {
+                                return original_str.to_owned();
+                            }
+                        };
+                        // try to get the path given from parsed json, if fails, return original
+                        // value
+                        let v = match config::utils::json::get_value_from_path(&v, &path) {
+                            Some(v) => v,
+                            None => {
+                                // technically this is not error, simply the given path is not
+                                // present
+                                return original_str.to_owned();
+                            }
+                        };
+                        // given path must either be a string, in which case directly decrypt it
+                        // or is must be an array of string, in which case we basically .map() it
+                        // and re-stringify
+                        match v {
+                            Value::String(s) => match cipher.encrypt(&s) {
+                                Ok(v) => v,
+                                Err(e) => {
+                                    err_count += 1;
+                                    last_error = Some(e);
+                                    s.to_owned()
+                                }
+                            },
+                            Value::Array(arr) => {
+                                let mut ret = Vec::with_capacity(arr.len());
+                                // we only consider the string values from the array,
+                                // anything else gets silently ignored
+                                arr.into_iter().for_each(|v| {
+                                    if let Value::String(s) = v {
+                                        let t = match cipher.encrypt(&s) {
+                                            Ok(v) => v,
+                                            Err(e) => {
+                                                err_count += 1;
+                                                last_error = Some(e);
+                                                s.to_owned()
+                                            }
+                                        };
+                                        ret.push(t);
+                                    }
+                                });
+                                // if there is not a single string value in given array,
+                                // user probably has given incorrect path, we we return original
+                                // value
+                                if ret.is_empty() {
+                                    original_str.to_owned()
+                                } else {
+                                    // we can unwrap because vec of strings should be serializable
+                                    serde_json::to_string(&ret).unwrap()
+                                }
+                            }
+                            _ => original_str.to_owned(),
+                        }
                     }
                 })
             })
@@ -211,7 +367,7 @@ fn encrypt() -> ScalarFunctionImplementation {
 
         if let Some(e) = last_error {
             log::info!(
-                "encountered some errors while decrypting, total count {err_count}, last error : {e}"
+                "encountered some errors while encrypting, total count {err_count}, last error : {e}"
             );
         }
 
