@@ -1207,6 +1207,14 @@ export default defineComponent({
           return;
         }
 
+        if (currentlyExecutingPromises[name] === null) {
+          variableLog(
+            name,
+            `Promise already cancelled, skipping load for variable ${name}`,
+          );
+          currentlyExecutingPromises[name] = reject;
+        }
+
         // For search operations, use comprehensive cancellation
         if (searchText) {
           cancelAllVariableOperations(name);
@@ -1761,8 +1769,15 @@ export default defineComponent({
       if (variableObject.isLoading) {
         return;
       }
-      // When a dropdown is opened, only load the variable data
-      await loadSingleVariableDataByName(variableObject);
+      try {
+        // When a dropdown is opened, only load the variable data
+        await loadSingleVariableDataByName(variableObject);
+      } catch (error) {
+        variableLog(
+          variableObject.name,
+          `Error loading variable options for ${variableObject.name}: ${error.message}`,
+        );
+      }
     };
 
     let isLoading = false;
