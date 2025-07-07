@@ -73,7 +73,8 @@ use crate::{
     skip_all,
     fields(org_id = req.org_id)
 )]
-pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
+pub async fn search(_trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
+    let trace_id = "4e7b46e3cdf34054ba3fb31cfb69cc96";
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {}", sql);

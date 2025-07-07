@@ -20,19 +20,24 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    cluster::LOCAL_NODE, get_config, ider, meta::{
+    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config, ider,
+    meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
         search,
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{resolve_stream_names, OrderBy, SqlOperator, TableReferenceExt},
+        sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
-    }, metrics, utils::{
+    },
+    metrics,
+    utils::{
         base64, json,
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_distinct_query},
         time::now_micros,
-    }, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME
+    },
 };
 use hashbrown::HashMap;
 use infra::{
@@ -41,7 +46,7 @@ use infra::{
     schema::{get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use liquid_cache_common::LiquidCacheMode;
-use liquid_cache_parquet::{cache::policies::LruPolicy, LiquidCache};
+use liquid_cache_parquet::{LiquidCache, cache::policies::ToDiskPolicy};
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
@@ -121,13 +126,13 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
 
 pub static LIQUID_CACHE: Lazy<Arc<LiquidCache>> = Lazy::new(|| {
     Arc::new(LiquidCache::new(
-        PARQUET_BATCH_SIZE * 2,
-        1024 * 1024 * 1024 * 1024,
+        PARQUET_BATCH_SIZE,
+        0,
         PathBuf::from("/tmp/liquid-cache"),
         LiquidCacheMode::Liquid {
             transcode_in_background: false,
         },
-        Box::new(LruPolicy::new()),
+        Box::new(ToDiskPolicy::new()),
     ))
 });
 

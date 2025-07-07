@@ -512,7 +512,24 @@ pub async fn prepare_datafusion_context(
     )
     .await?;
 
-    let session_config = create_session_config(sorted_by_time, target_partition)?;
+    let mut session_config = create_session_config(sorted_by_time, target_partition)?;
+    if cfg.common.liquid_cache_enabled {
+        session_config
+            .options_mut()
+            .execution
+            .parquet
+            .pushdown_filters = true;
+        session_config
+            .options_mut()
+            .execution
+            .parquet
+            .schema_force_view_types = false;
+        session_config
+            .options_mut()
+            .execution
+            .parquet
+            .binary_as_string = true;
+    }
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
     let mut builder = SessionStateBuilder::new()
         .with_config(session_config)
@@ -689,7 +706,8 @@ pub async fn create_parquet_table(
             }]]);
     }
 
-    let schema_key = schema.hash_key();
+    let _schema_key = schema.hash_key();
+    let schema_key = "123456";
     let prefix = if session.storage_type == StorageType::Memory {
         file_list::set(&session.id, &schema_key, files).await;
         format!("memory:///{}/schema={}/", session.id, schema_key)

@@ -90,10 +90,11 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let req: FlightSearchRequest = req.into();
-        let trace_id = format!(
-            "{}-{}",
-            req.query_identifier.trace_id, req.query_identifier.job_id
-        );
+        // let trace_id = format!(
+        //     "{}-{}",
+        //     req.query_identifier.trace_id, req.query_identifier.job_id
+        // );
+        let trace_id = req.query_identifier.trace_id.clone();
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
         let timeout = req.search_info.timeout as u64;
         log::info!(

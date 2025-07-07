@@ -24,23 +24,6 @@ use std::{
 
 use ::datafusion::error::{DataFusionError, Result};
 
-/// The default file extension of arrow files
-pub const DEFAULT_ARROW_EXTENSION: &str = ".arrow";
-/// The default file extension of avro files
-pub const DEFAULT_AVRO_EXTENSION: &str = ".avro";
-/// The default file extension of csv files
-pub const DEFAULT_CSV_EXTENSION: &str = ".csv";
-/// The default file extension of json files
-pub const DEFAULT_JSON_EXTENSION: &str = ".json";
-/// The default file extension of parquet files
-pub const DEFAULT_PARQUET_EXTENSION: &str = ".parquet";
-
-/// Define each `FileType`/`FileCompressionType`'s extension
-pub trait GetExt {
-    /// File extension getter
-    fn get_ext(&self) -> String;
-}
-
 /// Readable file type
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -55,18 +38,6 @@ pub enum FileType {
     CSV,
     /// JSON file
     JSON,
-}
-
-impl GetExt for FileType {
-    fn get_ext(&self) -> String {
-        match self {
-            FileType::ARROW => DEFAULT_ARROW_EXTENSION.to_owned(),
-            FileType::AVRO => DEFAULT_AVRO_EXTENSION.to_owned(),
-            FileType::PARQUET => DEFAULT_PARQUET_EXTENSION.to_owned(),
-            FileType::CSV => DEFAULT_CSV_EXTENSION.to_owned(),
-            FileType::JSON => DEFAULT_JSON_EXTENSION.to_owned(),
-        }
-    }
 }
 
 impl Display for FileType {
