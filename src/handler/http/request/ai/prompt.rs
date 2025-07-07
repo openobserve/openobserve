@@ -43,49 +43,7 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
     }
 }
 
-/// CreatePrompt
-///
-/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"create"}#
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Ai",
-    operation_id = "CreatePrompt",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name")
-    ),
-    request_body(
-        content = PromptRequest,
-        description = "Prompt details", 
-        example = json!({
-            "name": "My Prompt",
-            "description": "This is a prompt",
-            "content": "Write a SQL query to get the top 10 users by response time in the default stream",
-            "active": true
-        }),
-    ),
-    responses(
-        (status = StatusCode::OK, description = "Prompt created", body = PromptResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
-    ),
-)]
-#[post("/{org_id}/ai/prompts")]
-pub async fn create_prompt(
-    _org_id: web::Path<String>,
-    request: web::Json<CreatePromptRequest>,
-) -> Result<HttpResponse, Error> {
-    match prompt_service::create_prompt(request.into_inner()).await {
-        Ok(prompt) => Ok(MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Prompt created")
-                .with_id(prompt.id)
-                .with_name(prompt.name),
-        )),
-        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
-    }
-}
+
 
 /// GetPrompt
 ///
@@ -180,6 +138,51 @@ pub async fn update_prompt(
                 .with_name(prompt.name),
         )),
         Err(err) => Ok(MetaHttpResponse::bad_request(err.to_string())),
+    }
+}
+
+
+/// CreatePrompt
+///
+/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"create"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Ai",
+    operation_id = "CreatePrompt",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name")
+    ),
+    request_body(
+        content = PromptRequest,
+        description = "Prompt details", 
+        example = json!({
+            "name": "My Prompt",
+            "description": "This is a prompt",
+            "content": "Write a SQL query to get the top 10 users by response time in the default stream",
+            "active": true
+        }),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Prompt created", body = PromptResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+    ),
+)]
+#[post("/{org_id}/ai/prompts")]
+pub async fn create_prompt(
+    _org_id: web::Path<String>,
+    request: web::Json<CreatePromptRequest>,
+) -> Result<HttpResponse, Error> {
+    match prompt_service::create_prompt(request.into_inner()).await {
+        Ok(prompt) => Ok(MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Prompt created")
+                .with_id(prompt.id)
+                .with_name(prompt.name),
+        )),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 

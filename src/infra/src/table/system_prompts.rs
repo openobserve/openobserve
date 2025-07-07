@@ -18,6 +18,7 @@ use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Schema, Set, Unchanged,
 };
+use crate::table::entity::system_prompts::ActiveModel;
 
 use super::{entity::system_prompts::Model, get_lock};
 use crate::{
@@ -38,7 +39,7 @@ impl TryFrom<Model> for SystemPrompt {
             created_at: model.created_at,
             updated_at: model.updated_at,
             is_active: model.is_active,
-            tags: model.tags,
+            tags: serde_json::from_value(model.tags.clone())?,
         })
     }
 }
@@ -58,15 +59,15 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn add(prompt: &SystemPrompt) -> Result<String, errors::Error> {
-    let record = SystemPrompt {
+    let record = ActiveModel {
         id: Set(prompt.id.clone()),
         name: Set(prompt.name.clone()),
         content: Set(prompt.content.clone()),
         version: Set(prompt.version),
-        created_at: Set(prompt.created_at.timestamp_micros()),
-        updated_at: Set(prompt.updated_at.timestamp_micros()),
+        created_at: Set(prompt.created_at),
+        updated_at: Set(prompt.updated_at),
         is_active: Set(prompt.is_active),
-        tags: Set(prompt.tags.clone()),
+        tags: Set(prompt.tags.clone().into()),
     };
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -78,16 +79,16 @@ pub async fn add(prompt: &SystemPrompt) -> Result<String, errors::Error> {
 }
 
 pub async fn update(prompt: &SystemPrompt) -> Result<String, errors::Error> {
-    let id = prompt.id.ok_or(Error::Message("id not set".to_string()))?;
-    let record = SystemPrompt {
-        id: Unchanged(id.to_string()),
+    let id = prompt.id.clone();
+    let record = ActiveModel {
+        id: Unchanged(id),
         name: Set(prompt.name.clone()),
         content: Set(prompt.content.clone()),
         version: Set(prompt.version),
-        created_at: Set(prompt.created_at.timestamp_micros()),
-        updated_at: Set(prompt.updated_at.timestamp_micros()),
+        created_at: Set(prompt.created_at),
+        updated_at: Set(prompt.updated_at),
         is_active: Set(prompt.is_active),
-        tags: Set(prompt.tags.clone()),
+        tags: Set(prompt.tags.clone().into()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -98,13 +99,12 @@ pub async fn update(prompt: &SystemPrompt) -> Result<String, errors::Error> {
 
     Ok(prompt.id)
 }
-pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
+pub async fn remove(_org_id: &str, id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _ = Entity::delete_many()
-        .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(client)
         .await?;
@@ -112,10 +112,9 @@ pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn get(id: &str, org_id: &str) -> Result<SystemPrompt, errors::Error> {
+pub async fn get(id: &str, _org_id: &str) -> Result<SystemPrompt, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find_by_id(id)
-        .filter(Column::OrgId.eq(org_id))
         .one(client)
         .await?
         .ok_or_else(|| {
@@ -125,11 +124,10 @@ pub async fn get(id: &str, org_id: &str) -> Result<SystemPrompt, errors::Error> 
     record.try_into()
 }
 
-pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<SystemPrompt>, errors::Error> {
+pub async fn list(_org_id: &str, limit: Option<i64>) -> Result<Vec<SystemPrompt>, errors::Error> {
     let limit = limit.unwrap_or(100);
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
         .limit(limit as u64)
         .order_by(Column::Id, Order::Desc);
 
@@ -143,11 +141,10 @@ pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<SystemPrompt>,
     Ok(records)
 }
 
-pub async fn contains(id: &str, org_id: &str) -> Result<bool, errors::Error> {
+pub async fn contains(id: &str, _org_id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::Id.eq(id))
-        .filter(Column::OrgId.eq(org_id))
         .one(client)
         .await?;
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, Utc};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,9 +21,9 @@ pub struct SystemPrompt {
     pub id: String,
     pub name: String,
     pub content: String,
-    pub version: u32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub version: i32,
+    pub created_at: i64,
+    pub updated_at: i64,
     pub is_active: bool,
     pub tags: Vec<String>,
 }
