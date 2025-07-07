@@ -205,10 +205,9 @@ pub async fn process_search_stream_request(
                 }
 
                 // send error message to client
-                if let Err(e) = sender.send(Err(e)).await {
+                if sender.send(Err(e)).await.is_err() {
                     log::warn!(
-                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                        trace_id
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping process_search_stream_request",
                     );
                 }
                 return;
@@ -323,10 +322,9 @@ pub async fn process_search_stream_request(
                 )
                 .await;
 
-                if let Err(e) = sender.send(Err(e)).await {
+                if sender.send(Err(e)).await.is_err() {
                     log::warn!(
-                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                        trace_id
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping process_search_stream_request",
                     );
                 }
                 return;
@@ -335,8 +333,7 @@ pub async fn process_search_stream_request(
             // Step 2: Search without cache
             // no caches found process req directly
             log::debug!(
-                "[HTTP2_STREAM trace_id {}] No cache found, processing search request",
-                trace_id
+                "[HTTP2_STREAM trace_id {trace_id}] No cache found, processing search request",
             );
 
             let size = req.query.size;
@@ -403,10 +400,9 @@ pub async fn process_search_stream_request(
                 )
                 .await;
 
-                if let Err(e) = sender.send(Err(e)).await {
+                if sender.send(Err(e)).await.is_err() {
                     log::warn!(
-                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                        trace_id
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping process_search_stream_request",
                     );
                 }
                 return;
@@ -457,10 +453,9 @@ pub async fn process_search_stream_request(
                     }
                 }
 
-                if let Err(e) = sender.send(Err(e)).await {
+                if sender.send(Err(e)).await.is_err() {
                     log::warn!(
-                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                        trace_id
+                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping process_search_stream_request",
                     );
                 }
                 return;
@@ -520,10 +515,9 @@ pub async fn process_search_stream_request(
                 }
             }
 
-            if let Err(e) = sender.send(Err(e)).await {
+            if sender.send(Err(e)).await.is_err() {
                 log::warn!(
-                    "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                    trace_id
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping process_search_stream_request",
                 );
             }
             return;
@@ -785,10 +779,9 @@ pub async fn do_partitioned_search(
                 },
             };
 
-            if let Err(e) = sender.send(Ok(response)).await {
+            if sender.send(Ok(response)).await.is_err() {
                 log::warn!(
-                    "[trace_id {}] Sender is closed, stopping do_partitioned_search",
-                    trace_id
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping do_partitioned_search",
                 );
                 return Ok(());
             }
@@ -803,10 +796,13 @@ pub async fn do_partitioned_search(
                 modified_end_time,
                 partition_order_by,
             );
-            if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
+            if sender
+                .send(Ok(StreamResponses::Progress { percent }))
+                .await
+                .is_err()
+            {
                 log::warn!(
-                    "[trace_id {}] Sender is closed, stopping do_partitioned_search",
-                    trace_id
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping do_partitioned_search",
                 );
                 return Ok(());
             }
@@ -1314,11 +1310,11 @@ async fn process_delta(
                 result_cache_ratio,
             );
 
-            if let Err(e) = sender.send(Ok(response)).await {
-                log::error!("Error sending search response: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Failed to send search response".to_string(),
-                ));
+            if sender.send(Ok(response)).await.is_err() {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending search response",
+                );
+                return Ok(());
             }
         }
 
@@ -1359,11 +1355,15 @@ async fn process_delta(
                 original_req_end_time,
                 cache_order_by,
             );
-            if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
-                log::error!("Error sending progress update: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Failed to send progress update".to_string(),
-                ));
+            if sender
+                .send(Ok(StreamResponses::Progress { percent }))
+                .await
+                .is_err()
+            {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending progress update",
+                );
+                return Ok(());
             }
         }
 
@@ -1438,11 +1438,11 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    if let Err(e) = sender.send(Ok(response)).await {
-        log::error!("Error sending partial search response: {}", e);
-        return Err(infra::errors::Error::Message(
-            "Error sending partial search response".to_string(),
-        ));
+    if sender.send(Ok(response)).await.is_err() {
+        log::warn!(
+            "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending partial search response",
+        );
+        return Ok(());
     }
 
     Ok(())
@@ -1532,11 +1532,11 @@ async fn send_cached_responses(
         },
     };
 
-    if let Err(e) = sender.send(Ok(response)).await {
-        log::error!("Error sending cached search response: {}", e);
-        return Err(infra::errors::Error::Message(
-            "Error sending cached search response".to_string(),
-        ));
+    if sender.send(Ok(response)).await.is_err() {
+        log::warn!(
+            "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending cached search response",
+        );
+        return Ok(());
     }
 
     {
@@ -1547,11 +1547,15 @@ async fn send_cached_responses(
             req.query.end_time,
             cache_order_by,
         );
-        if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
-            log::error!("Error sending progress update: {}", e);
-            return Err(infra::errors::Error::Message(
-                "Error sending progress update".to_string(),
-            ));
+        if sender
+            .send(Ok(StreamResponses::Progress { percent }))
+            .await
+            .is_err()
+        {
+            log::warn!(
+                "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending progress update",
+            );
+            return Ok(());
         }
     }
 
