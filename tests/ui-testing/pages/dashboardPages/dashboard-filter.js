@@ -168,11 +168,16 @@ export default class DashboardFilter {
     //   .getByRole("option", { name: newFieldName, exact: true })
     //   .first()
     //   .click();
-    const option = this.page
-      .getByRole("option", { name: newFieldName, exact: true })
-      .first();
-    await option.waitFor({ state: "visible", timeout: 10000 });
-    await option.click();
+    // const option = this.page
+    //   .getByRole("option", { name: newFieldName, exact: true })
+    //   .first();
+    // await option.waitFor({ state: "visible", timeout: 10000 });
+    // await option.click();
+
+    await this.page
+      .locator('div.q-menu[role="listbox"] div.q-item')
+      .first()
+      .click();
 
     // Step 3: Condition dropdown
     if (operator || value) {
