@@ -3467,7 +3467,6 @@ mod tests {
                 max_connections: usize::default(),
                 wal_size_limit: u64::default(),
                 batch_enabled: bool::default(),
-                batch_size: usize::default(),
                 batch_size_bytes: usize::default(),
                 batch_timeout_ms: u64::default(),
                 use_shared_http_client: bool::default(),
