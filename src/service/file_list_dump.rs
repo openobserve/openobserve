@@ -183,6 +183,7 @@ async fn inner_exec(
         None,
         vec![],
         false,
+        None,
     )
     .await?;
     let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, partitions).await?;

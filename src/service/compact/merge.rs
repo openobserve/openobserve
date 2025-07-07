@@ -878,6 +878,7 @@ pub async fn merge_files(
             None,
             vec![],
             is_match_downsampling_rule,
+            None,
         )
         .await
         {

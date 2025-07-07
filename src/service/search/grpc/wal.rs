@@ -34,6 +34,7 @@ use config::{
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
     execution::cache::cache_manager::FileStatisticsCache,
+    prelude::SessionContext,
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
@@ -65,6 +66,7 @@ pub async fn search_parquet(
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    ctx: &SessionContext,
 ) -> super::SearchTable {
     let load_start = std::time::Instant::now();
     // get file list
@@ -296,6 +298,7 @@ pub async fn search_parquet(
             index_condition.clone(),
             fst_fields.clone(),
             true,
+            Some(&ctx),
         )
         .await
         {

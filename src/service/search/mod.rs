@@ -122,6 +122,18 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .unwrap()
 });
 
+pub static LIQUID_CACHE: Lazy<Arc<LiquidCache>> = Lazy::new(|| {
+    Arc::new(LiquidCache::new(
+        PARQUET_BATCH_SIZE,
+        1024 * 1024 * 1024 * 1024,
+        PathBuf::from("/tmp/liquid-cache"),
+        LiquidCacheMode::Liquid {
+            transcode_in_background: true,
+        },
+        Box::new(policies::LruPolicy::new()),
+    ))
+});
+
 // Please note: `query_fn` which is the vrl needs to be base64::decoded
 // when using this search
 #[tracing::instrument(name = "service:search:enter", skip_all)]

@@ -39,13 +39,14 @@ use datafusion::{
         cache::cache_manager::{CacheManagerConfig, FileStatisticsCache},
         context::SessionConfig,
         memory_pool::{FairSpillPool, GreedyMemoryPool, TrackConsumersPool, UnboundedMemoryPool},
+        options::ReadOptions,
         runtime_env::{RuntimeEnv, RuntimeEnvBuilder},
         session_state::SessionStateBuilder,
     },
     logical_expr::AggregateUDF,
     optimizer::{AnalyzerRule, OptimizerRule},
     physical_plan::execute_stream,
-    prelude::{Expr, SessionContext},
+    prelude::{Expr, ParquetReadOptions, SessionContext},
 };
 use futures::TryStreamExt;
 use hashbrown::HashMap;
@@ -61,7 +62,6 @@ use {
 };
 
 use super::{
-    file_type::{FileType, GetExt},
     optimizer::join_reorder::JoinReorderRule,
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
@@ -616,6 +616,7 @@ pub async fn register_table(
         None,
         vec![],
         need_optimize_partition,
+        Some(&ctx),
     )
     .await?;
     ctx.register_table(table_name, table)?;
@@ -634,6 +635,7 @@ pub async fn create_parquet_table(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     need_optimize_partition: bool,
+    ctx: Option<&SessionContext>, // for cache
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
     let target_partitions = if session.target_partitions == 0 {
@@ -665,10 +667,15 @@ pub async fn create_parquet_table(
         target_partitions
     );
 
-    // Configure listing options
-    let file_format = ParquetFormat::default();
-    let mut listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
+    let mut listing_options = if let Some(ctx) = ctx {
+        ParquetReadOptions::default()
+            .to_listing_options(&ctx.copied_config(), ctx.copied_table_options())
+            .with_target_partitions(target_partitions)
+            .with_collect_stat(true)
+    } else {
+        ListingOptions::new(Arc::new(ParquetFormat::default()))
+    };
+    listing_options = listing_options
         .with_target_partitions(target_partitions)
         .with_collect_stat(true);
 

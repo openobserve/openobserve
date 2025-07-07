@@ -35,7 +35,7 @@ use config::{
         time::BASE_TIME,
     },
 };
-use datafusion::execution::cache::cache_manager::FileStatisticsCache;
+use datafusion::{execution::cache::cache_manager::FileStatisticsCache, prelude::SessionContext};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -76,6 +76,7 @@ pub async fn search(
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
     idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
+    ctx: SessionContext,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {}] search->storage: enter", query.trace_id);
@@ -372,6 +373,7 @@ pub async fn search(
             index_condition.clone(),
             fst_fields.clone(),
             true,
+            Some(&ctx),
         )
         .await?;
         tables.push(table);

@@ -287,6 +287,7 @@ pub async fn search(
             index_condition.clone(),
             fst_fields.clone(),
             storage_search_idx_optimize_rule,
+            ctx.clone(),
         )
         .await
         {
@@ -316,6 +317,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            &ctx,
         )
         .await
         {
@@ -387,6 +389,9 @@ pub async fn search(
         ));
         physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
     }
+
+    // replace with liquid-cache
+    let physical_plan = rewrite_data_source_plan(physical_plan, &LIQUID_CACHE);
 
     log::info!(
         "{}",
