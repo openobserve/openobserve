@@ -771,7 +771,7 @@ pub async fn do_partitioned_search(
             };
 
             if sender.send(Ok(response)).await.is_err() {
-                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response",);
+                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response");
                 return Ok(());
             }
         }
@@ -1041,7 +1041,7 @@ pub async fn handle_cache_responses_and_deltas(
             }
         } else if let Some(&delta) = delta_iter.peek() {
             // Process remaining deltas
-            log::info!("[HTTP2_STREAM trace_id {trace_id}] Processing remaining delta",);
+            log::info!("[HTTP2_STREAM trace_id {trace_id}] Processing remaining delta");
             process_delta(
                 req,
                 trace_id,
@@ -1286,7 +1286,7 @@ async fn process_delta(
             );
 
             if sender.send(Ok(response)).await.is_err() {
-                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending search response",);
+                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending search response");
                 return Ok(());
             }
         }
@@ -1411,7 +1411,7 @@ async fn send_partial_search_resp(
     );
 
     if sender.send(Ok(response)).await.is_err() {
-        log::warn!("[trace_id {trace_id}] Sender is closed, stop sending partial search response",);
+        log::warn!("[trace_id {trace_id}] Sender is closed, stop sending partial search response");
         return Ok(());
     }
 
@@ -1503,7 +1503,7 @@ async fn send_cached_responses(
     };
 
     if sender.send(Ok(response)).await.is_err() {
-        log::warn!("[trace_id {trace_id}] Sender is closed, stop sending cached search response",);
+        log::warn!("[trace_id {trace_id}] Sender is closed, stop sending cached search response");
         return Ok(());
     }
 

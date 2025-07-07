@@ -358,7 +358,7 @@ pub async fn search_http2_stream(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}",);
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         // if err code is cancelled return cancelled response
@@ -655,7 +655,7 @@ pub async fn values_http2_stream(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in values stream: {err}",);
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in values stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         let message = code.get_message();
