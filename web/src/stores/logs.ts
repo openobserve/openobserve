@@ -23,6 +23,11 @@ export default {
       state.logs = {};
       state.isInitialized = false;
     },
+    setFunctionList(state: any, functionList: any) {
+      if (state.data && state.data.transforms) {
+        state.data.transforms = functionList;
+      }
+    },
   },
   actions: {
     setLogs(context: any, logs: any) {
@@ -33,6 +38,9 @@ export default {
     },
     resetLogs(context: any) {
       context.commit('resetLogs');
+    },
+    setFunctionList(context: any, functionList: any) {
+      context.commit('setFunctionList', functionList);
     },
   },
 };

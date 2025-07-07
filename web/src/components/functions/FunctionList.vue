@@ -215,7 +215,6 @@ import {
   outlinedDelete,
   outlinedAccountTree,
 } from "@quasar/extras/material-icons-outlined";
-import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   name: "functionList",
@@ -229,7 +228,7 @@ export default defineComponent({
     "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
-    "sendToAiChat"
+    "sendToAiChat",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -244,9 +243,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
-    const { searchObj } = useLogs();
-    const pipelineList = ref([
-    ]);
+    const pipelineList = ref([]);
     const selectedPipeline = ref("");
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -326,7 +323,7 @@ export default defineComponent({
             };
           });
 
-          searchObj.data.transforms = jsTransforms.value;
+          store.dispatch("logs/setFunctionList", jsTransforms.value);
 
           dismiss();
         })
@@ -593,7 +590,7 @@ export default defineComponent({
       },
       getImageURL,
       verifyOrganizationStatus,
-      sendToAiChat
+      sendToAiChat,
     };
   },
   computed: {

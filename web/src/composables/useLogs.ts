@@ -6396,7 +6396,6 @@ const useLogs = (searchObj: any, searchConfig?: any, searchMeta?: any, searchDat
   });
   
   return {
-    searchObj,
     searchAggData,
     getStreams,
     resetSearchObj,
