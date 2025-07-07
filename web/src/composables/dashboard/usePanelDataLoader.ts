@@ -1187,6 +1187,22 @@ export const usePanelDataLoader = (
 
       runCount++;
 
+      // if there is search response, then set the data and result metadata
+      if (searchResponse?.value?.hits?.length > 0) {
+        // Add empty objects to state.resultMetaData for the results of this query
+        state.data.push([]);
+        state.resultMetaData.push({});
+
+        const currentQueryIndex = state.data.length - 1;
+
+        state.data[currentQueryIndex] = searchResponse.value.hits;
+        state.resultMetaData[currentQueryIndex] = searchResponse.value;
+        // set loading to false
+        state.loading = false;
+
+        return;
+      }
+
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
@@ -1526,21 +1542,6 @@ export const usePanelDataLoader = (
                   )
                 : [];
               state.annotations = annotations;
-
-              if (searchResponse?.value?.hits?.length > 0) {
-                // Add empty objects to state.resultMetaData for the results of this query
-                state.data.push([]);
-                state.resultMetaData.push({});
-
-                const currentQueryIndex = state.data.length - 1;
-
-                state.data[currentQueryIndex] = searchResponse.value.hits;
-                state.resultMetaData[currentQueryIndex] = searchResponse.value;
-                // set loading to false
-                state.loading = false;
-
-                return;
-              }
 
               if (isStreamingEnabled(store.state)) {
                 await getDataThroughStreaming(
