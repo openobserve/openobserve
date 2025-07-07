@@ -1546,7 +1546,7 @@ import config from "@/aws-exports";
 import O2AIChat from "../O2AIChat.vue";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -2134,7 +2134,7 @@ const validateFrequency = (frequency: {
 
     if (frequency.frequency < intervalInMins) {
       cronJobError.value =
-        "Minimum frequency should be " + (intervalInMins) + " minutes";
+        "Minimum frequency should be " + intervalInMins + " minutes";
       return;
     }
   }
@@ -2567,7 +2567,7 @@ defineExpose({
   overflow: hidden;
 }
 </style>
-<style lang="scss" >
+<style lang="scss">
 .scheduled-alert-tabs {
   .q-tab--active {
     background-color: $primary;

@@ -66,7 +66,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
-pub const INDEX_SEGMENT_LENGTH: usize = 1024; // this can't be change, it will cause segment matching error
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
 pub const FILE_EXT_JSON: &str = ".json";
@@ -74,11 +73,9 @@ pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
 pub const FILE_EXT_TANTIVY: &str = ".ttv";
-pub const FILE_EXT_TANTIVY_FOLDER: &str = ".mmap";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
-pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i64 = -999;
 
 pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
@@ -432,10 +429,6 @@ pub struct WebSocket {
     pub enabled: bool,
     #[env_config(name = "ZO_WEBSOCKET_SESSION_IDLE_TIMEOUT_SECS", default = 300)]
     pub session_idle_timeout_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_MAX_LIFETIME_SECS", default = 3600)]
-    pub session_max_lifetime_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
-    pub session_gc_interval_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
     pub ping_interval_secs: i64,
     #[env_config(
@@ -944,40 +937,12 @@ pub struct Common {
         help = "Toggle inverted index cache."
     )]
     pub inverted_index_cache_enabled: bool,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = "",
-        help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
-    )]
-    pub inverted_index_split_chars: String,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
     )]
     pub inverted_index_old_format: bool,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_STORE_FORMAT",
-        default = "tantivy",
-        help = "InvertedIndex store format, parquet(default), tantivy, both"
-    )]
-    pub inverted_index_store_format: String,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
-        default = "tantivy",
-        help = "InvertedIndex search format, parquet(default), tantivy."
-    )]
-    pub inverted_index_search_format: String,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
-        default = "",
-        help = "Tantivy search mode, puffin or mmap, default is puffin."
-    )]
-    pub inverted_index_tantivy_mode: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
         default = false,
@@ -1071,7 +1036,7 @@ pub struct Common {
     pub self_metrics_consumption_whitelist: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = false,
+        default = true,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
@@ -1145,10 +1110,18 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
     pub utf8_view_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_SYMBOL_ENABLED",
+        default = false,
+        help = "Enable to show symbol in dashboard"
+    )]
+    pub dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1884,6 +1857,36 @@ pub struct Pipeline {
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_ENABLED",
+        default = true,
+        help = "Enable batching of entries before sending HTTP requests"
+    )]
+    pub batch_enabled: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE",
+        default = 100,
+        help = "Maximum number of entries to batch together"
+    )]
+    pub batch_size: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_TIMEOUT_MS",
+        default = 1000,
+        help = "Maximum time to wait for a batch to fill up (in milliseconds)"
+    )]
+    pub batch_timeout_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE_BYTES",
+        default = 10485760, // 10MB
+        help = "Maximum size of a batch in bytes"
+    )]
+    pub batch_size_bytes: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
+        default = false,
+        help = "Use shared HTTP client instances for better connection pooling"
+    )]
+    pub use_shared_http_client: bool,
 }
 
 #[derive(EnvConfig)]
@@ -2089,7 +2092,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.file_list_id_batch_size = 5000;
     }
 
-    if cfg.limit.consistent_hash_vnodes == 0 {
+    if cfg.limit.consistent_hash_vnodes < 1 {
         cfg.limit.consistent_hash_vnodes = 1000;
     }
 
@@ -2222,37 +2225,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check bloom filter ndv ratio
     if cfg.common.bloom_filter_ndv_ratio == 0 {
         cfg.common.bloom_filter_ndv_ratio = 100;
-    }
-
-    // check default inverted index search format
-    #[allow(deprecated)]
-    {
-        cfg.common.inverted_index_store_format =
-            cfg.common.inverted_index_store_format.to_lowercase();
-        if cfg.common.inverted_index_store_format.is_empty() {
-            cfg.common.inverted_index_store_format = "parquet".to_string();
-        }
-        if !["both", "parquet", "tantivy"]
-            .contains(&cfg.common.inverted_index_store_format.as_str())
-        {
-            return Err(anyhow::anyhow!(
-                "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
-            ));
-        }
-        cfg.common.inverted_index_search_format =
-            cfg.common.inverted_index_search_format.to_lowercase();
-        if cfg.common.inverted_index_search_format.is_empty() {
-            cfg.common.inverted_index_search_format =
-                cfg.common.inverted_index_store_format.clone();
-        }
-        if cfg.common.inverted_index_search_format == "both" {
-            cfg.common.inverted_index_search_format = "parquet".to_string();
-        }
-        if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
-            return Err(anyhow::anyhow!(
-                "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
-            ));
-        }
     }
 
     // check for join match one
@@ -2482,6 +2454,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
         && !cfg.common.metrics_cache_enabled
+        && !cfg.common.aggregation_cache_enabled
     {
         cfg.disk_cache.enabled = false;
     }
@@ -2490,6 +2463,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
+        cfg.common.aggregation_cache_enabled = false;
         cfg.cache_latest_files.enabled = false;
         cfg.cache_latest_files.delete_merge_files = false;
     }
@@ -2590,17 +2564,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
-
-    // check disk cache with tantivy mode
-    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
-    if cfg.common.inverted_index_tantivy_mode.is_empty() {
-        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
-    }
-    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
-        return Err(anyhow::anyhow!(
-            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
-        ));
-    }
 
     Ok(())
 }

@@ -74,10 +74,8 @@ use crate::{
     },
     service::{
         db,
-        search::{
-            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-            tantivy::puffin_directory::reader_cache,
-        },
+        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+        tantivy::puffin_directory::reader_cache,
     },
 };
 
@@ -135,6 +133,7 @@ struct ConfigResponse<'a> {
     max_query_range: i64,
     ai_enabled: bool,
     dashboard_placeholder: String,
+    dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -327,7 +326,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         #[cfg(feature = "enterprise")]
-        aggregation_cache_enabled: cfg.disk_cache.aggregation_cache_enabled,
+        aggregation_cache_enabled: cfg.common.aggregation_cache_enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
@@ -337,6 +336,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
     }))
 }
 
@@ -399,8 +399,14 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
     );
 
-    let consistent_hashing = cluster::print_consistent_hash().await;
-    stats.insert("CONSISTENT_HASHING", json::json!(consistent_hashing));
+    #[cfg(feature = "enterprise")]
+    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    #[cfg(not(feature = "enterprise"))]
+    let (total_count, expired_count) = (0, 0);
+    stats.insert(
+        "CARDINALITY",
+        json::json!({"total_count": total_count, "expired_count": expired_count}),
+    );
 
     Ok(HttpResponse::Ok().json(stats))
 }

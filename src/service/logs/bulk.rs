@@ -205,11 +205,11 @@ pub async fn ingest(
                     streams_need_original_map
                         .get(&stream_name)
                         .is_some_and(|v| *v)
-                        .then_some(value.to_string())
+                        .then(|| value.to_string())
                 } else {
                     // 3. with pipeline, storing original as long as streams_need_original_set is
                     //    not empty
-                    store_original_when_pipeline_exists.then_some(value.to_string())
+                    store_original_when_pipeline_exists.then(|| value.to_string())
                 }
             } else {
                 None // `item` won't be flattened, no need to store original
@@ -744,7 +744,7 @@ mod tests {
             Err(e) => {
                 // Expected to fail due to missing infrastructure
                 // Just verify it's a proper error
-                assert!(e.to_string().len() > 0);
+                assert!(!e.to_string().is_empty());
             }
         }
     }

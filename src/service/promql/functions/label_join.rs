@@ -72,18 +72,20 @@ mod tests {
         let eval_ts = 1000;
 
         // Create instant values with labels
-        let mut labels1 = crate::service::promql::value::Labels::default();
-        labels1.push(Arc::new(Label::new("instance", "server1")));
-        labels1.push(Arc::new(Label::new("job", "web")));
+        let labels1 = vec![
+            Arc::new(Label::new("instance", "server1")),
+            Arc::new(Label::new("job", "web")),
+        ];
 
         let instant_value1 = InstantValue {
             labels: labels1,
             sample: crate::service::promql::value::Sample::new(eval_ts, 42.0),
         };
 
-        let mut labels2 = crate::service::promql::value::Labels::default();
-        labels2.push(Arc::new(Label::new("instance", "server2")));
-        labels2.push(Arc::new(Label::new("job", "web")));
+        let labels2 = vec![
+            Arc::new(Label::new("instance", "server2")),
+            Arc::new(Label::new("job", "web")),
+        ];
 
         let instant_value2 = InstantValue {
             labels: labels2,

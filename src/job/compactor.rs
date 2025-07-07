@@ -140,16 +140,13 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
 /// Generate downsampling job for compactor
 #[cfg(feature = "enterprise")]
 async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
-    if get_o2_config()
-        .downsampling
-        .metrics_downsampling_rules
-        .is_empty()
-    {
+    let cfg = get_o2_config();
+    if cfg.downsampling.metrics_downsampling_rules.is_empty() {
         return Ok(());
     }
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_o2_config().downsampling.downsampling_interval,
+            cfg.downsampling.downsampling_interval,
         ))
         .await;
         log::debug!("[COMPACTOR::JOB] Running generate downsampling job");

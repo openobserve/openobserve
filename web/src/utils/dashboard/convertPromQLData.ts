@@ -784,7 +784,7 @@ export const convertPromQLData = async (
       data: [[convertedTimeStampToDataFormat, null]],
       markLine: {
         itemStyle: {
-          color: "rgba(0, 191, 255, 0.5)",
+          color: "rgba(108, 122, 125, 1)",
         },
         silent: false,
         animation: false,
@@ -847,6 +847,8 @@ export const convertPromQLData = async (
       },
     };
   }
+
+  moment = null;
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;

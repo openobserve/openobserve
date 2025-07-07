@@ -26,7 +26,10 @@ use config::{
     },
     utils::sql::AGGREGATE_UDF_LIST,
 };
-use datafusion::{arrow::datatypes::Schema, common::TableReference};
+use datafusion::{
+    arrow::datatypes::Schema,
+    common::{TableReference, tree_node::TreeNode},
+};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
@@ -60,9 +63,13 @@ use super::{
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
 };
 use crate::service::search::{
-    datafusion::udf::{
-        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-        STR_MATCH_UDF_NAME,
+    cluster::flight::{generate_context, register_table},
+    datafusion::{
+        distributed_plan::rewrite::GroupByFieldVisitor,
+        udf::{
+            MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+            STR_MATCH_UDF_NAME,
+        },
     },
     index::get_arg_name,
 };
@@ -122,12 +129,12 @@ impl Sql {
         let sql =
             config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
         // 1. get table name
-        let stream_names =
-            resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
+        let stream_names = resolve_stream_names_with_type(&sql)
+            .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
         if stream_names.len() > 1 && stream_names.iter().any(|s| s.schema() == Some("index")) {
-            return Err(Error::Message(
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Index stream is not supported in multi-stream query".to_string(),
-            ));
+            )));
         }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
@@ -140,7 +147,7 @@ impl Sql {
         }
 
         let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
-            .map_err(|e| Error::Message(e.to_string()))?
+            .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
             .unwrap();
 
@@ -206,10 +213,10 @@ impl Sql {
                 .into_iter()
                 .all(|field| !schema.contains_field(&field))
             {
-                return Err(Error::Message(
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                     "Using match_all() function in a stream that don't have full text search field"
                         .to_string(),
-                ));
+                )));
             }
         }
 
@@ -268,12 +275,7 @@ impl Sql {
         // 12. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
-        #[allow(deprecated)]
-        if cfg.common.inverted_index_search_format.eq("tantivy")
-            && stream_names.len() == 1
-            && cfg.common.inverted_index_enabled
-            && use_inverted_index
-        {
+        if stream_names.len() == 1 && cfg.common.inverted_index_enabled && use_inverted_index {
             let mut index_visitor = IndexVisitor::new(
                 &used_schemas,
                 cfg.common.feature_query_remove_filter_with_index,
@@ -283,12 +285,14 @@ impl Sql {
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
         }
+
         // use all condition for histogram without filter
         if use_inverted_index && can_optimize && index_condition.is_none() {
             index_condition = Some(IndexCondition {
                 conditions: vec![Condition::All()],
             });
         }
+
         //********************Change the sql here*********************************//
 
         // 13. check `select * from table where match_all()` optimizer
@@ -1753,12 +1757,16 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
         "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
         "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
         _ => {
-            return Err(Error::Message(
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Unsupported histogram interval unit".to_string(),
-            ));
+            )));
         }
     };
-    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
+    seconds.map_err(|_| {
+        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "Invalid number format".to_string(),
+        ))
+    })
 }
 
 pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
@@ -2142,6 +2150,24 @@ impl VisitorMut for RemoveDashboardAllVisitor {
         }
         ControlFlow::Continue(())
     }
+}
+
+// get group by fields from sql, if sql is not a single table query, return empty vector
+#[allow(dead_code)]
+pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
+    if sql.schemas.len() != 1 {
+        return Ok(vec![]);
+    }
+    let sql_arc = Arc::new(sql.clone());
+    let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
+    register_table(&ctx, &sql_arc).await?;
+    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+    // visit group by fields
+    let mut group_by_visitor = GroupByFieldVisitor::new();
+    physical_plan.visit(&mut group_by_visitor)?;
+    Ok(group_by_visitor.get_group_by_fields())
 }
 
 fn expr_boolean(value: bool) -> Expr {
@@ -3008,7 +3034,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
         let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3021,7 +3047,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
         let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3035,7 +3061,7 @@ mod tests {
     fn test_histogram_interval_visitor() {
         // Test with time range and histogram function
         let sql = "SELECT histogram(_timestamp, '10 second') FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3052,7 +3078,7 @@ mod tests {
     fn test_histogram_interval_visitor_with_zero_time_range() {
         // Test with zero time range
         let sql = "SELECT histogram(_timestamp) FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3068,7 +3094,7 @@ mod tests {
     #[test]
     fn test_column_visitor() {
         let sql = "SELECT name, age, COUNT(*) FROM users WHERE status = 'active' GROUP BY name, age ORDER BY name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3099,7 +3125,7 @@ mod tests {
     #[test]
     fn test_partition_column_visitor() {
         let sql = "SELECT * FROM users WHERE name = 'john' AND age = 25 AND city IN ('NYC', 'LA')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3131,7 +3157,7 @@ mod tests {
     #[test]
     fn test_prefix_column_visitor() {
         let sql = "SELECT * FROM users WHERE name LIKE 'john%' AND email LIKE 'test%'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3160,7 +3186,7 @@ mod tests {
     #[test]
     fn test_match_visitor() {
         let sql = "SELECT * FROM logs WHERE match_all('error') AND match_all('critical')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3178,7 +3204,7 @@ mod tests {
     #[test]
     fn test_field_name_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3194,7 +3220,7 @@ mod tests {
     #[test]
     fn test_add_timestamp_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3210,7 +3236,7 @@ mod tests {
     #[test]
     fn test_add_o2_id_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3226,7 +3252,7 @@ mod tests {
     #[test]
     fn test_complex_query_visitor() {
         let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3241,7 +3267,7 @@ mod tests {
     #[test]
     fn test_add_ordering_term_visitor() {
         let sql = "SELECT * FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

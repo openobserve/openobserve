@@ -256,7 +256,6 @@ pub async fn search(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };
-
     req.use_cache = get_use_cache_from_request(&query);
 
     // set search event type
@@ -789,7 +788,7 @@ pub async fn build_search_request_per_field(
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
         from: 0,
-        size: config::meta::sql::MAX_LIMIT,
+        size: req.size.unwrap_or(config::meta::sql::MAX_LIMIT),
         start_time,
         end_time,
         query_fn: query_fn.clone(),

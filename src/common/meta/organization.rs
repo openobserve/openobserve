@@ -222,7 +222,7 @@ fn default_toggle_ingestion_logs() -> bool {
 fn default_enable_aggregation_cache() -> bool {
     #[cfg(feature = "enterprise")]
     {
-        config::get_config().disk_cache.aggregation_cache_enabled
+        config::get_config().common.aggregation_cache_enabled
     }
     #[cfg(not(feature = "enterprise"))]
     {

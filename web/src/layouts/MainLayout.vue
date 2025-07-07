@@ -431,18 +431,11 @@ class="padding-none" />
       :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
       :key="store.state.selectedOrganization?.identifier"
     >
-      <q-page-container>
-        <router-view v-slot="{ Component }">
-          <template v-if="$route.meta.keepAlive">
-            <keep-alive>
-              <component :is="Component" />
-            </keep-alive>
-          </template>
-          <template v-else>
-            <component :is="Component" />
-          </template>
-        </router-view>
-      </q-page-container>
+    <q-page-container v-if="isLoading">
+      <router-view v-slot="{ Component }">
+        <component :is="Component"  @sendToAiChat="sendToAiChat" />
+      </router-view>
+    </q-page-container>
     </div>
 
     <!-- Right Panel (AI Chat) -->
@@ -453,12 +446,13 @@ class="padding-none" />
       style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
-      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" />
+      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat"   :aiChatInputContext="aiChatInputContext"  />
     </div>
   </div>
   <q-dialog v-model="showGetStarted" maximized full-height>
     <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
   </q-dialog>
+
   </q-layout>
 </template>
 
@@ -628,6 +622,7 @@ export default defineComponent({
     const isMonacoEditorLoaded = ref(false);
     const showGetStarted = ref(localStorage.getItem('isFirstTimeLogin') == 'true' ?? false);
     const isHovered = ref(false);
+    const aiChatInputContext = ref("");
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -932,6 +927,7 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       resetStreams();
+      store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
@@ -1283,6 +1279,10 @@ export default defineComponent({
       localStorage.removeItem('isFirstTimeLogin');
     }
 
+    const sendToAiChat = (value: any) => {
+      store.dispatch("setIsAiChatEnabled", true);
+      aiChatInputContext.value = value;
+    }
 
     return {
       t,
@@ -1318,6 +1318,8 @@ export default defineComponent({
       isHovered,
       showGetStarted,
       removeFirstTimeLogin,
+      sendToAiChat,
+      aiChatInputContext
     };
   },
   computed: {

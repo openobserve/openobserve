@@ -21,13 +21,14 @@ use config::{
         websocket::{SearchResultType, ValuesEventReq},
     },
 };
+use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::utils::stream::get_max_query_range,
-    handler::http::request::{search::build_search_request_per_field, ws::session::send_message},
+    handler::http::request::{search::build_search_request_per_field, ws::session::send_message_2},
     service::{
         search::{cache, sql::Sql},
         setup_tracing_with_trace_id,
@@ -46,6 +47,7 @@ pub async fn handle_values_request(
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), infra::errors::Error> {
     let mut start_timer = std::time::Instant::now();
 
@@ -83,10 +85,10 @@ pub async fn handle_values_request(
             let err_res = WsServerEvents::error_response(
                 &infra::errors::Error::Message(e),
                 Some(request_id.to_string()),
-                Some(trace_id),
+                Some(trace_id.clone()),
                 Default::default(),
             );
-            send_message(request_id, err_res.to_json()).await?;
+            send_message_2(request_id, err_res, response_tx.clone()).await?;
             return Ok(());
         }
     }
@@ -198,6 +200,7 @@ pub async fn handle_values_request(
                     remaining_query_range,
                     &order_by,
                     &mut start_timer,
+                    response_tx.clone(),
                 )
                 .instrument(ws_values_span.clone())
                 .await?;
@@ -245,6 +248,7 @@ pub async fn handle_values_request(
                     max_query_range,
                     &mut start_timer,
                     &order_by,
+                    response_tx.clone(),
                 )
                 .instrument(ws_values_span.clone())
                 .await?;
@@ -307,6 +311,7 @@ pub async fn handle_values_request(
                 max_query_range,
                 &mut start_timer,
                 &order_by,
+                response_tx.clone(),
             )
             .instrument(ws_values_span.clone())
             .await?;
@@ -318,7 +323,7 @@ pub async fn handle_values_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(request_id, end_res.to_json()).await?;
+    send_message_2(request_id, end_res, response_tx).await?;
 
     Ok(())
 }

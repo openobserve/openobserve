@@ -578,9 +578,8 @@ mod tests {
         let lifecycle_end = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
             .unwrap()
             .to_utc();
-        delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[])
-            .await
-            .unwrap();
+        let res = delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[]).await;
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -589,7 +588,8 @@ mod tests {
         let org_id = "test";
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
-        delete_all(org_id, stream_type, stream_name).await.unwrap();
+        let res = delete_all(org_id, stream_type, stream_name).await;
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -604,8 +604,8 @@ mod tests {
             now.timestamp_micros(),
         );
         let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
-        println!("original time range : {}", original_time_range);
-        println!("red day time range : {}", exclude_range);
+        println!("original time range : {original_time_range}");
+        println!("red day time range : {exclude_range}");
         let time_ranges_to_delete = generate_time_ranges_for_deletion(
             vec![exclude_range],
             original_time_range.clone(),
@@ -630,8 +630,8 @@ mod tests {
             (now - Duration::try_days(2).unwrap()).timestamp_micros(),
         );
         let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
-        println!("original time range : {}", original_time_range);
-        println!("red day time range : {}", exclude_range);
+        println!("original time range : {original_time_range}");
+        println!("red day time range : {exclude_range}");
         let res_time_ranges = generate_time_ranges_for_deletion(
             vec![exclude_range],
             original_time_range.clone(),
@@ -685,7 +685,7 @@ mod tests {
             last_retained_time,
         );
 
-        println!("original time range : {}", original_time_range);
+        println!("original time range : {original_time_range}");
         println!("res time ranges : {}", res_time_ranges.iter().join(", "));
         assert_eq!(res_time_ranges.len(), 2);
     }
