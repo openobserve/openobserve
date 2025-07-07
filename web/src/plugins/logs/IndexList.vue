@@ -663,6 +663,7 @@ import {
   computed,
   onBeforeMount,
   onBeforeUnmount,
+  inject,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -720,8 +721,8 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+    const searchObj = inject("searchObj") as any;
     const {
-      searchObj,
       updatedLocalLogFilterField,
       handleQueryData,
       onStreamChange,
@@ -733,7 +734,7 @@ export default defineComponent({
       extractValueQuery,
       fnParsedSQL,
       fnUnparsedSQL,
-    } = useLogs();
+    } = useLogs(searchObj);
 
     const {
       fetchQueryDataWithWebSocket,

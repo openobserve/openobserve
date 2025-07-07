@@ -316,6 +316,7 @@ import {
   onMounted,
   onUpdated,
   defineAsyncComponent,
+  inject,
   watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
@@ -510,8 +511,9 @@ export default defineComponent({
     const disableMoreErrorDetails = ref(false);
     const router = useRouter();
 
+    const searchObj = inject("searchObj") as any;
+
     const {
-      searchObj,
       updatedLocalLogFilterField,
       searchAroundData,
       extractFTSFields,
@@ -521,7 +523,7 @@ export default defineComponent({
       getFilterExpressionByFieldType,
       refreshPagination,
       refreshJobPagination,
-    } = useLogs();
+    } = useLogs(searchObj);
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
 
@@ -712,7 +714,7 @@ export default defineComponent({
 
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
-    }
+    };
 
     return {
       t,
@@ -754,7 +756,7 @@ export default defineComponent({
       refreshJobPagination,
       histogramLoader,
       sendToAiChat,
-      closeTable
+      closeTable,
     };
   },
   computed: {

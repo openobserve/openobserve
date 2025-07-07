@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="6px"
             class="tw-px-2 tw-py-2"
             dense
-            style="border-radius: 100%;"
+            style="border-radius: 100%"
           >
             <div class="row items-center no-wrap">
               <img :src="getBtnLogo" class="header-icon ai-icon" />
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -383,7 +383,7 @@ export default defineComponent({
     "add:table",
     "view-trace",
     "sendToAiChat",
-    "closeTable"
+    "closeTable",
   ],
   props: {
     modelValue: {
@@ -418,7 +418,7 @@ export default defineComponent({
     ) {
       this.$emit("add:searchterm", field, field_value, action);
     },
-    searchTimeBoxed(rowData: any, size: number) { 
+    searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {
         key: rowData[this.store.state.zoConfig.timestamp_column],
         size: size,
@@ -435,7 +435,8 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const { searchObj, fnParsedSQL, hasAggregation } = useLogs();
+    const searchObj = inject("searchObj") as any;
+    const { fnParsedSQL, hasAggregation } = useLogs(searchObj);
     const $q = useQuasar();
     let multiStreamFields: any = ref([]);
     let hasAggregationQuery: any = computed(() => {
@@ -506,13 +507,13 @@ export default defineComponent({
       emit("closeTable");
     };
     const getBtnLogo = computed(() => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg");
     });
     const closeTable = () => {
       emit("closeTable");
-    }
+    };
     return {
       t,
       store,
@@ -533,7 +534,7 @@ export default defineComponent({
       hasAggregationQuery,
       sendToAiChat,
       getBtnLogo,
-      closeTable
+      closeTable,
     };
   },
   async created() {

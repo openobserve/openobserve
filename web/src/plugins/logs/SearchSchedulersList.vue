@@ -339,6 +339,7 @@ import {
   computed,
   onBeforeMount,
   onActivated,
+  inject,
 } from "vue";
 import {
   timestampToTimezoneDate,
@@ -402,7 +403,8 @@ export default defineComponent({
     const qTableRef: Ref<InstanceType<typeof qTableSchedule> | null> =
       ref(null);
     const searchDateTimeRef = ref(null);
-    const { searchObj, extractTimestamps } = useLogs();
+    const searchObj = inject("searchObj") as any;
+    const { extractTimestamps } = useLogs(searchObj);
     const dataToBeLoaded: any = ref([]);
     const dateTimeToBeSent = ref({
       valueType: "relative",

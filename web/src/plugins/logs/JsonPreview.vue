@@ -203,13 +203,17 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item  clickable v-close-popup>
+            <q-item clickable v-close-popup>
               <q-item-section>
                 <q-item-label
                   data-test="send-to-ai-chat-btn"
-                  @click.stop="sendToAiChat(JSON.stringify({
-                    [key]: value[key],
-                  }))"
+                  @click.stop="
+                    sendToAiChat(
+                      JSON.stringify({
+                        [key]: value[key],
+                      }),
+                    )
+                  "
                   v-close-popup
                   ><q-btn
                     title="Send to AI Chat"
@@ -217,8 +221,11 @@
                     round
                     class="q-mr-sm pointer"
                   >
-                  <q-img height="14px" width="14px" :src="getBtnLogo" />
-                  </q-btn
+                    <q-img
+                      height="14px"
+                      width="14px"
+                      :src="getBtnLogo"
+                    /> </q-btn
                   >Send to AI Chat</q-item-label
                 >
               </q-item-section>
@@ -247,7 +254,15 @@
 </template>
 
 <script lang="ts">
-import { ref, onBeforeMount, computed, nextTick, onMounted, watch } from "vue";
+import {
+  ref,
+  onBeforeMount,
+  computed,
+  nextTick,
+  onMounted,
+  watch,
+  inject,
+} from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -293,7 +308,14 @@ export default {
       () => import("@/components/CodeQueryEditor.vue"),
     ),
   },
-  emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace", "sendToAiChat","closeTable"],
+  emits: [
+    "copy",
+    "addSearchTerm",
+    "addFieldToTable",
+    "view-trace",
+    "sendToAiChat",
+    "closeTable",
+  ],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
@@ -304,6 +326,8 @@ export default {
     const { getStreams } = useStreams();
 
     const filteredTracesStreamOptions = ref([]);
+
+    const searchObj = inject("searchObj") as any;
 
     const tracesStreams = ref([]);
 
@@ -347,7 +371,7 @@ export default {
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);
     };
-    const { searchObj, searchAggData } = useLogs();
+    const { searchAggData } = useLogs(searchObj);
     let multiStreamFields: any = ref([]);
 
     const showViewTraceBtn = ref(false);
@@ -518,10 +542,10 @@ export default {
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    })
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg");
+    });
 
     return {
       t,
@@ -552,7 +576,7 @@ export default {
       getOriginalData,
       addOrRemoveLabel,
       sendToAiChat,
-      getBtnLogo
+      getBtnLogo,
     };
   },
 };

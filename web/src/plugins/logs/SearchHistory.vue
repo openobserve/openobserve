@@ -232,7 +232,15 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, watch, onMounted, nextTick, computed, onUnmounted } from "vue";
+import {
+  ref,
+  watch,
+  onMounted,
+  nextTick,
+  computed,
+  onUnmounted,
+  inject,
+} from "vue";
 import {
   timestampToTimezoneDate,
   b64EncodeUnicode,
@@ -287,7 +295,8 @@ export default defineComponent({
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
-    const { searchObj, extractTimestamps } = useLogs();
+    const searchObj = inject("searchObj") as any;
+    const { extractTimestamps } = useLogs(searchObj);
     const dataToBeLoaded: any = ref([]);
     const dateTimeToBeSent = ref({
       valueType: "relative",

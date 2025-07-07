@@ -1311,6 +1311,7 @@ import {
   defineAsyncComponent,
   onBeforeMount,
   onBeforeUnmount,
+  inject,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1346,7 +1347,6 @@ import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -1506,8 +1506,9 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
 
+    const searchObj = inject("searchObj") as any;
+
     const {
-      searchObj,
       refreshData,
       handleRunQuery,
       updatedLocalLogFilterField,
@@ -1530,7 +1531,7 @@ export default defineComponent({
       getJobData,
       routeToSearchSchedule,
       isActionsEnabled,
-    } = useLogs();
+    } = useLogs(searchObj);
 
     const { isStreamExists, isStreamFetched } = useStreams();
     const queryEditorRef = ref(null);

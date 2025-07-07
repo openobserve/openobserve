@@ -370,6 +370,10 @@ import config from "@/aws-exports";
 import {
   verifyOrganizationStatus,
   useLocalInterestingFields,
+  useLocalWrapContent,
+  useLocalSavedView,
+  useLocalLogFilterField,
+  useLocalTimezone,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -538,8 +542,187 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
+
+    const defaultObject = {
+      organizationIdentifier: "",
+      runQuery: false,
+      loading: false,
+      loadingHistogram: false,
+      loadingCounter: false,
+      loadingStream: false,
+      loadingSavedView: false,
+      shouldIgnoreWatcher: false,
+      communicationMethod: "http",
+      config: {
+        splitterModel: 20,
+        lastSplitterPosition: 0,
+        splitterLimit: [0, 40],
+        fnSplitterModel: 60,
+        fnLastSplitterPosition: 0,
+        fnSplitterLimit: [40, 100],
+        refreshTimes: [
+          [
+            { label: "5 sec", value: 5 },
+            { label: "1 min", value: 60 },
+            { label: "1 hr", value: 3600 },
+          ],
+          [
+            { label: "10 sec", value: 10 },
+            { label: "5 min", value: 300 },
+            { label: "2 hr", value: 7200 },
+          ],
+          [
+            { label: "15 sec", value: 15 },
+            { label: "15 min", value: 900 },
+            { label: "1 day", value: 86400 },
+          ],
+          [
+            { label: "30 sec", value: 30 },
+            { label: "30 min", value: 1800 },
+          ],
+        ],
+      },
+      meta: {
+        logsVisualizeToggle: "logs",
+        refreshInterval: <number>0,
+        refreshIntervalLabel: "Off",
+        refreshHistogram: false,
+        showFields: true,
+        showQuery: true,
+        showHistogram: true,
+        showDetailTab: false,
+        showTransformEditor: true,
+        searchApplied: false,
+        toggleSourceWrap: useLocalWrapContent()
+          ? JSON.parse(useLocalWrapContent())
+          : false,
+        histogramDirtyFlag: false,
+        sqlMode: false,
+        sqlModeManualTrigger: false,
+        quickMode: false,
+        queryEditorPlaceholderFlag: true,
+        functionEditorPlaceholderFlag: true,
+        resultGrid: {
+          rowsPerPage: 50,
+          wrapCells: false,
+          manualRemoveFields: false,
+          chartInterval: "1 second",
+          chartKeyFormat: "HH:mm:ss",
+          navigation: {
+            currentRowIndex: 0,
+          },
+          showPagination: true,
+        },
+        jobId: "",
+        jobRecords: "100",
+        scrollInfo: {},
+        pageType: "logs", // 'logs' or 'stream
+        regions: [],
+        clusters: [],
+        useUserDefinedSchemas: "user_defined_schema",
+        hasUserDefinedSchemas: false,
+        selectedTraceStream: "",
+        showSearchScheduler: false,
+        toggleFunction: false, // DEPRECATED use showTransformEditor instead
+        isActionsEnabled: false,
+        resetPlotChart: false,
+      },
+      data: {
+        query: <any>"",
+        histogramQuery: <any>"",
+        parsedQuery: {},
+        countErrorMsg: "",
+        errorMsg: "",
+        errorDetail: "",
+        errorCode: 0,
+        filterErrMsg: "",
+        missingStreamMessage: "",
+        additionalErrorMsg: "",
+        savedViewFilterFields: "",
+        hasSearchDataTimestampField: false,
+        originalDataCache: {},
+        stream: {
+          loading: false,
+          streamLists: <object[]>[],
+          selectedStream: <any>[],
+          selectedStreamFields: <any>[],
+          selectedFields: <string[]>[],
+          filterField: "",
+          addToFilter: "",
+          functions: <any>[],
+          streamType: "logs",
+          interestingFieldList: <string[]>[],
+          userDefinedSchema: <any>[],
+          expandGroupRows: <any>{},
+          expandGroupRowsFieldCount: <any>{},
+          filteredField: <any>[],
+          missingStreamMultiStreamFilter: <any>[],
+          pipelineQueryStream: <any>[],
+        },
+        resultGrid: {
+          currentDateTime: new Date(),
+          currentPage: 1,
+          columns: <any>[],
+          colOrder: <any>{},
+          colSizes: <any>{},
+        },
+        histogramInterval: <any>0,
+        transforms: <any>[],
+        transformType: "function",
+        actions: <any>[],
+        selectedTransform: <any>null,
+        queryResults: <any>[],
+        sortedQueryResults: <any>[],
+        streamResults: <any>[],
+        histogram: <any>{
+          xData: [],
+          yData: [],
+          chartParams: {
+            title: "",
+            unparsed_x_data: [],
+            timezone: "",
+          },
+          errorMsg: "",
+          errorCode: 0,
+          errorDetail: "",
+        },
+        editorValue: <any>"",
+        datetime: <any>{
+          startTime: (new Date().getTime() - 900000) * 1000,
+          endTime: new Date().getTime(),
+          relativeTimePeriod: "15m",
+          type: "relative",
+          selectedDate: <any>{},
+          selectedTime: <any>{},
+          queryRangeRestrictionMsg: "",
+          queryRangeRestrictionInHour: 100000,
+        },
+        searchAround: {
+          indexTimestamp: 0,
+          size: <number>10,
+          histogramHide: false,
+        },
+        tempFunctionName: "",
+        tempFunctionContent: "",
+        tempFunctionLoading: false,
+        savedViews: <any>[],
+        customDownloadQueryObj: <any>{},
+        functionError: "",
+        searchRequestTraceIds: <string[]>[],
+        searchWebSocketTraceIds: <string[]>[],
+        isOperationCancelled: false,
+        searchRetriesCount: <{ [key: string]: number }>{},
+        actionId: null,
+      },
+    };
+
+    const searchObj = reactive(
+      Object.assign({}, JSON.parse(JSON.stringify(defaultObject))),
+    );
+
+    provide("searchObj", searchObj);
+
     let {
-      searchObj,
       getQueryData,
       getJobData,
       fieldValues,
@@ -573,9 +756,8 @@ export default defineComponent({
       getStream,
       fnUnparsedSQL,
       initialLogsState,
-      clearSearchObj,
       setCommunicationMethod,
-    } = useLogs();
+    } = useLogs(searchObj);
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -687,6 +869,12 @@ export default defineComponent({
       searchBarRef.value = null;
       searchResultRef.value = null;
     });
+
+    const clearSearchObj = () => {
+      searchObj = reactive(
+        Object.assign({}, JSON.parse(JSON.stringify(defaultObject))),
+      );
+    };
 
     onActivated(() => {
       if (isLogsMounted.value) handleActivation();

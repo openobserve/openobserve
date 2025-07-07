@@ -24,7 +24,8 @@ import {
   onBeforeMount,
   watch,
   computed,
-  onBeforeUnmount
+  onBeforeUnmount,
+  inject,
 } from "vue";
 import { useStore } from "vuex";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
@@ -83,178 +84,6 @@ import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 
-const defaultObject = {
-  organizationIdentifier: "",
-  runQuery: false,
-  loading: false,
-  loadingHistogram: false,
-  loadingCounter: false,
-  loadingStream: false,
-  loadingSavedView: false,
-  shouldIgnoreWatcher: false,
-  communicationMethod: "http",
-  config: {
-    splitterModel: 20,
-    lastSplitterPosition: 0,
-    splitterLimit: [0, 40],
-    fnSplitterModel: 60,
-    fnLastSplitterPosition: 0,
-    fnSplitterLimit: [40, 100],
-    refreshTimes: [
-      [
-        { label: "5 sec", value: 5 },
-        { label: "1 min", value: 60 },
-        { label: "1 hr", value: 3600 },
-      ],
-      [
-        { label: "10 sec", value: 10 },
-        { label: "5 min", value: 300 },
-        { label: "2 hr", value: 7200 },
-      ],
-      [
-        { label: "15 sec", value: 15 },
-        { label: "15 min", value: 900 },
-        { label: "1 day", value: 86400 },
-      ],
-      [
-        { label: "30 sec", value: 30 },
-        { label: "30 min", value: 1800 },
-      ],
-    ],
-  },
-  meta: {
-    logsVisualizeToggle: "logs",
-    refreshInterval: <number>0,
-    refreshIntervalLabel: "Off",
-    refreshHistogram: false,
-    showFields: true,
-    showQuery: true,
-    showHistogram: true,
-    showDetailTab: false,
-    showTransformEditor: true,
-    searchApplied: false,
-    toggleSourceWrap: useLocalWrapContent()
-      ? JSON.parse(useLocalWrapContent())
-      : false,
-    histogramDirtyFlag: false,
-    sqlMode: false,
-    sqlModeManualTrigger: false,
-    quickMode: false,
-    queryEditorPlaceholderFlag: true,
-    functionEditorPlaceholderFlag: true,
-    resultGrid: {
-      rowsPerPage: 50,
-      wrapCells: false,
-      manualRemoveFields: false,
-      chartInterval: "1 second",
-      chartKeyFormat: "HH:mm:ss",
-      navigation: {
-        currentRowIndex: 0,
-      },
-      showPagination: true,
-    },
-    jobId: "",
-    jobRecords: "100",
-    scrollInfo: {},
-    pageType: "logs", // 'logs' or 'stream
-    regions: [],
-    clusters: [],
-    useUserDefinedSchemas: "user_defined_schema",
-    hasUserDefinedSchemas: false,
-    selectedTraceStream: "",
-    showSearchScheduler: false,
-    toggleFunction: false, // DEPRECATED use showTransformEditor instead
-    isActionsEnabled: false,
-    resetPlotChart: false,
-  },
-  data: {
-    query: <any>"",
-    histogramQuery: <any>"",
-    parsedQuery: {},
-    countErrorMsg: "",
-    errorMsg: "",
-    errorDetail: "",
-    errorCode: 0,
-    filterErrMsg: "",
-    missingStreamMessage: "",
-    additionalErrorMsg: "",
-    savedViewFilterFields: "",
-    hasSearchDataTimestampField: false,
-    originalDataCache: {},
-    stream: {
-      loading: false,
-      streamLists: <object[]>[],
-      selectedStream: <any>[],
-      selectedStreamFields: <any>[],
-      selectedFields: <string[]>[],
-      filterField: "",
-      addToFilter: "",
-      functions: <any>[],
-      streamType: "logs",
-      interestingFieldList: <string[]>[],
-      userDefinedSchema: <any>[],
-      expandGroupRows: <any>{},
-      expandGroupRowsFieldCount: <any>{},
-      filteredField: <any>[],
-      missingStreamMultiStreamFilter: <any>[],
-      pipelineQueryStream: <any>[],
-    },
-    resultGrid: {
-      currentDateTime: new Date(),
-      currentPage: 1,
-      columns: <any>[],
-      colOrder: <any>{},
-      colSizes: <any>{},
-    },
-    histogramInterval: <any>0,
-    transforms: <any>[],
-    transformType: "function",
-    actions: <any>[],
-    selectedTransform: <any>null,
-    queryResults: <any>[],
-    sortedQueryResults: <any>[],
-    streamResults: <any>[],
-    histogram: <any>{
-      xData: [],
-      yData: [],
-      chartParams: {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "",
-      },
-      errorMsg: "",
-      errorCode: 0,
-      errorDetail: "",
-    },
-    editorValue: <any>"",
-    datetime: <any>{
-      startTime: (new Date().getTime() - 900000) * 1000,
-      endTime: new Date().getTime(),
-      relativeTimePeriod: "15m",
-      type: "relative",
-      selectedDate: <any>{},
-      selectedTime: <any>{},
-      queryRangeRestrictionMsg: "",
-      queryRangeRestrictionInHour: 100000,
-    },
-    searchAround: {
-      indexTimestamp: 0,
-      size: <number>10,
-      histogramHide: false,
-    },
-    tempFunctionName: "",
-    tempFunctionContent: "",
-    tempFunctionLoading: false,
-    savedViews: <any>[],
-    customDownloadQueryObj: <any>{},
-    functionError: "",
-    searchRequestTraceIds: <string[]>[],
-    searchWebSocketTraceIds: <string[]>[],
-    isOperationCancelled: false,
-    searchRetriesCount: <{ [key: string]: number }>{},
-    actionId: null,
-  },
-};
 
 const maxSearchRetries = 2;
 const searchReconnectDelay = 1000; // 1 second
@@ -263,9 +92,6 @@ const searchReconnectDelay = 1000; // 1 second
 // useStreamManagement for stream-related functions
 // useQueryProcessing for query-related functions
 // useDataVisualization for histogram and data display functions
-
-let searchObj: any = reactive(Object.assign({}, defaultObject));
-
 
 const searchObjDebug = reactive({
   queryDataStartTime: 0,
@@ -322,7 +148,7 @@ const {
 
 const searchPartitionMap = reactive<{ [key: string]: number }>({});
 
-const useLogs = () => {
+const useLogs = (searchObj: any, searchConfig?: any, searchMeta?: any, searchData?: any, searchState?: any) => {
   const store = useStore();
   const { t } = useI18n();
   const $q = useQuasar();
@@ -340,9 +166,15 @@ const useLogs = () => {
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
+  // Use granular objects if provided, otherwise fall back to searchObj
+  const config = searchConfig || searchObj?.config;
+  const meta = searchMeta || searchObj?.meta;
+  const data = searchData || searchObj?.data;
+  const state = searchState || searchObj;
+
   onBeforeMount(async () => {
     if (router.currentRoute.value.query?.quick_mode == "true") {
-      searchObj.meta.quickMode = true;
+      meta.quickMode = true;
     }
     extractValueQuery();
   });
@@ -351,9 +183,7 @@ const useLogs = () => {
     parser = null;
   });
 
-  const clearSearchObj = () => {
-    searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(defaultObject))));
-  };
+
 
   /**
    * This function is used to initialize the logs state from the store which was cached in the store
@@ -3609,7 +3439,7 @@ const useLogs = () => {
       // By default when no fields are selected. Timestamp and Source will be visible. If user selects field, then only selected fields will be visible in table
       // In SQL and Quick mode.
       // If user adds timestamp manually then only we get it in response.
-      // If we don’t add timestamp and add timestamp to table it should show invalid date.
+      // If we don't add timestamp and add timestamp to table it should show invalid date.
 
       if (
         selectedFields.length == 0 ||
@@ -6625,7 +6455,6 @@ const useLogs = () => {
     isWithQuery,
     getStream,
     initialLogsState,
-    clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
   };

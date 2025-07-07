@@ -129,7 +129,7 @@ export default defineComponent({
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
-    const { searchObj } = useLogs();
+    const { searchObj } = useLogs(searchObj);
     const queryEditorRef = ref(null);
 
     const functionOptions = ref(searchObj.data.transforms);
