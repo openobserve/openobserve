@@ -1876,7 +1876,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 };
                 if list.args.len() != 3 {
                     self.error = Some(Error::Message(
-                        "invalid number of arguments to cipher function".to_string(),
+                        "invalid number of arguments to cipher function, expected 3: column, key and path".to_string(),
                     ));
                     return ControlFlow::Continue(());
                 }
