@@ -331,11 +331,16 @@ export default defineComponent({
     headerHeight: {
       type: Number,
       default: 0,
+    },
+    //this will be used to set the input message if the user sends the data from any page by clicking on the ai chat button
+    aiChatInputContext: {
+      type: String,
+      default: ''
     }
   },
   setup(props) {
     const $q = useQuasar();
-    const inputMessage = ref('');
+    const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : '');
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
@@ -402,6 +407,12 @@ export default defineComponent({
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
       }
     };
+
+    watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
+      if(newAiChatInputContext) {
+        inputMessage.value = newAiChatInputContext;
+      }
+    });
 
 
     //fetchInitialMessage is called when the component is mounted and the isOpen prop is true

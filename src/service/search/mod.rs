@@ -103,7 +103,6 @@ pub(crate) mod search_stream;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
-pub(crate) mod tantivy;
 pub(crate) mod utils;
 
 /// The result of search in cluster
@@ -1404,10 +1403,10 @@ pub fn generate_search_schema_diff(
     diff_fields
 }
 
-pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
-    // parquet format inverted index only support single table
+// inverted index only support single table
+pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
     if sql.stream_names.len() != 1 {
-        return (false, vec![]);
+        return false;
     }
 
     let cfg = get_config();
@@ -1420,13 +1419,11 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
         vec![]
     };
 
-    let use_inverted_index = sql.stream_type != StreamType::Index
+    sql.stream_type != StreamType::Index
         && sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty());
-
-    (use_inverted_index, index_terms)
+        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty())
 }
 
 pub fn filter_index_fields(

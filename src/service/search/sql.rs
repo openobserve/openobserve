@@ -275,12 +275,7 @@ impl Sql {
         // 12. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
-        #[allow(deprecated)]
-        if cfg.common.inverted_index_search_format.eq("tantivy")
-            && stream_names.len() == 1
-            && cfg.common.inverted_index_enabled
-            && use_inverted_index
-        {
+        if stream_names.len() == 1 && cfg.common.inverted_index_enabled && use_inverted_index {
             let mut index_visitor = IndexVisitor::new(
                 &used_schemas,
                 cfg.common.feature_query_remove_filter_with_index,
@@ -3039,7 +3034,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
         let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3052,7 +3047,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
         let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3066,7 +3061,7 @@ mod tests {
     fn test_histogram_interval_visitor() {
         // Test with time range and histogram function
         let sql = "SELECT histogram(_timestamp, '10 second') FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3083,7 +3078,7 @@ mod tests {
     fn test_histogram_interval_visitor_with_zero_time_range() {
         // Test with zero time range
         let sql = "SELECT histogram(_timestamp) FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3099,7 +3094,7 @@ mod tests {
     #[test]
     fn test_column_visitor() {
         let sql = "SELECT name, age, COUNT(*) FROM users WHERE status = 'active' GROUP BY name, age ORDER BY name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3130,7 +3125,7 @@ mod tests {
     #[test]
     fn test_partition_column_visitor() {
         let sql = "SELECT * FROM users WHERE name = 'john' AND age = 25 AND city IN ('NYC', 'LA')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3162,7 +3157,7 @@ mod tests {
     #[test]
     fn test_prefix_column_visitor() {
         let sql = "SELECT * FROM users WHERE name LIKE 'john%' AND email LIKE 'test%'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3191,7 +3186,7 @@ mod tests {
     #[test]
     fn test_match_visitor() {
         let sql = "SELECT * FROM logs WHERE match_all('error') AND match_all('critical')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3209,7 +3204,7 @@ mod tests {
     #[test]
     fn test_field_name_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3225,7 +3220,7 @@ mod tests {
     #[test]
     fn test_add_timestamp_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3241,7 +3236,7 @@ mod tests {
     #[test]
     fn test_add_o2_id_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3257,7 +3252,7 @@ mod tests {
     #[test]
     fn test_complex_query_visitor() {
         let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3272,7 +3267,7 @@ mod tests {
     #[test]
     fn test_add_ordering_term_visitor() {
         let sql = "SELECT * FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

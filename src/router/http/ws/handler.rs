@@ -206,7 +206,7 @@ impl WsHandler {
                                             break;
                                         }
                                     }
-                                    #[allow(unused_mut)]
+                                    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
                                     Ok(mut message) => {
                                         #[cfg(feature = "enterprise")]
                                         {

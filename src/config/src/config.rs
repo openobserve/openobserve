@@ -66,7 +66,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
-pub const INDEX_SEGMENT_LENGTH: usize = 1024; // this can't be change, it will cause segment matching error
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
 pub const FILE_EXT_JSON: &str = ".json";
@@ -74,11 +73,9 @@ pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
 pub const FILE_EXT_TANTIVY: &str = ".ttv";
-pub const FILE_EXT_TANTIVY_FOLDER: &str = ".mmap";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
-pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i64 = -999;
 
 pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
@@ -938,40 +935,12 @@ pub struct Common {
         help = "Toggle inverted index cache."
     )]
     pub inverted_index_cache_enabled: bool,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = "",
-        help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
-    )]
-    pub inverted_index_split_chars: String,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
     )]
     pub inverted_index_old_format: bool,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_STORE_FORMAT",
-        default = "tantivy",
-        help = "InvertedIndex store format, parquet(default), tantivy, both"
-    )]
-    pub inverted_index_store_format: String,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
-        default = "tantivy",
-        help = "InvertedIndex search format, parquet(default), tantivy."
-    )]
-    pub inverted_index_search_format: String,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
-        default = "",
-        help = "Tantivy search mode, puffin or mmap, default is puffin."
-    )]
-    pub inverted_index_tantivy_mode: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
         default = false,
@@ -1065,7 +1034,7 @@ pub struct Common {
     pub self_metrics_consumption_whitelist: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = false,
+        default = true,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
@@ -1145,6 +1114,12 @@ pub struct Common {
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
     pub utf8_view_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_SYMBOL_ENABLED",
+        default = false,
+        help = "Enable to show symbol in dashboard"
+    )]
+    pub dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -2250,37 +2225,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.bloom_filter_ndv_ratio = 100;
     }
 
-    // check default inverted index search format
-    #[allow(deprecated)]
-    {
-        cfg.common.inverted_index_store_format =
-            cfg.common.inverted_index_store_format.to_lowercase();
-        if cfg.common.inverted_index_store_format.is_empty() {
-            cfg.common.inverted_index_store_format = "parquet".to_string();
-        }
-        if !["both", "parquet", "tantivy"]
-            .contains(&cfg.common.inverted_index_store_format.as_str())
-        {
-            return Err(anyhow::anyhow!(
-                "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
-            ));
-        }
-        cfg.common.inverted_index_search_format =
-            cfg.common.inverted_index_search_format.to_lowercase();
-        if cfg.common.inverted_index_search_format.is_empty() {
-            cfg.common.inverted_index_search_format =
-                cfg.common.inverted_index_store_format.clone();
-        }
-        if cfg.common.inverted_index_search_format == "both" {
-            cfg.common.inverted_index_search_format = "parquet".to_string();
-        }
-        if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
-            return Err(anyhow::anyhow!(
-                "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
-            ));
-        }
-    }
-
     // check for join match one
     if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
     {
@@ -2618,17 +2562,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
-
-    // check disk cache with tantivy mode
-    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
-    if cfg.common.inverted_index_tantivy_mode.is_empty() {
-        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
-    }
-    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
-        return Err(anyhow::anyhow!(
-            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
-        ));
-    }
 
     Ok(())
 }

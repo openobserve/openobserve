@@ -54,11 +54,6 @@ message FileKey {
     optional bytes segment_ids = 6;
 }
 
-message IdxFileName {
-    string         key         = 1;
-    optional bytes segment_ids = 2;
-}
-
 message SimpleFileList {
     repeated string files = 1;
 }

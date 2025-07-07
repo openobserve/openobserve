@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
+use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode};
 use datafusion::{
     common::{
         Result, TableReference,
@@ -47,7 +47,6 @@ impl RemoteScanRewriter {
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-        idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
@@ -60,7 +59,6 @@ impl RemoteScanRewriter {
                 req,
                 nodes,
                 file_id_lists,
-                idx_file_list,
                 equal_keys,
                 match_all_keys,
                 index_condition,

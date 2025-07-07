@@ -102,15 +102,6 @@ pub struct FileKey {
     #[prost(bytes = "vec", optional, tag = "6")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
-#[derive(Eq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IdxFileName {
-    #[prost(string, tag = "1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", optional, tag = "2")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SimpleFileList {
@@ -2931,8 +2922,6 @@ pub struct SearchInfo {
     pub plan: ::prost::alloc::vec::Vec<u8>,
     #[prost(int64, repeated, tag = "2")]
     pub file_id_list: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "3")]
-    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
     #[prost(int64, tag = "4")]
     pub start_time: i64,
     #[prost(int64, tag = "5")]

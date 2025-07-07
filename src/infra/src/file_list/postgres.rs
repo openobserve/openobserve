@@ -889,12 +889,13 @@ SELECT date
         } else {
             ("org", org_id.to_string())
         };
+        let file_list_stream = format!("{org_id}/file_list/");
         let mut sql = format!(
             r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
     SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
     FROM file_list 
-    WHERE {field} = '{value}'
+    WHERE {field} = '{value}' AND stream NOT LIKE '{file_list_stream}%'
             "#
         );
         if deleted {
