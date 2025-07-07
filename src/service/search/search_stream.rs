@@ -206,18 +206,10 @@ pub async fn process_search_stream_request(
 
                 // send error message to client
                 if let Err(e) = sender.send(Err(e)).await {
-                    if matches!(e, tokio::sync::mpsc::error::SendError(_)) {
-                        log::warn!(
-                            "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                            trace_id
-                        );
-                    } else {
-                        log::error!(
-                            "[HTTP2_STREAM trace_id {}] Error sending error message to client: {}",
-                            trace_id,
-                            e
-                        );
-                    }
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
+                        trace_id
+                    );
                 }
                 return;
             }
@@ -332,18 +324,10 @@ pub async fn process_search_stream_request(
                 .await;
 
                 if let Err(e) = sender.send(Err(e)).await {
-                    if matches!(e, tokio::sync::mpsc::error::SendError(_)) {
-                        log::warn!(
-                            "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                            trace_id
-                        );
-                    } else {
-                        log::error!(
-                            "[HTTP2_STREAM trace_id {}] Error sending error message to client: {}",
-                            trace_id,
-                            e
-                        );
-                    }
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
+                        trace_id
+                    );
                 }
                 return;
             }
@@ -420,18 +404,10 @@ pub async fn process_search_stream_request(
                 .await;
 
                 if let Err(e) = sender.send(Err(e)).await {
-                    if matches!(e, tokio::sync::mpsc::error::SendError(_)) {
-                        log::warn!(
-                            "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                            trace_id
-                        );
-                    } else {
-                        log::error!(
-                            "[HTTP2_STREAM trace_id {}] Error sending error message to client: {}",
-                            trace_id,
-                            e
-                        );
-                    }
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
+                        trace_id
+                    );
                 }
                 return;
             }
@@ -482,18 +458,10 @@ pub async fn process_search_stream_request(
                 }
 
                 if let Err(e) = sender.send(Err(e)).await {
-                    if matches!(e, tokio::sync::mpsc::error::SendError(_)) {
-                        log::warn!(
-                            "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                            trace_id
-                        );
-                    } else {
-                        log::error!(
-                            "[HTTP2_STREAM trace_id {}] Error sending error message to client: {}",
-                            trace_id,
-                            e
-                        );
-                    }
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
+                        trace_id
+                    );
                 }
                 return;
             }
@@ -553,18 +521,10 @@ pub async fn process_search_stream_request(
             }
 
             if let Err(e) = sender.send(Err(e)).await {
-                if matches!(e, tokio::sync::mpsc::error::SendError(_)) {
-                    log::warn!(
-                        "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                        trace_id
-                    );
-                } else {
-                    log::error!(
-                        "[HTTP2_STREAM trace_id {}] Error sending error message to client: {}",
-                        trace_id,
-                        e
-                    );
-                }
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
+                    trace_id
+                );
             }
             return;
         }
@@ -605,18 +565,10 @@ pub async fn process_search_stream_request(
         .send(Ok(config::meta::search::StreamResponses::Done))
         .await
     {
-        if matches!(e, tokio::sync::mpsc::error::SendError(_)) {
-            log::warn!(
-                "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
-                trace_id
-            );
-        } else {
-            log::error!(
-                "[HTTP2_STREAM trace_id {}] Error sending completion message to client: {}",
-                trace_id,
-                e
-            );
-        }
+        log::warn!(
+            "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
+            trace_id
+        );
     }
 }
 
@@ -851,19 +803,11 @@ pub async fn do_partitioned_search(
                 partition_order_by,
             );
             if let Err(e) = sender.send(Ok(StreamResponses::Progress { percent })).await {
-                if matches!(e, tokio::sync::mpsc::error::SendError(_)) {
-                    log::warn!(
-                        "[trace_id {}] Sender is closed, stopping do_partitioned_search",
-                        trace_id
-                    );
-                    return Ok(());
-                } else {
-                    log::error!("[trace_id {}] Error sending progress: {}", trace_id, e);
-                    return Err(infra::errors::Error::Message(format!(
-                        "Error sending progress: {}",
-                        e
-                    )));
-                }
+                log::warn!(
+                    "[trace_id {}] Sender is closed, stopping do_partitioned_search",
+                    trace_id
+                );
+                return Ok(());
             }
         }
         let stop_values_search = req_size != -1
