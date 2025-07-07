@@ -473,7 +473,7 @@ class="padding-none" />
       style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
-      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" />
+      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" :aiChatInputContext="aiChatInputContext" />
     </div>
   </div>
   </q-layout>
