@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             filled
             dense
-            class="q-ml-auto q-mb-xs no-border"
+            class="q-ml-auto no-border"
             :placeholder="t('alert_destinations.search')"
           >
             <template #prepend>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
           <q-btn
             data-test="alert-destination-list-add-alert-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
+            class="q-ml-md text-bold no-border"
             padding="sm lg"
             color="secondary"
             no-caps
