@@ -40,7 +40,7 @@ pub(crate) const ENCRYPT_UDF_NAME: &str = "encrypt";
 pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         DECRYPT_UDF_NAME,
-        // expects two arguments : field and key_name
+        // expects three arguments : field, key_name and path
         vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
         // returns string
         DataType::Utf8,
@@ -53,7 +53,7 @@ pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 pub(crate) static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ENCRYPT_UDF_NAME,
-        // expects two arguments : field and key_name
+        // expects three arguments : field, key_name and path
         vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
         // returns string
         DataType::Utf8,
@@ -319,7 +319,7 @@ fn encrypt() -> ScalarFunctionImplementation {
                                 return original_str.to_owned();
                             }
                         };
-                        // given path must either be a string, in which case directly decrypt it
+                        // given path must either be a string, in which case directly encrypt it
                         // or is must be an array of string, in which case we basically .map() it
                         // and re-stringify
                         match v {
