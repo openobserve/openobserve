@@ -164,10 +164,15 @@ export default class DashboardFilter {
     await columnLocator.click();
     await columnLocator.fill(newFieldName);
 
-    await this.page
+    // await this.page
+    //   .getByRole("option", { name: newFieldName, exact: true })
+    //   .first()
+    //   .click();
+    const option = this.page
       .getByRole("option", { name: newFieldName, exact: true })
-      .first()
-      .click();
+      .first();
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
 
     // Step 3: Condition dropdown
     if (operator || value) {
