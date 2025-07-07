@@ -112,7 +112,7 @@ async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
         .set(cfg.memory_cache.max_size as i64);
     metrics::QUERY_DISK_CACHE_LIMIT_BYTES
         .with_label_values(&[])
-        .set(cfg.disk_cache.max_size as i64);
+        .set((cfg.disk_cache.max_size*cfg.disk_cache.bucket_num) as i64);
     Ok(())
 }
 
