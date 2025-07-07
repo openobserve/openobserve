@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="col">
             <div>
               <q-select
-                class="textbox showLabelOnTop"
+                class=" showLabelOnTop"
                 filled
                 stack-label
                 input-debounce="0"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               ></q-select>
             </div>
-            <div class="text-body1 text-bold q-mt-lg">
+            <div class="text-body1 text-bold q-mt-md">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
             <div class="row">
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-lg"
+              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-sm"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   dense
                   stack-label
-                  class="textbox showLabelOnTop col no-case q-mr-sm"
+                  class=" showLabelOnTop col no-case q-mr-sm"
                   @update:model-value="streamTypeUpdated"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-type-select"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   option-value="name"
                   option-label="name"
                   emit-value
-                  class="textbox showLabelOnTop col no-case"
+                  class=" showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-select"
                 >
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 input-debounce="0"
                 :options="fieldsFilteredOptions"
                 @filter="fieldsFilterFn"
-                class="textbox showLabelOnTop no-case"
+                class=" showLabelOnTop no-case"
                 option-value="name"
                 option-label="name"
                 emit-value
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-query-values-filter-name-selector"
                       @filter="fieldsFilterFn"
                       :placeholder="filter.name ? '' : 'Select Field'"
-                      class="textbox col no-case q-ml-sm"
+                      class=" col no-case q-ml-sm"
                       :rules="[
                         (val: any) => !!val.trim() || 'Field is required!',
                       ]"
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     icon="add"
                     no-outline
-                    class="q-mt-md"
+                    class="q-mt-sm"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
                   >
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="['query_values'].includes(variableData.type)">
             <div
               class="button-group multi-select-default-value-toggle q-mt-md"
-              style="margin-bottom: 12px"
+              style="margin-bottom: 8px"
             >
               <div class="multi-select-default-value">By Default Select:</div>
               <div class="row">
@@ -589,7 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-center q-mt-md">
             <q-btn
               class="q-mb-md text-bold"
               :label="t('dashboard.cancel')"
