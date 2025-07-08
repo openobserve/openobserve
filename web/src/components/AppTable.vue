@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-th
             v-for="col in props.cols"
             :key="col.name"
+            :class="col.classes || ''"
             :props="props"
             :style="col.style"
           >

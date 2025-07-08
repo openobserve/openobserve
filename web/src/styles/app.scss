@@ -232,3 +232,71 @@
   z-index: 1000;
 }
 
+
+//this is used to target the table in the app-table component internally it uses q-table component
+//but due to virtual scroll the classes are different so we need to target the classes differently
+//here we have q-virtual-scroll__content and q-table classes to target td and th respectively
+//we have also added the actions-column class to the last column of the table
+//we have also added the o2-quasar-app-table-dark and o2-quasar-app-table-light classes to the table to target the dark and light theme for actions column
+//we have also added the o2-quasar-app-table-dark and o2-quasar-app-table-light classes to the table to target the dark and light theme for actions column
+.o2-quasar-app-table{
+  .q-virtual-scroll__content{
+    th,td{
+      padding: 0px 16px !important;
+      height: 36px !important;
+    }
+    td:last-child.actions-column {
+      //the fixed width as we have moved some actions to the menu so lot of space is occupied by actions section so remvoed that
+      position: sticky;
+      right: 0;
+      z-index: 1;
+      width: 150px !important;
+    }
+  }
+  .q-table{
+    thead{
+      th:last-child.actions-column{
+        position: sticky;
+        right: 0;
+        z-index: 1;
+      }
+    }
+  }
+}
+.o2-quasar-app-table-light{
+  .q-virtual-scroll__content{
+    td:last-child.actions-column {
+      background: #ffffff !important;
+      box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1) !important;
+      width: 150px !important;
+    }
+  }
+  .q-table{
+    thead{
+      th:last-child.actions-column{
+        background: #ffffff !important;
+        box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1) !important;
+        width: 150px !important;
+      }
+    }
+  }
+}
+
+.o2-quasar-app-table-dark{
+  .q-virtual-scroll__content{
+    td:last-child.actions-column {
+      background: var(--q-dark) !important;
+      box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1) !important;
+      width: 150px !important;
+    }
+  }
+  .q-table{
+    thead{
+      th:last-child.actions-column{
+        background: var(--q-dark) !important;
+        box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1) !important;
+        width: 150px !important;
+      }
+    }
+  }
+}

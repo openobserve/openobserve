@@ -55,7 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <app-table
       data-test="iam-roles-table-section"
-      class="iam-table"
+      class="iam-table o2-quasar-app-table"
+      :class="store.state.theme == 'dark' ? 'o2-quasar-app-table-dark': 'o2-quasar-app-table-light'"
       :rows="rows"
       :columns="columns"
       pagination
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       :bordered="false"
       :title="t('iam.roles')"
+
     >
       <template v-slot:actions="slotProps: any">
         <div>
@@ -142,6 +144,7 @@ const columns: any = [
     label: "#",
     field: "#",
     align: "left",
+    style: "width: 67px"
   },
   {
     name: "role_name",
@@ -158,7 +161,7 @@ const columns: any = [
     sortable: false,
     slot: true,
     slotName: "actions",
-    style: "width: 400px",
+    classes: "actions-column",
   },
 ];
 
