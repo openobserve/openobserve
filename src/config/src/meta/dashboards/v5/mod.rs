@@ -318,8 +318,7 @@ pub struct ColorCfg {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Mapping {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none", rename="type")]
     typee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
@@ -329,8 +328,7 @@ pub struct Mapping {
     to: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pattern: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "match")]
+    #[serde(skip_serializing_if = "Option::is_none", rename="match")]
     matchh: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<String>,
@@ -343,8 +341,7 @@ pub struct Mapping {
 pub struct DrillDown {
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none", rename="type")]
     type_field: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     target_blank: Option<bool>,
@@ -359,8 +356,7 @@ pub struct DrillDown {
 pub struct MarkLine {
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none", rename="type")]
     typee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,

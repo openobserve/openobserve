@@ -687,8 +687,7 @@ mod v3 {
     pub struct DrillDown {
         #[serde(skip_serializing_if = "Option::is_none")]
         name: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "type")]
+        #[serde(skip_serializing_if = "Option::is_none", rename="type")]
         type_field: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         target_blank: Option<bool>,
@@ -1027,8 +1026,7 @@ mod v4 {
     pub struct DrillDown {
         #[serde(skip_serializing_if = "Option::is_none")]
         name: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "type")]
+        #[serde(skip_serializing_if = "Option::is_none", rename="type")]
         type_field: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         target_blank: Option<bool>,
@@ -1043,8 +1041,7 @@ mod v4 {
     pub struct MarkLine {
         #[serde(skip_serializing_if = "Option::is_none")]
         name: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "type")]
+        #[serde(skip_serializing_if = "Option::is_none", rename="type")]
         typee: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
@@ -1433,8 +1430,7 @@ mod v5 {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Mapping {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "type")]
+        #[serde(skip_serializing_if = "Option::is_none", rename="type")]
         typee: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
@@ -1444,8 +1440,7 @@ mod v5 {
         to: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pattern: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "match")]
+        #[serde(skip_serializing_if = "Option::is_none", rename="match")]
         matchh: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         color: Option<String>,
@@ -1458,8 +1453,7 @@ mod v5 {
     pub struct DrillDown {
         #[serde(skip_serializing_if = "Option::is_none")]
         name: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "type")]
+        #[serde(skip_serializing_if = "Option::is_none", rename="type")]
         type_field: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         target_blank: Option<bool>,
@@ -1474,8 +1468,7 @@ mod v5 {
     pub struct MarkLine {
         #[serde(skip_serializing_if = "Option::is_none")]
         name: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename = "type")]
+        #[serde(skip_serializing_if = "Option::is_none", rename="type")]
         typee: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
