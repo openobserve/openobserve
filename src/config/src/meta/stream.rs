@@ -553,8 +553,7 @@ pub struct UpdateSettingsWrapper<D> {
 pub struct UpdateStreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: UpdateSettingsWrapper<StreamPartition>,
     #[serde(default)]
     pub full_text_search_keys: UpdateSettingsWrapper<String>,
@@ -562,11 +561,9 @@ pub struct UpdateStreamSettings {
     pub index_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
     pub bloom_filter_fields: UpdateSettingsWrapper<String>,
-    #[serde(skip_serializing_if = "Option::None")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::None", default)]
     pub data_retention: Option<i64>,
-    #[serde(skip_serializing_if = "Option::None")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::None", default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
     pub defined_schema_fields: UpdateSettingsWrapper<String>,
@@ -681,14 +678,11 @@ impl TimeRange {
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: Vec<StreamPartition>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub index_fields: Vec<String>,
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
@@ -704,8 +698,7 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
     pub index_updated_at: i64,
