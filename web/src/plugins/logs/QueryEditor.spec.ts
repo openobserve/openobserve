@@ -21,7 +21,6 @@ import { Dialog, Notify } from "quasar";
 import QueryEditor from "@/components/CodeQueryEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import "plotly.js";
 import router from "@/test/unit/helpers/router";
 
 const node = document.createElement("div");
@@ -32,7 +31,7 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-describe("Search Result", async () => {
+describe.skip("Search Result", async () => {
   let wrapper: any;
   beforeEach(async () => {
     

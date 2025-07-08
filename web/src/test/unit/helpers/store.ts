@@ -84,6 +84,7 @@ const store = createStore({
           text: "re_not_match(field, 'pattern')",
         },
       ],
+      timestamp_column: "_timestamp"
     },
     organizationData: {
       organizationPasscode: "",
@@ -102,6 +103,7 @@ const store = createStore({
       },
       isDataIngested: false,
       allDashboardData: {},
+      foldersByType:[],
     },
 
   },
