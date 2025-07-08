@@ -104,10 +104,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, computed } from "vue";
+import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import QueryEditor from "@/components/QueryEditor.vue";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
 import config from "@/aws-exports";
@@ -117,7 +116,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 export default defineComponent({
   name: "JsonEditor",
   components: {
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(() => import('@/components/CodeQueryEditor.vue')),
     O2AIChat,
   },
   props: {

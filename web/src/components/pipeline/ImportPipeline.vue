@@ -505,6 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     reactive,
     computed,
     watch,
+    defineAsyncComponent
   } from "vue";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
@@ -513,7 +514,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import router from "@/router";
   import { useQuasar } from "quasar";
   import pipelinesService from "../../services/pipelines";
-  import QueryEditor from "../QueryEditor.vue";
   import useStreams from "@/composables/useStreams";
   import destinationService from "@/services/alert_destination";
   import AppTabs from "../common/AppTabs.vue";
@@ -1416,7 +1416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       };
     },
     components: {
-      QueryEditor,
+      QueryEditor: defineAsyncComponent(() => import('@/components/CodeQueryEditor.vue')),
       AppTabs,
     },
   });
