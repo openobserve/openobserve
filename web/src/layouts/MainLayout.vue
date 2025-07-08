@@ -145,10 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="top middle"
               class="organization-menu-o2"
             >
-              <q-list style="width: 250px">
-                <q-item style="padding: 0">
-                  <q-item-section class="column" style="padding: 0px">
+              <q-list data-test="organization-menu-list" style="width: 250px">
+                <q-item data-test="organization-menu-item" style="padding: 0">
+                  <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
                     <q-table
+                      data-test="organization-menu-table"
                       :rows="filteredOrganizations"
                       :row-key="row => 'org_' + row.identifier"
                       :visible-columns="['label']"
@@ -160,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #top>
                       <div class="full-width">
                         <q-input
-                          data-test="log-search-saved-view-field-search-input"
+                          data-test="organization-search-input"
                           v-model="searchQuery"
                           data-cy="index-field-search-input"
                           filled
@@ -178,8 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
 
                       <template v-slot:body-cell-label="props">
-                        <q-td :props="props" class="org-list-item">
+                        <q-td data-test="organization-menu-item-label" :props="props" class="org-list-item">
                           <q-item
+                            data-test="organization-menu-item-label-item"
                             clickable
                             v-close-popup
                             dense
@@ -187,15 +189,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="selectedOrg = props.row; updateOrganization()"
                           >
                             <q-item-section>
-                              <q-item-label class="ellipsis">
+                              <q-item-label data-test="organization-menu-item-label-item-label" class="ellipsis">
                                 {{ props.row.label }}
                               </q-item-label>
                             </q-item-section>
                           </q-item>
                         </q-td>
                       </template>
-                      <template v-slot:no-data>
-                        <div class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center">
+                      <template  v-slot:no-data>
+                        <div data-test="organization-menu-no-data" class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center">
                           No organizations found
                         </div>
                       </template>
