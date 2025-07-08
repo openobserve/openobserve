@@ -241,7 +241,8 @@
     "version": "Version",
     "commitHash": "Commit Hash",
     "buildDate": "Build Date",
-    "logoMsg": "Observability simplified."
+    "logoMsg": "Observability simplified.",
+    "buildType": "Platform"
   },
   "login": {
     "userid": "User ID",
