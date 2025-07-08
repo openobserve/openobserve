@@ -830,9 +830,9 @@ export default defineComponent({
 
     // Main method for handling before mount logic
     async function handleBeforeMount() {
-      if (isLogsTab()) {
-        await setupLogsTab();
-      } else {
+      await setupLogsTab();
+
+      if (!isLogsTab()) {
         handleVisualizeTab();
       }
     }
