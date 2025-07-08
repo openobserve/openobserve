@@ -1214,7 +1214,7 @@ mod tests {
 
     fn create_file_key(min_ts: i64, max_ts: i64) -> FileKey {
         FileKey {
-            key: format!("file_{}_{}", min_ts, max_ts),
+            key: format!("file_{min_ts}_{max_ts}"),
             meta: FileMeta {
                 min_ts,
                 max_ts,

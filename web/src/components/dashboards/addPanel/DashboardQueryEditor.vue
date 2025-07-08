@@ -25,19 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="display: flex; flex-direction: row; align-items: center"
         data-test="dashboard-query-data"
       >
-        <div>
-          <q-icon
-            flat
-            :name="
-              !dashboardPanelData.layout.showQueryBar
-                ? 'arrow_right'
-                : 'arrow_drop_down'
-            "
-            text-color="black"
-            class="q-mr-sm"
-            data-test="dashboard-panel-error-bar-icon"
-          />
-        </div>
         <q-space />
         <div style="max-width: 600px">
           <q-tabs
@@ -602,7 +589,7 @@ export default defineComponent({
 .sql-bar {
   height: 40px !important;
   // overflow: hidden;
-  cursor: pointer;
+  // cursor: pointer;
 }
 
 .dashboard-query-remove-icon:hover {

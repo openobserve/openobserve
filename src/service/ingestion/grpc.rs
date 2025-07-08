@@ -374,10 +374,10 @@ mod tests {
 
         // Test with float value
         let attr_val = json::json!({
-            "key4": 3.14
+            "key4": std::f32::consts::PI
         });
         let resp = get_val_for_attr(attr_val);
-        assert_eq!(resp.as_str().unwrap(), "3.14");
+        assert_eq!(resp.as_str().unwrap(), "3.1415927");
     }
 
     #[test]

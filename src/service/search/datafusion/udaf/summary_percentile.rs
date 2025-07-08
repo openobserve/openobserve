@@ -478,24 +478,20 @@ mod test {
     async fn test_summary_percentile_udaf() {
         let ctx = create_context();
         let percentile = 0.75;
-        let sql_float_field = &format!(
-            "select summary_percentile(value_float, total_count, {}) from t",
-            percentile
-        );
-        let sql_uint_field = &format!(
-            "select summary_percentile(value_uint, total_count, {}) from t",
-            percentile
-        );
+        let sql_float_field =
+            format!("select summary_percentile(value_float, total_count, {percentile}) from t");
+        let sql_uint_field =
+            format!("select summary_percentile(value_uint, total_count, {percentile}) from t");
         let acc_udaf = AggregateUDF::from(SummaryPercentile::new());
         ctx.register_udaf(acc_udaf);
 
-        let df = ctx.sql(sql_float_field).await.unwrap();
+        let df = ctx.sql(&sql_float_field).await.unwrap();
         let results = df.collect().await.unwrap();
         // downcast the array to the expected type
         let result = as_float64_array(results[0].column(0)).unwrap();
         assert_eq!(result.value(0), 2433.0);
 
-        let df = ctx.sql(sql_uint_field).await.unwrap();
+        let df = ctx.sql(&sql_uint_field).await.unwrap();
         let results = df.collect().await.unwrap();
         // downcast the array to the expected type
         let result = as_uint32_array(results[0].column(0)).unwrap();
@@ -527,14 +523,13 @@ mod test {
         ctx.register_table("t", Arc::new(table)).unwrap();
 
         let percentile = 0.75;
-        let sql = &format!(
-            "select summary_percentile(f1, total_count, {}), summary_percentile(f2, total_count, {}) from t",
-            percentile, percentile
+        let sql = format!(
+            "select summary_percentile(f1, total_count, {percentile}), summary_percentile(f2, total_count, {percentile}) from t"
         );
         let acc_udaf = AggregateUDF::from(SummaryPercentile::new());
         ctx.register_udaf(acc_udaf);
 
-        let df = ctx.sql(sql).await.unwrap();
+        let df = ctx.sql(&sql).await.unwrap();
         let results = df.collect().await.unwrap();
         // downcast the array to the expected type
         let result1 = as_float64_array(results[0].column(0)).unwrap();

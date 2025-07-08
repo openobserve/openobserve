@@ -144,7 +144,7 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
 
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
-    if LOCAL_NODE.is_compactor() {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }
     let pipelines = list().await?;

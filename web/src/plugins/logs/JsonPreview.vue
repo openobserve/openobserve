@@ -139,13 +139,11 @@
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
               "
+              @click.stop="addSearchTerm(key, value[key], 'include')"
+              data-test="log-details-include-field-btn"
             >
               <q-item-section>
-                <q-item-label
-                  data-test="log-details-include-field-btn"
-                  @click.stop="addSearchTerm(key, value[key], 'include')"
-                  v-close-popup
-                  ><q-btn
+                <q-item-label><q-btn
                     title="Add to search query"
                     size="6px"
                     round
@@ -167,12 +165,11 @@
                   item.name === key ? item.isSchemaField : '',
                 ) && multiStreamFields.includes(key)
               "
+              @click.stop="addSearchTerm(key, value[key], 'exclude')"
+              data-test="log-details-exclude-field-btn"
             >
               <q-item-section>
                 <q-item-label
-                  data-test="log-details-exclude-field-btn"
-                  @click.stop="addSearchTerm(key, value[key], 'exclude')"
-                  v-close-popup
                   ><q-btn
                     title="Add to search query"
                     size="6px"
@@ -186,13 +183,9 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item clickable v-close-popup>
+            <q-item clickable v-close-popup @click.stop="addFieldToTable(key)" data-test="log-details-add-field-btn">
               <q-item-section>
-                <q-item-label
-                  data-test="log-details-add-field-btn"
-                  @click.stop="addFieldToTable(key)"
-                  v-close-popup
-                  ><q-btn
+                <q-item-label><q-btn
                     title="Add field to table"
                     icon="visibility"
                     size="6px"
@@ -200,6 +193,26 @@
                     class="q-mr-sm pointer"
                   ></q-btn
                   >{{ addOrRemoveLabel(key) }}</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item  clickable v-close-popup>
+              <q-item-section>
+                <q-item-label
+                  data-test="send-to-ai-chat-btn"
+                  @click.stop="sendToAiChat(JSON.stringify({
+                    [key]: value[key],
+                  }))"
+                  v-close-popup
+                  ><q-btn
+                    title="Send to AI Chat"
+                    size="6px"
+                    round
+                    class="q-mr-sm pointer"
+                  >
+                  <q-img height="14px" width="14px" :src="getBtnLogo" />
+                  </q-btn
+                  >Send to AI Chat</q-item-label
                 >
               </q-item-section>
             </q-item>
@@ -273,7 +286,7 @@ export default {
       () => import("@/components/CodeQueryEditor.vue"),
     ),
   },
-  emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
+  emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace", "sendToAiChat","closeTable"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
@@ -492,6 +505,17 @@ export default {
       return t("common.addFieldToTable");
     };
 
+    const sendToAiChat = (key: string, value: string) => {
+      emit("closeTable");
+      emit("sendToAiChat", key, value);
+    };
+
+    const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+
     return {
       t,
       copyLogToClipboard,
@@ -520,6 +544,8 @@ export default {
       setViewTraceBtn,
       getOriginalData,
       addOrRemoveLabel,
+      sendToAiChat,
+      getBtnLogo
     };
   },
 };

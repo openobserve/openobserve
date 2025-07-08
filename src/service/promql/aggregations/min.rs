@@ -36,20 +36,22 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::service::promql::value::{InstantValue, Label, Labels, Sample, Value};
+    use crate::service::promql::value::{InstantValue, Label, Sample, Value};
 
     #[test]
     fn test_min_function() {
         let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
 
         // Create test data with multiple samples
-        let mut labels1 = Labels::default();
-        labels1.push(Arc::new(Label::new("instance", "server1")));
-        labels1.push(Arc::new(Label::new("job", "node_exporter")));
+        let labels1 = vec![
+            Arc::new(Label::new("instance", "server1")),
+            Arc::new(Label::new("job", "node_exporter")),
+        ];
 
-        let mut labels2 = Labels::default();
-        labels2.push(Arc::new(Label::new("instance", "server2")));
-        labels2.push(Arc::new(Label::new("job", "node_exporter")));
+        let labels2 = vec![
+            Arc::new(Label::new("instance", "server2")),
+            Arc::new(Label::new("job", "node_exporter")),
+        ];
 
         let data = Value::Vector(vec![
             InstantValue {

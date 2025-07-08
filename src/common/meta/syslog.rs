@@ -157,4 +157,14 @@ mod tests {
         assert!(serialized.contains("orgId"));
         assert!(serialized.contains("streamName"));
     }
+
+    #[test]
+    fn test_empty_syslog_routes() {
+        let routes = SyslogRoutes { routes: vec![] };
+        assert!(routes.routes.is_empty());
+
+        let serialized = serde_json::to_string(&routes).unwrap();
+        let deserialized: SyslogRoutes = serde_json::from_str(&serialized).unwrap();
+        assert!(deserialized.routes.is_empty());
+    }
 }

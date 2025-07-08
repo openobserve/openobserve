@@ -51,7 +51,7 @@ mod tests {
         let cli = cli::Cli::args(args);
 
         if let Err(err) = export::Export::operator(cli).await {
-            println!("Error: {}", err);
+            println!("Error: {err}");
         }
     }
 
@@ -78,7 +78,7 @@ mod tests {
         let cli = cli::Cli::args(args);
 
         if let Err(err) = import::Import::operator(cli).await {
-            println!("Error: {}", err);
+            println!("Error: {err}");
         }
     }
 
@@ -109,7 +109,7 @@ mod tests {
         let cli = cli::Cli::args(args);
 
         if let Err(err) = import::Import::operator(cli).await {
-            println!("Error: {}", err);
+            println!("Error: {err}");
         }
     }
 
@@ -140,7 +140,7 @@ mod tests {
         let cli = cli::Cli::args(args);
 
         if let Err(err) = import::Import::operator(cli).await {
-            println!("Error: {}", err);
+            println!("Error: {err}");
         }
     }
 }

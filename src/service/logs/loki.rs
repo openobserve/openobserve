@@ -106,7 +106,7 @@ fn validate_and_process_json_request(
         for (entry_idx, entry) in loki_stream.values.into_iter().enumerate() {
             if entry.line.trim().is_empty() {
                 return Err(LokiError::InvalidTimestamp {
-                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line",),
+                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line"),
                 });
             }
 
@@ -181,7 +181,7 @@ fn validate_and_process_protobuf_request(
         for (entry_idx, entry) in loki_stream.entries.into_iter().enumerate() {
             if entry.line.trim().is_empty() {
                 return Err(LokiError::InvalidTimestamp {
-                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line",),
+                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line"),
                 });
             }
 

@@ -133,6 +133,7 @@ struct ConfigResponse<'a> {
     max_query_range: i64,
     ai_enabled: bool,
     dashboard_placeholder: String,
+    dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -268,10 +269,13 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
+    #[cfg(feature = "cloud")]
+    let build_type = "cloud";
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
+
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -335,6 +339,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
     }))
 }
 

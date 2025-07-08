@@ -1492,7 +1492,7 @@ impl VisitorMut for HistogramIntervalVisitor {
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr
-            && func.name.to_string().to_lowercase() == "histogram"
+            && func.name.to_string().eq_ignore_ascii_case("histogram")
         {
             if let FunctionArguments::List(list) = &func.args {
                 let mut args = list.args.iter();
@@ -1505,7 +1505,7 @@ impl VisitorMut for HistogramIntervalVisitor {
                         .trim_matches(|v| v == '\'' || v == '"')
                         .to_string()
                 } else {
-                    generate_histogram_interval(self.time_range)
+                    generate_histogram_interval(self.time_range).to_string()
                 };
                 self.interval = match convert_histogram_interval_to_seconds(&interval) {
                     Ok(v) => Some(v),
@@ -1643,12 +1643,12 @@ impl VisitorMut for TrackTotalHitsVisitor {
 
 fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
     if idents.len() == 2 {
-        let table_name = idents[0].value.clone();
+        let table_name = idents[0].value.as_str();
         let field_name = idents[1].value.clone();
         (TableReference::from(table_name), field_name)
     } else {
-        let stream_type = idents[0].value.clone();
-        let table_name = idents[1].value.clone();
+        let stream_type = idents[0].value.as_str();
+        let table_name = idents[1].value.as_str();
         let field_name = idents[2].value.clone();
         (TableReference::partial(stream_type, table_name), field_name)
     }
@@ -1717,11 +1717,14 @@ macro_rules! intervals {
     (@unit m) => { chrono::Duration::minutes };
 }
 
-pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> String {
-    if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
-        return "1 hour".to_string();
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> &'static str {
+    let Some((start, end)) = time_range else {
+        return "1 hour";
+    };
+    if (start, end).eq(&(0, 0)) {
+        return "1 hour";
     }
-    let duration = time_range.map(|r| r.1 - r.0).unwrap();
+    let duration = end - start;
 
     const INTERVALS: [(i64, &str); 10] = intervals![
         (h, 24 * 60, "1 day"),
@@ -1738,35 +1741,39 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> String {
 
     for (time, interval) in INTERVALS.iter() {
         if duration >= *time {
-            return interval.to_string();
+            return interval;
         }
     }
-    "10 second".to_string()
+    "10 second"
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
     let interval = interval.trim();
-    let (num, unit) = interval
+    let pos = interval
         .find(|c: char| !c.is_numeric())
-        .map(|pos| interval.split_at(pos))
         .ok_or_else(|| Error::Message(format!("Invalid interval format: '{interval}'")))?;
 
-    let seconds = match unit.trim().to_lowercase().as_str() {
-        "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
-        "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
-        "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
-        "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
+    let (num_str, unit_str) = interval.split_at(pos);
+    let num = num_str.parse::<i64>().map_err(|_| {
+        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "Invalid number format".to_string(),
+        ))
+    })?;
+
+    let unit = unit_str.trim().to_lowercase();
+    let seconds = match unit.as_str() {
+        "second" | "seconds" | "s" | "secs" | "sec" => num,
+        "minute" | "minutes" | "m" | "mins" | "min" => num * 60,
+        "hour" | "hours" | "h" | "hrs" | "hr" => num * 3600,
+        "day" | "days" | "d" => num * 86400,
         _ => {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Unsupported histogram interval unit".to_string(),
             )));
         }
     };
-    seconds.map_err(|_| {
-        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-            "Invalid number format".to_string(),
-        ))
-    })
+
+    Ok(seconds)
 }
 
 pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
@@ -1786,17 +1793,28 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
         return Ok(None);
     };
     let mut where_str = caps.get(1).unwrap().as_str().to_string();
-    if !meta.group_by.is_empty() {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" group ").unwrap()].to_string();
+    let where_str_lower = where_str.to_lowercase();
+
+    let clause_to_strip = if !meta.group_by.is_empty() {
+        Some(" group ")
     } else if meta.having {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" having ").unwrap()].to_string();
+        Some(" having ")
     } else if !meta.order_by.is_empty() {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" order ").unwrap()].to_string();
-    } else if meta.limit > 0 || where_str.to_lowercase().ends_with(" limit 0") {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" limit ").unwrap()].to_string();
+        Some(" order ")
+    } else if meta.limit > 0 || where_str_lower.ends_with(" limit 0") {
+        Some(" limit ")
     } else if meta.offset > 0 {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
+        Some(" offset ")
+    } else {
+        None
+    };
+
+    if let Some(clause) = clause_to_strip
+        && let Some(pos) = where_str_lower.rfind(clause)
+    {
+        where_str.truncate(pos);
     }
+
     Ok(Some(where_str))
 }
 
@@ -3034,7 +3052,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
         let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3047,7 +3065,7 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
         let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3061,7 +3079,7 @@ mod tests {
     fn test_histogram_interval_visitor() {
         // Test with time range and histogram function
         let sql = "SELECT histogram(_timestamp, '10 second') FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3078,7 +3096,7 @@ mod tests {
     fn test_histogram_interval_visitor_with_zero_time_range() {
         // Test with zero time range
         let sql = "SELECT histogram(_timestamp) FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3094,7 +3112,7 @@ mod tests {
     #[test]
     fn test_column_visitor() {
         let sql = "SELECT name, age, COUNT(*) FROM users WHERE status = 'active' GROUP BY name, age ORDER BY name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3125,7 +3143,7 @@ mod tests {
     #[test]
     fn test_partition_column_visitor() {
         let sql = "SELECT * FROM users WHERE name = 'john' AND age = 25 AND city IN ('NYC', 'LA')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3157,7 +3175,7 @@ mod tests {
     #[test]
     fn test_prefix_column_visitor() {
         let sql = "SELECT * FROM users WHERE name LIKE 'john%' AND email LIKE 'test%'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3186,7 +3204,7 @@ mod tests {
     #[test]
     fn test_match_visitor() {
         let sql = "SELECT * FROM logs WHERE match_all('error') AND match_all('critical')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3204,7 +3222,7 @@ mod tests {
     #[test]
     fn test_field_name_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3220,7 +3238,7 @@ mod tests {
     #[test]
     fn test_add_timestamp_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3236,7 +3254,7 @@ mod tests {
     #[test]
     fn test_add_o2_id_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3252,7 +3270,7 @@ mod tests {
     #[test]
     fn test_complex_query_visitor() {
         let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -3267,7 +3285,7 @@ mod tests {
     #[test]
     fn test_add_ordering_term_visitor() {
         let sql = "SELECT * FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
