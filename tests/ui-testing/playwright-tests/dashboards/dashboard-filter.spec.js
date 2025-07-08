@@ -353,7 +353,7 @@ test.describe("dashboard filter testcases", () => {
 
     await dashboardActions.waitForChartToRender();
 
-    await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
+    // await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
 
     await expect(page.getByText("'$variablename'").first()).toBeVisible();
 
