@@ -174,10 +174,17 @@ export default class DashboardFilter {
     // await option.waitFor({ state: "visible", timeout: 10000 });
     // await option.click();
 
-    await this.page
+    // await this.page
+    //   .locator('div.q-menu[role="listbox"] div.q-item')
+    //   .first()
+    //   .click();
+
+    // Wait for the suggestion list to appear and select the first suggestion
+    const suggestion = this.page
       .locator('div.q-menu[role="listbox"] div.q-item')
-      .first()
-      .click();
+      .first();
+    await suggestion.waitFor({ state: "visible", timeout: 10000 });
+    await suggestion.click();
 
     // Step 3: Condition dropdown
     if (operator || value) {
