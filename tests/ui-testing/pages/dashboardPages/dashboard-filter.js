@@ -181,7 +181,7 @@ export default class DashboardFilter {
     //   .click();
 
     // Wait for the suggestion list to appear and select the first suggestion
-    const suggestion = this.page.locator(
+    const suggestion = await this.page.locator(
       'div.q-menu[role="listbox"] div.q-item'
     );
     await suggestion.waitFor({ state: "visible", timeout: 10000 });
