@@ -269,10 +269,13 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
+    #[cfg(feature = "cloud")]
+    let build_type = "cloud";
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
+
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
