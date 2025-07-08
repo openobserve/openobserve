@@ -90,36 +90,32 @@ test.describe("Logs Queries testcases", () => {
   test("should display quick mode toggle button", {
     tag: ['@quickModeLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await expect(
-      page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
-    ).toBeVisible();
+    await logsPage.expectQuickModeToggleVisible();
   });
 
   test.skip("should add timestamp to editor save this view and switch", {
     tag: ['@timestampViewLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="log-table-column-0-source"]').click();
-
-    await page.locator(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click(); 
-    await page.locator('[data-test="log-details-include-field-btn"]').click(); 
-    await page.locator('[data-test="close-dialog"] > .q-btn__content').click(); 
-    await page.locator('[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)').click(); 
-    await page.locator('[data-test="add-alert-name-input"]').fill("e2etimestamp"); 
-    await page.locator('[data-test="saved-view-dialog-save-btn"] > .q-btn__content').click(); 
-    await page.locator('[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon').click(); 
-    await page.locator('.q-item__label').getByText(/timestamp/).first().click({ force: true });
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill('e2e');
-    await page.getByTitle('e2etimestamp').click();
-    await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
-    await page.getByTitle('e2etimestamp').click();
-    // await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
-    await page.getByText('delete').click();
-    await page.locator('[data-test="confirm-button"]').click();
+    await logsPage.waitForTimeout(3000);
+    await logsPage.clickLogTableColumnSource();
+    await logsPage.clickIncludeExcludeFieldButton();
+    await logsPage.clickIncludeFieldButton();
+    await logsPage.clickCloseDialog();
+    await logsPage.clickSavedViewsButton();
+    await logsPage.fillSavedViewName("e2etimestamp");
+    await logsPage.clickSavedViewDialogSaveContent();
+    await logsPage.clickSavedViewArrow();
+    await logsPage.clickSavedViewByLabel(/timestamp/);
+    await logsPage.waitForTimeout(3000);
+    await logsPage.clickSavedViewsExpand();
+    await logsPage.clickSavedViewSearchInput();
+    await logsPage.fillSavedViewSearchInput('e2e');
+    await logsPage.clickSavedViewByTitle('e2etimestamp');
+    await logsPage.clickSavedViewsExpand();
+    await logsPage.clickSavedViewSearchInput();
+    await logsPage.clickSavedViewByTitle('e2etimestamp');
+    await logsPage.clickDeleteButton();
+    await logsPage.clickConfirmButton();
   });
 
   test("should redirect to logs after clicking on stream explorer via stream page", {
@@ -129,34 +125,32 @@ test.describe("Logs Queries testcases", () => {
     const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
   
     // Interactions with the page
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
-    await page.locator('button').filter({ hasText: 'savesaved_search' }).click();
-    await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill(randomSavedViewName); // Use the random name
-    await page.locator('[data-test="saved-view-dialog-save-btn"]').click({ force: true });
-    await page.waitForTimeout(5000);
-    await page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
-    await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e');
-    await page.waitForTimeout(1000);
-    await page.getByRole('button', { name: 'Explore' }).first().click({ force: true });
-    await page.waitForTimeout(5000);
-    await page.waitForSelector('[data-test="logs-search-saved-views-btn"]');
-    await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').click({ force: true });
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill(randomSavedViewName); // Use the random name here
-    await page.waitForTimeout(3000);
-    await page.waitForSelector(`:text("${randomSavedViewName}")`);
-    await page.click(`:text("${randomSavedViewName}")`);
-    await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
-    await page.getByTitle(randomSavedViewName).click(); // Use the random name here
+    await logsPage.clickRefreshButton();
+    await logsPage.clickSavedViewsExpand();
+    await logsPage.clickSaveViewButton();
+    await logsPage.fillSavedViewName(randomSavedViewName); // Use the random name
+    await logsPage.clickSavedViewDialogSave();
+    await logsPage.waitForTimeout(5000);
+    await logsPage.clickStreamsMenuItem();
+    await logsPage.clickSearchStreamInput();
+    await logsPage.fillSearchStreamInput('e2e');
+    await logsPage.waitForTimeout(1000);
+    await logsPage.clickExploreButton();
+    await logsPage.waitForTimeout(5000);
+    await logsPage.waitForSavedViewsButton();
+    await logsPage.clickSavedViewsExpand();
+    await logsPage.clickSavedViewSearchInput();
+    await logsPage.fillSavedViewSearchInput(randomSavedViewName); // Use the random name here
+    await logsPage.waitForTimeout(3000);
+    await logsPage.waitForSavedViewText(randomSavedViewName);
+    await logsPage.clickSavedViewByText(randomSavedViewName);
+    await logsPage.clickSavedViewsExpand();
+    await logsPage.clickSavedViewSearchInput();
+    await logsPage.clickSavedViewByTitle(randomSavedViewName); // Use the random name here
   
     // Dynamic delete button selector using the random saved view name
-    const deleteButtonSelector = `[data-test="logs-search-bar-delete-${randomSavedViewName}-saved-view-btn"]`;
-    await page.locator(deleteButtonSelector).click(); // Click delete
-    await page.locator('[data-test="confirm-button"]').click(); // Confirm deletion
+    await logsPage.clickDeleteSavedViewButton(randomSavedViewName);
+    await logsPage.clickConfirmButton(); // Confirm deletion
   });
 
   test("should reset the editor on clicking reset filter button", {

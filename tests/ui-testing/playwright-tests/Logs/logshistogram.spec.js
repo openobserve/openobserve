@@ -67,8 +67,7 @@ test.describe("Logs Histogram testcases", () => {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Check if histogram is off and toggle it on if needed
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    const isHistogramOn = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'true');
+    const isHistogramOn = await logsPage.isHistogramOn();
     if (!isHistogramOn) {
       await logsPage.toggleHistogram();
     }
@@ -94,8 +93,7 @@ test.describe("Logs Histogram testcases", () => {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Check if histogram is on and toggle it off
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    const isHistogramOn = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'true');
+    const isHistogramOn = await logsPage.isHistogramOn();
     if (isHistogramOn) {
       await logsPage.toggleHistogram();
     }
@@ -124,8 +122,7 @@ test.describe("Logs Histogram testcases", () => {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Start with histogram on
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    const isHistogramOn = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'true');
+    const isHistogramOn = await logsPage.isHistogramOn();
     if (!isHistogramOn) {
       await logsPage.toggleHistogram();
     }
@@ -150,18 +147,14 @@ test.describe("Logs Histogram testcases", () => {
     await logsPage.waitForTimeout(2000);
 
     // Verify histogram stays off
-    const ariaChecked = await histogramToggle.getAttribute('aria-checked');
-    console.log('aria-checked:', ariaChecked);
-    const isHistogramStillOff = ariaChecked === 'false';
-    expect(isHistogramStillOff).toBeTruthy();
+    await logsPage.verifyHistogramState();
   });
 
   test("Verify histogram toggle with empty query", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Start with histogram off
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    const isHistogramOn = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'true');
+    const isHistogramOn = await logsPage.isHistogramOn();
     if (isHistogramOn) {
       await logsPage.toggleHistogram();
     }
@@ -177,7 +170,7 @@ test.describe("Logs Histogram testcases", () => {
     await logsPage.toggleHistogram();
 
     // Verify histogram state
-    const isHistogramOnAfterToggle = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'true');
+    const isHistogramOnAfterToggle = await logsPage.isHistogramOn();
     expect(isHistogramOnAfterToggle).toBeTruthy();
   });
 
@@ -185,8 +178,7 @@ test.describe("Logs Histogram testcases", () => {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Start with histogram on
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    const isHistogramOn = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'true');
+    const isHistogramOn = await logsPage.isHistogramOn();
     if (!isHistogramOn) {
       await logsPage.toggleHistogram();
     }
@@ -200,8 +192,8 @@ test.describe("Logs Histogram testcases", () => {
 
     // Toggle histogram off and verify
     await logsPage.toggleHistogram();
-    const isHistogramOff = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'false');
-    expect(isHistogramOff).toBeTruthy();
+    const isHistogramOff = await logsPage.isHistogramOn();
+    expect(!isHistogramOff).toBeTruthy();
 
     // Run another query and verify histogram stays off
     await logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
@@ -209,7 +201,7 @@ test.describe("Logs Histogram testcases", () => {
     await logsPage.clickRefresh();
     await logsPage.waitForTimeout(2000);
 
-    const isHistogramStillOff = await histogramToggle.evaluate(el => el.getAttribute('aria-checked') === 'false');
-    expect(isHistogramStillOff).toBeTruthy();
+    const isHistogramStillOff = await logsPage.isHistogramOn();
+    expect(!isHistogramStillOff).toBeTruthy();
   });
 }); 

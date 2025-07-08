@@ -825,7 +825,7 @@ export class LogsPage {
     }
 
     async clickExploreButton() {
-        return await this.page.locator(this.exploreButtonRole).first().click({ force: true });
+        return await this.page.getByRole(this.exploreButtonRole.role, { name: this.exploreButtonRole.name }).first().click({ force: true });
     }
 
     async waitForSavedViewsButton() {
@@ -903,6 +903,10 @@ export class LogsPage {
 
     async expectTextVisible(text) {
         return await expect(this.page.locator(`text=${text}`)).toBeVisible();
+    }
+
+    async expectExactTextVisible(text) {
+        await expect(this.page.getByText(text, { exact: true })).toBeVisible();
     }
 
     async expectLogsTableVisible() {
@@ -1559,5 +1563,13 @@ export class LogsPage {
             result += characters.charAt(Math.floor(Math.random() * characters.length));
         }
         return result;
+    }
+
+    async expectQueryEditorNotContainsText(text) {
+        await expect(this.page.locator(this.queryEditor)).not.toContainText(text);
+    }
+
+    async expectLogTableColumnSourceNotHaveText(text) {
+        await expect(this.page.locator(this.logTableColumnSource)).not.toHaveText(text);
     }
 } 

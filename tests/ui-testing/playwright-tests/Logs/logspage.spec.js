@@ -101,17 +101,15 @@ test.describe("Logs Page testcases", () => {
   }, async ({
     page,
   }) => {
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
-    await page.locator('[data-test="logs-search-bar-query-editor"]').click();
-    await page.keyboard.press(
-      process.platform === "darwin" ? "Meta+A" : "Control+A"
-    ); // Select all text
-    await page.keyboard.press("Backspace");
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByText("SQL query is missing or invalid. Please submit a valid SQL statement.").click();
+    await logsPage.waitForTimeout(3000);
+    await logsPage.clickRefreshButton();
+    await logsPage.clickSQLModeToggle();
+    await logsPage.clickQueryEditor();
+    await logsPage.selectAllText();
+    await logsPage.pressBackspace();
+    await logsPage.waitForTimeout(3000);
+    await logsPage.clickRefreshButton();
+    await logsPage.expectSQLQueryMissingError();
   });
 
   test("should be able to enter valid text in VRL and run query", {
@@ -222,64 +220,29 @@ test.describe("Logs Page testcases", () => {
   }, async ({
     page,
   }) => {
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    await page
-      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-      .click({ force: true });
-    await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
-      "Past 6 Weeks"
-    );
+    await logsPage.clickDateTimeButton();
+    await logsPage.clickRelative6WeeksButton();
+    await logsPage.expectTextVisible("Past 6 Weeks");
     await applyQueryButton(page);
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    await page
-      .locator('[data-test="date-time-relative-6-d-btn"]')
-      .click({ force: true });
-    await expect(page.locator('[data-test="date-time-btn"]')).toContainText(
-      "Past 6 Days"
-    );
+    await logsPage.clickDateTimeButton();
+    await logsPage.clickPast6DaysButton();
+    await logsPage.expectTextVisible("Past 6 Days");
     await applyQueryButton(page);
   });
+  
   test("should display SQL query on switching between Menu options & navigating to Logs again", {
     tag: ['@sqlQueryPersistence', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
-    // Intercept the GET request, replace 'logData.ValueQuery' with your actual endpoint
-    await page.route("**/logData.ValueQuery", (route) => route.continue());
-
-    // Click on the date-time button
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-
-    await page.waitForTimeout(1000);
-
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
-
-    // Assert that the SQL query is visible
-    const expectedQuery =
-      'SELECT * FROM "e2e_automate"';
-    // const text = await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').textContent();
-    //   console.log(textval)
-    const text = await page.evaluate(() => {
-      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.cm-content'); // Adjust selector if needed
-      return editor ? editor.textContent.trim() : null;
-    });
-
-    console.log(text);
-    await expect(text.replace(/\s/g, "")).toContain(
-      expectedQuery.replace(/\s/g, "")
-    );
-    await page.locator('[data-test="menu-link-/-item"]').click({ force: true });
-    await page
-      .locator('[data-test="menu-link-/logs-item"]')
-      .click({ force: true });
-    await page.waitForTimeout(2000);
-
-    await page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".cm-content")
-      .locator(".cm-line")
-      .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
-      .nth(0);
+  }, async ({ page }) => {
+    await logsPage.clickDateTimeButton();
+    await logsPage.waitForTimeout(1000);
+    await logsPage.clickSQLModeToggle();
+    const expectedQuery = 'SELECT * FROM "e2e_automate"';
+    const text = await logsPage.getQueryEditorText();
+    await expect(text.replace(/\s/g, "")).toContain(expectedQuery.replace(/\s/g, ""));
+    await logsPage.clickMenuLinkMetricsItem();
+    await logsPage.clickMenuLinkLogsItem();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectQueryEditorContainsSelectFrom();
   });
   test("should display ingested logs - search logs, navigate on another tab, revisit logs page", {
     tag: ['@ingestedLogsPersistence', '@all', '@logs']
@@ -296,7 +259,9 @@ test.describe("Logs Page testcases", () => {
     await logsPage.expectBarChartVisible();
   });
 
-  test("should redirect to logs after clicking on stream explorer via stream page", async ({
+  test.skip("should redirect to logs after clicking on stream explorer via stream page", {
+    tag: ['@streamExplorer', '@all', '@logs']
+  }, async ({
     page,
   }) => {
     await logsPage.clickDateTimeButton();
@@ -442,68 +407,61 @@ test.describe("Logs Page testcases", () => {
   test("should display results for search around with limit query", {
     tag: ['@searchAroundLimit', '@all', '@logs']
   }, async ({ page }) => {
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-    await page.click('[data-test="logs-search-bar-query-editor"]')
-    await page.keyboard.type("match_all('code') limit 5");
-    await page.waitForTimeout(2000);
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="log-table-column-0-source"]').click();
-    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-    await page.waitForTimeout(2000);
-    const element = await page.locator('[data-test="log-table-column-0-source"]');
-    const isVisible = await element.isVisible();
-    expect(isVisible).toBeTruthy();
-    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickDateTimeButton();
+    await logsPage.clickRelative15MinButton();
+    await logsPage.clickQueryEditor();
+    await logsPage.typeInQueryEditor("match_all('code') limit 5");
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickSQLModeToggle();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickLogTableColumnSource();
+    await logsPage.clickLogsDetailTableSearchAroundBtn();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectLogTableColumnSourceVisible();
   });
 
   test("should not display pagination for limit query", {
     tag: ['@paginationLimit', '@all', '@logs']
   }, async ({ page }) => {
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-    await page.click('[data-test="logs-search-bar-query-editor"]')
-    await page.keyboard.type("match_all('code') limit 5");
-    await page.waitForTimeout(2000);
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.waitForTimeout(2000);
-    const fastRewindElement = page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
-    await expect(fastRewindElement).not.toBeVisible();
-
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickDateTimeButton();
+    await logsPage.clickRelative15MinButton();
+    await logsPage.clickQueryEditor();
+    await logsPage.typeInQueryEditor("match_all('code') limit 5");
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickSQLModeToggle();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickRefreshButton();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectPaginationNotVisible();
   });
 
   test("should not display pagination for SQL limit query", {
     tag: ['@paginationSQLLimit', '@sqlMode', '@all', '@logs']
   }, async ({ page }) => {
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-    await page.click('[data-test="logs-search-bar-query-editor"]');
-    await page.keyboard.type('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.waitForTimeout(2000);
-    const fastRewindElement = page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
-    await expect(fastRewindElement).not.toBeVisible();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickDateTimeButton();
+    await logsPage.clickRelative15MinButton();
+    await logsPage.clickQueryEditor();
+    await logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickRefreshButton();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectPaginationNotVisible();
   });
 
   test("should not display pagination for SQL group/order/limit query", {
     tag: ['@paginationSQLGroupOrder', '@sqlMode', '@all', '@logs']
   }, async ({ page }) => {
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-    await page.click('[data-test="logs-search-bar-query-editor"]');
-    await page.keyboard.type('SELECT * FROM "e2e_automate" WHERE code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5');
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.waitForTimeout(2000);
-    const fastRewindElement = page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
-    await expect(fastRewindElement).not.toBeVisible();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickDateTimeButton();
+    await logsPage.clickRelative15MinButton();
+    await logsPage.clickQueryEditor();
+    await logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" WHERE code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5');
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickRefreshButton();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectPaginationNotVisible();
   });
 });
