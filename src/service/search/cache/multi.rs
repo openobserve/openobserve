@@ -40,9 +40,10 @@ pub async fn get_cached_results(
     let is_cached = r.get(&query_key).cloned();
     drop(r);
     if is_cached.is_none() {
-        log::info!(
-            "[CACHE RESULT {trace_id}] No cache found for query key: {}",
-            query_key
+        log::debug!(
+            "[CACHE RESULT {trace_id}] No cache found during get_cached_results for query key: {}, cache_query: {:?}",
+            query_key,
+            cache_req
         );
         return res;
     }
@@ -74,9 +75,10 @@ async fn recursive_process_multiple_metas(
 ) -> Result<(), anyhow::Error> {
     if cache_metas.is_empty() {
         if results.is_empty() {
-            log::info!(
-                "[CACHE RESULT {trace_id}] No cache found for query key: {}",
-                query_key
+            log::debug!(
+                "[CACHE RESULT {trace_id}] No cache found during recursive_process_multiple_metas for query key: {}, cached_metas: {:?}",
+                query_key,
+                cache_metas
             );
         }
 
@@ -155,13 +157,13 @@ async fn recursive_process_multiple_metas(
                 match json::from_str::<Response>(&v) {
                     Ok(v) => Some(v),
                     Err(e) => {
-                        log::error!("[trace_id {trace_id}] Error parsing cached response: {:?}", e);
+                        log::error!("[trace_id {trace_id}] Error parsing cached response: {e}");
                         None
                     }
                 }
             }
             Err(e) => {
-                log::error!("[trace_id {trace_id}] Get results from disk failed: {:?}", e);
+                log::error!("[trace_id {trace_id}] Get results from disk failed: {e}");
                 None
             }
         };
@@ -185,7 +187,7 @@ async fn recursive_process_multiple_metas(
             });
 
             // Sort the hits by the order
-            sort_response(cache_req.is_descending, &mut cached_response, &cache_req.ts_column);
+            sort_response(cache_req.is_descending, &mut cached_response, &cache_req.ts_column, &vec![]);
 
             cached_response.total = cached_response.hits.len();
             if cache_req.discard_interval < 0 {
@@ -534,7 +536,9 @@ mod tests {
         for strategy in strategies.iter() {
             let score = select_cache_meta(&meta, &req, strategy);
             // Score should be a valid i64 (no overflow/underflow for reasonable inputs)
-            assert!(score >= i64::MIN && score <= i64::MAX);
+            // TODO: This test should go away because an i64 will always be in range,
+            // despite any overflow or underflow.
+            assert!((i64::MIN..=i64::MAX).contains(&score));
         }
     }
 }

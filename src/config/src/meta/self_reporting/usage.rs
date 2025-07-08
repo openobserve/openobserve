@@ -186,6 +186,8 @@ pub enum UsageType {
     Multi,
     #[serde(rename = "/logs/_hec")]
     Hec,
+    #[serde(rename = "/logs/_loki")]
+    Loki,
     #[serde(rename = "/_kinesis_firehose")]
     KinesisFirehose,
     #[serde(rename = "/gcp/_sub")]
@@ -240,6 +242,8 @@ impl UsageType {
             UsageType::Bulk
                 | UsageType::Json
                 | UsageType::Multi
+                | UsageType::Hec
+                | UsageType::Loki
                 | UsageType::KinesisFirehose
                 | UsageType::GCPSubscription
                 | UsageType::Logs
@@ -265,6 +269,7 @@ impl std::fmt::Display for UsageType {
             UsageType::Json => write!(f, "/logs/_json"),
             UsageType::Multi => write!(f, "/logs/_multi"),
             UsageType::Hec => write!(f, "/logs/_hec"),
+            UsageType::Loki => write!(f, "/logs/_loki"),
             UsageType::KinesisFirehose => write!(f, "/_kinesis_firehose"),
             UsageType::GCPSubscription => write!(f, "/gcp/_sub"),
             UsageType::Logs => write!(f, "/otlp/v1/logs"),

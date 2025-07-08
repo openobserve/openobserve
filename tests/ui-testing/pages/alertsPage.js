@@ -1,45 +1,26 @@
 import { expect } from '@playwright/test';
 
-import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator } from '../pages/CommonLocator.js';
+import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator } from '../pages/CommonLocator.js';
 import DashboardFolder from "./dashboardPages/dashboard-folder.js";
 
-export class AlertsPage {
-  constructor(page) {
-    this.page = page;
-    this.alertMenu = this.page.locator('[data-test="menu-link-\\/alerts-item"]');
-    this.addAlertButton = this.page.locator('[data-test="alert-list-add-alert-btn"]');
-    this.sqlOption = this.page.getByText('SQL');
-    this.addTimeRangeButton = this.page.locator('[data-test="multi-time-range-alerts-add-btn"]');
+export  class AlertsPage {
+    constructor(page) {
+      this.page = page;
+      this.alertMenu = this.page.locator('[data-test="menu-link-\\/alerts-item"]');
+      this.addAlertButton = this.page.locator('[data-test="alert-list-add-alert-btn"]');
+      this.sqlOption = this.page.getByText('SQL');
+      this.addTimeRangeButton = this.page.locator('[data-test="multi-time-range-alerts-add-btn"]');
 
+    
+      this.dateTimeButton = dateTimeButtonLocator;
+      this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
+      this.absoluteTab = absoluteTabLocator;
 
-    this.dateTimeButton = dateTimeButtonLocator;
-    this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-    this.absoluteTab = absoluteTabLocator;
-
-
+    
 
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
     this.signOutButton = page.getByText('Sign Out');
     this.dashboardFolders = new DashboardFolder(page);
-
-    this.alertImportButton = '[data-test="alert-import"]';
-    this.alertImportCancelButton = '[data-test="alert-import-cancel-btn"]';
-    this.alertImportJsonButton = '[data-test="alert-import-json-btn"]';
-
-    this.alertImportUrlInput = '[data-test="alert-import-url-input"]';  
-    this.alertImportUrlTab = '[data-test="tab-import_json_url"]';
-
-    this.alertImportError00Input = '[data-test="alert-import-error-0-0"] [data-test="alert-import-name-input"]';
-    this.alertImportError01Input = '[data-test="alert-import-error-0-1"] [data-test="alert-import-org-id-input"]';
-    this.alertImportError02Input = '[data-test="alert-import-error-0-2"] [data-test="alert-import-stream-name-input"]';
-    this.alertImportError03Input = '[data-test="alert-import-error-0-3"] [data-test="alert-import-destination-name-input"]';
-
-    this.alertImportError10Input = '[data-test="alert-import-error-1-0"] [data-test="alert-import-name-input"]';
-    this.alertImportError11Input = '[data-test="alert-import-error-1-1"] [data-test="alert-import-org-id-input"]';
-    this.alertImportError12Input = '[data-test="alert-import-error-1-2"] [data-test="alert-import-stream-name-input"]';
-    this.alertImportError13Input = '[data-test="alert-import-error-1-3"] [data-test="alert-import-destination-name-input"]';
-    this.alertImportFileInput = '[data-test="alert-import-json-file-input"]';
-    
   }
 
   async navigateToAlerts() {
@@ -48,24 +29,23 @@ export class AlertsPage {
   }
 
   async alertsPageDefaultMultiOrg() {
-    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();    
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
-  }
+}
 
-  async alertsPageURLValidation() {
-    // TODO: Make sure the url contains the id of the selected org
-    // await expect(this.page).not.toHaveURL(/default/);
-  }
+async alertsPageURLValidation() {
+ await expect(this.page).toHaveURL(/defaulttestmulti/);
+}
 
-  async alertsURLValidation() {
-    await expect(this.page).toHaveURL(/alerts/);
-  }
+async alertsURLValidation() {
+  await expect(this.page).toHaveURL(/alerts/);
+}
 
   async createAlerts() {
     await this.addAlertButton.click();
     await this.sqlOption.click();
     await this.addTimeRangeButton.click();
-
+    
   }
 
   async setTimeToPast30Seconds() {
@@ -76,16 +56,16 @@ export class AlertsPage {
 
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
-    // await expect(this.page.locator(this.dateTimeButton)).toContainText(process.env["Past30SecondsValue"]);
+   // await expect(this.page.locator(this.dateTimeButton)).toContainText(process.env["Past30SecondsValue"]);
     await expect(this.page.locator(this.dateTimeButton)).toContainText('schedule30 Seconds agoarrow_drop_down');
   }
-
-
+ 
+ 
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();
   }
-
+  
   async createAlertTemplate(templateName) {
     await this.page.locator('[data-test="alert-templates-tab"]').waitFor();
     await this.page.locator('[data-test="alert-templates-tab"]').click();
@@ -99,7 +79,7 @@ export class AlertsPage {
     await this.page.locator('[data-test="add-template-name-input"]').fill(templateName);
     
     const jsonString = '{"text": "{alert_name} is active"}';
-    await this.page.locator(".view-line").click();
+    await this.page.locator(".cm-line").click();
     await this.page.keyboard.type(jsonString);
     await this.page.waitForTimeout(500);
     
@@ -224,92 +204,4 @@ export class AlertsPage {
     await this.page.getByText(folderName, { exact: true }).click();
     await this.page.waitForTimeout(2000);
   }
-
-  async importAlertButton() {
-    await this.page.waitForSelector(this.alertImportButton);
-    await this.page.locator(this.alertImportButton).click();
-}
-
-async ClickAlertImportJsonButton() {
-    await this.page.waitForSelector(this.alertImportJsonButton);
-    await this.page.locator(this.alertImportJsonButton).click();
-}
-
-async ClickAlertImportCancelButton() {
-    await this.page.waitForSelector(this.alertImportCancelButton);
-    await this.page.locator(this.alertImportCancelButton).click();
-}
-
-async importAlertFromUrl(url) {
-  await this.page.waitForSelector(this.alertImportUrlTab);
-  await this.page.locator(this.alertImportUrlTab).click();
-  await this.page.waitForSelector(this.alertImportUrlInput);
-  await this.page.locator(this.alertImportUrlInput).click();
-  await this.page.locator(this.alertImportUrlInput).fill(url);    
-}
-
-async ClickAlertImportError00NameInput(alertName) {
-  await this.page.waitForSelector(this.alertImportError00Input);
-  await this.page.locator(this.alertImportError00Input).click();
-  await this.page.locator(this.alertImportError00Input).fill(alertName);
-}
-
-async ClickAlertImportError01Input(orgName) {
-  await this.page.waitForSelector(this.alertImportError01Input);
-  await this.page.locator(this.alertImportError01Input).click();
-  await this.page.getByRole('option', { name: orgName }).locator('div').nth(2).click();
-}
-
-  async ClickAlertImportError02Input(streamName) {
-  await this.page.waitForTimeout(2000);
-  console.log(streamName);
-  await this.page.waitForSelector(this.alertImportError02Input);
-  await this.page.locator(this.alertImportError02Input).click();
-  await this.page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
-  await this.page.waitForTimeout(2000);
-}
-
-async ClickAlertImportError03Input(destinationName) {
-  await this.page.waitForSelector(this.alertImportError03Input);
-  await this.page.locator(this.alertImportError03Input).click();
-  await this.page.locator(`[data-test="add-alert-destination-${destinationName}-select-item"] [data-test="alert-import-destination-label"]`).click();
-}
-
-
-async ClickAlertImportError10Input(alertName) {
-  await this.page.waitForSelector(this.alertImportError10Input);
-  await this.page.locator(this.alertImportError10Input).click();
-  await this.page.locator(this.alertImportError10Input).fill(alertName);
-} 
-
-async ClickAlertImportError11Input(orgName) {
-  await this.page.waitForSelector(this.alertImportError11Input);
-  await this.page.locator(this.alertImportError11Input).click();
-  await this.page.getByRole('option', { name: orgName }).locator('div').nth(2).click();
-}
-
-async ClickAlertImportError12Input(streamName) {
-  await this.page.waitForTimeout(2000);
-  console.log(streamName);
-  await this.page.waitForSelector(this.alertImportError12Input);
-  await this.page.locator(this.alertImportError12Input).click();
-  await this.page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
-  await this.page.waitForTimeout(2000);
-} 
-
-async ClickAlertImportError13Input(destinationName) {
-  await this.page.waitForSelector(this.alertImportError13Input);
-  await this.page.locator(this.alertImportError13Input).click();
-  await this.page.locator(`[data-test="add-alert-destination-${destinationName}-select-item"] [data-test="alert-import-destination-label"]`).click();
-}
-
-async uploadAlertFile(filePath) {
-  await this.page.waitForSelector(this.alertImportFileInput);
-  await this.page.locator(this.alertImportFileInput).click();
-  await this.page.locator(this.alertImportFileInput).setInputFiles(filePath);
-  await this.page.waitForTimeout(5000);
-}
-
-
-  
 }

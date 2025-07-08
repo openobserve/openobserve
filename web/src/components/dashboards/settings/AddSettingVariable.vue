@@ -404,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   flat
                   round
+                  :disable="variableData?.options?.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
                   icon="cancel"
@@ -458,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </button>
                 </div>
 
-                <div v-if="variableData.multiSelect">
+                <div>
                   <button
                     data-test="dashboard-multi-select-default-value-toggle-all-values"
                     :class="
@@ -560,6 +561,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
             />
+          </div>
+
+          <!-- escape single quotes toggle -->
+          <div>
+            <div class="row items-center all-pointer-events">
+              <q-toggle
+                v-model="variableData.escapeSingleQuotes"
+                :label="t('dashboard.escapeSingleQuotes')"
+              />
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-limit-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  If enabled, single quotes will be escaped in the query. For
+                  example, a value like `O'Reilly` will be replaced as
+                  `O''Reilly`.
+                </q-tooltip>
+              </div>
+            </div>
           </div>
           <div class="flex justify-center q-mt-lg">
             <q-btn
@@ -680,11 +708,18 @@ export default defineComponent({
         filter: [],
       },
       value: "",
-      options: [],
+      options: [
+        {
+          label: "",
+          value: "",
+          selected: true,
+        },
+      ],
       multiSelect: false,
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
+      escapeSingleQuotes: false,
     });
 
     const filterCycleError: any = ref("");
@@ -724,6 +759,11 @@ export default defineComponent({
     // by default, use selectAllValueForMultiSelect as 'first'
     if (!variableData.selectAllValueForMultiSelect) {
       variableData.selectAllValueForMultiSelect = "first";
+    }
+
+    // by default, use escapeSingleQuotes as false
+    if (!variableData.escapeSingleQuotes) {
+      variableData.escapeSingleQuotes = false;
     }
 
     const filterUpdated = (index: number, filter: any) => {
@@ -874,6 +914,9 @@ export default defineComponent({
     };
 
     const removeField = (index: any) => {
+      if (variableData?.options?.length === 1) {
+        return;
+      }
       variableData.options.splice(index, 1);
 
       // if all values are selected, then check customSelectAllModel = true
@@ -1020,6 +1063,15 @@ export default defineComponent({
           return false;
         }
 
+        // for custom, check at least one option is selected as default value
+        if (
+          variableData.type === "custom" &&
+          variableData.options.every((option: any) => !option.selected)
+        ) {
+          showErrorNotification("Select at least one default option");
+          return false;
+        }
+
         // above conditions passed, so remove filter cycle error
         filterCycleError.value = "";
 
@@ -1122,7 +1174,6 @@ export default defineComponent({
       () => variableData?.multiSelect,
       (newVal) => {
         if (!newVal) {
-          variableData.selectAllValueForMultiSelect = "first";
           if (Array.isArray(variableData?.options)) {
             variableData.options.forEach((option: any, index: any) => {
               if (variableData.options[index]) {

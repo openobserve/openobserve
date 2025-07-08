@@ -689,6 +689,7 @@
     "DefaultSize": "Default max record size (optional)",
     "multiSelect": "Allow multiple selection",
     "hideOnDashboard": "Hide On Dashboard",
+    "escapeSingleQuotes": "Escape Single Quotes",
     "maxRecordSize": "Default max record size is 10. You can update this value as required",
     "newFolderBtnLabel": "New Folder",
     "folderLabel": "Folders",
@@ -808,7 +809,15 @@
     "inside": "Inside",
     "insideTop": "Inside Top",
     "insideBottom": "Inside Bottom",
+    "outside": "Outside",
+    "insideLeft": "Inside Left",
+    "insideRight": "Inside Right",
+    "insideTopLeft": "Inside Top Left",
+    "insideBottomLeft": "Inside Bottom Left",
+    "insideTopRight": "Inside Top Right",
+    "insideBottomRight": "Inside Bottom Right",
     "top": "Top",
+    "left": "Left",
     "showSymbol": "Show Symbol",
     "yes": "Yes",
     "no": "No",
@@ -1100,7 +1109,8 @@
     "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
     "cipherKeys": "Cipher Keys",
     "nodes": "Nodes",
-    "enableStreamingSearch": "Enable Streaming Search"
+    "enableStreamingSearch": "Enable Streaming Search",
+    "enableAggregationCache": "Enable Aggregation Cache"
   },
   "reports": {
     "header": "Reports",

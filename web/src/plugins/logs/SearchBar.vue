@@ -815,7 +815,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="row query-editor-container" v-show="searchObj.meta.showQuery">
+    <div class="row query-editor-container">
       <div
         class="col"
         style="border-top: 1px solid #dbdbdb; height: 100%"
@@ -830,7 +830,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <query-editor
+            <code-query-editor
+              v-if="router.currentRoute.value.name === 'logs'"
               data-test="logs-search-bar-query-editor"
               editor-id="logsQueryEditor"
               ref="queryEditorRef"
@@ -839,6 +840,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:query="searchObj.data.query"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
+              :debounceTime="100"
               @update:query="updateQueryValue"
               @run-query="handleRunQueryFn"
               @keydown="handleKeyDown"
@@ -848,6 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'empty-query'
                   : ''
               "
+              language="sql"
               @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
               @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
             />
@@ -855,11 +858,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="logs-vrl-function-editor"
-              v-show="searchObj.data.transformType"
+              v-if="searchObj.data.transformType"
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
-                <query-editor
+                <code-query-editor
+                  v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"
@@ -878,7 +882,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
-                <query-editor
+                <code-query-editor
+                  v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"
@@ -1305,6 +1310,7 @@ import {
   onDeactivated,
   defineAsyncComponent,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1313,6 +1319,7 @@ import { useQuasar, copyToClipboard, is } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
+import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
@@ -1320,6 +1327,7 @@ import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1339,7 +1347,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -1361,12 +1368,12 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
-    QueryEditor,
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
     TransformSelector,
     FunctionSelector,
+    CodeQueryEditor,
   },
   emits: [
     "searchdata",
@@ -1524,6 +1531,8 @@ export default defineComponent({
       routeToSearchSchedule,
       isActionsEnabled,
     } = useLogs();
+
+    const { isStreamExists, isStreamFetched } = useStreams();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -1556,7 +1565,6 @@ export default defineComponent({
     let confirmCallback;
     let streamName = "";
 
-    let parser: any;
     const dateTimeRef = ref(null);
     const saveViewLoader = ref(false);
     const favoriteViews = ref([]);
@@ -1625,6 +1633,17 @@ export default defineComponent({
       return [];
     });
 
+    // const toggleHistogram = ref(false);
+
+    const toggleHistogram = computed({
+      get: () => {
+        return searchObj.meta.showHistogram;
+      },
+      set: (value) => {
+        searchObj.meta.showHistogram = value;
+      },
+    });
+
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
 
@@ -1641,6 +1660,13 @@ export default defineComponent({
 
       return searchObj.data.transformType === "function";
     });
+
+    watch(
+      () => searchObj.data.transforms,
+      (newVal) => {
+        functionOptions.value = newVal;
+      },
+    );
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -1706,15 +1732,10 @@ export default defineComponent({
       { immediate: true, deep: true },
     );
 
-    onBeforeMount(async () => {
-      await importSqlParser();
+    onBeforeUnmount(() => {
+      queryEditorRef.value = null;
+      fnEditorRef.value = null;
     });
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
 
     const transformsLabel = computed(() => {
       if (
@@ -1796,13 +1817,14 @@ export default defineComponent({
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
-
       searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
           searchObj.meta.sqlMode === true &&
-          Object.hasOwn(parsedSQL, "from")
+          Object.hasOwn(parsedSQL, "from") &&
+          isStreamFetched(searchObj.data.stream.streamType) &&
+          isStreamExists(value, searchObj.data.stream.streamType)
         ) {
           setSelectedStreams(value);
           // onStreamChange(value);
@@ -1862,8 +1884,10 @@ export default defineComponent({
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
-          Object.hasOwn(parsedSQL, "from") ||
-          Object.hasOwn(parsedSQL, "select")
+          (Object.hasOwn(parsedSQL, "from") ||
+            Object.hasOwn(parsedSQL, "select")) &&
+          isStreamFetched(searchObj.data.stream.streamType) &&
+          isStreamExists(value, searchObj.data.stream.streamType)
         ) {
           setSelectedStreams(value);
           // onStreamChange(value);
@@ -1873,13 +1897,19 @@ export default defineComponent({
       updateAutoComplete(value);
       try {
         if (searchObj.meta.sqlMode === true) {
-          searchObj.data.parsedQuery = parser.astify(value);
-          if (searchObj.data.parsedQuery?.from?.length > 0) {
+          let parsedQuery = null;
+          try {
+            parsedQuery = fnParsedSQL(value);
+          } catch (e) {
+            console.log(e, "Logs: Error while parsing query");
+          }
+
+          if (parsedQuery?.from?.length > 0) {
             //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array
             //the table which is there in from array is the temporary array
-            const tableName: string = !searchObj.data.parsedQuery.with
-              ? searchObj.data.parsedQuery.from[0].table ||
-                searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table
+            const tableName: string = !parsedQuery.with
+              ? parsedQuery.from[0].table ||
+                parsedQuery.from[0].expr?.ast?.from?.[0]?.table
               : "";
             if (
               !searchObj.data.stream.selectedStream.includes(tableName) &&
@@ -1902,16 +1932,21 @@ export default defineComponent({
                   onStreamChange(searchObj.data.query);
                 }
               });
+              console.log(
+                "searchObj.data.streamResults.list",
+                JSON.parse(JSON.stringify(searchObj.data.streamResults.list)),
+              );
+
               if (streamFound == false) {
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                $q.notify({
-                  message: "Stream not found",
-                  color: "negative",
-                  position: "top",
-                  timeout: 2000,
-                });
+                // $q.notify({
+                //   message: "Stream not found",
+                //   color: "info",
+                //   position: "bottom",
+                //   timeout: 2000,
+                // });
               }
             }
           }
@@ -2277,12 +2312,7 @@ export default defineComponent({
           timeout: 3000,
         });
       }
-      console.log(
-        "fnValue",
-        fnValue,
-        fnEditorRef?.value,
-        showFunctionEditor.value,
-      );
+
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -2466,7 +2496,7 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
-              searchObj.value = mergeDeep(searchObj, extractedObj);
+              mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -2551,7 +2581,7 @@ export default defineComponent({
               extractedObj.meta.scrollInfo = {};
               delete searchObj.data.queryResults.aggs;
 
-              searchObj.value = mergeDeep(searchObj, extractedObj);
+              mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
 
               const streamData = await getStreams(
@@ -2561,7 +2591,6 @@ export default defineComponent({
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
-              // searchObj.value = mergeDeep(searchObj, extractedObj);
 
               const streamValues = searchObj.data.stream.streamLists.map(
                 (item) => item.value,
@@ -2665,13 +2694,6 @@ export default defineComponent({
                   searchObj.data.stream.selectedStream
                 ];
             }
-
-            // } else {
-            //   searchObj.value = mergeDeep(searchObj, extractedObj);
-            //   await nextTick();
-            //   updatedLocalLogFilterField();
-            //   handleRunQuery();
-            // }
           } else {
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
@@ -2694,11 +2716,6 @@ export default defineComponent({
           });
           console.log(err);
         });
-      // const extractedObj = JSON.parse(b64DecodeUnicode(item.data));
-      // searchObj.value = mergeDeep(searchObj, extractedObj);
-      // await nextTick();
-      // updatedLocalLogFilterField();
-      // handleRunQuery();
     };
 
     const handleSavedView = () => {
@@ -2795,9 +2812,10 @@ export default defineComponent({
         delete savedSearchObj.data.transforms;
 
         savedSearchObj.data.timezone = store.state.timezone;
-        delete savedSearchObj.value;
 
-        delete savedSearchObj.data.parsedQuery;
+        if (savedSearchObj.data.parsedQuery) {
+          delete savedSearchObj.data.parsedQuery;
+        }
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
@@ -2958,6 +2976,9 @@ export default defineComponent({
 
     const shareLink = useLoading(async () => {
       const queryObj = generateURLQuery(true);
+      // Removed the 'type' property from the object to avoid issues when navigating from the stream to the logs page,
+      // especially when the user performs multi-select on streams and shares the URL.
+      delete queryObj?.type;
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
@@ -3622,6 +3643,7 @@ export default defineComponent({
       customRangeIcon,
       createScheduledSearchIcon,
       listScheduledSearchIcon,
+      toggleHistogram,
     };
   },
   computed: {
@@ -3792,7 +3814,7 @@ export default defineComponent({
       this.resetEditorLayout();
     },
     resetFunction(newVal) {
-      if (newVal == "" && store.state.savedViewFlag == false) {
+      if (newVal == "" && store?.state?.savedViewFlag == false) {
         this.resetFunctionContent();
       }
     },
@@ -3845,16 +3867,25 @@ export default defineComponent({
     height: 100%; /* or any other height you want to set */
   }
 
-  .empty-query .monaco-editor-background {
+  .empty-query .cm-scroller {
     background-image: url("../../assets/images/common/query-editor.png");
     background-repeat: no-repeat;
     background-size: 115px;
+    background-position: 5px 5px;
+  }
+  .empty-query .cm-gutters {
+    display: none;
   }
 
-  .empty-function .monaco-editor-background {
+  .empty-function .cm-scroller {
     background-image: url("../../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
     background-size: 170px;
+    background-position: 5px 5px;
+  }
+
+  .empty-function .cm-gutters {
+    display: none;
   }
 
   .function-dropdown {

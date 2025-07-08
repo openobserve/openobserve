@@ -152,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="filteredStreams"
                     :label="t('alerts.stream_name') + ' *'"
                     :loading="isFetchingStreams"
-                    :popup-content-style="{ textTransform: 'lowercase' }"
                     color="input-border"
                     class="q-py-sm showLabelOnTop no-case col"
                     :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
@@ -208,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-alert-query-input-title"
             >
               <real-time-alert
+                ref="realTimeAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
                 @field:add="addField"
@@ -432,10 +432,6 @@ import {
   onBeforeMount,
 } from "vue";
 
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
-
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -567,6 +563,7 @@ export default defineComponent({
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
+    const realTimeAlertRef: any = ref(null);
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
@@ -864,7 +861,7 @@ export default defineComponent({
 
       await nextTick();
       if (getSelectedTab.value !== "sql") {
-        previewAlertRef.value.refreshData();
+        previewAlertRef.value?.refreshData();
       }
     };
 
@@ -883,10 +880,23 @@ export default defineComponent({
         case ">=":
           condition = column + ` ${operator} ${value}`;
           break;
-        case "Contains":
+          //this is done because when we get from BE the response includes the operator in lowercase
+          //so we need to handle it separately
+        case "contains":
           condition = column + ` LIKE '%${value}%'`;
           break;
-        case "NotContains":
+        //this is done because when we get from BE the response includes the operator in lowercase and converted NotContains to not_contains
+        //so we need to handle it separately
+        case "not_contains":
+          condition = column + ` NOT LIKE '%${value}%'`;
+          break;
+          //this is done because in the FE we are not converting the operator to lowercase
+          //so we need to handle it separately
+        case 'Contains':
+          condition = column + ` LIKE '%${value}%'`;
+          break;
+          //this is done because in the FE we are not converting the operator to lowercase
+        case 'NotContains':
           condition = column + ` NOT LIKE '%${value}%'`;
           break;
         default:
@@ -908,6 +918,8 @@ export default defineComponent({
       //else we need to return the value as a string and add single quotes to it
       function formatValue(column: any, operator: any, value: any) {
         return streamFieldsMap[column]?.type === "Int64" ||
+          operator === "contains" ||
+          operator === "not_contains" ||
           operator === "Contains" ||
           operator === "NotContains"
           ? value
@@ -937,7 +949,7 @@ export default defineComponent({
           // Single condition
           if (item.column && item.operator && item.value !== undefined) {
             const formattedValue = formatValue(item.column, item.operator, item.value);
-            return formatCondition(item.column, item.operator, formattedValue);
+              return getFormattedCondition(item.column, item.operator, formattedValue);
           }
 
           return "";
@@ -1342,20 +1354,28 @@ export default defineComponent({
 //we need to remove the condition group if it is empty because we cannot simply show empty group in the UI
   const removeConditionGroup = (targetGroupId: string, currentGroup: any = formData.value.query_condition.conditions) => {
     if (!currentGroup?.items || !Array.isArray(currentGroup.items)) return;
-    //here we are iterating over the items and removing the condition group
-    currentGroup.items = currentGroup.items.filter((item: any) => {
-      if (item.items && item.groupId === targetGroupId) {
-        // Remove matching group
-        return false;
-      }
 
-      if (item.items) {
-        // Recurse into nested group
-        removeConditionGroup(targetGroupId, item);
-      }
+    // Recursive function to filter empty groups
+    const filterEmptyGroups = (items: any[]): any[] => {
+      return items.filter((item: any) => {
+        // If this is the target group to remove, filter it out
+        if (item.groupId === targetGroupId) {
+          return false;
+        }
 
-      return true;
-    });
+        // If it's a group, recursively filter its items
+        if (item.items && Array.isArray(item.items)) {
+          item.items = filterEmptyGroups(item.items);
+          // Remove groups that are empty after filtering
+          return item.items.length > 0;
+        }
+
+        return true;
+      });
+    };
+
+    // Apply the filtering to the root group
+    currentGroup.items = filterEmptyGroups(currentGroup.items);
   };
 
 
@@ -1448,6 +1468,24 @@ export default defineComponent({
       items
     };
   }
+  const validateFormAndNavigateToErrorField = async (formRef: any) => {
+      const isValid = await formRef.validate().then(async (valid: any) => {
+        return valid;
+      });
+      if (!isValid) {
+        navigateToErrorField(formRef);
+        return false;
+      }
+      return true;
+    }
+
+    const navigateToErrorField = (formRef: any) => {
+      const errorField = formRef.$el.querySelector('.q-field--error');
+      if (errorField) { 
+        errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
 
 
 
@@ -1529,7 +1567,10 @@ export default defineComponent({
       updateGroup,
       removeConditionGroup,
       transformFEToBE,
-      retransformBEToFE
+      retransformBEToFE,
+      validateFormAndNavigateToErrorField,
+      navigateToErrorField,
+      realTimeAlertRef
     };
   },
 
@@ -1682,10 +1723,28 @@ export default defineComponent({
         this.formData.tz_offset = convertedDateTime.offset;
       }
 
-      this.addAlertForm.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
+            //from here validation starts so if there are any errors we need to navigate user to that paricular field
+      //this is for main form validation
+      let isAlertValid = true;
+      let isScheduledAlertValid = true;
+      let isRealTimeAlertValid = true;
+        isAlertValid = await this.validateFormAndNavigateToErrorField(this.addAlertForm);
+        //we need to handle scheduled alert validation separately 
+        //if there are any scheduled alert errors then we need to navigate user to that field
+        if(this.formData.is_real_time == "false"){
+          isScheduledAlertValid = this.scheduledAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
         }
+        else{
+          isRealTimeAlertValid = this.realTimeAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
+        }
+        if( isAlertValid && !isScheduledAlertValid){
+          this.navigateToErrorField(this.scheduledAlertRef); 
+        }
+        if( isAlertValid && !isRealTimeAlertValid){
+          this.navigateToErrorField(this.realTimeAlertRef);
+        }
+        if (!isAlertValid || !isScheduledAlertValid || !isRealTimeAlertValid) return false;
+
 
         const payload = this.getAlertPayload();
         if (!this.validateInputs(payload)) return;
@@ -1707,8 +1766,14 @@ export default defineComponent({
             // So waiting here for sql validation to complete
             await this.validateSqlQueryPromise;
           } catch (error) {
+
             dismiss();
-            console.log("Error while validating sql query");
+            this.q.notify({
+              type: "negative",
+              message: "Error while validating sql query. Please check the query and try again.",
+              timeout: 1500,
+            });
+            console.log("Error while validating sql query",error);
             return false;
           }
         }
@@ -1725,7 +1790,7 @@ export default defineComponent({
           );
           callAlert
             .then((res: { data: any }) => {
-              this.formData = { ...defaultValue };
+              this.formData = { ...defaultValue() };
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
@@ -1757,7 +1822,7 @@ export default defineComponent({
 
           callAlert
             .then((res: { data: any }) => {
-              this.formData = defaultValue();
+              this.formData = { ...defaultValue() };
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
@@ -1779,7 +1844,7 @@ export default defineComponent({
             page: "Add/Update Alert",
           });
         }
-      });
+
     },
   },
 });
@@ -1846,7 +1911,7 @@ export default defineComponent({
 .dark-mode{
   .alert-setup-container{
   background-color: #212121;
-  padding: 12px 12px 24px 0px;
+  padding: 12px 12px 24px 12px;
   margin-left: 24px;
   border-radius: 4px;
   border: 1px solid #343434;
@@ -1866,7 +1931,7 @@ export default defineComponent({
 .light-mode{
   .alert-setup-container{
     background-color: #ffffff;
-    padding: 12px 12px 24px 0px;
+    padding: 12px 12px 24px 12px;
     margin-left: 24px;
     border-radius: 4px;
     border: 1px solid #e6e6e6;

@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use config::meta::search::Response;
+use config::meta::{search::Response, sql::OrderBy};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -65,6 +65,7 @@ pub struct MultiCachedQueryResponse {
     pub is_aggregate: bool,
     pub file_path: String,
     pub trace_id: String,
+    pub order_by: Vec<(String, OrderBy)>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -116,12 +117,12 @@ mod tests {
             limit: 100,
         };
 
-        assert_eq!(response.has_cached_data, true);
-        assert_eq!(response.cache_query_response, true);
+        assert!(response.has_cached_data);
+        assert!(response.cache_query_response);
         assert_eq!(response.response_start_time, 1000);
         assert_eq!(response.response_end_time, 2000);
         assert_eq!(response.ts_column, "timestamp");
-        assert_eq!(response.is_descending, false);
+        assert!(!response.is_descending);
         assert_eq!(response.limit, 100);
         assert_eq!(response.deltas.len(), 1);
     }
@@ -136,7 +137,7 @@ mod tests {
 
         assert_eq!(delta.delta_start_time, 1000);
         assert_eq!(delta.delta_end_time, 2000);
-        assert_eq!(delta.delta_removed_hits, true);
+        assert!(delta.delta_removed_hits);
     }
 
     #[test]
@@ -170,10 +171,10 @@ mod tests {
 
         assert_eq!(request.q_start_time, 1000);
         assert_eq!(request.q_end_time, 2000);
-        assert_eq!(request.is_aggregate, true);
+        assert!(request.is_aggregate);
         assert_eq!(request.ts_column, "timestamp");
         assert_eq!(request.discard_interval, 100);
-        assert_eq!(request.is_descending, false);
+        assert!(!request.is_descending);
     }
 
     #[test]
@@ -185,6 +186,7 @@ mod tests {
             cache_query_response: true,
             ts_column: "timestamp".to_string(),
             is_descending: false,
+            order_by: vec![],
             limit: 100,
             took: 50,
             histogram_interval: 1000,
@@ -194,15 +196,15 @@ mod tests {
             trace_id: "trace123".to_string(),
         };
 
-        assert_eq!(response.has_cached_data, true);
-        assert_eq!(response.cache_query_response, true);
+        assert!(response.has_cached_data);
+        assert!(response.cache_query_response);
         assert_eq!(response.ts_column, "timestamp");
-        assert_eq!(response.is_descending, false);
+        assert!(!response.is_descending);
         assert_eq!(response.limit, 100);
         assert_eq!(response.took, 50);
         assert_eq!(response.histogram_interval, 1000);
         assert_eq!(response.total_cache_duration, 2000);
-        assert_eq!(response.is_aggregate, true);
+        assert!(response.is_aggregate);
         assert_eq!(response.file_path, "test.json");
         assert_eq!(response.trace_id, "trace123");
         assert_eq!(response.cached_response.len(), 1);
@@ -251,5 +253,181 @@ mod tests {
                 serde_json::from_str(&serialized).unwrap();
             assert_eq!(strategy, deserialized);
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "enterprise")]
+mod enterprise_tests {
+    use arrow::array::record_batch;
+    use arrow_schema::{DataType, Field};
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::common::streaming_agg_cache::{
+        StreamingAggsCacheResultRecordBatch, calculate_record_batches_deltas,
+    };
+
+    #[test]
+    fn test_calculate_record_batches_deltas() {
+        let batch1 = record_batch!(
+            ("status", Utf8, ["200", "404"]),
+            ("count", Int64, [100, 50])
+        )
+        .unwrap();
+
+        let batch2 =
+            record_batch!(("status", Utf8, ["200", "500"]), ("count", Int64, [80, 20])).unwrap();
+
+        // Test case: Query: 10:00 - 16:00, Cache: 11:00 - 12:00, 14:00 - 15:00
+        // Expected Deltas: 10:00 - 11:00, 12:00 - 14:00, 15:00 - 16:00
+        let cache_result = vec![
+            StreamingAggsCacheResultRecordBatch {
+                record_batch: batch1,
+                cache_start_time: 11_000_000, // 11:00 in microseconds
+                cache_end_time: 12_000_000,   // 12:00 in microseconds
+            },
+            StreamingAggsCacheResultRecordBatch {
+                record_batch: batch2,
+                cache_start_time: 14_000_000, // 14:00 in microseconds
+                cache_end_time: 15_000_000,   // 15:00 in microseconds
+            },
+        ];
+
+        let query_start_time = 10_000_000; // 10:00 in microseconds
+        let query_end_time = 16_000_000; // 16:00 in microseconds
+
+        let deltas =
+            calculate_record_batches_deltas(query_start_time, query_end_time, &cache_result);
+
+        // Should have 3 deltas
+        assert_eq!(deltas.len(), 3);
+
+        // Delta 1: 10:00 - 11:00 (before first cache)
+        assert_eq!(deltas[0].delta_start_time, 10_000_000);
+        assert_eq!(deltas[0].delta_end_time, 11_000_000);
+
+        // Delta 2: 12:00 - 14:00 (between caches)
+        assert_eq!(deltas[1].delta_start_time, 12_000_000);
+        assert_eq!(deltas[1].delta_end_time, 14_000_000);
+
+        // Delta 3: 15:00 - 16:00 (after last cache)
+        assert_eq!(deltas[2].delta_start_time, 15_000_000);
+        assert_eq!(deltas[2].delta_end_time, 16_000_000);
+    }
+
+    #[test]
+    fn test_calculate_record_batches_deltas_no_cache() {
+        // Test case: No cache, entire query range should be a delta
+        let cache_result = vec![];
+        let query_start_time = 10_000_000;
+        let query_end_time = 16_000_000;
+
+        let deltas =
+            calculate_record_batches_deltas(query_start_time, query_end_time, &cache_result);
+
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(deltas[0].delta_start_time, 10_000_000);
+        assert_eq!(deltas[0].delta_end_time, 16_000_000);
+    }
+
+    #[test]
+    fn test_calculate_record_batches_deltas_complete_cache() {
+        use std::sync::Arc;
+
+        use arrow::{
+            array::{Int64Array, StringArray},
+            datatypes::Schema,
+        };
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("status", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
+        ]));
+
+        let batch = arrow::array::RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["200"])),
+                Arc::new(Int64Array::from(vec![100])),
+            ],
+        )
+        .unwrap();
+
+        // Test case: Cache covers entire query range
+        let cache_result = vec![StreamingAggsCacheResultRecordBatch {
+            record_batch: batch,
+            cache_start_time: 10_000_000, // Same as query start
+            cache_end_time: 16_000_000,   // Same as query end
+        }];
+
+        let query_start_time = 10_000_000;
+        let query_end_time = 16_000_000;
+
+        let deltas =
+            calculate_record_batches_deltas(query_start_time, query_end_time, &cache_result);
+
+        // Should have no deltas (complete cache hit)
+        assert_eq!(deltas.len(), 0);
+    }
+
+    #[test]
+    fn test_calculate_record_batches_deltas_unsorted_cache() {
+        use std::sync::Arc;
+
+        use arrow::{
+            array::{Int64Array, StringArray},
+            datatypes::Schema,
+        };
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("status", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
+        ]));
+
+        let batch1 = arrow::array::RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["200"])),
+                Arc::new(Int64Array::from(vec![100])),
+            ],
+        )
+        .unwrap();
+
+        let batch2 = arrow::array::RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["404"])),
+                Arc::new(Int64Array::from(vec![50])),
+            ],
+        )
+        .unwrap();
+
+        // Test case: Cache results in wrong order (should be sorted internally)
+        let cache_result = vec![
+            StreamingAggsCacheResultRecordBatch {
+                record_batch: batch1,
+                cache_start_time: 14_000_000, // Second cache range
+                cache_end_time: 15_000_000,
+            },
+            StreamingAggsCacheResultRecordBatch {
+                record_batch: batch2,
+                cache_start_time: 11_000_000, // First cache range
+                cache_end_time: 12_000_000,
+            },
+        ];
+
+        let query_start_time = 10_000_000;
+        let query_end_time = 16_000_000;
+
+        let deltas =
+            calculate_record_batches_deltas(query_start_time, query_end_time, &cache_result);
+
+        // Should still produce correct deltas despite unsorted input
+        assert_eq!(deltas.len(), 3);
+        assert_eq!(deltas[0].delta_start_time, 10_000_000); // Before first
+        assert_eq!(deltas[0].delta_end_time, 11_000_000);
+        assert_eq!(deltas[1].delta_start_time, 12_000_000); // Between
+        assert_eq!(deltas[1].delta_end_time, 14_000_000);
+        assert_eq!(deltas[2].delta_start_time, 15_000_000); // After last
+        assert_eq!(deltas[2].delta_end_time, 16_000_000);
     }
 }

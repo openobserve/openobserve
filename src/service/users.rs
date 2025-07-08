@@ -290,7 +290,7 @@ pub async fn update_user(
     let mut new_role = None;
     let conf = get_config();
     let password_ext_salt = conf.auth.ext_auth_salt.as_str();
-    if existing_user.is_ok() {
+    if let Ok(existing_user) = existing_user {
         let mut new_user;
         let mut is_updated = false;
         let mut is_org_updated = false;
@@ -299,7 +299,7 @@ pub async fn update_user(
         let mut custom_roles = vec![];
         #[cfg(feature = "enterprise")]
         let mut custom_roles_need_change = false;
-        match existing_user.unwrap() {
+        match existing_user {
             Some(local_user) => {
                 if local_user.is_external {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
@@ -489,10 +489,10 @@ pub async fn update_user(
                             },
                         };
 
-                        if get_openfga_config().enabled && old_role.is_some() && new_role.is_some()
+                        if get_openfga_config().enabled
+                            && let Some(old) = old_role
+                            && let Some(new) = new_role
                         {
-                            let old = old_role.unwrap();
-                            let new = new_role.unwrap();
                             if !old.eq(&new) {
                                 let mut old_str = old.to_string();
                                 let mut new_str = new.to_string();
@@ -810,32 +810,34 @@ pub async fn list_users(
         if is_list_all {
             let (org, id) = org_user.key().split_once('/').unwrap();
             if let Some(org_record) = organization::get_org(org).await {
-                let user_org = user_orgs.entry(id.to_string()).or_insert(vec![]);
-                user_org.push(OrgRoleMapping {
-                    org_id: org.to_string(),
-                    role: org_user.value().role.clone(),
-                    org_name: org_record.name,
-                });
-            }
-        } else if org_user.key().starts_with(&format!("{org_id}/")) {
-            if let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await {
-                let should_include = if let Some(ref required_role) = role {
-                    // Filter by role if specified
-                    user.role.eq(required_role)
-                } else {
-                    user.role.ne(&UserRole::ServiceAccount)
-                };
-                if should_include {
-                    user_list.push(UserResponse {
-                        email: user.email.clone(),
-                        role: user.role.to_string(),
-                        first_name: user.first_name.clone(),
-                        last_name: user.last_name.clone(),
-                        is_external: user.is_external,
-                        orgs: None,
-                        created_at: org_user.value().created_at,
+                user_orgs
+                    .entry(id.to_string())
+                    .or_default()
+                    .push(OrgRoleMapping {
+                        org_id: org.to_string(),
+                        role: org_user.value().role.clone(),
+                        org_name: org_record.name,
                     });
-                }
+            }
+        } else if org_user.key().starts_with(&format!("{org_id}/"))
+            && let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await
+        {
+            let should_include = if let Some(ref required_role) = role {
+                // Filter by role if specified
+                user.role.eq(required_role)
+            } else {
+                user.role.ne(&UserRole::ServiceAccount)
+            };
+            if should_include {
+                user_list.push(UserResponse {
+                    email: user.email.clone(),
+                    role: user.role.to_string(),
+                    first_name: user.first_name.clone(),
+                    last_name: user.last_name.clone(),
+                    is_external: user.is_external,
+                    orgs: None,
+                    created_at: org_user.value().created_at,
+                });
             }
         }
     }
@@ -866,8 +868,9 @@ pub async fn list_users(
     }
 
     user_list.retain(|user| {
-        if user.role.eq(&UserRole::ServiceAccount.to_string()) && permitted.is_some() {
-            let permitted = permitted.as_ref().unwrap();
+        if user.role.eq(&UserRole::ServiceAccount.to_string())
+            && let Some(ref permitted) = permitted
+        {
             permitted.contains(&format!("service_accounts:{}", user.email))
                 || permitted.contains(&format!("service_accounts:_all_{org_id}"))
         } else {
@@ -934,7 +937,7 @@ pub async fn remove_user_from_org(
                 }
 
                 if !user.organizations.is_empty() {
-                    let mut orgs = user.clone().organizations;
+                    let orgs = &mut user.organizations;
                     if orgs.len() == 1 {
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
@@ -977,7 +980,7 @@ pub async fn remove_user_from_org(
                                     ),
                                 ));
                             }
-                            if org.name.eq(&org_id.to_string()) {
+                            if org.name.eq(org_id) {
                                 let user_role = &org.role;
                                 is_service_account = user_role.eq(&UserRole::ServiceAccount);
                                 _user_fga_role =
@@ -988,8 +991,7 @@ pub async fn remove_user_from_org(
                                     };
                             }
                         }
-                        orgs.retain(|x| !x.name.eq(&org_id.to_string()));
-                        user.organizations = orgs;
+                        orgs.retain(|x| !x.name.eq(org_id));
                         let resp = db::org_users::remove(org_id, &email_id).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
@@ -1000,11 +1002,13 @@ pub async fn remove_user_from_org(
                                     "user_fga_role, multi org: {}",
                                     _user_fga_role.as_ref().unwrap()
                                 );
-                                if get_openfga_config().enabled && _user_fga_role.is_some() {
+                                if get_openfga_config().enabled
+                                    && let Some(_user_fga_role) = _user_fga_role
+                                {
                                     delete_user_from_org(
                                         org_id,
                                         &email_id,
-                                        _user_fga_role.unwrap().as_str(),
+                                        _user_fga_role.as_str(),
                                     )
                                     .await;
                                     if is_service_account {
@@ -1066,7 +1070,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
         (false, get_default_user_org())
     } else {
         let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
+        local_orgs.retain(|org| !org.name.eq(org_id));
         if local_orgs.is_empty() {
             (false, get_default_user_org())
         } else {
@@ -1183,10 +1187,10 @@ fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<Str
 #[cfg(feature = "enterprise")]
 async fn check_cache(user_email: &str) -> Option<Vec<String>> {
     let cache = USER_ROLES_CACHE.read().await;
-    if let Some(cached) = cache.get(user_email) {
-        if cached.expires_at > Instant::now() {
-            return Some(cached.roles.clone());
-        }
+    if let Some(cached) = cache.get(user_email)
+        && cached.expires_at > Instant::now()
+    {
+        return Some(cached.roles.clone());
     }
     None
 }
@@ -1212,7 +1216,39 @@ mod tests {
     };
 
     use super::*;
-    use crate::common::infra::config::USERS;
+    use crate::common::{infra::config::USERS, meta::user::get_default_user_role};
+
+    #[test]
+    fn test_is_user_from_org() {
+        let target_org = "org1".to_string();
+
+        let user_org = UserOrg {
+            name: "org2".to_string(),
+            token: "token2".to_string(),
+            rum_token: Some("rum2".to_string()),
+            role: get_default_user_role(),
+        };
+
+        let matched_org = UserOrg {
+            name: target_org.clone(),
+            token: "token1".to_string(),
+            rum_token: Some("rum1".to_string()),
+            role: get_default_user_role(),
+        };
+
+        let (found, org) = is_user_from_org(vec![], &target_org);
+        assert!(!found);
+        assert_eq!(org.name, "");
+
+        let (found, org) = is_user_from_org(vec![matched_org.clone()], &target_org);
+        assert!(!found);
+        assert_eq!(org.name, "");
+
+        let (found, org) =
+            is_user_from_org(vec![matched_org.clone(), user_org.clone()], &target_org);
+        assert!(found);
+        assert_eq!(org.name, "org2");
+    }
 
     async fn set_up() {
         let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;

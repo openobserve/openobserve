@@ -427,18 +427,11 @@ class="padding-none" />
       :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
       :key="store.state.selectedOrganization?.identifier"
     >
-      <q-page-container>
-        <router-view v-slot="{ Component }">
-          <template v-if="$route.meta.keepAlive">
-            <keep-alive>
-              <component :is="Component" />
-            </keep-alive>
-          </template>
-          <template v-else>
-            <component :is="Component" />
-          </template>
-        </router-view>
-      </q-page-container>
+    <q-page-container v-if="isLoading">
+      <router-view v-slot="{ Component }">
+        <component :is="Component"  @sendToAiChat="sendToAiChat" />
+      </router-view>
+    </q-page-container>
     </div>
 
     <!-- Right Panel (AI Chat) -->
@@ -449,9 +442,10 @@ class="padding-none" />
       style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
-      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" />
+      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat"   :aiChatInputContext="aiChatInputContext"  />
     </div>
   </div>
+
   </q-layout>
 </template>
 
@@ -617,6 +611,7 @@ export default defineComponent({
 
     const isMonacoEditorLoaded = ref(false);
     const isHovered = ref(false);
+    const aiChatInputContext = ref("");
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -921,6 +916,7 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       resetStreams();
+      store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
@@ -1162,6 +1158,8 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_websocket_search ?? false,
           enable_streaming_search:
             orgSettings?.data?.data?.enable_streaming_search ?? false,
+          aggregation_cache_enabled:
+            orgSettings?.data?.data?.aggregation_cache_enabled ?? false,
         });
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);
@@ -1256,6 +1254,10 @@ export default defineComponent({
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
+    const sendToAiChat = (value: any) => {
+      store.dispatch("setIsAiChatEnabled", true);
+      aiChatInputContext.value = value;
+    }
 
     return {
       t,
@@ -1289,6 +1291,8 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
+      sendToAiChat,
+      aiChatInputContext
     };
   },
   computed: {
@@ -1325,6 +1329,14 @@ export default defineComponent({
       await this.getOrganizationSettings();
 
       this.isLoading = true;
+      // Find the matching organization from orgOptions
+      const matchingOrg = this.orgOptions.find(org => 
+        org.identifier === this.store.state.selectedOrganization.identifier
+      );
+      
+      if (matchingOrg) {
+        this.selectedOrg = matchingOrg;
+      }
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {

@@ -503,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <ConfirmDialog
       title="Delete Alert"
-      message="Are you sure you want to delete alert?"
+      message="Are you sure you want to delete this alert?"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -1235,11 +1235,7 @@ export default defineComponent({
       toBeClonedAlert.value = await getAlertById(row.alert_id);
     };
     const submitForm = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
+
 
       if (!toBeClonedAlert.value) {
         $q.notify({
@@ -1266,6 +1262,11 @@ export default defineComponent({
         return;
       }
       isSubmitting.value = true;
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
 
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
@@ -1404,14 +1405,17 @@ export default defineComponent({
           selectedDelete.value.alert_id,
           activeFolderId.value,
         )
-        .then((res: any) => {
+        .then(async (res: any) => {
           if (res.data.code == 200) {
             $q.notify({
               type: "positive",
               message: res.data.message,
               timeout: 2000,
             });
-            getAlertsFn(store, activeFolderId.value);
+            await getAlertsFn(store, activeFolderId.value);
+            if(filterQuery.value){
+              filterAlertsByQuery(filterQuery.value);
+            }
           } else {
             $q.notify({
               type: "negative",
@@ -1690,23 +1694,7 @@ export default defineComponent({
         filterAlertsByTab();
       }
       if (newVal) {
-        let tempResults = allAlerts.value.filter((alert: any) =>
-          alert.name.toLowerCase().includes(newVal.toLowerCase())
-        )
-        filteredResults.value = tempResults.filter((alert: any) => {
-          //here we are filtering the alerts by the activeTab
-          if(activeTab.value === "scheduled"){
-            return !alert.is_real_time;
-          } 
-          //we filter the alerts by the realTime tab
-          else if(activeTab.value === "realTime"){
-            return alert.is_real_time;
-          } 
-          //else we will return all the alerts
-          else {
-            return true;
-          }
-        })
+        filterAlertsByQuery(newVal);
       }
     });
     watch(searchAcrossFolders, (newVal) => {
@@ -1885,6 +1873,27 @@ export default defineComponent({
         const joined = parts.join(` ${label} `);
         return wrap ? `(${joined})` : joined;
       }
+      //this function is used to filter the alerts by the local search not the global search
+      //this will be used when the user is searching for the alerts in the same folder
+    const filterAlertsByQuery = (query: string) => {
+      let tempResults = allAlerts.value.filter((alert: any) =>
+          alert.name.toLowerCase().includes(query.toLowerCase())
+        )
+        filteredResults.value = tempResults.filter((alert: any) => {
+          //here we are filtering the alerts by the activeTab
+          if(activeTab.value === "scheduled"){
+            return !alert.is_real_time;
+          } 
+          //we filter the alerts by the realTime tab
+          else if(activeTab.value === "realTime"){
+            return alert.is_real_time;
+          } 
+          //else we will return all the alerts
+          else {
+            return true;
+          }
+        })
+    }
 
 
 
@@ -1992,6 +2001,7 @@ export default defineComponent({
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
       transformToExpression,
+      filterAlertsByQuery,
     };
   },
 });

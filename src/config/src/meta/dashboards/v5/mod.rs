@@ -489,6 +489,8 @@ pub struct VariableList {
     pub select_all_value_for_multi_select: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_multi_select_value: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escape_single_quotes: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
@@ -588,7 +590,17 @@ pub enum LineInterpolation {
 #[serde(rename_all = "camelCase")]
 pub enum LabelPosition {
     Top,
+    Left,
+    Right,
+    Bottom,
     Inside,
+    InsideLeft,
+    InsideRight,
     InsideTop,
     InsideBottom,
+    InsideTopLeft,
+    InsideBottomLeft,
+    InsideTopRight,
+    InsideBottomRight,
+    Outside,
 }

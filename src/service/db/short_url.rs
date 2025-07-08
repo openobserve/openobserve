@@ -115,6 +115,7 @@ async fn run_gc_task(gc_interval_minutes: i64, retention_period_minutes: i64) {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
         gc_interval_minutes as u64 * 60,
     ));
+    interval.tick().await;
 
     loop {
         interval.tick().await;
@@ -141,17 +142,16 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
         Some(SHORT_URL_CACHE_LIMIT),
     )
     .await
+        && !expired_short_ids.is_empty()
     {
-        if !expired_short_ids.is_empty() {
-            // delete from db
-            short_urls::batch_remove(expired_short_ids.clone()).await?;
+        // delete from db
+        short_urls::batch_remove(expired_short_ids.clone()).await?;
 
-            // delete from cache & notify super cluster
-            for short_id in expired_short_ids {
-                cluster::emit_delete_event(&short_id).await?;
-                #[cfg(feature = "enterprise")]
-                super_cluster::emit_delete_event(&short_id).await?;
-            }
+        // delete from cache & notify super cluster
+        for short_id in expired_short_ids {
+            cluster::emit_delete_event(&short_id).await?;
+            #[cfg(feature = "enterprise")]
+            super_cluster::emit_delete_event(&short_id).await?;
         }
     }
 

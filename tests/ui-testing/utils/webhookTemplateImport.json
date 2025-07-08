@@ -1,0 +1,7 @@
+{
+  "name": "",
+  "body": "{\r\n  \"text\": \"{alert_name} is active. This is the alert url {alert_url}. This alert template has been created using a playwright automation script. This template has been uploaded as a part of import feature.\"\r\n  }",
+  "isDefault": true,
+  "type": "http",
+  "title": ""
+} 

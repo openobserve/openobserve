@@ -14,6 +14,7 @@
             :options="filteredFields"
             :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
+            :class="store.state.isAiChatEnabled ? 'o2-ai-condition-input' : 'xl:tw-min-w-[200px] lg:tw-max-w-[120px] lg:tw-w-fit'"
             bg-color="input-bg"
             class="q-py-sm mini-select conditions-input"
             filled
@@ -27,9 +28,12 @@
             @filter="filterColumns"
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width:200px;"
             @update:model-value="emits('input:update', 'conditions', condition)"
-          />
+          >
+          <q-tooltip v-if="condition.column && store.state.isAiChatEnabled"> 
+            {{ condition.column }}
+          </q-tooltip>
+        </q-select>
         </div>
         <div
           data-test="alert-conditions-operator-select"
@@ -47,9 +51,13 @@
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 200px"
+            :class="store.state.isAiChatEnabled ? 'tw-w-[70px]' : 'xl:tw-min-w-[200px] lg:tw-min-w-[90px] lg:tw-w-fit'"
             @update:model-value="emits('input:update', 'conditions', condition)"
-          />
+          >
+          <q-tooltip v-if="condition.operator && store.state.isAiChatEnabled">
+            {{ condition.operator }}
+          </q-tooltip>
+        </q-select>
         </div>
         <div
           data-test="alert-conditions-value-input"
@@ -68,9 +76,14 @@
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 200px"
+            :class="store.state.isAiChatEnabled ? 'tw-w-[110px]' : 'xl:tw-min-w-[200px] lg:tw-w-fit lg:tw-min-w-[80px]'"
             @update:model-value="emits('input:update', 'conditions', condition)"
-          />
+
+          >
+          <q-tooltip v-if="condition.value && store.state.isAiChatEnabled">
+            {{ condition.value }}
+          </q-tooltip>
+        </q-input>
         </div>
     </div>
   </template>
@@ -163,6 +176,9 @@ const filterColumns = (val: string, update: Function) => {
   <style > 
   .conditions-input .q-field__control{
     border: 1px solid #424242 !important;
+  }
+  .o2-ai-condition-input .q-field__control{
+    width: 130px !important;
   }
 </style>
   

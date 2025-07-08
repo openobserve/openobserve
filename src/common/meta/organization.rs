@@ -194,8 +194,15 @@ fn default_toggle_ingestion_logs() -> bool {
     false
 }
 
-fn default_enable_websocket_search() -> bool {
-    false
+fn default_enable_aggregation_cache() -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        config::get_config().common.aggregation_cache_enabled
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        false
+    }
 }
 
 fn default_enable_streaming_search() -> bool {
@@ -215,7 +222,7 @@ pub struct OrganizationSettingPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toggle_ingestion_logs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub enable_websocket_search: Option<bool>,
+    pub aggregation_cache_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -234,8 +241,8 @@ pub struct OrganizationSetting {
     pub span_id_field_name: String,
     #[serde(default = "default_toggle_ingestion_logs")]
     pub toggle_ingestion_logs: bool,
-    #[serde(default = "default_enable_websocket_search")]
-    pub enable_websocket_search: bool,
+    #[serde(default = "default_enable_aggregation_cache")]
+    pub aggregation_cache_enabled: bool,
     #[serde(default = "default_enable_streaming_search")]
     pub enable_streaming_search: bool,
     #[serde(default = "default_auto_refresh_interval")]
@@ -249,7 +256,7 @@ impl Default for OrganizationSetting {
             trace_id_field_name: default_trace_id_field_name(),
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
-            enable_websocket_search: default_enable_websocket_search(),
+            aggregation_cache_enabled: default_enable_aggregation_cache(),
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
         }
@@ -352,5 +359,129 @@ impl ClusterInfoResponse {
             });
 
         region_entry.clusters.insert(cluster_name, cluster_info);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::cluster::Node;
+
+    use super::*;
+
+    #[test]
+    fn test_organization_setting_defaults() {
+        let setting = OrganizationSetting::default();
+        assert_eq!(setting.trace_id_field_name, "trace_id");
+        assert_eq!(setting.span_id_field_name, "span_id");
+        assert!(!setting.toggle_ingestion_logs);
+        assert!(!setting.enable_streaming_search);
+    }
+
+    #[test]
+    fn test_node_list_response_add_node() {
+        let node = Node {
+            name: "node-1".into(),
+            ..Default::default()
+        };
+
+        let mut response = NodeListResponse::new();
+        response.add_node(node.clone(), "us-east".into(), "cluster-a".into());
+
+        let nodes = &response
+            .regions
+            .get("us-east")
+            .unwrap()
+            .clusters
+            .get("cluster-a")
+            .unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].name, "node-1");
+    }
+
+    #[test]
+    fn test_node_list_response_add_nodes() {
+        let node1 = Node {
+            name: "node-1".into(),
+            ..Default::default()
+        };
+        let node2 = Node {
+            name: "node-2".into(),
+            ..Default::default()
+        };
+
+        let mut response = NodeListResponse::new();
+        response.add_nodes(vec![
+            (node1.clone(), "us-west".into(), "cluster-x".into()),
+            (node2.clone(), "us-west".into(), "cluster-x".into()),
+        ]);
+
+        let nodes = &response
+            .regions
+            .get("us-west")
+            .unwrap()
+            .clusters
+            .get("cluster-x")
+            .unwrap();
+        assert_eq!(nodes.len(), 2);
+    }
+
+    #[test]
+    fn test_cluster_info_response_add() {
+        let mut response = ClusterInfoResponse::default();
+        let info = ClusterInfo { pending_jobs: 5 };
+
+        response.add_cluster_info(info.clone(), "cluster-1".into(), "eu".into());
+
+        let cluster = response
+            .regions
+            .get("eu")
+            .unwrap()
+            .clusters
+            .get("cluster-1")
+            .unwrap();
+        assert_eq!(cluster.pending_jobs, 5);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_organization_invite_response_data_serialization() {
+        let data = OrganizationInviteResponseData {
+            valid_members: Some(vec!["user1@example.com".into(), "user2@example.com".into()]),
+            existing_members: Some(vec!["existing@example.com".into()]),
+            invalid_email: Some("bad-email".into()),
+        };
+
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(json.contains("user1@example.com"));
+        assert!(json.contains("bad-email"));
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_organization_invites_creation() {
+        let invites = OrganizationInvites {
+            invites: vec!["a@example.com".into(), "b@example.com".into()],
+            role: UserRole::Member,
+        };
+
+        assert_eq!(invites.invites.len(), 2);
+        assert_eq!(invites.role, UserRole::Member);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_organization_invite_user_record() {
+        let record = OrganizationInviteUserRecord {
+            email: "user@example.com".into(),
+            first_name: "First".into(),
+            last_name: "Last".into(),
+            role: "admin".into(),
+            status: InviteStatus::Pending,
+            expires_at: 999999,
+            is_external: true,
+        };
+
+        assert_eq!(record.status, InviteStatus::Pending);
+        assert!(record.is_external);
     }
 }

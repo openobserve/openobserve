@@ -326,7 +326,7 @@ pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| 
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
+        &["organization", "stream_type", "cache_type"],
     )
     .expect("Metric created")
 });
@@ -788,7 +788,6 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-
 pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_consistent_hash", "Consistent hash")
@@ -863,6 +862,98 @@ pub static FILE_ACCESS_TIME: Lazy<HistogramVec> = Lazy::new(|| {
         .buckets(vec![1.0, 2.0, 3.0, 6.0, 12.0, 24.0, 48.0, 96.0, 168.0])
         .const_labels(create_const_labels()),
         &["stream_type"],
+    )
+    .expect("Metric created")
+});
+
+// Metrics for pipeline wal writer
+pub static PIPELINE_WAL_WRITER_DESTINATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "pipeline_wal_writer_destinations",
+            "Total number of pipeline wal writer destinations",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_WAL_WRITERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "pipeline_wal_writers",
+            "Total number of wal writer across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_WAL_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "pipeline_wal_files",
+            "Total number of wal files across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_wal_ingestion_bytes",
+            "Bytes ingested across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_http_exported_bytes",
+            "Bytes exported across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static QUERY_AGGREGATION_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_aggregation_cache_items",
+            "Total number of aggregation cache items",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_aggregation_cache_bytes",
+            "Total number of aggregation cache bytes",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
     )
     .expect("Metric created")
 });
@@ -1098,9 +1189,30 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(FILE_ACCESS_TIME.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_WRITER_DESTINATIONS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_WRITERS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_INGESTION_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_EXPORTED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_AGGREGATION_CACHE_ITEMS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_AGGREGATION_CACHE_BYTES.clone()))
+        .expect("Metric registered");
 }
 
-fn create_const_labels() -> HashMap<String, String> {
+pub fn create_const_labels() -> HashMap<String, String> {
     let cfg = crate::config::get_config();
     let mut labels = HashMap::new();
     labels.insert("cluster".to_string(), cfg.common.cluster_name.clone());

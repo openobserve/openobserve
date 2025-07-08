@@ -60,10 +60,8 @@ impl Telemetry {
             HashMap::new()
         };
 
-        if data.is_some() {
-            for item in data.unwrap() {
-                props.insert(item.0, item.1);
-            }
+        if let Some(data) = data {
+            props.extend(data);
         }
 
         if send_zo_data {
@@ -306,5 +304,13 @@ mod test_telemetry {
         let mut props = tel.base_info.clone();
         add_zo_info(&mut props).await;
         assert!(!tel.base_info.is_empty())
+    }
+
+    #[tokio::test]
+    async fn test_telemetry_send_track_event_without_base_info_or_zo_data() {
+        let mut telemetry = Telemetry::new();
+        telemetry
+            .send_track_event("test_event", None, false, false)
+            .await;
     }
 }

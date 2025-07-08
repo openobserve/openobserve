@@ -18,6 +18,7 @@ use std::{any::Any, sync::Arc};
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
+use config::get_config;
 use datafusion::{
     catalog::Session,
     common::{Constraints, Result},
@@ -121,13 +122,25 @@ impl TableProvider for NewMemTable {
             memory_exec,
         )?;
 
-        let filter_exec = apply_filter(
-            self.index_condition.as_ref(),
-            &projection_exec.schema(),
-            &self.fst_fields,
-            projection_exec,
-            filter_projection,
-        )?;
+        // if the index condition can remove filter, we can skip the config
+        // feature_query_remove_filter_with_index
+        let can_remove_filter = self
+            .index_condition
+            .as_ref()
+            .map(|v| v.can_remove_filter())
+            .unwrap_or(true);
+        let filter_exec =
+            if can_remove_filter || get_config().common.feature_query_remove_filter_with_index {
+                apply_filter(
+                    self.index_condition.as_ref(),
+                    &projection_exec.schema(),
+                    &self.fst_fields,
+                    projection_exec,
+                    filter_projection,
+                )?
+            } else {
+                projection_exec
+            };
 
         apply_sort(filter_exec, self.sorted_by_time)
     }

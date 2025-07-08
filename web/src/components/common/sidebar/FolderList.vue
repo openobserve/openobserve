@@ -410,6 +410,9 @@ export default defineComponent({
 }
 
 .folder-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-transform: none !important;
-}
+  }
 </style>

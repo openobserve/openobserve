@@ -102,7 +102,7 @@ pub(crate) async fn create_context(
         stats.original_size,
     );
 
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, 0).await?;
+    let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, 0).await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
@@ -131,7 +131,8 @@ async fn get_wal_batches(
     }
     let nodes = nodes.unwrap();
 
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, cfg.limit.cpu_num).await?;
+    let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, cfg.limit.cpu_num)
+        .await?;
     let table = Arc::new(
         NewEmptyTable::new(stream_name, Arc::clone(&schema))
             .with_partitions(ctx.state().config().target_partitions()),
@@ -172,12 +173,13 @@ async fn get_wal_batches(
             job_id: "".to_string(), // set in FlightSearchRequest
         },
         search_infos: SearchInfos {
-            plan: vec![],          // set in RemoteScanNode
-            file_id_list: vec![],  // not needed for wal
-            idx_file_list: vec![], // not needed for wal
+            plan: vec![],         // set in RemoteScanNode
+            file_id_list: vec![], // not needed for wal
             start_time: time_range.0,
             end_time: time_range.1,
             timeout: cfg.limit.query_timeout,
+            use_cache: false,
+            histogram_interval: 0, // not needed for wal
         },
         index_info: IndexInfo::default(), // not needed for wal
         super_cluster_info: cluster_rpc::SuperClusterInfo::default(), // current not needed for wal

@@ -190,6 +190,7 @@ impl super::FileList for PostgresFileList {
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
+            // we don't care the id here, because the id is from file_list table not for this table
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
                 "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
@@ -226,7 +227,7 @@ impl super::FileList for PostgresFileList {
         Ok(())
     }
 
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -236,8 +237,12 @@ impl super::FileList for PostgresFileList {
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
+                if file.id > 0 {
+                    ids.push(file.id.to_string());
+                    continue;
+                }
                 let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+                    parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
                 DB_QUERY_NUMS
                     .with_label_values(&["select", "file_list_deleted", ""])
                     .inc();
@@ -387,10 +392,11 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -445,10 +451,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         date_range: Option<(String, String)>,
     ) -> Result<Vec<FileKey>> {
-        if let Some((start, end)) = date_range.as_ref() {
-            if start.is_empty() && end.is_empty() {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = date_range.as_ref()
+            && start.is_empty()
+            && end.is_empty()
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -525,10 +532,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<super::FileId>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -641,10 +649,11 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<String>> {
-        if let Some((start, end)) = time_range {
-            if start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+        if let Some((start, end)) = time_range
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -693,27 +702,98 @@ SELECT date
         if time_max == 0 {
             return Ok(Vec::new());
         }
-        let pool = CLIENT_RO.clone();
+
+        let pool = CLIENT.clone();
+        let mut tx = pool.begin().await?;
+        let lock_key = "file_list_deleted:query_deleted";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_id = if lock_id > (i64::MAX as u64) {
+            (lock_id >> 1) as i64
+        } else {
+            lock_id as i64
+        };
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
+        DB_QUERY_NUMS.with_label_values(&["get_lock", "", ""]).inc();
+        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback query_deleted error: {}", e);
+            }
+            return Err(e.into());
+        }
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
-        let ret = sqlx
-            ::query_as::<_, super::FileDeletedRecord>(
-                r#"SELECT account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#
-            )
-            .bind(org_id)
-            .bind(time_max)
-            .bind(limit)
-            .fetch_all(&pool).await?;
-        Ok(ret
-            .iter()
-            .map(|r| FileListDeleted {
-                account: r.account.to_string(),
-                file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                index_file: r.index_file,
-                flattened: r.flattened,
-            })
-            .collect())
+        let items: Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
+        )
+        .bind(org_id)
+        .bind(time_max)
+        .bind(limit)
+        .fetch_all(&mut *tx)
+        .await {
+            Ok(v) => v
+                .iter()
+                .map(|r| FileListDeleted {
+                    id: r.id,
+                    account: r.account.to_string(),
+                    file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    index_file: r.index_file,
+                    flattened: r.flattened,
+                })
+                .collect(),
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!(
+                        "[POSTGRES] rollback select query_deleted for update error: {e}"
+                    );
+                }
+                return Err(e.into());
+            }
+        };
+
+        // update file created_at to NOW to avoid these files being deleted again
+        let ids = items.iter().map(|r| r.id.to_string()).collect::<Vec<_>>();
+        if ids.is_empty() {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback select query_deleted error: {e}");
+            }
+            return Ok(Vec::new());
+        }
+        let sql = format!(
+            "UPDATE file_list_deleted SET created_at = $1 WHERE id IN ({});",
+            ids.join(",")
+        );
+        let now = config::utils::time::now_micros();
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "file_list_deleted", ""])
+            .inc();
+        let ret = match sqlx::query(&sql).bind(now).execute(&mut *tx).await {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback update query_deleted status error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
+        if ret.rows_affected() != ids.len() as u64 {
+            log::warn!(
+                "[POSTGRES] update query_deleted error: query_deleted rows affected: {}, expected: {}, try again later",
+                ret.rows_affected(),
+                ids.len()
+            );
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback update query_deleted status error: {e}");
+            }
+            return Ok(Vec::new());
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit select query_deleted error: {e}");
+            return Err(e.into());
+        }
+        Ok(items)
     }
 
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
@@ -722,13 +802,14 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted", ""])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
         Ok(ret
             .iter()
             .map(|r| FileListDeleted {
+                id: r.id,
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
@@ -808,25 +889,26 @@ SELECT date
         } else {
             ("org", org_id.to_string())
         };
+        let file_list_stream = format!("{org_id}/file_list/");
         let mut sql = format!(
             r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
     SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
     FROM file_list 
-    WHERE {field} = '{value}'
+    WHERE {field} = '{value}' AND stream NOT LIKE '{file_list_stream}%'
             "#
         );
         if deleted {
-            sql = format!("{} AND deleted IS TRUE", sql);
+            sql = format!("{sql} AND deleted IS TRUE");
         }
         let sql = match pk_value {
-            None => format!("{} GROUP BY stream", sql),
-            Some((0, 0)) => format!("{} GROUP BY stream", sql),
+            None => format!("{sql} GROUP BY stream"),
+            Some((0, 0)) => format!("{sql} GROUP BY stream"),
             Some((min, max)) => {
                 if deleted {
-                    format!("{} AND id <= {} GROUP BY stream", sql, max)
+                    format!("{sql} AND id <= {max} GROUP BY stream")
                 } else {
-                    format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                    format!("{sql} AND id > {min} AND id <= {max} GROUP BY stream")
                 }
             }
         };
@@ -863,7 +945,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
                 stream_name.unwrap()
             )
         } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{}';", org_id)
+            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
         };
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -885,8 +967,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
         stream_name: &str,
     ) -> Result<()> {
         let sql = format!(
-            "DELETE FROM stream_stats WHERE stream = '{}/{}/{}';",
-            org_id, stream_type, stream_name
+            "DELETE FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';"
         );
         let pool = CLIENT.clone();
         DB_QUERY_NUMS

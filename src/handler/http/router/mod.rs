@@ -227,13 +227,11 @@ async fn proxy(
         .request(method, &path.target_url)
         .send()
         .await
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Request failed: {}", e))
-        })?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Request failed: {e}")))?;
 
     let status = forwarded_resp.status().as_u16();
     let body = forwarded_resp.bytes().await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
+        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {e}"))
     })?;
 
     Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap()).body(body))
@@ -436,7 +434,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(promql::label_values)
         .service(promql::format_query_get)
         .service(promql::format_query_post)
-        .service(enrichment_table::save_enrichment_table)
         .service(search::search)
         .service(search::search_partition)
         .service(search::around_v1)
@@ -524,13 +521,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(syslog::update_route)
         .service(syslog::toggle_state)
         .service(enrichment_table::save_enrichment_table)
-        .service(metrics::ingest::otlp_metrics_write)
-        .service(logs::ingest::otlp_logs_write)
-        .service(traces::otlp_traces_write)
-        .service(dashboards::move_dashboard)
-        .service(traces::get_latest_traces)
-        .service(logs::ingest::multi)
-        .service(logs::ingest::json)
         .service(logs::ingest::handle_kinesis_request)
         .service(logs::ingest::handle_gcp_request)
         .service(organization::org::create_org)
@@ -549,7 +539,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(authz::fga::get_groups_for_user)
         .service(authz::fga::delete_role)
         .service(authz::fga::delete_group)
-        .service(users::list_roles)
         .service(clusters::list_clusters)
         .service(pipeline::save_pipeline)
         .service(pipeline::update_pipeline)
@@ -665,14 +654,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_proxy_routes() {
-        let mut app =
+        let app =
             init_service(App::new().configure(|cfg| get_proxy_routes_inner(cfg, false))).await;
 
         // Test GET request to /proxy/{org_id}/{target_url}
         let req = TestRequest::get()
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
-        let resp = call_service(&mut app, req).await;
+        let resp = call_service(&app, req).await;
         assert_eq!(resp.status().as_u16(), 404);
     }
 }

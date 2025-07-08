@@ -186,7 +186,7 @@ pub(crate) async fn create_context(
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {cache_type:?} in background,")
     };
     log::info!(
         "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
@@ -227,7 +227,7 @@ pub(crate) async fn create_context(
     let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
     if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
-            filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
+            filter_file_list_by_tantivy_index(query.clone(), &mut files, Some(index_condition), None)
                 .await
                 .map_err(|e| {
                     log::error!(
@@ -257,6 +257,7 @@ pub(crate) async fn create_context(
         true,
     )
     .await?;
+
     Ok(Some((ctx, schema, scan_stats)))
 }
 

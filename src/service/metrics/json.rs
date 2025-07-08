@@ -19,7 +19,6 @@ use actix_web::{http, web};
 use anyhow::{Result, anyhow};
 use config::{
     TIMESTAMP_COL_NAME,
-    cluster::LOCAL_NODE,
     meta::{
         alerts::alert::Alert,
         promql::{HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
@@ -47,7 +46,10 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+        ingestion::{
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_write_partition_key,
+            write_file,
+        },
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
         self_reporting::report_request_usage_stats,
@@ -55,30 +57,18 @@ use crate::{
 };
 
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
-    let start = std::time::Instant::now();
-    let started_at = now_micros();
-
-    if !LOCAL_NODE.is_ingester() {
-        return Err(anyhow::anyhow!("not an ingester"));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Err(anyhow::anyhow!(
-            "Quota exceeded for this organization [{}]",
-            org_id
-        ));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
+        log::error!("Metrics ingestion error: {e}");
         return Ok(IngestionResponse {
             code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
             status: vec![],
             error: Some(e.to_string()),
         });
     }
+
+    let start = std::time::Instant::now();
+    let started_at = now_micros();
 
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
@@ -218,8 +208,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             {
                 Err(e) => {
                     let err_msg = format!(
-                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
-                        stream_name, e,
+                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
                     );
                     log::error!("{err_msg}");
                     // update status
@@ -427,14 +416,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert
+                        if let Ok(Some(data)) = alert
                             .evaluate(Some(record), (None, alert_end_time), None)
                             .await
+                            .map(|res| res.data)
                         {
-                            Ok(res) if res.data.is_some() => {
-                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
-                            }
-                            _ => {}
+                            trigger_alerts.push((alert.clone(), data))
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));

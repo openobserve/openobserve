@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    io::{Error, ErrorKind},
+    io::Error,
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
@@ -23,7 +23,7 @@ use actix_web::{
     web::Query,
 };
 use config::meta::{
-    search::{SearchEventContext, SearchEventType},
+    search::{SearchEventContext, SearchEventType, default_use_cache},
     stream::StreamType,
 };
 use hashbrown::{HashMap, HashSet};
@@ -52,8 +52,7 @@ pub(crate) fn get_search_type_from_request(
         Some(s) => match SearchEventType::try_from(s.as_str()) {
             Ok(search_type) => Some(search_type),
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed",
                 ));
             }
@@ -88,6 +87,9 @@ pub(crate) fn get_search_event_context_from_request(
 
 #[inline(always)]
 pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>) -> bool {
+    if !default_use_cache() {
+        return false;
+    }
     let Some(v) = query.get("use_cache") else {
         return true;
     };

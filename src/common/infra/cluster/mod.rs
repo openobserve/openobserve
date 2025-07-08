@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::min,
     collections::HashMap,
     ops::Bound,
     sync::{Arc, atomic::Ordering},
@@ -187,7 +186,9 @@ pub async fn register_and_keep_alive() -> Result<()> {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
-        let node = load_local_node();
+        let mut node = load_local_node();
+        node.status = NodeStatus::Online;
+        node.scheduled = true;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
@@ -203,12 +204,11 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     // check node heatbeat
     tokio::task::spawn(async move {
-        let cfg = get_config();
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
-        let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
@@ -374,10 +374,10 @@ async fn watch_node_list() -> Result<()> {
                 log::info!("[CLUSTER] join {:?}", item_value);
                 item_value.broadcasted = true;
                 // check if the same node is already in the cluster
-                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
-                    if node.uuid.ne(&item_value.uuid) {
-                        NODES.write().await.remove(&node.uuid);
-                    }
+                if let Some(node) = get_cached_node_by_name(&item_value.name).await
+                    && node.uuid.ne(&item_value.uuid)
+                {
+                    NODES.write().await.remove(&node.uuid);
                 }
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(

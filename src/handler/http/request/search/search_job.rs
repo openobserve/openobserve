@@ -119,10 +119,13 @@ pub async fn submit_job(
             return Ok(MetaHttpResponse::bad_request(e));
         }
 
-        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-        if use_cache {
-            req.use_cache = Some(use_cache);
-        }
+        if let Ok(sql) =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
+        {
+            req.query.sql = sql;
+        };
+
+        req.use_cache = get_use_cache_from_request(&query);
 
         // update timeout
         if req.timeout == 0 {
@@ -433,10 +436,9 @@ pub async fn get_job_result(
             return Ok(res);
         }
 
-        if model.error_message.is_some() {
+        if let Some(msg) = model.error_message {
             Ok(MetaHttpResponse::ok(format!(
-                "job_id: {job_id} error: {}",
-                model.error_message.unwrap()
+                "job_id: {job_id} error: {msg}",
             )))
         } else if model.status == 1 && model.partition_num != Some(1) {
             let response = get_partition_result(&model, from, size).await;
@@ -446,8 +448,8 @@ pub async fn get_job_result(
                 "[Job_Id: {job_id}] don't have result_path or cluster"
             )))
         } else {
-            let path = model.result_path.clone().unwrap();
-            let cluster = model.cluster.clone().unwrap();
+            let path = model.result_path.unwrap();
+            let cluster = model.cluster.unwrap();
             let response = get_result(&path, &cluster, from, size).await;
             if let Err(e) = response {
                 return Ok(MetaHttpResponse::internal_error(e));
@@ -641,10 +643,10 @@ async fn cancel_job_inner(
 
     // 3. use job_id to make background_partition_job cancel
     let status = status.unwrap();
-    if status == 1 {
-        if let Err(e) = cancel_partition_job(job_id).await {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
+    if status == 1
+        && let Err(e) = cancel_partition_job(job_id).await
+    {
+        return Ok(MetaHttpResponse::bad_request(e));
     }
 
     // 4. use cancel query function to cancel the query

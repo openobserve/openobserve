@@ -101,8 +101,7 @@ fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
         Value::Vector(v) => v,
         _ => {
             return Err(DataFusionError::NotImplemented(format!(
-                "Invalid input for minute value: {:?}",
-                data
+                "Invalid input for minute value: {data:?}",
             )));
         }
     };
@@ -135,10 +134,7 @@ mod tests {
             let got = op.get_component_from_ts(timestamp_micros);
             assert!(
                 got == expected,
-                "operation type: {:?} expected {} got {}",
-                op,
-                expected,
-                got
+                "operation type: {op:?} expected {expected} got {got}"
             );
         }
     }

@@ -124,8 +124,7 @@ impl super::Db for PostgresDb {
             .with_label_values(&["select", "meta", ""])
             .inc();
         let query = format!(
-            "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
-            module, key1, key2
+            "SELECT value FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
         );
         let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
             Ok(v) => v,
@@ -229,7 +228,7 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
-        let lock_key = format!("get_for_update_{}", key);
+        let lock_key = format!("get_for_update_{key}");
         let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
         let lock_id = if lock_id > i64::MAX as u64 {
             (lock_id >> 1) as i64
@@ -429,27 +428,22 @@ impl super::Db for PostgresDb {
         let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
         let sql = if with_prefix {
             if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
+                format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
             } else if key2.is_empty() {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
-                    module, key1
-                )
+                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND (key2 = '{}' OR key2 LIKE '{}/%');"#,
-                    module, key1, key2, key2
+                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
                 )
             }
         } else {
             format!(
-                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
-                module, key1, key2
+                r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}';"#
             )
         };
 
         let sql = if let Some(start_dt) = start_dt {
-            sql.replace(';', &format!(" AND start_dt = {};", start_dt))
+            sql.replace(';', &format!(" AND start_dt = {start_dt};"))
         } else {
             sql
         };
@@ -467,15 +461,15 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -499,15 +493,15 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta ".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "meta", ""])
@@ -545,19 +539,16 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!(
-            "{} AND start_dt >= {} AND start_dt <= {}",
-            sql, min_dt, max_dt
-        );
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
+        sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -576,13 +567,13 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -679,9 +670,9 @@ async fn add_start_dt_column() -> Result<()> {
     .execute(&mut *tx)
     .await
     {
-        log::error!("[POSTGRES] Error in adding column start_dt: {}", e);
+        log::error!("[POSTGRES] Error in adding column start_dt: {e}");
         if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+            log::error!("[POSTGRES] Error in rolling back transaction: {e}");
         }
         return Err(e.into());
     }
@@ -712,18 +703,12 @@ async fn create_meta_backup() -> Result<()> {
             .await
     {
         if let Err(e) = tx.rollback().await {
-            log::error!(
-                "[POSTGRES] rollback create table meta_backup_20240330 error: {}",
-                e
-            );
+            log::error!("[POSTGRES] rollback create table meta_backup_20240330 error: {e}");
         }
         return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
-        log::error!(
-            "[POSTGRES] commit create table meta_backup_20240330 error: {}",
-            e
-        );
+        log::error!("[POSTGRES] commit create table meta_backup_20240330 error: {e}");
         return Err(e.into());
     }
     Ok(())
@@ -774,8 +759,8 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     }) {
         return Ok(());
     }
-    log::info!("[POSTGRES] deleting index {} on table {}", idx_name, table);
-    let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
+    log::info!("[POSTGRES] deleting index {idx_name} on table {table}");
+    let sql = format!("DROP INDEX IF EXISTS {idx_name};");
     DB_QUERY_NUMS.with_label_values(&["drop", table, ""]).inc();
     let start = std::time::Instant::now();
     sqlx::query(&sql).execute(&client).await?;
@@ -783,6 +768,6 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     DB_QUERY_TIME
         .with_label_values(&["drop_index", table])
         .observe(time);
-    log::info!("[POSTGRES] index {} deleted successfully", idx_name);
+    log::info!("[POSTGRES] index {idx_name} deleted successfully");
     Ok(())
 }

@@ -5,35 +5,66 @@
       <div class="chat-header" :style="{ height:  headerHeight ? headerHeight + 'px' : '' }">
         <div class="chat-title tw-flex tw-justify-between tw-items-center tw-w-full">
 
-          <div >
-            <q-avatar size="24px" class="q-mr-sm">
+          <div class="tw-flex tw-items-center tw-gap-2">
+            <q-avatar size="24px">
               <img :src="o2AiTitleLogo" />
             </q-avatar>
-            <span>O2 AI</span>
+            <div class="tw-flex tw-items-center">
+              <span class="tw-mr-[5.5px]">O2 AI
+              </span>
+              <span class="o2-ai-beta-text"
+              >Beta</span>
+            </div>
+
           </div>
 
           <div>
             <q-btn flat round dense icon="add" @click="addNewChat" />
             <q-btn flat round dense icon="history" @click="loadHistory">
               <q-menu>
-                <q-list style="min-width: 200px; max-width: 300px; border: 1px solid var(--q-separator-color);" padding>
-                  <q-item
-                    v-for="chat in chatHistory"
-                    :key="chat.id"
-                    clickable
-                    v-ripple
-                    v-close-popup
-                    @click="loadChat(chat.id)"
-                    dense
-                  >
-                    <q-item-section>
-                      <div class="row items-center justify-between">
-                        <div class="col-8 ellipsis">{{ chat.title }}</div>
-                        <div class="col-4 text-right text-grey-7 text-caption">{{ formatTime(chat.timestamp) }}</div>
-                      </div>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
+                <!-- here we will show the history menu -->
+                 <!-- and also the search functionality to search the history  -->
+                <div class="history-menu-container">
+                  <div class="search-history-bar-sticky">
+                    <q-input
+                      v-model="historySearchTerm"
+                      placeholder="Search chat history"
+                      dense
+                    filled
+                    borderless
+                      class="tw-mb-2"
+                    >
+                    <template #prepend>
+                    <q-icon name="search" />
+                  </template>
+                    </q-input>
+                  </div>
+                  <div class="history-list-container">
+                    <q-list style="min-width: 200px; width: 300px; max-width: 300px; border: 1px solid var(--q-separator-color);" padding>
+                      <q-item
+                        v-for="chat in filteredChatHistory"
+                        :key="chat.id"
+                        clickable
+                        v-ripple
+                        v-close-popup
+                        @click="loadChat(chat.id)"
+                        dense
+                      >
+                        <q-item-section>
+                          <div class="row items-center justify-between">
+                            <div class="col-8 ellipsis">{{ chat.title }}</div>
+                            <div class="col-4 text-right text-grey-7 text-caption">{{ formatTime(chat.timestamp) }}</div>
+                          </div>
+                        </q-item-section>
+                      </q-item>
+                      <q-item v-if="filteredChatHistory.length === 0">
+                        <q-item-section class="text-center text-grey">
+                          No matching chats found
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </div>
+                </div>
               </q-menu>
             </q-btn>
             <q-btn flat round dense icon="close" @click="$emit('close')" />
@@ -216,12 +247,12 @@ import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL } from '@/utils/zincutils';
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface ChatHistoryEntry {
+export interface ChatHistoryEntry {
   id: number;
   timestamp: string;
   title: string;
@@ -299,11 +330,16 @@ export default defineComponent({
     headerHeight: {
       type: Number,
       default: 0,
+    },
+    //this will be used to set the input message if the user sends the data from any page by clicking on the ai chat button
+    aiChatInputContext: {
+      type: String,
+      default: ''
     }
   },
   setup(props) {
     const $q = useQuasar();
-    const inputMessage = ref('');
+    const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : '');
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
@@ -318,6 +354,7 @@ export default defineComponent({
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
+    const historySearchTerm = ref('');
     
     const modelConfig: any = {
       openai: [
@@ -368,6 +405,12 @@ export default defineComponent({
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
       }
     };
+
+    watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
+      if(newAiChatInputContext) {
+        inputMessage.value = newAiChatInputContext;
+      }
+    });
 
 
     //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
@@ -546,28 +589,57 @@ export default defineComponent({
       }
     };
 
+    const MAX_HISTORY_ITEMS = 100;
+
     const loadHistory = async () => {
       try {
         const db = await initDB();
         const transaction = db.transaction(STORE_NAME, 'readonly');
         const store = transaction.objectStore(STORE_NAME);
         const request = store.index('timestamp').openCursor(null, 'prev');
-        
+        //one the promise is resolved we get the history here 
+        //this history length might be more than 100 so after resolving / finishing the indexDB call
+        // we do the filtering
         const history: any[] = [];
         
-        return new Promise((resolve, reject) => {
+        const loadResult = await new Promise((resolve, reject) => {
           request.onsuccess = (event: Event) => {
             const cursor = (event.target as IDBRequest).result as IDBCursorWithValue;
             if (cursor) {
               history.push(cursor.value);
               cursor.continue();
             } else {
-              chatHistory.value = history;
               resolve(history);
             }
           };
           request.onerror = () => reject(request.error);
         });
+
+        // If we have more than MAX_HISTORY_ITEMS, delete the oldest ones
+        //this will allows the user to see only top 100 chat histories and also delete the non required ones
+        //as we are not giving option to delete history manually we are doing this
+        //some times it takes time to delete the history from the indexDB so we only delete the history if user access the history menu
+        if (history.length > MAX_HISTORY_ITEMS) {
+          const itemsToDelete = history.slice(MAX_HISTORY_ITEMS);
+          const deleteTransaction = db.transaction(STORE_NAME, 'readwrite');
+          const deleteStore = deleteTransaction.objectStore(STORE_NAME);
+          
+          for (const item of itemsToDelete) {
+            deleteStore.delete(item.id);
+          }
+
+          // Wait for deletion transaction to complete
+          await new Promise((resolve, reject) => {
+            deleteTransaction.oncomplete = () => resolve(true);
+            deleteTransaction.onerror = () => reject(deleteTransaction.error);
+          });
+        }
+
+        //here we do assign the history to the actual chat history 
+        // Keep only the latest MAX_HISTORY_ITEMS
+        chatHistory.value = history.slice(0, MAX_HISTORY_ITEMS);
+        return chatHistory.value;
+
       } catch (error) {
         console.error('Error loading chat history:', error);
         return [];
@@ -884,6 +956,17 @@ export default defineComponent({
     const getGenerateAiIcon = computed(()=> {
       return getImageURL('images/common/ai_icon_dark.svg')
     })
+
+    const filteredChatHistory = computed(() => {
+      if (!historySearchTerm.value) {
+        return chatHistory.value;
+      }
+      const searchTerm = historySearchTerm.value.toLowerCase();
+      return chatHistory.value.filter(chat => 
+        chat.title.toLowerCase().includes(searchTerm)
+      );
+    });
+
     return {
       inputMessage,
       chatMessages,
@@ -917,7 +1000,9 @@ export default defineComponent({
       currentChatTimestamp,
       o2AiTitleLogo,
       getGenerateAiIcon,
-      saveHistoryLoading
+      saveHistoryLoading,
+      historySearchTerm,
+      filteredChatHistory,
     }
   }
 });
@@ -1196,5 +1281,39 @@ export default defineComponent({
     border: 1px solid #f3f3f3;
     padding: 0px 4px;
   }
+}
+  .o2-ai-beta-text {
+    position: relative;
+    color: var(--q-primary);
+    font-size: 8px;
+    padding: 0px 4px;
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid var(--q-primary);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    width: 34px;
+  }
+
+.history-menu-container {
+  position: relative;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-history-bar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--q-page-background);
+  padding: 8px;
+  border-bottom: 1px solid var(--q-separator-color);
+}
+
+.history-list-container {
+  flex: 1;
+  overflow-y: auto;
 }
 </style> 

@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
+          @hide="setTimeForVariables"
         />
         <q-btn
           class="q-ml-md text-bold"
@@ -209,12 +210,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <q-separator />
                       <VariablesValueSelector
+                        v-if="dateTimeForVariables ||
+                          (dashboardPanelData.meta.dateTime 
+                            && dashboardPanelData.meta.dateTime.start_time 
+                            && dashboardPanelData.meta.dateTime.end_time)"
                         :variablesConfig="currentDashboardData.data?.variables"
                         :showDynamicFilters="
                           currentDashboardData.data?.variables
                             ?.showDynamicFilters
                         "
-                        :selectedTimeDate="dashboardPanelData.meta.dateTime"
+                        :selectedTimeDate="
+                          dateTimeForVariables ||
+                          dashboardPanelData.meta.dateTime
+                        "
                         @variablesData="variablesDataUpdated"
                         :initialVariableValues="initialVariableValues"
                       />
@@ -757,6 +765,9 @@ export default defineComponent({
 
       removeAiContextHandler();
       // console.timeEnd("onUnmounted");
+
+      // Clear all refs to prevent memory leaks
+      dateTimePickerRef.value = null;
     });
 
     onMounted(async () => {
@@ -930,9 +941,31 @@ export default defineComponent({
       //check that is it addpanel initial call
       if (isInitialDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
+
+      const normalizeVariables = (obj: any) => {
+        const normalized = JSON.parse(JSON.stringify(obj));
+        // Sort arrays to ensure consistent ordering
+        if (normalized.values) {
+          normalized.values = normalized.values
+            .map((variable: any) => {
+              if (Array.isArray(variable.value)) {
+                variable.value.sort((a: any, b: any) =>
+                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
+                );
+              }
+              return variable;
+            })
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        }
+        return normalized;
+      };
+
+      const normalizedCurrent = normalizeVariables(variablesData);
+      const normalizedRefreshed = normalizeVariables(updatedVariablesData);
+
       return (
         !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(variablesData, updatedVariablesData)
+        !isEqual(normalizedCurrent, normalizedRefreshed)
       );
     });
 
@@ -949,7 +982,19 @@ export default defineComponent({
         // console.timeEnd("watch:dashboardPanelData.data.type");
       },
     );
+    const dateTimeForVariables = ref(null);
 
+    const setTimeForVariables = () => {
+      const date = dateTimePickerRef.value?.getConsumableDateTime();
+      const startTime = new Date(date.startTime);
+      const endTime = new Date(date.endTime);
+
+      // Update only the variables time object
+      dateTimeForVariables.value = {
+        start_time: startTime,
+        end_time: endTime,
+      };
+    };
     watch(selectedDate, () => {
       // console.time("watch:selectedDate");
       updateDateTime(selectedDate.value);
@@ -1041,6 +1086,10 @@ export default defineComponent({
           end_time: new Date(date.endTime),
         };
 
+        dateTimeForVariables.value = {
+          start_time: new Date(selectedDate.value.startTime),
+          end_time: new Date(selectedDate.value.endTime),
+        };
         router.replace({
           query: {
             ...route.query,
@@ -1679,6 +1728,8 @@ export default defineComponent({
       collapseFieldList,
       splitterModel,
       inputStyle,
+      setTimeForVariables,
+      dateTimeForVariables,
     };
   },
   methods: {

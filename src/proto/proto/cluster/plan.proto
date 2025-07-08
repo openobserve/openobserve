@@ -39,10 +39,11 @@ message QueryIdentifier {
 message SearchInfo {
     bytes                            plan = 1;
     repeated int64           file_id_list = 2;
-    repeated IdxFileName    idx_file_list = 3;
     int64                      start_time = 4;
     int64                        end_time = 5;
     int64                         timeout = 6;
+    bool                        use_cache = 7;
+    int64              histogram_interval = 8;
 }
 
 message IndexInfo {

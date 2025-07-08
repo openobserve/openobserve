@@ -18,7 +18,6 @@ use infra::errors::Result;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub mod alerts;
-pub mod circuit_breaker;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
@@ -46,6 +45,7 @@ pub mod promql;
 pub mod ratelimit;
 pub mod schema;
 pub mod search;
+pub mod tantivy;
 pub mod websocket_events;
 
 #[cfg(feature = "enterprise")]

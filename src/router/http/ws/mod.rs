@@ -67,7 +67,7 @@ use pool::QuerierConnectionPool;
 use session::SessionManager;
 
 mod connection;
-mod error;
+pub mod error;
 mod handler;
 mod pool;
 mod session;

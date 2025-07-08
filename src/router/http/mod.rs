@@ -162,13 +162,20 @@ async fn dispatch(
         .await
         .map_err(|e| {
             Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                format!("Failed to parse node list request: {:?}", e).as_str(),
+                format!("Failed to parse node list request: {e}").as_str(),
             )))
         });
     }
 
     let new_url = get_url(&path).await;
     if new_url.is_error {
+        log::error!(
+            "dispatch: {} to {}, get url details error: {:?}, took: {} ms",
+            new_url.path,
+            new_url.node_addr,
+            new_url.error,
+            start.elapsed().as_millis()
+        );
         return Ok(HttpResponse::ServiceUnavailable()
             .force_close()
             .body(new_url.error.unwrap_or("internal server error".to_string())));
@@ -357,7 +364,7 @@ async fn proxy_querier_by_body(
         }
         s if s.ends_with("/_values_stream") => {
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse values stream request data: {:?}", e);
+                log::error!("Failed to parse values stream request data: {e}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
                     "Failed to parse values stream request data",
                 )))
@@ -375,9 +382,9 @@ async fn proxy_querier_by_body(
             let request_type = if is_stream { "stream" } else { "search" };
 
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse {} request data: {:?}", request_type, e);
+                log::error!("Failed to parse {request_type} request data: {e:?}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                    format!("Failed to parse {} request data", request_type).as_str(),
+                    format!("Failed to parse {request_type} request data").as_str(),
                 )))
             })?;
             let Ok(query) = json::from_slice::<SearchRequest>(&body) else {
@@ -394,7 +401,7 @@ async fn proxy_querier_by_body(
         }
         s if s.ends_with("/_search_partition") => {
             let body = payload.to_bytes().await.map_err(|e| {
-                log::error!("Failed to parse search partition request data: {:?}", e);
+                log::error!("Failed to parse search partition request data: {e}");
                 Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
                     "Failed to parse search partition request data",
                 )))
@@ -413,6 +420,13 @@ async fn proxy_querier_by_body(
     // get node name by consistent hash
     let Some(node_name) = cluster::get_node_from_consistent_hash(&key, &Role::Querier, None).await
     else {
+        log::error!(
+            "dispatch: {} to {}, get node from consistent hash error: {:?}, took: {} ms",
+            new_url.path,
+            new_url.node_addr,
+            "No online querier nodes",
+            start.elapsed().as_millis()
+        );
         return Ok(HttpResponse::ServiceUnavailable()
             .force_close()
             .body("No online querier nodes"));
@@ -420,6 +434,13 @@ async fn proxy_querier_by_body(
 
     // get node by name
     let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
+        log::error!(
+            "dispatch: {} to {}, get node from cache error: {:?}, took: {} ms",
+            new_url.path,
+            new_url.node_addr,
+            "No online querier nodes",
+            start.elapsed().as_millis()
+        );
         return Ok(HttpResponse::ServiceUnavailable()
             .force_close()
             .body("No online querier nodes"));
@@ -615,6 +636,7 @@ mod tests {
         assert!(!is_querier_route("/api/clusters/_bulk"));
         assert!(!is_querier_route("/api/clusters/ws/_multi"));
         assert!(!is_querier_route("/api/default/config/_json"));
+        assert!(is_querier_route("/api/default/ai/chat_stream"));
     }
 
     #[test]

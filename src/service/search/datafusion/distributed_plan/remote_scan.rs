@@ -127,16 +127,12 @@ impl RemoteScanExec {
 }
 
 impl DisplayAs for RemoteScanExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(
-                    f,
-                    "RemoteScanExec: input_partitions=output_partitions={}",
-                    self.partitions,
-                )
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "RemoteScanExec: input_partitions=output_partitions={}",
+            self.partitions,
+        )
     }
 }
 
@@ -243,7 +239,7 @@ async fn get_remote_batch(
     request.search_info.timeout = timeout as i64;
 
     log::info!(
-        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}, idx_files: {}",
+        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}",
         trace_id,
         &node.get_grpc_addr(),
         search_type.unwrap_or(SearchEventType::UI),
@@ -251,7 +247,6 @@ async fn get_remote_batch(
         is_querier,
         timeout,
         request.search_info.file_id_list.len(),
-        request.search_info.idx_file_list.len(),
     );
 
     let request: cluster_rpc::FlightSearchRequest = request.into();
@@ -472,7 +467,7 @@ fn process_partial_err(partial_err: Arc<Mutex<String>>, e: tonic::Status) {
     if partial_err.is_empty() {
         guard.push_str(e.to_string().as_str());
     } else {
-        guard.push_str(format!(" \n {}", e).as_str());
+        guard.push_str(format!(" \n {e}").as_str());
     }
 }
 
@@ -652,10 +647,10 @@ impl Stream for FlightStream {
 impl Drop for FlightStream {
     fn drop(&mut self) {
         let cfg = config::get_config();
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            if let Err(e) = self.create_stream_end_span() {
-                log::error!("error creating stream span: {}", e);
-            }
+        if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
+            && let Err(e) = self.create_stream_end_span()
+        {
+            log::error!("error creating stream span: {e}");
         }
         log::info!(
             "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",

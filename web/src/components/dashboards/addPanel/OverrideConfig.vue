@@ -57,7 +57,7 @@ interface Column {
   format?: (val: unknown) => string;
 }
 
-interface OverrideConfig {
+export interface OverrideConfig {
   [key: string]: string;
 }
 

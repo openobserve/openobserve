@@ -26,15 +26,15 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
         .get(url)
         .send()
         .await
-        .or(Err(format!("Failed to GET from '{}'", &url)))?;
+        .or(Err(format!("Failed to GET from '{url}'")))?;
     let total_size = res
         .content_length()
-        .ok_or(format!("Failed to get content length from '{}'", &url))?;
+        .ok_or(format!("Failed to get content length from '{url}'"))?;
 
     // download chunks
     let mut file = File::create(path)
         .await
-        .or(Err(format!("Failed to create file '{}'", path)))?;
+        .or(Err(format!("Failed to create file '{path}'")))?;
     let mut downloaded: u64 = 0;
     let mut stream = res.bytes_stream();
 

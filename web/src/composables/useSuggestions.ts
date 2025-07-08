@@ -1,140 +1,149 @@
 import { ref, nextTick } from "vue";
 import { useStore } from "vuex";
 
-const defaultKeywords = [
-  {
-    label: "and",
-    kind: "Keyword",
-    insertText: "and ",
-  },
-  {
-    label: "or",
-    kind: "Keyword",
-    insertText: "or ",
-  },
-  {
-    label: "like",
-    kind: "Keyword",
-    insertText: "like '%${1:params}%' ",
-    insertTextRules: "InsertAsSnippet",
-  },
-  {
-    label: "in",
-    kind: "Keyword",
-    insertText: "in ('${1:params}') ",
-    insertTextRules: "InsertAsSnippet",
-  },
-  {
-    label: "not in",
-    kind: "Keyword",
-    insertText: "not in ('${1:params}') ",
-    insertTextRules: "InsertAsSnippet",
-  },
-  {
-    label: "between",
-    kind: "Keyword",
-    insertText: "between '${1:params}' and '${1:params}' ",
-    insertTextRules: "InsertAsSnippet",
-  },
-  {
-    label: "not between",
-    kind: "Keyword",
-    insertText: "not between '${1:params}' and '${1:params}' ",
-    insertTextRules: "InsertAsSnippet",
-  },
-  {
-    label: "is null",
-    kind: "Keyword",
-    insertText: "is null ",
-  },
-  {
-    label: "is not null",
-    kind: "Keyword",
-    insertText: "is not null ",
-  },
-  {
-    label: ">",
-    kind: "Operator",
-    insertText: "> ",
-  },
-  {
-    label: "<",
-    kind: "Operator",
-    insertText: "< ",
-  },
-  {
-    label: ">=",
-    kind: "Operator",
-    insertText: ">= ",
-  },
-  {
-    label: "<=",
-    kind: "Operator",
-    insertText: "<= ",
-  },
-  {
-    label: "<>",
-    kind: "Operator",
-    insertText: "<> ",
-  },
-  {
-    label: "=",
-    kind: "Operator",
-    insertText: "= ",
-  },
-  {
-    label: "!=",
-    kind: "Operator",
-    insertText: "!= ",
-  },
-  {
-    label: "()",
-    kind: "Keyword",
-    insertText: "(${1:condition}) ",
-    insertTextRules: "InsertAsSnippet",
-  },
-];
-const defaultSuggestions = [
-  {
-    label: (_keyword: string) => `match_all('${_keyword}')`,
-    kind: "Text",
-    insertText: (_keyword: string) => `match_all('${_keyword}')`,
-  },
-  {
-    label: (_keyword: string) => `re_match(fieldname: string, regular_expression: string)`,
-    kind: "Text",
-    insertText: (_keyword: string) => `re_match(fieldname, '')`,
-  },
-  {
-    label: (_keyword: string) => `re_not_match(fieldname: string, regular_expression: string)`,
-    kind: "Text",
-    insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
-  },
-  {
-    label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
-    kind: "Text",
-    insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
-  },
-  {
-    label: (_keyword: string) =>
-      `str_match_ignore_case(fieldname, '${_keyword}')`,
-    kind: "Text",
-    insertText: (_keyword: string) =>
-      `str_match_ignore_case(fieldname, '${_keyword}')`,
-  },
-  {
-    label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
-    kind: "Text",
-    insertText: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
-  },
-  {
-    label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
-    kind: "Text",
-    insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
-  },
-];
-
 const useSqlSuggestions = () => {
+  const defaultKeywords = [
+    {
+      label: "and",
+      kind: "Keyword",
+      insertText: "and ",
+    },
+    {
+      label: "or",
+      kind: "Keyword",
+      insertText: "or ",
+    },
+    {
+      label: "like",
+      kind: "Keyword",
+      insertText: "like '%${1:params}%' ",
+      insertTextRules: "InsertAsSnippet",
+    },
+    {
+      label: "in",
+      kind: "Keyword",
+      insertText: "in ('${1:params}') ",
+      insertTextRules: "InsertAsSnippet",
+    },
+    {
+      label: "not in",
+      kind: "Keyword",
+      insertText: "not in ('${1:params}') ",
+      insertTextRules: "InsertAsSnippet",
+    },
+    {
+      label: "between",
+      kind: "Keyword",
+      insertText: "between '${1:params}' and '${1:params}' ",
+      insertTextRules: "InsertAsSnippet",
+    },
+    {
+      label: "not between",
+      kind: "Keyword",
+      insertText: "not between '${1:params}' and '${1:params}' ",
+      insertTextRules: "InsertAsSnippet",
+    },
+    {
+      label: "is null",
+      kind: "Keyword",
+      insertText: "is null ",
+    },
+    {
+      label: "is not null",
+      kind: "Keyword",
+      insertText: "is not null ",
+    },
+    {
+      label: ">",
+      kind: "Operator",
+      insertText: "> ",
+    },
+    {
+      label: "<",
+      kind: "Operator",
+      insertText: "< ",
+    },
+    {
+      label: ">=",
+      kind: "Operator",
+      insertText: ">= ",
+    },
+    {
+      label: "<=",
+      kind: "Operator",
+      insertText: "<= ",
+    },
+    {
+      label: "<>",
+      kind: "Operator",
+      insertText: "<> ",
+    },
+    {
+      label: "=",
+      kind: "Operator",
+      insertText: "= ",
+    },
+    {
+      label: "!=",
+      kind: "Operator",
+      insertText: "!= ",
+    },
+    {
+      label: "()",
+      kind: "Keyword",
+      insertText: "(${1:condition}) ",
+      insertTextRules: "InsertAsSnippet",
+    },
+  ];
+  const defaultSuggestions = [
+    {
+      label: (_keyword: string) => `match_all('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `match_all('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `match_all_raw('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `match_all_raw('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `re_match(fieldname: string, regular_expression: string)`,
+      kind: "Text",
+      insertText: (_keyword: string) => `re_match(fieldname, '')`,
+    },
+    {
+      label: (_keyword: string) => `re_not_match(fieldname: string, regular_expression: string)`,
+      kind: "Text",
+      insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
+    },
+    {
+      label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) =>
+        `str_match_ignore_case(fieldname, '${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) =>
+        `str_match_ignore_case(fieldname, '${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
+      kind: "Text",
+      insertText: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
+    },
+    {
+      label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
+      kind: "Text",
+      insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
+    },
+  ];
   const autoCompleteData = ref({
     fieldValues: {} as any, // { kubernetes_host: new Set([value1, value2]) }
     query: "",

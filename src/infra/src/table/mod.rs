@@ -28,13 +28,13 @@ pub mod cipher;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
-#[allow(unused_imports)]
 pub mod entity;
 pub mod folders;
 mod migration;
 pub mod org_users;
 pub mod organizations;
 pub mod ratelimit;
+pub mod reports;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;

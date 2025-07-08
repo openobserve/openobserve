@@ -112,7 +112,7 @@ async function multistreamselect(page) {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click();
     await page.waitForTimeout(4000);
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines').click()
+    await page.locator('#fnEditor').getByRole('textbox').click()
 //   await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click({force:true});
     const cell = await page.getByRole('cell', { name: /Common Group Fields/ });
 
@@ -134,7 +134,7 @@ async function multistreamselect(page) {
 
   test("should add a function and display it in streams", async ({ page }) => {
 await multistreamselect(page);
-await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
+await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
 await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page

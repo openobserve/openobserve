@@ -40,14 +40,16 @@ use crate::service::search::{
 pub struct RewriteHistogram {
     start_time: i64,
     end_time: i64,
+    histogram_interval: i64,
 }
 
 impl RewriteHistogram {
     #[allow(missing_docs)]
-    pub fn new(start_time: i64, end_time: i64) -> Self {
+    pub fn new(start_time: i64, end_time: i64, histogram_interval: i64) -> Self {
         Self {
             start_time,
             end_time,
+            histogram_interval,
         }
     }
 }
@@ -75,7 +77,8 @@ impl OptimizerRule for RewriteHistogram {
             .iter()
             .any(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
         {
-            let mut expr_rewriter = HistogramToDatebin::new(self.start_time, self.end_time);
+            let mut expr_rewriter =
+                HistogramToDatebin::new(self.start_time, self.end_time, self.histogram_interval);
 
             let name_preserver = NamePreserver::new(&plan);
             plan.map_expressions(|expr| {
@@ -98,13 +101,15 @@ fn is_histogram(expr: &Expr) -> bool {
 pub struct HistogramToDatebin {
     start_time: i64,
     end_time: i64,
+    histogram_interval: i64,
 }
 
 impl HistogramToDatebin {
-    pub fn new(start_time: i64, end_time: i64) -> Self {
+    pub fn new(start_time: i64, end_time: i64, histogram_interval: i64) -> Self {
         Self {
             start_time,
             end_time,
+            histogram_interval,
         }
     }
 }
@@ -120,23 +125,18 @@ impl TreeNodeRewriter for HistogramToDatebin {
                     let new_func = Arc::new(ScalarUDF::from(DateBinFunc::new()));
                     // construct interval
                     let arg1 = if args.len() == 1 {
-                        let interval =
-                            generate_histogram_interval(Some((self.start_time, self.end_time)), 0);
+                        let interval = if self.histogram_interval > 0 {
+                            format!("{} second", self.histogram_interval)
+                        } else {
+                            generate_histogram_interval(Some((self.start_time, self.end_time)))
+                                .to_string()
+                        };
                         cast(
                             Expr::Literal(ScalarValue::from(interval)),
                             DataType::Interval(IntervalUnit::MonthDayNano),
                         )
                     } else if args.len() == 2 {
-                        if let Expr::Literal(ScalarValue::Int64(Some(num))) = &args[1] {
-                            let interval = generate_histogram_interval(
-                                Some((self.start_time, self.end_time)),
-                                *num as u16,
-                            );
-                            cast(
-                                Expr::Literal(ScalarValue::from(interval)),
-                                DataType::Interval(IntervalUnit::MonthDayNano),
-                            )
-                        } else if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
+                        if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
                             cast(
                                 args[1].clone(),
                                 DataType::Interval(IntervalUnit::MonthDayNano),
@@ -226,20 +226,6 @@ mod tests {
                     "+-------------------------------------------+",
                 ],
             ),
-            (
-                "select histogram(_timestamp, 5) from t",
-                vec![
-                    "+----------------------------------+",
-                    "| histogram(t._timestamp,Int64(5)) |",
-                    "+----------------------------------+",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "| 1970-01-01T00:00:00              |",
-                    "+----------------------------------+",
-                ],
-            ),
         ];
 
         // define a schema.
@@ -268,7 +254,7 @@ mod tests {
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
         ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
-        ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(0, 5)));
+        ctx.add_optimizer_rule(Arc::new(RewriteHistogram::new(0, 5, 0)));
 
         for item in sqls {
             let df = ctx.sql(item.0).await.unwrap();

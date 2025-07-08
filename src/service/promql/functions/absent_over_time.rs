@@ -28,3 +28,22 @@ fn exec(data: RangeValue) -> Option<f64> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_absent_over_time_function() {
+        // Test with empty matrix - should return 1.0
+        let empty_matrix = Value::Matrix(vec![]);
+        let result = absent_over_time(empty_matrix).unwrap();
+
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 0);
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

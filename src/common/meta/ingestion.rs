@@ -323,11 +323,12 @@ pub struct GCPIngestionResponse {
 pub enum IngestionRequest<'a> {
     JSON(&'a web::Bytes),
     Multi(&'a web::Bytes),
+    Hec(&'a Vec<json::Value>),
+    Loki(&'a Vec<json::Value>),
     GCP(&'a GCPIngestionRequest),
     KinesisFH(&'a KinesisFHRequest),
     RUM(&'a web::Bytes),
     Usage(&'a web::Bytes),
-    Hec(&'a Vec<json::Value>),
 }
 
 pub enum IngestionData<'a> {
@@ -648,5 +649,48 @@ mod tests {
         assert_eq!(request.message.data, "test-data");
         assert_eq!(request.message.message_id, "test-id");
         assert_eq!(request.subscription, "test-subscription");
+    }
+
+    #[test]
+    fn test_ingestion_response_skip_empty_status_and_error() {
+        let response = IngestionResponse {
+            code: 200,
+            status: vec![],
+            error: None,
+        };
+        let serialized = serde_json::to_string(&response).unwrap();
+        assert!(!serialized.contains("status"));
+        assert!(!serialized.contains("error"));
+    }
+
+    #[test]
+    fn test_record_status_skip_empty_error() {
+        let status = RecordStatus {
+            successful: 1,
+            failed: 0,
+            error: "".to_string(),
+        };
+        let serialized = serde_json::to_string(&status).unwrap();
+        assert!(!serialized.contains("error"));
+    }
+
+    #[test]
+    fn test_hec_status_conversion() {
+        // Test all variants
+        let success: HecResponse = HecStatus::Success.into();
+        assert_eq!(success.text, "Success");
+        assert_eq!(success.code, 200);
+
+        let invalid_format: HecResponse = HecStatus::InvalidFormat.into();
+        assert_eq!(invalid_format.text, "Invalid data format");
+        assert_eq!(invalid_format.code, 400);
+
+        let invalid_index: HecResponse = HecStatus::InvalidIndex.into();
+        assert_eq!(invalid_index.text, "Incorrect index");
+        assert_eq!(invalid_index.code, 400);
+
+        let custom: HecResponse = HecStatus::Custom("Test error".to_string(), 418).into();
+        assert_eq!(custom.text, "Test error");
+        assert_eq!(custom.code, 418);
     }
 }

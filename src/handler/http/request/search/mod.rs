@@ -21,7 +21,8 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse, format_values_search_response},
+        search::{SearchEventType, SearchHistoryHitResponse, format_values_search_response,
+        default_use_cache},
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -229,11 +230,10 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
-
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
+        req.query.sql = sql;
+    };
+    req.use_cache = get_use_cache_from_request(&query);
 
     // set search event type
     if req.search_type.is_none() {
@@ -270,8 +270,7 @@ pub async fn search(
             {
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
                 range_error = format!(
-                    "Query duration is modified due to query range restriction of {} hours",
-                    max_query_range
+                    "Query duration is modified due to query range restriction of {max_query_range} hours"
                 );
             }
         }
@@ -351,6 +350,7 @@ pub async fn search(
         Some(user_id),
         &req,
         range_error,
+        false,
     )
     .instrument(http_span)
     .await;
@@ -713,7 +713,7 @@ pub async fn build_search_request_per_field(
         .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl| {
             if !vrl.trim().ends_with('.') {
-                format!("{} \n .", vrl)
+                format!("{vrl} \n .")
             } else {
                 vrl
             }
@@ -765,7 +765,7 @@ pub async fn build_search_request_per_field(
         sql: base64::decode_url(&req.sql).unwrap_or_default(), /* Will be populated per field in
                                                                 * the loop below */
         from: 0,
-        size: config::meta::sql::MAX_LIMIT,
+        size: req.size.unwrap_or(config::meta::sql::MAX_LIMIT),
         start_time,
         end_time,
         query_fn: query_fn.clone(),
@@ -778,7 +778,7 @@ pub async fn build_search_request_per_field(
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| query.sql.contains(&format!("{}(", fn_name)));
+                    .any(|fn_name| query.sql.contains(&format!("{fn_name}(")));
 
                 let Ok(sql) = crate::service::search::sql::Sql::new(
                     &(query.clone().into()),
@@ -794,7 +794,7 @@ pub async fn build_search_request_per_field(
                 let sql_where_from_query = if !sql.is_complex {
                     // pick up where clause from sql
                     match SearchService::sql::pickup_where(&query.sql, None) {
-                        Ok(Some(v)) => format!("WHERE {}", v),
+                        Ok(Some(v)) => format!("WHERE {v}"),
                         Ok(None) => "".to_string(),
                         Err(e) => {
                             return Err(Error::other(e));
@@ -830,12 +830,12 @@ pub async fn build_search_request_per_field(
                     return Err(Error::other("Invalid filter format"));
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                let sql_where = format!("WHERE {} IN ('{}')", columns[0], vals);
+                let sql_where = format!("WHERE {} IN ('{vals}')", columns[0]);
 
                 // Define the default_sql here
-                let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
+                let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
 
-                query.sql = format!("{} {}", default_sql, sql_where);
+                query.sql = format!("{default_sql} {sql_where}");
 
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
@@ -862,7 +862,7 @@ pub async fn build_search_request_per_field(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(req.use_cache),
+        use_cache: req.use_cache,
         local_mode: None,
     };
 
@@ -915,7 +915,6 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let cfg = get_config();
 
     let mut uses_fn = false;
     let field = match query.get("field") {
@@ -927,13 +926,13 @@ async fn values_v1(
         .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl_function| {
             if !vrl_function.trim().ends_with('.') {
-                format!("{} \n .", vrl_function)
+                format!("{vrl_function} \n .")
             } else {
                 vrl_function
             }
         });
 
-    let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
+    let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
@@ -945,10 +944,13 @@ async fn values_v1(
                     return Ok(MetaHttpResponse::bad_request("Invalid filter format"));
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                format!("{} WHERE {} IN ('{}')", default_sql, columns[0], vals)
+                format!("{default_sql} WHERE {} IN ('{vals}')", columns[0])
             }
         }
     };
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&query_sql) {
+        query_sql = sql;
+    }
 
     let keyword = match query.get("keyword") {
         None => "".to_string(),
@@ -962,14 +964,14 @@ async fn values_v1(
         }
     };
 
-    if let Some(v) = query.get("sql") {
-        if let Ok(sql) = base64::decode_url(v) {
-            uses_fn = functions::get_all_transform_keys(org_id)
-                .await
-                .iter()
-                .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-            query_sql = sql;
-        }
+    if let Some(v) = query.get("sql")
+        && let Ok(sql) = base64::decode_url(v)
+    {
+        uses_fn = functions::get_all_transform_keys(org_id)
+            .await
+            .iter()
+            .any(|fn_name| sql.contains(&format!("{fn_name}(")));
+        query_sql = sql;
     };
 
     // pick up where clause from sql
@@ -1057,14 +1059,11 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    req.use_cache = get_use_cache_from_request(query);
 
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
@@ -1074,7 +1073,7 @@ async fn values_v1(
     let sql_where = if where_str.is_empty() {
         "".to_string()
     } else {
-        format!("WHERE {}", where_str)
+        format!("WHERE {where_str}")
     };
 
     let http_span = http_span.clone();
@@ -1250,6 +1249,10 @@ pub async fn search_partition(
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
+        req.sql = sql;
+    }
+
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }

@@ -19,9 +19,7 @@ use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
-    cluster::LOCAL_NODE,
-    get_config,
+    DISTINCT_FIELDS, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         otlp::OtlpRequestType,
@@ -52,8 +50,10 @@ use crate::{
     handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
-        db, format_stream_name,
-        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
+        format_stream_name,
+        ingestion::{
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, grpc::get_val, write_file,
+        },
         logs::O2IngestJsonData,
         metadata::{
             MetadataItem, MetadataType,
@@ -94,7 +94,7 @@ pub async fn otlp_proto(
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid proto: {}", e),
+                format!("Invalid proto: {e}"),
             )));
         }
     };
@@ -129,7 +129,7 @@ pub async fn otlp_json(
             log::error!("[TRACES:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid json: {}", e),
+                format!("Invalid json: {e}"),
             )));
         }
     };
@@ -151,33 +151,9 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
-    let start = std::time::Instant::now();
-    let started_at = Utc::now().timestamp_micros();
-
-    if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                "not an ingester",
-            )));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN,
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        log::error!(
-            "[TRACES:OTLP] ingestion error while checking memtable size: {}",
-            e
-        );
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+        log::error!("[TRACES:OTLP] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                 http::StatusCode::SERVICE_UNAVAILABLE,
@@ -185,6 +161,9 @@ pub async fn handle_otlp_request(
             )),
         );
     }
+
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
 
     let cfg = get_config();
     let traces_stream_name = match in_stream_name {
@@ -267,7 +246,7 @@ pub async fn handle_otlp_request(
                 for span_att in span.attributes {
                     let mut key = span_att.key;
                     if BLOCK_FIELDS.contains(&key.as_str()) {
-                        key = format!("attr_{}", key);
+                        key = format!("attr_{key}");
                     }
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
@@ -459,7 +438,7 @@ pub async fn handle_otlp_request(
                     e
                 );
                 partial_success.rejected_spans += records_count as i64;
-                partial_success.error_message = format!("Pipeline batch execution error: {}", e);
+                partial_success.error_message = format!("Pipeline batch execution error: {e}");
             }
             Ok(pl_results) => {
                 log::debug!(
@@ -592,33 +571,9 @@ pub async fn ingest_json(
     req_type: OtlpRequestType,
     traces_stream_name: &str,
 ) -> Result<HttpResponse, Error> {
-    let start = std::time::Instant::now();
-    let started_at = Utc::now().timestamp_micros();
-
-    if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                "not an ingester",
-            )));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN,
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        log::error!(
-            "[TRACES:JSON] ingestion error while checking memtable size: {}",
-            e
-        );
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+        log::error!("[TRACES:JSON] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                 http::StatusCode::SERVICE_UNAVAILABLE,
@@ -626,6 +581,9 @@ pub async fn ingest_json(
             )),
         );
     }
+
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
 
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
@@ -928,31 +886,30 @@ async fn write_traces(
         }));
 
         // Start check for alert trigger
-        if let Some(alerts) = cur_stream_alerts {
-            if triggers.len() < alerts.len() {
-                let alert_end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Traces,
-                        stream_name,
-                        alert.get_unique_key()
-                    );
-                    // check if alert already evaluated
-                    if evaluated_alerts.contains(&key) {
-                        continue;
-                    }
-                    match alert
-                        .evaluate(Some(&record_val), (None, alert_end_time), None)
-                        .await
-                    {
-                        Ok(res) if res.data.is_some() => {
-                            triggers.push((alert.clone(), res.data.unwrap()));
-                            evaluated_alerts.insert(key);
-                        }
-                        _ => {}
-                    }
+        if let Some(alerts) = cur_stream_alerts
+            && triggers.len() < alerts.len()
+        {
+            let alert_end_time = now_micros();
+            for alert in alerts {
+                let key = format!(
+                    "{}/{}/{}/{}",
+                    org_id,
+                    StreamType::Traces,
+                    stream_name,
+                    alert.get_unique_key()
+                );
+                // check if alert already evaluated
+                if evaluated_alerts.contains(&key) {
+                    continue;
+                }
+
+                if let Ok(Some(data)) = alert
+                    .evaluate(Some(&record_val), (None, alert_end_time), None)
+                    .await
+                    .map(|res| res.data)
+                {
+                    triggers.push((alert.clone(), data));
+                    evaluated_alerts.insert(key);
                 }
             }
         }
@@ -990,21 +947,22 @@ async fn write_traces(
     .await
     .map_err(|e| {
         log::error!("Error while writing traces: {}", e);
-        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+        std::io::Error::other(e.to_string())
     })?;
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
+    if !distinct_values.is_empty()
+        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
+    {
+        log::error!("Error while writing distinct values: {}", e);
     }
 
     // send trace metadata
-    if !trace_index_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await {
-            log::error!("Error while writing trace_index values: {}", e);
-        }
+    if !trace_index_values.is_empty()
+        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
+    {
+        log::error!("Error while writing trace_index values: {}", e);
     }
 
     // only one trigger per request

@@ -19,7 +19,6 @@ use std::{
 };
 
 use actix_web::http;
-use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
@@ -28,9 +27,14 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+        time::parse_timestamp_micro_from_value,
+    },
 };
 use flate2::read::GzDecoder;
+use infra::errors::{Error, Result};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -75,7 +79,9 @@ pub async fn ingest(
     } else {
         format_stream_name(in_stream_name)
     };
-    check_ingestion_allowed(org_id, Some(&stream_name))?;
+
+    // check system resource
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name))?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
@@ -134,6 +140,16 @@ pub async fn ingest(
             UsageType::Multi,
             IngestionData::Multi(req),
         ),
+        IngestionRequest::Hec(logs) => (
+            "/api/org/ingest/logs/_hec",
+            UsageType::Hec,
+            IngestionData::JSON(logs),
+        ),
+        IngestionRequest::Loki(logs) => (
+            "/api/org/ingest/logs/_loki",
+            UsageType::Loki,
+            IngestionData::JSON(logs),
+        ),
         IngestionRequest::GCP(req) => (
             "/api/org/ingest/logs/_gcs",
             UsageType::GCPSubscription,
@@ -162,21 +178,17 @@ pub async fn ingest(
                 IngestionData::JSON(&json_req),
             )
         }
-        IngestionRequest::Hec(logs) => (
-            "/api/org/ingest/logs/_hec",
-            UsageType::Hec,
-            IngestionData::JSON(logs),
-        ),
     };
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
     for ret in data.iter() {
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {
-                log::error!("IngestionError: {:?}", e);
-                return Err(anyhow::anyhow!("Failed processing: {:?}", e));
+                log::error!("IngestionError: {e:?}");
+                return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
             }
         };
 
@@ -195,12 +207,12 @@ pub async fn ingest(
                 streams_need_original_map
                     .get(&stream_name)
                     .is_some_and(|v| *v)
-                    .then_some(item.to_string())
+                    .then(|| item.to_string())
             } else {
                 // 3. with pipeline, storing original as long as streams_need_original_set is not
                 //    empty
                 // because not sure the pipeline destinations
-                store_original_when_pipeline_exists.then_some(item.to_string())
+                store_original_when_pipeline_exists.then(|| item.to_string())
             }
         } else {
             None // `item` won't be flattened, no need to store original
@@ -211,6 +223,9 @@ pub async fn ingest(
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
+            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+            *_size += estimate_json_bytes(&item);
+
             // JSON Flattening
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
@@ -247,12 +262,9 @@ pub async fn ingest(
             if streams_need_original_map
                 .get(&stream_name)
                 .is_some_and(|v| *v)
-                && original_data.is_some()
+                && let Some(original_data) = original_data
             {
-                local_val.insert(
-                    ORIGINAL_DATA_COL_NAME.to_string(),
-                    original_data.unwrap().into(),
-                );
+                local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
                 let record_id = crate::service::ingestion::generate_record_id(
                     org_id,
                     &stream_name,
@@ -307,13 +319,10 @@ pub async fn ingest(
         {
             Err(e) => {
                 log::error!(
-                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                    org_id,
-                    stream_name,
-                    e
+                    "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}.",
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -361,6 +370,9 @@ pub async fn ingest(
                                 continue;
                             }
                         };
+
+                        // we calculate the size BEFORE applying uds
+                        let original_size = estimate_json_bytes(&res);
 
                         // get json object
                         let mut local_val = match res.take() {
@@ -428,6 +440,11 @@ pub async fn ingest(
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
 
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
+
                         tokio::task::coop::consume_budget().await;
                     }
                 }
@@ -460,6 +477,7 @@ pub async fn ingest(
             usage_type,
             &mut status,
             json_data_by_stream,
+            size_by_stream,
         )
         .await;
         stream_status.status = match status {
@@ -679,10 +697,10 @@ pub fn get_size_of_var_int_header(bytes: &[u8]) -> Option<usize> {
 
 fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Vec<json::Value>> {
     // If it's a protobuf, process it as an OpenTelemetry 1.0 metric
-    if let Some(header) = get_size_of_var_int_header(&data) {
-        if let Ok(a) = ExportMetricsServiceRequest::decode(&mut Cursor::new(&data[header..])) {
-            return construct_values_from_open_telemetry_v1_metric(a);
-        }
+    if let Some(header) = get_size_of_var_int_header(&data)
+        && let Ok(a) = ExportMetricsServiceRequest::decode(&mut Cursor::new(&data[header..]))
+    {
+        return construct_values_from_open_telemetry_v1_metric(a);
     }
 
     let mut events = vec![];
@@ -762,7 +780,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                         "CloudWatch metrics dimensions parsing failed"
                     ))?
                     .iter()
-                    .map(|(k, v)| format!("{}=[{}]", k, v))
+                    .map(|(k, v)| format!("{k}=[{v}]"))
                     .collect::<Vec<_>>()
                     .join(", ");
 
@@ -890,7 +908,7 @@ fn construct_values_from_open_telemetry_v1_metric(
                         }
                         .into_iter()
                         .filter_map(get_tuple_from_open_telemetry_key_value)
-                        .map(|(k, v)| format!("{}=[\"{}\"]", k, v))
+                        .map(|(k, v)| format!("{k}=[\"{v}\"]"))
                         .collect::<Vec<_>>()
                         .join(", ");
                         metric_value.insert("metric_dimensions".to_string(), string.into());

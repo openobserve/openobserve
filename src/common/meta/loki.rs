@@ -114,41 +114,37 @@ impl From<LokiError> for actix_web::HttpResponse {
     fn from(error: LokiError) -> Self {
         use actix_web::HttpResponse;
 
-        match error {
-            // Client errors (400)
-            LokiError::InvalidTimestamp { message } => HttpResponse::BadRequest()
+        if let LokiError::Ingestion { .. } = &error {
+            return HttpResponse::InternalServerError()
                 .content_type("text/plain")
-                .body(format!("invalid timestamp: {}", message)),
-            LokiError::InvalidLabels { message } => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body(format!("invalid labels: {}", message)),
-            LokiError::EmptyStream => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body("empty stream data"),
-            LokiError::UnsupportedContentType { content_type } => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body(format!("unsupported content type: {}", content_type)),
-            LokiError::UnsupportedContentEncoding { encoding } => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body(format!("unsupported content encoding: {}", encoding)),
-            LokiError::ProtobufDecode { source } => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body(format!("failed to decode protobuf: {}", source)),
-            LokiError::SnappyDecompression { source } => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body(format!("failed to decompress snappy: {}", source)),
-            LokiError::JsonParse { source } => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body(format!("failed to parse JSON: {}", source)),
-            LokiError::GzipDecompression { source } => HttpResponse::BadRequest()
-                .content_type("text/plain")
-                .body(format!("failed to decompress gzip: {}", source)),
-
-            // Server errors (500)
-            LokiError::Ingestion { .. } => HttpResponse::InternalServerError()
-                .content_type("text/plain")
-                .body("internal server error during log ingestion"),
+                .body("internal server error during log ingestion");
         }
+        let body = match error {
+            LokiError::InvalidTimestamp { message } => format!("invalid timestamp: {message}"),
+            LokiError::InvalidLabels { message } => format!("invalid labels: {message}"),
+            LokiError::EmptyStream => "empty stream data".to_string(),
+            LokiError::UnsupportedContentType { content_type } => {
+                format!("unsupported content type: {content_type}")
+            }
+            LokiError::UnsupportedContentEncoding { encoding } => {
+                format!("unsupported content encoding: {encoding}")
+            }
+            LokiError::ProtobufDecode { source } => {
+                format!("failed to decode protobuf: {source}")
+            }
+            LokiError::SnappyDecompression { source } => {
+                format!("failed to decompress snappy: {source}")
+            }
+            LokiError::JsonParse { source } => format!("failed to parse JSON: {source}"),
+            LokiError::GzipDecompression { source } => {
+                format!("failed to decompress gzip: {source}")
+            }
+            LokiError::Ingestion { .. } => unreachable!("Already tested above"),
+        };
+
+        HttpResponse::BadRequest()
+            .content_type("text/plain")
+            .body(body)
     }
 }
 
@@ -256,5 +252,32 @@ mod tests {
         assert_eq!(request.streams.len(), 1);
         assert_eq!(request.streams[0].values[0].line, "log message");
         assert!(request.streams[0].values[0].structured_metadata.is_some());
+    }
+    #[test]
+    fn test_loki_entry_default() {
+        let entry = LokiEntry::default();
+        assert_eq!(entry.timestamp, "");
+        assert_eq!(entry.line, "");
+        assert!(entry.structured_metadata.is_none());
+    }
+
+    #[test]
+    fn test_loki_stream_structure() {
+        let mut labels = HashMap::new();
+        labels.insert("service".to_string(), "api".to_string());
+
+        let entry = LokiEntry {
+            timestamp: "123".to_string(),
+            line: "log".to_string(),
+            structured_metadata: None,
+        };
+
+        let stream = LokiStream {
+            stream: labels.clone(),
+            values: vec![entry],
+        };
+
+        assert_eq!(stream.stream, labels);
+        assert_eq!(stream.values.len(), 1);
     }
 }

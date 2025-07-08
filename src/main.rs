@@ -43,7 +43,6 @@ use openobserve::{
         utils::zo_logger,
     },
     handler::{
-        self,
         grpc::{
             auth::check_auth,
             flight::FlightServiceImpl,
@@ -206,7 +205,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
     log::info!(
         "Caches info: Disk max size {}, MEM max size {}, Datafusion pool size: {}",
-        bytes_to_human_readable(cfg.disk_cache.max_size as f64),
+        bytes_to_human_readable((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as f64),
         bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
         bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
@@ -240,48 +239,48 @@ async fn main() -> Result<(), anyhow::Error> {
             // it must be initialized before the server starts
             if let Err(e) = cluster::register_and_keep_alive().await {
                 job_init_tx.send(false).ok();
-                panic!("cluster init failed: {}", e);
+                panic!("cluster init failed: {e}");
             }
             // init config
             if let Err(e) = config::init().await {
                 job_init_tx.send(false).ok();
-                panic!("config init failed: {}", e);
+                panic!("config init failed: {e}");
             }
 
             // db related inits
             if let Err(e) = migration::init_db().await {
                 job_init_tx.send(false).ok();
-                panic!("db init failed: {}", e);
+                panic!("db init failed: {e}");
             }
 
             // init infra
             if let Err(e) = infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("infra init failed: {}", e);
+                panic!("infra init failed: {e}");
             }
 
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("common infra init failed: {}", e);
+                panic!("common infra init failed: {e}");
             }
 
             // init enterprise
             #[cfg(feature = "enterprise")]
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
-                panic!("enterprise init failed: {}", e);
+                panic!("enterprise init failed: {e}");
             }
 
             // ingester init
             if let Err(e) = ingester::init().await {
                 job_init_tx.send(false).ok();
-                panic!("ingester init failed: {}", e);
+                panic!("ingester init failed: {e}");
             }
 
             // init job
             if let Err(e) = job::init().await {
                 job_init_tx.send(false).ok();
-                panic!("job init failed: {}", e);
+                panic!("job init failed: {e}");
             }
 
             // init meter provider
@@ -289,15 +288,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("meter provider init failed");
             };
-
-            // init websocket gc
-            if cfg.websocket.enabled {
-                log::info!("Initializing WebSocket session garbage collector");
-                if let Err(e) = handler::http::request::ws::init().await {
-                    job_init_tx.send(false).ok();
-                    panic!("websocket gc init failed: {}", e);
-                }
-            }
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
@@ -351,7 +341,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
             };
             if let Err(e) = ret {
-                log::error!("gRPC server init failed: {:?}", e);
+                log::error!("gRPC server init failed: {e}");
                 std::process::exit(1);
             }
         });
@@ -377,6 +367,24 @@ async fn main() -> Result<(), anyhow::Error> {
                 .send_track_event("OpenObserve - Starting server", None, true, false)
                 .await;
         });
+    }
+
+    // let node schedulable
+    let mut start_ok = false;
+    for _ in 0..10 {
+        match cluster::set_schedulable().await {
+            Ok(_) => {
+                start_ok = true;
+                break;
+            }
+            Err(e) => {
+                log::error!("set node schedulable failed: {}", e);
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+        }
+    }
+    if !start_ok {
+        return Err(anyhow::anyhow!("set node schedulable failed"));
     }
 
     // init http server
@@ -581,7 +589,7 @@ async fn init_common_grpc_server(
         })
         .await;
     if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{:?}", e));
+        return Err(anyhow::anyhow!("{e}"));
     }
 
     stopped_tx.send(()).ok();
@@ -637,7 +645,7 @@ async fn init_router_grpc_server(
         })
         .await;
     if let Err(e) = ret {
-        return Err(anyhow::anyhow!("{:?}", e));
+        return Err(anyhow::anyhow!("{e}"));
     }
 
     stopped_tx.send(()).ok();
@@ -692,10 +700,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
-                        .wrap(middlewares::SlowLog::new(
-                            cfg.limit.http_slow_log_threshold,
-                            cfg.limit.circuit_breaker_enabled,
-                        ))
+                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                         .wrap(from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
@@ -711,10 +716,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
-                    .wrap(middlewares::SlowLog::new(
-                        cfg.limit.http_slow_log_threshold,
-                        cfg.limit.circuit_breaker_enabled,
-                    ))
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                     .wrap(from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
@@ -812,10 +814,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
-                        .wrap(middlewares::SlowLog::new(
-                            cfg.limit.http_slow_log_threshold,
-                            cfg.limit.circuit_breaker_enabled,
-                        ))
+                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                         .wrap(from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
@@ -831,10 +830,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
-                    .wrap(middlewares::SlowLog::new(
-                        cfg.limit.http_slow_log_threshold,
-                        cfg.limit.circuit_breaker_enabled,
-                    ))
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                     .wrap(from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)

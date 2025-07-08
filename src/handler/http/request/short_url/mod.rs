@@ -72,7 +72,7 @@ pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<Http
             Ok(HttpResponse::Ok().json(response))
         }
         Err(e) => {
-            log::error!("Failed to shorten URL: {:?}", e);
+            log::error!("Failed to shorten URL: {e}");
             Ok(map_error_to_http_response(&e.into(), None))
         }
     }
@@ -117,13 +117,13 @@ pub async fn retrieve(
     let original_url = short_url::retrieve(&short_id).await;
 
     // Check if type=ui for JSON response
-    if let Some(ref type_param) = query.type_param {
-        if type_param == "ui" {
-            if let Some(url) = original_url {
-                return Ok(HttpResponse::Ok().json(url));
-            } else {
-                return Ok(HttpResponse::NotFound().finish());
-            }
+    if let Some(ref type_param) = query.type_param
+        && type_param == "ui"
+    {
+        if let Some(url) = original_url {
+            return Ok(HttpResponse::Ok().json(url));
+        } else {
+            return Ok(HttpResponse::NotFound().finish());
         }
     }
 

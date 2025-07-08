@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use actix_web::HttpResponse;
 use arrow::array::{Int64Array, RecordBatch};
@@ -29,8 +29,7 @@ use crate::service::users;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
-    Err(Error::new(
-        ErrorKind::Other,
+    Err(Error::other(
         "only 'type' query param with value 'logs' or 'metrics' allowed",
     ))
 }
@@ -218,8 +217,7 @@ mod tests {
 
         for &suffix in &suffix_nums {
             let new_suffix = increment_stream_file_num_v1(&format!(
-                "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_{}.json",
-                suffix
+                "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_{suffix}.json"
             ));
             assert_eq!(new_suffix as usize, suffix + 1);
         }

@@ -196,7 +196,7 @@ impl ObjectStore for Remote {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data = self
@@ -252,7 +252,7 @@ impl ObjectStore for Remote {
         result
     }
 
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.map(|p| p.as_ref());
         let prefix = format_key(key.unwrap_or(""), true);
         self.client.list(Some(&prefix.into()))
@@ -365,25 +365,25 @@ fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
         "aws" | "s3" => match init_aws_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("s3 init config error: {:?}", e);
+                panic!("s3 init config error: {e}");
             }
         },
         "azure" => match init_azure_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("azure init config error: {:?}", e);
+                panic!("azure init config error: {e}");
             }
         },
         "gcs" | "gcp" => match init_gcp_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("gcp init config error: {:?}", e);
+                panic!("gcp init config error: {e}");
             }
         },
         _ => match init_aws_config(config) {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("{} init config error: {:?}", provider, e);
+                panic!("{provider} init config error: {e:?}");
             }
         },
     }
@@ -400,7 +400,7 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
             object_store::Error::PermissionDenied { path: _, source }
                 if source.to_string().contains("ListBucket") => {}
             _ => {
-                return Err(anyhow::anyhow!("S3 download test failed: {:?}", e));
+                return Err(anyhow::anyhow!("S3 download test failed: {e}"));
             }
         },
     };
@@ -408,7 +408,7 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
     // Test upload
     let data = Bytes::from("Hello, OpenObserve!");
     if let Err(e) = super::put("", TEST_FILE, data).await {
-        return Err(anyhow::anyhow!("S3 upload test failed: {:?}", e));
+        return Err(anyhow::anyhow!("S3 upload test failed: {e}"));
     }
     Ok(())
 }

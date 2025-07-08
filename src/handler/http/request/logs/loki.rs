@@ -51,7 +51,7 @@ use crate::{
         (status = 500, description = "Internal Server Error - Server error during log processing", content_type = "text/plain", body = String),
     )
 )]
-#[post("/{org_id}/loki/v1/push")]
+#[post("/{org_id}/loki/api/v1/push")]
 pub async fn loki_push(
     thread_id: web::Data<usize>,
     org_id: web::Path<String>,
@@ -150,7 +150,7 @@ fn parse_protobuf_request(
         Some("snappy") | None => snap::raw::Decoder::new()
             .decompress_vec(&body)
             .map_err(|e| LokiError::UnsupportedContentEncoding {
-                encoding: format!("snappy decompression failed: {}", e),
+                encoding: format!("snappy decompression failed: {e}"),
             })?,
         Some("identity") => body.to_vec(),
         Some(encoding) => {
@@ -183,7 +183,7 @@ mod tests {
 
         // Test JSON routing
         let req = test::TestRequest::post()
-            .uri("/test_org/loki/v1/push")
+            .uri("/test_org/loki/api/v1/push")
             .insert_header(("content-type", "application/json"))
             .set_payload(create_valid_loki_json())
             .to_request();
@@ -192,7 +192,7 @@ mod tests {
 
         // Test invalid JSON
         let req = test::TestRequest::post()
-            .uri("/test_org/loki/v1/push")
+            .uri("/test_org/loki/api/v1/push")
             .insert_header(("content-type", "application/json"))
             .set_payload("invalid")
             .to_request();
@@ -201,7 +201,7 @@ mod tests {
 
         // Test unsupported content type
         let req = test::TestRequest::post()
-            .uri("/test_org/loki/v1/push")
+            .uri("/test_org/loki/api/v1/push")
             .insert_header(("content-type", "text/plain"))
             .set_payload("data")
             .to_request();

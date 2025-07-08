@@ -29,6 +29,8 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     Folders,
+    #[sea_orm(has_many = "super::report_dashboards::Entity")]
+    ReportDashboards,
     #[sea_orm(has_many = "super::timed_annotations::Entity")]
     TimedAnnotations,
 }
@@ -39,9 +41,24 @@ impl Related<super::folders::Entity> for Entity {
     }
 }
 
+impl Related<super::report_dashboards::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ReportDashboards.def()
+    }
+}
+
 impl Related<super::timed_annotations::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TimedAnnotations.def()
+    }
+}
+
+impl Related<super::reports::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::report_dashboards::Relation::Reports.def()
+    }
+    fn via() -> Option<RelationDef> {
+        Some(super::report_dashboards::Relation::Dashboards.def().rev())
     }
 }
 

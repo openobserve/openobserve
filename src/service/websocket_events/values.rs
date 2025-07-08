@@ -18,13 +18,14 @@ use config::meta::{
     search::{SearchEventType, ValuesEventContext},
     websocket::{SearchResultType, ValuesEventReq},
 };
+use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::utils::stream::get_max_query_range,
-    handler::http::request::{search::build_search_request_per_field, ws::session::send_message},
+    handler::http::request::{search::build_search_request_per_field, ws::session::send_message_2},
     service::{
         search::{cache, sql::Sql},
         setup_tracing_with_trace_id,
@@ -43,6 +44,7 @@ pub async fn handle_values_request(
     request_id: &str,
     req: ValuesEventReq,
     accumulated_results: &mut Vec<SearchResultType>,
+    response_tx: Sender<WsServerEvents>,
 ) -> Result<(), infra::errors::Error> {
     let mut start_timer = std::time::Instant::now();
 
@@ -78,10 +80,10 @@ pub async fn handle_values_request(
             let err_res = WsServerEvents::error_response(
                 &infra::errors::Error::Message(e),
                 Some(request_id.to_string()),
-                Some(trace_id),
+                Some(trace_id.clone()),
                 Default::default(),
             );
-            send_message(request_id, err_res.to_json()).await?;
+            send_message_2(request_id, err_res, response_tx.clone()).await?;
             return Ok(());
         }
     }
@@ -130,10 +132,8 @@ pub async fn handle_values_request(
             .unwrap_or_default();
 
         log::info!(
-            "[WS_VALUES] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
-            trace_id,
+            "[WS_VALUES] trace_id: {trace_id}, found cache responses len:{}, with hits: {cached_hits}, cache_start_time: {:#?}, cache_end_time: {:#?}",
             cached_resp.len(),
-            cached_hits,
             c_start_time,
             c_end_time
         );
@@ -186,11 +186,11 @@ pub async fn handle_values_request(
             .instrument(ws_values_span.clone())
             .await?;
         } else {
+
             // Step 2: Search without cache
             // no caches found process req directly
             log::info!(
-                "[WS_VALUES] trace_id: {} No cache found, processing search request",
-                trace_id
+                "[WS_VALUES] trace_id: {trace_id} No cache found, processing search request",
             );
             let max_query_range =
                 get_max_query_range(&[stream_name.clone()], org_id, user_id, stream_type).await; // hours
@@ -203,7 +203,7 @@ pub async fn handle_values_request(
                 search_type: search_req.search_type.unwrap_or(SearchEventType::Values),
                 search_event_context: None,
                 trace_id: trace_id.clone(),
-                use_cache: search_req.use_cache.unwrap_or(false),
+                use_cache: search_req.use_cache,
                 payload: search_req.clone(),
                 user_id: Some(user_id.to_string()),
                 time_offset: None,
@@ -222,6 +222,7 @@ pub async fn handle_values_request(
                 max_query_range,
                 &mut start_timer,
                 &order_by,
+                response_tx.clone(),
             )
             .instrument(ws_values_span.clone())
             .await?;
@@ -287,7 +288,7 @@ pub async fn handle_values_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(request_id, end_res.to_json()).await?;
+    send_message_2(request_id, end_res, response_tx).await?;
 
     Ok(())
 }
