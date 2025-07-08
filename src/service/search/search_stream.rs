@@ -555,9 +555,10 @@ pub async fn process_search_stream_request(
     }
 
     // Send a completion signal
-    if let Err(e) = sender
+    if sender
         .send(Ok(config::meta::search::StreamResponses::Done))
         .await
+        .is_err()
     {
         log::warn!(
             "[HTTP2_STREAM trace_id {}] Sender is closed, stopping process_search_stream_request",
