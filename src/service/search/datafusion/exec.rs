@@ -765,7 +765,7 @@ async fn get_cpu_and_mem_limit(
     };
 
     log::info!(
-        "[trace_id: {}] work_group: {:?}, target_partition: {}, memory_size: {}",
+        "[trace_id: {}] work_group: {:?}, target_partitions: {}, memory_size: {}",
         trace_id,
         work_group,
         target_partitions,
