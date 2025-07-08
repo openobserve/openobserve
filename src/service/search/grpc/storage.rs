@@ -641,6 +641,7 @@ pub async fn filter_file_list_by_tantivy_index(
 
     let mut no_more_files = false;
     let mut total_hits = 0;
+    let mut total_warm_up_time = 0;
     let group_num = index_parquet_files.len();
     let max_group_len = index_parquet_files
         .iter()
@@ -721,10 +722,11 @@ pub async fn filter_file_list_by_tantivy_index(
             }
         };
         for result in tasks {
-            let result: anyhow::Result<(String, Option<BitVec>, usize)> = result;
+            let result: anyhow::Result<(String, Option<BitVec>, usize, usize)> = result;
             // Each result corresponds to a file in the file list
             match result {
-                Ok((file_name, bitvec, hits_in_file)) => {
+                Ok((file_name, bitvec, hits_in_file, warm_up_time)) => {
+                    total_warm_up_time += warm_up_time;
                     total_hits += hits_in_file;
                     if file_name.is_empty() && bitvec.is_none() {
                         // no need inverted index for this file, need add filter back
@@ -788,12 +790,14 @@ pub async fn filter_file_list_by_tantivy_index(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} rows, is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} rows, is_add_filter_back: {}, file_num: {}, target_partitions: {}, warm_up_time: {} ms, took: {} ms",
                 query.trace_id,
                 index_condition,
                 total_hits,
                 is_add_filter_back,
                 file_list_map.len(),
+                target_partitions,
+                total_warm_up_time / 1000 / target_partitions,
                 search_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
@@ -840,7 +844,7 @@ async fn search_tantivy_index(
     index_condition: Option<IndexCondition>,
     idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
     parquet_file: &FileKey,
-) -> anyhow::Result<(String, Option<BitVec>, usize)> {
+) -> anyhow::Result<(String, Option<BitVec>, usize, usize)> {
     let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(&parquet_file.key)
     else {
         return Err(anyhow::anyhow!(
@@ -925,6 +929,7 @@ async fn search_tantivy_index(
         .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
         .collect::<Vec<_>>();
 
+    let warm_up_start = std::time::Instant::now();
     // warm up the terms in the query
     if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Puffin.to_string() {
         let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
@@ -936,6 +941,7 @@ async fn search_tantivy_index(
         });
         warm_up_terms(&tantivy_searcher, &warm_terms, need_all_term_fields).await?;
     }
+    let warm_up_time = warm_up_start.elapsed().as_micros() as usize;
 
     // search the index
     let file_in_range =
@@ -978,10 +984,10 @@ async fn search_tantivy_index(
     // return early if no matches in tantivy
     let (matched_docs, total_hits) = matched_docs;
     if total_hits > 0 {
-        return Ok((parquet_file.key.to_string(), None, total_hits));
+        return Ok((parquet_file.key.to_string(), None, total_hits, warm_up_time));
     }
     if matched_docs.is_empty() {
-        return Ok((parquet_file.key.to_string(), None, 0));
+        return Ok((parquet_file.key.to_string(), None, 0, warm_up_time));
     }
     // return early if the number of matched docs is too large
     if cfg.limit.inverted_index_skip_threshold > 0
@@ -997,7 +1003,7 @@ async fn search_tantivy_index(
             cfg.limit.inverted_index_skip_threshold,
             parquet_file.key
         );
-        return Ok(("".to_string(), None, 0));
+        return Ok(("".to_string(), None, 0, warm_up_time));
     }
 
     // Prepare a vec of segment offsets
@@ -1023,7 +1029,12 @@ async fn search_tantivy_index(
     for doc in matched_docs {
         res.set(doc.doc_id as usize, true);
     }
-    Ok((parquet_file.key.to_string(), Some(res), matched_num))
+    Ok((
+        parquet_file.key.to_string(),
+        Some(res),
+        matched_num,
+        warm_up_time,
+    ))
 }
 
 // Group files by time range
