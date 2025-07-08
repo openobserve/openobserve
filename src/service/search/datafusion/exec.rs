@@ -700,8 +700,7 @@ pub async fn create_parquet_table(
             }]]);
     }
 
-    let _schema_key = schema.hash_key();
-    let schema_key = "123456";
+    let schema_key = schema.hash_key();
     let prefix = if session.storage_type == StorageType::Memory {
         file_list::set(&session.id, &schema_key, files).await;
         format!("memory:///{}/schema={}/", session.id, schema_key)

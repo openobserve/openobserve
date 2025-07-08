@@ -336,7 +336,7 @@ impl Sql {
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
-                let fields = schema
+                let mut fields = schema
                     .schema()
                     .fields()
                     .iter()
@@ -348,13 +348,23 @@ impl Sql {
                         }
                     })
                     .collect::<Vec<_>>();
+                fields.sort_by(|a, b| a.name().cmp(b.name()));
                 let new_schema =
                     Schema::new(fields).with_metadata(schema.schema().metadata().clone());
                 final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
             }
             final_schemas
         } else {
-            used_schemas.clone()
+            let mut final_schemas = HashMap::with_capacity(used_schemas.len());
+            // sort the schema fields by name
+            for (stream, schema) in used_schemas.iter() {
+                let mut fields = schema.schema().fields().to_vec();
+                fields.sort_by(|a, b| a.name().cmp(b.name()));
+                let new_schema =
+                    Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+                final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
+            }
+            final_schemas
         };
 
         let is_complex = is_complex_query(&mut statement);
