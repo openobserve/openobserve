@@ -1,35 +1,7 @@
 import { expect } from "playwright/test";
 import logData from "../../cypress/fixtures/log.json";
 
-// fuction of Dashboard page and Apply query button
-// export const waitForDashboardPage = async function (page) {
-//   const dashboardListApi = page.waitForResponse(
-//     (response) =>
-//       /\/api\/.+\/dashboards/.test(response.url()) && response.status() === 200
-//   );
-
-//   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/dashboards**");
-
-//   // await page.waitForSelector(`text="Please wait while loading dashboards..."`, {
-//   //   state: "hidden",
-//   // });
-//   await dashboardListApi;
-//   await page.waitForTimeout(500);
-// };
-
-// export const waitForDashboardPage = async function (page) {
-//   // Wait for navigation first
-//   await page.waitForURL(/\/web\/dashboards.*/);
-
-//   // Wait for the dashboard list API call with a timeout
-//   await page.waitForResponse(
-//     (response) =>
-//       /\/api\/.*\/dashboards/.test(response.url()) && response.status() === 200,
-//     { timeout: 15000 } // 15 seconds, adjust as needed
-//   );
-
-//   await page.waitForTimeout(500);
-// };
+// Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
   // If already on the dashboard page, skip waiting for navigation
   if (!page.url().includes("/web/dashboards")) {
