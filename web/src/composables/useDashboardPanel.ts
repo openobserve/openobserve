@@ -3124,42 +3124,40 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     //     ]
     // }
     // based on extractedFields, we will set the custom query fields
-    // if timestamp is available, we will set it as x axis, else first groupBy field will go to x axis
-    // if groupBy is available, we will set it as breakdown
-    // if yAxisFields is available, we will set it as y axis
-    // if timestamp is not available, we will set the first groupBy field as x axis
+    // if timestamp is available and group by length is less than 2, then set timestamp as x axis and group by as breakdown and select line chart as default
+    // else select table chart as default
 
-    if (
-      extractedFields.timestamp &&
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x.length == 0
-    ) {
+    if (extractedFields.timestamp && extractedFields.groupBy.length < 2) {
+      // select line chart as default
+      dashboardPanelData.data.type = "line";
+
+      // add timestamp as x axis
       addXAxisItem({ name: extractedFields.timestamp });
-    }
-
-    // add first group by field as x axis if timestamp is not available
-    if (extractedFields.groupBy.length > 0) {
-      if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x.length == 0
-      ) {
-        addXAxisItem({ name: extractedFields.groupBy[0] });
-        // add second group by field as breakdown if available
-        if (extractedFields.groupBy.length > 1) {
-          addBreakDownAxisItem({ name: extractedFields.groupBy[1] });
-        }
-      } else {
-        // timestamp fields is available, add first group by field on breakdown
-        addBreakDownAxisItem({ name: extractedFields.groupBy[0] });
+      // here upto 1 group by will be available, add group by as breakdown
+      extractedFields.groupBy.forEach((field: any) => {
+        addBreakDownAxisItem({ name: field });
+      });
+      // add all y axis fields
+      extractedFields.yAxisFields.forEach((field: any) => {
+        addYAxisItem({ name: field });
+      });
+    } else {
+      // select table chart as default
+      dashboardPanelData.data.type = "table";
+      // add timestamp as x axis if available
+      if (extractedFields.timestamp) {
+        addXAxisItem({ name: extractedFields.timestamp });
       }
-    }
 
-    // add all y axis fields
-    extractedFields.yAxisFields.forEach((field: any) => {
-      addYAxisItem({ name: field });
-    });
+      // add all group by fields as x axis
+      extractedFields.groupBy.forEach((field: any) => {
+        addXAxisItem({ name: field });
+      });
+      // add all y axis fields
+      extractedFields.yAxisFields.forEach((field: any) => {
+        addYAxisItem({ name: field });
+      });
+    }
   };
 
   return {

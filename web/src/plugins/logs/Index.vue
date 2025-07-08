@@ -1554,9 +1554,6 @@ export default defineComponent({
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          // select chary type as line
-          dashboardPanelData.data.type = "line";
-
           // extract custom fields from query
           // identify x axis, y axis and breakdown fields
           // push on query fields
