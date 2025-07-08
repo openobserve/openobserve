@@ -18,13 +18,12 @@ use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Schema, Set, Unchanged,
 };
-use crate::table::entity::system_prompts::ActiveModel;
 
 use super::{entity::system_prompts::Model, get_lock};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{self, DbError, Error},
-    table::entity::system_prompts::{Column, Entity},
+    table::entity::system_prompts::{ActiveModel, Column, Entity},
 };
 
 impl TryFrom<Model> for SystemPrompt {
@@ -114,12 +113,9 @@ pub async fn remove(_org_id: &str, id: &str) -> Result<(), errors::Error> {
 
 pub async fn get(id: &str, _org_id: &str) -> Result<SystemPrompt, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find_by_id(id)
-        .one(client)
-        .await?
-        .ok_or_else(|| {
-            Error::DbError(DbError::SeaORMError("System Prompt not found".to_string()))
-        })?;
+    let record = Entity::find_by_id(id).one(client).await?.ok_or_else(|| {
+        Error::DbError(DbError::SeaORMError("System Prompt not found".to_string()))
+    })?;
 
     record.try_into()
 }
@@ -143,10 +139,7 @@ pub async fn list(_org_id: &str, limit: Option<i64>) -> Result<Vec<SystemPrompt>
 
 pub async fn contains(id: &str, _org_id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find()
-        .filter(Column::Id.eq(id))
-        .one(client)
-        .await?;
+    let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
     Ok(record.is_some())
 }

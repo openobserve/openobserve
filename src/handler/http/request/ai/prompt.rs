@@ -43,8 +43,6 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
     }
 }
 
-
-
 /// GetPrompt
 ///
 /// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"get"}#
@@ -140,7 +138,6 @@ pub async fn update_prompt(
         Err(err) => Ok(MetaHttpResponse::bad_request(err.to_string())),
     }
 }
-
 
 /// CreatePrompt
 ///
