@@ -678,11 +678,11 @@ pub async fn create_parquet_table(
         target_partitions
     );
 
-    let mut listing_options = if let Some(ctx) = ctx {
+    let mut listing_options = if let Some(ctx) = ctx
+        && cfg.common.liquid_cache_enabled
+    {
         ParquetReadOptions::default()
             .to_listing_options(&ctx.copied_config(), ctx.copied_table_options())
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true)
     } else {
         ListingOptions::new(Arc::new(ParquetFormat::default()))
     };
