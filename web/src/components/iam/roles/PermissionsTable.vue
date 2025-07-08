@@ -380,6 +380,9 @@ defineExpose({
 <style scoped></style>
 <style lang="scss">
 .iam-permissions-table {
+  th{
+    height: 48px !important;
+  }
   .q-table--bordered {
     border: none;
   }
