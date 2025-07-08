@@ -499,11 +499,13 @@ pub async fn run_datafusion(
         };
 
         // NOTE: temporary check
-        let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
+        let org_settings = crate::service::db::organization::get_org_setting(&org_id)
+            .await
+            .unwrap_or_default();
         let use_cache = use_cache && org_settings.aggregation_cache_enabled;
         let target_partitions = ctx.state().config().target_partitions();
 
-        let (plan,is_complete_cache_hit) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
+        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
             streaming_id,
             start_time,
             end_time,
@@ -520,6 +522,11 @@ pub async fn run_datafusion(
             // since the new plan after rewrite will have a `EmptyExec` for a complete cache
             // hit
             skip_empty_exec_visitor = true;
+        }
+
+        // no need to run datafusion, return empty result
+        if is_complete_cache_hit_with_no_data {
+            return Ok((vec![], ScanStats::default(), "".to_string()));
         }
     }
 
