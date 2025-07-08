@@ -163,7 +163,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
   layout: {
     splitter: 20,
     querySplitter: 41,
-    showQueryBar: false,
+    showQueryBar: true,
     isConfigPanelOpen: false,
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
