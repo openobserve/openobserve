@@ -347,7 +347,7 @@ test.describe("dashboard filter testcases", () => {
     await page.getByLabel("Value").fill("$variablename");
 
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
+    // await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
     await expect(page.getByText("'$variablename'").first()).toBeVisible();
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
@@ -596,7 +596,7 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
 
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
+    // await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
     await expect(page.getByText("'$variablename'").first()).toBeVisible();
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')

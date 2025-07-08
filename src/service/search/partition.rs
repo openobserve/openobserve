@@ -506,13 +506,8 @@ mod tests {
             let end_time = chrono::DateTime::from_timestamp_micros(end_time)
                 .unwrap()
                 .with_timezone(&chrono::Local);
-            println!("start: {}, end: {}", start_time, end_time);
-            println!(
-                "Partition {}: {} - {}",
-                i + 1,
-                partition_start,
-                partition_end,
-            );
+            println!("start: {start_time}, end: {end_time}");
+            println!("Partition {}: {partition_start} - {partition_end}", i + 1);
         }
 
         // Verify histogram alignment

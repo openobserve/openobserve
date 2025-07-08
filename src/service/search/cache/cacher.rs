@@ -62,16 +62,13 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
 
     let filtered_responses = responses
         .iter()
+        .filter(|meta| meta.response_end_time >= stream_min_ts)
         .cloned()
-        .filter_map(|mut meta| {
-            if meta.response_end_time >= stream_min_ts {
-                if meta.response_start_time < stream_min_ts {
-                    meta.response_start_time = stream_min_ts;
-                }
-                Some(meta) // Keep the entry after updating
-            } else {
-                None // Remove the entry
+        .map(|mut meta| {
+            if meta.response_start_time < stream_min_ts {
+                meta.response_start_time = stream_min_ts;
             }
+            meta
         })
         .collect();
 
@@ -726,10 +723,10 @@ fn handle_histogram(
             .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
             .collect::<Vec<&str>>();
 
-        attrs.get(1).map_or_else(
-            || generate_histogram_interval(q_time_range),
-            |v| v.to_string(),
-        )
+        attrs
+            .get(1)
+            .map_or_else(|| generate_histogram_interval(q_time_range), |v| *v)
+            .to_string()
     };
 
     *origin_sql = origin_sql.replace(
@@ -881,14 +878,13 @@ mod tests {
             query_end_time,
             histogram_interval,
         );
-        println!("Deltas: {:?}", deltas);
+        println!("Deltas: {deltas:?}");
 
         // All deltas should have start <= end
         for delta in &deltas {
             assert!(
                 delta.delta_start_time <= delta.delta_end_time,
-                "delta_start_time > delta_end_time: {:?}",
-                delta
+                "delta_start_time > delta_end_time: {delta:?}"
             );
         }
 

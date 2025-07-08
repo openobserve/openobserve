@@ -198,7 +198,7 @@ mod tests {
         let df = ctx.sql(sql).await.unwrap();
         df.clone().show().await.unwrap();
         df.schema().fields().iter().for_each(|f| {
-            println!("field: {:?}", f);
+            println!("field: {f:?}");
         });
         let result = df.collect().await.unwrap();
         let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();

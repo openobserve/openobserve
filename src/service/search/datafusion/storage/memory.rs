@@ -64,7 +64,6 @@ impl ObjectStore for FS {
         infra::cache::storage::head(&account, &location).await
     }
 
-    #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.unwrap().to_string();
         let objects = match super::file_list::get(&key) {

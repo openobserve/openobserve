@@ -208,6 +208,24 @@
             </q-tooltip>
           </q-icon>
         </template>
+        <template #right>
+          <q-btn
+            :ripple="false"
+            @click.prevent.stop="sendToAiChat(JSON.stringify(inputEvents))"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            size="6px"
+            class="tw-px-2 tw-mr-4 "
+            dense
+            style="border-radius: 100%;"
+          >
+            <div class="row items-center no-wrap">
+              <img height="16" width="16" :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
+          </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
@@ -318,7 +336,7 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import useQuery from "@/composables/useQuery";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { event, useQuasar } from "quasar";
@@ -337,7 +355,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["function-error"]);
+const emit = defineEmits(["function-error","sendToAiChat"]);
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -736,9 +754,20 @@ function highlightSpecificEvent() {
     console.log("Error in highlightSpecificEvent", e);
   }
 }
+const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    });
+
+const sendToAiChat = (value: any) => {
+  emit("sendToAiChat", value);
+};
 
 defineExpose({
   testFunction,
+  sendToAiChat,
+  getBtnLogo
 });
 </script>
 

@@ -176,7 +176,7 @@ impl DisplayAs for NewEmptyExec {
         };
 
         write!(f, "NewEmptyExec: ")?;
-        write!(f, "{name}{projection}{filters}{limit}{sorted_by_time}",)
+        write!(f, "{name}{projection}{filters}{limit}{sorted_by_time}")
     }
 }
 

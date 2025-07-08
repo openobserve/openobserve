@@ -99,11 +99,6 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-// TODO
-pub fn generate_invite_token() -> String {
-    "".to_string()
-}
-
 pub(crate) fn is_root_user(user_id: &str) -> bool {
     match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
@@ -1056,6 +1051,39 @@ mod tests {
     };
 
     #[test]
+    fn test_valid_emails() {
+        assert!(is_valid_email("user@example.com"));
+        assert!(is_valid_email("john.doe+123@mail.co.in"));
+        assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        assert!(!is_valid_email("no-at-symbol.com"));
+        assert!(!is_valid_email("@missing-user.com"));
+        assert!(!is_valid_email("user@.com"));
+        assert!(!is_valid_email("user@com"));
+        assert!(!is_valid_email("user@domain..com"));
+    }
+
+    #[test]
+    fn test_is_ofga_unsupported() {
+        assert!(is_ofga_unsupported("abc:123"));
+        assert!(is_ofga_unsupported("name with space"));
+        assert!(is_ofga_unsupported("foo&bar"));
+        assert!(!is_ofga_unsupported("valid_name"));
+        assert!(!is_ofga_unsupported("name_with_underscores"));
+    }
+
+    #[test]
+    fn test_into_ofga_supported_format() {
+        assert_eq!(into_ofga_supported_format("foo:bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo#bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo : bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format(" a  & b "), "_a_b_");
+        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a:b#c?d e"), "a_b_c_d_e");
+        assert_eq!(into_ofga_supported_format("foo & bar % baz"), "foo_bar_baz");
+    }
+
+    #[test]
     fn test_generate_presigned_url() {
         let password = "password";
         let salt = "saltsalt";
@@ -1128,14 +1156,13 @@ mod tests {
         let pass2 = get_hash(&format!("{}{}", &pass1, time), "openobserve");
         let exp_in = 600;
         let pass3 = get_hash(&format!("{}{}", &pass2, exp_in), "openobserve");
-        println!("time: {}", time);
-        println!("pass3: {}", pass3);
+        println!("time: {time}");
+        println!("pass3: {pass3}");
 
         let user_pass = format!("{}:{}", "b@b.com", pass3);
         let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
         println!(
-            "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
-            time, exp_in, auth
+            "http://localhost:5080/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
         );
     }
 }
