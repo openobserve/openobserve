@@ -422,6 +422,9 @@ export const usePanelDataLoader = (
         abortControllerRef.signal,
       );
 
+      if (shouldSkipSearchDueToEmptyVariables()) {
+        return;
+      }
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
         // Set partial data when partition API call is interrupted
@@ -882,7 +885,6 @@ export const usePanelDataLoader = (
         (v) =>
           v.value === null ||
           v.value === undefined ||
-          v.value === "" ||
           (Array.isArray(v.value) && v.value.length === 0),
       )
       .map((v) => v.name);
@@ -1477,7 +1479,9 @@ export const usePanelDataLoader = (
                   periodAsStr: "",
                 },
               };
-
+              if (shouldSkipSearchDueToEmptyVariables()) {
+                return;
+              }
               state.metadata.queries[panelQueryIndex] = metadata;
               const annotations = await refreshAnnotations(
                 Number(startISOTimestamp),
