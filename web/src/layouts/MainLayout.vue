@@ -692,14 +692,13 @@ export default defineComponent({
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const rowsPerPage = ref(10);
-    const filteredOrgOptions = ref([]);
     const searchQuery = ref('');
     
     const filteredOrganizations = computed(() => {
       if (!searchQuery.value) return orgOptions.value;
-      const needle = searchQuery.value.toLowerCase();
+      const toBeSearched = searchQuery.value.toLowerCase();
       return orgOptions.value.filter((org: any) => 
-        org.label?.toLowerCase().includes(needle)
+        org.label?.toLowerCase().includes(toBeSearched)
       );
     });
 
@@ -1368,13 +1367,6 @@ export default defineComponent({
         aiChatInputContext.value = value;
       });
     }
-    const filterOrganizations = (val: string, update: Function) => {
-      update(() => {
-        filteredOrgOptions.value = orgOptions.value.filter((option: any) => {
-          return option.label.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        });
-      });
-    }
     //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
     //to make sync with the user clicked org
     //we dont need search query after selectedOrg has been changed so resetting it
@@ -1383,11 +1375,6 @@ export default defineComponent({
       searchQuery.value = "";
     }, { immediate: true });
 
-
-    // Remove the watch for rowsNumber since we're not using pagination
-    // watch(() => filteredOrganizations.value, (newVal) => {
-    //   pagination.value.rowsNumber = newVal.length;
-    // }, { immediate: true });
 
 
     return {
@@ -1426,8 +1413,6 @@ export default defineComponent({
       removeFirstTimeLogin,
       sendToAiChat,
       aiChatInputContext,
-      filterOrganizations,
-      filteredOrgOptions,
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
