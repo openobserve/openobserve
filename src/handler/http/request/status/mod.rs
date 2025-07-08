@@ -506,7 +506,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
             Ok(_) => {
                 let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
-            // }
+            }
             Err(_) => {
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
