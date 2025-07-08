@@ -377,6 +377,7 @@ setup(props, {emit}) {
         if(props.isEdit){
             regexPatternInputs.value.name = props.data.name;
             regexPatternInputs.value.pattern = props.data.pattern;
+            regexPatternInputs.value.description = props.data.description ? props.data.description : "";
         }
         else{
             regexPatternInputs.value = {
