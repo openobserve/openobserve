@@ -114,13 +114,7 @@ export class LogsPage {
         this.searchFunctionInput = { placeholder: 'Search Function' };
     }
 
-    expandLabel(label) {
-        return `Expand "${label}"`;
-    }
 
-    collapseLabel(label) {
-        return `Collapse "${label}"`;
-    }
 
     // Reusable helper methods for code reuse
     async expectQueryEditorContainsTextHelper(text) {
@@ -400,7 +394,9 @@ export class LogsPage {
 
     async captureSearchCalls() {
         const searchCalls = [];
-        this.page.on('response', async response => {
+        
+        // Create the event listener function
+        const responseHandler = async response => {
             if (response.url().includes('/api/default/_search') && 
                 response.request().method() === 'POST') {
                 const requestData = await response.request().postDataJSON();
@@ -410,9 +406,18 @@ export class LogsPage {
                     sql: requestData.query.sql
                 });
             }
-        });
-        await this.page.waitForTimeout(2000);
-        return searchCalls;
+        };
+        
+        // Attach the event listener
+        this.page.on('response', responseHandler);
+        
+        try {
+            await this.page.waitForTimeout(2000);
+            return searchCalls;
+        } finally {
+            // Always remove the event listener to prevent memory leaks
+            this.page.removeListener('response', responseHandler);
+        }
     }
 
     async verifyStreamingModeResponse() {
@@ -432,12 +437,12 @@ export class LogsPage {
     // Explore and results methods
     async clickExplore() {
         try {
-            await this.exploreButton.first().waitFor({ state: 'visible', timeout: 10000 });
-            await this.exploreButton.first().waitFor({ state: 'attached', timeout: 10000 });
+            await this.page.locator(this.exploreButton).first().waitFor({ state: 'visible', timeout: 10000 });
+            await this.page.locator(this.exploreButton).first().waitFor({ state: 'attached', timeout: 10000 });
             
             await Promise.all([
                 this.page.waitForLoadState('networkidle'),
-                this.exploreButton.first().click()
+                this.page.locator(this.exploreButton).first().click()
             ]);
             
             await this.page.waitForTimeout(3000);
@@ -992,22 +997,6 @@ export class LogsPage {
         return await addButton.click({ force: true });
     }
 
-    async safeClickButton(selector, options = { force: true }) {
-        const button = this.page.locator(selector);
-        
-        // Wait for the button to be visible
-        await button.waitFor({ state: 'visible', timeout: 10000 });
-        
-        // Scroll the button into view if needed
-        await button.scrollIntoViewIfNeeded();
-        
-        // Wait a moment for the scroll to complete
-        await this.page.waitForTimeout(500);
-        
-        // Click the button
-        return await button.click(options);
-    }
-
     async clickAddStreamNameInput() {
         return await this.page.click(this.addStreamNameInput);
     }
@@ -1241,188 +1230,8 @@ export class LogsPage {
         return await this.expectQueryEditorContainsTextHelper("ziox-ingester-");
     }
 
-    async expectQueryEditorContainsKubernetesPodName() {
-        return await this.expectKubernetesPodContent('pod_name');
-    }
-
-    async expectQueryEditorContainsKubernetesPodId() {
-        return await this.expectKubernetesPodContent('pod_id');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester() {
-        return await this.expectKubernetesPodContent('pod_name', '0');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester() {
-        return await this.expectKubernetesPodContent('pod_id', '0');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester0() {
-        return await this.expectKubernetesPodContent('pod_name', '0');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester0() {
-        return await this.expectKubernetesPodContent('pod_id', '0');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester1() {
-        return await this.expectKubernetesPodContent('pod_name', '1');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester1() {
-        return await this.expectKubernetesPodContent('pod_id', '1');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester2() {
-        return await this.expectKubernetesPodContent('pod_name', '2');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester2() {
-        return await this.expectKubernetesPodContent('pod_id', '2');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester3() {
-        return await this.expectKubernetesPodContent('pod_name', '3');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester3() {
-        return await this.expectKubernetesPodContent('pod_id', '3');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester4() {
-        return await this.expectKubernetesPodContent('pod_name', '4');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester4() {
-        return await this.expectKubernetesPodContent('pod_id', '4');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester5() {
-        return await this.expectKubernetesPodContent('pod_name', '5');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester5() {
-        return await this.expectKubernetesPodContent('pod_id', '5');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester6() {
-        return await this.expectKubernetesPodContent('pod_name', '6');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester6() {
-        return await this.expectKubernetesPodContent('pod_id', '6');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester7() {
-        return await this.expectKubernetesPodContent('pod_name', '7');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester7() {
-        return await this.expectKubernetesPodContent('pod_id', '7');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester8() {
-        return await this.expectKubernetesPodContent('pod_name', '8');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester8() {
-        return await this.expectKubernetesPodContent('pod_id', '8');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester9() {
-        return await this.expectKubernetesPodContent('pod_name', '9');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester9() {
-        return await this.expectKubernetesPodContent('pod_id', '9');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester10() {
-        return await this.expectKubernetesPodContent('pod_name', '10');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester10() {
-        return await this.expectKubernetesPodContent('pod_id', '10');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester11() {
-        return await this.expectKubernetesPodContent('pod_name', '11');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester11() {
-        return await this.expectKubernetesPodContent('pod_id', '11');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester12() {
-        return await this.expectKubernetesPodContent('pod_name', '12');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester12() {
-        return await this.expectKubernetesPodContent('pod_id', '12');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester13() {
-        return await this.expectKubernetesPodContent('pod_name', '13');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester13() {
-        return await this.expectKubernetesPodContent('pod_id', '13');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester14() {
-        return await this.expectKubernetesPodContent('pod_name', '14');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester14() {
-        return await this.expectKubernetesPodContent('pod_id', '14');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester15() {
-        return await this.expectKubernetesPodContent('pod_name', '15');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester15() {
-        return await this.expectKubernetesPodContent('pod_id', '15');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester16() {
-        return await this.expectKubernetesPodContent('pod_name', '16');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester16() {
-        return await this.expectKubernetesPodContent('pod_id', '16');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester17() {
-        return await this.expectKubernetesPodContent('pod_name', '17');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester17() {
-        return await this.expectKubernetesPodContent('pod_id', '17');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester18() {
-        return await this.expectKubernetesPodContent('pod_name', '18');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester18() {
-        return await this.expectKubernetesPodContent('pod_id', '18');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester19() {
-        return await this.expectKubernetesPodContent('pod_name', '19');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester19() {
-        return await this.expectKubernetesPodContent('pod_id', '19');
-    }
-
-    async expectQueryEditorContainsKubernetesPodNameZioxIngester20() {
-        return await this.expectKubernetesPodContent('pod_name', '20');
-    }
-
-    async expectQueryEditorContainsKubernetesPodIdZioxIngester20() {
-        return await this.expectKubernetesPodContent('pod_id', '20');
+    async expectQueryEditorContainsKubernetesPod(type, ingesterNumber) {
+        return await this.expectKubernetesPodContent(type, ingesterNumber);
     }
 
     // Additional methods for logsPage spec
@@ -1540,10 +1349,10 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsExpectedQuery(expectedQuery) {
-        const text = await this.page.evaluate(() => {
-            const editor = document.querySelector(this.queryEditor).querySelector('.cm-content');
+        const text = await this.page.evaluate((queryEditorSelector) => {
+            const editor = document.querySelector(queryEditorSelector).querySelector('.cm-content');
             return editor ? editor.textContent.trim() : null;
-        });
+        }, this.queryEditor);
         console.log(text);
         return await expect(text.replace(/\s/g, "")).toContain(expectedQuery.replace(/\s/g, ""));
     }
