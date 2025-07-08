@@ -200,7 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="q-px-md q-my-sm"
           >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table

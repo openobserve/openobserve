@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
        <template #top="scope">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full  "> 
-          <span class="tw-font-bold tw-text-[14px] tw-mr-sm tw-w-full">
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  "> 
+          <span class="tw-font-bold tw-text-[14px] tw-w-full q-pa-none">
           {{ rows.length }} {{ title }}
         </span>
         <QTablePagination
@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :perPageOptions="perPageOptions"
           position="top"
           @update:changeRecordPerPage="changePagination"
+          style="padding: 0px;"
         />
         </div>
        </template>

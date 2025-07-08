@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="col q-pr-xs">
+    <div class="col">
       <div
         data-test="iam-service-accounts-selection-filters"
         class="flex justify-start bordered q-px-md q-py-sm"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table" class="q-px-md">
+      <div data-test="iam-service-accounts-selection-table">
         <template v-if="rows.length">
           <app-table
             :rows="rows"
@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dense="true"
             :virtual-scroll="false"
             style="height: fit-content"
+            class="o2-quasar-table"
             :filter="{
               value: userSearchKey,
               method: filterUsers,
@@ -187,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sortable: false,
       slot: true,
       slotName: "select",
+      style: "width: 67px"
     },
     {
       name: "email",

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="col q-pr-xs">
+  <div data-test="iam-roles-selection-section" class="col">
     <div
       class="flex justify-start bordered q-px-md q-py-sm"
       style="position: sticky; top: 0px; z-index: 2"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-input>
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" class="q-px-md">
+    <div data-test="iam-roles-selection-table">
       <template v-if="rows.length">
         <app-table
           :rows="rows"
