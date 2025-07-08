@@ -2,7 +2,7 @@ import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -111,7 +111,7 @@ test.describe("Core Pipeline Tests", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
+    await logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
 

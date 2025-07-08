@@ -1,7 +1,7 @@
 import { test, expect } from './baseFixtures.js';
 import logData from "../cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -66,7 +66,7 @@ test.describe("Search Partition Tests", () => {
     await ingestTestData(page);
     await page.waitForTimeout(2000);
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
+    await logsPage.selectStream("e2e_automate"); 
     await applyQuery(page);
   });
 

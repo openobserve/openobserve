@@ -1,6 +1,6 @@
 import { test, expect } from './baseFixtures';
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 

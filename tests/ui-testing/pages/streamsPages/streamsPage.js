@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { LoginPage } from '../loginPage.js';
-import { LogsPage } from '../logsPage.js';
+import { LogsPage } from '../logsPages/logsPage.js';
 import { IngestionPage } from '../ingestionPage.js';
 import { ManagementPage } from '../managementPage.js';
 import { StreamPage } from '../streamPage.js';

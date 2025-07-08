@@ -67,7 +67,7 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
+const selectStream = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
@@ -110,7 +110,7 @@ test.describe("dashboard testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await selectStream(page, logData.Stream);
     await page.waitForTimeout(1000);
     await applyQueryButton(page);
   });

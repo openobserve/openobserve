@@ -7,7 +7,7 @@ import logData from "../../cypress/fixtures/log.json";
 import { log } from "console";
 
 test.describe.configure({ mode: "parallel" });
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
+const selectStream = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
@@ -26,7 +26,7 @@ test.describe("logs testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await selectStream(page, logData.Stream);
   });
 
   test("should create logs when queries are ingested into the search field", async ({

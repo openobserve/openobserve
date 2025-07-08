@@ -1,7 +1,7 @@
-import { test, expect } from "./baseFixtures";
-import logData from "../../ui-testing/cypress/fixtures/log.json";
-import logsdata from "../../test-data/logs_data.json";
-import { LogsPage } from '../pages/logsPage.js';
+import { test, expect } from "../baseFixtures";
+import logData from "../../cypress/fixtures/log.json";
+import logsdata from "../../../test-data/logs_data.json";
+import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -64,8 +64,6 @@ test.describe("Logs Quickmode testcases", () => {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
   async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
     const search = page.waitForResponse(logData.applyQuery);
     await page.waitForTimeout(3000);
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
@@ -79,122 +77,86 @@ test.describe("Logs Quickmode testcases", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     logsPage = new LogsPage(page);
-    await page.waitForTimeout(1000)
+    await page.waitForTimeout(1000);
     await ingestion(page);
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(2000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
+    await logsPage.selectStream("e2e_automate");
  
     await applyQueryButton(page);
 
-    // Get the toggle button element
+    // Enable quick mode toggle if it's not already enabled
     const toggleButton = await page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
     // Evaluate the class attribute to determine if the toggle is in the off state
     const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
-    // If the toggle is switched off, click on it to switch it on
     if (isSwitchedOff) {
       await toggleButton.click();
     }
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
-  test("should click on interesting fields icon and display query in editor", async ({
+  test("should click on interesting fields icon and display query in editor", {
+    tag: ['@interestingFieldsLogs', '@all', '@logs']
+  }, async ({
     page,
   }) => {
-    await page
-      .locator('[data-cy="index-field-search-input"]')
-      .fill("kubernetes_pod_id");
-    await page.waitForTimeout(2000);
-    await page
-      .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
-      )
-      .first()
-      .click();
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
-    await page.waitForTimeout(2000);
-    await expect(
-      page
-        .locator('[data-test="logs-search-bar-query-editor"]')
-        .getByText(/kubernetes_pod_id/)
-        .first()
-    ).toBeVisible();
+    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await logsPage.clickSQLModeToggle();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectInterestingFieldInEditor("kubernetes_pod_id");
   });
-  test("should display quick mode toggle button", async ({ page }) => {
-    await expect(
-      page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
-    ).toBeVisible();
+  test("should display quick mode toggle button", {
+    tag: ['@quickModeLogs', '@all', '@logs']
+  }, async ({ page }) => {
+    await logsPage.expectQuickModeToggleVisible();
   });
 
-  test("should click on interesting fields icon in histogram mode and run query", async ({
+  test("should click on interesting fields icon in histogram mode and run query", {
+    tag: ['@interestingFieldsHistogramModeLogs', '@histogram', '@all', '@logs']
+  }, async ({
     page,
   }) => {
-    await page
-      .locator('[data-cy="index-field-search-input"]')
-      .fill("kubernetes_pod_id");
-    await page.waitForTimeout(2000);
-    await page
-      .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
-      )
-      .first()
-      .click();
-    await page
-      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
-      .click();
-    await page.waitForTimeout(2000);
-    await expect(
-      page
-        .locator('[data-test="log-table-column-0-source"]')
-        .getByText(/kubernetes_pod_id/)
-        // .getByText(/_timestamp/)
-        .first()
-    ).toBeVisible();
+    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await logsPage.clickSearchBarRefreshButton();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectInterestingFieldInTable("kubernetes_pod_id");
   });
 
-  test("should display error on entering random text in histogram mode when quick mode is on", async ({ page }) => {
-    await page.waitForTimeout(2000)
-    // Click on the Monaco Editor to focus it
-    await page.click('[data-test="logs-search-bar-query-editor"]');
-    // Type into the Monaco Editor
-    await page.keyboard.type("oooo");
-    await page.waitForTimeout(1000)
-    await page.waitForSelector('[data-cy="search-bar-refresh-button"] > .q-btn__content', { visible: true, timeout: 5000 });
-
-    // Click on the refresh button
-    await page.click('[data-cy="search-bar-refresh-button"] > .q-btn__content', { force: true });
-
-    await page.waitForTimeout(2000)
-    // Wait for the error message to appear and ensure it is visible
-    await expect(page.locator('[data-test="logs-search-error-message"]').first()).toBeVisible({ timeout: 10000 });
+  test("should display error on entering random text in histogram mode when quick mode is on", {
+    tag: ['@errorHandlingHistogramModeLogs', '@histogram', '@all', '@logs']
+  }, async ({ page }) => {
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickQueryEditor();
+    await logsPage.typeInQueryEditor("oooo");
+    await logsPage.waitForTimeout(1000);
+    await logsPage.waitForSearchBarRefreshButton();
+    await logsPage.clickSearchBarRefreshButton();
+    await logsPage.waitForTimeout(2000);
+    await logsPage.expectErrorMessageVisible();
   });
 
-  test("should display selected interestesing field and order by - as default in editor", async ({
+  test("should display selected interestesing field and order by - as default in editor", {
+    tag: ['@interestingFieldsSqlModeLogs', '@sqlMode', '@all', '@logs']
+  }, async ({
     page,
   }) => {
-    await page
-      .locator('[data-cy="index-field-search-input"]')
-      .fill("kubernetes_pod_id");
-    await page.waitForTimeout(2000);
-    await page
-      .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
-      )
-      .first()
-      .click();
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await logsPage.waitForTimeout(2000);
+    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await logsPage.clickSQLModeToggle();
     await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
-    await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]')
-    ).toBeVisible();
-    
-   
+    await logsPage.expectQueryEditorVisible();
   });
 
-  test("should adding/removing interesting field removes it from editor and results too", async ({
+  test("should adding/removing interesting field removes it from editor and results too", {
+    tag: ['@interestingFieldsCRUD', '@all', '@logs']
+  }, async ({
     page,
   }) => {
     await page
@@ -250,7 +212,9 @@ test.describe("Logs Quickmode testcases", () => {
     ).not.toHaveText(/source/);
   });
 
-  test("should display order by in sql mode by default even after page reload", async ({
+  test("should display order by in sql mode by default even after page reload", {
+    tag: ['@sqlModeOrderBy', '@sqlMode', '@all', '@logs']
+  }, async ({
     page,
   }) => {
     await page
@@ -282,7 +246,9 @@ test.describe("Logs Quickmode testcases", () => {
     ).toBeVisible();
   });
 
-  test("should display results without adding timestamp in quick mode", async ({
+  test("should display results without adding timestamp in quick mode", {
+    tag: ['@quickModeResults', '@all', '@logs']
+  }, async ({
     page,
   }) => {
 

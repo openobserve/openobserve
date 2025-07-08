@@ -1,0 +1,1563 @@
+import { expect } from '@playwright/test';
+import { LogsQueryPage } from './logsQueryPage.js';
+import { LoginPage } from '../loginPage.js';
+import { IngestionPage } from '../ingestionPage.js';
+import { ManagementPage } from '../managementPage.js';
+
+export class LogsPage {
+    constructor(page) {
+        this.page = page;
+        
+        // Initialize existing page objects
+        this.logsQueryPage = new LogsQueryPage(page);
+        this.loginPage = new LoginPage(page);
+        this.ingestionPage = new IngestionPage(page);
+        this.managementPage = new ManagementPage(page);
+        
+        // Locators
+        this.logsMenuItem = '[data-test="menu-link-\\/logs-item"]';
+        this.homeButton = "[name ='home']";
+        this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
+        this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
+        this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
+        this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+        this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
+        this.dateTimeButton = '[data-test="date-time-btn"]';
+        this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
+        this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] div';
+        this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
+        this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
+        this.exploreButton = '[data-test="logs-search-explore-btn"]';
+        this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
+        this.resultText = '[data-test="logs-search-search-result"]';
+        this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
+        this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
+        this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"] > .q-btn__content';
+        this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
+        this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"] > .q-btn__content';
+        this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"] > .q-btn__content > .block';
+        this.absoluteTab = '[data-test="date-time-absolute-tab"]';
+        this.scheduleText = '[data-test="date-time-schedule-text"]';
+        this.timeZoneDropdown = '[data-test="timezone-select"]';
+        this.timeZoneOption = (zone) => `[data-test="timezone-option-${zone}"]`;
+        this.dateSelector = (day) => `[data-test="date-selector-${day}"]`;
+        this.monthSelector = (month) => `[data-test="month-selector-${month}"]`;
+        this.yearSelector = (year) => `[data-test="year-selector-${year}"]`;
+        this.startTimeField = '[data-test="start-time-field"]';
+        this.endTimeField = '[data-test="end-time-field"]';
+        this.startTimeInput = '[data-test="start-time-input"]';
+        this.endTimeInput = '[data-test="end-time-input"]';
+        this.showQueryToggle = '[data-test="logs-search-bar-show-query-toggle-btn"]';
+        this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
+        this.savedViewsButton = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)';
+        this.savedViewsExpand = '[data-test="logs-search-saved-views-btn"]';
+        this.saveViewButton = 'button'; // filter by text in method
+        this.savedViewNameInput = '[data-test="add-alert-name-input"]';
+        this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
+        this.savedViewArrow = '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon';
+        this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
+        this.confirmButton = '[data-test="confirm-button"]';
+        this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
+        this.searchStreamInput = '[placeholder="Search Stream"]';
+        this.exploreButtonRole = { role: 'button', name: 'Explore' };
+        this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
+        this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
+        this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
+        this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
+        this.savedViewDialogSaveContent = '[data-test="saved-view-dialog-save-btn"] > .q-btn__content';
+        this.savedViewByLabel = '.q-item__label';
+        this.notificationMessage = '.q-notification__message';
+        this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
+        this.errorMessage = '[data-test="logs-search-error-message"]';
+        this.warningElement = 'text=warning Query execution';
+        this.logsTable = '[data-test="logs-search-result-logs-table"]';
+        this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
+        this.expandLabel = label => `Expand "${label}"`;
+        this.collapseLabel = label => `Collapse "${label}"`;
+        this.addStreamButton = '[data-test="log-stream-add-stream-btn"]';
+        this.addStreamNameInput = '[data-test="add-stream-name-input"]';
+        this.saveStreamButton = '[data-test="save-stream-btn"]';
+        this.streamDetail = '[title="Stream Detail"]';
+        this.schemaStreamIndexSelect = ':nth-child(2) > [data-test="schema-stream-index-select"]';
+        this.fullTextSearch = '.q-virtual-scroll__content';
+        this.schemaUpdateSettingsButton = '[data-test="schema-update-settings-button"]';
+        this.colAutoButton = '.col-auto > .q-btn > .q-btn__content';
+        this.exploreTitle = '[title="Explore"]';
+        this.streamsSearchStreamInput = '[data-test="streams-search-stream-input"]';
+        this.logSearchIndexListFieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
+        this.expandCode = 'Expand "code"';
+        this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
+        this.logTableColumn3Source = '[data-test="log-table-column-3-source"]';
+        this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
+
+        // Additional locators
+        this.fnEditor = '#fnEditor';
+        this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
+        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
+        this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
+        this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
+        this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"] img';
+        this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
+        this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"] > .q-btn__content';
+        this.menuLink = link => `[data-test="menu-link-${link}"]`;
+        this.searchAroundBtn = '[data-test="logs-search-bar-search-around-btn"]';
+        this.pagination = '[data-test="logs-search-pagination"]';
+        this.sqlPagination = '[data-test="logs-search-sql-pagination"]';
+        this.sqlGroupOrderLimitPagination = '[data-test="logs-search-sql-group-order-limit-pagination"]';
+        this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
+        this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
+        this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
+        this.qNotifyWarning = '#q-notify div';
+        this.qPageContainer = '.q-page-container';
+        this.cmContent = '.cm-content';
+        this.cmLine = '.cm-line';
+        this.searchFunctionInput = { placeholder: 'Search Function' };
+    }
+
+    expandLabel(label) {
+        return `Expand "${label}"`;
+    }
+
+    collapseLabel(label) {
+        return `Collapse "${label}"`;
+    }
+
+    // Reusable helper methods for code reuse
+    async expectQueryEditorContainsTextHelper(text) {
+        return await expect(this.page.locator(this.queryEditor)).toContainText(text);
+    }
+
+    async clickMenuLinkByType(linkType) {
+        const linkMap = {
+            'logs': this.logsMenuItem,
+            'traces': '[data-test="menu-link-/traces-item"]',
+            'streams': this.streamsMenuItem,
+            'metrics': '[data-test="menu-link-\\/metrics-item"]',
+            'pipeline': '[data-test="menu-link-\\/pipeline-item"]',
+            'functions': '[data-test="menu-link-\\/functions-item"]'
+        };
+        return await this.page.locator(linkMap[linkType]).click({ force: true });
+    }
+
+    async fillInputField(selector, text) {
+        return await this.page.locator(selector).fill(text);
+    }
+
+    async clickElementByLabel(label, action = 'Expand') {
+        const labelText = action === 'Expand' ? this.expandLabel(label) : this.collapseLabel(label);
+        return await this.page.getByLabel(labelText).click();
+    }
+
+    async expectKubernetesPodContent(podType, ingesterNumber = '') {
+        const content = `kubernetes_${podType}${ingesterNumber ? `-ziox-ingester-${ingesterNumber}` : ''}`;
+        return await this.expectQueryEditorContainsTextHelper(content);
+    }
+
+    // Navigation methods
+    async navigateToLogs() {
+        await this.page.goto('/logs');
+    }
+
+    async validateLogsPage() {
+        await expect(this.page).toHaveURL(/.*\/logs/);
+    }
+
+    async logsPageDefaultMultiOrg() {
+        await this.page.goto('/logs');
+        await expect(this.page).toHaveURL(/.*\/logs/);
+    }
+
+    async logsPageURLValidation() {
+        await expect(this.page).toHaveURL(/.*\/logs/);
+    }
+
+    // Stream and index selection methods
+    async selectIndexAndStream() {
+        await this.page.locator(this.indexDropDown).click();
+        await this.page.locator(this.streamToggle).click();
+    }
+
+    async selectIndexAndStreamJoin() {
+        await this.page.locator(this.indexDropDown).click();
+        await this.page.locator(this.streamToggle).click();
+    }
+
+    async selectIndexStreamDefault() {
+        await this.page.locator(this.indexDropDown).click();
+        await this.page.locator(this.streamToggle).click();
+    }
+
+    async selectIndexStream(streamName) {
+        await this.page.locator(this.indexDropDown).click();
+        await this.page.locator(this.streamToggle).click();
+    }
+
+    async selectStream(stream) {
+        await this.page.locator(this.indexDropDown).click();
+        await this.page.getByText(stream, { exact: true }).first().click();
+    }
+
+    // Query execution methods
+    async selectRunQuery() {
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async applyQuery() {
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async applyQueryButton(expectedUrl) {
+        await this.page.locator(this.queryButton).click();
+        await expect(this.page).toHaveURL(expectedUrl);
+    }
+
+    async clearAndRunQuery() {
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async clearAndFillQueryEditor(query) {
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.keyboard.type(query);
+    }
+
+    async typeQuery(query) {
+        await this.page.locator(this.queryEditor).click();
+        await this.page.locator(this.queryEditor).press('ControlOrMeta+a');
+        await this.page.keyboard.type(query);
+    }
+
+    async executeQueryWithKeyboardShortcut() {
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+    }
+
+    async executeQueryWithKeyboardShortcutTest() {
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.type("SELECT * FROM 'e2e_automate' LIMIT 10");
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+    }
+
+    async executeQueryWithKeyboardShortcutAfterClickingElsewhere() {
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.type("SELECT * FROM 'e2e_automate' LIMIT 10");
+        await this.page.locator(this.homeButton).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+    }
+
+    async executeQueryWithKeyboardShortcutWithDifferentQuery() {
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.keyboard.type("SELECT * FROM 'e2e_automate' WHERE log LIKE '%test%' LIMIT 5");
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+    }
+
+    async executeQueryWithKeyboardShortcutWithSQLMode() {
+        await this.page.locator(this.sqlModeToggle).first().click();
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.type("SELECT * FROM 'e2e_automate' LIMIT 10");
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+    }
+
+    async executeQueryWithErrorHandling() {
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.type("INVALID QUERY");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async executeHistogramQuery(query) {
+        await this.clearAndFillQueryEditor(query);
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async waitForSearchResultAndCheckText(expectedText) {
+        await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]');
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText);
+    }
+
+    // Time and date methods
+    async setTimeToPast30Seconds() {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.locator(this.relative30SecondsButton).click();
+    }
+
+    async verifyTimeSetTo30Seconds() {
+        await expect(this.page.locator(this.scheduleText)).toContainText('Past 30 seconds');
+    }
+
+    async setDateTime() {
+        await this.page.locator(this.dateTimeButton).click();
+    }
+
+    async setDateTimeToToday() {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.locator(this.absoluteTab).click();
+    }
+
+    async setDateTimeTo15Minutes() {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click();
+    }
+
+    async setAbsoluteDate(year, month, day, currentMonth, currentYear) {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.locator(this.absoluteTab).click();
+        await this.page.locator(this.monthSelector(currentMonth)).click();
+        await this.page.locator(this.yearSelector(currentYear)).click();
+        await this.page.locator(this.dateSelector(day)).click();
+    }
+
+    async setStartAndEndTime(startTime, endTime) {
+        await this.page.locator(this.startTimeField).fill(startTime);
+        await this.page.locator(this.endTimeField).fill(endTime);
+    }
+
+    async setTimeRange(startTime, endTime) {
+        await this.setStartAndEndTime(startTime, endTime);
+    }
+
+    async verifySchedule(expectedTime) {
+        await expect(this.page.locator(this.scheduleText)).toContainText(expectedTime);
+    }
+
+    async setTimeZone(zone) {
+        await this.page.locator(this.timeZoneDropdown).click();
+        await this.page.locator(this.timeZoneOption(zone)).click();
+    }
+
+    async changeTimeZone() {
+        await this.setTimeZone('UTC');
+    }
+
+    async verifyDateTime(startTime, endTime) {
+        await expect(this.page.locator(this.startTimeInput)).toHaveValue(startTime);
+        await expect(this.page.locator(this.endTimeInput)).toHaveValue(endTime);
+    }
+
+    async getScheduleText() {
+        return await this.page.locator(this.scheduleText).textContent();
+    }
+
+    // SQL Mode methods
+    async enableSQLMode() {
+        await this.page.locator(this.sqlModeToggle).first().click();
+    }
+
+    // Quick Mode methods
+    async verifyQuickModeToggle() {
+        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+    }
+
+    async clickQuickModeToggle() {
+        await this.page.locator(this.quickModeToggle).click();
+    }
+
+    // Histogram methods
+    async toggleHistogram() {
+        await this.page.locator(this.histogramToggle).click();
+    }
+
+    async toggleHistogramAndExecute() {
+        await this.toggleHistogram();
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async verifyHistogramState() {
+        const isHistogramOff = await this.page.locator(this.histogramToggle)
+            .evaluate(el => el.getAttribute('aria-checked') === 'false');
+        expect(isHistogramOff).toBeTruthy();
+    }
+
+    // Error handling methods
+    async checkErrorVisible() {
+        await expect(this.page.locator(this.errorMessage)).toBeVisible();
+    }
+
+    async getErrorDetails() {
+        return await this.page.locator(this.errorMessage).textContent();
+    }
+
+    // Search partition methods
+    async verifySearchPartitionResponse() {
+        const searchPartitionPromise = this.page.waitForResponse(response => 
+            response.url().includes('/api/default/_search_partition') && 
+            response.request().method() === 'POST'
+        );
+        
+        const searchPartitionResponse = await searchPartitionPromise;
+        const searchPartitionData = await searchPartitionResponse.json();
+
+        expect(searchPartitionData).toHaveProperty('partitions');
+        expect(searchPartitionData).toHaveProperty('histogram_interval');
+        expect(searchPartitionData).toHaveProperty('order_by', 'asc');
+
+        return searchPartitionData;
+    }
+
+    async captureSearchCalls() {
+        const searchCalls = [];
+        this.page.on('response', async response => {
+            if (response.url().includes('/api/default/_search') && 
+                response.request().method() === 'POST') {
+                const requestData = await response.request().postDataJSON();
+                searchCalls.push({
+                    start_time: requestData.query.start_time,
+                    end_time: requestData.query.end_time,
+                    sql: requestData.query.sql
+                });
+            }
+        });
+        await this.page.waitForTimeout(2000);
+        return searchCalls;
+    }
+
+    async verifyStreamingModeResponse() {
+        const searchPromise = this.page.waitForResponse(response => 
+            response.url().includes('/api/default/_search') && 
+            response.request().method() === 'POST'
+        );
+        
+        const searchResponse = await searchPromise;
+        expect(searchResponse.status()).toBe(200);
+        
+        const searchData = await searchResponse.json();
+        expect(searchData).toBeDefined();
+        expect(searchData.hits).toBeDefined();
+    }
+
+    // Explore and results methods
+    async clickExplore() {
+        try {
+            await this.exploreButton.first().waitFor({ state: 'visible', timeout: 10000 });
+            await this.exploreButton.first().waitFor({ state: 'attached', timeout: 10000 });
+            
+            await Promise.all([
+                this.page.waitForLoadState('networkidle'),
+                this.exploreButton.first().click()
+            ]);
+            
+            await this.page.waitForTimeout(3000);
+        } catch (error) {
+            console.error('Error in clickExplore:', error);
+            throw error;
+        }
+    }
+
+    async openTimestampMenu() {
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { state: 'visible', timeout: 10000 });
+            await this.page.waitForSelector('[data-test="log-table-column-1-_timestamp"]', { state: 'visible', timeout: 10000 });
+            await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 10000 });
+            await this.timestampColumnMenu.scrollIntoViewIfNeeded();
+            
+            await Promise.all([
+                this.page.waitForLoadState('networkidle'),
+                this.timestampColumnMenu.click({ force: true })
+            ]);
+            
+            await this.page.waitForTimeout(1000);
+        } catch (error) {
+            console.error('Error in openTimestampMenu:', error);
+            try {
+                await this.page.waitForTimeout(2000);
+                await this.timestampColumnMenu.click({ force: true });
+                await this.page.waitForTimeout(1000);
+            } catch (retryError) {
+                console.error('Error in openTimestampMenu retry:', retryError);
+                throw retryError;
+            }
+        }
+    }
+
+    async clickResultsPerPage() {
+        await this.page.locator('[data-test="logs-search-search-result"]').getByText('arrow_drop_down').click();
+        await this.page.getByText('10', { exact: true }).click();
+        await this.page.waitForTimeout(2000);
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10 out of');
+    }
+
+    async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
+        await this.page.getByText(resultsPerPage, { exact: true }).click();
+        await this.page.waitForTimeout(2000);
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedText);
+    }
+
+    async pageNotVisible() {
+        const fastRewindElement = this.page.locator('[data-test="logs-search-result-records-per-page"]').getByText('50');
+        await expect(fastRewindElement).not.toBeVisible();
+    }
+
+    // Validation methods
+    async validateResult() {
+        await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]');
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+    }
+
+    async displayCountQuery() {
+        await this.clearAndFillQueryEditor("SELECT COUNT(*) as count FROM 'e2e_automate'");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async displayTwoStreams() {
+        await this.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    // Interesting fields methods
+    async clickInterestingFields() {
+        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').click();
+    }
+
+    async validateInterestingFields() {
+        await expect(this.page.locator(this.queryEditor)).toContainText('kubernetes_pod_name');
+    }
+
+    async validateInterestingFieldsQuery() {
+        await expect(this.page.locator(this.queryEditor)).toContainText('kubernetes_pod_name');
+    }
+
+    async addRemoveInteresting() {
+        await this.clickInterestingFields();
+        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').click();
+    }
+
+    // Kubernetes methods
+    async kubernetesContainerName() {
+        await this.clearAndFillQueryEditor("SELECT kubernetes_container_name FROM 'e2e_automate' LIMIT 10");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async kubernetesContainerNameJoin() {
+        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async kubernetesContainerNameJoinLimit() {
+        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 5");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async kubernetesContainerNameJoinLike() {
+        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a JOIN 'e2e_automate' b ON a.kubernetes_container_name LIKE b.kubernetes_container_name LIMIT 10");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async kubernetesContainerNameLeftJoin() {
+        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a LEFT JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async kubernetesContainerNameRightJoin() {
+        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a RIGHT JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    async kubernetesContainerNameFullJoin() {
+        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a FULL JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
+        await this.page.locator(this.queryButton).click();
+    }
+
+    // Log count ordering methods
+    async verifyLogCountOrdering(orderType) {
+        const query = orderType === 'desc' 
+            ? `SELECT MAX(_timestamp) as ts, count(_timestamp) as logcount,kubernetes_container_name FROM 'e2e_automate' where log is not null GROUP BY kubernetes_container_name order by logcount desc`
+            : `SELECT MAX(_timestamp) as ts, count(_timestamp) as logcount,kubernetes_container_name FROM 'e2e_automate' where log is not null GROUP BY kubernetes_container_name order by logcount asc`;
+
+        await this.clearAndFillQueryEditor(query);
+        await this.page.waitForTimeout(2000);
+
+        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isSqlEnabled = await sqlModeSwitch.isChecked();
+        if (!isSqlEnabled) {
+            await sqlModeSwitch.click();
+            await this.page.waitForTimeout(1000);
+        }
+
+        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+        await this.page.waitForTimeout(2000);
+
+        const rows = await this.page.locator('[data-test^="logs-search-result-detail-"]').all();
+        let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+
+        for (const row of rows) {
+            const sourceCell = await row.locator('[data-test^="log-table-column-"][data-test$="-source"]').textContent();
+            try {
+                const logcountMatch = sourceCell.match(/logcount":(\d+)/);
+                const currentValue = logcountMatch ? parseInt(logcountMatch[1]) : 0;
+
+                if (orderType === 'desc') {
+                    expect(currentValue).toBeLessThanOrEqual(previousValue);
+                } else {
+                    expect(currentValue).toBeGreaterThanOrEqual(previousValue);
+                }
+                previousValue = currentValue;
+            } catch (error) {
+                console.error('Error parsing cell content:', sourceCell);
+                throw error;
+            }
+        }
+
+        expect(rows.length).toBeGreaterThan(0);
+    }
+
+    async verifyLogCountOrderingDescending() {
+        await this.verifyLogCountOrdering('desc');
+    }
+
+    async verifyLogCountOrderingAscending() {
+        await this.verifyLogCountOrdering('asc');
+    }
+
+    // String match ignore case methods
+    async searchWithStringMatchIgnoreCase(searchText) {
+        await this.page.locator(this.logsSearchBarQueryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.keyboard.type(`str_match_ignore_case(kubernetes_labels_app, '${searchText}')`);
+        await this.page.locator(this.searchBarRefreshButton).click();
+        
+        // Wait for search results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for the log table to be visible first
+        await this.page.locator('[data-test="logs-search-result-logs-table"]').waitFor({ state: 'visible', timeout: 10000 });
+        
+        // Wait for the specific column to be visible
+        await this.page.locator(this.logTableColumnSource).waitFor({ state: 'visible', timeout: 10000 });
+        
+        // Verify the column is visible
+        await expect(this.page.locator(this.logTableColumnSource)).toBeVisible();
+    }
+
+    // Organization methods
+    async selectOrganization() {
+        await this.page.locator('[data-test="navbar-organizations-select"]').click();
+        await this.page.getByRole('option', { name: 'default', exact: true }).locator('div').nth(2).click();
+    }
+
+    // Copy share methods
+    async copyShare() {
+        await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
+        await this.page.getByText('Copy Share').click();
+    }
+
+    // Sign out methods
+    async signOut() {
+        await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
+        await this.page.getByText('Sign Out').click();
+    }
+
+    // LogsQueryPage methods - delegate to LogsQueryPage
+    async setDateTimeFilter() {
+        return await this.logsQueryPage.setDateTimeFilter();
+    }
+
+    async clickRefresh() {
+        return await this.logsQueryPage.clickRefresh();
+    }
+
+    async clickErrorMessage() {
+        return await this.logsQueryPage.clickErrorMessage();
+    }
+
+    async clickResetFilters() {
+        return await this.logsQueryPage.clickResetFilters();
+    }
+
+    async clickNoDataFound() {
+        return await this.logsQueryPage.clickNoDataFound();
+    }
+
+    async clickResultDetail() {
+        return await this.page.locator(this.resultText).click();
+    }
+
+    async isHistogramOn() {
+        return await this.logsQueryPage.isHistogramOn();
+    }
+
+    async ensureHistogramState(desiredState) {
+        return await this.logsQueryPage.ensureHistogramState(desiredState);
+    }
+
+    // Login methods - delegate to LoginPage
+    async loginAsInternalUser() {
+        return await this.loginPage.loginAsInternalUser();
+    }
+
+    async login() {
+        return await this.loginPage.login();
+    }
+
+    // Ingestion methods - delegate to IngestionPage
+    async ingestLogs(orgId, streamName, logData) {
+        return await this.ingestionPage.ingestLogs(orgId, streamName, logData);
+    }
+
+    // Management methods - delegate to ManagementPage
+    async navigateToManagement() {
+        return await this.managementPage.navigateToManagement();
+    }
+
+    // Additional methods needed for tests
+    async clickDateTimeButton() {
+        return await this.page.locator(this.dateTimeButton).click({ force: true });
+    }
+
+    async clickRelative15MinButton() {
+        return await this.page.locator(this.relative15MinButton).click({ force: true });
+    }
+
+    async clickRelative6WeeksButton() {
+        return await this.page.locator(this.relative6WeeksButton).click({ force: true });
+    }
+
+    async clickQueryEditor() {
+        return await this.page.locator(this.queryEditor).click();
+    }
+
+    async clickQueryEditorTextbox() {
+        return await this.page.locator(this.queryEditor).getByRole('textbox').click();
+    }
+
+    async fillQueryEditor(query) {
+        return await this.page.locator(this.queryEditor).getByRole('textbox').fill(query);
+    }
+
+    async typeInQueryEditor(text) {
+        return await this.page.keyboard.type(text);
+    }
+
+    async clickRefreshButton() {
+        return await this.page.locator(this.queryButton).click({ force: true });
+    }
+
+    async clickSearchBarRefreshButton() {
+        return await this.page.locator(this.searchBarRefreshButton).click({ force: true });
+    }
+
+    async waitForSearchBarRefreshButton() {
+        return await this.page.locator(this.searchBarRefreshButton).waitFor({ state: "visible" });
+    }
+
+    async clickSQLModeToggle() {
+        return await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').first().click();
+    }
+
+    async clickShowQueryToggle() {
+        return await this.page.locator(this.showQueryToggle).click({ force: true });
+    }
+
+    async clickFieldListCollapseButton() {
+        return await this.page.locator(this.fieldListCollapseButton).click();
+    }
+
+    async clickSavedViewsButton() {
+        return await this.page.locator(this.savedViewsButton).click({ force: true });
+    }
+
+    async clickSavedViewsExpand() {
+        return await this.page.locator(this.savedViewsExpand).getByLabel('Expand').click();
+    }
+
+    async clickSaveViewButton() {
+        return await this.page.locator(this.saveViewButton).filter({ hasText: 'savesaved_search' }).click();
+    }
+
+    async fillSavedViewName(name) {
+        return await this.fillInputField(this.savedViewNameInput, name);
+    }
+
+    async clickSavedViewDialogSave() {
+        const saveButton = this.page.locator(this.savedViewDialogSave);
+        
+        // Wait for the button to be visible
+        await saveButton.waitFor({ state: 'visible', timeout: 10000 });
+        
+        // Scroll the button into view if needed
+        await saveButton.scrollIntoViewIfNeeded();
+        
+        // Wait a moment for the scroll to complete
+        await this.page.waitForTimeout(500);
+        
+        // Click the button with force option
+        return await saveButton.click({ force: true });
+    }
+
+    async clickSavedViewArrow() {
+        return await this.page.locator(this.savedViewArrow).click();
+    }
+
+    async clickSavedViewSearchInput() {
+        return await this.page.locator(this.savedViewSearchInput).click();
+    }
+
+    async fillSavedViewSearchInput(text) {
+        return await this.fillInputField(this.savedViewSearchInput, text);
+    }
+
+    async clickSavedViewByTitle(title) {
+        return await this.page.getByTitle(title).click();
+    }
+
+    async clickDeleteButton() {
+        return await this.page.getByText('delete').click();
+    }
+
+    async clickConfirmButton() {
+        return await this.page.locator(this.confirmButton).click();
+    }
+
+    async clickStreamsMenuItem() {
+        return await this.page.locator(this.streamsMenuItem).click({ force: true });
+    }
+
+    async clickSearchStreamInput() {
+        return await this.page.locator(this.searchStreamInput).click();
+    }
+
+    async fillSearchStreamInput(text) {
+        return await this.fillInputField(this.searchStreamInput, text);
+    }
+
+    async clickExploreButton() {
+        return await this.page.locator(this.exploreButtonRole).first().click({ force: true });
+    }
+
+    async waitForSavedViewsButton() {
+        return await this.page.waitForSelector(this.savedViewsButton);
+    }
+
+    async clickSavedViewByText(text) {
+        return await this.page.click(`:text("${text}")`);
+    }
+
+    async waitForSavedViewText(text) {
+        return await this.page.waitForSelector(`:text("${text}")`);
+    }
+
+    async clickDeleteSavedViewButton(savedViewName) {
+        const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
+        return await this.page.locator(deleteButtonSelector).click();
+    }
+
+    async clickResetFiltersButton() {
+        return await this.page.locator(this.resetFiltersButton).click({ force: true });
+    }
+
+    async waitForQueryEditorTextbox() {
+        return await this.page.locator(this.queryEditor).getByRole('textbox').waitFor({ state: "visible" });
+    }
+
+    async getQueryEditorText() {
+        return await this.page.evaluate((selector) => {
+            const editor = document.querySelector(selector).querySelector('.cm-content');
+            return editor ? editor.textContent : null;
+        }, this.queryEditor);
+    }
+
+    async clickLogTableColumnSource() {
+        return await this.page.locator(this.logTableColumnSource).click();
+    }
+
+    async clickIncludeExcludeFieldButton() {
+        return await this.page.locator(this.includeExcludeFieldButton).click();
+    }
+
+    async clickIncludeFieldButton() {
+        return await this.page.locator(this.includeFieldButton).click();
+    }
+
+    async clickCloseDialog() {
+        return await this.page.locator(this.closeDialog).click();
+    }
+
+    async clickSavedViewDialogSaveContent() {
+        return await this.page.locator(this.savedViewDialogSaveContent).click();
+    }
+
+    async clickSavedViewByLabel(label) {
+        return await this.page.locator(this.savedViewByLabel).getByText(new RegExp(label)).first().click({ force: true });
+    }
+
+    async expectNotificationMessage(text) {
+        return await expect(this.page.locator(this.notificationMessage)).toContainText(text);
+    }
+
+    async expectIndexFieldSearchInputVisible() {
+        return await expect(this.page.locator(this.indexFieldSearchInput)).toBeVisible();
+    }
+
+    async expectErrorMessageVisible() {
+        return await expect(this.page.locator(this.errorMessage)).toBeVisible();
+    }
+
+    async expectWarningElementHidden() {
+        const warningElement = this.page.locator(this.warningElement);
+        return await expect(warningElement).toBeHidden();
+    }
+
+    async expectTextVisible(text) {
+        return await expect(this.page.locator(`text=${text}`)).toBeVisible();
+    }
+
+    async expectLogsTableVisible() {
+        const table = this.page.locator(this.logsTable);
+        // Wait for the table to be visible with a timeout
+        await table.waitFor({ state: 'visible', timeout: 30000 });
+        return await expect(table).toBeVisible();
+    }
+
+    async waitForSearchResults() {
+        // Wait for search results to appear by checking for the logs table
+        const table = this.page.locator(this.logsTable);
+        await table.waitFor({ state: 'visible', timeout: 30000 });
+        
+        // Also wait for at least one row to be present
+        const firstRow = this.page.locator(this.logTableColumnSource);
+        await firstRow.waitFor({ state: 'visible', timeout: 30000 });
+        
+        return true;
+    }
+
+    async expectFieldRequiredVisible() {
+        return await expect(this.page.getByText(/Field is required/).first()).toBeVisible();
+    }
+
+    async expectErrorWhileFetchingNotVisible() {
+        return await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
+    }
+
+    async clickBarChartCanvas() {
+        return await this.page.locator(this.barChartCanvas).click({
+            position: { x: 182, y: 66 }
+        });
+    }
+
+    async fillIndexFieldSearchInput(text) {
+        return await this.fillInputField(this.logSearchIndexListFieldSearchInput, text);
+    }
+
+    async clickExpandLabel(label) {
+        return await this.clickElementByLabel(label, 'Expand');
+    }
+
+    async clickCollapseLabel(label) {
+        return await this.clickElementByLabel(label, 'Collapse');
+    }
+
+    async expectErrorWhileFetchingFieldValuesNotVisible() {
+        const errorMessage = this.page.getByText('Error while fetching field values');
+        return await expect(errorMessage).not.toBeVisible();
+    }
+
+    async clickText(text) {
+        return await this.page.getByText(text).click();
+    }
+
+    async clickSubfieldAddButton(field, value) {
+        // Remove trailing dash from value to avoid double dash
+        const cleanValue = value.endsWith('-') ? value.slice(0, -1) : value;
+        return await this.page.locator(`[data-test="logs-search-subfield-add-${field}-${cleanValue}-0"]`).getByText(value).click();
+    }
+
+    async expectSubfieldAddButtonVisible(field, value) {
+        // Remove trailing dash from value to avoid double dash
+        const cleanValue = value.endsWith('-') ? value.slice(0, -1) : value;
+        const targetElement = this.page.locator(`[data-test="logs-search-subfield-add-${field}-${cleanValue}-0"]`).getByText(value);
+        return await expect(targetElement).toBeVisible();
+    }
+
+    async clickAddStreamButton() {
+        const addButton = this.page.locator(this.addStreamButton);
+        
+        // Wait for the button to be visible
+        await addButton.waitFor({ state: 'visible', timeout: 10000 });
+        
+        // Scroll the button into view if needed
+        await addButton.scrollIntoViewIfNeeded();
+        
+        // Wait a moment for the scroll to complete
+        await this.page.waitForTimeout(500);
+        
+        // Click the button
+        return await addButton.click({ force: true });
+    }
+
+    async safeClickButton(selector, options = { force: true }) {
+        const button = this.page.locator(selector);
+        
+        // Wait for the button to be visible
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        
+        // Scroll the button into view if needed
+        await button.scrollIntoViewIfNeeded();
+        
+        // Wait a moment for the scroll to complete
+        await this.page.waitForTimeout(500);
+        
+        // Click the button
+        return await button.click(options);
+    }
+
+    async clickAddStreamNameInput() {
+        return await this.page.click(this.addStreamNameInput);
+    }
+
+    async clickSaveStreamButton() {
+        const saveButton = this.page.locator(this.saveStreamButton);
+        
+        // Wait for the button to be visible
+        await saveButton.waitFor({ state: 'visible', timeout: 10000 });
+        
+        // Scroll the button into view if needed
+        await saveButton.scrollIntoViewIfNeeded();
+        
+        // Wait a moment for the scroll to complete
+        await this.page.waitForTimeout(500);
+        
+        // Click the button
+        return await saveButton.click({ force: true });
+    }
+
+    async waitForSaveStreamButton() {
+        return await this.page.locator(this.saveStreamButton).waitFor({ state: "visible" });
+    }
+
+    async scrollSaveStreamButtonIntoView() {
+        return await this.page.locator(this.saveStreamButton).scrollIntoViewIfNeeded();
+    }
+
+    async clickStreamDetail() {
+        return await this.page.locator(this.streamDetail).first().click({ force: true });
+    }
+
+    async clickSchemaStreamIndexSelect() {
+        return await this.page.locator(this.schemaStreamIndexSelect).click();
+    }
+
+    async clickFullTextSearch() {
+        const scope = this.page.locator(this.fullTextSearch);
+        return await scope.getByText(/Full text search/).first().click();
+    }
+
+    async clickSchemaUpdateSettingsButton() {
+        return await this.page.locator(this.schemaUpdateSettingsButton).click({ force: true });
+    }
+
+    async clickColAutoButton() {
+        return await this.page.locator(this.colAutoButton).click({ force: true });
+    }
+
+    async clickExploreTitle() {
+        return await this.page.locator(this.exploreTitle).first().click({ force: true });
+    }
+
+    async clickStreamsSearchStreamInput() {
+        return await this.page.click(this.streamsSearchStreamInput);
+    }
+
+    async fillStreamsSearchStreamInput(text) {
+        return await this.page.keyboard.type(text);
+    }
+
+    async selectAllText() {
+        return await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    }
+
+    async pressBackspace() {
+        return await this.page.keyboard.press("Backspace");
+    }
+
+    async expectSQLQueryMissingError() {
+        return await this.page.getByText("SQL query is missing or invalid. Please submit a valid SQL statement.").click();
+    }
+
+    async clickTableRowExpandMenu() {
+        return await this.page.locator(this.timestampColumnMenu).first().click({ force: true });
+    }
+
+    async clickVrlEditor() {
+        return await this.page.locator(this.vrlEditor).first().getByRole('textbox').fill('.a=2');
+    }
+
+    async waitForTimeout(milliseconds) {
+        return await this.page.waitForTimeout(milliseconds);
+    }
+
+    async expectSearchListVisible() {
+        return await expect(this.page.locator(this.searchListFirstTextLeft)).toBeVisible();
+    }
+
+    async clickCloseDialogForce() {
+        return await this.page.locator(this.closeDialog).click({ force: true });
+    }
+
+    async clickLiveModeButton() {
+        return await this.page.locator(this.liveModeToggleBtn).click();
+    }
+
+    async clickLiveMode5Sec() {
+        return await this.page.locator(this.liveMode5SecBtn).click();
+    }
+
+    async clickVrlToggle() {
+        return await this.page.locator(this.vrlToggleButton).click();
+    }
+
+    async expectVrlFieldVisible() {
+        return await expect(this.page.locator(this.vrlEditor).first()).toBeVisible();
+    }
+
+    async expectVrlFieldNotVisible() {
+        return await expect(this.page.locator(this.vrlEditor).first()).not.toBeVisible();
+    }
+
+    async expectFnEditorNotVisible() {
+        return await expect(this.page.locator('#fnEditor').getByRole('textbox').locator('div')).not.toBeVisible();
+    }
+
+    async clickPast6DaysButton() {
+        return await this.page.locator(this.relative6DaysBtn).click();
+    }
+
+    async clickMenuLink(link) {
+        return await this.page.locator(this.menuLink(link)).click();
+    }
+
+    async expectSQLQueryVisible() {
+        return await expect(this.page.locator(this.queryEditor)).toContainText('SELECT * FROM');
+    }
+
+    async clickNavigateBack() {
+        return await this.page.goBack();
+    }
+
+    async expectLogTableColumnSourceVisibleAfterNavigation() {
+        const element = this.page.locator(this.logTableColumnSource);
+        // Wait for the element to be visible with a timeout
+        await element.waitFor({ state: 'visible', timeout: 30000 });
+        return await expect(element).toBeVisible();
+    }
+
+    async clickSearchAroundButton() {
+        return await this.page.locator(this.searchAroundBtn).click();
+    }
+
+    async expectPaginationNotVisible() {
+        return await expect(this.page.locator(this.pagination)).not.toBeVisible();
+    }
+
+    async expectSQLPaginationNotVisible() {
+        return await expect(this.page.locator(this.sqlPagination)).not.toBeVisible();
+    }
+
+    async expectSQLGroupOrderLimitPaginationNotVisible() {
+        return await expect(this.page.locator(this.sqlGroupOrderLimitPagination)).not.toBeVisible();
+    }
+
+    async expectSearchBarRefreshButtonVisible() {
+        return await expect(this.page.locator(this.searchBarRefreshButton)).toBeVisible();
+    }
+
+    async expectQuickModeToggleVisible() {
+        return await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+    }
+
+    async clickInterestingFieldButton(field) {
+        return await this.page.locator(this.interestingFieldBtn(field)).first().click();
+    }
+
+    async expectInterestingFieldInEditor(field) {
+        return await expect(this.page.locator(this.queryEditor).getByText(new RegExp(field)).first()).toBeVisible();
+    }
+
+    async expectInterestingFieldInTable(field) {
+        return await expect(this.page.locator(this.logTableColumnSource).getByText(new RegExp(field)).first()).toBeVisible();
+    }
+
+    async expectQueryEditorVisible() {
+        return await expect(this.page.locator(this.queryEditor)).toBeVisible();
+    }
+
+    async expectQueryEditorContainsText(text) {
+        return await expect(this.page.locator(this.queryEditor)).toContainText(text);
+    }
+
+    async expectQueryEditorEmpty() {
+        const text = await this.getQueryEditorText();
+        return await expect(text).toEqual("");
+    }
+
+    async expectQueryEditorContainsSQLQuery() {
+        return await this.expectQueryEditorContainsTextHelper('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
+    }
+
+    async expectQueryEditorContainsMatchAllQuery() {
+        return await this.expectQueryEditorContainsTextHelper("match_all('code')");
+    }
+
+    async expectQueryEditorContainsMatchAllRawQuery() {
+        return await this.expectQueryEditorContainsTextHelper("match_all_raw_ignore_case('provide_credentials')");
+    }
+
+    async expectQueryEditorContainsKubernetesQuery() {
+        return await this.expectQueryEditorContainsTextHelper("kubernetes");
+    }
+
+    async expectQueryEditorContainsVrlQuery() {
+        return await this.expectQueryEditorContainsTextHelper(".a=2");
+    }
+
+    async expectQueryEditorContainsSQLQueryMissingError() {
+        return await this.expectQueryEditorContainsTextHelper("SQL query is missing or invalid. Please submit a valid SQL statement.");
+    }
+
+    async expectQueryEditorContainsValidViewName() {
+        return await this.expectQueryEditorContainsTextHelper("Please provide valid view name");
+    }
+
+    async expectQueryEditorContainsFieldRequired() {
+        return await this.expectQueryEditorContainsTextHelper("Field is required");
+    }
+
+    async expectQueryEditorContainsErrorWhileFetching() {
+        return await this.expectQueryEditorContainsTextHelper("Error while fetching");
+    }
+
+    async expectQueryEditorContainsErrorWhileFetchingFieldValues() {
+        return await this.expectQueryEditorContainsTextHelper("Error while fetching field values");
+    }
+
+    async expectQueryEditorContainsZioxIngester() {
+        return await this.expectQueryEditorContainsTextHelper("ziox-ingester-");
+    }
+
+    async expectQueryEditorContainsKubernetesPodName() {
+        return await this.expectKubernetesPodContent('pod_name');
+    }
+
+    async expectQueryEditorContainsKubernetesPodId() {
+        return await this.expectKubernetesPodContent('pod_id');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester() {
+        return await this.expectKubernetesPodContent('pod_name', '0');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester() {
+        return await this.expectKubernetesPodContent('pod_id', '0');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester0() {
+        return await this.expectKubernetesPodContent('pod_name', '0');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester0() {
+        return await this.expectKubernetesPodContent('pod_id', '0');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester1() {
+        return await this.expectKubernetesPodContent('pod_name', '1');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester1() {
+        return await this.expectKubernetesPodContent('pod_id', '1');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester2() {
+        return await this.expectKubernetesPodContent('pod_name', '2');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester2() {
+        return await this.expectKubernetesPodContent('pod_id', '2');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester3() {
+        return await this.expectKubernetesPodContent('pod_name', '3');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester3() {
+        return await this.expectKubernetesPodContent('pod_id', '3');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester4() {
+        return await this.expectKubernetesPodContent('pod_name', '4');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester4() {
+        return await this.expectKubernetesPodContent('pod_id', '4');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester5() {
+        return await this.expectKubernetesPodContent('pod_name', '5');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester5() {
+        return await this.expectKubernetesPodContent('pod_id', '5');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester6() {
+        return await this.expectKubernetesPodContent('pod_name', '6');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester6() {
+        return await this.expectKubernetesPodContent('pod_id', '6');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester7() {
+        return await this.expectKubernetesPodContent('pod_name', '7');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester7() {
+        return await this.expectKubernetesPodContent('pod_id', '7');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester8() {
+        return await this.expectKubernetesPodContent('pod_name', '8');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester8() {
+        return await this.expectKubernetesPodContent('pod_id', '8');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester9() {
+        return await this.expectKubernetesPodContent('pod_name', '9');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester9() {
+        return await this.expectKubernetesPodContent('pod_id', '9');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester10() {
+        return await this.expectKubernetesPodContent('pod_name', '10');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester10() {
+        return await this.expectKubernetesPodContent('pod_id', '10');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester11() {
+        return await this.expectKubernetesPodContent('pod_name', '11');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester11() {
+        return await this.expectKubernetesPodContent('pod_id', '11');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester12() {
+        return await this.expectKubernetesPodContent('pod_name', '12');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester12() {
+        return await this.expectKubernetesPodContent('pod_id', '12');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester13() {
+        return await this.expectKubernetesPodContent('pod_name', '13');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester13() {
+        return await this.expectKubernetesPodContent('pod_id', '13');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester14() {
+        return await this.expectKubernetesPodContent('pod_name', '14');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester14() {
+        return await this.expectKubernetesPodContent('pod_id', '14');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester15() {
+        return await this.expectKubernetesPodContent('pod_name', '15');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester15() {
+        return await this.expectKubernetesPodContent('pod_id', '15');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester16() {
+        return await this.expectKubernetesPodContent('pod_name', '16');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester16() {
+        return await this.expectKubernetesPodContent('pod_id', '16');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester17() {
+        return await this.expectKubernetesPodContent('pod_name', '17');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester17() {
+        return await this.expectKubernetesPodContent('pod_id', '17');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester18() {
+        return await this.expectKubernetesPodContent('pod_name', '18');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester18() {
+        return await this.expectKubernetesPodContent('pod_id', '18');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester19() {
+        return await this.expectKubernetesPodContent('pod_name', '19');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester19() {
+        return await this.expectKubernetesPodContent('pod_id', '19');
+    }
+
+    async expectQueryEditorContainsKubernetesPodNameZioxIngester20() {
+        return await this.expectKubernetesPodContent('pod_name', '20');
+    }
+
+    async expectQueryEditorContainsKubernetesPodIdZioxIngester20() {
+        return await this.expectKubernetesPodContent('pod_id', '20');
+    }
+
+    // Additional methods for logsPage spec
+    async clickMenuLinkItem(link) {
+        return await this.clickMenuLinkByType(link);
+    }
+
+    async clickMenuLinkLogsItem() {
+        return await this.clickMenuLinkByType('logs');
+    }
+
+    async clickMenuLinkTracesItem() {
+        return await this.clickMenuLinkByType('traces');
+    }
+
+    async clickMenuLinkStreamsItem() {
+        return await this.clickMenuLinkByType('streams');
+    }
+
+    async clickMenuLinkMetricsItem() {
+        return await this.clickMenuLinkByType('metrics');
+    }
+
+    async clickMenuLinkPipelineItem() {
+        return await this.clickMenuLinkByType('pipeline');
+    }
+
+    async clickMenuLinkFunctionsItem() {
+        return await this.clickMenuLinkByType('functions');
+    }
+
+    async clickTabRealtime() {
+        return await this.page.locator('[data-test="tab-realtime"]').click();
+    }
+
+    async clickFunctionStreamTab() {
+        return await this.page.locator('[data-test="function-stream-tab"]').click();
+    }
+
+    async clickSearchFunctionInput() {
+        return await this.page.getByPlaceholder(this.searchFunctionInput.placeholder).click();
+    }
+
+    async fillSearchFunctionInput(text) {
+        return await this.page.getByPlaceholder(this.searchFunctionInput.placeholder).fill(text);
+    }
+
+    async clickDeleteFunctionButton() {
+        return await this.page.getByRole('button', { name: 'Delete Function' }).click();
+    }
+
+    async clickFunctionDropdownSave() {
+        return await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+    }
+
+    async clickSavedFunctionNameInput() {
+        return await this.page.locator(this.savedFunctionNameInput).click();
+    }
+
+    async fillSavedFunctionNameInput(text) {
+        return await this.fillInputField(this.savedFunctionNameInput, text);
+    }
+
+    async expectFunctionNameNotValid() {
+        return await this.page.getByText('Function name is not valid.').click();
+    }
+
+    async expectWarningNoFunctionDefinition() {
+        return await this.page.locator(this.qNotifyWarning).filter({ hasText: 'warningNo function definition' }).nth(3).click();
+    }
+
+    async expectBarChartVisible() {
+        const barChart = this.page.locator(this.logsTable);
+        return await expect(barChart).toBeTruthy();
+    }
+
+    async expectUrlContainsLogs() {
+        return await expect(this.page.url()).toContain("logs");
+    }
+
+    async expectPageContainsText(text) {
+        const logsPage = this.page.locator(this.qPageContainer);
+        return await expect(logsPage).toContainText(text);
+    }
+
+    async clickLogSearchIndexListFieldSearchInput() {
+        return await this.page.locator(this.logSearchIndexListFieldSearchInput).click();
+    }
+
+    async fillLogSearchIndexListFieldSearchInput(text) {
+        return await this.fillInputField(this.logSearchIndexListFieldSearchInput, text);
+    }
+
+    async clickExpandCode() {
+        return await this.page.getByLabel(this.expandCode).click();
+    }
+
+    async clickLogsDetailTableSearchAroundBtn() {
+        return await this.page.locator(this.logsDetailTableSearchAroundBtn).click();
+    }
+
+    async expectLogTableColumnSourceVisible() {
+        const element = this.page.locator(this.logTableColumnSource);
+        // Wait for the element to be visible with a timeout
+        await element.waitFor({ state: 'visible', timeout: 30000 });
+        return await expect(element).toBeVisible();
+    }
+
+    async clickLogTableColumn3Source() {
+        return await this.page.locator(this.logTableColumn3Source).getByText('{"_timestamp":').click();
+    }
+
+    async clickHistogramToggleDiv() {
+        return await this.page.locator(this.histogramToggleDiv).nth(2).click();
+    }
+
+    async expectQueryEditorContainsExpectedQuery(expectedQuery) {
+        const text = await this.page.evaluate(() => {
+            const editor = document.querySelector(this.queryEditor).querySelector('.cm-content');
+            return editor ? editor.textContent.trim() : null;
+        });
+        console.log(text);
+        return await expect(text.replace(/\s/g, "")).toContain(expectedQuery.replace(/\s/g, ""));
+    }
+
+    async expectQueryEditorContainsSelectFrom() {
+        return await this.page.locator(this.queryEditor)
+            .locator(this.cmContent)
+            .locator(this.cmLine)
+            .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
+            .nth(0);
+    }
+
+    generateRandomString() {
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let result = '';
+        for (let i = 0; i < 5; i++) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return result;
+    }
+} 
