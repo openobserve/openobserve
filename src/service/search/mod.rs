@@ -126,7 +126,7 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
 
 pub static LIQUID_CACHE: Lazy<Arc<LiquidCache>> = Lazy::new(|| {
     Arc::new(LiquidCache::new(
-        PARQUET_BATCH_SIZE,
+        PARQUET_BATCH_SIZE * 2,
         0,
         PathBuf::from("/tmp/liquid-cache"),
         LiquidCacheMode::Liquid {

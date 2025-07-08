@@ -419,6 +419,17 @@ pub fn create_session_config(
         .listing_table_ignore_subdirectory = false;
     config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
 
+    if cfg.common.liquid_cache_enabled {
+        config.options_mut().execution.parquet.pushdown_filters = true;
+        config
+            .options_mut()
+            .execution
+            .parquet
+            .schema_force_view_types = false;
+        config.options_mut().execution.parquet.binary_as_string = true;
+        config.options_mut().execution.batch_size = PARQUET_BATCH_SIZE * 2;
+    }
+
     // based on data distributing, it only works for the data on a few records
     // config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
@@ -512,24 +523,7 @@ pub async fn prepare_datafusion_context(
     )
     .await?;
 
-    let mut session_config = create_session_config(sorted_by_time, target_partition)?;
-    if cfg.common.liquid_cache_enabled {
-        session_config
-            .options_mut()
-            .execution
-            .parquet
-            .pushdown_filters = true;
-        session_config
-            .options_mut()
-            .execution
-            .parquet
-            .schema_force_view_types = false;
-        session_config
-            .options_mut()
-            .execution
-            .parquet
-            .binary_as_string = true;
-    }
+    let session_config = create_session_config(sorted_by_time, target_partition)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
     let mut builder = SessionStateBuilder::new()
         .with_config(session_config)
