@@ -124,7 +124,7 @@ mod tests {
             "field" varchar(1024) NOT NULL, 
             "pattern_id" varchar(100) NOT NULL, 
             "policy" text NOT NULL, 
-            "apply_at_search" bool NOT NULL DEFAULT FALSE,
+            "apply_at" varchar(100) NOT NULL,
             CONSTRAINT "re_pattern_stream_map_fk" FOREIGN KEY ("pattern_id") REFERENCES "re_patterns" ("id") 
             )"#
         );
@@ -142,7 +142,7 @@ mod tests {
             `field` varchar(1024) NOT NULL, 
             `pattern_id` varchar(100) NOT NULL, 
             `policy` text NOT NULL, 
-            `apply_at_search` bool NOT NULL DEFAULT FALSE,
+            `apply_at` varchar(100) NOT NULL,
             CONSTRAINT `re_pattern_stream_map_fk` FOREIGN KEY (`pattern_id`) REFERENCES `re_patterns` (`id`) 
             )"#
         );
@@ -160,7 +160,7 @@ mod tests {
             "field" varchar(1024) NOT NULL, 
             "pattern_id" varchar(100) NOT NULL, 
             "policy" text NOT NULL, 
-            "apply_at_search" boolean NOT NULL DEFAULT FALSE,
+            "apply_at" varchar(100) NOT NULL,
             FOREIGN KEY ("pattern_id") REFERENCES "re_patterns" ("id") 
             )"#
         );
