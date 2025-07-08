@@ -4541,6 +4541,7 @@ const useLogs = () => {
 
       const streamDataResults = await Promise.all(streamDataPromises);
 
+      // TODO : We can optimize filter + flatMap using a single reducer function
       // Collect all schema fields
       const allStreamFields = streamDataResults
         .filter((data) => data?.schema)
@@ -4550,8 +4551,7 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields = allStreamFields;
       //check if allStreamFields is empty or not 
       //if empty then we are displaying no events found... message on the UI instead of throwing in an error format
-      if (allStreamFields.length === 0) {
-
+      if (!allStreamFields.length) {
         // searchObj.data.errorMsg = t("search.noFieldFound");
         return;
       }
@@ -4696,6 +4696,7 @@ const useLogs = () => {
 
         if (!searchObj.data.searchRequestTraceIds.length) {
           searchObj.data.isOperationCancelled = false;
+          resolve(true);
           return;
         }
 
