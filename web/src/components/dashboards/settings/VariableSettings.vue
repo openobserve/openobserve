@@ -385,7 +385,7 @@ export default defineComponent({
 
 .variables-list-header {
   display: grid;
-  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 180px 120px;
+  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 120px;
   padding: 8px 0;
   font-weight: 900;
   border-bottom: 1px solid #cccccc70;
@@ -419,12 +419,12 @@ export default defineComponent({
 
 .draggable-content {
   display: grid;
-  grid-template-columns: 80px minmax(200px, 1fr) 150px 180px 120px;
+  grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 120px;
   align-items: center;
 
-  .item-name {
-    padding-right: 16px;
-  }
+  // .item-name {
+  //   padding-right: 16px;
+  // }
 
   .item-actions {
     display: flex;

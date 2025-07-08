@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="col">
             <div>
               <q-select
-                class=" showLabelOnTop"
+                class="showLabelOnTop"
                 filled
                 stack-label
                 input-debounce="0"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               ></q-select>
             </div>
-            <div class="text-body1 text-bold q-mt-md">
+            <div class="text-body1 text-bold q-mt-sm">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
             <div class="row">
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   dense
                   stack-label
-                  class=" showLabelOnTop col no-case q-mr-sm"
+                  class="showLabelOnTop col no-case q-mr-sm"
                   @update:model-value="streamTypeUpdated"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-type-select"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   option-value="name"
                   option-label="name"
                   emit-value
-                  class=" showLabelOnTop col no-case"
+                  class="showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-select"
                 >
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 input-debounce="0"
                 :options="fieldsFilteredOptions"
                 @filter="fieldsFilterFn"
-                class=" showLabelOnTop no-case"
+                class="showLabelOnTop no-case"
                 option-value="name"
                 option-label="name"
                 emit-value
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-query-values-filter-name-selector"
                       @filter="fieldsFilterFn"
                       :placeholder="filter.name ? '' : 'Select Field'"
-                      class=" col no-case q-ml-sm"
+                      class="col no-case q-ml-sm"
                       :rules="[
                         (val: any) => !!val.trim() || 'Field is required!',
                       ]"
@@ -436,10 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- default value for multi select variables -->
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
-            <div
-              class="button-group multi-select-default-value-toggle q-mt-md"
-              style="margin-bottom: 8px"
-            >
+            <div class="button-group multi-select-default-value-toggle">
               <div class="multi-select-default-value">By Default Select:</div>
               <div class="row">
                 <div>
@@ -452,7 +449,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="button button-left"
                     type="button"
-                    style="padding: 8px"
                     @click="variableData.selectAllValueForMultiSelect = 'first'"
                   >
                     First value
@@ -469,7 +465,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     type="button"
                     class="button button-middle"
-                    style="padding: 8px"
                     @click="variableData.selectAllValueForMultiSelect = 'all'"
                   >
                     All values
@@ -486,7 +481,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     type="button"
                     class="button button-right"
-                    style="padding: 8px"
                     @click="
                       variableData.selectAllValueForMultiSelect = 'custom'
                     "
@@ -508,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? variableData.customMultiSelectValue
                   : [variableData.customMultiSelectValue[0]]"
                 :key="index"
-                class="q-mb-sm q-mt-md"
+                class="q-mt-md"
                 style="flex-wrap: wrap"
               >
                 <div class="flex q-mr-sm" style="width: 50%">
@@ -589,9 +583,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="flex justify-center q-mt-md">
+          <div class="flex justify-center">
             <q-btn
-              class="q-mb-md text-bold"
+              class="text-bold"
               :label="t('dashboard.cancel')"
               text-color="light-text"
               padding="sm md"
@@ -603,7 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 type="submit"
                 :loading="saveVariableApiCall.isLoading.value"
-                class="q-mb-md text-bold no-border q-ml-md"
+                class="text-bold no-border q-ml-md"
                 color="secondary"
                 padding="sm xl"
                 no-caps
@@ -1262,10 +1256,10 @@ export default defineComponent({
   text-transform: none !important;
 }
 
-.textbox {
-  margin-top: 5px;
-  margin-bottom: 5px;
-}
+// .textbox {
+//   margin-top: 5px;
+//   margin-bottom: 5px;
+// }
 
 .theme-dark .bg-highlight {
   background-color: #747474;
@@ -1313,5 +1307,9 @@ export default defineComponent({
   font-size: 14px;
   font-weight: 600;
   color: #666666;
+}
+
+.q-field--with-bottom {
+  padding-bottom: 0 !important;
 }
 </style>
