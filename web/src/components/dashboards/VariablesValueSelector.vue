@@ -1207,6 +1207,14 @@ export default defineComponent({
           return;
         }
 
+        if (currentlyExecutingPromises[name] === null) {
+          variableLog(
+            name,
+            `Promise already cancelled, skipping load for variable ${name}`,
+          );
+          currentlyExecutingPromises[name] = reject;
+        }
+
         // For search operations, use comprehensive cancellation
         if (searchText) {
           cancelAllVariableOperations(name);
@@ -1556,7 +1564,30 @@ export default defineComponent({
             value: value.zo_sql_key.toString(),
           }));
 
-        // Update options with new values
+        // Efficiently add the selected value to options if not present
+        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
+          const val = variableObject.value[0];
+          if (
+            val !== undefined &&
+            val !== null &&
+            !newOptions.some((opt) => opt.value === val) &&
+            val !== SELECT_ALL_VALUE
+          ) {
+            newOptions.push({ label: val, value: val });
+          }
+        } else if (
+          !variableObject.multiSelect &&
+          variableObject.value !== null &&
+          variableObject.value !== undefined &&
+          !newOptions.some((opt) => opt.value === variableObject.value) &&
+          variableObject.value !== SELECT_ALL_VALUE
+        ) {
+          newOptions.push({
+            label: variableObject.value,
+            value: variableObject.value,
+          });
+        }
+
         variableObject.options = newOptions;
 
         // Set default value
@@ -1761,8 +1792,15 @@ export default defineComponent({
       if (variableObject.isLoading) {
         return;
       }
-      // When a dropdown is opened, only load the variable data
-      await loadSingleVariableDataByName(variableObject);
+      try {
+        // When a dropdown is opened, only load the variable data
+        await loadSingleVariableDataByName(variableObject);
+      } catch (error) {
+        variableLog(
+          variableObject.name,
+          `Error loading variable options for ${variableObject.name}: ${error.message}`,
+        );
+      }
     };
 
     let isLoading = false;
