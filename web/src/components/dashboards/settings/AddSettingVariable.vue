@@ -277,7 +277,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchRegex="(?:^|[^$])\$?(\w+)"
                       :rules="[(val: any) => val?.length > 0 || 'Required']"
                       debounce="1000"
-                      style="margin-top: none !important; width: 41% !important"
+                      style="
+                        margin-top: none !important;
+                        width: 41% !important;
+                        padding-bottom: 0px !important;
+                      "
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
                     <q-btn
