@@ -15,41 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="iam-roles-section-title"
-    style="font-size: 18px; padding-top: 12px"
-    class="q-mb-md q-px-md"
-  >
-    {{ t("iam.roles") }}
-  </div>
-
-  <div>
-    <div class="q-px-md q-mb-sm q-pb-xs row items-center justify-between">
-      <div date-test="iam-roles-search-input">
-        <q-input
-          v-model="filterQuery"
-          filled
-          dense
-          class="q-pr-sm"
-          style="width: 500px"
-          :placeholder="t('iam.searchRole')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
+  <q-page class="q-pa-none">
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
+      :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      >
+      <div
+        data-test="iam-roles-section-title"
+        class="q-table__title"
+      >
+        {{ t("iam.roles") }}
       </div>
+      <div class="row items-center justify-end">
+          <div date-test="iam-roles-search-input">
+            <q-input
+              v-model="filterQuery"
+              filled
+              dense
+              class="q-pr-sm"
+              style="width: 400px"
+              :placeholder="t('iam.searchRole')"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </div>
 
-      <q-btn
-        data-test="alert-list-add-alert-btn"
-        class="q-ml-md q-mb-xs text-bold no-border q-mr-sm"
-        padding="sm lg"
-        color="secondary"
-        no-caps
-        :label="t(`iam.addRole`)"
-        @click="addRole"
-      />
+          <q-btn
+            data-test="alert-list-add-alert-btn"
+            class="q-ml-md text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t(`iam.addRole`)"
+            @click="addRole"
+          />
+        </div>
     </div>
+  <div>
     <app-table
       data-test="iam-roles-table-section"
       class="iam-table"
@@ -100,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
   />
+  </q-page>
 </template>
 
 <script setup lang="ts">

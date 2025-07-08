@@ -15,24 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="q-pa-none">
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
+      :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      >
     <div
       data-test="iam-groups-section-title"
-      style="font-size: 18px; padding-top: 12px"
-      class="q-mb-md q-px-md"
+      class="q-table__title"
     >
       {{ t("iam.groups") }}
     </div>
-
-    <div>
-      <div class="q-px-md q-mb-sm q-pb-xs row items-center justify-between">
+    <div class=" row items-center justify-end">
         <div date-test="iam-groups-search-input">
           <q-input
             v-model="filterQuery"
             filled
             dense
             class="q-pr-sm"
-            style="width: 500px"
+            style="width: 400px"
             :placeholder="t('iam.searchGroup')"
           >
             <template #prepend>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-btn
           data-test="alert-list-add-alert-btn"
-          class="q-ml-md q-mb-xs text-bold no-border q-mr-sm"
+          class="q-ml-md text-bold no-border"
           padding="sm lg"
           color="secondary"
           no-caps
@@ -50,6 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="addGroup"
         />
       </div>
+    </div>
+    <div>
       <app-table
         data-test="iam-groups-table-section"
         class="iam-table"

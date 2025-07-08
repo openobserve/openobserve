@@ -18,11 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none">
-    <div>
       <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
       :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      style="position: sticky; top: 0; z-index: 1000 ;"
       >
-
           <div  class="q-table__title full-width" data-test="organizations-title-text">{{ t("organization.header") }}</div>
           <div class="full-width tw-flex tw-justify-end">
 
@@ -52,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             </div>
         </div>
-    </div>
-    <q-table
+    <div>
+      <q-table
       ref="qTable"
       :rows="organizations"
       :columns="columns"
@@ -106,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
       </template>
     </q-table>
+    </div>
     <q-dialog
       v-model="showAddOrganizationDialog"
       position="right"
