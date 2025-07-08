@@ -3125,6 +3125,13 @@ const useLogs = () => {
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
 
+
+            // check if histogram interval is undefined, then set current response as histogram response
+            // for visualization, will require to set histogram interval to fill missing values
+            if(searchObj.data.queryResults.histogram_interval == undefined && res.data?.histogram_interval) {
+              searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
+            }
+
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
             // }
