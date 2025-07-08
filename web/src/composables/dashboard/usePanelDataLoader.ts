@@ -917,7 +917,6 @@ export const usePanelDataLoader = (
         (v) =>
           v.value === null ||
           v.value === undefined ||
-          v.value === "" ||
           (Array.isArray(v.value) && v.value.length === 0),
       )
       .map((v) => v.name);
