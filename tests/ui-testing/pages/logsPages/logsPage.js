@@ -24,7 +24,7 @@ export class LogsPage {
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
-        this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] div';
+        this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] .q-toggle__inner';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
@@ -37,7 +37,7 @@ export class LogsPage {
         this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"] > .q-btn__content';
         this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"] > .q-btn__content > .block';
         this.absoluteTab = '[data-test="date-time-absolute-tab"]';
-        this.scheduleText = '[data-test="date-time-schedule-text"]';
+        this.scheduleText = '[data-test="date-time-btn"]';
         this.timeZoneDropdown = '[data-test="timezone-select"]';
         this.timeZoneOption = (zone) => `[data-test="timezone-option-${zone}"]`;
         this.dateSelector = (day) => `[data-test="date-selector-${day}"]`;
@@ -148,8 +148,10 @@ export class LogsPage {
     }
 
     // Navigation methods
-    async navigateToLogs() {
-        await this.page.goto('/logs');
+    async navigateToLogs(orgIdentifier) {
+        const logsUrl = '/web/logs'; // Using the same pattern as in test files
+        const orgId = orgIdentifier || process.env["ORGNAME"];
+        await this.page.goto(`${logsUrl}?org_identifier=${orgId}`);
     }
 
     async validateLogsPage() {
@@ -280,7 +282,7 @@ export class LogsPage {
     }
 
     async verifyTimeSetTo30Seconds() {
-        await expect(this.page.locator(this.scheduleText)).toContainText('Past 30 seconds');
+        await expect(this.page.locator(this.scheduleText)).toContainText('Past 30 Seconds');
     }
 
     async setDateTime() {
@@ -514,7 +516,8 @@ export class LogsPage {
 
     // Interesting fields methods
     async clickInterestingFields() {
-        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').click();
+        await this.fillIndexFieldSearchInput('kubernetes_pod_name');
+        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').first().click();
     }
 
     async validateInterestingFields() {
@@ -527,7 +530,7 @@ export class LogsPage {
 
     async addRemoveInteresting() {
         await this.clickInterestingFields();
-        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').click();
+        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').first().click();
     }
 
     // Kubernetes methods

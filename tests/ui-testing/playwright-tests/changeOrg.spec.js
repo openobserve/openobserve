@@ -91,10 +91,8 @@ test.describe("Change Organisation", () => {
         multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
         await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
         await homePage.homePageOrg(newOrgName);
-        await logsPage.navigateToLogs();
+        await logsPage.navigateToLogs(multiOrgIdentifier);
         await homePage.homeURLContains(multiOrgIdentifier);
-     
-
     });
 
     test("Metrics Page default validation", async ({ page }) => {
