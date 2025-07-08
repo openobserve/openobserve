@@ -1134,6 +1134,7 @@ async fn values_v1(
         Some(user_id.to_string()),
         &req,
         "".to_string(),
+        false,
     )
     .instrument(http_span)
     .await;

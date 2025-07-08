@@ -732,6 +732,16 @@ pub async fn do_partitioned_search(
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
 
+            if is_result_array_skip_vrl {
+                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                    backup_query_fn.clone(),
+                    &mut search_res,
+                    org_id,
+                    stream_name,
+                    &trace_id,
+                );
+            }
+
             // Send the cached response
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
@@ -1208,6 +1218,16 @@ async fn process_delta(
 
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
+
+            if is_result_array_skip_vrl {
+                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                    backup_query_fn.clone(),
+                    &mut search_res,
+                    org_id,
+                    stream_name,
+                    trace_id,
+                );
+            }
 
             let response = StreamResponses::SearchResponse {
                 results: search_res.clone(),
