@@ -247,12 +247,6 @@ watch(
     top: 0;
     opacity: 1;
     z-index: 1;
-    background: #f5f5f5;
-  }
-
-  .q-table--dark .thead-sticky,
-  .q-table--dark .tfoot-sticky {
-    background: #565656 !important;
   }
 
   .q-table__bottom {
