@@ -810,12 +810,14 @@ pub async fn list_users(
         if is_list_all {
             let (org, id) = org_user.key().split_once('/').unwrap();
             if let Some(org_record) = organization::get_org(org).await {
-                let user_org = user_orgs.entry(id.to_string()).or_insert(vec![]);
-                user_org.push(OrgRoleMapping {
-                    org_id: org.to_string(),
-                    role: org_user.value().role.clone(),
-                    org_name: org_record.name,
-                });
+                user_orgs
+                    .entry(id.to_string())
+                    .or_default()
+                    .push(OrgRoleMapping {
+                        org_id: org.to_string(),
+                        role: org_user.value().role.clone(),
+                        org_name: org_record.name,
+                    });
             }
         } else if org_user.key().starts_with(&format!("{org_id}/"))
             && let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await
@@ -935,7 +937,7 @@ pub async fn remove_user_from_org(
                 }
 
                 if !user.organizations.is_empty() {
-                    let mut orgs = user.clone().organizations;
+                    let orgs = &mut user.organizations;
                     if orgs.len() == 1 {
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
@@ -978,7 +980,7 @@ pub async fn remove_user_from_org(
                                     ),
                                 ));
                             }
-                            if org.name.eq(&org_id.to_string()) {
+                            if org.name.eq(org_id) {
                                 let user_role = &org.role;
                                 is_service_account = user_role.eq(&UserRole::ServiceAccount);
                                 _user_fga_role =
@@ -989,8 +991,7 @@ pub async fn remove_user_from_org(
                                     };
                             }
                         }
-                        orgs.retain(|x| !x.name.eq(&org_id.to_string()));
-                        user.organizations = orgs;
+                        orgs.retain(|x| !x.name.eq(org_id));
                         let resp = db::org_users::remove(org_id, &email_id).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
@@ -1069,7 +1070,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
         (false, get_default_user_org())
     } else {
         let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
+        local_orgs.retain(|org| !org.name.eq(org_id));
         if local_orgs.is_empty() {
             (false, get_default_user_org())
         } else {

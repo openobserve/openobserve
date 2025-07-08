@@ -305,4 +305,12 @@ mod test_telemetry {
         add_zo_info(&mut props).await;
         assert!(!tel.base_info.is_empty())
     }
+
+    #[tokio::test]
+    async fn test_telemetry_send_track_event_without_base_info_or_zo_data() {
+        let mut telemetry = Telemetry::new();
+        telemetry
+            .send_track_event("test_event", None, false, false)
+            .await;
+    }
 }
