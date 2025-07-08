@@ -50,14 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addRole"
       />
     </div>
-    <div
-      data-test="iam-roles-table-title"
-      class="q-px-md q-pt-sm q-ml-xs text-bold"
-      style="font-size: 14px; padding-bottom: 12px"
-    >
-      {{ rows.length }} {{ t("iam.roles") }}
-      <!-- Add QTablePagination here -->
-    </div>
     <app-table
       data-test="iam-roles-table-section"
       class="iam-table"
@@ -70,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         method: filterRoles,
       }"
       :bordered="false"
+      :title="t('iam.roles')"
     >
       <template v-slot:actions="slotProps: any">
         <div>

@@ -50,13 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="addGroup"
         />
       </div>
-      <div
-        data-test="iam-groups-table-title"
-        class="q-px-md q-pt-sm q-ml-xs text-bold"
-        style="font-size: 14px; padding-bottom: 12px"
-      >
-        {{ rows.length }} {{ t("iam.groups") }}
-      </div>
       <app-table
         data-test="iam-groups-table-section"
         class="iam-table"
@@ -69,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           method: filterGroups,
         }"
         :bordered="false"
+        :title="t('iam.groups')"
       >
         <template v-slot:actions="slotProps: any">
           <div>

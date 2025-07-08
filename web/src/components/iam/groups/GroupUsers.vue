@@ -107,12 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
     </div>
     <div data-test="iam-users-selection-table" class="q-px-md">
-      <div
-        data-test="iam-users-selection-table-title"
-        class="q-my-sm text-bold"
-      >
-        {{ rows.length }} Users
-      </div>
       <template v-if="rows.length">
         <app-table
           :rows="rows"
@@ -124,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value: userSearchKey,
             method: filterUsers,
           }"
+          :title="t('iam.users')"
         >
           <template v-slot:select="slotProps: any">
             <q-checkbox

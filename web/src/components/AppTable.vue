@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filter && filter.value"
       :filter-method="filter && filter.method"
       @virtual-scroll="onScroll"
-      class="full-height"
     >
       <template #no-data>
         <NoData class="q-mb-lg" />
@@ -60,6 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
        <template #top="scope">
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full  "> 
+          <span class="tw-font-bold tw-text-[14px] tw-mr-sm tw-w-full">
+          {{ rows.length }} {{ title }}
+        </span>
         <QTablePagination
           :scope="scope"
           :resultTotal="resultTotal"
@@ -67,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           position="top"
           @update:changeRecordPerPage="changePagination"
         />
+        </div>
        </template>
       <template v-slot:body="props">
         <q-tr :props="props" :key="`m_${props.row.index}`">
@@ -124,7 +128,6 @@ import { ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { computed,watch  } from "vue";
 import NoData from "./shared/grid/NoData.vue";
-
 const props = defineProps({
   columns: {
     type: Array,

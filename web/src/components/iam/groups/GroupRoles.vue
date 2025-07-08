@@ -84,12 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div data-test="iam-roles-selection-table" class="q-px-md">
-      <div
-        data-test="iam-roles-selection-table-title"
-        class="q-my-sm text-bold"
-      >
-        {{ rows.length }} Roles
-      </div>
       <template v-if="rows.length">
         <app-table
           :rows="rows"
@@ -100,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value: userSearchKey,
             method: filterRoles,
           }"
+          :title="t('iam.roles')"
         >
           <template v-slot:select="slotProps: any">
             <q-checkbox
