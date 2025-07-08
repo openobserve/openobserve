@@ -168,6 +168,7 @@ export default class DashboardFilter {
     //   .getByRole("option", { name: newFieldName, exact: true })
     //   .first()
     //   .click();
+
     // const option = this.page
     //   .getByRole("option", { name: newFieldName, exact: true })
     //   .first();
@@ -183,7 +184,7 @@ export default class DashboardFilter {
     const suggestion = this.page
       .locator('div.q-menu[role="listbox"] div.q-item')
       .first();
-    await suggestion.waitFor({ state: "visible", timeout: 10000 });
+    await suggestion.waitFor({ state: "visible", timeout: 10000 }).first;
     await suggestion.click();
 
     // Step 3: Condition dropdown
