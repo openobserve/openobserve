@@ -770,7 +770,8 @@ function stringifyAstExpr(expr: any, defaultTable?: string): string {
       let raw = typeof expr.value === "string" ? expr.value : String(expr.value);
       if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"')))
         raw = raw.substring(1, raw.length - 1);
-      const escaped = raw.replace(/"/g, '\\"');
+      // Escape backslashes first, then double quotes to ensure correct escaping sequence
+      const escaped = raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       return `Utf8("${escaped}")`;
     }
     case "bool":
