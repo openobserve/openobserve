@@ -613,12 +613,23 @@ pub struct MergeJobPendingRecord {
 }
 
 #[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
-#[repr(i32)]
+#[repr(i64)]
 pub enum FileListJobStatus {
     #[default]
     Pending,
     Running,
     Done,
+}
+
+impl From<i64> for FileListJobStatus {
+    fn from(status: i64) -> Self {
+        match status {
+            0 => Self::Pending,
+            1 => Self::Running,
+            2 => Self::Done,
+            _ => Self::Pending,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, sqlx::FromRow)]
