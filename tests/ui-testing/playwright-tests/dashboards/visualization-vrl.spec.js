@@ -1,11 +1,11 @@
 import { test, expect } from "../baseFixtures";
-import LogsVisualise from "../../pages/dashboardPages/visualise";
-import { login } from "../utils/dashLogin";
-import { ingestion } from "../utils/dashIngestion";
+import LogsVisualise from "../../pages/dashboardPages/visualise.js";
+import { login } from "../utils/dashLogin.js";
+import { ingestion } from "../utils/dashIngestion.js";
 import logData from "../../cypress/fixtures/log.json";
 
 test.describe.configure({ mode: "parallel" });
-const selectStream = async (page, stream) => {
+const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
