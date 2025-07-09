@@ -313,8 +313,7 @@ pub async fn generate_report(
     if let Err(e) = page.goto(&dashb_url).await {
         let page_url = page.url().await;
         log::error!(
-            "Error navigating to dashboard url {dashb_url}: current uri: {:#?} error: {e}",
-            page_url
+            "Error navigating to dashboard url {dashb_url}: current uri: {page_url:#?} error: {e}"
         );
         return Err(anyhow::anyhow!("{e}"));
     }

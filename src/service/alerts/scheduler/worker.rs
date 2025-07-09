@@ -166,17 +166,13 @@ impl SchedulerJobPuller {
             // Check how many workers are available
             let trace_id = config::ider::uuid();
 
-            log::info!("[SCHEDULER][JobPuller-{}] Pulling jobs", trace_id);
+            log::info!("[SCHEDULER][JobPuller-{trace_id}] Pulling jobs");
 
             // Pull only as many jobs as we have workers
             let triggers = match self.pull().await {
                 Ok(triggers) => triggers,
                 Err(e) => {
-                    log::error!(
-                        "[SCHEDULER][JobPuller-{}] Error pulling triggers: {}",
-                        trace_id,
-                        e
-                    );
+                    log::error!("[SCHEDULER][JobPuller-{trace_id}] Error pulling triggers: {e}");
                     continue;
                 }
             };
@@ -235,10 +231,7 @@ impl SchedulerJobPuller {
                             _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                             _ = rx.recv() => {
                                 log::debug!(
-                                    "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] trigger[{}] done",
-                                    trace_id_keep_alive,
-                                    job_id,
-                                    job_key
+                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for job[{job_id}] trigger[{job_key}] done"
                                 );
                                 return;
                             }
@@ -248,11 +241,7 @@ impl SchedulerJobPuller {
                                 .await
                         {
                             log::error!(
-                                "[SCHEDULER][JobPuller-{}] keep_alive for job[{}] trigger[{}] failed: {}",
-                                trace_id_keep_alive,
-                                job_id,
-                                job_key,
-                                e
+                                "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for job[{job_id}] trigger[{job_key}] failed: {e}"
                             );
                         }
                     }
@@ -263,8 +252,7 @@ impl SchedulerJobPuller {
             for job in jobs {
                 if self.tx.send(job).await.is_err() {
                     log::error!(
-                        "[SCHEDULER][JobPuller-{}] Channel closed, exiting job puller",
-                        trace_id
+                        "[SCHEDULER][JobPuller-{trace_id}] Channel closed, exiting job puller"
                     );
                     return Ok(());
                 }
@@ -290,7 +278,7 @@ impl SchedulerJobPuller {
         {
             Ok(triggers) => Ok(triggers),
             Err(e) => {
-                log::error!("[SCHEDULER] Error pulling triggers: {}", e);
+                log::error!("[SCHEDULER] Error pulling triggers: {e}");
                 Ok(vec![])
             }
         }
@@ -335,7 +323,7 @@ impl Scheduler {
                 let worker = worker.clone();
                 tokio::spawn(async move {
                     if let Err(e) = worker.run().await {
-                        log::error!("[SCHEDULER][Worker] Error in worker: {}", e);
+                        log::error!("[SCHEDULER][Worker] Error in worker: {e}");
                     }
                 })
             })
@@ -346,7 +334,7 @@ impl Scheduler {
             let puller = self.job_puller.clone();
             tokio::spawn(async move {
                 if let Err(e) = puller.run().await {
-                    log::error!("[SCHEDULER] Error in job puller: {}", e);
+                    log::error!("[SCHEDULER] Error in job puller: {e}");
                 }
             })
         };
@@ -356,7 +344,7 @@ impl Scheduler {
 
         // Wait for puller to complete
         if let Err(e) = puller_handle.await {
-            log::error!("[SCHEDULER] Error waiting for puller to complete: {}", e);
+            log::error!("[SCHEDULER] Error waiting for puller to complete: {e}");
         }
 
         // When shutting down:
@@ -364,7 +352,7 @@ impl Scheduler {
 
         // Wait for workers to complete
         if let Err(e) = futures::future::try_join_all(worker_handles).await {
-            log::error!("[SCHEDULER] Error waiting for workers to complete: {}", e);
+            log::error!("[SCHEDULER] Error waiting for workers to complete: {e}");
         }
 
         // Ideally should never reach here

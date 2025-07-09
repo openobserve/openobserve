@@ -66,7 +66,7 @@ pub(crate) async fn create_context(
 
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
-        log::error!("stream [{}] is being deleted", stream_name);
+        log::error!("stream [{stream_name}] is being deleted");
         return Ok(None);
     }
 
@@ -75,7 +75,7 @@ pub(crate) async fn create_context(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            log::error!("[trace_id {trace_id}] get schema error: {err}");
             return Err(datafusion::error::DataFusionError::Execution(
                 err.to_string(),
             ));
@@ -130,7 +130,7 @@ pub(crate) async fn create_context(
     let mut scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
+            log::error!("[trace_id {trace_id}] calculate files size error: {err}");
             return Err(datafusion::error::DataFusionError::Execution(
                 "calculate files size error".to_string(),
             ));
@@ -284,7 +284,7 @@ async fn get_file_list(
     {
         Ok(results) => results,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] get file list error: {}", err);
+            log::error!("[trace_id {trace_id}] get file list error: {err}");
             return Err(DataFusionError::Execution(
                 "get file list error".to_string(),
             ));

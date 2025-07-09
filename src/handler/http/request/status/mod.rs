@@ -530,7 +530,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         }
     };
 
-    log::info!("entering exchange_code: {}", code);
+    log::info!("entering exchange_code: {code}");
 
     match exchange_code(code).await {
         Ok(login_data) => {

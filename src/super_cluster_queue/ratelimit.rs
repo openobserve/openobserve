@@ -36,8 +36,7 @@ pub async fn process(msg: Message) -> Result<()> {
             Ok(_) => Ok(()),
             Err(e) if e.to_string() == RULE_EXISTS => {
                 log::warn!(
-                    "[SUPER_CLUSTER:RATELIMIT] Rule already exists, ignoring, rule: {:?}",
-                    rule
+                    "[SUPER_CLUSTER:RATELIMIT] Rule already exists, ignoring, rule: {rule:?}"
                 );
                 Ok(())
             }
@@ -53,7 +52,7 @@ pub async fn process(msg: Message) -> Result<()> {
         },
         MessageType::RatelimitDelete => {
             let RuleEntry::Single(rule) = rule else {
-                log::error!("[SUPER_CLUSTER:RATELIMIT] Invalid message: {:?}", rule);
+                log::error!("[SUPER_CLUSTER:RATELIMIT] Invalid message: {rule:?}");
                 return Err(Error::Message("Invalid rule entry type".to_string()));
             };
 

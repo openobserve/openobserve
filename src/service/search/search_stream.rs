@@ -746,7 +746,7 @@ pub async fn do_partitioned_search(
                 search_res.total = hit_count as usize;
                 search_res.hits = top_k_values;
                 let duration = instant.elapsed();
-                log::debug!("Top k values for partition {idx} took {:?}", duration);
+                log::debug!("Top k values for partition {idx} took {duration:?}");
             }
 
             if is_result_array_skip_vrl {
@@ -790,10 +790,7 @@ pub async fn do_partitioned_search(
                 .await
                 .is_err()
             {
-                log::warn!(
-                    "[trace_id {}] Sender is closed, stop sending progress",
-                    trace_id
-                );
+                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending progress");
                 return Ok(());
             }
         }
@@ -990,8 +987,7 @@ pub async fn handle_cache_responses_and_deltas(
 
             if process_delta_first {
                 log::info!(
-                    "[HTTP2_STREAM trace_id {trace_id}] Processing delta before cached response, order_by: {:#?}",
-                    cache_order_by
+                    "[HTTP2_STREAM trace_id {trace_id}] Processing delta before cached response, order_by: {cache_order_by:#?}"
                 );
                 process_delta(
                     req,
@@ -1122,11 +1118,7 @@ async fn process_delta(
     backup_query_fn: Option<String>,
     stream_name: &str,
 ) -> Result<(), infra::errors::Error> {
-    log::info!(
-        "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
-        trace_id,
-        delta
-    );
+    log::info!("[HTTP2_STREAM]: Processing delta for trace_id: {trace_id}, delta: {delta:?}");
     let mut req = req.clone();
     let original_req_start_time = req.query.start_time;
     let original_req_end_time = req.query.end_time;
@@ -1332,10 +1324,7 @@ async fn process_delta(
                 .await
                 .is_err()
             {
-                log::warn!(
-                    "[trace_id {}] Sender is closed, stop sending progress",
-                    trace_id
-                );
+                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending progress");
                 return Ok(());
             }
         }
@@ -1405,10 +1394,7 @@ async fn send_partial_search_resp(
             end_time: new_end_time,
         },
     };
-    log::info!(
-        "[HTTP2_STREAM]: trace_id: {} Sending partial search response",
-        trace_id
-    );
+    log::info!("[HTTP2_STREAM]: trace_id: {trace_id} Sending partial search response");
 
     if sender.send(Ok(response)).await.is_err() {
         log::warn!("[trace_id {trace_id}] Sender is closed, stop sending partial search response");
@@ -1438,10 +1424,7 @@ async fn send_cached_responses(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
 ) -> Result<(), infra::errors::Error> {
-    log::info!(
-        "[HTTP2_STREAM]: Processing cached response for trace_id: {}",
-        trace_id
-    );
+    log::info!("[HTTP2_STREAM]: Processing cached response for trace_id: {trace_id}");
 
     let mut cached = cached.clone();
 

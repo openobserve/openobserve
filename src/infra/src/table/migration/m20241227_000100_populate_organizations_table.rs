@@ -59,7 +59,7 @@ impl MigrationTrait for Migration {
                     1
                 };
                 let now = chrono::Utc::now().timestamp_micros();
-                log::debug!("Creating organization: {}", org_id);
+                log::debug!("Creating organization: {org_id}");
                 orgs.push(organizations::ActiveModel {
                     identifier: Set(org_id.clone()),
                     org_name: Set(org_id.clone()),

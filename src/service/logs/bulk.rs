@@ -367,8 +367,7 @@ pub async fn ingest(
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(&stream_name) else {
                 log::error!(
-                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
-                    stream_name
+                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
                 );
                 continue;
             };
@@ -379,10 +378,7 @@ pub async fn ingest(
             {
                 Err(e) => {
                     log::error!(
-                        "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                        org_id,
-                        stream_name,
-                        e
+                        "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}."
                     );
                     bulk_res.errors = true;
                     metrics::INGEST_ERRORS
@@ -605,7 +601,7 @@ pub async fn ingest(
         match write_result {
             Ok(()) => ("200", bulk_res),
             Err(e) => {
-                log::error!("Error while writing logs: {}", e);
+                log::error!("Error while writing logs: {e}");
                 bulk_res.errors = true;
                 ("500", bulk_res)
             }

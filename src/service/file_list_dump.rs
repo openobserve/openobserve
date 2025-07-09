@@ -338,10 +338,7 @@ async fn move_and_delete(
                 infra::file_list::batch_add_deleted(org, Utc::now().timestamp_micros(), &del_items)
                     .await
         {
-            log::error!(
-                "[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {}",
-                e
-            );
+            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
@@ -357,10 +354,7 @@ async fn move_and_delete(
             })
             .collect();
         if let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!(
-                "[FILE_LIST_DUMP] batch_delete to db failed, retrying: {}",
-                e
-            );
+            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
@@ -412,8 +406,7 @@ pub async fn stats(
             let stats = stats_inner(org_id, stream_type, &stream_name, pk_value).await?;
             ret.extend(stats);
             log::debug!(
-                "[FILE_LIST_DUMP] stats for {org_id}/{stream_type}/{stream_name}: pk: {:?}",
-                pk_value,
+                "[FILE_LIST_DUMP] stats for {org_id}/{stream_type}/{stream_name}: pk: {pk_value:?}",
             );
         }
     }

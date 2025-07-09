@@ -538,7 +538,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     // flush db
     let db = infra::db::get_db().await;
     if let Err(e) = db.close().await {
-        log::error!("waiting for db close failed, error: {}", e);
+        log::error!("waiting for db close failed, error: {e}");
     }
 
     println!("command {name} execute successfully");

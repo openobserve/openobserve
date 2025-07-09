@@ -44,7 +44,7 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
     while let Some(folders) = folder_pages.fetch_and_next().await? {
         let folders_len = folders.len();
         len += folders_len;
-        log::debug!("Processing {} records", folders_len);
+        log::debug!("Processing {folders_len} records");
         for folder in folders {
             log::debug!(
                 "Processing record -> id: {}, org: {}",
@@ -57,7 +57,7 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
             authorizer::authz::set_ownership(&org_id, &obj_str, "", "").await;
         }
     }
-    log::info!("Processed {} folders for ofga migrations", len);
+    log::info!("Processed {len} folders for ofga migrations");
 
     // Next migrate all the alerts of every organizations
     len = 0;
@@ -66,7 +66,7 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
     while let Some(alerts) = alert_pages.fetch_and_next().await? {
         let alerts_len = alerts.len();
         len += alerts_len;
-        log::debug!("Processing {} records", alerts_len);
+        log::debug!("Processing {alerts_len} records");
         let mut tuples = vec![];
         for alert in alerts {
             let org_id = alert.org;
@@ -87,23 +87,23 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
         if !tuples.is_empty() {
             match authorizer::authz::update_tuples(tuples, vec![]).await {
                 Ok(_) => {
-                    log::debug!("{} alerts migrated to openfga", alerts_len);
+                    log::debug!("{alerts_len} alerts migrated to openfga");
                 }
                 Err(e) => {
-                    log::error!("Error migrating alerts in openfga: {}", e);
+                    log::error!("Error migrating alerts in openfga: {e}");
                 }
             }
         }
     }
 
-    log::info!("Processed {} alerts for ofga migrations", len);
+    log::info!("Processed {len} alerts for ofga migrations");
 
     // 1. Get all the roles for every org
     for org in orgs.iter() {
         let roles = match authorizer::roles::get_all_roles(org, None).await {
             Ok(roles) => roles,
             Err(e) => {
-                log::error!("Error openfga getting roles for org: {}", e);
+                log::error!("Error openfga getting roles for org: {e}");
                 continue;
             }
         };
@@ -114,7 +114,7 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
                 match authorizer::roles::get_role_permissions(org, role, alerts_ofga_type).await {
                     Ok(alerts) => alerts,
                     Err(e) => {
-                        log::error!("Error openfga getting alerts for role: {}", e);
+                        log::error!("Error openfga getting alerts for role: {e}");
                         continue;
                     }
                 };
@@ -159,10 +159,10 @@ pub async fn migrate_alert_folders<C: ConnectionTrait>(db: &C) -> Result<(), any
                 match authorizer::roles::update_role(org, role, add_roles, vec![], None, None).await
                 {
                     Ok(_) => {
-                        log::debug!("{} roles added to openfga", add_roles_len);
+                        log::debug!("{add_roles_len} roles added to openfga");
                     }
                     Err(e) => {
-                        log::error!("Error adding roles in openfga: {}", e);
+                        log::error!("Error adding roles in openfga: {e}");
                     }
                 }
             }

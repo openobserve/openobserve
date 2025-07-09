@@ -229,7 +229,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     if triggers.is_empty() {
         return;
     }
-    log::debug!("Evaluating triggers: {:?}", triggers);
+    log::debug!("Evaluating triggers: {triggers:?}");
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
@@ -258,7 +258,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
-                log::error!("Failed to send notification: {}", e);
+                log::error!("Failed to send notification: {e}");
                 trigger_data_stream.status = TriggerDataStatus::Failed;
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
@@ -299,7 +299,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                     })
                     .await
                     {
-                        log::error!("Failed to update trigger: {}", e);
+                        log::error!("Failed to update trigger: {e}");
                     }
                     trigger_data_stream.next_run_at = next_run_at;
                 }

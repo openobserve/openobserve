@@ -381,6 +381,11 @@ pub async fn search(
         records: res.hits.len() as i64,
         response_time: took_time,
         size: res.scan_size as f64,
+        scan_files: if res.scan_files > 0 {
+            Some(res.scan_files as i64)
+        } else {
+            None
+        },
         request_body: Some(req.query.sql),
         function: req.query.query_fn,
         user_email: user_id,
@@ -864,10 +869,7 @@ pub async fn write_results_v2(
     }
 
     if local_resp.hits.is_empty() {
-        log::info!(
-            "[trace_id {trace_id}] No hits found for caching, skipping caching",
-            trace_id = trace_id
-        );
+        log::info!("[trace_id {trace_id}] No hits found for caching, skipping caching");
         return;
     }
 
@@ -968,7 +970,7 @@ pub fn apply_vrl_to_response(
                 Some(program)
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
                 local_res.function_error.push(err.to_string());
                 local_res.is_partial = true;
                 None
@@ -1101,7 +1103,7 @@ pub async fn check_cache_v2(
                 }
             }
             Err(e) => {
-                log::error!("[trace_id {}]: Error parsing sql: {:?}", trace_id, e);
+                log::error!("[trace_id {trace_id}]: Error parsing sql: {e:?}");
                 MultiCachedQueryResponse::default()
             }
         }

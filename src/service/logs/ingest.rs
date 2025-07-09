@@ -487,7 +487,7 @@ pub async fn ingest(
         match write_result {
             Ok(()) => ("200", stream_status),
             Err(e) => {
-                log::error!("Error while writing logs: {}", e);
+                log::error!("Error while writing logs: {e}");
                 ("500", stream_status)
             }
         }

@@ -231,7 +231,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if LOCAL_NODE.is_ingester() {
         // create wal dir
         if let Err(e) = std::fs::create_dir_all(&cfg.common.data_wal_dir) {
-            log::error!("Failed to create wal dir: {}", e);
+            log::error!("Failed to create wal dir: {e}");
         }
     }
 

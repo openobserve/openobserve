@@ -34,7 +34,7 @@ pub async fn udp_server(socket: UdpSocket) {
         let (recv_len, addr) = match socket.recv_from(&mut buf_udp).await {
             Ok(val) => val,
             Err(e) => {
-                log::error!("Error while reading from UDP socket: {}", e);
+                log::error!("Error while reading from UDP socket: {e}");
                 continue;
             }
         };
@@ -42,7 +42,7 @@ pub async fn udp_server(socket: UdpSocket) {
         let input_str = match String::from_utf8(message.to_vec()) {
             Ok(val) => val,
             Err(e) => {
-                log::error!("Error while converting UDP message to UTF8 string: {}", e);
+                log::error!("Error while converting UDP message to UTF8 string: {e}");
                 continue;
             }
         };
@@ -65,18 +65,18 @@ pub async fn tls_tcp_server(listener: TcpListener, tls_acceptor: Option<TlsAccep
         let (tcp_stream, peer_addr) = match listener.accept().await {
             Ok(val) => val,
             Err(e) => {
-                log::error!("Error while accepting TCP connection: {}", e);
+                log::error!("Error while accepting TCP connection: {e}");
                 continue;
             }
         };
         match tls_acceptor.clone() {
             Some(acceptor) => match acceptor.accept(tcp_stream).await {
                 Ok(tls_stream) => {
-                    log::info!("accepted TLS connection for peer {}", peer_addr);
+                    log::info!("accepted TLS connection for peer {peer_addr}");
                     tokio::task::spawn(handle_connection(tls_stream, peer_addr));
                 }
                 Err(e) => {
-                    log::error!("TLS accept error: {}", e);
+                    log::error!("TLS accept error: {e}");
                 }
             },
             None => {
@@ -99,16 +99,16 @@ where
     S: AsyncRead + Unpin + Send + 'static,
 {
     let mut buf_tcp = vec![0u8; 1460];
-    log::info!("spawned new syslog tcp receiver for peer {}", peer_addr);
+    log::info!("spawned new syslog tcp receiver for peer {peer_addr}");
     loop {
         let n = match stream.read(&mut buf_tcp).await {
             Ok(0) => {
-                log::info!("received 0 bytes, closing for peer {}", peer_addr);
+                log::info!("received 0 bytes, closing for peer {peer_addr}");
                 break;
             }
             Ok(n) => n,
             Err(e) => {
-                log::error!("Error while reading from TCP stream: {}", e);
+                log::error!("Error while reading from TCP stream: {e}");
                 break;
             }
         };
@@ -116,16 +116,16 @@ where
         let input_str = match String::from_utf8(message.to_vec()) {
             Ok(val) => val,
             Err(e) => {
-                log::error!("Error while converting TCP message to UTF8 string: {}", e);
+                log::error!("Error while converting TCP message to UTF8 string: {e}");
                 continue;
             }
         };
         if input_str != STOP_SRV {
             if let Err(e) = syslog::ingest(&input_str, peer_addr).await {
-                log::error!("Error while ingesting TCP message: {}", e);
+                log::error!("Error while ingesting TCP message: {e}");
             }
         } else {
-            log::info!("received stop signal, closing for peer {}", peer_addr);
+            log::info!("received stop signal, closing for peer {peer_addr}");
             break;
         }
     }

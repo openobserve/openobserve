@@ -194,7 +194,7 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                 .await
             {
                 Ok(files) => {
-                    log::debug!("Deleted objects: {:?}", files);
+                    log::debug!("Deleted objects: {files:?}");
                 }
                 Err(e) => {
                     log::error!("Failed to delete objects: {e}");
@@ -214,13 +214,13 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                     .await
                 {
                     Ok(_) => {
-                        log::debug!("Deleted object: {}", file);
+                        log::debug!("Deleted object: {file}");
                     }
                     Err(e) => {
                         // TODO: need a better solution for identifying the error
                         if file.ends_with(".result.json") {
                             // ignore search job file deletion error
-                            log::debug!("Failed to delete object: {}, error: {:?}", file, e);
+                            log::debug!("Failed to delete object: {file}, error: {e:?}");
                         } else if !is_local_disk_storage() {
                             log::error!("Failed to delete object: {e}");
                         }

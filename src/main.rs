@@ -378,7 +378,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 break;
             }
             Err(e) => {
-                log::error!("set node schedulable failed: {}", e);
+                log::error!("set node schedulable failed: {e}");
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         }
@@ -390,17 +390,17 @@ async fn main() -> Result<(), anyhow::Error> {
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         if let Err(e) = init_http_server_without_tracing().await {
-            log::error!("HTTP server runs failed: {}", e);
+            log::error!("HTTP server runs failed: {e}");
         }
     } else if let Err(e) = init_http_server().await {
-        log::error!("HTTP server runs failed: {}", e);
+        log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
 
     // stop tracing
     if let Some(tracer_provider) = tracer_provider {
         let result = tracer_provider.shutdown();
-        log::info!("Tracer provider shutdown result: {:?}", result);
+        log::info!("Tracer provider shutdown result: {result:?}");
     }
 
     // flush usage report
@@ -678,12 +678,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         } else {
             "HTTP"
         };
-        log::info!(
-            "Starting {} server at: {}, thread_id: {}",
-            scheme,
-            haddr,
-            local_id
-        );
+        log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
@@ -791,12 +786,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         } else {
             "HTTP"
         };
-        log::info!(
-            "Starting {} server at: {}, thread_id: {}",
-            scheme,
-            haddr,
-            local_id
-        );
+        log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
 
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
@@ -915,7 +905,7 @@ async fn graceful_shutdown(handle: ServerHandle) {
 
     // offline the node
     if let Err(e) = cluster::set_offline(true).await {
-        log::error!("set offline failed: {}", e);
+        log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
 
@@ -1082,12 +1072,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         } else {
             "HTTP"
         };
-        log::info!(
-            "Starting Script Server {} server at: {}, thread_id: {}",
-            scheme,
-            haddr,
-            local_id
-        );
+        log::info!("Starting Script Server {scheme} server at: {haddr}, thread_id: {local_id}");
         let mut app = App::new();
         app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))

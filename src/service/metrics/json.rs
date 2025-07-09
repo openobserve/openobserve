@@ -194,8 +194,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 log::error!(
-                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
-                    stream_name
+                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
                 );
                 continue;
             };

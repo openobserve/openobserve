@@ -238,16 +238,12 @@ async fn update_settings(
             {
                 Ok(_) => {
                     log::debug!(
-                        "Data retention settings for {} synced to index stream {}",
-                        stream_name,
-                        index_stream_name
+                        "Data retention settings for {stream_name} synced to index stream {index_stream_name}"
                     );
                 }
                 Err(e) => {
                     log::error!(
-                        "Failed to sync data retention settings to index stream {}: {}",
-                        index_stream_name,
-                        e
+                        "Failed to sync data retention settings to index stream {index_stream_name}: {e}"
                     );
                 }
             }

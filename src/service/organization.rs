@@ -280,7 +280,7 @@ pub async fn create_org(
             Ok(org.clone())
         }
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -319,7 +319,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
             Ok(org.clone())
         }
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -345,7 +345,7 @@ pub async fn check_and_create_org_without_ofga(
     match db::organization::save_org(org).await {
         Ok(_) => Ok(org.clone()),
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -376,7 +376,7 @@ pub async fn rename_org(
     match db::organization::rename_org(org_id, name).await {
         Ok(org) => Ok(org),
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -409,7 +409,7 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
             Ok(())
         }
         Err(e) => {
-            log::error!("Error deleting org: {}", e);
+            log::error!("Error deleting org: {e}");
             Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
     }
