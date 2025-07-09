@@ -210,7 +210,7 @@
               <!-- test pattern section -->
 
               <div class="tw-flex tw-flex-col tw-gap-2">
-                <span class="individual-section-title">
+                <span class="individual-section-title-main">
                   Test Pattern
                 </span>
                 <div class="tw-flex tw-flex-col">
@@ -230,7 +230,7 @@
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
                     <template #right>
-                        <div class="tw-h-[19px] tw-flex tw-items-center tw-mt-[1px] tw-justify-center">
+                        <div class="tw-h-[19px] tw-flex tw-items-center tw-mt-[1px] tw-justify-center tw-cursor-pointer">
                             <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-h-[19px] tw-min-h-[19px] tw-mr-1 tw-bg-[#5960B2] tw-text-white tw-flex tw-items-center tw-justify-center"
                         style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
                         <span>
@@ -797,6 +797,10 @@ export default defineComponent({
 }
 
     .individual-section-title{
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .individual-section-title-main{
       font-size: 16px;
       font-weight: 600;
       line-height: 24px;
