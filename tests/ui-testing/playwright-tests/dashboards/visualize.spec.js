@@ -13,7 +13,7 @@ import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-acti
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 
 test.describe.configure({ mode: "parallel" });
-const selectStream = async (page, stream) => {
+const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
@@ -33,6 +33,7 @@ test.describe("logs testcases", () => {
     );
 
     const logsVisualise = new LogsVisualise(page);
+
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await logsVisualise.logsApplyQueryButton();
   });
