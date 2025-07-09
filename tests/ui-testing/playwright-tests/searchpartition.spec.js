@@ -69,7 +69,7 @@ test.describe("Search Partition Tests", () => {
     await page.waitForTimeout(2000);
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     console.log("[DEBUG] Navigation to logs page complete");
-    await logsPage.selectStream("e2e_automate"); 
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
     console.log("[DEBUG] Stream selected"); 
     await applyQuery(page);
     console.log("[DEBUG] Initial query applied");
@@ -118,9 +118,34 @@ test.describe("Search Partition Tests", () => {
         expect(matchingCall.sql).toContain('SELECT histogram(_timestamp');
       }
     } else {
+      // Log streaming toggle state
+      const streamingToggleSelector = '[data-test="general-settings-enable-streaming"] input[type="checkbox"]';
+      const streamingEnabled = await page.isChecked(streamingToggleSelector);
+      console.log("[DEBUG] Streaming toggle checked:", streamingEnabled);
+
+      // Log selected stream
+      const streamSelector = '[data-test="log-search-index-list-select-stream"]';
+      let selectedStream = "";
+      try {
+        selectedStream = await page.locator(streamSelector).inputValue();
+      } catch (e) {
+        selectedStream = await page.locator(streamSelector).textContent();
+      }
+      console.log("[DEBUG] Selected stream:", selectedStream);
+
+      // Log query editor value
+      const queryEditorSelector = '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar-query-editor"] input';
+      let queryValue = "";
+      try {
+        queryValue = await page.locator(queryEditorSelector).inputValue();
+      } catch (e) {
+        queryValue = await page.locator('[data-test="logs-search-bar-query-editor"]').textContent();
+      }
+      console.log("[DEBUG] Query editor value:", queryValue);
+
       console.log("[DEBUG] About to click Run Query and wait for /api/e2e_automate/_search");
       await logsPage.clickRunQueryButton();
-      await logsPage.verifyStreamingModeResponse("e2e_automate");
+      await logsPage.verifyStreamingModeResponse();
       console.log("[DEBUG] Streaming mode response received");
     }
 

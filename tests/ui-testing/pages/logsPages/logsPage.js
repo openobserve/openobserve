@@ -1737,4 +1737,14 @@ export class LogsPage {
     async expectLogTableColumnSourceNotHaveText(text) {
         await expect(this.page.locator(this.logTableColumnSource)).not.toHaveText(text);
     }
+
+    async selectStreamAndStreamTypeForLogs(stream) {
+        await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
+        await this.page.waitForTimeout(2000);
+        await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(stream);
+        await this.page.waitForTimeout(2000);
+        await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
+        await this.page.waitForTimeout(2000);
+        await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
+    }
 } 
