@@ -120,8 +120,13 @@ test.describe("Search Partition Tests", () => {
     } else {
       // Log streaming toggle state
       const streamingToggleSelector = '[data-test="general-settings-enable-streaming"] input[type="checkbox"]';
-      const streamingEnabled = await page.isChecked(streamingToggleSelector);
-      console.log("[DEBUG] Streaming toggle checked:", streamingEnabled);
+      const toggleExists = await page.locator(streamingToggleSelector).count();
+      if (toggleExists) {
+        const streamingEnabled = await page.isChecked(streamingToggleSelector);
+        console.log("[DEBUG] Streaming toggle checked:", streamingEnabled);
+      } else {
+        console.log("[DEBUG] Streaming toggle not found on page.");
+      }
 
       // Log selected stream
       const streamSelector = '[data-test="log-search-index-list-select-stream"]';
