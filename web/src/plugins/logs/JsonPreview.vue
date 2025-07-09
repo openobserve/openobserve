@@ -509,9 +509,9 @@ export default {
       return t("common.addFieldToTable");
     };
 
-    const sendToAiChat = (key: string, value: string) => {
+    const sendToAiChat = (value: string) => {
       emit("closeTable");
-      emit("sendToAiChat", key, value);
+      emit("sendToAiChat", value);
     };
 
     const getBtnLogo = computed(() => {
