@@ -1245,6 +1245,7 @@ const useLogs = () => {
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              searchType: "ui",
             })
             .then(async (res: any) => {
               searchObj.data.queryResults.partitionDetail = {

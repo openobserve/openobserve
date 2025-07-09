@@ -402,6 +402,7 @@ export const usePanelDataLoader = (
             },
             page_type: pageType,
             traceparent,
+            searchType: "dashboards",
           }),
         abortControllerRef.signal,
       );
