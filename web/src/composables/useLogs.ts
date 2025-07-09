@@ -1707,16 +1707,12 @@ const useLogs = () => {
       }
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
-      searchObj.data.searchRequestTraceIds = [];
-      searchObj.data.searchWebSocketTraceIds = [];
 
       // get websocket enable config from store
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
       searchObj.meta.jobId = "";
-      const shouldUseWebSocket = isWebSocketEnabled(store.state);
-      const shouldUseStreaming = isStreamingEnabled(store.state);
 
       setCommunicationMethod();
 
