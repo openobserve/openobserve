@@ -603,6 +603,10 @@ export class LogsPage {
     }
 
     // Search partition methods
+    async clickRunQueryButton() {
+        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+    }
+
     async verifySearchPartitionResponse() {
         const searchPartitionPromise = this.page.waitForResponse(response => 
             response.url().includes('/api/default/_search_partition') && 
@@ -647,9 +651,9 @@ export class LogsPage {
         }
     }
 
-    async verifyStreamingModeResponse() {
+    async verifyStreamingModeResponse(streamName = "default") {
         const searchPromise = this.page.waitForResponse(response => 
-            response.url().includes('/api/default/_search') && 
+            response.url().includes(`/api/${streamName}/_search`) && 
             response.request().method() === 'POST'
         );
         

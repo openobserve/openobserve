@@ -79,8 +79,10 @@ test.describe("Search Partition Tests", () => {
     await logsPage.toggleHistogramAndExecute();
 
     if (!isStreamingEnabled) {
-      // Verify search partition response
-      const searchPartitionData = await logsPage.verifySearchPartitionResponse();
+      // Verify search partition response using robust pattern
+      const partitionPromise = logsPage.verifySearchPartitionResponse();
+      await logsPage.clickRunQueryButton();
+      const searchPartitionData = await partitionPromise;
       const searchCalls = await logsPage.captureSearchCalls();
       
       expect(searchCalls.length).toBe(searchPartitionData.partitions.length);
@@ -95,7 +97,8 @@ test.describe("Search Partition Tests", () => {
         expect(matchingCall.sql).toContain('SELECT histogram(_timestamp');
       }
     } else {
-      await logsPage.verifyStreamingModeResponse();
+      await logsPage.clickRunQueryButton();
+      await logsPage.verifyStreamingModeResponse("e2e_automate");
     }
 
     // Verify histogram state
