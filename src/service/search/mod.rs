@@ -99,8 +99,8 @@ pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
 pub(crate) mod request;
-pub(crate) mod search_stream;
 pub(crate) mod sql;
+pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod utils;
@@ -258,7 +258,7 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res = crate::service::search::search_stream::order_search_results(res, None);
+                res = crate::service::search::streaming::order_search_results(res, None);
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
