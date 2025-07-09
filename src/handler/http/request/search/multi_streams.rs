@@ -680,9 +680,9 @@ pub async fn _search_partition_multi(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let search_type = get_search_type_from_request(&query)
-        .unwrap_or(Some(SearchEventType::Other))
-        .unwrap_or(SearchEventType::Other);
+    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
+        opt.unwrap_or(SearchEventType::Other)
+    });
 
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
