@@ -14,7 +14,7 @@ test.describe("Streaming for logs", () => {
         await streamsPage.ingestion();
         await streamsPage.ingestionJoin();
         await streamsPage.goToManagement();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(3000); // Reduced from 5000
         await streamsPage.checkStreaming();
     });
 
@@ -56,7 +56,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.kubernetesContainerNameJoin();
        // await streamsPage.enableSQLMode();
         await streamsPage.selectRunQuery();
+        await page.waitForTimeout(3000); // Wait for query results
         await streamsPage.displayCountQuery();
+        await page.waitForTimeout(3000); // Wait for query results
         await streamsPage.validateResult();
     });
 
@@ -68,6 +70,7 @@ test.describe("Streaming for logs", () => {
         await streamsPage.kubernetesContainerNameJoinLimit();
        // await streamsPage.enableSQLMode();
         await streamsPage.selectRunQuery();
+        await page.waitForTimeout(3000); // Wait for query results
         await streamsPage.validateResult();
     });
 
