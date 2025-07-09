@@ -1349,7 +1349,7 @@ const loading = ref(false);
 
 const aiChatInputContext = ref("");
 
-const userDefinedFields = ref([]);
+const userDefinedFields = ref<any[]>([]);
 
 
 const selectedStreamType = ref(props.streamType || "logs");
@@ -2138,7 +2138,7 @@ const getBtnLogo = computed(() => {
     const getContext = async () => {
       return new Promise(async (resolve, reject) => {
         try {
-          const payload = {};
+          const payload : any = {};
 
 
           if (!selectedStreamType.value || !selectedStreamName.value) {
