@@ -64,7 +64,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let route = match matching_route {
         Some(matching_route) => matching_route,
         None => {
-            log::warn!("Syslogs from the IP {} are not allowed", ip);
+            log::warn!("Syslogs from the IP {ip} are not allowed");
             return Ok(HttpResponse::InternalServerError()
                 .append_header((
                     ERROR_HEADER,
@@ -446,7 +446,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         match write_result {
             Ok(_) => ("200", stream_status),
             Err(e) => {
-                log::error!("Error while writing logs: {}", e);
+                log::error!("Error while writing logs: {e}");
                 ("500", stream_status)
             }
         }

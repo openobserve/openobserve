@@ -620,7 +620,7 @@ pub async fn delete(
     match db.delete(&key, false, infra_db::NEED_WATCH, start_dt).await {
         Ok(_) => {}
         Err(e) => {
-            log::error!("Error deleting schema: {}", e);
+            log::error!("Error deleting schema: {e}");
             return Err(Error::Message(format!("Error deleting schema: {e}")));
         }
     }

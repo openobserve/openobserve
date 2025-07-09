@@ -25,8 +25,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 .ok_or(Error::Message("Message missing value".to_string()))?;
             let pipeline: Pipeline = json::from_slice(&bytes).inspect_err(|e| {
                 log::error!(
-                    "[SUPER_CLUSTER:PIPELINE] Failed to deserialize message value to pipeline: {}",
-                    e
+                    "[SUPER_CLUSTER:PIPELINE] Failed to deserialize message value to pipeline: {e}"
                 );
             })?;
             infra::pipeline::put(&pipeline).await?;

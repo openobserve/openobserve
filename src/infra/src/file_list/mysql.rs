@@ -208,12 +208,12 @@ impl super::FileList for MysqlFileList {
                 .inc();
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback file_list_deleted batch add error: {}", e);
+                    log::error!("[MYSQL] rollback file_list_deleted batch add error: {e}");
                 }
                 return Err(e.into());
             };
             if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit file_list_deleted batch add error: {}", e);
+                log::error!("[MYSQL] commit file_list_deleted batch add error: {e}");
                 return Err(e.into());
             }
         }
@@ -708,7 +708,7 @@ SELECT date
             Ok(v) => {
                 if v != 1 {
                     if let Err(e) = lock_tx.rollback().await {
-                        log::error!("[MYSQL] rollback lock for query_deleted error: {}", e);
+                        log::error!("[MYSQL] rollback lock for query_deleted error: {e}");
                     }
                     return Err(Error::from(DbError::DBOperError(
                         "LockTimeout".to_string(),
@@ -718,7 +718,7 @@ SELECT date
             }
             Err(e) => {
                 if let Err(e) = lock_tx.rollback().await {
-                    log::error!("[MYSQL] rollback lock for query_deleted error: {}", e);
+                    log::error!("[MYSQL] rollback lock for query_deleted error: {e}");
                 }
                 return Err(e.into());
             }
@@ -729,10 +729,10 @@ SELECT date
             Ok(tx) => tx,
             Err(e) => {
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                    log::error!("[MYSQL] unlock query_deleted error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                    log::error!("[MYSQL] commit for unlock query_deleted error: {e}");
                 }
                 return Err(e.into());
             }
@@ -769,10 +769,10 @@ SELECT date
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                    log::error!("[MYSQL] unlock query_deleted error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                    log::error!("[MYSQL] commit for unlock query_deleted error: {e}");
                 }
                 return Err(e.into());
             }
@@ -788,10 +788,10 @@ SELECT date
                 .with_label_values(&["release_lock", "", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                log::error!("[MYSQL] unlock query_deleted error: {e}");
             }
             if let Err(e) = lock_tx.commit().await {
-                log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                log::error!("[MYSQL] commit for unlock query_deleted error: {e}");
             }
             return Ok(Vec::new());
         }
@@ -813,10 +813,10 @@ SELECT date
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                    log::error!("[MYSQL] unlock query_deleted error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                    log::error!("[MYSQL] commit for unlock query_deleted error: {e}");
                 }
                 return Err(e.into());
             }
@@ -834,10 +834,10 @@ SELECT date
                 .with_label_values(&["release_lock", "", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                log::error!("[MYSQL] unlock query_deleted error: {}", e);
+                log::error!("[MYSQL] unlock query_deleted error: {e}");
             }
             if let Err(e) = lock_tx.commit().await {
-                log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+                log::error!("[MYSQL] commit for unlock query_deleted error: {e}");
             }
             return Ok(Vec::new());
         }
@@ -850,10 +850,10 @@ SELECT date
             .with_label_values(&["release_lock", "", ""])
             .inc();
         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-            log::error!("[MYSQL] unlock query_deleted error: {}", e);
+            log::error!("[MYSQL] unlock query_deleted error: {e}");
         }
         if let Err(e) = lock_tx.commit().await {
-            log::error!("[MYSQL] commit for unlock query_deleted error: {}", e);
+            log::error!("[MYSQL] commit for unlock query_deleted error: {e}");
         }
         Ok(items)
     }
@@ -1415,10 +1415,10 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                 .with_label_values(&["release_lock", "", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                log::error!("[MYSQL] unlock get_pending_jobs error: {e}");
             }
             if let Err(e) = lock_tx.commit().await {
-                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {e}");
             }
             return Ok(Vec::new());
         }
@@ -1445,10 +1445,10 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                 .with_label_values(&["release_lock", "", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                log::error!("[MYSQL] unlock get_pending_jobs error: {e}");
             }
             if let Err(e) = lock_tx.commit().await {
-                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {e}");
             }
             return Err(e.into());
         }
@@ -1473,10 +1473,10 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {e}");
                 }
                 return Err(e.into());
             }
@@ -1489,10 +1489,10 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             .with_label_values(&["release_lock", "", ""])
             .inc();
         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-            log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+            log::error!("[MYSQL] unlock get_pending_jobs error: {e}");
         }
         if let Err(e) = lock_tx.commit().await {
-            log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+            log::error!("[MYSQL] commit for unlock get_pending_jobs error: {e}");
         }
         Ok(ret)
     }
@@ -1823,10 +1823,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                     .inc();
                 if let Err(e) = query_builder.build().execute(&mut *tx).await {
                     if let Err(e) = tx.rollback().await {
-                        log::error!(
-                            "[MYSQL] rollback {table} batch process for add error: {}",
-                            e
-                        );
+                        log::error!("[MYSQL] rollback {table} batch process for add error: {e}");
                     }
                     return Err(e.into());
                 }
@@ -1869,8 +1866,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                         Err(e) => {
                             if let Err(e) = tx.rollback().await {
                                 log::error!(
-                                    "[MYSQL] rollback {table} batch process for delete error: {}",
-                                    e
+                                    "[MYSQL] rollback {table} batch process for delete error: {e}"
                                 );
                             }
                             return Err(e.into());
@@ -1890,8 +1886,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                     if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
-                                "[MYSQL] rollback {table} batch process for delete error: {}",
-                                e
+                                "[MYSQL] rollback {table} batch process for delete error: {e}"
                             );
                         }
                         return Err(e.into());
@@ -1905,7 +1900,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit {table} batch process error: {}", e);
+            log::error!("[MYSQL] commit {table} batch process error: {e}");
             return Err(e.into());
         }
 
@@ -2201,14 +2196,14 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
         && !e.to_string().contains("Duplicate column name")
     {
         // Check for the specific MySQL error code for duplicate column
-        log::error!("[MYSQL] Unexpected error in adding column {column}: {}", e);
+        log::error!("[MYSQL] Unexpected error in adding column {column}: {e}");
         if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+            log::error!("[MYSQL] Error in rolling back transaction: {e}");
         }
         return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {}", e);
+        log::info!("[MYSQL] Error in committing transaction: {e}");
         return Err(e.into());
     };
     Ok(())

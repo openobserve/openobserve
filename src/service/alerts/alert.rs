@@ -1083,10 +1083,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     );
     if !resp_status.is_success() {
         log::error!(
-            "Alert http notification failed with status: {}, body: {}, payload: {}",
-            resp_status,
-            resp_body,
-            msg
+            "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
         return Err(anyhow::anyhow!(
             "sent error status: {}, err: {}",

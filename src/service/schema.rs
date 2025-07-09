@@ -233,11 +233,7 @@ async fn handle_diff_schema(
     let cfg = get_config();
 
     log::debug!(
-        "handle_diff_schema start for [{}/{}/{}] start_dt: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        record_ts
+        "handle_diff_schema start for [{org_id}/{stream_type}/{stream_name}] start_dt: {record_ts}"
     );
 
     // acquire a local_lock to ensure only one thread can update schema
@@ -409,13 +405,7 @@ async fn handle_diff_schema(
         )
         .await
         {
-            log::error!(
-                "save_stream_settings [{}/{}/{}] error: {}",
-                org_id,
-                stream_type,
-                stream_name,
-                e
-            );
+            log::error!("save_stream_settings [{org_id}/{stream_type}/{stream_name}] error: {e}");
         }
     }
 

@@ -133,7 +133,7 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[MYSQL] triggers len error: {}", e);
+                log::error!("[MYSQL] triggers len error: {e}");
                 return 0;
             }
         };
@@ -172,13 +172,13 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback push scheduled_jobs error: {}", e);
+                log::error!("[MYSQL] rollback push scheduled_jobs error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit push scheduled_jobs error: {}", e);
+            log::error!("[MYSQL] commit push scheduled_jobs error: {e}");
             return Err(e.into());
         }
 
@@ -424,7 +424,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
             Ok(tx) => tx,
             Err(e) => {
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+                    log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
                     log::error!("[SCHEDULER] commit for unlock pull scheduled_jobs error: {e}");
@@ -455,13 +455,13 @@ LIMIT ?;
             Ok(ids) => ids,
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[SCHEDULER] rollback select jobs for update error: {}", e);
+                    log::error!("[SCHEDULER] rollback select jobs for update error: {e}");
                 }
                 DB_QUERY_NUMS
                     .with_label_values(&["release_lock", "scheduled_jobs", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+                    log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
                     log::error!("[SCHEDULER] commit for unlock pull scheduled_jobs error: {e}");
@@ -476,13 +476,13 @@ LIMIT ?;
         );
         if job_ids.is_empty() {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SCHEDULER] rollback scheduler pull error: {}", e);
+                log::error!("[SCHEDULER] rollback scheduler pull error: {e}");
             }
             DB_QUERY_NUMS
                 .with_label_values(&["release_lock", "scheduled_jobs", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {e}");
             }
             if let Err(e) = lock_tx.commit().await {
                 log::error!("[SCHEDULER] commit for unlock pull scheduled_jobs error: {e}");
@@ -514,37 +514,31 @@ WHERE id IN ({});",
             .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback update scheduled jobs status error: {}", e);
+                log::error!("[MYSQL] rollback update scheduled jobs status error: {e}");
             }
             DB_QUERY_NUMS
                 .with_label_values(&["release_lock", "scheduled_jobs", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {e}");
             }
             if let Err(e) = lock_tx.commit().await {
-                log::error!(
-                    "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
-                    e
-                );
+                log::error!("[SCHEDULER] commit for unlock pull scheduled_jobs error: {e}");
             }
             return Err(e.into());
         }
 
         log::debug!("Update scheduled jobs for selected pull job ids");
         if let Err(e) = tx.commit().await {
-            log::error!("[SCHEDULER] commit scheduler pull update error: {}", e);
+            log::error!("[SCHEDULER] commit scheduler pull update error: {e}");
             DB_QUERY_NUMS
                 .with_label_values(&["release_lock", "scheduled_jobs", ""])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+                log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {e}");
             }
             if let Err(e) = lock_tx.commit().await {
-                log::error!(
-                    "[SCHEDULER] commit for unlock pull scheduled_jobs error: {}",
-                    e
-                );
+                log::error!("[SCHEDULER] commit for unlock pull scheduled_jobs error: {e}");
             }
             return Err(e.into());
         }
@@ -553,7 +547,7 @@ WHERE id IN ({});",
             .with_label_values(&["release_lock", "scheduled_jobs", ""])
             .inc();
         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-            log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
+            log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {e}");
         }
         if let Err(e) = lock_tx.commit().await {
             log::error!("[SCHEDULER] commit for unlock pull scheduled_jobs error: {e}");
@@ -706,7 +700,7 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[MYSQL] triggers len error: {}", e);
+                log::error!("[MYSQL] triggers len error: {e}");
                 return 0;
             }
         };
@@ -730,7 +724,7 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
             .await
         {
             Ok(_) => log::info!("[SCHEDULER] scheduled_jobs table cleared"),
-            Err(e) => log::error!("[MYSQL] error clearing scheduled_jobs table: {}", e),
+            Err(e) => log::error!("[MYSQL] error clearing scheduled_jobs table: {e}"),
         }
 
         Ok(())

@@ -84,7 +84,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
     let db = manager.get_connection();
     let backend = db.get_database_backend();
 
-    log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] db backend: {:?}", backend);
+    log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] db backend: {backend:?}");
 
     let select_query = Query::select()
         .column(ScheduledJobs::ModuleKey)

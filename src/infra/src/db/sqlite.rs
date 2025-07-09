@@ -146,7 +146,7 @@ impl SqliteDbChannel {
                     }
                 };
                 if config::get_config().common.print_key_event {
-                    log::info!("[SQLITE] watch event: {:?}", event);
+                    log::info!("[SQLITE] watch event: {event:?}");
                 }
                 for (prefix, tx) in WATCHERS.read().await.iter() {
                     match event.clone() {
@@ -155,7 +155,7 @@ impl SqliteDbChannel {
                                 let tx = tx.clone();
                                 tokio::task::spawn(async move {
                                     if let Err(e) = tx.send(Event::Put(e)).await {
-                                        log::error!("[SQLITE] send put event error: {}", e);
+                                        log::error!("[SQLITE] send put event error: {e}");
                                     }
                                 });
                             }
@@ -165,7 +165,7 @@ impl SqliteDbChannel {
                                 let tx = tx.clone();
                                 tokio::task::spawn(async move {
                                     if let Err(e) = tx.send(Event::Delete(e)).await {
-                                        log::error!("[SQLITE] send delete event error: {}", e);
+                                        log::error!("[SQLITE] send delete event error: {e}");
                                     }
                                 });
                             }
@@ -772,18 +772,12 @@ async fn create_meta_backup() -> Result<()> {
             .await
     {
         if let Err(e) = tx.rollback().await {
-            log::error!(
-                "[SQLITE] rollback create table meta_backup_20240330 error: {}",
-                e
-            );
+            log::error!("[SQLITE] rollback create table meta_backup_20240330 error: {e}");
         }
         return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
-        log::error!(
-            "[SQLITE] commit create table meta_backup_20240330 error: {}",
-            e
-        );
+        log::error!("[SQLITE] commit create table meta_backup_20240330 error: {e}");
         return Err(e.into());
     }
     Ok(())

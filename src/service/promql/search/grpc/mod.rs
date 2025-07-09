@@ -141,10 +141,7 @@ pub async fn search(
             }
         };
         if group.len() > 1 {
-            log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: get groups {:?}",
-                group
-            );
+            log::info!("[trace_id {trace_id}] promql->search->grpc: get groups {group:?}");
         }
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",

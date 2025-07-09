@@ -106,12 +106,7 @@ async fn setting(msg: Message) -> Result<()> {
         infra::schema::update_setting(&org_id, &stream_name, stream_type, metadata.clone()).await
     {
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to update setting for stream: {}/{}/{}, metadata: {:?}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            metadata,
-            e
+            "[SUPER_CLUSTER:sync] Failed to update setting for stream: {org_id}/{stream_type}/{stream_name}, metadata: {metadata:?}, error: {e}"
         );
         return Err(e);
     }
@@ -125,12 +120,7 @@ async fn delete_fields(msg: Message) -> Result<()> {
         infra::schema::delete_fields(&org_id, &stream_name, stream_type, fields.clone()).await
     {
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete fields for stream: {}/{}/{}, fields: {:?}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            fields,
-            e
+            "[SUPER_CLUSTER:sync] Failed to delete fields for stream: {org_id}/{stream_type}/{stream_name}, fields: {fields:?}, error: {e}"
         );
         return Err(e);
     }
@@ -144,11 +134,7 @@ async fn stream_delete(msg: Message) -> Result<()> {
         crate::service::stream::stream_delete_inner(&org_id, stream_type, &stream_name).await
     {
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+            "[SUPER_CLUSTER:sync] Failed to delete stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
         return Err(Error::Message(e.to_string()));
     }
@@ -159,7 +145,7 @@ async fn stream_delete(msg: Message) -> Result<()> {
 fn parse_key(key: &str) -> Result<(String, StreamType, String)> {
     let key_columns = key.split('/').collect::<Vec<&str>>();
     if key_columns.len() < 5 {
-        log::error!("[SUPER_CLUSTER:sync] Invalid key format: {}", key);
+        log::error!("[SUPER_CLUSTER:sync] Invalid key format: {key}");
         return Err(Error::Message("Invalid key format".to_string()));
     }
     let org_id = key_columns[2].into();

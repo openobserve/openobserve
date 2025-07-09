@@ -248,7 +248,7 @@ pub async fn len() -> usize {
     match len {
         Ok(len) => len as usize,
         Err(e) => {
-            log::error!("users len error: {}", e);
+            log::error!("users len error: {e}");
             0
         }
     }

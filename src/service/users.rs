@@ -90,7 +90,7 @@ pub async fn post_user(
                     }
                 }
                 Err(e) => {
-                    log::error!("Error fetching custom roles during post user: {}", e);
+                    log::error!("Error fetching custom roles during post user: {e}");
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                         http::StatusCode::BAD_REQUEST,
                         "Custom role not found",
@@ -198,7 +198,7 @@ pub async fn post_user(
                             log::info!("User saved successfully in openfga");
                         }
                         Err(e) => {
-                            log::error!("Error creating user in openfga: {}", e);
+                            log::error!("Error creating user in openfga: {e}");
                         }
                     }
                 }
@@ -341,7 +341,7 @@ pub async fn update_user(
 
                         new_user.password = get_hash(&new_pass, &local_user.salt);
                         new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                        log::info!("Password self updated for user: {}", email);
+                        log::info!("Password self updated for user: {email}");
                         is_updated = true;
                     } else {
                         message = "Existing/old password mismatch, please provide valid existing password";
@@ -362,7 +362,7 @@ pub async fn update_user(
 
                     new_user.password = get_hash(&new_pass, &local_user.salt);
                     new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                    log::info!("Password by root updated for user: {}", email);
+                    log::info!("Password by root updated for user: {email}");
 
                     is_updated = true;
                 } else if user.new_password.is_some() {
@@ -454,7 +454,7 @@ pub async fn update_user(
                         )
                         .await
                         {
-                            log::error!("Error updating org user relation: {}", e);
+                            log::error!("Error updating org user relation: {e}");
                             return Ok(HttpResponse::InternalServerError().json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -471,7 +471,7 @@ pub async fn update_user(
                     )
                     .await
                     {
-                        log::error!("Error adding org user relation: {}", e);
+                        log::error!("Error adding org user relation: {e}");
                         return Ok(HttpResponse::InternalServerError().json(
                             MetaHttpResponse::error(
                                 http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -530,8 +530,7 @@ pub async fn update_user(
                                 });
                                 if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
                                     log::error!(
-                                        "Error updating custom roles for user {email} in {org_id} org : {}",
-                                        e
+                                        "Error updating custom roles for user {email} in {org_id} org : {e}"
                                     );
                                     return Ok(HttpResponse::InternalServerError().json(
                                         MetaHttpResponse::error(
@@ -595,7 +594,7 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
                         log::info!("User added to org successfully in openfga");
                     }
                     Err(e) => {
-                        log::error!("Error adding user to the org in openfga: {}", e);
+                        log::error!("Error adding user to the org in openfga: {e}");
                     }
                 }
             }
@@ -629,7 +628,7 @@ pub async fn add_user_to_org(
             match db::user::get(Some(org_id), initiator_id).await {
                 Ok(user) => user.unwrap(),
                 Err(e) => {
-                    log::error!("Error fetching user: {}", e);
+                    log::error!("Error fetching user: {e}");
                     return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                         http::StatusCode::NOT_FOUND,
                         "User not found",
@@ -691,7 +690,7 @@ pub async fn add_user_to_org(
                             log::info!("User added to org successfully in openfga");
                         }
                         Err(e) => {
-                            log::error!("Error adding user to the org in openfga: {}", e);
+                            log::error!("Error adding user to the org in openfga: {e}");
                         }
                     }
                 }
@@ -766,11 +765,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
         }
         Some(user_from_db)
     } else {
-        log::info!(
-            "get_user_by_token: User not found even in db {} {}",
-            org_id,
-            token
-        );
+        log::info!("get_user_by_token: User not found even in db {org_id} {token}");
         None
     }
 }
@@ -785,7 +780,7 @@ pub async fn list_users(
     let mut user_list: Vec<UserResponse> = vec![];
     let is_list_all = list_all & org_id.eq(META_ORG_ID);
     let mut user_orgs: HashMap<String, Vec<OrgRoleMapping>> = HashMap::new();
-    log::debug!("Listing users for org: {}", org_id);
+    log::debug!("Listing users for org: {org_id}");
 
     #[cfg(feature = "enterprise")]
     if get_openfga_config().enabled && role.is_none() && permitted.is_none() {
@@ -1137,7 +1132,7 @@ pub(crate) async fn create_root_user(
             if db::user::root_user_exists().await {
                 Ok(())
             } else {
-                log::error!("Error creating root user: {}", e);
+                log::error!("Error creating root user: {e}");
                 Err(e)
             }
         }

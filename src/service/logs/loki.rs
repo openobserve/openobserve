@@ -63,12 +63,7 @@ pub async fn handle_request(
         )
         .await
         .map_err(|e| {
-            log::error!(
-                "[Loki] Stream {} ingestion failed for org {}: {}",
-                stream_name,
-                org_id,
-                e
-            );
+            log::error!("[Loki] Stream {stream_name} ingestion failed for org {org_id}: {e}");
             LokiError::from(anyhow::anyhow!(
                 "Stream {} ingestion failed: {:?}",
                 stream_name,

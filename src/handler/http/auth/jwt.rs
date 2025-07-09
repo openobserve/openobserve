@@ -283,11 +283,7 @@ pub async fn process_token(
                 if write_tuples.is_empty() && delete_tuples.is_empty() {
                     log::info!("No changes to the user information tuples");
                 } else {
-                    log::info!(
-                        "openfga tuples: wt {:?} ,dt {:?} ",
-                        write_tuples,
-                        delete_tuples
-                    );
+                    log::info!("openfga tuples: wt {write_tuples:?} ,dt {delete_tuples:?} ");
 
                     match update_tuples(write_tuples, delete_tuples).await {
                         Ok(_) => {
@@ -346,14 +342,14 @@ pub async fn process_token(
                                     log::info!("User updated to the openfga");
                                 }
                                 Err(e) => {
-                                    log::error!("Error updating user to the openfga: {}", e);
+                                    log::error!("Error updating user to the openfga: {e}");
                                 }
                             }
                         }
                     }
                 }
                 Err(e) => {
-                    log::error!("Error adding user to the database: {}", e);
+                    log::error!("Error adding user to the database: {e}");
                 }
             }
         }
@@ -411,7 +407,7 @@ async fn map_group_to_custom_role(
     let openfga_cfg = get_openfga_config();
     // Check if the user exists in the database
     let db_user = db::user::get_user_by_email(user_email).await;
-    log::debug!("map_group_to_custom_role custom roles: {:#?}", custom_roles);
+    log::debug!("map_group_to_custom_role custom roles: {custom_roles:#?}");
 
     if db_user.is_none() {
         let mut tuples = vec![];
@@ -471,8 +467,7 @@ async fn map_group_to_custom_role(
                         }
                         Err(e) => {
                             log::error!(
-                                "group_to_custom_role: Error updating user to the openfga: {}",
-                                e
+                                "group_to_custom_role: Error updating user to the openfga: {e}"
                             );
                         }
                     }
@@ -484,10 +479,7 @@ async fn map_group_to_custom_role(
                 }
             }
             Err(e) => {
-                log::error!(
-                    "group_to_custom_role: Error adding user to the database: {}",
-                    e
-                );
+                log::error!("group_to_custom_role: Error adding user to the database: {e}");
             }
         }
     } else {
@@ -518,7 +510,7 @@ async fn map_group_to_custom_role(
             .filter(|&role| !existing_roles.contains(role))
             .cloned()
             .collect();
-        log::debug!("new roles: {:#?}", new_roles);
+        log::debug!("new roles: {new_roles:#?}");
 
         check_and_get_crole_tuple_for_new_user(
             user_email,
@@ -527,11 +519,7 @@ async fn map_group_to_custom_role(
             &mut add_tuples,
         )
         .await;
-        log::debug!(
-            "add_tuples: {:#?}\nremove_tuples: {:#?}",
-            add_tuples,
-            remove_tuples
-        );
+        log::debug!("add_tuples: {add_tuples:#?}\nremove_tuples: {remove_tuples:#?}");
 
         if openfga_cfg.enabled {
             let start = std::time::Instant::now();
@@ -540,10 +528,7 @@ async fn map_group_to_custom_role(
                     log::info!("group_to_custom_role: User updated to the openfga");
                 }
                 Err(e) => {
-                    log::error!(
-                        "group_to_custom_role: Error updating user to the openfga: {}",
-                        e
-                    );
+                    log::error!("group_to_custom_role: Error updating user to the openfga: {e}");
                 }
             }
             log::info!(

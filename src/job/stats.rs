@@ -42,10 +42,7 @@ async fn file_list_update_stats() -> Result<(), anyhow::Error> {
         interval.tick().await;
         match update_stats_from_file_list().await {
             Err(e) => {
-                log::error!(
-                    "[STATS] run update stream stats from file list error: {}",
-                    e
-                );
+                log::error!("[STATS] run update stream stats from file list error: {e}");
             }
             Ok(Some((offset, max_pk))) => {
                 log::debug!(
@@ -82,7 +79,7 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = db::file_list::cache_stats().await {
-            log::error!("[STATS] run cached stream stats error: {}", e);
+            log::error!("[STATS] run cached stream stats error: {e}");
         } else {
             log::debug!("[STATS] run cached stream stats success");
         }

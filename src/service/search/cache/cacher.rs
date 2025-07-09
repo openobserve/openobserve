@@ -291,10 +291,9 @@ pub async fn check_cache(
                         // single cached query response is expected
                         cached_resp = responses[0].clone();
                     }
-                    Err(e) => log::error!(
-                        "Error invalidating cached response by stream min ts: {:?}",
-                        e
-                    ),
+                    Err(e) => {
+                        log::error!("Error invalidating cached response by stream min ts: {e:?}")
+                    }
                 }
 
                 let mut deltas = vec![];
@@ -418,8 +417,7 @@ pub async fn get_cached_results(
                             Ok(v) => v,
                             Err(e) => {
                                 log::error!(
-                                    "[trace_id {trace_id}] Error parsing cached response: {:?}",
-                                    e
+                                    "[trace_id {trace_id}] Error parsing cached response: {e:?}"
                                 );
                                 return None;
                             }
@@ -508,7 +506,7 @@ pub async fn get_cached_results(
                 }
             }
             None => {
-                log::debug!("No matching cache found for query key: {}", query_key);
+                log::debug!("No matching cache found for query key: {query_key}");
                 None
             }
         }
@@ -682,7 +680,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
             match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("Error deleting cache: {:?}", e);
+                    log::error!("Error deleting cache: {e:?}");
                     return Err(std::io::Error::other("Error deleting cache"));
                 }
             }

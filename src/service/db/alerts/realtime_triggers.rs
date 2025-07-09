@@ -94,7 +94,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match handle_format_conversion(item_key, &org_id, &module_key).await {
                         Ok(result) => result,
                         Err(e) => {
-                            log::error!("Error handling format conversion: {}", e);
+                            log::error!("Error handling format conversion: {e}");
                             continue;
                         }
                     };
@@ -112,7 +112,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         {
                             Ok(val) => val,
                             Err(e) => {
-                                log::error!("Error getting value: {}", e);
+                                log::error!("Error getting value: {e}");
                                 continue;
                             }
                         }
@@ -120,7 +120,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         match json::from_slice(&ev.value.unwrap()) {
                             Ok(val) => val,
                             Err(e) => {
-                                log::error!("Error parsing trigger value: {}", e);
+                                log::error!("Error parsing trigger value: {e}");
                                 continue;
                             }
                         }
@@ -140,7 +140,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match handle_format_conversion(item_key, &org_id, &module_key).await {
                         Ok(result) => result,
                         Err(e) => {
-                            log::error!("Error handling format conversion: {}", e);
+                            log::error!("Error handling format conversion: {e}");
                             continue;
                         }
                     };

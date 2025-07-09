@@ -225,7 +225,7 @@ impl Writer {
 impl Drop for Writer {
     fn drop(&mut self) {
         if let Err(e) = self.close() {
-            log::error!("failed to close wal file: {}", e);
+            log::error!("failed to close wal file: {e}");
         }
     }
 }

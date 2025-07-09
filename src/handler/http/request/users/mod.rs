@@ -634,7 +634,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {name} - {cookie_name}");
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
@@ -653,7 +653,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(req_ts);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {name} - {cookie_name}");
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 

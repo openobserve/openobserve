@@ -208,8 +208,7 @@ pub async fn handle_values_request(
                 // Step 2: Search without cache
                 // no caches found process req directly
                 log::debug!(
-                    "[WS_VALUES] trace_id: {} No cache found, processing search request",
-                    trace_id
+                    "[WS_VALUES] trace_id: {trace_id} No cache found, processing search request"
                 );
                 let max_query_range = get_max_query_range(
                     std::slice::from_ref(&stream_name),
@@ -265,9 +264,7 @@ pub async fn handle_values_request(
                     .await
                     .map_err(|e| {
                         log::error!(
-                            "[WS_VALUES] trace_id: {}, Error writing results to cache: {:?}",
-                            trace_id,
-                            e
+                            "[WS_VALUES] trace_id: {trace_id}, Error writing results to cache: {e:?}"
                         );
                         e
                     })?;
@@ -319,7 +316,7 @@ pub async fn handle_values_request(
     }
 
     // Once all searches are complete, write the accumulated results to a file
-    log::info!("[WS_VALUES] trace_id {} all searches completed", trace_id);
+    log::info!("[WS_VALUES] trace_id {trace_id} all searches completed");
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };

@@ -290,7 +290,7 @@ pub async fn search(
                 let stream_name = match resolve_stream_names(&req_query.sql) {
                     Ok(v) => v.join(","),
                     Err(e) => {
-                        log::error!("ParseSQLError(report_usage: parse sql error: {:?})", e);
+                        log::error!("ParseSQLError(report_usage: parse sql error: {e:?})");
                         "".to_string()
                     }
                 };
@@ -409,7 +409,7 @@ pub async fn search_multi(
         stream_names = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("ParseSQLError(search_multi: parse sql error: {:?})", e);
+                log::error!("ParseSQLError(search_multi: parse sql error: {e:?})");
                 vec![]
             }
         };
@@ -494,7 +494,7 @@ pub async fn search_multi(
                 Some(program)
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
                 multi_res.function_error.push(err.to_string());
                 multi_res.is_partial = true;
                 None
@@ -714,11 +714,7 @@ pub async fn search_partition(
         );
 
         log::info!(
-            "[trace_id {}] search_partition: using streaming_output, group by fields: {:?}, cardinality level: {:?}, interval: {:?}",
-            trace_id,
-            cardinality_map,
-            cardinality_level,
-            cache_interval
+            "[trace_id {trace_id}] search_partition: using streaming_output, group by fields: {cardinality_map:?}, cardinality level: {cardinality_level:?}, interval: {cache_interval:?}"
         );
 
         let cache_interval_mins = cache_interval.get_duration_minutes();
@@ -745,10 +741,7 @@ pub async fn search_partition(
                 &cache_file_path,
             );
             log::info!(
-                "[trace_id {}] [streaming_id: {}] init streaming_agg cache: cache_file_path: {}",
-                trace_id,
-                streaming_id,
-                cache_file_path
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
             );
             (
                 Some(streaming_id),
@@ -828,11 +821,7 @@ pub async fn search_partition(
             let records = (stats.doc_num as i64 / data_retention) * query_duration;
             let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
             log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {} , data_retention in seconds: {}",
-                stream_name,
-                records,
-                original_size,
-                data_retention,
+                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size} , data_retention in seconds: {data_retention}",
             );
             files.push(infra::file_list::FileId {
                 id: Utc::now().timestamp_micros(),
@@ -1367,7 +1356,7 @@ pub async fn search_partition_multi(
                 }
             }
             Err(err) => {
-                log::error!("search_partition_multi error: {:?}", err);
+                log::error!("search_partition_multi error: {err:?}");
             }
         };
     }

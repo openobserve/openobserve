@@ -62,11 +62,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
-                "[METRICS:OTLP] Invalid proto: org_id: {}, error: {}",
-                org_id,
-                e
-            );
+            log::error!("[METRICS:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 format!("Invalid proto: {e}"),
@@ -77,9 +73,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[METRICS:OTLP] Error while handling grpc metrics request: org_id: {}, error: {}",
-                org_id,
-                e
+                "[METRICS:OTLP] Error while handling grpc metrics request: org_id: {org_id}, error: {e}"
             );
             Err(Error::other(e))
         }
@@ -90,7 +84,7 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
     let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
-            log::error!("[METRICS:OTLP] Invalid json: {}", e);
+            log::error!("[METRICS:OTLP] Invalid json: {e}");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 format!("Invalid json: {e}"),
@@ -251,11 +245,7 @@ pub async fn handle_otlp_request(
                     )
                     .await
                 {
-                    log::error!(
-                        "Failed to set metadata for metric: {} with error: {}",
-                        metric_name,
-                        e
-                    );
+                    log::error!("Failed to set metadata for metric: {metric_name} with error: {e}");
                 }
                 for mut rec in records {
                     // flattening
