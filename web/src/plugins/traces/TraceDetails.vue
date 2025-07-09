@@ -1075,10 +1075,22 @@ export default defineComponent({
       }
       traceChart.value.data = data;
       ChartData.value = convertTimelineData(traceChart);
+
+      nextTick(() => {
+        updateChart({});
+      });
     };
+
     const updateChart = (data: any) => {
-      timeRange.value.start = data.start || 0;
-      timeRange.value.end = data.end || 0;
+      // If dataZoom is not set, set the time range to the start and end of the trace duration
+      if (typeof data.start !== "number" || typeof data.end !== "number") {
+        timeRange.value.start = 0;
+        timeRange.value.end =
+          traceChart.value.data[traceChart.value.data.length - 1].x1;
+      } else {
+        timeRange.value.start = data.start || 0;
+        timeRange.value.end = data.end || 0;
+      }
       calculateTracePosition();
       updateHeight();
     };
