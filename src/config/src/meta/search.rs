@@ -1223,7 +1223,7 @@ mod tests {
     fn test_response() {
         let mut res = Response::default();
         res.set_total(10);
-        res.set_file_count(5);
+        res.set_scan_files(5);
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));

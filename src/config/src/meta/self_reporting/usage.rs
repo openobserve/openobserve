@@ -102,6 +102,8 @@ pub struct UsageData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_files: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_ts: Option<i64>,
