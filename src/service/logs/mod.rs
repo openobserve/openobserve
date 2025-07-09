@@ -75,7 +75,7 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     for action in BULK_OPERATORS {
         if let Some(val) = local_val.get(action) {
             let Some(local_val) = val.as_object() else {
-                log::warn!("Invalid bulk index action: {}", action);
+                log::warn!("Invalid bulk index action: {action}");
                 continue;
             };
             let Some(index) = local_val
@@ -536,7 +536,7 @@ async fn write_logs(
         && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
         && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
     {
-        log::error!("Error while writing distinct values: {}", e);
+        log::error!("Error while writing distinct values: {e}");
     }
 
     // only one trigger per request
@@ -596,11 +596,7 @@ fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str)
     if !enabled {
         return;
     }
-    log::warn!(
-        "failed to process record with error {} : {:?} ",
-        error,
-        record
-    );
+    log::warn!("failed to process record with error {error} : {record:?} ");
 }
 
 #[cfg(test)]

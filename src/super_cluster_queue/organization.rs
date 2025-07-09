@@ -100,11 +100,7 @@ async fn delete(msg: Message) -> Result<()> {
     }
     let org_id = keys[2];
     if let Err(e) = organizations::remove(org_id).await {
-        log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete scheduler: {}, error: {}",
-            org_id,
-            e
-        );
+        log::error!("[SUPER_CLUSTER:sync] Failed to delete scheduler: {org_id}, error: {e}");
         return Err(e);
     }
     let _ = delete_from_db_coordinator(&msg.key, false, msg.need_watch, None).await;

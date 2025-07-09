@@ -147,9 +147,7 @@ pub async fn websocket(
                                 .await
                             {
                                 log::error!(
-                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
-                                    req_id,
-                                    e
+                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {req_id}, error: {e}"
                                 );
                             }
                             break;
@@ -163,9 +161,7 @@ pub async fn websocket(
                             );
                             if let Err(e) = disconnect_tx_clone.send(None).await {
                                 log::error!(
-                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
-                                    req_id,
-                                    e
+                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {req_id}, error: {e}"
                                 );
                             }
                             break;
@@ -179,9 +175,7 @@ pub async fn websocket(
                             );
                             if let Err(e) = disconnect_tx_clone.send(None).await {
                                 log::error!(
-                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {}, error: {}",
-                                    req_id,
-                                    e
+                                    "[WS_HANDLER]: Error sending disconnect message for request_id: {req_id}, error: {e}"
                                 );
                             }
                             break;
@@ -190,8 +184,7 @@ pub async fn websocket(
                 }
             }
             log::info!(
-                "[WS::Querier::Handler] handle_incoming task stopped for request_id: {}",
-                req_id
+                "[WS::Querier::Handler] handle_incoming task stopped for request_id: {req_id}"
             );
         };
 
@@ -207,24 +200,24 @@ pub async fn websocket(
                                 log::debug!("[WS::Querier::Handler]: sending pong to request_id: {}, msg: {:?}", req_id, String::from_utf8_lossy(&ping));
                                 if let Err(e) = ws_session.pong(&ping).await {
                                     close_conn = true;
-                                    log::error!("[WS::Querier::Handler]: Error sending pong to client: {}, request_id: {}", e, req_id);
+                                    log::error!("[WS::Querier::Handler]: Error sending pong to client: {e}, request_id: {req_id}");
                                 }
 
                                 if close_conn {
-                                    log::debug!("[WS::Querier::Handler]: closing websocket session due to ping-pong failure request_id: {}", req_id);
+                                    log::debug!("[WS::Querier::Handler]: closing websocket session due to ping-pong failure request_id: {req_id}");
                                     if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Normal))).await {
-                                        log::error!("[WS::Querier::Handler]: Error closing websocket session request_id: {}, error: {}", req_id, e);
+                                        log::error!("[WS::Querier::Handler]: Error closing websocket session request_id: {req_id}, error: {e}");
                                     };
                                     return Ok(());
                                 }
                             }
                             WsServerEvents::Pong(pong) => {
-                                log::debug!("[WS::Querier::Handler]: Pong received from client : {:?}", pong);
+                                log::debug!("[WS::Querier::Handler]: Pong received from client : {pong:?}");
                             }
                             _ => {
                                 let Ok(message_str) = serde_json::to_string(&message) else {
                                     log::error!(
-                                        "[WS::Querier::Handler]: error convert WsServerEvents to string before sending back to client for request_id: {}", req_id
+                                        "[WS::Querier::Handler]: error convert WsServerEvents to string before sending back to client for request_id: {req_id}"
                                     );
                                     continue;
                                 };
@@ -237,28 +230,28 @@ pub async fn websocket(
                         }
                     }
                     Some(msg) = disconnect_rx.recv() => {
-                        log::info!("[WS::Querier::Handler] disconnect signal received from request_id: {}, msg: {:?}", req_id, msg);
+                        log::info!("[WS::Querier::Handler] disconnect signal received from request_id: {req_id}, msg: {msg:?}");
                         match msg {
                             None => {
                                 // proper disconnecting
                                 log::debug!(
-                                    "[WS::Querier::Handler] disconnect signal received from request_id: {}, handle_outgoing stopped", req_id
+                                    "[WS::Querier::Handler] disconnect signal received from request_id: {req_id}, handle_outgoing stopped"
                                 );
                                 break;
                             }
                             Some(DisconnectMessage::Error(err_msg)) => {
                                 // send error message to client first
                                 if let Err(e) = ws_session.text(err_msg.ws_server_events.to_json()).await {
-                                    log::error!("[WS::Querier::Handler]: Failed to send error message to client: {}", e);
+                                    log::error!("[WS::Querier::Handler]: Failed to send error message to client: {e}");
                                 }
                                 if err_msg.should_disconnect {
-                                    log::debug!("[WS::Querier::Handler]: disconnecting client for request_id: {}", req_id);
+                                    log::debug!("[WS::Querier::Handler]: disconnecting client for request_id: {req_id}");
                                     break;
                                 }
                             }
                             Some(DisconnectMessage::Close(close_reason)) => {
                                 if let Err(e) = ws_session.close(close_reason).await {
-                                    log::error!("[WS::Querier::Handler]: Error closing websocket session request_id: {}, error: {}", req_id, e);
+                                    log::error!("[WS::Querier::Handler]: Error closing websocket session request_id: {req_id}, error: {e}");
                                 };
                                 return Ok(());
                             }
@@ -268,20 +261,17 @@ pub async fn websocket(
             }
 
             log::info!(
-                "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {}",
-                req_id
+                "[WS::Querier::Handler] handle_outgoing task stopped for request_id: {req_id}"
             );
             if let Err(e) = ws_session
                 .close(Some(CloseReason::from(CloseCode::Normal)))
                 .await
             {
                 log::error!(
-                    "[WS::Querier::Handler]: Error closing websocket session request_id: {}, error: {}",
-                    req_id,
-                    e
+                    "[WS::Querier::Handler]: Error closing websocket session request_id: {req_id}, error: {e}"
                 );
             }
-            log::info!("[WS::Querier::Handler]: client ws closed: {}", req_id);
+            log::info!("[WS::Querier::Handler]: client ws closed: {req_id}");
             Ok::<_, Error>(())
         };
 

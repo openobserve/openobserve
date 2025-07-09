@@ -28,7 +28,7 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
         };
         format!("{}:{}", ip, cfg.report_server.port).parse()?
     };
-    log::info!("starting Report server at: {}", haddr);
+    log::info!("starting Report server at: {haddr}");
     let server = HttpServer::new(move || {
         App::new()
             .service(web::scope("/api").service(send_report).service(healthz))

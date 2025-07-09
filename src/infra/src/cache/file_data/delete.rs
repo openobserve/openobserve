@@ -29,7 +29,7 @@ impl Queue {
             while let Some(files) = rx.recv().await {
                 for file in files {
                     if let Err(e) = super::disk::remove(&file).await {
-                        log::error!("[CACHE:FILE_DATA] Failed to delete file: {}", e);
+                        log::error!("[CACHE:FILE_DATA] Failed to delete file: {e}");
                     }
                     tokio::task::consume_budget().await;
                 }

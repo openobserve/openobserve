@@ -148,7 +148,7 @@ pub async fn search(
                         Some(program)
                     }
                     Err(err) => {
-                        log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                        log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
                         result.function_error = vec![err.to_string()];
                         None
                     }
@@ -230,9 +230,7 @@ pub async fn search(
                 }
                 ActionTriggerResult::Failure(err_msg) => {
                     log::error!(
-                        "[trace_id {trace_id}] search->action: action_id: {}, err: {}",
-                        action_id,
-                        err_msg
+                        "[trace_id {trace_id}] search->action: action_id: {action_id}, err: {err_msg}"
                     );
                     return Err(Error::Message(err_msg));
                 }
@@ -284,7 +282,7 @@ pub async fn search(
         scan_stats.file_list_took as usize,
         scan_stats.idx_took as usize,
     );
-    result.set_file_count(scan_stats.files as usize);
+    result.set_scan_files(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);

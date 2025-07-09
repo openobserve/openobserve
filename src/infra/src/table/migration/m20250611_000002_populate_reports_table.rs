@@ -54,7 +54,7 @@ impl MigrationTrait for Migration {
                     r#type: Set(REPORTS_FOLDER_TYPE),
                 })
                 .collect_vec();
-            log::debug!("Inserting folders: {:?}", folders);
+            log::debug!("Inserting folders: {folders:?}");
             folders_table::Entity::insert_many(folders)
                 .exec(&txn)
                 .await?;
@@ -66,7 +66,7 @@ impl MigrationTrait for Migration {
         // memory.
         let mut meta_pages = MetaReportWithFolder::paginate(&txn, 100);
         while let Some(metas) = meta_pages.fetch_and_next().await? {
-            log::debug!("Meta table query results: {:?}", metas);
+            log::debug!("Meta table query results: {metas:?}");
             for m in metas {
                 // Use the report JSON from the meta table and the associated folder ID to create a
                 // new record in the new reports table.

@@ -163,7 +163,7 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
     let res = Entity::insert_many(jobs).exec(&tx).await;
 
     if let Err(e) = res {
-        log::error!("submit partition job insert error: {}", e);
+        log::error!("submit partition job insert error: {e}");
         if let Err(e) = tx.rollback().await {
             return orm_err!(format!("submit partition job rollback error: {e}"));
         }

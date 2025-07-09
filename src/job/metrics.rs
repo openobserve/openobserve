@@ -86,7 +86,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if config::cluster::LOCAL_NODE.is_ingester() {
         tokio::spawn(async {
             if let Err(e) = traces_metrics_collect().await {
-                log::error!("Error traces_metrics_collect metrics: {}", e);
+                log::error!("Error traces_metrics_collect metrics: {e}");
             }
         });
     }
@@ -96,10 +96,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         if let Err(e) = update_metadata_metrics().await {
-            log::error!("Error update metadata metrics: {}", e);
+            log::error!("Error update metadata metrics: {e}");
         }
         if let Err(e) = update_storage_metrics().await {
-            log::error!("Error update storage metrics: {}", e);
+            log::error!("Error update storage metrics: {e}");
         }
         interval.tick().await;
     }

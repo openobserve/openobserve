@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use itertools::Itertools;
 pub use serde_json::{
     Error, Map, Number, Value, from_slice, from_str, from_value, json, to_string, to_value, to_vec,
 };
@@ -155,6 +156,52 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
     size
 }
 
+/// NOTE: caller should check if the path == '.', because if so,
+/// this will do an unnecessary to_owned call on the value, which
+/// can be avoided.
+pub fn get_value_from_path(value: &Value, path: &str) -> Option<Value> {
+    if path == "." {
+        return Some(value.to_owned());
+    }
+    let (first, rest) = match path.split_once('*') {
+        Some((first, rest)) => (first, Some(rest)),
+        None => (path, None),
+    };
+
+    let mut temp = value;
+    for key in first.split('.') {
+        if key.is_empty() {
+            continue;
+        }
+        match temp.as_object() {
+            Some(map) => match map.get(key) {
+                Some(v) => temp = v,
+                None => return None,
+            },
+            None => return None,
+        }
+    }
+    match rest {
+        None => Some(temp.to_owned()),
+        Some(rest) => match temp.as_array() {
+            None => None,
+            Some(arr) => {
+                let t = arr
+                    .iter()
+                    .flat_map(|f| {
+                        get_value_from_path(f, rest).map(|v| match v {
+                            Value::Array(arr) => arr,
+                            _ => vec![v],
+                        })
+                    })
+                    .flatten()
+                    .collect_vec();
+                Some(Value::Array(t))
+            }
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +211,89 @@ mod tests {
         let json = r#"{"a":null,"b":true,"c":false,"d":{"a":"b","c":true,"d":false,"e":123456},"e":[""],"f":["a"],"g":["a","b"],"h":"bcdef","i":{},"j":{"ok":"yes"}}"#;
         let val: Value = from_str(json).unwrap();
         assert_eq!(estimate_json_bytes(&val), json.len());
+    }
+
+    #[test]
+    fn test_get_path_simple() {
+        // simple extraction with .
+        let json = r#""abcde""#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(
+            get_value_from_path(&val, "."),
+            Some(Value::String("abcde".to_string()))
+        );
+
+        // non existing path and leading .
+        let json = r#""abcde""#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(get_value_from_path(&val, ".a.b"), None);
+        // existing path and leading .
+        let json = r#"{"a":{"b":5}}"#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(
+            get_value_from_path(&val, ".a.b"),
+            Some(Value::Number(Number::from_u128(5).unwrap()))
+        );
+
+        // simple array
+        let json = r#"["a","b","c"]"#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(
+            get_value_from_path(&val, "*."),
+            Some(Value::Array(
+                ["a", "b", "c"]
+                    .into_iter()
+                    .map(|v| Value::String(v.to_string()))
+                    .collect_vec()
+            ))
+        );
+
+        let json = r#"["a","b","c"]"#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(
+            get_value_from_path(&val, "."),
+            Some(Value::Array(
+                ["a", "b", "c"]
+                    .into_iter()
+                    .map(|v| Value::String(v.to_string()))
+                    .collect_vec()
+            ))
+        );
+
+        // complex array
+        let json = r#"[{"a":true},{"a":false},{"a":true}]"#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(
+            get_value_from_path(&val, ".*.a"),
+            Some(Value::Array(
+                [true, false, true]
+                    .into_iter()
+                    .map(|v| Value::Bool(v))
+                    .collect_vec()
+            ))
+        );
+
+        // array with non existing key elements
+        let json = r#"[{"a":true},{"c":false},{"b":true}]"#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(
+            get_value_from_path(&val, ".*.a"),
+            Some(Value::Array(
+                [true,].into_iter().map(|v| Value::Bool(v)).collect_vec()
+            ))
+        );
+
+        // complex nested array
+        let json = r#"[{"a":[{"b":true}]},{"a":[{"b":false}]},{"a":[{"b":true}]}]"#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(
+            get_value_from_path(&val, "*.a.*.b"),
+            Some(Value::Array(
+                [true, false, true]
+                    .into_iter()
+                    .map(|v| Value::Bool(v))
+                    .collect_vec()
+            ))
+        );
     }
 }

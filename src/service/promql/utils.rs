@@ -98,7 +98,7 @@ pub fn apply_label_selector(
         df = match df.select(selected_cols) {
             Ok(df) => df,
             Err(e) => {
-                log::error!("Selecting cols error: {}", e);
+                log::error!("Selecting cols error: {e}");
                 return None;
             }
         };

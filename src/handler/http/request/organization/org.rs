@@ -729,11 +729,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
                 }
             }
             Err(e) => {
-                log::error!(
-                    "Failed to get node list from cluster {}: {:?}",
-                    cluster_name,
-                    e
-                );
+                log::error!("Failed to get node list from cluster {cluster_name}: {e:?}");
                 return Err(anyhow::anyhow!("Failed to get node list: {e}"));
             }
         }
@@ -797,11 +793,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
                 response.add_cluster_info(cluster_info_obj, cluster_name.clone(), region.clone());
             }
             Err(e) => {
-                log::error!(
-                    "Failed to get cluster info from cluster {}: {:?}",
-                    cluster_name,
-                    e
-                );
+                log::error!("Failed to get cluster info from cluster {cluster_name}: {e:?}");
                 // Return error
                 return Err(anyhow::anyhow!("Failed to get cluster info: {e}"));
             }

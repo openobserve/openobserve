@@ -352,7 +352,7 @@ async fn permitted_folders(
     .await
     .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
 
-    log::debug!("permitted_dashboards: {:?}", permitted_dashboards);
+    log::debug!("permitted_dashboards: {permitted_dashboards:?}");
     if let Some(permitted_dashboards) = permitted_dashboards {
         let mut folder_list_with_roles = vec![];
         for dashboard in permitted_dashboards {
@@ -364,7 +364,7 @@ async fn permitted_folders(
             let Some((folder_id, _)) = folder_id.split_once("/") else {
                 continue;
             };
-            log::info!("folder_id: {:?}", folder_id);
+            log::info!("folder_id: {folder_id:?}");
             folder_list_with_roles.push(format!("{folder_ofga_model}:{folder_id}"));
         }
         if let Some(folder_list) = folder_list.as_mut() {
@@ -373,7 +373,7 @@ async fn permitted_folders(
             folder_list = Some(folder_list_with_roles);
         }
     }
-    log::info!("folder_list: {:?}", folder_list);
+    log::info!("folder_list: {folder_list:?}");
 
     Ok(folder_list)
 }

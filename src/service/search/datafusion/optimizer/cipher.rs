@@ -27,15 +27,15 @@ use datafusion::{
 };
 
 use crate::service::search::datafusion::udf::cipher_udf::{
-    DECRYPT_UDF, DECRYPT_UDF_NAME, ENCRYPT_UDF, ENCRYPT_UDF_NAME,
+    DECRYPT_SLOW_UDF_NAME, DECRYPT_UDF, DECRYPT_UDF_NAME, ENCRYPT_UDF, ENCRYPT_UDF_NAME,
 };
 
 /// Optimization rule that rewrite decrypt if applicable
 /// This will convert the following and the other way around
-/// - decrypt(field,key_name) = value -> field = encrypt(value,key_name)
-/// - decrypt(field,key_name) != value -> field != encrypt(value,key_name)
-/// - encrypt(field,key_name) = value -> field = decrypt(value,key_name)
-/// - encrypt(field,key_name) != value -> field != decrypt(value,key_name)
+/// - decrypt_path(field,key_name) = value -> field = encrypt(value,key_name)
+/// - decrypt_path(field,key_name) != value -> field != encrypt(value,key_name)
+/// - encrypt(field,key_name) = value -> field = decrypt_path(value,key_name)
+/// - encrypt(field,key_name) != value -> field != decrypt_path(value,key_name)
 ///
 /// The value must be static string, as otherwise there is no benefit to
 /// converting from decrypt->encrypt, both will have same const.
@@ -96,17 +96,25 @@ fn is_rewritable_cipher_call(expr: &Expr) -> bool {
         // we are specifically looking for binary op, where the one side
         // is encrypt/decrypt invocation and other side is a constant string
 
-        // check one side is encrypt/decrypt call
+        // check one side is encrypt/decrypt call, as well as there are only two args given
+        // if path is given, we simply cannot convert one to another, although at that point,
+        // the equality might not be valid expr either.
+        // in any case we hope that due to the order we have added the rules, this runs before the
+        // RewriteCipherKey and thus we can in fact rewrite the calls that do not have
+        // explicit paths given
+        // also decrypt_slow is simply not supported for rewrite
         let left_is_cipher = match left.as_ref() {
-            Expr::ScalarFunction(ScalarFunction { func, .. }) => {
-                func.name() == DECRYPT_UDF_NAME || func.name() == ENCRYPT_UDF_NAME
+            Expr::ScalarFunction(ScalarFunction { func, args }) => {
+                (func.name() == DECRYPT_UDF_NAME || func.name() == ENCRYPT_UDF_NAME)
+                    && args.len() == 2
             }
             _ => false,
         };
 
         let right_is_cipher = match right.as_ref() {
-            Expr::ScalarFunction(ScalarFunction { func, .. }) => {
-                func.name() == DECRYPT_UDF_NAME || func.name() == ENCRYPT_UDF_NAME
+            Expr::ScalarFunction(ScalarFunction { func, args }) => {
+                (func.name() == DECRYPT_UDF_NAME || func.name() == ENCRYPT_UDF_NAME)
+                    && args.len() == 2
             }
             _ => false,
         };
@@ -169,9 +177,11 @@ impl TreeNodeRewriter for CipherReplace {
         };
 
         // sanity check
+        // because is_rewritable_cipher_call checks that no path is given, this should be always
+        // true but better to do a sanity check anyways
         if cipher_args.len() != 2 {
             return Err(DataFusionError::Internal(
-                "encrypt/decrypt functions requires 2 arguments".to_string(),
+                "UDF impl error: attempted to rewrite cipher call that has path".to_string(),
             ));
         }
 
@@ -270,7 +280,10 @@ impl TreeNodeRewriter for CipherKeyRewrite {
         // get function and args from the call
         let (func, args) = match &expr {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
-                if func.name() != DECRYPT_UDF_NAME && func.name() != ENCRYPT_UDF_NAME {
+                if func.name() != DECRYPT_UDF_NAME
+                    && func.name() != ENCRYPT_UDF_NAME
+                    && func.name() != DECRYPT_SLOW_UDF_NAME
+                {
                     return Ok(Transformed::no(expr));
                 }
                 (func, args)
@@ -279,15 +292,21 @@ impl TreeNodeRewriter for CipherKeyRewrite {
         };
 
         // sanity check
-        if args.len() != 2 {
+        if args.len() < 2 {
             return Err(DataFusionError::Internal(
-                "encrypt/decrypt functions requires 2 arguments".to_string(),
+                "encrypt/decrypt/decrypt_path functions requires at least 2 arguments".to_string(),
             ));
         }
 
         // extract args
         let col_expr = args[0].clone();
         let key_name = args[1].clone();
+        // if path is given, use that path, otherwise
+        // rewrite and add '.' as the default path
+        let path = match args.get(2) {
+            Some(v) => v.clone(),
+            None => Expr::Literal(ScalarValue::Utf8(Some(".".to_string()))),
+        };
 
         let new_key_name = match key_name {
             Expr::Literal(ScalarValue::Utf8(Some(s))) => {
@@ -307,10 +326,18 @@ impl TreeNodeRewriter for CipherKeyRewrite {
         };
 
         // construct the cipher call with new key name
-        let cipher_call = Expr::ScalarFunction(ScalarFunction {
-            func: func.clone(),
-            args: vec![col_expr, new_key_name],
-        });
+        // decrypt_slow does not take a path, so we do not pass it
+        let cipher_call = if func.name() == DECRYPT_SLOW_UDF_NAME {
+            Expr::ScalarFunction(ScalarFunction {
+                func: func.clone(),
+                args: vec![col_expr, new_key_name],
+            })
+        } else {
+            Expr::ScalarFunction(ScalarFunction {
+                func: func.clone(),
+                args: vec![col_expr, new_key_name, path],
+            })
+        };
 
         Ok(Transformed::yes(cipher_call))
     }
@@ -335,7 +362,7 @@ mod tests {
 
     use super::{RewriteCipherCall, RewriteCipherKey};
     use crate::service::search::datafusion::udf::{
-        cipher_udf::{DECRYPT_UDF, ENCRYPT_UDF},
+        cipher_udf::{DECRYPT_SLOW_UDF, DECRYPT_UDF, ENCRYPT_UDF},
         match_all_udf::MATCH_ALL_UDF,
     };
 
@@ -344,37 +371,37 @@ mod tests {
         let sqls = [
             // equal to operator gets re-written
             (
-                "SELECT _timestamp FROM t where decrypt(name, 'test_key') = 'test_val'",
+                "SELECT _timestamp FROM t where decrypt_path(name, 'test_key') = 'test_val'",
                 "Projection: t._timestamp\n  Filter: t.name = encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             // not equal operator gets rewritten
             (
-                "SELECT _timestamp FROM t where decrypt(name, 'test_key') != 'test_val'",
+                "SELECT _timestamp FROM t where decrypt_path(name, 'test_key') != 'test_val'",
                 "Projection: t._timestamp\n  Filter: t.name != encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             // like operator does not get rewritten
             (
-                "SELECT _timestamp FROM t where decrypt(name, 'test_key') LIKE '%test%'",
-                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test_key\")) LIKE Utf8(\"%test%\")\n    TableScan: t",
+                "SELECT _timestamp FROM t where decrypt_path(name, 'test_key') LIKE '%test%'",
+                "Projection: t._timestamp\n  Filter: decrypt_path(t.name, Utf8(\"test_key\")) LIKE Utf8(\"%test%\")\n    TableScan: t",
             ),
             // match all does not get re-written
             (
-                "SELECT _timestamp FROM t where match_all(decrypt(name, 'test_key'), 'test')",
-                "Projection: t._timestamp\n  Filter: match_all(decrypt(t.name, Utf8(\"test_key\")), Utf8(\"test\"))\n    TableScan: t",
+                "SELECT _timestamp FROM t where match_all(decrypt_path(name, 'test_key'), 'test')",
+                "Projection: t._timestamp\n  Filter: match_all(decrypt_path(t.name, Utf8(\"test_key\")), Utf8(\"test\"))\n    TableScan: t",
             ),
             // if comparison is to non-literal, it does not get re-written
             (
-                "SELECT _timestamp FROM t where decrypt(name, 'test_key') = other_col",
-                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t",
+                "SELECT _timestamp FROM t where decrypt_path(name, 'test_key') = other_col",
+                "Projection: t._timestamp\n  Filter: decrypt_path(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t",
             ),
             // similar checks for encrypt
             (
                 "SELECT _timestamp FROM t where encrypt(name, 'test_key') = 'test_val'",
-                "Projection: t._timestamp\n  Filter: t.name = decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
+                "Projection: t._timestamp\n  Filter: t.name = decrypt_path(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where encrypt(name, 'test_key') != 'test_val'",
-                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
+                "Projection: t._timestamp\n  Filter: t.name != decrypt_path(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where encrypt(name, 'test_key') = other_col",
@@ -382,17 +409,27 @@ mod tests {
             ),
             // checks for revered order in query
             (
-                "SELECT _timestamp FROM t where 'test_val' = decrypt(name, 'test_key')",
+                "SELECT _timestamp FROM t where 'test_val' = decrypt_path(name, 'test_key')",
                 "Projection: t._timestamp\n  Filter: t.name = encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where 'test_val' != encrypt(name, 'test_key')",
-                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
+                "Projection: t._timestamp\n  Filter: t.name != decrypt_path(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t",
             ),
             // no op sanity check
             (
                 "SELECT _timestamp FROM t where match_all(name, 'test')",
                 "Projection: t._timestamp\n  Filter: match_all(t.name, Utf8(\"test\"))\n    TableScan: t",
+            ),
+            // decrypt_slow should not get re-written
+            (
+                "SELECT _timestamp FROM t where decrypt(name, 'test') = 'test_val'",
+                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test\")) = Utf8(\"test_val\")\n    TableScan: t",
+            ),
+            // with path
+            (
+                "SELECT _timestamp FROM t where decrypt_path(name, 'test_key','a.b.c') = 'test_val'",
+                "Projection: t._timestamp\n  Filter: decrypt_path(t.name, Utf8(\"test_key\"), Utf8(\"a.b.c\")) = Utf8(\"test_val\")\n    TableScan: t",
             ),
         ];
 
@@ -433,6 +470,7 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
         ctx.register_udf(DECRYPT_UDF.clone());
         ctx.register_udf(ENCRYPT_UDF.clone());
+        ctx.register_udf(DECRYPT_SLOW_UDF.clone());
         ctx.register_udf(MATCH_ALL_UDF.clone());
         ctx.add_optimizer_rule(Arc::new(RewriteCipherCall::new()));
 
@@ -452,12 +490,25 @@ mod tests {
         let sqls = [
             // check key is re-written
             (
-                "SELECT _timestamp FROM t where decrypt(name, 'test_key') = 'test_val'",
-                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"org1:test_key\")) = Utf8(\"test_val\")\n    TableScan: t",
+                "SELECT _timestamp FROM t where decrypt_path(name, 'test_key') = 'test_val'",
+                "Projection: t._timestamp\n  Filter: decrypt_path(t.name, Utf8(\"org1:test_key\"), Utf8(\".\")) = Utf8(\"test_val\")\n    TableScan: t",
             ),
             (
                 "SELECT _timestamp FROM t where 'test_val' = encrypt(name, 'test_key')",
-                "Projection: t._timestamp\n  Filter: Utf8(\"test_val\") = encrypt(t.name, Utf8(\"org1:test_key\"))\n    TableScan: t",
+                "Projection: t._timestamp\n  Filter: Utf8(\"test_val\") = encrypt(t.name, Utf8(\"org1:test_key\"), Utf8(\".\"))\n    TableScan: t",
+            ),
+            (
+                "SELECT _timestamp FROM t where decrypt(name, 'test_key') = 'test_val'",
+                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"org1:test_key\")) = Utf8(\"test_val\")\n    TableScan: t",
+            ),
+            // check path is correctly passed
+            (
+                "SELECT _timestamp FROM t where 'test_val' = decrypt_path(name, 'test_key','a.b.c')",
+                "Projection: t._timestamp\n  Filter: Utf8(\"test_val\") = decrypt_path(t.name, Utf8(\"org1:test_key\"), Utf8(\"a.b.c\"))\n    TableScan: t",
+            ),
+            (
+                "SELECT _timestamp FROM t where 'test_val' = encrypt(name, 'test_key','a.*.c')",
+                "Projection: t._timestamp\n  Filter: Utf8(\"test_val\") = encrypt(t.name, Utf8(\"org1:test_key\"), Utf8(\"a.*.c\"))\n    TableScan: t",
             ),
         ];
 
@@ -490,6 +541,7 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
         ctx.register_udf(DECRYPT_UDF.clone());
         ctx.register_udf(ENCRYPT_UDF.clone());
+        ctx.register_udf(DECRYPT_SLOW_UDF.clone());
         ctx.add_optimizer_rule(Arc::new(RewriteCipherKey::new("org1")));
 
         for (sql, res) in sqls {

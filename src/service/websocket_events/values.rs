@@ -286,7 +286,7 @@ pub async fn handle_values_request(
     }
 
     // Once all searches are complete, write the accumulated results to a file
-    log::info!("[WS_VALUES] trace_id {} all searches completed", trace_id);
+    log::info!("[WS_VALUES] trace_id {trace_id} all searches completed");
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };

@@ -74,7 +74,7 @@ pub async fn init() -> Result<()> {
         let items = std::mem::take(&mut *w);
         for item in items.iter() {
             if let Err(e) = load(item).await {
-                log::error!("load disk metrics cache error: {}", e);
+                log::error!("load disk metrics cache error: {e}");
             }
         }
         log::info!(
@@ -145,7 +145,7 @@ pub async fn get(
     let mut resp = match proto::cluster_rpc::MetricsQueryResponse::decode(data) {
         Ok(resp) => resp,
         Err(e) => {
-            log::error!("decode metrics query response error: {}", e);
+            log::error!("decode metrics query response error: {e}");
             return Ok(None);
         }
     };

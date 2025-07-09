@@ -182,7 +182,7 @@ pub async fn check_ttl() -> Result<()> {
                 .send((WriterSignal::Rotate, vec![], false))
                 .await
             {
-                log::error!("[INGESTER:MEM] writer queue rotate error: {}", e);
+                log::error!("[INGESTER:MEM] writer queue rotate error: {e}");
             }
         }
     }
@@ -215,7 +215,7 @@ impl Writer {
             .join(idx.to_string());
         log::info!(
             "[INGESTER:MEM:{idx}] create file: {}/{}/{}/{}.wal",
-            wal_dir.display().to_string(),
+            wal_dir.display(),
             &key.org_id,
             &key.stream_type,
             wal_id
@@ -253,15 +253,12 @@ impl Writer {
                         WriterSignal::Close => break,
                         WriterSignal::Rotate => {
                             if let Err(e) = writer.rotate(0, 0).await {
-                                log::error!("[INGESTER:MEM:{idx}] writer rotate error: {}", e);
+                                log::error!("[INGESTER:MEM:{idx}] writer rotate error: {e}");
                             }
                         }
                         WriterSignal::Produce => {
                             if let Err(e) = writer.consume(entries, fsync).await {
-                                log::error!(
-                                    "[INGESTER:MEM:{idx}] writer consume batch error: {}",
-                                    e
-                                );
+                                log::error!("[INGESTER:MEM:{idx}] writer consume batch error: {e}");
                             }
                         }
                     },
@@ -423,7 +420,7 @@ impl Writer {
             .join(self.idx.to_string());
         log::info!(
             "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
-            wal_dir.display().to_string(),
+            wal_dir.display(),
             &self.key.org_id,
             &self.key.stream_type,
             wal_id
@@ -462,9 +459,9 @@ impl Writer {
         let path = old_wal.path().clone();
         let path_str = path.display().to_string();
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str);
+        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {path_str}");
         IMMUTABLES.write().await.insert(path, table);
-        log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
+        log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {path_str}");
 
         Ok(())
     }

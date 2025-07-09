@@ -297,7 +297,7 @@ pub async fn search(
             }
         };
         if !keys_used.is_empty() {
-            log::info!("keys used : {:?}", keys_used);
+            log::info!("keys used : {keys_used:?}");
         }
         for key in keys_used {
             // Check permissions on keys
@@ -373,7 +373,7 @@ pub async fn search(
                 &search_type,
                 "",
             );
-            log::error!("[trace_id {trace_id}] search error: {}", err);
+            log::error!("[trace_id {trace_id}] search error: {err}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -472,7 +472,7 @@ pub async fn around_v1(
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
-            log::error!("search around error: {:?}", err);
+            log::error!("search around error: {err:?}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -581,7 +581,7 @@ pub async fn around_v2(
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
-            log::error!("search around error: {:?}", err);
+            log::error!("search around error: {err:?}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -1092,10 +1092,6 @@ async fn values_v1(
         sql_where.clone()
     };
 
-    let distinct_prefix;
-    let count_fn;
-    let actual_stream_type;
-
     if use_distinct_stream {
         distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
         // if we are using distinct stream, we have already partially aggregated
@@ -1294,7 +1290,7 @@ pub async fn search_partition(
                 "",
                 "",
             );
-            log::error!("search error: {:?}", err);
+            log::error!("search error: {err:?}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -1433,7 +1429,7 @@ pub async fn search_history(
                 "",
                 "",
             );
-            log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
+            log::error!("[trace_id {trace_id}] Search history error : {err:?}");
             return Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -1448,12 +1444,12 @@ pub async fn search_history(
             Ok(response) => match serde_json::to_value(response) {
                 Ok(json_value) => Some(json_value),
                 Err(e) => {
-                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
+                    log::error!("[trace_id {trace_id}] Serialization error: {e:?}");
                     None
                 }
             },
             Err(e) => {
-                log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
+                log::error!("[trace_id {trace_id}] Deserialization error: {e:?}");
                 None
             }
         })

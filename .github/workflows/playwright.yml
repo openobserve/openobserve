@@ -144,8 +144,8 @@ jobs:
             "websocket.spec.js",
             "pipeline-dynamic.spec.js",
             "searchpartition.spec.js",
-            "pipeline-core.spec.js"
-             # "remotepipeline.spec.js",
+            "pipeline-core.spec.js",
+            # "remotepipeline.spec.js",
 
           ]
 

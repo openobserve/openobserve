@@ -117,8 +117,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     Err(e) => {
                         log::error!(
-                            "Error writing init ofga tuples to the openfga during migration: {}",
-                            e
+                            "Error writing init ofga tuples to the openfga during migration: {e}"
                         );
                     }
                 }
@@ -262,9 +261,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             }
                             Err(e) => {
                                 log::error!(
-                                    "Failed to migrate RBAC for org {} pipelines: {}",
-                                    org_name,
-                                    e
+                                    "Failed to migrate RBAC for org {org_name} pipelines: {e}"
                                 );
                             }
                         }
@@ -290,8 +287,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         }
                         Err(e) => {
                             log::error!(
-                                "[OFGA:Local] Error migrating alert folders to openfga: {}",
-                                e
+                                "[OFGA:Local] Error migrating alert folders to openfga: {e}"
                             );
                         }
                     }
@@ -306,15 +302,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
             if tuples.is_empty() {
                 log::info!("[OFGA:Local] No orgs to update to the openfga");
             } else {
-                log::debug!("[OFGA:Local] tuples not empty: {:#?}", tuples);
+                log::debug!("[OFGA:Local] tuples not empty: {tuples:#?}");
                 match update_tuples(tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("[OFGA:Local] Data migrated to openfga");
                     }
                     Err(e) => {
                         log::error!(
-                            "Error updating orgs & users to the openfga during migration: {}",
-                            e
+                            "Error updating orgs & users to the openfga during migration: {e}"
                         );
                     }
                 }

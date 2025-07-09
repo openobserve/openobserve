@@ -473,7 +473,7 @@ pub async fn handle_request(
             ("200", out)
         }
         Err(e) => {
-            log::error!("Error while writing logs: {}", e);
+            log::error!("Error while writing logs: {e}");
             stream_status.status = match status {
                 IngestionStatus::Record(status) => status,
                 IngestionStatus::Bulk(_) => unreachable!(),

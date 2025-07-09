@@ -31,11 +31,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     && let Some(zip_path) = &current_cluster_action.zip_file_path
                     && let Err(e) = infra::storage::del(vec![("", zip_path)]).await
                 {
-                    log::error!(
-                        "failed to delete the zip file from s3 bucket {}: {}",
-                        zip_path,
-                        e
-                    );
+                    log::error!("failed to delete the zip file from s3 bucket {zip_path}: {e}");
                 }
                 infra::table::action_scripts::update(&action).await?;
             } else {
@@ -51,11 +47,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     && let Some(zip_path) = &current_cluster_action.zip_file_path
                     && let Err(e) = infra::storage::del(vec![("", zip_path)]).await
                 {
-                    log::error!(
-                        "failed to delete the zip file from s3 bucket {}: {}",
-                        zip_path,
-                        e
-                    );
+                    log::error!("failed to delete the zip file from s3 bucket {zip_path}: {e}");
                 }
             }
             infra::table::action_scripts::remove(&org_id, &action_id).await?;

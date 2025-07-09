@@ -138,8 +138,7 @@ impl FlightService for FlightServiceImpl {
                 // clear session data
                 clear_session_data(&trace_id);
                 log::error!(
-                    "[trace_id {}] flight->search: do_get physical plan generate error: {e:?}",
-                    trace_id,
+                    "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
                 );
                 return Err(Status::internal(e.to_string()));
             }
@@ -182,8 +181,7 @@ impl FlightService for FlightServiceImpl {
                 // clear session data
                 clear_session_data(&trace_id);
                 log::error!(
-                    "[trace_id {}] flight->search: do_get create IPC write options error: {e:?}",
-                    trace_id,
+                    "[trace_id {trace_id}] flight->search: do_get create IPC write options error: {e:?}",
                 );
                 Status::internal(e.to_string())
             })?;
@@ -191,8 +189,7 @@ impl FlightService for FlightServiceImpl {
             // clear session data
             clear_session_data(&trace_id);
             log::error!(
-                "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
-                trace_id,
+                "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
             );
             Status::internal(e.to_string())
         })?;
@@ -322,7 +319,7 @@ impl Stream for FlightSenderStream {
                 log::error!(
                     "[trace_id {}] flight->search: stream error: {}, took: {} ms",
                     self.trace_id,
-                    e.to_string(),
+                    e,
                     self.start.elapsed().as_millis()
                 );
                 Poll::Ready(Some(Err(FlightError::Tonic(

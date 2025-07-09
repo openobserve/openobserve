@@ -123,54 +123,48 @@ pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::na
                     "[infra::config] Successfully refreshed in-memory cache \"UserSessions\""
                 ),
                 Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"UserSessions\": {}",
-                    e
+                    "[infra::config] Error refreshing in-memory cache \"UserSessions\": {e}"
                 ),
             }
             match crate::service::db::user::cache().await {
                 Ok(()) => {
                     log::info!("[infra::config] Successfully refreshed in-memory cache \"Users\"")
                 }
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Users\": {}",
-                    e
-                ),
+                Err(e) => {
+                    log::error!("[infra::config] Error refreshing in-memory cache \"Users\": {e}")
+                }
             }
             match crate::service::db::pipeline::cache().await {
                 Ok(()) => log::info!(
                     "[infra::config] Successfully refreshed in-memory cache \"Pipelines\""
                 ),
                 Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Pipelines\": {}",
-                    e
+                    "[infra::config] Error refreshing in-memory cache \"Pipelines\": {e}"
                 ),
             }
             match crate::service::db::alerts::alert::cache().await {
                 Ok(()) => {
                     log::info!("[infra::config] Successfully refreshed in-memory cache \"Alerts\"")
                 }
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Alerts\": {}",
-                    e
-                ),
+                Err(e) => {
+                    log::error!("[infra::config] Error refreshing in-memory cache \"Alerts\": {e}")
+                }
             }
             match crate::service::db::alerts::realtime_triggers::cache().await {
                 Ok(()) => log::info!(
                     "[infra::config] Successfully refreshed in-memory cache \"RealtimeTriggers\""
                 ),
                 Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"RealtimeTriggers\": {}",
-                    e
+                    "[infra::config] Error refreshing in-memory cache \"RealtimeTriggers\": {e}"
                 ),
             }
             match crate::service::db::schema::cache().await {
                 Ok(()) => {
                     log::info!("[infra::config] Successfully refreshed in-memory cache \"Schema\"")
                 }
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Schema\": {}",
-                    e
-                ),
+                Err(e) => {
+                    log::error!("[infra::config] Error refreshing in-memory cache \"Schema\": {e}")
+                }
             }
         }
     }

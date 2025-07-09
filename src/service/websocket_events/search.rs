@@ -71,9 +71,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
         }
         Err(e) => {
             log::error!(
-                "[WS_HANDLER]: Failed to cancel search for trace_id: {}, error: {:?}",
-                trace_id,
-                e
+                "[WS_HANDLER]: Failed to cancel search for trace_id: {trace_id}, error: {e:?}"
             );
             WsServerEvents::CancelResponse {
                 trace_id: trace_id.to_string(),
@@ -100,10 +98,7 @@ pub async fn handle_search_request(
     let end_time = req.payload.query.end_time;
 
     log::info!(
-        "[WS_SEARCH] trace_id: {} Received search request, start_time: {}, end_time: {}",
-        trace_id,
-        start_time,
-        end_time
+        "[WS_SEARCH] trace_id: {trace_id} Received search request, start_time: {start_time}, end_time: {end_time}"
     );
 
     // Setup tracing
@@ -276,8 +271,7 @@ pub async fn handle_search_request(
             // Step 2: Search without cache
             // no caches found process req directly
             log::debug!(
-                "[WS_SEARCH] trace_id: {} No cache found, processing search request",
-                trace_id
+                "[WS_SEARCH] trace_id: {trace_id} No cache found, processing search request"
             );
             let max_query_range =
                 get_max_query_range(&stream_names, org_id, user_id, stream_type).await; // hours
@@ -305,9 +299,7 @@ pub async fn handle_search_request(
                 .await
                 .map_err(|e| {
                     log::error!(
-                        "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
-                        trace_id,
-                        e
+                        "[WS_SEARCH] trace_id: {trace_id}, Error writing results to cache: {e:?}"
                     );
                     e
                 })?;
@@ -334,7 +326,7 @@ pub async fn handle_search_request(
     }
 
     // Once all searches are complete, write the accumulated results to a file
-    log::info!("[WS_SEARCH] trace_id {} all searches completed", trace_id);
+    log::info!("[WS_SEARCH] trace_id {trace_id} all searches completed");
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
@@ -465,9 +457,7 @@ pub async fn handle_cache_responses_and_deltas(
 
             if process_delta_first {
                 log::info!(
-                    "[WS_SEARCH] trace_id: {} Processing delta before cached response, order_by: {:#?}",
-                    trace_id,
-                    cache_order_by
+                    "[WS_SEARCH] trace_id: {trace_id} Processing delta before cached response, order_by: {cache_order_by:#?}"
                 );
                 process_delta(
                     req_id,
@@ -506,10 +496,7 @@ pub async fn handle_cache_responses_and_deltas(
             }
         } else if let Some(&delta) = delta_iter.peek() {
             // Process remaining deltas
-            log::info!(
-                "[WS_SEARCH] trace_id: {} Processing remaining delta",
-                trace_id
-            );
+            log::info!("[WS_SEARCH] trace_id: {trace_id} Processing remaining delta");
             process_delta(
                 req_id,
                 req,
@@ -548,9 +535,7 @@ pub async fn handle_cache_responses_and_deltas(
         // Stop if reached the requested result size
         if req_size != -1 && curr_res_size >= req_size {
             log::info!(
-                "[WS_SEARCH] trace_id: {} Reached requested result size: {}, stopping search",
-                trace_id,
-                req_size
+                "[WS_SEARCH] trace_id: {trace_id} Reached requested result size: {req_size}, stopping search"
             );
             break;
         }
@@ -576,11 +561,7 @@ async fn process_delta(
     cache_order_by: &OrderBy,
     response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
-    log::info!(
-        "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
-        trace_id,
-        delta
-    );
+    log::info!("[WS_SEARCH]: Processing delta for trace_id: {trace_id}, delta: {delta:?}");
     let mut req = req.clone();
     let original_req_start_time = req.payload.query.start_time;
     let original_req_end_time = req.payload.query.end_time;
@@ -703,8 +684,7 @@ async fn process_delta(
         // Stop if `remaining_query_range` is less than 0
         if *remaining_query_range <= 0.00 {
             log::info!(
-                "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
-                trace_id
+                "[WS_SEARCH]: trace_id: {trace_id} Remaining query range is less than 0, stopping search"
             );
             let (new_start_time, new_end_time) = (
                 original_req_end_time - cache_req_duration,
@@ -748,10 +728,7 @@ async fn process_delta(
 
         // Stop if reached the request result size
         if req_size != -1 && *curr_res_size >= req_size {
-            log::info!(
-                "[WS_SEARCH]: Reached requested result size ({}), stopping search",
-                req_size
-            );
+            log::info!("[WS_SEARCH]: Reached requested result size ({req_size}), stopping search");
             break;
         }
     }
@@ -814,10 +791,7 @@ async fn send_cached_responses(
     start_timer: &mut Instant,
     response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
-    log::info!(
-        "[WS_SEARCH]: Processing cached response for trace_id: {}",
-        trace_id
-    );
+    log::info!("[WS_SEARCH]: Processing cached response for trace_id: {trace_id}");
 
     let mut cached = cached.clone();
 
@@ -1010,6 +984,7 @@ pub async fn do_partitioned_search(
             } else {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
+
             // Send the cached response
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.to_string(),
@@ -1046,10 +1021,7 @@ pub async fn do_partitioned_search(
 
         // Stop if reached the requested result size and it is not a streaming aggs query
         if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
-            log::info!(
-                "[WS_SEARCH]: Reached requested result size ({}), stopping search",
-                req_size
-            );
+            log::info!("[WS_SEARCH]: Reached requested result size ({req_size}), stopping search");
             break;
         }
     }
@@ -1097,10 +1069,7 @@ async fn send_partial_search_resp(
         },
         streaming_aggs: is_streaming_aggs,
     };
-    log::info!(
-        "[WS_SEARCH]: trace_id: {} Sending partial search response",
-        trace_id
-    );
+    log::info!("[WS_SEARCH]: trace_id: {trace_id} Sending partial search response");
 
     send_message_2(req_id, ws_search_res, response_tx.clone()).await?;
 

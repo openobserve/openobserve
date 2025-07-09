@@ -114,7 +114,7 @@ SELECT COUNT(*) as num FROM scheduled_jobs WHERE module = $1;"#,
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[SQLITE] triggers len error: {}", e);
+                log::error!("[SQLITE] triggers len error: {e}");
                 return 0;
             }
         };
@@ -152,13 +152,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback push scheduled_jobs error: {}", e);
+                log::error!("[SQLITE] rollback push scheduled_jobs error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit push scheduled_jobs error: {}", e);
+            log::error!("[SQLITE] commit push scheduled_jobs error: {e}");
             return Err(e.into());
         }
 
@@ -520,7 +520,7 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[SQLITE] triggers len error: {}", e);
+                log::error!("[SQLITE] triggers len error: {e}");
                 return 0;
             }
         };
@@ -542,7 +542,7 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
             .await
         {
             Ok(_) => log::info!("[SCHEDULER] scheduled_jobs table cleared"),
-            Err(e) => log::error!("[SQLITE] error clearing scheduled_jobs table: {}", e),
+            Err(e) => log::error!("[SQLITE] error clearing scheduled_jobs table: {e}"),
         }
 
         Ok(())
