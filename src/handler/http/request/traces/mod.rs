@@ -330,7 +330,7 @@ pub async fn get_latest_traces(
                     "",
                 ])
                 .inc();
-            log::error!("get traces latest data error: {:?}", err);
+            log::error!("get traces latest data error: {err:?}");
             return Ok(map_error_to_http_response(&err, Some(trace_id)));
         }
     };
@@ -418,7 +418,7 @@ pub async fn get_latest_traces(
                         "",
                     ])
                     .inc();
-                log::error!("get traces latest data error: {:?}", err);
+                log::error!("get traces latest data error: {err:?}");
                 return Ok(map_error_to_http_response(&err, Some(trace_id)));
             }
         };

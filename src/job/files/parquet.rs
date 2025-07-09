@@ -100,11 +100,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await;
         // check pending delete files
         if let Err(e) = scan_pending_delete_files().await {
-            log::error!("[INGESTER:JOB] Error scan pending delete files: {}", e);
+            log::error!("[INGESTER:JOB] Error scan pending delete files: {e}");
         }
         // scan wal files
         if let Err(e) = scan_wal_files(tx.clone()).await {
-            log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
+            log::error!("[INGESTER:JOB] Error prepare parquet files: {e}");
         }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
@@ -123,20 +123,13 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         if wal::lock_files_exists(&file_key) {
             continue;
         }
-        log::warn!(
-            "[INGESTER:JOB] the file was released, delete it: {}",
-            file_key
-        );
+        log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
         let file = wal_dir.join(&file_key);
         let Ok(file_size) = get_file_size(&file) else {
             continue;
         };
         if let Err(e) = remove_file(&file) {
-            log::error!(
-                "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
-                file_key,
-                e
-            );
+            log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
         }
 
         // delete metadata from cache
@@ -145,11 +138,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         PROCESSING_FILES.write().await.remove(&file_key);
         // delete from pending delete list
         if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
-            log::error!(
-                "[INGESTER:JOB] Failed to remove pending delete file: {}, {}",
-                file_key,
-                e
-            );
+            log::error!("[INGESTER:JOB] Failed to remove pending delete file: {file_key}, {e}");
         }
         // deleted successfully then update metrics
         let (org_id, stream_type, ..) = split_perfix(&file_key);
@@ -188,7 +177,7 @@ async fn scan_wal_files(
         .await
             && !e.to_string().contains("No such file or directory")
         {
-            log::error!("[INGESTER:JOB] Failed to scan files: {}", e);
+            log::error!("[INGESTER:JOB] Failed to scan files: {e}");
         }
     });
     let mut files_num = 0;
@@ -208,14 +197,13 @@ async fn scan_wal_files(
                 files_num += files.len();
                 match prepare_files(files).await {
                     Err(e) => {
-                        log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
+                        log::error!("[INGESTER:JOB] Error prepare parquet files: {e}");
                     }
                     Ok(files) => {
                         for (prefix, files) in files.into_iter() {
                             if let Err(e) = worker_tx.send((prefix, files)).await {
                                 log::error!(
-                                    "[INGESTER:JOB] Error sending parquet files to move: {}",
-                                    e
+                                    "[INGESTER:JOB] Error sending parquet files to move: {e}"
                                 );
                             }
                         }
@@ -271,16 +259,9 @@ async fn prepare_files(
             continue;
         };
         if parquet_meta.eq(&FileMeta::default()) {
-            log::warn!(
-                "[INGESTER:JOB] the file is empty, just delete file: {}",
-                file
-            );
+            log::warn!("[INGESTER:JOB] the file is empty, just delete file: {file}");
             if let Err(e) = remove_file(wal_dir.join(&file)) {
-                log::error!(
-                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
-                    file,
-                    e
-                );
+                log::error!("[INGESTER:JOB] Failed to remove parquet file from disk: {file}, {e}");
             }
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file_key);
@@ -486,7 +467,7 @@ async fn move_files(
             match merge_files(thread_id, latest_schema.clone(), &wal_dir, &files_with_size).await {
                 Ok(v) => v,
                 Err(e) => {
-                    log::error!("[INGESTER:JOB] merge files failed: {}", e);
+                    log::error!("[INGESTER:JOB] merge files failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
@@ -507,9 +488,7 @@ async fn move_files(
             db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
         {
             log::error!(
-                "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
-                new_file_name,
-                e.to_string()
+                "[INGESTER:JOB] Failed write parquet file meta: {new_file_name}, error: {e}"
             );
             // need release all the files
             for file in files_with_size.iter() {
@@ -536,7 +515,7 @@ async fn move_files(
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
                         file.key,
-                        e.to_string()
+                        e
                     );
                 }
                 false
@@ -552,7 +531,7 @@ async fn move_files(
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
                             file.key,
-                            e.to_string()
+                            e
                         );
                         // add to pending delete list
                         if let Err(e) = db::file_list::local::add_pending_delete(
@@ -565,7 +544,7 @@ async fn move_files(
                             log::error!(
                                 "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
                                 file.key,
-                                e.to_string()
+                                e
                             );
                         }
                     }
@@ -764,15 +743,10 @@ async fn merge_files(
         Ok(v) => v,
         Err(e) => {
             log::error!(
-                "[INGESTER:JOB:{thread_id}] merge_parquet_files error for stream: {}/{}/{}, err: {}",
-                org_id,
-                stream_type,
-                stream_name,
-                e
+                "[INGESTER:JOB:{thread_id}] merge_parquet_files error for stream: {org_id}/{stream_type}/{stream_name}, err: {e}"
             );
             log::error!(
-                "[INGESTER:JOB:{thread_id}] merge_parquet_files error for files: {:?}",
-                retain_file_list
+                "[INGESTER:JOB:{thread_id}] merge_parquet_files error for files: {retain_file_list:?}"
             );
             return Err(e.into());
         }
@@ -830,12 +804,7 @@ async fn merge_files(
         .chain(index_fields.iter())
         .any(|f| latest_schema_fields.contains(f));
     if !need_index {
-        log::debug!(
-            "skip index generation for stream: {}/{}/{}",
-            org_id,
-            stream_type,
-            stream_name
-        );
+        log::debug!("skip index generation for stream: {org_id}/{stream_type}/{stream_name}");
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 

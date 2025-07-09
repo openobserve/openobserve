@@ -110,7 +110,7 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
                     tls_stream.write_all(STOP_SRV.as_bytes()).await?;
                 }
                 Err(e) => {
-                    log::error!("Failed to connect to TCP server for stop signal: {}", e);
+                    log::error!("Failed to connect to TCP server for stop signal: {e}");
                 }
             }
         } else {

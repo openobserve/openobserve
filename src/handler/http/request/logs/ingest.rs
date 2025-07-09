@@ -327,10 +327,7 @@ pub async fn handle_gcp_request(
         {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
-                log::error!(
-                    "Error processing request {org_id}/{stream_name}/_gcp: {:?}",
-                    e
-                );
+                log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e:?}");
                 if matches!(e, infra::errors::Error::ResourceError(_)) {
                     HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                         http::StatusCode::SERVICE_UNAVAILABLE,
@@ -375,7 +372,7 @@ pub async fn otlp_logs_write(
         CONTENT_TYPE_PROTO => match ExportLogsServiceRequest::decode(body) {
             Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
-                log::error!("[LOGS:OTLP] Invalid proto: {}", e);
+                log::error!("[LOGS:OTLP] Invalid proto: {e}");
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST,
                     format!("Invalid proto: {e}"),
@@ -386,7 +383,7 @@ pub async fn otlp_logs_write(
             match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
                 Err(e) => {
-                    log::error!("[LOGS:OTLP] Invalid json: {}", e);
+                    log::error!("[LOGS:OTLP] Invalid json: {e}");
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                         http::StatusCode::BAD_REQUEST,
                         format!("Invalid json: {e}"),
@@ -415,10 +412,7 @@ pub async fn otlp_logs_write(
         Ok(v) => v,
         Err(e) => {
             log::error!(
-                "Error processing otlp {} logs write request {org_id}/{:?}: {:?}",
-                content_type,
-                in_stream_name,
-                e
+                "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
             );
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(

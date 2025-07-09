@@ -111,19 +111,11 @@ async fn delete(msg: Message) -> Result<()> {
     }
     let email = keys[1];
     if let Err(e) = org_users::remove_by_user(email).await {
-        log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete user: {}, error: {}",
-            email,
-            e
-        );
+        log::error!("[SUPER_CLUSTER:sync] Failed to delete user: {email}, error: {e}");
         return Err(e);
     }
     if let Err(e) = users::remove(email).await {
-        log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete user: {}, error: {}",
-            email,
-            e
-        );
+        log::error!("[SUPER_CLUSTER:sync] Failed to delete user: {email}, error: {e}");
         return Err(e);
     }
 

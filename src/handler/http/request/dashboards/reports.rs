@@ -214,7 +214,7 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
                             Some(item)
                         }
                         Err(e) => {
-                            log::error!("Error converting report to response body: {}", e);
+                            log::error!("Error converting report to response body: {e}");
                             None
                         }
                     }

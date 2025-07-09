@@ -57,11 +57,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         use_cache: false,
         local_mode: Some(true),
     };
-    log::debug!(
-        "get enrichment table {} data req start time: {}",
-        name,
-        start_time
-    );
+    log::debug!("get enrichment table {name} data req start time: {start_time}");
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
@@ -72,7 +68,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
             }
         }
         Err(err) => {
-            log::error!("get enrichment table data error: {:?}", err);
+            log::error!("get enrichment table data error: {err:?}");
             Ok(vec![])
         }
     }
@@ -163,7 +159,7 @@ pub async fn get_meta_table_stats(
     };
     let stream_meta_stats: EnrichmentTableMetaStreamStats = serde_json::from_slice(&size)
         .map_err(|e| {
-            log::error!("Failed to parse meta stream stats: {}", e);
+            log::error!("Failed to parse meta stream stats: {e}");
         })
         .ok()?;
     Some(stream_meta_stats)
@@ -254,7 +250,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 if let Some((key, _)) = ENRICHMENT_TABLES.remove(item_key) {
-                    log::info!("deleted enrichment table: {}", key);
+                    log::info!("deleted enrichment table: {key}");
                 }
             }
             infra_db::Event::Empty => {}

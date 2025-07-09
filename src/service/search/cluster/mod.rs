@@ -106,11 +106,7 @@ pub async fn work_group_need_wait(
                 Ok((true, cur, max)) => {
                     if !log_wait {
                         log::info!(
-                            "[trace_id {trace_id}] user: {:?} is waiting in work_group {:?}[{}/{}]",
-                            user_id,
-                            wg,
-                            cur,
-                            max
+                            "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {wg:?}[{cur}/{max}]"
                         );
                         log_wait = true;
                     }
@@ -119,11 +115,7 @@ pub async fn work_group_need_wait(
                 Ok((false, cur, max)) => {
                     if log_wait {
                         log::info!(
-                            "[trace_id {trace_id}] user: {:?} get approved in work_group  {:?}[{}/{}]",
-                            user_id,
-                            wg,
-                            cur,
-                            max
+                            "[trace_id {trace_id}] user: {user_id:?} get approved in work_group  {wg:?}[{cur}/{max}]"
                         );
                     }
                     return Ok(());

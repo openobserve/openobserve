@@ -47,7 +47,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     {
         // maybe the file already deleted, so we just skip the `not found` error
         if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
             return Err(e.into());
         }
     }
@@ -76,7 +76,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
         // maybe the file already deleted or there's not related index files,
         // so we just skip the `not found` error
         if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
             return Err(e.into());
         }
     }
@@ -110,7 +110,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     {
         // maybe the file already deleted, so we just skip the `not found` error
         if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
             return Err(e.into());
         }
     }
@@ -132,7 +132,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     )
     .await
     {
-        log::error!("[COMPACTOR] delete files from table failed: {}", e);
+        log::error!("[COMPACTOR] delete files from table failed: {e}");
         return Err(e.into());
     }
 

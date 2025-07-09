@@ -66,7 +66,7 @@ pub async fn search(
 ) -> Result<SearchResult> {
     let _start = std::time::Instant::now();
     let cfg = get_config();
-    log::info!("[trace_id {trace_id}] super cluster leader: start {}", sql);
+    log::info!("[trace_id {trace_id}] super cluster leader: start {sql}");
 
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -158,7 +158,7 @@ pub async fn search(
             match ret {
                 Ok(ret) => Ok(ret),
                 Err(err) => {
-                    log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {}", err);
+                    log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {err}");
                     Err(Error::Message(err.to_string()))
                 }
             }
@@ -329,8 +329,10 @@ async fn run_datafusion(
 
         // no need to run datafusion, return empty result
         if is_complete_cache_hit_with_no_data {
-            let mut scan_stats = ScanStats::default();
-            scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+            let scan_stats = ScanStats {
+                aggs_cache_ratio,
+                ..Default::default()
+            };
             return Ok((vec![], scan_stats, "".to_string()));
         }
     }

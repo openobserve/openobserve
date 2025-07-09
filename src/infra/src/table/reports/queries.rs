@@ -327,7 +327,7 @@ impl ListReportsQueryResult {
         params: &ListReportsParams,
     ) -> Result<Vec<Self>, sea_orm::DbErr> {
         let rslts = Self::select(params).all(conn).await?;
-        log::info!("rslts: {:?}", rslts);
+        log::info!("rslts: {rslts:?}");
         Ok(rslts)
     }
 

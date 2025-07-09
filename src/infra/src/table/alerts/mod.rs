@@ -313,7 +313,7 @@ pub async fn create<C: TransactionTrait>(
     let alert_m: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
     let alert = alert_m.try_into()?;
     txn.commit().await?;
-    log::debug!("Alert created: {:?}", alert);
+    log::debug!("Alert created: {alert:?}");
     Ok(alert)
 }
 

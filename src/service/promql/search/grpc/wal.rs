@@ -67,7 +67,7 @@ pub(crate) async fn create_context(
         infra::schema::get(org_id, stream_name, StreamType::Metrics)
             .await
             .map_err(|err| {
-                log::error!("[trace_id {trace_id}] get schema error: {}", err);
+                log::error!("[trace_id {trace_id}] get schema error: {err}");
                 DataFusionError::Execution(err.to_string())
             })?,
     );

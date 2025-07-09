@@ -201,7 +201,7 @@ async fn query(
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("parse time error: {}", e);
+                log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
                     promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
                 ));
@@ -422,7 +422,7 @@ async fn query_range(
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("[trace_id: {trace_id}] parse promql error: {}", e);
+                log::error!("[trace_id: {trace_id}] parse promql error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
                     promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
                 ));
@@ -469,7 +469,7 @@ async fn query_range(
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("parse time error: {}", e);
+                log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
                     promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
                 ));
@@ -481,7 +481,7 @@ async fn query_range(
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("parse time error: {}", e);
+                log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
                     promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
                 ));
@@ -493,7 +493,7 @@ async fn query_range(
         Some(v) => match parse_milliseconds(&v) {
             Ok(v) => (v * 1_000) as i64,
             Err(e) => {
-                log::error!("parse time error: {}", e);
+                log::error!("parse time error: {e}");
                 return Ok(HttpResponse::BadRequest().json(
                     promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
                 ));
@@ -1001,7 +1001,7 @@ fn search_timeout(timeout: Option<String>) -> i64 {
         Some(v) => match parse_milliseconds(&v) {
             Ok(v) => (v / 1000) as i64, // seconds
             Err(e) => {
-                log::error!("parse timeout error: {}", e);
+                log::error!("parse timeout error: {e}");
                 0
             }
         },

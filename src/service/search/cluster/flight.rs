@@ -76,7 +76,7 @@ use crate::{
 pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    log::info!("[trace_id {trace_id}] flight->search: start {}", sql);
+    log::info!("[trace_id {trace_id}] flight->search: start {sql}");
 
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -266,10 +266,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         }
     }
     log::info!(
-        "[trace_id {trace_id}] flight->search: get files num: {}, need ingester num: {}, need querier num: {}",
-        file_id_list_num,
-        need_ingesters,
-        need_queriers,
+        "[trace_id {trace_id}] flight->search: get files num: {file_id_list_num}, need ingester num: {need_ingesters}, need querier num: {need_queriers}",
     );
 
     #[cfg(feature = "enterprise")]
@@ -329,7 +326,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
             match ret {
                 Ok(ret) => Ok(ret),
                 Err(err) => {
-                    log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {}", err);
+                    log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {err}");
                     Err(Error::Message(err.to_string()))
                 }
             }
@@ -502,8 +499,10 @@ pub async fn run_datafusion(
 
         // no need to run datafusion, return empty result
         if is_complete_cache_hit_with_no_data {
-            let mut scan_stats = ScanStats::default();
-            scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+            let scan_stats = ScanStats {
+                aggs_cache_ratio,
+                ..Default::default()
+            };
             return Ok((vec![], scan_stats, "".to_string()));
         }
     }
@@ -847,10 +846,7 @@ pub(crate) async fn partition_file_by_hash(
         let idx = match node_idx.get(&node_name) {
             Some(idx) => *idx,
             None => {
-                log::error!(
-                    "partition_file_by_hash: {} not found in node_idx",
-                    node_name
-                );
+                log::error!("partition_file_by_hash: {node_name} not found in node_idx");
                 0
             }
         };

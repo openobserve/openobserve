@@ -128,7 +128,7 @@ pub async fn handle_text_message(
             );
             // Validate the events
             if !client_msg.is_valid() {
-                log::error!("[WS_HANDLER]: Invalid event: {:?}", client_msg);
+                log::error!("[WS_HANDLER]: Invalid event: {client_msg:?}");
                 let err_res = WsServerEvents::error_response(
                     &errors::Error::Message("Invalid event".to_string()),
                     Some(req_id.to_string()),
@@ -240,7 +240,7 @@ pub async fn handle_text_message(
                         return;
                     };
 
-                    log::info!("[WS_HANDLER]: trace_id: {}, Cancelling search", trace_id);
+                    log::info!("[WS_HANDLER]: trace_id: {trace_id}, Cancelling search");
 
                     let res = handle_cancel(&trace_id, &org_id).await;
                     let _ = send_message_2(req_id, res, response_tx.clone()).await;
@@ -317,10 +317,7 @@ pub async fn handle_text_message(
         }
         Err(e) => {
             log::error!(
-                "[WS_HANDLER]: Request id: {} Failed to parse message: {:?}, error: {:?}",
-                req_id,
-                msg,
-                e
+                "[WS_HANDLER]: Request id: {req_id} Failed to parse message: {msg:?}, error: {e:?}"
             );
             let err_res = WsServerEvents::error_response(
                 &e.into(),
@@ -353,15 +350,11 @@ pub async fn send_message_2(
 ) -> Result<(), Error> {
     let trace_id = msg.get_trace_id();
     log::debug!(
-        "[WS::Querier::Channel] attempting sending response between incoming->outgoing threads for trace_id: {}, request_id: {}",
-        trace_id,
-        req_id,
+        "[WS::Querier::Channel] attempting sending response between incoming->outgoing threads for trace_id: {trace_id}, request_id: {req_id}",
     );
     if let Err(e) = response_tx.send(msg).await {
         log::error!(
-            "[WS::Querier::Channel] sending response between incoming->outgoing threads for trace_id: {} error: {}",
-            trace_id,
-            e
+            "[WS::Querier::Channel] sending response between incoming->outgoing threads for trace_id: {trace_id} error: {e}"
         );
         return Err(Error::Message(e.to_string()));
     }
@@ -436,10 +429,7 @@ async fn handle_search_event(
             }
             Err(e) => {
                 log::error!(
-                    "[WS_HANDLER]: trace_id: {}, req_id: {}, Search error: {}",
-                    trace_id,
-                    req_id,
-                    e
+                    "[WS_HANDLER]: trace_id: {trace_id}, req_id: {req_id}, Search error: {e}"
                 );
                 let handle_err = async || {
                     let _ = handle_search_error(

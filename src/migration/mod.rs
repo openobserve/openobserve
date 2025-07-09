@@ -38,7 +38,7 @@ async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error
         return Ok(());
     }
 
-    log::info!("Upgrading from {} to {}", old_ver, new_ver);
+    log::info!("Upgrading from {old_ver} to {new_ver}");
     let v093 = Version::from("v0.9.3").unwrap();
     if old_ver < v093 {
         #[allow(deprecated)]

@@ -277,7 +277,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                         threshold: Set(rule.threshold),
                         created_at: Set(current_time),
                     };
-                    log::debug!("add_upsert_batch insert active_model: {:?} ", active_model);
+                    log::debug!("add_upsert_batch insert active_model: {active_model:?} ");
                     if let Err(e) = Entity::insert(active_model).exec(&txn).await {
                         txn.rollback().await.map_err(|e| {
                             anyhow!("DbError# Failed to rollback transaction: {}", e)

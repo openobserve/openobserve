@@ -338,7 +338,7 @@ async fn proxy_querier_by_body(
 ) -> actix_web::Result<HttpResponse, Error> {
     let p = new_url.path.find("?").unwrap_or(new_url.path.len());
     let query_str = &new_url.path[..p];
-    log::debug!("proxy_querier_by_body checking query_str: {}", query_str);
+    log::debug!("proxy_querier_by_body checking query_str: {query_str}");
     let (key, payload) = match query_str {
         s if s.ends_with("/prometheus/api/v1/query_range")
             || s.ends_with("/prometheus/api/v1/query_exemplars") =>
@@ -550,7 +550,7 @@ async fn proxy_ws(
             match ws_handler.handle_connection(req, payload, client_id).await {
                 Ok(response) => Ok(response),
                 Err(e) => {
-                    log::error!("[WS_ROUTER] failed: {}", e);
+                    log::error!("[WS_ROUTER] failed: {e}");
                     Ok(HttpResponse::InternalServerError().body("WebSocket v2 error"))
                 }
             }

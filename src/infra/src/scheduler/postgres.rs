@@ -131,7 +131,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs WHERE module = $1;"#,
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[POSTGRES] triggers len error: {}", e);
+                log::error!("[POSTGRES] triggers len error: {e}");
                 return 0;
             }
         };
@@ -171,13 +171,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[POSTGRES] rollback push scheduled_jobs error: {}", e);
+                log::error!("[POSTGRES] rollback push scheduled_jobs error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit push scheduled_jobs error: {}", e);
+            log::error!("[POSTGRES] commit push scheduled_jobs error: {e}");
             return Err(e.into());
         }
 
@@ -418,7 +418,7 @@ RETURNING *;"#;
             .inc();
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SCHEDULER] rollback pull scheduled_jobs error: {}", e);
+                log::error!("[SCHEDULER] rollback pull scheduled_jobs error: {e}");
             }
             return Err(e.into());
         }
@@ -443,14 +443,14 @@ RETURNING *;"#;
             Ok(jobs) => jobs,
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback pull scheduled_jobs error: {}", e);
+                    log::error!("[POSTGRES] rollback pull scheduled_jobs error: {e}");
                 }
                 return Err(e.into());
             }
         };
 
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit pull scheduled_jobs error: {}", e);
+            log::error!("[POSTGRES] commit pull scheduled_jobs error: {e}");
             return Err(e.into());
         }
         Ok(jobs)
@@ -591,7 +591,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[POSTGRES] triggers len error: {}", e);
+                log::error!("[POSTGRES] triggers len error: {e}");
                 return 0;
             }
         };
@@ -616,7 +616,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
             .await
         {
             Ok(_) => log::info!("[SCHEDULER] scheduled_jobs table cleared"),
-            Err(e) => log::error!("[POSTGRES] error clearing scheduled_jobs table: {}", e),
+            Err(e) => log::error!("[POSTGRES] error clearing scheduled_jobs table: {e}"),
         }
 
         Ok(())
@@ -635,7 +635,7 @@ async fn add_data_column() -> Result<()> {
     .execute(&pool)
     .await
     {
-        log::error!("[POSTGRES] Error in adding column data: {}", e);
+        log::error!("[POSTGRES] Error in adding column data: {e}");
         return Err(e.into());
     }
     Ok(())

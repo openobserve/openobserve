@@ -122,10 +122,7 @@ pub async fn save_enrichment_data(
     let total_expected_size_in_bytes = current_size_in_bytes + bytes_in_payload as f64;
     let total_expected_size_in_mb = total_expected_size_in_bytes / SIZE_IN_MB;
     log::info!(
-        "enrichment table [{stream_name}] current stats in bytes: {:?} vs total expected size in mb: {} vs max_table_size in mb: {}",
-        current_size_in_bytes,
-        total_expected_size_in_mb,
-        enrichment_table_max_size
+        "enrichment table [{stream_name}] current stats in bytes: {current_size_in_bytes:?} vs total expected size in mb: {total_expected_size_in_mb} vs max_table_size in mb: {enrichment_table_max_size}"
     );
 
     // we need to check if the storage size exceeds the max size
@@ -277,11 +274,7 @@ pub async fn save_enrichment_data(
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     log::info!(
-        "save enrichment data to: {}/{}/{} success with stats {:?}",
-        org_id,
-        table_name,
-        append_data,
-        req_stats
+        "save enrichment data to: {org_id}/{table_name}/{append_data} success with stats {req_stats:?}"
     );
 
     // metric + data usage
@@ -306,14 +299,14 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        log::error!("Error deleting stream schema: {}", e);
+        log::error!("Error deleting stream schema: {e}");
     }
 
     // create delete for compactor
     if let Err(e) =
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
-        log::error!("Error creating stream retention job: {}", e);
+        log::error!("Error creating stream retention job: {e}");
     }
 
     // delete stream schema cache
@@ -338,7 +331,7 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
 
     // delete stream key
     if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table: {}", e);
+        log::error!("Error deleting enrichment table: {e}");
     }
 
     // delete stream stats cache

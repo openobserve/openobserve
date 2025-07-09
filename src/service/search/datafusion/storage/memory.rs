@@ -69,7 +69,7 @@ impl ObjectStore for FS {
         let objects = match super::file_list::get(&key) {
             Ok(objects) => objects,
             Err(e) => {
-                log::error!("Error getting file list for memory storage: {}", e);
+                log::error!("Error getting file list for memory storage: {e}");
                 vec![]
             }
         };

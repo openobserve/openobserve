@@ -1410,7 +1410,7 @@ async fn load_samples_from_datafusion(
                         }
                         Ok(None) => break,
                         Err(e) => {
-                            log::error!("load samples from datafusion execute stream Error: {}", e);
+                            log::error!("load samples from datafusion execute stream Error: {e}");
                             return Err(e);
                         }
                     }
@@ -1533,10 +1533,7 @@ async fn load_exemplars_from_datafusion(
                         }
                         Ok(None) => break,
                         Err(e) => {
-                            log::error!(
-                                "load exemplars from datafusion execute stream Error: {}",
-                                e
-                            );
+                            log::error!("load exemplars from datafusion execute stream Error: {e}");
                             return Err(e);
                         }
                     }
