@@ -795,6 +795,7 @@ async fn get_partitions(
         &req.org_id,
         Some(user_id),
         req.stream_type,
+        req.search_type,
         &search_partition_req,
         false,
         false,

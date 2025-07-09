@@ -21,7 +21,7 @@ use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
         function::{RESULT_ARRAY, VRLResultResolver},
-        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -680,6 +680,9 @@ pub async fn _search_partition_multi(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let search_type = get_search_type_from_request(&query)
+        .unwrap_or(Some(SearchEventType::Other))
+        .unwrap_or(SearchEventType::Other);
 
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -688,8 +691,14 @@ pub async fn _search_partition_multi(
         }
     };
 
-    let search_fut =
-        SearchService::search_partition_multi(&trace_id, &org_id, &user_id, stream_type, &req);
+    let search_fut = SearchService::search_partition_multi(
+        &trace_id,
+        &org_id,
+        &user_id,
+        stream_type,
+        search_type,
+        &req,
+    );
     let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span).await
     } else {

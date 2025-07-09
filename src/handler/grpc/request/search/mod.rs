@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::{search, stream::StreamType},
+    meta::{
+        search::{self, SearchEventType},
+        stream::StreamType,
+    },
     utils::json,
 };
 use proto::cluster_rpc::{
@@ -230,6 +233,7 @@ impl Search for Searcher {
             &req.org_id,
             None,
             stream_type,
+            SearchEventType::Other,
             &request,
             req.skip_max_query_range,
             true,

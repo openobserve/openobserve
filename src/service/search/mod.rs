@@ -26,7 +26,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
-        search,
+        search::{self, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
@@ -85,7 +85,10 @@ use crate::{
         },
     },
     handler::grpc::request::search::Searcher,
-    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    service::search::{
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        sql::{convert_histogram_interval_to_seconds, generate_histogram_interval},
+    },
 };
 
 pub(crate) mod cache;
@@ -603,6 +606,7 @@ pub async fn search_partition(
     org_id: &str,
     user_id: Option<&str>,
     stream_type: StreamType,
+    search_type: SearchEventType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
     is_http_req: bool,
@@ -911,6 +915,21 @@ pub async fn search_partition(
         if hist_int > 0 {
             min_step *= hist_int;
         }
+    } else if search_type.eq(&SearchEventType::UI) {
+        let time_range = (req.start_time, req.end_time);
+        let interval = generate_histogram_interval(Some(time_range), 0);
+        match convert_histogram_interval_to_seconds(&interval) {
+            Ok(v) => {
+                // convert seconds to microseconds
+                min_step = v * 1_000_000
+            }
+            Err(e) => {
+                log::error!(
+                    "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {:?}",
+                    e
+                );
+            }
+        }
     }
 
     // Calculate original step with all factors considered
@@ -959,7 +978,14 @@ pub async fn search_partition(
         };
     }
 
-    let is_histogram = sql.histogram_interval.is_some();
+    let mut is_histogram = sql.histogram_interval.is_some();
+    // Set this to true to generate partitions aligned with interval
+    // only for logs page when query is non-histogram, so that logs can reuse the same partitions
+    // for histogram query
+    if !is_histogram && search_type.eq(&SearchEventType::UI) {
+        is_histogram = true;
+    }
+
     let sql_order_by = sql
         .order_by
         .first()
@@ -1002,6 +1028,10 @@ pub async fn search_partition(
     }
 
     resp.partitions = partitions;
+    if search_type.eq(&SearchEventType::UI) {
+        let min_step_secs = min_step / 1_000_000;
+        resp.histogram_interval = Some(min_step_secs);
+    }
     Ok(resp)
 }
 
@@ -1326,6 +1356,7 @@ pub async fn search_partition_multi(
     org_id: &str,
     user_id: &str,
     stream_type: StreamType,
+    search_type: SearchEventType,
     req: &search::MultiSearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
@@ -1336,6 +1367,7 @@ pub async fn search_partition_multi(
             org_id,
             Some(user_id),
             stream_type,
+            search_type,
             &search::SearchPartitionRequest {
                 start_time: req.start_time,
                 end_time: req.end_time,

@@ -862,6 +862,7 @@ async fn get_partitions(
         org_id,
         Some(user_id),
         stream_type,
+        req.search_type.unwrap_or(SearchEventType::Other),
         &search_partition_req,
         false,
         false,
