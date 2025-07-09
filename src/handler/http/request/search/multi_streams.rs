@@ -265,7 +265,7 @@ pub async fn search_multi(
                 }
             };
             if !keys_used.is_empty() {
-                log::info!("keys used : {:?}", keys_used);
+                log::info!("keys used : {keys_used:?}");
             }
             // Check permissions on stream ends
             // Check permissions on keys
@@ -448,7 +448,7 @@ pub async fn search_multi(
                     ])
                     .inc();
 
-                log::error!("search error: {:?}", err);
+                log::error!("search error: {err:?}");
                 multi_res.function_error =
                     vec![multi_res.function_error.join(", "), err.to_string()];
                 if let errors::Error::ErrorCode(code) = err
@@ -484,7 +484,7 @@ pub async fn search_multi(
                 Some(program)
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
                 multi_res.function_error =
                     vec![multi_res.function_error.join(", "), err.to_string()];
                 None
@@ -742,7 +742,7 @@ pub async fn _search_partition_multi(
                     "",
                 ])
                 .inc();
-            log::error!("search error: {:?}", err);
+            log::error!("search error: {err:?}");
             Ok(map_error_to_http_response(&err, Some(trace_id)))
         }
     }
@@ -881,7 +881,7 @@ pub async fn around_multi(
                         "",
                     ])
                     .inc();
-                log::error!("multi search around error: {:?}", err);
+                log::error!("multi search around error: {err:?}");
                 return Ok(map_error_to_http_response(&err, Some(trace_id)));
             }
         };

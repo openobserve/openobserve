@@ -80,7 +80,7 @@ where
                 };
                 let folder_id = ev.value.map(|v| String::from_utf8_lossy(&v).to_string());
                 if let Err(e) = (on_put)(org, alert_id, folder_id).await {
-                    log::error!("Error in alert put handler: {}", e);
+                    log::error!("Error in alert put handler: {e}");
                 }
             }
             Event::Delete(ev) => {

@@ -294,10 +294,7 @@ async fn download_from_storage(
                     && validate_file(&data_bytes, FileType::Ttv).await.is_ok();
                 if valid_parquet || valid_ttv {
                     log::warn!(
-                        "download file {} found size mismatch, remote : {}, db: {}, correcting db as valid file",
-                        file,
-                        expected_blob_size,
-                        size,
+                        "download file {file} found size mismatch, remote : {expected_blob_size}, db: {size}, correcting db as valid file",
                     );
                     // only update for parquet files, not ttv files
                     if file.ends_with(".parquet") {
@@ -309,10 +306,7 @@ async fn download_from_storage(
                     Ok((data_len, data_bytes))
                 } else {
                     log::warn!(
-                        "download file {} found corrupt file, remote: {}, db: {}, deleting entry from file_list ",
-                        file,
-                        expected_blob_size,
-                        size
+                        "download file {file} found corrupt file, remote: {expected_blob_size}, db: {size}, deleting entry from file_list "
                     );
                     // only update for parquet files, not ttv files
                     if file.ends_with(".parquet") {

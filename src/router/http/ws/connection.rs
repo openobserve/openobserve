@@ -110,17 +110,12 @@ impl ResponseRouter {
                 })
                 .await;
             log::debug!(
-                "[WS::QuerierConnection::ResponseRouter] flushed for trace_id: {}, querier_name: {}, force_remove: {}",
-                trace_id,
-                querier_name,
-                force_remove
+                "[WS::QuerierConnection::ResponseRouter] flushed for trace_id: {trace_id}, querier_name: {querier_name}, force_remove: {force_remove}"
             );
             count += 1;
         }
         log::debug!(
-            "[WS::QuerierConnection::ResponseRouter] flushed {count} routes for querier: {}, force_remove: {}",
-            querier_name,
-            force_remove
+            "[WS::QuerierConnection::ResponseRouter] flushed {count} routes for querier: {querier_name}, force_remove: {force_remove}"
         );
     }
 }
@@ -400,8 +395,7 @@ impl QuerierConnection {
         if let Some(write) = write_guard.as_mut() {
             if let Err(e) = write.close().await {
                 log::warn!(
-                    "[WS::QuerierConnection] failed to send close frame to querier during cleanup: {}",
-                    e
+                    "[WS::QuerierConnection] failed to send close frame to querier during cleanup: {e}"
                 );
             }
             *write_guard = None;
@@ -467,9 +461,7 @@ impl ResponseRouter {
             Some(resp_sender) => {
                 if let Err(e) = resp_sender.clone().send(message).await {
                     log::warn!(
-                        "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {} error: {}",
-                        trace_id,
-                        e
+                        "[WS::Router::QuerierConnection] router-client task the route_response channel for trace_id: {trace_id} error: {e}"
                     );
                     let mut write_guard = self.routes.write().await;
                     write_guard.remove(&trace_id);
@@ -498,11 +490,7 @@ impl Connection for QuerierConnection {
         let (ws_stream, _) = connect_async_with_config(ws_req, Some(websocket_config), false)
             .await
             .map_err(|e| {
-                log::error!(
-                    "[WS::QuerierConnection] error connecting to querier {}: {}",
-                    http_url,
-                    e
-                );
+                log::error!("[WS::QuerierConnection] error connecting to querier {http_url}: {e}");
                 WsError::ConnectionError(e.to_string())
             })?;
         let (write, read) = ws_stream.split();

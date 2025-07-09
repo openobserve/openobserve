@@ -31,7 +31,7 @@ pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), an
     {
         Ok(_) => {}
         Err(e) => {
-            log::error!("Error saving function: {}", e);
+            log::error!("Error saving function: {e}");
             return Err(anyhow::anyhow!("Error saving function: {}", e));
         }
     }
@@ -49,7 +49,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
-            log::error!("Error deleting function: {}", e);
+            log::error!("Error deleting function: {e}");
             return Err(anyhow::anyhow!("Error deleting function: {}", e));
         }
     }
@@ -85,12 +85,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("Error getting value: {}", e);
+                            log::error!("Error getting value: {e}");
                             continue;
                         }
                     },
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };

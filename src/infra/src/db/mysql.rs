@@ -86,7 +86,7 @@ async fn cache_indices() -> HashSet<DBIndex> {
             })
             .collect(),
         Err(e) => {
-            log::debug!("error in caching indices : {}", e);
+            log::debug!("error in caching indices : {e}");
             HashSet::new()
         }
     }
@@ -179,13 +179,13 @@ impl super::Db for MysqlDb {
         .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback put meta error: {}", e);
+                log::error!("[MYSQL] rollback put meta error: {e}");
             }
             return Err(e.into());
         }
         // need commit it first to avoid the deadlock of insert and update
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit put meta error: {}", e);
+            log::error!("[MYSQL] commit put meta error: {e}");
             return Err(e.into());
         }
 
@@ -205,12 +205,12 @@ impl super::Db for MysqlDb {
             .await
             {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback put meta error: {}", e);
+                    log::error!("[MYSQL] rollback put meta error: {e}");
                 }
                 return Err(e.into());
             }
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit put meta error: {}", e);
+            log::error!("[MYSQL] commit put meta error: {e}");
             return Err(e.into());
         }
         let time = start.elapsed().as_secs_f64();
@@ -455,17 +455,17 @@ impl super::Db for MysqlDb {
                     .with_label_values(&["release_lock", "", ""])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
-                    log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] unlock get_for_update error: {e}");
                 }
                 if let Err(e) = lock_tx.commit().await {
-                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {e}");
                 }
                 return Err(e.into());
             }
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit get_for_update error: {}", e);
+            log::error!("[MYSQL] commit get_for_update error: {e}");
             return Err(e.into());
         }
         DB_QUERY_NUMS
@@ -888,7 +888,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     }) {
         return Ok(());
     }
-    log::info!("[MYSQL] deleting index {} on table {}", idx_name, table);
+    log::info!("[MYSQL] deleting index {idx_name} on table {table}");
     DB_QUERY_NUMS.with_label_values(&["drop", table, ""]).inc();
     let sql = format!("DROP INDEX {idx_name} ON {table};");
     let start = std::time::Instant::now();
@@ -897,6 +897,6 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     DB_QUERY_TIME
         .with_label_values(&["drop_index", table])
         .observe(time);
-    log::info!("[MYSQL] index {} deleted successfully", idx_name);
+    log::info!("[MYSQL] index {idx_name} deleted successfully");
     Ok(())
 }

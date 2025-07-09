@@ -400,7 +400,7 @@ pub fn clean_lock_files() {
 }
 
 pub fn lock_request(trace_id: &str, files: &[String]) {
-    log::info!("[trace_id: {}] lock_request for wal files", trace_id);
+    log::info!("[trace_id: {trace_id}] lock_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
     locker.insert(trace_id.to_string(), files.to_vec());
 }
@@ -409,7 +409,7 @@ pub fn release_request(trace_id: &str) {
     if !config::cluster::LOCAL_NODE.is_ingester() {
         return;
     }
-    log::info!("[trace_id: {}] release_request for wal files", trace_id);
+    log::info!("[trace_id: {trace_id}] release_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
     let files = locker.remove(trace_id);
     locker.shrink_to_fit();

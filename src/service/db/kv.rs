@@ -80,7 +80,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_value = match db::get(&ev.key).await {
                     Ok(val) => val,
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };

@@ -82,12 +82,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("Error getting value: {}", e);
+                            log::error!("Error getting value: {e}");
                             continue;
                         }
                     },
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };
@@ -113,7 +113,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let json_val: String = match json::from_slice(&item_value) {
             Ok(val) => val,
             Err(e) => {
-                log::error!("Error deserializing session value: {}", e);
+                log::error!("Error deserializing session value: {e}");
                 continue;
             }
         };

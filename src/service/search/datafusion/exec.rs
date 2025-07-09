@@ -202,12 +202,12 @@ pub async fn merge_parquet_files(
                 }
                 Ok(Some(batch)) => {
                     if let Err(e) = tx.send(batch).await {
-                        log::error!("merge_parquet_files write to channel error: {}", e);
+                        log::error!("merge_parquet_files write to channel error: {e}");
                         return Err(DataFusionError::External(Box::new(e)));
                     }
                 }
                 Err(e) => {
-                    log::error!("merge_parquet_files execute stream error: {}", e);
+                    log::error!("merge_parquet_files execute stream error: {e}");
                     return Err(e);
                 }
             }
@@ -217,7 +217,7 @@ pub async fn merge_parquet_files(
     while let Some(batch) = rx.recv().await {
         new_file_meta.records += batch.num_rows() as i64;
         if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write error: {}", e);
+            log::error!("merge_parquet_files write error: {e}");
             return Err(e.into());
         }
     }
@@ -255,7 +255,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let sql = generate_downsampling_sql(&schema, rule);
 
-    log::debug!("merge_parquet_files_with_downsampling sql: {}", sql);
+    log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -303,17 +303,13 @@ pub async fn merge_parquet_files_with_downsampling(
                 Ok(Some(batch)) => {
                     if let Err(e) = tx.send(batch).await {
                         log::error!(
-                            "merge_parquet_files_with_downsampling write to channel error: {}",
-                            e
+                            "merge_parquet_files_with_downsampling write to channel error: {e}"
                         );
                         return Err(DataFusionError::External(Box::new(e)));
                     }
                 }
                 Err(e) => {
-                    log::error!(
-                        "merge_parquet_files_with_downsampling execute stream error: {}",
-                        e
-                    );
+                    log::error!("merge_parquet_files_with_downsampling execute stream error: {e}");
                     return Err(e);
                 }
             }
@@ -347,7 +343,7 @@ pub async fn merge_parquet_files_with_downsampling(
             );
         }
         if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
+            log::error!("merge_parquet_files_with_downsampling write Error: {e}");
             return Err(e.into());
         }
     }
@@ -759,11 +755,7 @@ async fn get_cpu_and_mem_limit(
     };
 
     log::info!(
-        "[trace_id: {}] work_group: {:?}, target_partitions: {}, memory_size: {}",
-        trace_id,
-        work_group,
-        target_partitions,
-        memory_size
+        "[trace_id: {trace_id}] work_group: {work_group:?}, target_partitions: {target_partitions}, memory_size: {memory_size}"
     );
 
     Ok((target_partitions, memory_size))

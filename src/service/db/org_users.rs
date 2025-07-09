@@ -262,7 +262,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     let item_value = match get_from_db(org_id, user_id).await {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("Error getting value: {}", e);
+                            log::error!("Error getting value: {e}");
                             continue;
                         }
                     };
@@ -285,7 +285,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         match list_orgs_by_user(item_key).await {
                             Ok(val) => val,
                             Err(e) => {
-                                log::error!("Error getting value: {}", e);
+                                log::error!("Error getting value: {e}");
                                 continue;
                             }
                         };
@@ -336,7 +336,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         match list_orgs_by_user(item_key).await {
                             Ok(val) => val,
                             Err(e) => {
-                                log::error!("Error getting value: {}", e);
+                                log::error!("Error getting value: {e}");
                                 continue;
                             }
                         };

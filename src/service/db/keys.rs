@@ -35,7 +35,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
             return Err(anyhow::anyhow!("Key with given name already exists"));
         }
         Err(e) => {
-            log::info!("error while saving cipher key to db : {}", e);
+            log::info!("error while saving cipher key to db : {e}");
             return Err(anyhow::anyhow!(e));
         }
     }
@@ -196,7 +196,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };

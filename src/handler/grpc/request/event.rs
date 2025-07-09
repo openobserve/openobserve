@@ -99,7 +99,7 @@ impl Event for Eventer {
                     match crate::job::download_from_node(&grpc_addr, &files_to_download).await {
                         Ok(failed) => failed_files = failed,
                         Err(e) => {
-                            log::error!("[gRPC:Event] Failed to get files from notifier: {}", e);
+                            log::error!("[gRPC:Event] Failed to get files from notifier: {e}");
                             failed_files = files_to_download;
                         }
                     }
@@ -118,7 +118,7 @@ impl Event for Eventer {
                     )
                     .await
                     {
-                        log::error!("[gRPC:Event] Failed to cache file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {e}");
                     }
                 }
             } else {
@@ -135,7 +135,7 @@ impl Event for Eventer {
                     )
                     .await
                     {
-                        log::error!("[gRPC:Event] Failed to cache file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {e}");
                     }
                 }
             }
@@ -195,7 +195,7 @@ impl Event for Eventer {
         tokio::spawn(async move {
             for path in file_list.files.iter() {
                 if let Err(e) = handle_file_chunked(path, tx.clone()).await {
-                    log::error!("[gRPC:Event] Failed to handle file {}: {}", path, e);
+                    log::error!("[gRPC:Event] Failed to handle file {path}: {e}");
                     break;
                 }
             }
@@ -228,7 +228,7 @@ async fn handle_file_chunked(
             Some(file_data) => file_data,
             None => {
                 if let Err(e) = tx.send(Err(Status::not_found(path))).await {
-                    log::error!("[gRPC:Event] Failed to send error: {}", e);
+                    log::error!("[gRPC:Event] Failed to send error: {e}");
                 }
                 return Err(Status::not_found(path));
             }
@@ -242,7 +242,7 @@ async fn handle_file_chunked(
         };
 
         if let Err(e) = tx.send(Ok(response)).await {
-            log::error!("[gRPC:Event] Failed to send file chunk: {}", e);
+            log::error!("[gRPC:Event] Failed to send file chunk: {e}");
             return Err(Status::internal("Failed to send file chunk"));
         }
 

@@ -91,11 +91,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                 .await
                 {
                     log::error!(
-                        "[COMPACTOR] lifecycle: delete_by_stream [{}/{}/{}] error: {}",
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        e
+                        "[COMPACTOR] lifecycle: delete_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
                     );
                 }
             }
@@ -135,11 +131,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 
         if let Err(e) = ret {
             log::error!(
-                "[COMPACTOR] delete: delete [{}/{}/{}] error: {}",
-                org_id,
-                stream_type,
-                stream_name,
-                e
+                "[COMPACTOR] delete: delete [{org_id}/{stream_type}/{stream_name}] error: {e}"
             );
         }
     }
@@ -210,11 +202,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                             merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
                         {
                             log::error!(
-                                "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
-                                org_id,
-                                stream_type,
-                                stream_name,
-                                e
+                                "[COMPACTOR] generate_job_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
                             );
                         }
                     }
@@ -227,11 +215,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                         .await
                         {
                             log::error!(
-                                "[COMPACTOR] generate_old_data_job_by_stream [{}/{}/{}] error: {}",
-                                org_id,
-                                stream_type,
-                                stream_name,
-                                e
+                                "[COMPACTOR] generate_old_data_job_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
                             );
                         }
                     }
@@ -312,12 +296,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                 .await
                 {
                     log::error!(
-                        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?} error: {}",
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        rule,
-                        e
+                        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{org_id}/{stream_type}/{stream_name}] rule: {rule:?} error: {e}"
                     );
                 }
             }
@@ -380,7 +359,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
     if !need_done_ids.is_empty() {
         // set those jobs to done
         if let Err(e) = infra_file_list::set_job_done(&need_done_ids).await {
-            log::error!("[COMPACTOR] set_job_done failed: {}", e);
+            log::error!("[COMPACTOR] set_job_done failed: {e}");
         }
         let need_done_ids = need_done_ids.into_iter().collect::<HashSet<_>>();
         jobs.retain(|job| !need_done_ids.contains(&job.id));
@@ -389,7 +368,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
     if !need_release_ids.is_empty() {
         // release those jobs
         if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {
-            log::error!("[COMPACTOR] set_job_pending failed: {}", e);
+            log::error!("[COMPACTOR] set_job_pending failed: {e}");
         }
         let need_release_ids = need_release_ids.into_iter().collect::<HashSet<_>>();
         jobs.retain(|job| !need_release_ids.contains(&job.id));
@@ -415,7 +394,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
                 }
             }
             if let Err(e) = infra_file_list::update_running_jobs(&job_ids).await {
-                log::error!("[COMPACTOR] update_job_status failed: {}", e);
+                log::error!("[COMPACTOR] update_job_status failed: {e}");
             }
         }
     });
@@ -454,11 +433,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             .await
         {
             log::error!(
-                "[COMPACTOR] send merge job to worker failed [{}/{}/{}] error: {}",
-                org_id,
-                stream_type,
-                stream_name,
-                e
+                "[COMPACTOR] send merge job to worker failed [{org_id}/{stream_type}/{stream_name}] error: {e}"
             );
         }
     }
@@ -495,7 +470,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
                     log::debug!("[COMPACTOR] deleted from file_list_deleted {affected} files");
                 }
                 Err(e) => {
-                    log::error!("[COMPACTOR] delete files error: {}", e);
+                    log::error!("[COMPACTOR] delete files error: {e}");
                     break;
                 }
             };

@@ -83,8 +83,7 @@ pub mod tantivy_index {
                 let data = bytes::Bytes::from(timestamp.to_string());
                 if let Err(e) = db::put(key, data, db::NO_NEED_WATCH, None).await {
                     log::warn!(
-                        "[db::metas] Error storing tantivy _timestamp index updated_at: {}",
-                        e
+                        "[db::metas] Error storing tantivy _timestamp index updated_at: {e}"
                     );
                 }
                 timestamp

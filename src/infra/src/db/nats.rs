@@ -477,11 +477,7 @@ impl super::Db for NatsDb {
                 let mut entries = match bucket.watch_all().await {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!(
-                            "[NATS:watch] prefix: {}, bucket.watch_all error: {}",
-                            prefix,
-                            e
-                        );
+                        log::error!("[NATS:watch] prefix: {prefix}, bucket.watch_all error: {e}");
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -489,7 +485,7 @@ impl super::Db for NatsDb {
                 loop {
                     match entries.next().await {
                         None => {
-                            log::error!("[NATS:watch] prefix: {}, get message error", prefix);
+                            log::error!("[NATS:watch] prefix: {prefix}, get message error");
                             break;
                         }
                         Some(entry) => {
@@ -497,9 +493,7 @@ impl super::Db for NatsDb {
                                 Ok(entry) => entry,
                                 Err(e) => {
                                     log::error!(
-                                        "[NATS:watch] prefix: {}, get message error: {}",
-                                        prefix,
-                                        e
+                                        "[NATS:watch] prefix: {prefix}, get message error: {e}"
                                     );
                                     break;
                                 }
@@ -528,10 +522,7 @@ impl super::Db for NatsDb {
                             };
                             if let Err(e) = ret {
                                 log::warn!(
-                                    "[NATS:watch] prefix: {}, key: {}, send error: {}",
-                                    prefix,
-                                    new_key,
-                                    e
+                                    "[NATS:watch] prefix: {prefix}, key: {new_key}, send error: {e}"
                                 );
                             }
                         }
@@ -573,10 +564,7 @@ pub async fn connect(nats_event_sender: mpsc::Sender<async_nats::Event>) -> asyn
         let sender = nats_event_sender.clone();
         async move {
             if let Err(e) = sender.send(event).await {
-                log::error!(
-                    "NATs client event callback channel failed to send event: {}",
-                    e
-                );
+                log::error!("NATs client event callback channel failed to send event: {e}");
             }
         }
     });
@@ -589,11 +577,7 @@ pub async fn connect(nats_event_sender: mpsc::Sender<async_nats::Event>) -> asyn
     match async_nats::connect_with_options(addrs.clone(), opts).await {
         Ok(client) => client,
         Err(e) => {
-            log::error!(
-                "NATS connect failed for address(es): {:?}, err: {}",
-                addrs,
-                e
-            );
+            log::error!("NATS connect failed for address(es): {addrs:?}, err: {e}");
             panic!("NATS connect failed");
         }
     }
@@ -714,7 +698,7 @@ impl Locker {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
                     if let Err(e) = wait_for_delete(&bucket, &key, &self.key).await {
-                        log::error!("nats wait_for_delete key: {}, error: {}", key, e);
+                        log::error!("nats wait_for_delete key: {key}, error: {e}");
                     }
                 }
             };
@@ -743,7 +727,7 @@ impl Locker {
             if let Err(e) =
                 keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id).await
             {
-                log::error!("nats keep alive for key: {}, error: {}", lock_key, e);
+                log::error!("nats keep alive for key: {lock_key}, error: {e}");
             }
         });
 
@@ -806,10 +790,10 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str, orig_key: &st
                                 if matches!(entry.operation, jetstream::kv::Operation::Delete | jetstream::kv::Operation::Purge) {
                                      return Ok(());
                                 }
-                                log::debug!("nats event was not delete, continuing to wait the key: {}", orig_key);
+                                log::debug!("nats event was not delete, continuing to wait the key: {orig_key}");
                              }
                             Err(e) => {
-                                log::error!("nats got error from key watcher, will wait for next event, key: {}, error: {}", orig_key, e);
+                                log::error!("nats got error from key watcher, will wait for next event, key: {orig_key}, error: {e}");
                              }
                         }
                     }
@@ -829,14 +813,14 @@ async fn check_exist_lock(
 ) -> Result<bool> {
     Ok(match bucket.get(key).await {
         Ok(Some(body)) => {
-            log::debug!("nats another process is locking the key: {}", orig_key);
+            log::debug!("nats another process is locking the key: {orig_key}");
             let ret = String::from_utf8_lossy(&body).to_string();
             let ret_parts = ret.split(':').collect::<Vec<_>>();
             let expiration = ret_parts.last().unwrap();
             let expiration = expiration.parse::<i64>().unwrap();
             if expiration < now_micros() {
                 if let Err(err) = bucket.purge(&key).await {
-                    log::error!("nats purge lock for key: {}, error: {}", orig_key, err);
+                    log::error!("nats purge lock for key: {orig_key}, error: {err}");
                     return Err(Error::Message("nats purge lock error".to_string()));
                 };
                 true
@@ -846,7 +830,7 @@ async fn check_exist_lock(
         }
         Ok(None) => true,
         Err(e) => {
-            log::error!("nats got error for key: {}, error: {}", orig_key, e);
+            log::error!("nats got error for key: {orig_key}, error: {e}");
             false
         }
     })
@@ -877,12 +861,12 @@ async fn keep_alive_lock(
             now_micros() + second_micros(LOCKER_WATCHER_UPDATE_TTL),
         ));
         if let Err(e) = bucket.put(&key, value).await {
-            log::error!("nats keep alive for key: {}, error: {}", orig_key, e);
+            log::error!("nats keep alive for key: {orig_key}, error: {e}");
         }
-        log::debug!("nats keep alive for key: {} updated", orig_key);
+        log::debug!("nats keep alive for key: {orig_key} updated");
     }
 
-    log::debug!("nats keep alive for key: {} exit", orig_key);
+    log::debug!("nats keep alive for key: {orig_key} exit");
 
     Ok(())
 }

@@ -62,7 +62,7 @@ pub async fn create<C: ConnectionTrait + TransactionTrait>(
     };
     db::scheduler::push(trigger)
         .await
-        .inspect_err(|e| log::error!("Failed to save trigger: {}", e))?;
+        .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
     Ok(())
 }
 
@@ -91,11 +91,11 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     if scheduler_exists {
         db::scheduler::update_trigger(trigger)
             .await
-            .inspect_err(|e| log::error!("Failed to update trigger: {}", e))?;
+            .inspect_err(|e| log::error!("Failed to update trigger: {e}"))?;
     } else {
         db::scheduler::push(trigger)
             .await
-            .inspect_err(|e| log::error!("Failed to save trigger: {}", e))?;
+            .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
     }
 
     Ok(())
@@ -172,7 +172,7 @@ pub async fn delete<C: ConnectionTrait + TransactionTrait>(
         .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
     let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, &report_id)
         .await
-        .inspect_err(|e| log::error!("Failed to delete trigger: {}", e));
+        .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, folder_snowflake_id, name).await?;
     Ok(())
@@ -209,7 +209,7 @@ mod super_cluster {
         report: Report,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            log::debug!("Sending super cluster report creation event: {:?}", report);
+            log::debug!("Sending super cluster report creation event: {report:?}");
             o2_enterprise::enterprise::super_cluster::queue::reports_create(
                 org_id, folder_id, report_id, report,
             )
@@ -228,7 +228,7 @@ mod super_cluster {
         report: Report,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            log::debug!("Sending super cluster report update event: {:?}", report);
+            log::debug!("Sending super cluster report update event: {report:?}");
             o2_enterprise::enterprise::super_cluster::queue::reports_update(
                 org,
                 folder_snowflake_id,
@@ -249,7 +249,7 @@ mod super_cluster {
         name: &str,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            log::debug!("Sending super cluster report delete event: {:?}", name);
+            log::debug!("Sending super cluster report delete event: {name:?}");
             o2_enterprise::enterprise::super_cluster::queue::reports_delete(org, folder_id, name)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;

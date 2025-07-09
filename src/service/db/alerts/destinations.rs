@@ -190,7 +190,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting from db: {}", e);
+                        log::error!("Error getting from db: {e}");
                         continue;
                     }
                 };

@@ -139,33 +139,19 @@ pub async fn check_cardinality(
         match get_cardinality_from_cache(org_id, stream_type, stream_name, field_name).await {
             Ok(cardinality) => {
                 log::debug!(
-                    "Cardinality cache hit for {}/{}/{}/{}: {}",
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    field_name,
-                    cardinality
+                    "Cardinality cache hit for {org_id}/{stream_type}/{stream_name}/{field_name}: {cardinality}"
                 );
                 results.insert(field_name.to_string(), cardinality);
             }
             Err(Error::Message(msg)) if msg.contains("cache miss") => {
                 log::debug!(
-                    "Cardinality cache miss for {}/{}/{}/{}, will calculate",
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    field_name
+                    "Cardinality cache miss for {org_id}/{stream_type}/{stream_name}/{field_name}, will calculate"
                 );
                 fields_to_calculate.push(field_name.clone());
             }
             Err(e) => {
                 log::warn!(
-                    "Error getting cardinality from cache for {}/{}/{}/{}: {}",
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    field_name,
-                    e
+                    "Error getting cardinality from cache for {org_id}/{stream_type}/{stream_name}/{field_name}: {e}"
                 );
                 fields_to_calculate.push(field_name.clone());
             }
@@ -195,12 +181,7 @@ pub async fn check_cardinality(
                     CARDINALITY_CACHE.insert(cache_key, cache_entry);
 
                     log::debug!(
-                        "Calculated and cached cardinality for {}/{}/{}/{}: {}",
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        field_name,
-                        cardinality
+                        "Calculated and cached cardinality for {org_id}/{stream_type}/{stream_name}/{field_name}: {cardinality}"
                     );
 
                     results.insert(field_name, cardinality);
@@ -208,12 +189,7 @@ pub async fn check_cardinality(
             }
             Err(e) => {
                 log::error!(
-                    "Error getting cardinality for fields {:?} in {}/{}/{}: {}",
-                    fields_to_calculate,
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    e
+                    "Error getting cardinality for fields {fields_to_calculate:?} in {org_id}/{stream_type}/{stream_name}: {e}"
                 );
                 // Return 0.0 for fields that failed to calculate
                 for field_name in fields_to_calculate {
@@ -275,11 +251,7 @@ async fn get_cardinality(
             valid_fields.push(field_name.clone());
         } else {
             log::warn!(
-                "Field '{}' not found in schema for {}/{}/{}",
-                field_name,
-                org_id,
-                stream_type,
-                stream_name
+                "Field '{field_name}' not found in schema for {org_id}/{stream_type}/{stream_name}"
             );
         }
     }
@@ -350,9 +322,7 @@ async fn get_cardinality(
             results.insert(field_name.to_string(), cardinality);
         } else {
             log::warn!(
-                "Column '{}' not found in search response for field '{}'",
-                column_name,
-                field_name
+                "Column '{column_name}' not found in search response for field '{field_name}'"
             );
             results.insert(field_name.to_string(), 0.0);
         }
