@@ -1312,6 +1312,7 @@ const useLogs = () => {
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              searchType: "ui",
             })
             .then(async (res: any) => {
               //this is called to get data into partitions array
