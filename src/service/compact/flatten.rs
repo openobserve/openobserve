@@ -63,7 +63,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
                         .await
                         .unwrap_or_default();
                 let defined_schema_fields =
-                    stream_setting.defined_schema_fields.unwrap_or_default();
+                    stream_setting.defined_schema_fields;
                 if defined_schema_fields.is_empty() {
                     continue;
                 }
