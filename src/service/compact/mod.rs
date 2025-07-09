@@ -17,6 +17,7 @@ use std::collections::HashSet;
 
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
+    COMPACT_OLD_DATA_STREAM_SET,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -219,6 +220,11 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                         }
                     }
                     CompactionJobType::Historical => {
+                        if !COMPACT_OLD_DATA_STREAM_SET.is_empty()
+                            && !COMPACT_OLD_DATA_STREAM_SET.contains(&stream_name)
+                        {
+                            continue;
+                        }
                         if let Err(e) = merge::generate_old_data_job_by_stream(
                             &org_id,
                             stream_type,

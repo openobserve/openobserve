@@ -1234,6 +1234,11 @@ async fn values_v1(
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
+        scan_files: if resp.scan_files > 0 {
+            Some(resp.scan_files as i64)
+        } else {
+            None
+        },
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
         min_ts: Some(start_time),

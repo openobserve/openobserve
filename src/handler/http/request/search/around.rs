@@ -223,6 +223,11 @@ pub(crate) async fn around(
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
+        scan_files: if resp.scan_files > 0 {
+            Some(resp.scan_files as i64)
+        } else {
+            None
+        },
         request_body: Some(req.query.sql),
         user_email: user_id,
         min_ts: Some(around_start_time),
