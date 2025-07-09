@@ -193,8 +193,25 @@ export class LogsPage {
         await this.page.getByText(stream, { exact: true }).first().click();
     }
 
+    // Helper method to ensure query editor is ready
+    async ensureQueryEditorReady() {
+        // Wait for the query editor to be visible and ready
+        await this.page.locator(this.queryEditor).waitFor({ 
+            state: 'visible', 
+            timeout: 10000 
+        });
+        
+        // Wait a moment for any UI updates
+        await this.page.waitForTimeout(1000);
+    }
+
     // Query execution methods
     async selectRunQuery() {
+        // Ensure query editor is ready
+        await this.ensureQueryEditorReady();
+        
+        // Wait for the query button to be visible and click it
+        await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.queryButton).click();
     }
 
@@ -546,11 +563,23 @@ export class LogsPage {
 
     async displayCountQuery() {
         await this.clearAndFillQueryEditor("SELECT COUNT(*) as count FROM 'e2e_automate'");
+        
+        // Ensure query editor is ready
+        await this.ensureQueryEditorReady();
+        
+        // Wait for the query button to be visible and click it
+        await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.queryButton).click();
     }
 
     async displayTwoStreams() {
         await this.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' UNION ALL SELECT * FROM 'e2e_automate'");
+        
+        // Ensure query editor is ready
+        await this.ensureQueryEditorReady();
+        
+        // Wait for the query button to be visible and click it
+        await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.queryButton).click();
     }
 
