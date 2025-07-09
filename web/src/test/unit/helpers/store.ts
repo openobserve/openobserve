@@ -105,6 +105,11 @@ const store = createStore({
       allDashboardData: {},
       foldersByType:[],
     },
+    streams:{
+      logs:{
+        
+      }
+    }
 
   },
   mutations: {

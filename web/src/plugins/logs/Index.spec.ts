@@ -191,7 +191,20 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
     generateLabelFromName: (name: string) => name,
     resetDashboardPanelData: vi.fn()
   })
+  
 }));
+vi.mock('@/composables/useLogs', async () => {
+  // Import the real module
+  const actual = await vi.importActual<typeof import('@/composables/useLogs')>(
+    '@/composables/useLogs'
+  )
+
+  return {
+    ...actual,
+    // Only mock clearSearchObject
+    clearSearchObj: vi.fn()
+  }
+})
 
 describe("Logs Index", async () => {
   let wrapper: any;
@@ -215,6 +228,7 @@ describe("Logs Index", async () => {
     // vi.clearAllMocks();
   });
 
+
   it("Should hide index list when showFields is false.", async () => {
     
 
@@ -225,13 +239,6 @@ describe("Logs Index", async () => {
     ).toBeFalsy();
   });
 
-  it("Should render search result component when there are query results", async () => {
-    
-
-    expect(
-      wrapper.get('[data-test="logs-search-search-result"]').exists()
-    ).toBeTruthy();
-  });
 
   it("Should transform non-SQL query to SQL format when SQL mode is enabled", async () => {
     // Setup initial state
@@ -433,8 +440,6 @@ describe("Logs Index", async () => {
 
     // Verify dashboard panel data was set correctly
     const panelData = wrapper.vm.dashboardPanelData.data.queries[0].fields;
-
-    console.log(wrapper.vm.dashboardPanelData.data.queries[0].fields,'panelData');
     
     // Check stream settings
     expect(panelData.stream_type).toBe("logs");

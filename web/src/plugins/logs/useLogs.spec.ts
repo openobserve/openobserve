@@ -424,14 +424,6 @@ describe("Use Logs Composable", () => {
         const date = args[0] as string | number | Date;
         return new Date(date).getTime();
       });
-
-      vi.spyOn(wrapper.vm, 'importSqlParser').mockImplementation(function(this: unknown, ...args: unknown[]) {
-        return {
-            type: 'select',
-            from: [{ table: '"default_2"' }]
-        };
-      });
-
       // Setup basic searchObj structure
     //   wrapper.vm.searchObj = {
     //     data: {

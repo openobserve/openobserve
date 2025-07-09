@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Mock composable
-vi.mock("@/utils/zincutils", () => ({
-  
-  useLocalInterestingFields: vi.fn(() => ref({})),
-  useLocalOrganization: vi.fn(() => ref({}))
-}));
+
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -33,7 +29,6 @@ import { nextTick, ref } from "vue";
 
 
 
-
 vi.mock('@/services/search', () => ({
   default: {
     partition: vi.fn((...args) => {
@@ -44,6 +39,8 @@ vi.mock('@/services/search', () => ({
     })
   }
 }));
+
+
 
 vi.mock('@/composables/useLogs', () => {
   const mockSearchObj = {

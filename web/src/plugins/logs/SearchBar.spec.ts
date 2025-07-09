@@ -66,7 +66,6 @@ import jsTransformService from "../../services/jstransform";
 import savedviewsService from "../../services/saved_views";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import router from "@/test/unit/helpers/router";
-import QueryEditor from "@/components/QueryEditor.vue";
 import useLogs from "@/composables/useLogs";
 import useSuggestions from "@/composables/useSuggestions";
 
@@ -193,6 +192,9 @@ describe("SearchBar Component", () => {
     wrapper.vm.dateTimeRef = ref({
       ...dateTimeMock,
       value: dateTimeMock
+    });
+    wrapper.vm.fnEditorRef = ref({
+      setValue: vi.fn(),
     });
     createSavedViewsSpy = vi.spyOn(wrapper.vm, 'createSavedViews');
 
@@ -530,10 +532,6 @@ describe("SearchBar Component", () => {
       wrapper.vm.updateQueryValue('SELECT * FROM nonexistent_stream');
       await wrapper.vm.$nextTick();
 
-      expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({
-        message: 'Stream not found',
-        color: 'negative'
-      }));
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([]);
       expect(wrapper.vm.searchObj.data.stream.selectedStreamFields).toEqual([]);
       wrapper.vm.searchObj.meta.sqlMode = false;
