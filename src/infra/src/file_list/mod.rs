@@ -65,7 +65,7 @@ pub trait FileList: Sync + Send + 'static {
         created_at: i64,
         files: &[FileListDeleted],
     ) -> Result<()>;
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
@@ -221,7 +221,7 @@ pub async fn batch_add_deleted(
 }
 
 #[inline]
-pub async fn batch_remove_deleted(files: &[String]) -> Result<()> {
+pub async fn batch_remove_deleted(files: &[FileKey]) -> Result<()> {
     CLIENT.batch_remove_deleted(files).await
 }
 
@@ -591,6 +591,8 @@ impl From<&StatsRecord> for StreamStats {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileDeletedRecord {
+    #[sqlx(default)]
+    pub id: i64,
     pub stream: String,
     pub date: String,
     pub file: String,
