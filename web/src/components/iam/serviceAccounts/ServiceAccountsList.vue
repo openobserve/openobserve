@@ -64,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :pagination="pagination"
       :filter="filterQuery"
       :filter-method="filterData"
-      dense
     >
       <template #no-data>
         <NoData></NoData>
