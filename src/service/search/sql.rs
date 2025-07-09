@@ -55,7 +55,9 @@ use sqlparser::{
 };
 
 #[cfg(feature = "enterprise")]
-use super::datafusion::udf::cipher_udf::{DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME};
+use super::datafusion::udf::cipher_udf::{
+    DECRYPT_SLOW_UDF_NAME, DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME,
+};
 use super::{
     datafusion::udf::match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
     index::{Condition, IndexCondition, get_index_condition_from_expr},
@@ -1864,7 +1866,10 @@ impl VisitorMut for ExtractKeyNamesVisitor {
             }
             let fname = names.first().unwrap();
             let fname = fname.as_ident().unwrap();
-            if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
+            if fname.value == ENCRYPT_UDF_NAME
+                || fname.value == DECRYPT_UDF_NAME
+                || fname.value == DECRYPT_SLOW_UDF_NAME
+            {
                 let list = match args {
                     FunctionArguments::List(list) => list,
                     _ => {
@@ -1874,9 +1879,9 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                         return ControlFlow::Continue(());
                     }
                 };
-                if list.args.len() != 2 {
+                if list.args.len() < 2 {
                     self.error = Some(Error::Message(
-                        "invalid number of arguments to cipher function".to_string(),
+                        "invalid number of arguments to cipher function, expected at least 2: column, key and optional path".to_string(),
                     ));
                     return ControlFlow::Continue(());
                 }
