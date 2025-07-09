@@ -1183,6 +1183,7 @@ UPDATE stream_stats
     ) -> Result<i64> {
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
+        let mut tx = pool.begin().await?;
         DB_QUERY_NUMS
             .with_label_values(&["insert", "file_list_jobs", ""])
             .inc();
@@ -1195,7 +1196,7 @@ UPDATE stream_stats
                 .bind(&stream_key)
                 .bind(offset)
                 .bind(super::FileListJobStatus::Pending)
-                .execute(&pool).await
+                .execute(&mut *tx).await
         {
             Err(sqlx::Error::Database(e)) => if !e.is_unique_violation() {
                 return Err(Error::Message(e.to_string()));
@@ -1207,15 +1208,44 @@ UPDATE stream_stats
         };
 
         // get job id
-        let ret = sqlx::query(
-            "SELECT id FROM file_list_jobs WHERE org = $1 AND stream = $2 AND offsets = $3;",
+        let ret = match sqlx::query(
+            "SELECT id, status FROM file_list_jobs WHERE org = $1 AND stream = $2 AND offsets = $3;",
         )
         .bind(org_id)
         .bind(&stream_key)
         .bind(offset)
-        .fetch_one(&pool)
-        .await?;
-        Ok(ret.try_get::<i64, &str>("id").unwrap_or_default())
+        .fetch_one(&mut *tx)
+        .await {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback add job error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
+        let id = ret.try_get::<i64, &str>("id").unwrap_or_default();
+        let status = ret.try_get::<i64, &str>("status").unwrap_or_default();
+        if id > 0
+            && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done
+            && let Err(e) =
+                sqlx::query("UPDATE file_list_jobs SET status = $1 WHERE status = $2 AND id = $3;")
+                    .bind(super::FileListJobStatus::Pending)
+                    .bind(super::FileListJobStatus::Done)
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback update job status error: {e}");
+            }
+            return Err(e.into());
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit add job error: {e}");
+            return Err(e.into());
+        }
+        Ok(id)
     }
 
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {

@@ -381,6 +381,11 @@ pub async fn search(
         records: res.hits.len() as i64,
         response_time: took_time,
         size: res.scan_size as f64,
+        scan_files: if res.scan_files > 0 {
+            Some(res.scan_files as i64)
+        } else {
+            None
+        },
         request_body: Some(req.query.sql),
         function: req.query.query_fn,
         user_email: user_id,
