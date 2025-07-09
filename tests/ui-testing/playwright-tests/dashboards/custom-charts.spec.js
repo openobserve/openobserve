@@ -77,7 +77,6 @@ test.describe("Custom Charts Tests", () => {
     await page.keyboard.insertText(lineJSON);
 
     await page.waitForTimeout(1000);
-    // await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
       .getByRole("textbox")
