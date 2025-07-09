@@ -70,7 +70,7 @@ test.describe("Search Partition Tests", () => {
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     console.log("[DEBUG] Navigation to logs page complete");
     await logsPage.selectStream("e2e_automate"); 
-    console.log("[DEBUG] Stream selected");
+    console.log("[DEBUG] Stream selected"); 
     await applyQuery(page);
     console.log("[DEBUG] Initial query applied");
 
