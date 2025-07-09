@@ -379,9 +379,14 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   const q = useQuasar();
   const { getStreams } = useStreams();
   if (config.isCloud) {
-    if(store.state.organizationData?.organizationSettings?.free_trial_expiry != "") {
-      const trialDueDays = getDueDays(store.state.organizationData?.organizationSettings?.free_trial_expiry);
-      if(trialDueDays <= 0) {
+    if (
+      store.state.organizationData?.organizationSettings?.free_trial_expiry !=
+      ""
+    ) {
+      const trialDueDays = getDueDays(
+        store.state.organizationData?.organizationSettings?.free_trial_expiry,
+      );
+      if (trialDueDays <= 0 && to.path.indexOf("/iam") == -1) {
         next({ path: "/billings/plans" });
       }
     }
@@ -805,7 +810,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
   return formattedDuration;
 };
 
-export const getTimezoneOffset = (timezone: string |null = null) => {
+export const getTimezoneOffset = (timezone: string | null = null) => {
   const now = new Date();
 
   // Get the day, month, and year from the date object
@@ -823,7 +828,9 @@ export const getTimezoneOffset = (timezone: string |null = null) => {
   // Combine them in the HH:MM format
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = timezone
+    ? timezone
+    : Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
@@ -1064,7 +1071,7 @@ export function getDueDays(microTimestamp: number): number {
 
   return dueDays;
 }
-export function checkCallBackValues(url: string , key: string) {
+export function checkCallBackValues(url: string, key: string) {
   const tokens = url.split("&");
   for (const token of tokens) {
     const propArr = token.split("=");
@@ -1073,4 +1080,3 @@ export function checkCallBackValues(url: string , key: string) {
     }
   }
 }
-
