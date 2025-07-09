@@ -15,7 +15,8 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Folder {
     pub folder_id: String,
     pub name: String,
@@ -23,8 +24,9 @@ pub struct Folder {
 }
 
 /// Indicates the type of data that the folder can contain.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum FolderType {
+    #[default]
     Dashboards,
     Alerts,
     Reports,
