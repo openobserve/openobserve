@@ -709,6 +709,7 @@ export default defineComponent({
           !type
         ) {
           searchObj.meta.pageType = "logs";
+          searchObj.meta.refreshHistogram = true;
           loadLogsData();
         }
       },
