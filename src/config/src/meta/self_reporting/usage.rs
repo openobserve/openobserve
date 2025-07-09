@@ -297,6 +297,8 @@ pub struct RequestStats {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_files: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_ts: Option<i64>,
@@ -326,6 +328,7 @@ impl Default for RequestStats {
     fn default() -> Self {
         Self {
             size: 0.0,
+            scan_files: None,
             records: 0,
             dropped_records: 0,
             response_time: 0.0,
@@ -352,6 +355,7 @@ impl From<FileMeta> for RequestStats {
     fn from(meta: FileMeta) -> RequestStats {
         RequestStats {
             size: meta.original_size as f64 / SIZE_IN_MB,
+            scan_files: None,
             records: meta.records,
             dropped_records: 0,
             response_time: 0.0,
