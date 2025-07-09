@@ -269,7 +269,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
-    #[cfg(feature = "cloud")]
+    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";

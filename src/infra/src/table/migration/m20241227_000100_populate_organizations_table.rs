@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::time::day_micros;
 use hashbrown::HashSet;
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
@@ -57,14 +58,15 @@ impl MigrationTrait for Migration {
                 } else {
                     1
                 };
-                let now = chrono::Utc::now().timestamp_micros() as u64;
+                let now = chrono::Utc::now().timestamp_micros();
                 log::debug!("Creating organization: {}", org_id);
                 orgs.push(organizations::ActiveModel {
                     identifier: Set(org_id.clone()),
                     org_name: Set(org_id.clone()),
                     org_type: Set(org_type),
-                    created_at: Set(now),
-                    updated_at: Set(now),
+                    created_at: Set(now as u64),
+                    updated_at: Set(now as u64),
+                    trial_ends_at: Set(now + day_micros(14)),
                 });
                 org_set.insert(org_id);
             }
@@ -127,6 +129,7 @@ mod organizations {
         pub org_type: i16,
         pub created_at: u64,
         pub updated_at: u64,
+        pub trial_ends_at: i64,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter)]
