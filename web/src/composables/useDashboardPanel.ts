@@ -37,7 +37,7 @@ const colors = [
 ];
 let parser: any;
 
-const getDefaultDashboardPanelData: any = () => ({
+const getDefaultDashboardPanelData: any = (store: any) => ({
   data: {
     version: 5,
     id: "",
@@ -67,7 +67,8 @@ const getDefaultDashboardPanelData: any = () => ({
         position: null,
         rotate: 0,
       },
-      show_symbol: true,
+      show_symbol:
+        store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
       line_interpolation: "smooth",
       legend_width: {
         value: null,
@@ -193,9 +194,7 @@ const getDefaultDashboardPanelData: any = () => ({
   },
 });
 
-const dashboardPanelDataObj: any = {
-  dashboard: reactive({ ...getDefaultDashboardPanelData() }),
-};
+const dashboardPanelDataObj: any = {};
 
 const getDefaultCustomChartText = () => {
   return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
@@ -209,7 +208,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   // Initialize the state for this page key if it doesn't already exist
   if (!dashboardPanelDataObj[pageKey]) {
     dashboardPanelDataObj[pageKey] = reactive({
-      ...getDefaultDashboardPanelData(),
+      ...getDefaultDashboardPanelData(store),
     });
   }
 
@@ -225,7 +224,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   // get default queries
   const getDefaultQueries = () => {
-    return getDefaultDashboardPanelData().data.queries;
+    return getDefaultDashboardPanelData(store).data.queries;
   };
 
   const addQuery = () => {
@@ -276,7 +275,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetDashboardPanelData = () => {
-    Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
+    Object.assign(dashboardPanelData, getDefaultDashboardPanelData(store));
   };
 
   const resetDashboardPanelDataAndAddTimeField = () => {

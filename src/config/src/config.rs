@@ -1093,6 +1093,12 @@ pub struct Common {
         help = "Enable to use stream settings for partitions. This will apply for all streams"
     )]
     pub use_stream_settings_for_partitions_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_SYMBOL_ENABLED",
+        default = false,
+        help = "Enable to show symbol in dashboard"
+    )]
+    pub dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(EnvConfig)]
