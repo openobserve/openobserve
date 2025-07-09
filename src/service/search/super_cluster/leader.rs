@@ -329,8 +329,10 @@ async fn run_datafusion(
 
         // no need to run datafusion, return empty result
         if is_complete_cache_hit_with_no_data {
-            let mut scan_stats = ScanStats::default();
-            scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+            let scan_stats = ScanStats {
+                aggs_cache_ratio,
+                ..Default::default()
+            };
             return Ok((vec![], scan_stats, "".to_string()));
         }
     }

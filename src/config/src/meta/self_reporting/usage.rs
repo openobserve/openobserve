@@ -102,6 +102,8 @@ pub struct UsageData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_files: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_ts: Option<i64>,
@@ -305,6 +307,8 @@ pub struct RequestStats {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_files: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_ts: Option<i64>,
@@ -340,6 +344,7 @@ impl Default for RequestStats {
             request_body: None,
             function: None,
             cached_ratio: None,
+            scan_files: None,
             compressed_size: None,
             min_ts: None,
             max_ts: None,
@@ -366,6 +371,7 @@ impl From<FileMeta> for RequestStats {
             function: None,
             request_body: None,
             cached_ratio: None,
+            scan_files: None,
             compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),

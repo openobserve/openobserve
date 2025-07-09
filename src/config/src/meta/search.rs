@@ -213,10 +213,10 @@ pub struct Response {
     pub total: usize,
     pub from: i64,
     pub size: i64,
+    pub cached_ratio: usize,
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub file_count: usize,
-    pub cached_ratio: usize,
+    pub scan_files: usize,
     pub scan_size: usize,
     pub idx_scan_size: usize,
     pub scan_records: usize,
@@ -388,7 +388,7 @@ impl Response {
             total: 0,
             from,
             size,
-            file_count: 0,
+            scan_files: 0,
             cached_ratio: 0,
             scan_size: 0,
             idx_scan_size: 0,
@@ -455,8 +455,8 @@ impl Response {
         self.total = val;
     }
 
-    pub fn set_file_count(&mut self, val: usize) {
-        self.file_count = val;
+    pub fn set_scan_files(&mut self, val: usize) {
+        self.scan_files = val;
     }
 
     pub fn set_cached_ratio(&mut self, val: usize) {
@@ -1268,7 +1268,7 @@ mod tests {
     fn test_response() {
         let mut res = Response::default();
         res.set_total(10);
-        res.set_file_count(5);
+        res.set_scan_files(5);
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));

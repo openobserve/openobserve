@@ -401,7 +401,7 @@ pub async fn merge_response(
         resp.took_detail.add(&r.took_detail);
         resp.hits.extend(r.hits);
         resp.total += r.total;
-        resp.file_count += r.file_count;
+        resp.scan_files += r.scan_files;
         resp.scan_size += r.scan_size;
         resp.idx_scan_size += r.idx_scan_size;
         resp.scan_records += r.scan_records;

@@ -284,7 +284,7 @@ pub async fn search(
         scan_stats.file_list_took as usize,
         scan_stats.idx_took as usize,
     );
-    result.set_file_count(scan_stats.files as usize);
+    result.set_scan_files(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
