@@ -887,8 +887,11 @@ export default defineComponent({
         addSpansPositions(span, 0);
       });
 
-      timeRange.value.end = 0;
-      timeRange.value.start = 0;
+      // Reset time range atomically to prevent race conditions
+      timeRange.value = {
+        start: 0,
+        end: 0,
+      };
 
       calculateTracePosition();
       buildTraceChart();
@@ -1083,14 +1086,27 @@ export default defineComponent({
 
     const updateChart = (data: any) => {
       // If dataZoom is not set, set the time range to the start and end of the trace duration
+      let newStart: number;
+      let newEnd: number;
+
       if (typeof data.start !== "number" || typeof data.end !== "number") {
-        timeRange.value.start = 0;
-        timeRange.value.end =
-          traceChart.value.data[traceChart.value.data.length - 1].x1;
+        newStart = 0;
+        // Safety check to ensure trace chart data exists
+        newEnd =
+          traceChart.value.data && traceChart.value.data.length > 0
+            ? traceChart.value.data[traceChart.value.data.length - 1].x1
+            : 0;
       } else {
-        timeRange.value.start = data.start || 0;
-        timeRange.value.end = data.end || 0;
+        newStart = data.start || 0;
+        newEnd = data.end || 0;
       }
+
+      // Update time range atomically to prevent race conditions
+      timeRange.value = {
+        start: newStart,
+        end: newEnd,
+      };
+
       calculateTracePosition();
       updateHeight();
     };
