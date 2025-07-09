@@ -17,6 +17,7 @@ use std::collections::HashSet;
 
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
+    COMPACT_OLD_DATA_STREAM_SET,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -149,14 +150,6 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 
 /// Generate job for compactor
 pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow::Error> {
-    // check old data streams
-    let old_data_streams = get_config()
-        .compact
-        .old_data_streams
-        .split(',')
-        .map(|s| s.trim())
-        .collect::<HashSet<_>>();
-
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
@@ -227,7 +220,8 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                         }
                     }
                     CompactionJobType::Historical => {
-                        if !old_data_streams.is_empty() && !old_data_streams.contains(&stream_name)
+                        if !COMPACT_OLD_DATA_STREAM_SET.is_empty()
+                            && !COMPACT_OLD_DATA_STREAM_SET.contains(&stream_name)
                         {
                             continue;
                         }

@@ -255,6 +255,15 @@ pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::ne
     map
 });
 
+pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
+    get_config()
+        .compact
+        .old_data_streams
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect()
+});
+
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
