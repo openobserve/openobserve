@@ -607,7 +607,6 @@ export function extractTimestampAndGroupBy(sql: string): {
       if (col.as) {
         fieldName = col.as;
       } else if (col.expr) {
-
         // Recursive helpers for generating projection names
 
         // Fully-qualified column name (handles table alias / prefix object)
@@ -662,6 +661,23 @@ export function extractTimestampAndGroupBy(sql: string): {
               const argStr = stringifyFuncArgs(expr.args);
               return `${fname}(${argStr})`;
             }
+            case "binary_expr": {
+              const left = stringifyExpression(expr.left);
+              const right = stringifyExpression(expr.right);
+              const op = expr.operator ? expr.operator.trim() : "+";
+              return `${left}${op}${right}`;
+            }
+            case "unary_expr": {
+              const operand = stringifyExpression(expr.expr);
+              const op = expr.operator ? expr.operator.trim() : "";
+              return `${op}${operand}`;
+            }
+            case "null":
+              return "null";
+            case "bool":
+              return typeof expr.value === "boolean"
+                ? String(expr.value)
+                : "bool";
             default:
               return "expr";
           }
@@ -706,7 +722,10 @@ export function extractTimestampAndGroupBy(sql: string): {
           const funcExpr: any = col.expr;
 
           // Generate projection for functions (supports nesting)
-          if ((funcExpr.type === "function" || funcExpr.type === "aggr_func") && !fieldName) {
+          if (
+            (funcExpr.type === "function" || funcExpr.type === "aggr_func") &&
+            !fieldName
+          ) {
             const topFuncName = getFunctionName(funcExpr);
 
             if (topFuncName === "histogram") {
@@ -771,13 +790,13 @@ export function extractTimestampAndGroupBy(sql: string): {
 //   // Compare function names
 //   let name1 = "";
 //   let name2 = "";
-  
+
 //   if (typeof func1.name === "string") {
 //     name1 = func1.name.toLowerCase();
 //   } else if (func1.name && func1.name.name && Array.isArray(func1.name.name)) {
 //     name1 = func1.name.name.map((n: any) => n.value || n).join("_").toLowerCase();
 //   }
-  
+
 //   if (typeof func2.name === "string") {
 //     name2 = func2.name.toLowerCase();
 //   } else if (func2.name && func2.name.name && Array.isArray(func2.name.name)) {
@@ -837,7 +856,7 @@ export function extractTimestampAndGroupBy(sql: string): {
 //     case "function": {
 //       const funcExpr = expr as any;
 //       let functionName = "";
-      
+
 //       // Handle different function name structures
 //       if (typeof funcExpr.name === "string") {
 //         functionName = funcExpr.name.toLowerCase();
@@ -872,7 +891,7 @@ export function extractTimestampAndGroupBy(sql: string): {
 //             return null;
 //           })
 //           .filter(Boolean); // Remove null values
-        
+
 //         argsStr = argNames.join("_");
 //       }
 
@@ -966,7 +985,7 @@ export function extractTimestampAndGroupBy(sql: string): {
 //   } catch (e) {
 //     return [];
 //   }
-  
+
 //   const query = Array.isArray(ast) ? ast[0] : ast;
 //   if (!query || query.type !== "select") {
 //     return [];
