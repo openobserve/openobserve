@@ -1054,7 +1054,7 @@ def test_values_streaming_endpoint(create_session, base_url):
     }
     # Define the JSON payload
     payload = {
-        "fields": ["kubernetes_container_name"],
+        "fields": "kubernetes_container_name",
         "size": 10,
         "no_count": False,
         "regions": [],
@@ -1111,7 +1111,7 @@ def test_values_streaming_endpoint_cache(create_session, base_url):
     }
     # Define the JSON payload
     payload = {
-        "fields": ["kubernetes_container_name"],
+        "fields": "kubernetes_container_name",
         "size": 10,
         "no_count": False,
         "regions": [],
