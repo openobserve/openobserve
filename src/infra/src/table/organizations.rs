@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::organization::OrganizationType, utils::time::day_micros};
+use config::meta::organization::OrganizationType;
+#[cfg(feature = "cloud")]
+use config::utils::time::day_micros;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Schema, Set, entity::prelude::Expr,
@@ -35,6 +37,7 @@ pub struct OrganizationRecord {
     pub org_type: OrganizationType,
     pub created_at: i64,
     pub updated_at: i64,
+    #[cfg(feature = "cloud")]
     pub trial_ends_at: i64,
 }
 
@@ -47,6 +50,7 @@ impl OrganizationRecord {
             org_type,
             created_at: now,
             updated_at: now,
+            #[cfg(feature = "cloud")]
             trial_ends_at: now + day_micros(14),
         }
     }
@@ -60,6 +64,7 @@ impl From<Model> for OrganizationRecord {
             org_type: model.org_type.into(),
             created_at: model.created_at,
             updated_at: model.updated_at,
+            #[cfg(feature = "cloud")]
             trial_ends_at: model.trial_ends_at,
         }
     }
@@ -94,14 +99,14 @@ pub async fn add(
     org_type: OrganizationType,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
-    let trial_end = now + day_micros(15);
     let record = ActiveModel {
         identifier: Set(org_id.to_string()),
         org_name: Set(org_name.to_string()),
         org_type: Set(org_type.into()),
         created_at: Set(now),
         updated_at: Set(now),
-        trial_ends_at: Set(trial_end),
+        #[cfg(feature = "cloud")]
+        trial_ends_at: Set(now + day_micros(15)),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -116,6 +121,7 @@ pub async fn add(
     Ok(())
 }
 
+#[cfg(feature = "cloud")]
 pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;

@@ -134,6 +134,7 @@ pub struct AllOrganizationResponse {
     pub data: Vec<AllOrgListDetails>,
 }
 
+#[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ExtendTrialPeriodRequest {
     pub org_id: String,
@@ -489,18 +490,20 @@ mod tests {
     #[cfg(feature = "cloud")]
     #[test]
     fn test_organization_invites_creation() {
+        // what does this test exactly?
         let invites = OrganizationInvites {
             invites: vec!["a@example.com".into(), "b@example.com".into()],
-            role: UserRole::Member,
+            role: UserRole::User,
         };
 
         assert_eq!(invites.invites.len(), 2);
-        assert_eq!(invites.role, UserRole::Member);
+        assert_eq!(invites.role, UserRole::User);
     }
 
     #[cfg(feature = "cloud")]
     #[test]
     fn test_organization_invite_user_record() {
+        // what does this test exactly?
         let record = OrganizationInviteUserRecord {
             email: "user@example.com".into(),
             first_name: "First".into(),

@@ -25,7 +25,9 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::OrganizationInvites,
-    crate::common::meta::organization::{AllOrgListDetails, AllOrganizationResponse},
+    crate::common::meta::organization::{
+        AllOrgListDetails, AllOrganizationResponse, ExtendTrialPeriodRequest,
+    },
     o2_enterprise::enterprise::cloud::list_customer_billings,
 };
 
@@ -35,9 +37,9 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                ClusterInfo, ClusterInfoResponse, ExtendTrialPeriodRequest, NodeListResponse,
-                OrgDetails, OrgRenameBody, OrgUser, Organization, OrganizationResponse,
-                PasscodeResponse, RumIngestionResponse, THRESHOLD,
+                ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgDetails, OrgRenameBody,
+                OrgUser, Organization, OrganizationResponse, PasscodeResponse,
+                RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -478,6 +480,7 @@ async fn create_org(
     }
 }
 
+#[cfg(feature = "cloud")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Adds the dashboard's updated_at column
-
 use config::utils::time::day_micros;
 use sea_orm_migration::prelude::*;
 
@@ -34,7 +32,6 @@ impl MigrationTrait for Migration {
     }
 }
 
-// Removes the old created_at column.
 async fn add_updated_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     let end = chrono::Utc::now().timestamp_micros() + day_micros(14);
     if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
