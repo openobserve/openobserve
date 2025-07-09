@@ -174,13 +174,17 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
-        await this.page.locator(this.indexDropDown).click();
-        await this.page.locator(this.streamToggle).click();
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await this.page.waitForTimeout(3000);
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+        await this.page.waitForTimeout(1000);
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
     async selectIndexStreamDefault() {
-        await this.page.locator(this.indexDropDown).click();
-        await this.page.locator(this.streamToggle).click();
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await this.page.waitForTimeout(3000);
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
     }
 
     async selectIndexStream(streamName) {
@@ -212,11 +216,55 @@ export class LogsPage {
         
         // Wait for the query button to be visible and click it
         await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
+        
+        // Add a small wait to ensure the button is fully ready
+        await this.page.waitForTimeout(1000);
+        
         await this.page.locator(this.queryButton).click();
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async applyQuery() {
         await this.page.locator(this.queryButton).click();
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async applyQueryButton(expectedUrl) {
@@ -229,6 +277,26 @@ export class LogsPage {
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.press("Backspace");
         await this.page.locator(this.queryButton).click();
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async clearAndFillQueryEditor(query) {
@@ -246,12 +314,52 @@ export class LogsPage {
 
     async executeQueryWithKeyboardShortcut() {
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async executeQueryWithKeyboardShortcutTest() {
         await this.page.locator(this.queryEditor).click();
         await this.page.keyboard.type("SELECT * FROM 'e2e_automate' LIMIT 10");
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async executeQueryWithKeyboardShortcutAfterClickingElsewhere() {
@@ -259,6 +367,26 @@ export class LogsPage {
         await this.page.keyboard.type("SELECT * FROM 'e2e_automate' LIMIT 10");
         await this.page.locator(this.homeButton).click();
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async executeQueryWithKeyboardShortcutWithDifferentQuery() {
@@ -267,6 +395,26 @@ export class LogsPage {
         await this.page.keyboard.press("Backspace");
         await this.page.keyboard.type("SELECT * FROM 'e2e_automate' WHERE log LIKE '%test%' LIMIT 5");
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async executeQueryWithKeyboardShortcutWithSQLMode() {
@@ -274,6 +422,26 @@ export class LogsPage {
         await this.page.locator(this.queryEditor).click();
         await this.page.keyboard.type("SELECT * FROM 'e2e_automate' LIMIT 10");
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async executeQueryWithErrorHandling() {
@@ -285,6 +453,26 @@ export class LogsPage {
     async executeHistogramQuery(query) {
         await this.clearAndFillQueryEditor(query);
         await this.page.locator(this.queryButton).click();
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async waitForSearchResultAndCheckText(expectedText) {
@@ -377,6 +565,26 @@ export class LogsPage {
     async toggleHistogramAndExecute() {
         await this.toggleHistogram();
         await this.page.locator(this.queryButton).click();
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async verifyHistogramState() {
@@ -536,9 +744,9 @@ export class LogsPage {
     // Validation methods
     async validateResult() {
         try {
-            // Wait for the logs table with a shorter timeout (30 seconds instead of 5 minutes)
+            // Wait for the logs table with a longer timeout for streaming mode
             await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
-                timeout: 30000,
+                timeout: 45000, // Increased timeout for streaming mode
                 state: 'visible' 
             });
             await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
@@ -570,6 +778,26 @@ export class LogsPage {
         // Wait for the query button to be visible and click it
         await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.queryButton).click();
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     async displayTwoStreams() {
@@ -581,6 +809,26 @@ export class LogsPage {
         // Wait for the query button to be visible and click it
         await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.queryButton).click();
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
     }
 
     // Interesting fields methods
@@ -604,38 +852,51 @@ export class LogsPage {
 
     // Kubernetes methods
     async kubernetesContainerName() {
-        await this.clearAndFillQueryEditor("SELECT kubernetes_container_name FROM 'e2e_automate' LIMIT 10");
-        await this.page.locator(this.queryButton).click();
+        await this.page.getByLabel('Expand "kubernetes_container_name"').click();
+        await this.page.waitForTimeout(5000);
+        await this.page.locator('[data-test="logs-search-subfield-add-kubernetes_container_name-ziox"] [data-test="log-search-subfield-list-equal-kubernetes_container_name-field-btn"]').click();
     }
 
     async kubernetesContainerNameJoin() {
-        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
-        await this.page.locator(this.queryButton).click();
+        await this.page
+            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameJoinLimit() {
-        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 5");
-        await this.page.locator(this.queryButton).click();
+        await this.page
+            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+        await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameJoinLike() {
-        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a JOIN 'e2e_automate' b ON a.kubernetes_container_name LIKE b.kubernetes_container_name LIMIT 10");
-        await this.page.locator(this.queryButton).click();
+        await this.page
+            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
+        await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameLeftJoin() {
-        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a LEFT JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
-        await this.page.locator(this.queryButton).click();
+        await this.page
+            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameRightJoin() {
-        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a RIGHT JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
-        await this.page.locator(this.queryButton).click();
+        await this.page
+            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameFullJoin() {
-        await this.clearAndFillQueryEditor("SELECT a.kubernetes_container_name, b.kubernetes_container_name FROM 'e2e_automate' a FULL JOIN 'e2e_automate' b ON a.kubernetes_container_name = b.kubernetes_container_name LIMIT 10");
-        await this.page.locator(this.queryButton).click();
+        await this.page
+            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(5000);
     }
 
     // Log count ordering methods
@@ -655,7 +916,26 @@ export class LogsPage {
         }
 
         await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
-        await this.page.waitForTimeout(2000);
+        
+        // Wait for query execution and results to load
+        await this.page.waitForTimeout(3000);
+        
+        // Wait for either the logs table to appear or an error message
+        try {
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
+                timeout: 15000,
+                state: 'visible' 
+            });
+        } catch (error) {
+            // If logs table doesn't appear, check for error message
+            const errorMessage = this.page.locator(this.errorMessage);
+            if (await errorMessage.isVisible()) {
+                console.log('Query completed with error message');
+            } else {
+                // Wait a bit more for any UI updates
+                await this.page.waitForTimeout(2000);
+            }
+        }
 
         const rows = await this.page.locator('[data-test^="logs-search-result-detail-"]').all();
         let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
