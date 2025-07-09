@@ -606,20 +606,115 @@ export function extractTimestampAndGroupBy(sql: string): {
       let fieldName: string | null = null;
       if (col.as) {
         fieldName = col.as;
-      } else if (col.expr && col.expr.type === "column_ref") {
-        if (typeof col.expr.column === "string") {
-          fieldName = col.expr.column;
-        } else if (
-          typeof col.expr.column === "object" &&
-          col.expr.column.expr &&
-          typeof col.expr.column.expr.value === "string"
-        ) {
-          fieldName = col.expr.column.expr.value;
+      } else if (col.expr) {
+
+        // Recursive helpers for generating projection names
+
+        // Fully-qualified column name (handles table alias / prefix object)
+        const getFullColumnName = (columnRef: any): string => {
+          if (typeof columnRef.column === "string") {
+            return columnRef.table
+              ? `${columnRef.table}.${columnRef.column}`
+              : columnRef.column;
+          } else if (
+            typeof columnRef.column === "object" &&
+            columnRef.column.expr &&
+            typeof columnRef.column.expr.value === "string"
+          ) {
+            const prefix = columnRef.column.expr.type;
+            const value = columnRef.column.expr.value;
+            return prefix ? `${prefix}.${value}` : value;
+          }
+          return "column";
+        };
+
+        const getFunctionName = (fn: any): string => {
+          if (!fn) return "func";
+          if (typeof fn.name === "string") return fn.name.toLowerCase();
+          if (fn.name && Array.isArray(fn.name.name)) {
+            return fn.name.name
+              .map((n: any) => (typeof n === "string" ? n : n.value || ""))
+              .join(".")
+              .toLowerCase();
+          }
+          if (fn.name && typeof fn.name.value === "string") {
+            return fn.name.value.toLowerCase();
+          }
+          return "func";
+        };
+
+        const stringifyExpression = (expr: any): string => {
+          if (!expr) return "expr";
+
+          switch (expr.type) {
+            case "column_ref":
+              return getFullColumnName(expr);
+            case "star":
+              return "*";
+            case "string":
+            case "number":
+              return expr.value;
+            case "function":
+            case "aggr_func": {
+              const fname = getFunctionName(expr);
+              if (fname === "histogram") return ""; // Skip histogram
+
+              const argStr = stringifyFuncArgs(expr.args);
+              return `${fname}(${argStr})`;
+            }
+            default:
+              return "expr";
+          }
+        };
+
+        const stringifyFuncArgs = (args: any): string => {
+          if (!args) return "";
+
+          const distinctPrefix = args.distinct ? "DISTINCT " : "";
+
+          if (args.expr) {
+            return `${distinctPrefix}${stringifyExpression(args.expr)}`;
+          }
+
+          if (Array.isArray(args.value)) {
+            return `${distinctPrefix}${args.value
+              .map((arg: any) => stringifyExpression(arg))
+              .join(",")}`;
+          }
+
+          return "";
+        };
+
+        // Handle column references
+        if (col.expr.type === "column_ref") {
+          if (typeof col.expr.column === "string") {
+            fieldName = col.expr.column;
+          } else if (
+            typeof col.expr.column === "object" &&
+            col.expr.column.expr &&
+            typeof col.expr.column.expr.value === "string"
+          ) {
+            fieldName = col.expr.column.expr.value;
+          }
         }
-      } else if (col.expr && col.expr.type === "function") {
-        // For functions, use alias if available, otherwise skip
-        if (col.as) {
-          fieldName = col.as;
+
+        // Handle regular and aggregate functions without aliases
+        if (
+          (col.expr.type === "function" || col.expr.type === "aggr_func") &&
+          !fieldName
+        ) {
+          const funcExpr: any = col.expr;
+
+          // Generate projection for functions (supports nesting)
+          if ((funcExpr.type === "function" || funcExpr.type === "aggr_func") && !fieldName) {
+            const topFuncName = getFunctionName(funcExpr);
+
+            if (topFuncName === "histogram") {
+              continue; // Skip histogram projection entirely
+            }
+
+            fieldName = stringifyExpression(funcExpr);
+          }
         }
       }
 
