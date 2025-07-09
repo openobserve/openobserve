@@ -6326,9 +6326,15 @@ const useLogs = () => {
       errorMsg = message;
     }
 
-    searchObj.data.errorDetail = error_detail || "";
-    searchObj.data.errorMsg = errorMsg;
-    notificationMsg.value = errorMsg;
+    if(request.type === 'pageCount') {
+      searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+      if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
+      notificationMsg.value = searchObj.data.countErrorMsg;
+    } else {
+      searchObj.data.errorDetail = error_detail || "";
+      searchObj.data.errorMsg = errorMsg;
+      notificationMsg.value = errorMsg;
+    }
   };
 
   const constructErrorMessage = ({
