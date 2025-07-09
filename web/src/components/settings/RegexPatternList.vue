@@ -362,9 +362,6 @@
     }
 
     const deleteRegexPattern = async () => {
-      const dismiss = $q.notify({
-        message: `Deleting regex pattern "${deleteDialog.value.data}"`,
-      });
       try{
         await regexPatternsService.delete(store.state.selectedOrganization.identifier, deleteDialog.value.data);
         getRegexPatterns();
@@ -379,9 +376,6 @@
           color: "negative",
           timeout: 1500,
         });
-      }
-      finally{
-        dismiss();
       }
     }
 
