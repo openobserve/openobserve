@@ -480,6 +480,15 @@ export function extractTimestampAndGroupBy(sql: string): {
     return { timestamp: null, groupBy: [], yAxisFields: [] };
   }
   const query = Array.isArray(ast) ? ast[0] : ast;
+
+  // Determine default table name if query selects from a single plain table
+  let defaultTable: string | null = null;
+  if (query && query.from && Array.isArray(query.from)) {
+    const plainTables = query.from.filter((f: any) => f.table && !f.as);
+    if (plainTables.length === 1) {
+      defaultTable = plainTables[0].table;
+    }
+  }
   if (!query || query.type !== "select") {
     return { timestamp: null, groupBy: [], yAxisFields: [] };
   }
@@ -607,99 +616,9 @@ export function extractTimestampAndGroupBy(sql: string): {
       if (col.as) {
         fieldName = col.as;
       } else if (col.expr) {
-        // Recursive helpers for generating projection names
+        // use generic helper
 
-        // Fully-qualified column name (handles table alias / prefix object)
-        const getFullColumnName = (columnRef: any): string => {
-          if (typeof columnRef.column === "string") {
-            return columnRef.table
-              ? `${columnRef.table}.${columnRef.column}`
-              : columnRef.column;
-          } else if (
-            typeof columnRef.column === "object" &&
-            columnRef.column.expr &&
-            typeof columnRef.column.expr.value === "string"
-          ) {
-            const prefix = columnRef.column.expr.type;
-            const value = columnRef.column.expr.value;
-            return prefix ? `${prefix}.${value}` : value;
-          }
-          return "column";
-        };
-
-        const getFunctionName = (fn: any): string => {
-          if (!fn) return "func";
-          if (typeof fn.name === "string") return fn.name.toLowerCase();
-          if (fn.name && Array.isArray(fn.name.name)) {
-            return fn.name.name
-              .map((n: any) => (typeof n === "string" ? n : n.value || ""))
-              .join(".")
-              .toLowerCase();
-          }
-          if (fn.name && typeof fn.name.value === "string") {
-            return fn.name.value.toLowerCase();
-          }
-          return "func";
-        };
-
-        const stringifyExpression = (expr: any): string => {
-          if (!expr) return "expr";
-
-          switch (expr.type) {
-            case "column_ref":
-              return getFullColumnName(expr);
-            case "star":
-              return "*";
-            case "string":
-            case "number":
-              return expr.value;
-            case "function":
-            case "aggr_func": {
-              const fname = getFunctionName(expr);
-              if (fname === "histogram") return ""; // Skip histogram
-
-              const argStr = stringifyFuncArgs(expr.args);
-              return `${fname}(${argStr})`;
-            }
-            case "binary_expr": {
-              const left = stringifyExpression(expr.left);
-              const right = stringifyExpression(expr.right);
-              const op = expr.operator ? expr.operator.trim() : "+";
-              return `${left}${op}${right}`;
-            }
-            case "unary_expr": {
-              const operand = stringifyExpression(expr.expr);
-              const op = expr.operator ? expr.operator.trim() : "";
-              return `${op}${operand}`;
-            }
-            case "null":
-              return "null";
-            case "bool":
-              return typeof expr.value === "boolean"
-                ? String(expr.value)
-                : "bool";
-            default:
-              return "expr";
-          }
-        };
-
-        const stringifyFuncArgs = (args: any): string => {
-          if (!args) return "";
-
-          const distinctPrefix = args.distinct ? "DISTINCT " : "";
-
-          if (args.expr) {
-            return `${distinctPrefix}${stringifyExpression(args.expr)}`;
-          }
-
-          if (Array.isArray(args.value)) {
-            return `${distinctPrefix}${args.value
-              .map((arg: any) => stringifyExpression(arg))
-              .join(",")}`;
-          }
-
-          return "";
-        };
+        const stringifyExpression = (expr: any): string => stringifyAstExpr(expr, defaultTable);
 
         // Handle column references
         if (col.expr.type === "column_ref") {
@@ -726,14 +645,13 @@ export function extractTimestampAndGroupBy(sql: string): {
             (funcExpr.type === "function" || funcExpr.type === "aggr_func") &&
             !fieldName
           ) {
-            const topFuncName = getFunctionName(funcExpr);
-
-            if (topFuncName === "histogram") {
-              continue; // Skip histogram projection entirely
-            }
-
             fieldName = stringifyExpression(funcExpr);
           }
+        }
+
+        // Fallback: if still no field name derived, stringify the full expression
+        if (!fieldName) {
+          fieldName = stringifyExpression(col.expr);
         }
       }
 
@@ -754,6 +672,119 @@ export function extractTimestampAndGroupBy(sql: string): {
 
   return { timestamp, groupBy, yAxisFields };
 }
+
+// Utility to convert an AST expression into a deterministic DataFusion-style string
+function stringifyAstExpr(expr: any, defaultTable?: string): string {
+  const getFunctionName = (fn: any): string => {
+    if (!fn) return "func";
+    if (typeof fn.name === "string") return fn.name.toLowerCase();
+    if (fn.name && Array.isArray(fn.name.name)) {
+      return fn.name.name
+        .map((n: any) => (typeof n === "string" ? n : n.value || ""))
+        .join(".")
+        .toLowerCase();
+    }
+    if (fn.name && typeof fn.name.value === "string") {
+      return fn.name.value.toLowerCase();
+    }
+    return "func";
+  };
+
+  const stringifyFuncArgs = (args: any): string => {
+    if (!args) return "";
+    const distinctPrefix = args.distinct ? "DISTINCT " : "";
+    if (args.expr) {
+      return `${distinctPrefix}${stringifyAstExpr(args.expr, defaultTable)}`;
+    }
+    if (Array.isArray(args.value)) {
+      return `${distinctPrefix}${args.value
+        .map((arg: any) => stringifyAstExpr(arg, defaultTable))
+        .join(",")}`;
+    }
+    return "";
+  };
+
+  const getFullColumnName = (columnRef: any): string => {
+    if (typeof columnRef.column === "string") {
+      if (columnRef.table) return `${columnRef.table}.${columnRef.column}`;
+      if (defaultTable) return `${defaultTable}.${columnRef.column}`;
+      return columnRef.column;
+    } else if (
+      typeof columnRef.column === "object" &&
+      columnRef.column.expr &&
+      typeof columnRef.column.expr.value === "string"
+    ) {
+      const prefix = columnRef.column.expr.type;
+      const value = columnRef.column.expr.value;
+      if (prefix) return `${prefix}.${value}`;
+      if (defaultTable) return `${defaultTable}.${value}`;
+      return value;
+    }
+    return "column";
+  };
+
+  if (!expr) return "expr";
+
+  switch (expr.type) {
+    case "column_ref":
+      return getFullColumnName(expr);
+    case "star":
+      return "*";
+    case "function":
+    case "aggr_func": {
+      const fname = getFunctionName(expr);
+      if (fname === "array_element") {
+        if (
+          expr.args &&
+          expr.args.value &&
+          Array.isArray(expr.args.value) &&
+          expr.args.value.length >= 2
+        ) {
+          const collectionExpr = stringifyAstExpr(expr.args.value[0], defaultTable);
+          const indexExpr = stringifyAstExpr(expr.args.value[1], defaultTable);
+          return `${collectionExpr}[${indexExpr}]`;
+        }
+      }
+
+      const argStr = stringifyFuncArgs(expr.args);
+      return `${fname}(${argStr})`;
+    }
+    case "cast": {
+      if (expr.expr) return stringifyAstExpr(expr.expr, defaultTable);
+      return "cast_expr";
+    }
+    case "binary_expr": {
+      const left = stringifyAstExpr(expr.left, defaultTable);
+      const right = stringifyAstExpr(expr.right, defaultTable);
+      const op = expr.operator ? expr.operator.trim() : "+";
+      return `${left}${op}${right}`;
+    }
+    case "unary_expr": {
+      const operand = stringifyAstExpr(expr.expr, defaultTable);
+      const op = expr.operator ? expr.operator.trim() : "";
+      return `${op}${operand}`;
+    }
+    case "number":
+      return `Int64(${expr.value})`;
+    case "string": {
+      let raw = typeof expr.value === "string" ? expr.value : String(expr.value);
+      if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"')))
+        raw = raw.substring(1, raw.length - 1);
+      const escaped = raw.replace(/"/g, '\\"');
+      return `Utf8("${escaped}")`;
+    }
+    case "bool":
+      return typeof expr.value === "boolean" ? String(expr.value) : "bool";
+    case "null":
+      return "Null";
+    case "interval":
+      return "interval_expr";
+    default:
+      return "expr";
+  }
+}
+
+// -----------------------------------------
 
 // /**
 //  * Extracts clean column name from column reference, removing table prefixes
@@ -1018,8 +1049,15 @@ export function extractTimestampAndGroupBy(sql: string): {
 //         fieldName = col.as;
 //         hasAlias = true;
 //       } else {
-//         // Generate projection name for field without alias
-//         fieldName = generateProjectionName(col.expr);
+//         // Determine default table (same logic as earlier)
+//         let defaultTbl: string | null = null;
+//         if (query.from && Array.isArray(query.from)) {
+//           const pts = query.from.filter((f: any) => f.table && !f.as);
+//           if (pts.length === 1) defaultTbl = pts[0].table;
+//         }
+
+//         // Generate projection name using generic helper
+//         fieldName = stringifyAstExpr(col.expr, defaultTbl || undefined);
 //       }
 
 //              // Try to reconstruct expression string for display
