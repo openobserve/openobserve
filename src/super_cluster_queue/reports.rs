@@ -49,7 +49,7 @@ pub(crate) async fn process_msg(msg: ReportMessage) -> Result<()> {
             report_id,
             report,
         } => {
-            log::debug!("Creating report: {:?}", report);
+            log::debug!("Creating report: {report:?}");
             if table::reports::get_by_name(conn, &org_id, &folder_id, &report.name)
                 .await
                 .map_err(|e| infra::errors::Error::Message(e.to_string()))?

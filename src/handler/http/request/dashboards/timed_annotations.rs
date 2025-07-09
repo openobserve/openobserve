@@ -65,7 +65,7 @@ pub async fn create_annotations(
     match timed_annotations::create_timed_annotations(&dashboard_id, req).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
-            log::error!("Error creating timed annotations: {}", e);
+            log::error!("Error creating timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -125,7 +125,7 @@ pub async fn get_annotations(
     {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => {
-            log::error!("Error getting timed annotations: {}", e);
+            log::error!("Error getting timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -175,7 +175,7 @@ pub async fn delete_annotations(
     match timed_annotations::delete_timed_annotations(&dashboard_id, req).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
-            log::error!("Error deleting timed annotations: {}", e);
+            log::error!("Error deleting timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -229,7 +229,7 @@ pub async fn update_annotations(
     {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
-            log::error!("Error updating timed annotations: {}", e);
+            log::error!("Error updating timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -280,7 +280,7 @@ pub async fn delete_annotation_panels(
     match timed_annotations::delete_timed_annotation_panels(&timed_annotation_id, panels).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
-            log::error!("Error deleting timed annotation panels: {}", e);
+            log::error!("Error deleting timed annotation panels: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR,

@@ -437,7 +437,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let root_dir = FILES[0].read().await.root_dir.clone();
         let root_dir = Path::new(&root_dir).canonicalize().unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
-            log::error!("load disk cache error: {}", e);
+            log::error!("load disk cache error: {e}");
         }
         log::info!(
             "Loading disk cache done, total files: {}",
@@ -455,7 +455,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         interval.tick().await; // the first tick is immediate
         loop {
             if let Err(e) = gc().await {
-                log::error!("disk cache gc error: {}", e);
+                log::error!("disk cache gc error: {e}");
             }
             interval.tick().await;
         }
@@ -613,20 +613,20 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                 let fp = match f.path().canonicalize() {
                     Ok(p) => p,
                     Err(e) => {
-                        log::error!("canonicalize file path error: {}", e);
+                        log::error!("canonicalize file path error: {e}");
                         continue;
                     }
                 };
                 let ft = match f.file_type().await {
                     Ok(t) => t,
                     Err(e) => {
-                        log::error!("get file type error: {}", e);
+                        log::error!("get file type error: {e}");
                         continue;
                     }
                 };
                 if ft.is_dir() {
                     if let Err(e) = load(root_dir, &fp).await {
-                        log::error!("load disk cache error: {}", e);
+                        log::error!("load disk cache error: {e}");
                     }
                 } else {
                     // check file is tmp file
@@ -645,7 +645,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     let meta = match get_file_meta(&fp) {
                         Ok(m) => m,
                         Err(e) => {
-                            log::error!("get file meta error: {}", e);
+                            log::error!("get file meta error: {e}");
                             continue;
                         }
                     };
@@ -669,7 +669,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     let total = LOADING_FROM_DISK_NUM.fetch_add(1, Ordering::Relaxed);
                     // print progress
                     if total % 1000 == 0 {
-                        log::info!("Loading disk cache {}", total);
+                        log::info!("Loading disk cache {total}");
                     }
                     if file_key.starts_with("files") {
                         let mut w = FILES[idx].write().await;
@@ -689,7 +689,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         let Some((org_id, stream_type, query_key, meta)) =
                             parse_result_cache_key(&file_key)
                         else {
-                            log::error!("parse result cache key error: {}", file_key);
+                            log::error!("parse result cache key error: {file_key}");
                             continue;
                         };
 
@@ -719,7 +719,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         let Some((org_id, stream_type, ..)) =
                             parse_aggregation_cache_key(&file_key)
                         else {
-                            log::error!("parse aggregation cache key error: {}", file_key);
+                            log::error!("parse aggregation cache key error: {file_key}");
                             continue;
                         };
                         let mut w = AGGREGATION_FILES[idx].write().await;

@@ -139,11 +139,7 @@ pub async fn remote_write(
             )
             .await
         {
-            log::error!(
-                "Error updating metadata for stream: {}, err: {}",
-                metric_name,
-                e
-            );
+            log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
         }
     }
 
@@ -355,8 +351,7 @@ pub async fn remote_write(
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 log::error!(
-                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
-                    stream_name
+                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
                 );
                 continue;
             };
@@ -368,9 +363,7 @@ pub async fn remote_write(
             {
                 Err(e) => {
                     log::error!(
-                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
-                        stream_name,
-                        e,
+                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
                     );
                     continue;
                 }
@@ -903,7 +896,7 @@ pub(crate) async fn get_label_values(
             .map(|v| v.as_str().unwrap().to_string())
             .collect::<Vec<_>>(),
         Err(err) => {
-            log::error!("search values error: {:?}", err);
+            log::error!("search values error: {err:?}");
             return Err(err);
         }
     };
@@ -946,7 +939,7 @@ async fn prom_ha_handler(
             .write()
             .await
             .insert(cluster_name.to_owned(), vec![]);
-        log::info!("Making {} leader for {} ", replica_label, cluster_name);
+        log::info!("Making {replica_label} leader for {cluster_name} ");
         METRIC_CLUSTER_LEADER.write().await.insert(
             cluster_name.to_owned(),
             ClusterLeader {

@@ -439,7 +439,7 @@ pub async fn update_ratelimit(
         };
 
         let rules = RatelimitRule::from_updater(org_id.as_str(), user_role.as_str(), &updater);
-        log::debug!("RatelimitRule::from_updater rules: {:?}", rules);
+        log::debug!("RatelimitRule::from_updater rules: {rules:?}");
         match ratelimit::rule::update(RuleEntry::UpsertBatch(rules)).await {
             Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK,

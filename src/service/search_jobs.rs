@@ -353,7 +353,7 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
             job.id, job.status
         );
         set_job_error_message(&job.id, &job.trace_id, message.as_str()).await?;
-        log::error!("{}", message);
+        log::error!("{message}");
         return Err(anyhow::anyhow!(message));
     }
     Ok(())

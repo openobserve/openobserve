@@ -102,7 +102,7 @@ impl ObjectStore for Remote {
                 })
             }
             Err(err) => {
-                log::error!("[STORAGE] put_opts remote file: {}, error: {:?}", file, err);
+                log::error!("[STORAGE] put_opts remote file: {file}, error: {err:?}");
                 Err(err)
             }
         }
@@ -121,11 +121,7 @@ impl ObjectStore for Remote {
         {
             Ok(r) => Ok(r),
             Err(err) => {
-                log::error!(
-                    "[STORAGE] put_multipart_opts remote file: {}, error: {:?}",
-                    file,
-                    err
-                );
+                log::error!("[STORAGE] put_multipart_opts remote file: {file}, error: {err:?}");
                 Err(err)
             }
         }
@@ -140,7 +136,7 @@ impl ObjectStore for Remote {
             .await
             .map_err(|e| {
                 if file.ne(TEST_FILE) {
-                    log::error!("[STORAGE] get remote file: {}, error: {:?}", file, e);
+                    log::error!("[STORAGE] get remote file: {file}, error: {e:?}");
                 }
                 e
             })?;
@@ -173,7 +169,7 @@ impl ObjectStore for Remote {
             .get_opts(&(format_key(&file, true).into()), options)
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get_opts remote file: {}, error: {:?}", file, e);
+                log::error!("[STORAGE] get_opts remote file: {file}, error: {e:?}");
                 e
             })?;
 
@@ -205,10 +201,7 @@ impl ObjectStore for Remote {
             .await
             .map_err(|e| {
                 log::error!(
-                    "[STORAGE] get_range remote file: {}, range: {:?}, error: {:?}",
-                    file,
-                    range,
-                    e
+                    "[STORAGE] get_range remote file: {file}, range: {range:?}, error: {e:?}"
                 );
                 e
             })?;
@@ -357,7 +350,7 @@ fn init_gcp_config(
 
 fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
     if get_config().common.print_key_config {
-        log::info!("s3 init config: {:?}", config);
+        log::info!("s3 init config: {config:?}");
     }
 
     let provider = config.provider.to_string();

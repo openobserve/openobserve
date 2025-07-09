@@ -110,10 +110,7 @@ async fn update_token(msg: Message) -> Result<()> {
     let user_email = keys[3];
     if let Err(e) = org_users::update_token(org_id, user_email, &token).await {
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to update token for org user: {}/{}, error: {}",
-            org_id,
-            user_email,
-            e
+            "[SUPER_CLUSTER:sync] Failed to update token for org user: {org_id}/{user_email}, error: {e}"
         );
         return Err(e);
     }
@@ -134,10 +131,7 @@ async fn update_rum_token(msg: Message) -> Result<()> {
     let user_email = keys[3];
     if let Err(e) = org_users::update_rum_token(org_id, user_email, &rum_token).await {
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to update RUM token for org user: {}/{}, error: {}",
-            org_id,
-            user_email,
-            e
+            "[SUPER_CLUSTER:sync] Failed to update RUM token for org user: {org_id}/{user_email}, error: {e}"
         );
         return Err(e);
     }
@@ -154,19 +148,12 @@ async fn delete(msg: Message) -> Result<()> {
     let user_email = keys[3];
     if keys[1].eq("many") {
         if let Err(e) = org_users::remove_by_user(user_email).await {
-            log::error!(
-                "[SUPER_CLUSTER:sync] Failed to delete org user: {}, error: {}",
-                user_email,
-                e
-            );
+            log::error!("[SUPER_CLUSTER:sync] Failed to delete org user: {user_email}, error: {e}");
             return Err(e);
         }
     } else if let Err(e) = org_users::remove(org_id, user_email).await {
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete org user: {}/{}, error: {}",
-            org_id,
-            user_email,
-            e
+            "[SUPER_CLUSTER:sync] Failed to delete org user: {org_id}/{user_email}, error: {e}"
         );
         return Err(e);
     }

@@ -352,17 +352,12 @@ fn extract_openapi_path(path: &str, method: &Method) -> Option<String> {
 
             if method_exists {
                 log::debug!(
-                    "Matched OpenAPI path: {} for request path: {} and method: {}",
-                    openapi_path,
-                    path,
-                    method
+                    "Matched OpenAPI path: {openapi_path} for request path: {path} and method: {method}"
                 );
                 return Some(format!("{openapi_path}:{method}"));
             } else {
                 log::debug!(
-                    "Path matched but method {} not supported for OpenAPI path: {}",
-                    method,
-                    openapi_path
+                    "Path matched but method {method} not supported for OpenAPI path: {openapi_path}"
                 );
             }
         }

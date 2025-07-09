@@ -180,8 +180,7 @@ impl Request {
                             Ok(sql) => sql,
                             Err(e) => {
                                 log::error!(
-                                    "Error replacing o2 custom patterns , returning original sql: {}",
-                                    e
+                                    "Error replacing o2 custom patterns , returning original sql: {e}"
                                 );
                                 v
                             }
@@ -1605,7 +1604,7 @@ impl StreamResponses {
                                 time_offset: time_offset.clone(),
                             };
                             let data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
-                                log::error!("Failed to serialize metadata: {:?}", metadata);
+                                log::error!("Failed to serialize metadata: {metadata:?}");
                                 String::new()
                             });
                             ("search_response_metadata", data)

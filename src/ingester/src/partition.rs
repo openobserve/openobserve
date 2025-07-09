@@ -126,7 +126,7 @@ impl Partition {
             if filter_source_by_partition_key(&key, partition_filters) {
                 batches.extend(file.read(time_range)?);
             } else {
-                log::debug!("memtable skip key: {:?}", key);
+                log::debug!("memtable skip key: {key:?}");
             }
         }
         Ok((self.schema.clone(), batches))

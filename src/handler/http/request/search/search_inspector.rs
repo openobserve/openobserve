@@ -205,7 +205,7 @@ pub async fn get_search_profile(
             }
         };
         if !keys_used.is_empty() {
-            log::info!("keys used : {:?}", keys_used);
+            log::info!("keys used : {keys_used:?}");
         }
         for key in keys_used {
             // Check permissions on keys
@@ -334,7 +334,7 @@ pub async fn get_search_profile(
                 &search_type,
                 "",
             );
-            log::error!("[trace_id {trace_id}] search error: {}", err);
+            log::error!("[trace_id {trace_id}] search error: {err}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),

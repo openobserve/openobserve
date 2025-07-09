@@ -48,7 +48,7 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
         let root = format!("{}files/", config::get_config().common.data_wal_dir);
         if let Err(e) = config::utils::async_file::clean_empty_dirs(&root, Some(last_updated)).await
         {
-            log::error!("clean_empty_dirs, err: {}", e);
+            log::error!("clean_empty_dirs, err: {e}");
         }
     }
     log::info!("job::files::clean_empty_dirs is stopped");

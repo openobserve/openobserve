@@ -108,12 +108,12 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
                 Ok(val) => match json::from_slice(&val) {
                     Ok(val) => val,
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 },
                 Err(e) => {
-                    log::error!("Error getting value: {}", e);
+                    log::error!("Error getting value: {e}");
                     continue;
                 }
             };
@@ -162,7 +162,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 match get_org_from_db(item_key).await {
                     Ok(val) => val,
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 }
@@ -190,7 +190,7 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
     )
     .await
     {
-        log::error!("Error saving org: {}", e);
+        log::error!("Error saving org: {e}");
         return Err(anyhow::anyhow!("Error saving org: {}", e));
     }
 
@@ -207,7 +207,7 @@ pub async fn rename_org(org_id: &str, new_name: &str) -> Result<Organization, an
         return Err(anyhow::anyhow!("Organization name cannot be empty"));
     }
     if let Err(e) = organizations::rename(org_id, new_name).await {
-        log::error!("Error updating org: {}", e);
+        log::error!("Error updating org: {e}");
         return Err(anyhow::anyhow!("Error updating org: {}", e));
     }
     let org = get_org(org_id).await?;
@@ -246,7 +246,7 @@ pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
 
 pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
     if let Err(e) = organizations::remove(org_id).await {
-        log::error!("Error deleting org: {}", e);
+        log::error!("Error deleting org: {e}");
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
     #[cfg(feature = "enterprise")]

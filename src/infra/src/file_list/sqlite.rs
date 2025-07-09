@@ -1410,10 +1410,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                 query_builder.push(" ON CONFLICT(id) DO NOTHING");
                 if let Err(e) = query_builder.build().execute(&mut *tx).await {
                     if let Err(e) = tx.rollback().await {
-                        log::error!(
-                            "[SQLITE] rollback {table} batch process for add error: {}",
-                            e
-                        );
+                        log::error!("[SQLITE] rollback {table} batch process for add error: {e}");
                     }
                     return Err(e.into());
                 }
@@ -1448,8 +1445,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         Err(e) => {
                             if let Err(e) = tx.rollback().await {
                                 log::error!(
-                                    "[SQLITE] rollback {table} batch process for delete error: {}",
-                                    e
+                                    "[SQLITE] rollback {table} batch process for delete error: {e}"
                                 );
                             }
                             return Err(e.into());
@@ -1465,8 +1461,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                     if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
-                                "[SQLITE] rollback {table} batch process for delete error: {}",
-                                e
+                                "[SQLITE] rollback {table} batch process for delete error: {e}"
                             );
                         }
                         return Err(e.into());
@@ -1476,7 +1471,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit {table} batch process error: {}", e);
+            log::error!("[SQLITE] commit {table} batch process error: {e}");
             return Err(e.into());
         }
 

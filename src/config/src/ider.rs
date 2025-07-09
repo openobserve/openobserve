@@ -25,7 +25,7 @@ use svix_ksuid::{Ksuid, KsuidLike};
 
 static IDER: Lazy<Mutex<SnowflakeIdGenerator>> = Lazy::new(|| {
     let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
-    log::info!("init ider with machine_id: {}", machine_id);
+    log::info!("init ider with machine_id: {machine_id}");
     Mutex::new(SnowflakeIdGenerator::new(machine_id))
 });
 

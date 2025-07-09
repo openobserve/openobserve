@@ -31,7 +31,7 @@ use infra::{
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
     if let Err(e) = register().await {
-        log::error!("[CLUSTER] register failed: {}", e);
+        log::error!("[CLUSTER] register failed: {e}");
         return Err(e);
     }
 
@@ -57,7 +57,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
                         break;
                     }
                     Err(e) => {
-                        log::error!("[CLUSTER] keep alive failed: {}", e);
+                        log::error!("[CLUSTER] keep alive failed: {e}");
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -112,7 +112,7 @@ async fn register() -> Result<()> {
 
     node_ids.sort();
     node_ids.dedup();
-    log::debug!("node_ids: {:?}", node_ids);
+    log::debug!("node_ids: {node_ids:?}");
 
     let mut new_node_id = 1;
     for id in node_ids {
@@ -122,7 +122,7 @@ async fn register() -> Result<()> {
             break;
         }
     }
-    log::debug!("new_node_id: {:?}", new_node_id);
+    log::debug!("new_node_id: {new_node_id:?}");
     // update local id
     unsafe {
         LOCAL_NODE_ID = new_node_id;

@@ -69,7 +69,7 @@ pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
         match response {
             Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
             Err(e) => {
-                log::error!("Error in chat: {}", e);
+                log::error!("Error in chat: {e}");
                 MetaHttpResponse::internal_error(e)
             }
         }
@@ -173,7 +173,7 @@ pub async fn chat_stream(
             )
             .await;
 
-            log::error!("Error in chat_stream: {}", e);
+            log::error!("Error in chat_stream: {e}");
             return MetaHttpResponse::bad_request(e.to_string());
         }
     };

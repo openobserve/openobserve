@@ -356,10 +356,7 @@ pub async fn search(
             target_partitions,
         };
 
-        log::debug!(
-            "search->storage: session target_partitions: {}",
-            target_partitions
-        );
+        log::debug!("search->storage: session target_partitions: {target_partitions}");
 
         let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         let table = exec::create_parquet_table(
@@ -503,11 +500,7 @@ pub async fn cache_files(
             }
         }
         log::info!(
-            "[trace_id {}] search->storage: successfully enqueued {} files of {} for background download into {:?}",
-            trace_id,
-            files_num,
-            file_type,
-            cache_type,
+            "[trace_id {trace_id}] search->storage: successfully enqueued {files_num} files of {file_type} for background download into {cache_type:?}",
         );
     });
 
@@ -925,10 +918,7 @@ async fn search_tantivy_index(
     let (tantivy_index, tantivy_reader) = match indexer {
         Some((indexer, reader)) => (indexer, reader),
         None => {
-            log::debug!(
-                "[trace_id {trace_id}] init cache for tantivy file: {}",
-                ttv_file_name
-            );
+            log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
 
             let puffin_dir = Arc::new(
                 get_tantivy_directory(
@@ -1043,7 +1033,7 @@ async fn search_tantivy_index(
             ) => {
                 // fail the function if field not in tantivy schema
                 if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
-                    log::warn!("_timestamp not index in tantivy file: {}", ttv_file_name);
+                    log::warn!("_timestamp not index in tantivy file: {ttv_file_name}");
                     return Ok((HashSet::new(), 0, vec![]));
                 }
                 tantivy_searcher

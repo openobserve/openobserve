@@ -81,7 +81,7 @@ pub async fn loki_push(
             let loki_request = match parse_json_request(content_encoding, body) {
                 Ok(req) => req,
                 Err(e) => {
-                    log::error!("[Loki::JSON] Parse error for org '{}': {:?}", org_id, e);
+                    log::error!("[Loki::JSON] Parse error for org '{org_id}': {e:?}");
                     return Ok(e.into());
                 }
             };
@@ -91,18 +91,14 @@ pub async fn loki_push(
             let protobuf_request = match parse_protobuf_request(content_encoding, body) {
                 Ok(req) => req,
                 Err(e) => {
-                    log::error!("[Loki::Protobuf] Parse error for org '{}': {:?}", org_id, e);
+                    log::error!("[Loki::Protobuf] Parse error for org '{org_id}': {e:?}");
                     return Ok(e.into());
                 }
             };
             logs::loki::LokiRequest::Protobuf(protobuf_request)
         }
         _ => {
-            log::error!(
-                "[Loki] Unsupported content type '{}' for org '{}'",
-                content_type,
-                org_id
-            );
+            log::error!("[Loki] Unsupported content type '{content_type}' for org '{org_id}'");
             return Ok(LokiError::UnsupportedContentType {
                 content_type: content_type.to_string(),
             }
@@ -113,7 +109,7 @@ pub async fn loki_push(
     match logs::loki::handle_request(thread_id, &org_id, request, user_email).await {
         Ok(_) => Ok(HttpResponse::NoContent().finish()),
         Err(e) => {
-            log::error!("[Loki] Processing error for org '{}': {:?}", org_id, e);
+            log::error!("[Loki] Processing error for org '{org_id}': {e:?}");
             Ok(e.into())
         }
     }
