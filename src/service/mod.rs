@@ -45,6 +45,7 @@ pub mod promql;
 pub mod ratelimit;
 pub mod schema;
 pub mod search;
+pub mod tantivy;
 
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
