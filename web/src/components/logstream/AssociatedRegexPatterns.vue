@@ -169,8 +169,8 @@
                   </q-radio>
                   <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                       Redact
-                      <span class="tw-font-[400] individual-section-sub-information">
-                        This will redact the matched expression 
+                      <span class="tw-font-[400] individual-section-sub-information" style="line-height: 20px;">
+                        This will redact the matched expression during data ingestion
                       </span>
                     </div>
 
@@ -181,8 +181,8 @@
                   </q-radio>
                   <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                       Drop
-                      <span class="tw-font-[400] individual-section-sub-information">
-                        This will drop the field completely
+                      <span class="tw-font-[400] individual-section-sub-information" style="line-height: 20px;">
+                        This will drop the field completely during data ingestion
                       </span>
                     </div>
                     
@@ -190,7 +190,7 @@
                 </div>
               </div>
               <!-- detach at section -->
-              <div class="tw-flex tw-flex-col">
+              <div v-if="false" class="tw-flex tw-flex-col">
                 <span class="individual-section-title">
                   Detect at:
                 </span>
@@ -312,7 +312,7 @@
 
 
               <!-- remove or add pattern button  -->
-               <div class="add-remove-pattern-button tw-mb-4">
+               <div class="tw-mb-4" :class="store.state.theme === 'dark' ? 'add-remove-pattern-button-dark' : 'add-remove-pattern-button-light'">
                 <q-btn @click="handleAddOrRemovePattern" no-caps class="no-border">
                   <span>
                     {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
@@ -434,7 +434,7 @@ export default defineComponent({
         const isPatternValid = ref(false);
         const testString = ref("");
         const policy = ref("Redact");
-        const apply_at = ref<any>([]);
+        const apply_at = ref<any>(["AtIngestion"]);
         const appliedPatternsExpandedRef = ref<any>(null);
         const allPatternsExpandedRef = ref<any>(null);
         const isFormDirty = ref(false);
@@ -650,6 +650,10 @@ export default defineComponent({
             isFormDirty.value = true;
           }
           else{
+            //this needs to be removed once we suppport at search as well 
+            //as of now we are not supporting at search
+            //that is the reason we are hardcoding the apply_at value to AtIngestion
+            apply_at.value = ["AtIngestion"];
             if(apply_at.value.length == 0){
               $q.notify({
                 message: "Please select detect at option",
@@ -833,7 +837,12 @@ export default defineComponent({
         color: #5A5A5A;
       }
     }
-    .add-remove-pattern-button{
+    .add-remove-pattern-button-light{
+      color:#5960B2;
+      border: 1px solid #5960B2 ;
+      width: fit-content;
+    }
+    .add-remove-pattern-button-dark{
       color:#5960B2;
       border: 1px solid #5960B2 ;
       width: fit-content;
