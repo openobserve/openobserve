@@ -5826,6 +5826,16 @@ const useLogs = () => {
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
     searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
+
+    // check if histogram interval is undefined, then set current response as histogram response
+    // for visualization, will require to set histogram interval to fill missing values
+    if (
+      searchObj.data.queryResults.histogram_interval == undefined &&
+      response.content?.results?.histogram_interval
+    ) {
+      searchObj.data.queryResults.histogram_interval =
+        response.content?.results?.histogram_interval;
+    }
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
