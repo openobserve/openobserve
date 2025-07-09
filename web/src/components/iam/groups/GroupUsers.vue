@@ -20,12 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="iam-users-selection-filters"
       class="flex justify-start bordered q-px-md q-py-sm"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px 4px 7px 0px'
-            : 'rgb(240 240 240) 0px 4px 7px 0px',
-      }"
       style="position: sticky; top: 0px; z-index: 2"
     >
       <div data-test="iam-users-selection-show-toggle" class="q-mr-md">

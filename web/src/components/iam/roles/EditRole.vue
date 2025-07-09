@@ -75,13 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex justify-between items-center"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-            :style="{
-              'box-shadow':
-                store.state.theme === 'dark'
-                  ? 'rgb(45 45 45) 0px 4px 7px 0px'
-                  : 'rgb(240 240 240) 0px 4px 7px 0px',
-              height: '56px',
-            }"
           >
             <div
               v-show="permissionsUiType === 'table'"
@@ -285,12 +278,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end q-px-md q-py-sm full-width"
         style="position: sticky; bottom: 0px; z-index: 2"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        :style="{
-          'box-shadow':
-            store.state.theme === 'dark'
-              ? 'rgb(45 45 45) 0px -4px 7px 0px'
-              : 'rgb(240 240 240) 0px -4px 7px 0px',
-        }"
       >
         <q-btn
           data-test="edit-role-cancel-btn"
