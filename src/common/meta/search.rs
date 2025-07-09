@@ -259,6 +259,7 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "enterprise")]
 mod enterprise_tests {
+    use arrow::array::record_batch;
     use arrow_schema::{DataType, Field};
     #[cfg(feature = "enterprise")]
     use o2_enterprise::enterprise::common::streaming_agg_cache::{
@@ -267,37 +268,14 @@ mod enterprise_tests {
 
     #[test]
     fn test_calculate_record_batches_deltas() {
-        use std::sync::Arc;
-
-        use arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::Schema,
-        };
-
-        // Create a simple schema for testing
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("status", DataType::Utf8, false),
-            Field::new("count", DataType::Int64, false),
-        ]));
-
-        // Create test record batches
-        let batch1 = arrow::array::RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["200", "404"])),
-                Arc::new(Int64Array::from(vec![100, 50])),
-            ],
+        let batch1 = record_batch!(
+            ("status", Utf8, ["200", "404"]),
+            ("count", Int64, [100, 50])
         )
         .unwrap();
 
-        let batch2 = arrow::array::RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["200", "500"])),
-                Arc::new(Int64Array::from(vec![80, 20])),
-            ],
-        )
-        .unwrap();
+        let batch2 =
+            record_batch!(("status", Utf8, ["200", "500"]), ("count", Int64, [80, 20])).unwrap();
 
         // Test case: Query: 10:00 - 16:00, Cache: 11:00 - 12:00, 14:00 - 15:00
         // Expected Deltas: 10:00 - 11:00, 12:00 - 14:00, 15:00 - 16:00

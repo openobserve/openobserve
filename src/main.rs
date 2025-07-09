@@ -205,7 +205,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
     log::info!(
         "Caches info: Disk max size {}, MEM max size {}, Datafusion pool size: {}",
-        bytes_to_human_readable(cfg.disk_cache.max_size as f64),
+        bytes_to_human_readable((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as f64),
         bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
         bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );

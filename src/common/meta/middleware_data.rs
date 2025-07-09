@@ -67,17 +67,16 @@ impl RumExtraData {
     }
 
     fn filter_tags(data: &HashMap<String, String>) -> HashMap<String, serde_json::Value> {
-        match data.get("ootags").or_else(|| data.get("o2tags")) {
-            Some(tags) => tags
-                .split(',')
-                .map(|tag| {
-                    let key_val: Vec<_> = tag.split(':').collect();
-                    (key_val[0].to_string(), key_val[1].into())
-                })
-                .collect(),
-
-            None => HashMap::default(),
-        }
+        data.get("ootags")
+            .or_else(|| data.get("o2tags"))
+            .map_or_else(HashMap::default, |tags| {
+                tags.split(',')
+                    .map(|tag| {
+                        let key_val: Vec<_> = tag.split(':').collect();
+                        (key_val[0].to_string(), key_val[1].into())
+                    })
+                    .collect()
+            })
     }
 
     pub async fn extractor(
@@ -101,20 +100,26 @@ impl RumExtraData {
         user_agent_hashmap.extend(tags);
         {
             let headers = req.headers();
-            let conn_info = req.connection_info().clone();
-            let ip_address = match headers.contains_key("X-Forwarded-For")
-                || headers.contains_key("Forwarded")
-            {
-                true => conn_info.realip_remote_addr().unwrap(),
-                false => conn_info.peer_addr().unwrap(),
+            // Borrow checker can't reliably tell that RefCell has been dropped
+            // before an await, even if `drop` is directly used
+            // This little contraption helps avoid clippy issues
+            let ip_address = {
+                let conn_info = req.connection_info();
+                match headers.contains_key("X-Forwarded-For") || headers.contains_key("Forwarded") {
+                    true => conn_info.realip_remote_addr(),
+                    false => conn_info.peer_addr(),
+                }
+                .unwrap()
+                .to_string()
             };
 
-            user_agent_hashmap.insert("ip".into(), ip_address.into());
-            let ip = match parse_ip_addr(ip_address) {
+            let ip = match parse_ip_addr(&ip_address) {
                 Ok((ip, _)) => ip,
                 // Default to ipv4 loopback address
                 Err(_) => IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
             };
+
+            user_agent_hashmap.insert("ip".into(), ip_address.into());
 
             let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
             let geo_info = if let Some(client) = maxminddb_client.as_ref() {
@@ -151,11 +156,10 @@ impl RumExtraData {
             let user_agent = req
                 .headers()
                 .get("User-Agent")
-                .map(|v| v.to_str().unwrap_or(""))
+                .and_then(|v| v.to_str().ok())
                 .unwrap_or_default();
 
-            let ua_parser = UA_PARSER.clone();
-            let parsed_user_agent = ua_parser.parse(user_agent);
+            let parsed_user_agent = (*UA_PARSER).parse(user_agent);
 
             user_agent_hashmap.insert(
                 "user_agent".into(),

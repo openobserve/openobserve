@@ -131,7 +131,7 @@ impl PuffinFooterWriter {
         let payload = self.get_payload()?;
         let payload_size = payload.len();
 
-        let capacity = MIN_FOOTER_SIZE as usize + payload_size;
+        let capacity = MIN_DATA_SIZE as usize + payload_size;
         let mut buf = Vec::with_capacity(capacity);
 
         // HeadMagic
@@ -246,7 +246,7 @@ mod tests {
 
         let total_bytes = result.unwrap();
         // Should write header + footer even with no blobs
-        assert!(total_bytes >= MAGIC_SIZE + MIN_FOOTER_SIZE);
+        assert!(total_bytes >= MAGIC_SIZE + MIN_DATA_SIZE);
     }
 
     #[test]
@@ -345,7 +345,7 @@ mod tests {
         let footer_bytes = result.unwrap();
 
         // Should contain: header magic + payload + payload_size + flags + footer magic
-        assert!(footer_bytes.len() >= MIN_FOOTER_SIZE as usize);
+        assert!(footer_bytes.len() >= MIN_DATA_SIZE as usize);
 
         // Check header magic
         assert_eq!(&footer_bytes[0..MAGIC_SIZE as usize], &MAGIC);
@@ -378,7 +378,7 @@ mod tests {
         let footer_bytes = result.unwrap();
 
         // Should be larger than minimum size due to payload
-        assert!(footer_bytes.len() > MIN_FOOTER_SIZE as usize);
+        assert!(footer_bytes.len() > MIN_DATA_SIZE as usize);
 
         // Check structure
         assert_eq!(&footer_bytes[0..MAGIC_SIZE as usize], &MAGIC);
@@ -442,8 +442,8 @@ mod tests {
         ];
 
         for (i, blob_type) in blob_types.iter().enumerate() {
-            let blob_data = format!("blob data {}", i).into_bytes();
-            let blob_tag = format!("blob_{}", i);
+            let blob_data = format!("blob data {i}").into_bytes();
+            let blob_tag = format!("blob_{i}");
 
             writer
                 .add_blob(&blob_data, blob_type.clone(), blob_tag.clone())
@@ -456,7 +456,7 @@ mod tests {
             assert_eq!(writer.blobs_metadata[i].blob_type, *expected_type);
             assert_eq!(
                 writer.blobs_metadata[i].properties.get("blob_tag"),
-                Some(&format!("blob_{}", i))
+                Some(&format!("blob_{i}"))
             );
         }
 

@@ -129,6 +129,7 @@ impl TreeNodeRewriter for HistogramToDatebin {
                             format!("{} second", self.histogram_interval)
                         } else {
                             generate_histogram_interval(Some((self.start_time, self.end_time)))
+                                .to_string()
                         };
                         cast(
                             Expr::Literal(ScalarValue::from(interval)),

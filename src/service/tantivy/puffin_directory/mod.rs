@@ -179,7 +179,7 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert!(data.len() > 0); // Should have some data
+        assert!(!data.is_empty()); // Should have some data
     }
 
     #[test]
@@ -188,7 +188,7 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert!(data.len() > 0); // Should have some data
+        assert!(!data.is_empty()); // Should have some data
     }
 
     #[test]
@@ -197,7 +197,7 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert!(data.len() > 0); // Should have some data
+        assert!(!data.is_empty()); // Should have some data
     }
 
     #[test]
@@ -206,7 +206,7 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert!(data.len() > 0); // Should have some data
+        assert!(!data.is_empty()); // Should have some data
     }
 
     #[test]
@@ -302,7 +302,7 @@ mod tests {
 
         for ext in test_extensions {
             let result = get_file_from_empty_puffin_dir_with_ext(ext);
-            assert!(result.is_ok(), "Failed to get file with extension: {}", ext);
+            assert!(result.is_ok(), "Failed to get file with extension: {ext}");
 
             let data = result.unwrap();
             // Data should be valid OwnedBytes
@@ -440,7 +440,7 @@ mod tests {
         // Should be able to get files using the utility function
         for ext in ALLOWED_FILE_EXT {
             let data = get_file_from_empty_puffin_dir_with_ext(ext).unwrap();
-            assert!(data.len() > 0);
+            assert!(!data.is_empty());
         }
 
         for ext in EMPTY_FILE_EXT {
