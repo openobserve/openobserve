@@ -1907,7 +1907,7 @@ pub struct Pipeline {
         default = 10,
         help = "pipeline exporter client max retry count"
     )]
-    pub max_retry_count: usize,
+    pub max_retry_count: u32,
     #[env_config(
         name = "ZO_PIPELINE_MAX_RETRY_TIME_IN_HOURS",
         default = 24,
