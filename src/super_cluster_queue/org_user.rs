@@ -22,6 +22,8 @@ use infra::{
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
+use crate::service::db::org_users as db_org_users;
+
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::OrgUserAdd => {
@@ -53,6 +55,18 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
 async fn add(msg: Message) -> Result<()> {
     let org_user: OrgUserPut = json::from_slice(&msg.value.unwrap())?;
+    if db_org_users::get(&org_user.org_id, &org_user.email)
+        .await
+        .is_ok()
+    {
+        // Duplicate add, ignore
+        log::warn!(
+            "[SUPER_CLUSTER:sync] Duplicate add org user: {}/{}, ignore",
+            org_user.org_id,
+            org_user.email
+        );
+        return Ok(());
+    }
     if let Err(e) = org_users::add(
         &org_user.org_id,
         &org_user.email,
