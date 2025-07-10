@@ -994,7 +994,6 @@ const useLogs = () => {
         }
 
         req.query.sql = query;
-        req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
         const parseQuery = [query];
@@ -1248,7 +1247,6 @@ const useLogs = () => {
           sql: queryReq.query.sql,
           start_time: queryReq.query.start_time,
           end_time: queryReq.query.end_time,
-          sql_mode: searchObj.meta.sqlMode ? "full" : "context",
         };
         if (store.state.zoConfig.sql_base64_enabled) {
           partitionQueryReq["encoding"] = "base64";
@@ -1808,7 +1806,6 @@ const useLogs = () => {
 
         searchObj.data.histogramQuery.query.sql =
           searchObj.data.histogramQuery.aggs.histogram;
-        searchObj.data.histogramQuery.query.sql_mode = "full";
 
         // searchObj.data.histogramQuery.query.start_time =
         //   queryReq.query.start_time;
@@ -1820,8 +1817,6 @@ const useLogs = () => {
         delete searchObj.data.histogramQuery.query.from;
         if(searchObj.data.histogramQuery.query.action_id) delete searchObj.data.histogramQuery.query.action_id;
 
-        // Removing sql_mode from histogram query, as it is not required
-        //delete searchObj.data.histogramQuery.query.sql_mode;
         delete searchObj.data.histogramQuery.aggs;
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = JSON.parse(
@@ -2328,8 +2323,6 @@ const useLogs = () => {
         if(queryReq.query.action_id) delete queryReq.query.action_id;
         if(queryReq.query.hasOwnProperty("streaming_output")) delete queryReq.query.streaming_output;
         if(queryReq.query.hasOwnProperty("streaming_id")) delete queryReq.query.streaming_id;
-
-        queryReq.query["sql_mode"] = "full";
 
         queryReq.query.track_total_hits = true;
 
@@ -5169,7 +5162,6 @@ const useLogs = () => {
 
       searchObj.data.histogramQuery.query.sql =
         searchObj.data.histogramQuery.aggs.histogram;
-      searchObj.data.histogramQuery.query.sql_mode = "full";
       searchObj.data.histogramQuery.query.size = -1;
       delete searchObj.data.histogramQuery.query.quick_mode;
       delete searchObj.data.histogramQuery.query.from;
@@ -6455,8 +6447,6 @@ const useLogs = () => {
     delete queryReq.query.from;
     delete queryReq.query.quick_mode;
     if(delete queryReq.query.action_id) delete queryReq.query.action_id;
-
-    queryReq.query["sql_mode"] = "full";
 
     queryReq.query.track_total_hits = true;
 

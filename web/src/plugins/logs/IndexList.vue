@@ -1567,7 +1567,6 @@ export default defineComponent({
           sql: queryToBeSent,
           start_time: start,
           end_time: end,
-          sql_mode: "context",
           // streaming_output: true,
         };
         const res = await searchService.partition({
