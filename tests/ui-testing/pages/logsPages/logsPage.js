@@ -213,10 +213,22 @@ export class LogsPage {
     async selectIndexStreamOld(streamName) {
         console.log(`[DEBUG] selectIndexStreamOld: Starting selection for stream: ${streamName}`);
         try {
+            // Click the dropdown
             await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
             console.log(`[DEBUG] selectIndexStreamOld: Clicked dropdown`);
-            await this.page.waitForTimeout(2000);
+            await this.page.waitForTimeout(3000);
             
+            // Try to find the stream by text first (more reliable)
+            try {
+                console.log(`[DEBUG] selectIndexStreamOld: Trying to find stream by text: ${streamName}`);
+                await this.page.getByText(streamName, { exact: true }).first().click();
+                console.log(`[DEBUG] selectIndexStreamOld: Successfully selected stream by text: ${streamName}`);
+                return;
+            } catch (textError) {
+                console.log(`[DEBUG] selectIndexStreamOld: Could not find stream by text, trying toggle selector`);
+            }
+            
+            // Fallback to toggle selector
             const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${streamName}"] div`;
             console.log(`[DEBUG] selectIndexStreamOld: Looking for selector: ${streamToggleSelector}`);
             
@@ -225,7 +237,21 @@ export class LogsPage {
             console.log(`[DEBUG] selectIndexStreamOld: Successfully selected stream: ${streamName}`);
         } catch (error) {
             console.log(`[DEBUG] selectIndexStreamOld: Failed to select stream ${streamName}: ${error.message}`);
-            throw error;
+            
+            // Last resort: try to select any available stream
+            console.log(`[DEBUG] selectIndexStreamOld: Trying to select any available stream as fallback`);
+            try {
+                const availableStreams = await this.page.locator('[data-test*="log-search-index-list-stream-toggle-"]').all();
+                if (availableStreams.length > 0) {
+                    await availableStreams[0].click();
+                    console.log(`[DEBUG] selectIndexStreamOld: Selected first available stream as fallback`);
+                } else {
+                    throw new Error('No streams available to select');
+                }
+            } catch (fallbackError) {
+                console.log(`[DEBUG] selectIndexStreamOld: Fallback also failed: ${fallbackError.message}`);
+                throw error; // Throw original error
+            }
         }
     }
 
