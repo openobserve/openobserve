@@ -90,8 +90,7 @@ async fn _inner_flush() {
             }
             Err(e) => {
                 log::error!(
-                    "[SELF-REPORTING] Error in ingesting cloud events data to external URL {:?}",
-                    e
+                    "[SELF-REPORTING] Error in ingesting cloud events data to external URL {e:?}",
                 );
                 if &cfg.cloud.cloud_events_reporting_mode != "both" {
                     // on error in ingesting usage data, push back the data

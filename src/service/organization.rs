@@ -496,7 +496,7 @@ pub async fn generate_invitation(
                     log::info!("sent invite email response code: {}", resp.code());
                 }
                 Err(e) => {
-                    log::error!("Error sending email for invitation: {}", e);
+                    log::error!("Error sending email for invitation: {e}");
                 }
             }
         }
