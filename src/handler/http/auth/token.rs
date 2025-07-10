@@ -75,7 +75,7 @@ pub async fn token_validator(
                             }
                         }
                         Err(e) => {
-                            log::error!("Error getting user in token validator: {}", e);
+                            log::error!("Error getting user in token validator: {e}");
                             None
                         }
                     }

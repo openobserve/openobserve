@@ -63,12 +63,7 @@ pub async fn handle_request(
         )
         .await
         .map_err(|e| {
-            log::error!(
-                "[Loki] Stream {} ingestion failed for org {}: {}",
-                stream_name,
-                org_id,
-                e
-            );
+            log::error!("[Loki] Stream {stream_name} ingestion failed for org {org_id}: {e}");
             LokiError::from(anyhow::anyhow!(
                 "Stream {} ingestion failed: {:?}",
                 stream_name,
@@ -106,7 +101,7 @@ fn validate_and_process_json_request(
         for (entry_idx, entry) in loki_stream.values.into_iter().enumerate() {
             if entry.line.trim().is_empty() {
                 return Err(LokiError::InvalidTimestamp {
-                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line",),
+                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line"),
                 });
             }
 
@@ -181,7 +176,7 @@ fn validate_and_process_protobuf_request(
         for (entry_idx, entry) in loki_stream.entries.into_iter().enumerate() {
             if entry.line.trim().is_empty() {
                 return Err(LokiError::InvalidTimestamp {
-                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line",),
+                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line"),
                 });
             }
 

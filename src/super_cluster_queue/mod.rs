@@ -122,7 +122,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         break;
                     }
                     if let Err(e) = queue.subscribe().await {
-                        log::error!("[SUPER_CLUSTER:sync] failed to subscribe: {}", e);
+                        log::error!("[SUPER_CLUSTER:sync] failed to subscribe: {e}");
                     }
                 }
             });

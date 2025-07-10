@@ -46,7 +46,7 @@ pub async fn set_prom_cluster_leader(
     {
         Ok(_) => {}
         Err(e) => {
-            log::error!("Error updating cluster_leader: {}", e);
+            log::error!("Error updating cluster_leader: {e}");
             return Err(anyhow::anyhow!("Error updating cluster_leader: {}", e));
         }
     }
@@ -74,12 +74,12 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("Error getting value: {}", e);
+                            log::error!("Error getting value: {e}");
                             continue;
                         }
                     },
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };

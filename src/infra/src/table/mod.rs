@@ -78,8 +78,7 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
     }
     // If the migration is not found, it is already applied so return 0
     log::debug!(
-        "Migration m20241217_155000_populate_alerts_table at step {} (0 means already applied)",
-        index
+        "Migration m20241217_155000_populate_alerts_table at step {index} (0 means already applied)"
     );
     Ok(index)
 }

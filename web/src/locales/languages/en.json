@@ -241,7 +241,8 @@
     "version": "Version",
     "commitHash": "Commit Hash",
     "buildDate": "Build Date",
-    "logoMsg": "Observability simplified."
+    "logoMsg": "Observability simplified.",
+    "buildType": "Platform"
   },
   "login": {
     "userid": "User ID",
@@ -689,6 +690,9 @@
     "typeOfVariable": "Type of variable",
     "DefaultSize": "Default max record size (optional)",
     "multiSelect": "Allow multiple selection",
+    "selectType": "Selection",
+    "isSingleSelect": "Single",
+    "isMultiSelect": "Multiple",
     "hideOnDashboard": "Hide On Dashboard",
     "escapeSingleQuotes": "Escape Single Quotes",
     "maxRecordSize": "Default max record size is 10. You can update this value as required",

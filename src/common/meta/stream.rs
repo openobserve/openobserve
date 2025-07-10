@@ -237,7 +237,12 @@ mod tests {
             pattern_associations: vec![],
         };
 
-        assert!(stream.uds_schema.is_some());
-        assert_eq!(stream.uds_schema.unwrap().len(), 1);
+        assert!(stream.uds_schema.is_some_and(|schema| schema.len() == 1));
+    }
+
+    #[test]
+    fn test_empty_stream_delete_fields_default() {
+        let delete_fields = StreamDeleteFields::default();
+        assert!(delete_fields.fields.is_empty());
     }
 }

@@ -67,7 +67,7 @@ pub async fn init() -> errors::Result<()> {
         .unwrap_or_default();
     tokio::task::spawn(async move {
         if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
-            log::error!("replay wal files error: {}", e);
+            log::error!("replay wal files error: {e}");
         }
     });
 
@@ -80,7 +80,7 @@ pub async fn init() -> errors::Result<()> {
             .await;
             // check memtable ttl
             if let Err(e) = writer::check_ttl().await {
-                log::error!("memtable check ttl error: {}", e);
+                log::error!("memtable check ttl error: {e}");
             }
         }
     });
@@ -88,7 +88,7 @@ pub async fn init() -> errors::Result<()> {
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
         if let Err(e) = run().await {
-            log::error!("immutable persist error: {}", e);
+            log::error!("immutable persist error: {e}");
         }
     });
     Ok(())
@@ -131,7 +131,7 @@ async fn run() -> errors::Result<()> {
         interval.tick().await;
         // persist immutable data to disk
         if let Err(e) = immutable::persist(tx.clone()).await {
-            log::error!("immutable persist error: {}", e);
+            log::error!("immutable persist error: {e}");
         }
         // shrink metadata cache
         WAL_PARQUET_METADATA.write().await.shrink_to_fit();

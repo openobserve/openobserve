@@ -132,7 +132,7 @@ pub async fn validator(
             }
         }
         Err(err) => {
-            log::debug!("Token Validation Error: {:#?}", err);
+            log::debug!("Token Validation Error: {err:#?}");
             Err((err, req))
         }
     }
@@ -175,7 +175,7 @@ pub async fn validate_credentials(
                 }
             }
             Err(e) => {
-                log::debug!("Error getting user in validate_credentials: {}", e);
+                log::debug!("Error getting user in validate_credentials: {e}");
                 None
             }
         }
@@ -663,11 +663,6 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    // Check if the ws request is using internal grpc token
-    if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
-        return validate_http_internal(req).await;
-    }
-
     if auth_info.auth.starts_with("Basic") {
         let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
             Ok(val) => val,
@@ -851,7 +846,7 @@ pub async fn validate_http_internal(
         let node_url = match Url::parse(&node.http_addr) {
             Ok(node_url) => node_url,
             Err(e) => {
-                log::error!("Failed to parse node URL: {}", e);
+                log::error!("Failed to parse node URL: {e}");
                 return false;
             }
         };
@@ -864,7 +859,7 @@ pub async fn validate_http_internal(
         {
             Some(ip) => ip,
             None => {
-                log::debug!("Failed to parse peer IP from: {}", peer);
+                log::debug!("Failed to parse peer IP from: {peer}");
                 return false;
             }
         };
@@ -903,7 +898,7 @@ pub(crate) async fn check_permissions(
     }
 
     let object_str = auth_info.o2_type;
-    log::debug!("Role of user {user_id} is {:#?}", role);
+    log::debug!("Role of user {user_id} is {role:#?}");
     let obj_str = if object_str.contains("##user_id##") {
         object_str.replace("##user_id##", user_id)
     } else {
@@ -981,8 +976,7 @@ pub(crate) async fn list_objects_for_user(
         match list_objects(user_id, permission, object_type, org_id, &role).await {
             Ok(resp) => {
                 log::debug!(
-                    "list_objects_for_user for user {user_id} from {org_id} org returns: {:#?}",
-                    resp
+                    "list_objects_for_user for user {user_id} from {org_id} org returns: {resp:#?}"
                 );
                 Ok(Some(resp))
             }

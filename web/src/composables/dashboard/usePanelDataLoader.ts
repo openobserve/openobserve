@@ -390,7 +390,6 @@ export const usePanelDataLoader = (
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
-      sql_mode: "full",
       // if i == 0 ? then do gap of 7 days
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
@@ -433,7 +432,6 @@ export const usePanelDataLoader = (
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
-              sql_mode: "full",
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
               size: -1,
@@ -446,6 +444,9 @@ export const usePanelDataLoader = (
         abortControllerRef.signal,
       );
 
+      if (shouldSkipSearchDueToEmptyVariables()) {
+        return;
+      }
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
         // Set partial data when partition API call is interrupted
@@ -914,7 +915,6 @@ export const usePanelDataLoader = (
         (v) =>
           v.value === null ||
           v.value === undefined ||
-          v.value === "" ||
           (Array.isArray(v.value) && v.value.length === 0),
       )
       .map((v) => v.name);
@@ -1384,7 +1384,6 @@ export const usePanelDataLoader = (
                               query_fn: it.vrlFunctionQuery
                                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                                 : null,
-                              sql_mode: "full",
                               start_time: startISOTimestamp,
                               end_time: endISOTimestamp,
                               per_query_response: true,
@@ -1512,7 +1511,9 @@ export const usePanelDataLoader = (
                   periodAsStr: "",
                 },
               };
-
+              if (shouldSkipSearchDueToEmptyVariables()) {
+                return;
+              }
               state.metadata.queries[panelQueryIndex] = metadata;
               const annotations = shouldFetchAnnotations()
                 ? await refreshAnnotations(

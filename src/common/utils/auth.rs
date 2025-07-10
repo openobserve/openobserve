@@ -977,7 +977,7 @@ pub async fn extract_auth_expiry_and_user_id(
             .and_then(|exp| exp.as_i64())
             .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0)),
         Err(e) => {
-            log::error!("Error verifying token: {}", e);
+            log::error!("Error verifying token: {e}");
             None
         }
     };
@@ -998,7 +998,7 @@ pub async fn extract_auth_expiry_and_user_id(
         let stripped_bearer_token = match crate::service::db::session::get(session_key).await {
             Ok(bearer_token) => bearer_token,
             Err(e) => {
-                log::error!("Error getting session: {}", e);
+                log::error!("Error getting session: {e}");
                 return (None, None);
             }
         };

@@ -179,7 +179,7 @@ pub async fn submit_job(
                 "[Job_Id: {job_id}] Search Job submitted successfully."
             ))),
             Err(err) => {
-                log::error!("[trace_id {trace_id}] sumbit query error: {}", err);
+                log::error!("[trace_id {trace_id}] sumbit query error: {err}");
                 Ok(MetaHttpResponse::internal_error(err.to_string()))
             }
         }

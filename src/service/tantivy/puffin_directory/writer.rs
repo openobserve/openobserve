@@ -488,8 +488,8 @@ mod tests {
         for i in 0..10 {
             let writer_clone = writer.clone();
             let handle = thread::spawn(move || {
-                let path = format!("file_{}.txt", i);
-                let data = format!("data for file {}", i);
+                let path = format!("file_{i}.txt");
+                let data = format!("data for file {i}");
                 writer_clone
                     .atomic_write(Path::new(&path), data.as_bytes())
                     .unwrap();
@@ -506,9 +506,9 @@ mod tests {
 
         // All files should be readable
         for i in 0..10 {
-            let path = format!("file_{}.txt", i);
+            let path = format!("file_{i}.txt");
             let data = writer.atomic_read(Path::new(&path)).unwrap();
-            let expected = format!("data for file {}", i);
+            let expected = format!("data for file {i}");
             assert_eq!(data, expected.as_bytes());
         }
     }
@@ -556,7 +556,7 @@ mod tests {
         ];
 
         for filename in &special_files {
-            let data = format!("data for {}", filename);
+            let data = format!("data for {filename}");
             writer
                 .atomic_write(Path::new(filename), data.as_bytes())
                 .unwrap();
@@ -568,7 +568,7 @@ mod tests {
         for filename in &special_files {
             assert!(files.contains(&PathBuf::from(filename)));
             let read_data = writer.atomic_read(Path::new(filename)).unwrap();
-            let expected = format!("data for {}", filename);
+            let expected = format!("data for {filename}");
             assert_eq!(read_data, expected.as_bytes());
         }
     }
@@ -698,7 +698,7 @@ mod tests {
         // Test all allowed extensions
         let allowed_extensions = ["term", "idx", "pos", "fast"];
         for ext in &allowed_extensions {
-            let filename = format!("test.{}", ext);
+            let filename = format!("test.{ext}");
             writer.atomic_write(Path::new(&filename), b"data").unwrap();
         }
 

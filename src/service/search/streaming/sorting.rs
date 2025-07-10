@@ -13,19 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{search::Response, sql::OrderBy};
-use serde_json::Value;
+use config::{
+    meta::{search::Response, sql::OrderBy},
+    utils::json::Value,
+};
+use log;
 
-/// Represents different sorting strategies
-enum SortStrategy {
-    SqlOrderBy,
-    FallbackColumn(String, OrderBy),
-    AutoDetermine(String, bool), // (column, is_string)
-    NoSort,
-}
+use crate::common::meta::search::SortStrategy;
 
 /// Determines and applies sorting to search results
-pub(crate) fn order_search_results(
+pub fn order_search_results(
     mut search_res: Response,
     fallback_order_by_col: Option<String>,
 ) -> Response {
@@ -37,39 +34,6 @@ pub(crate) fn order_search_results(
     apply_sort_strategy(&mut search_res, strategy);
 
     search_res
-}
-
-/// Applies the chosen sort strategy to results
-fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
-    match strategy {
-        SortStrategy::FallbackColumn(col, order) => {
-            // Auto-detect column type from first hit
-            let is_string = search_res
-                .hits
-                .first()
-                .and_then(|hit| hit.get(&col))
-                .map(|v| !v.is_number())
-                .unwrap_or(true);
-
-            // Sorting behavior:
-            // - String columns: Always sort ascending (A->Z)
-            // - Numeric columns: Respect the specified order (ASC/DESC)
-            let is_descending = if is_string {
-                false // Strings always sort ascending
-            } else {
-                order == OrderBy::Desc // Numbers follow specified order
-            };
-
-            sort_by_column(search_res, &col, is_string, is_descending);
-            if search_res.order_by.is_none() {
-                search_res.order_by = Some(order);
-            }
-        }
-        SortStrategy::AutoDetermine(col, is_string) => {
-            sort_by_column(search_res, &col, is_string, !is_string);
-        }
-        _ => (),
-    }
 }
 
 /// Determines which sorting strategy to use
@@ -105,6 +69,39 @@ fn determine_sort_strategy(
     }
 
     SortStrategy::NoSort
+}
+
+/// Applies the chosen sort strategy to results
+fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
+    match strategy {
+        SortStrategy::FallbackColumn(col, order) => {
+            // Auto-detect column type from first hit
+            let is_string = search_res
+                .hits
+                .first()
+                .and_then(|hit| hit.get(&col))
+                .map(|v| !v.is_number())
+                .unwrap_or(true);
+
+            // Sorting behavior:
+            // - String columns: Always sort ascending (A->Z)
+            // - Numeric columns: Respect the specified order (ASC/DESC)
+            let is_descending = if is_string {
+                false // Strings always sort ascending
+            } else {
+                order == OrderBy::Desc // Numbers follow specified order
+            };
+
+            sort_by_column(search_res, &col, is_string, is_descending);
+            if search_res.order_by.is_none() {
+                search_res.order_by = Some(order);
+            }
+        }
+        SortStrategy::AutoDetermine(col, is_string) => {
+            sort_by_column(search_res, &col, is_string, !is_string);
+        }
+        _ => (),
+    }
 }
 
 /// Finds and validates fallback column in results
@@ -188,7 +185,8 @@ fn compare_numeric_values(a: &Value, b: &Value, column: &str) -> std::cmp::Order
     }
 }
 
-fn determine_sort_column(first_hit: &config::utils::json::Value) -> Option<(String, bool)> {
+/// Determines the best column to sort by from the first hit
+fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
     if let Some(obj) = first_hit.as_object() {
         // First try to find non-numeric columns
         for (key, value) in obj {

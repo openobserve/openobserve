@@ -144,7 +144,7 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
 
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
-    if LOCAL_NODE.is_compactor() {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }
     let pipelines = list().await?;
@@ -232,8 +232,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                 match config::utils::json::to_vec(pipeline) {
                     Err(e) => {
                         log::error!(
-                            "[Pipeline] error serializing pipeline for super_cluster event: {}",
-                            e
+                            "[Pipeline] error serializing pipeline for super_cluster event: {e}"
                         );
                     }
                     Ok(value_vec) => {
@@ -305,14 +304,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id) {
                             if stream_exec_pl.remove(&removed).is_some() {
                                 log::info!(
-                                    "[Pipeline]: pipeline {} disabled and removed from cache.",
-                                    pipeline_id
+                                    "[Pipeline]: pipeline {pipeline_id} disabled and removed from cache."
                                 );
                             }
                         } else {
                             log::error!(
-                                "[Pipeline]: pipeline {} not found in cache to remove.",
-                                pipeline_id
+                                "[Pipeline]: pipeline {pipeline_id} not found in cache to remove."
                             );
                         }
                     }
@@ -328,15 +325,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         .is_some()
                     {
                         log::info!(
-                            "[Pipeline]: pipeline {} deleted and removed from cache.",
-                            pipeline_id
+                            "[Pipeline]: pipeline {pipeline_id} deleted and removed from cache."
                         );
                     };
                 } else {
-                    log::error!(
-                        "[Pipeline]: pipeline {} not found in cache to remove.",
-                        pipeline_id
-                    );
+                    log::error!("[Pipeline]: pipeline {pipeline_id} not found in cache to remove.");
                 }
             }
             db::Event::Empty => {}

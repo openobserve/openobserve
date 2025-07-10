@@ -74,7 +74,7 @@ pub async fn exchange_token(
             Ok(HttpResponse::Ok().json(response))
         }
         Err(e) => {
-            log::error!("Error: {}", e);
+            log::error!("Error: {e}");
             audit_message.response_meta.http_response_code = 401;
             audit_message._timestamp = now_micros();
             audit(audit_message).await;

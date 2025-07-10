@@ -151,7 +151,7 @@ impl Metadata for TraceListIndex {
     }
     async fn stop(&self) -> infra::errors::Result<()> {
         if let Err(e) = self.flush().await {
-            log::error!("[TraceListIndex] flush error: {}", e);
+            log::error!("[TraceListIndex] flush error: {e}");
         }
         Ok(())
     }
@@ -196,7 +196,7 @@ impl TraceListIndex {
             )
             .await
             {
-                log::error!("[TraceListIndex] error while setting schema: {}", e);
+                log::error!("[TraceListIndex] error while setting schema: {e}");
             }
 
             let settings = StreamSettings {

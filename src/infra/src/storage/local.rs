@@ -96,7 +96,7 @@ impl ObjectStore for Local {
                 })
             }
             Err(err) => {
-                log::error!("disk File upload error: {:?}", err);
+                log::error!("disk File upload error: {err:?}");
                 Err(err)
             }
         }
@@ -129,7 +129,7 @@ impl ObjectStore for Local {
             .get(&(format_key(&file, self.with_prefix).into()))
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get local file: {}, error: {:?}", file, e);
+                log::error!("[STORAGE] get local file: {file}, error: {e:?}");
                 e
             })?;
 
@@ -160,7 +160,7 @@ impl ObjectStore for Local {
             .get_opts(&(format_key(&file, self.with_prefix).into()), options)
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get_opts local file: {}, error: {:?}", file, e);
+                log::error!("[STORAGE] get_opts local file: {file}, error: {e:?}");
                 e
             })?;
 
@@ -192,10 +192,7 @@ impl ObjectStore for Local {
             .await
             .map_err(|e| {
                 log::error!(
-                    "[STORAGE] get_range local file: {}, range: {:?}, error: {:?}",
-                    file,
-                    range,
-                    e
+                    "[STORAGE] get_range local file: {file}, range: {range:?}, error: {e:?}"
                 );
                 e
             })?;

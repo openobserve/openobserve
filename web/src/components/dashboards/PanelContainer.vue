@@ -514,7 +514,9 @@ export default defineComponent({
 
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {
-      if (!metaData.value) return false;
+      if (!metaData.value) {
+        return false;
+      }
 
       const adhocVariables = props.variablesData.values
         ?.filter((it: any) => it.type === "dynamic_filters")
@@ -528,6 +530,10 @@ export default defineComponent({
         );
         return vars?.length == adhocVariables?.length;
       });
+
+      if (adhocVariables?.length == 0 || adhocVariables == undefined) {
+        return false;
+      }
       return !metaDataDynamic;
     });
 

@@ -33,6 +33,12 @@ use o2_enterprise::enterprise::common::{
 use tokio::sync::mpsc;
 use tracing::Span;
 
+#[cfg(feature = "enterprise")]
+use crate::{
+    common::meta::search::AuditContext,
+    handler::http::request::search::utils::check_stream_permissions,
+    service::self_reporting::audit,
+};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -45,12 +51,7 @@ use crate::{
     handler::http::request::search::{
         build_search_request_per_field, error_utils::map_error_to_http_response,
     },
-    service::{search::search_stream::process_search_stream_request, setup_tracing_with_trace_id},
-};
-#[cfg(feature = "enterprise")]
-use crate::{
-    handler::http::request::search::utils::check_stream_permissions,
-    service::search::search_stream::AuditContext, service::self_reporting::audit,
+    service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
 };
 /// Search HTTP2 streaming endpoint
 ///
@@ -100,10 +101,8 @@ pub async fn search_http2_stream(
         .to_string();
 
     // Log the request
-    log::info!(
-        "[trace_id: {}] Received HTTP/2 stream request at handler for org_id: {}",
-        trace_id,
-        org_id
+    log::debug!(
+        "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request at handler for org_id: {org_id}"
     );
 
     #[cfg(feature = "enterprise")]
@@ -282,7 +281,7 @@ pub async fn search_http2_stream(
     {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+            log::error!("[HTTP2_STREAM trace_id {trace_id}] Error parsing sql: {e}");
 
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
@@ -360,11 +359,7 @@ pub async fn search_http2_stream(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!(
-                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
-                    trace_id,
-                    err
-                );
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         // if err code is cancelled return cancelled response
@@ -484,10 +479,8 @@ pub async fn values_http2_stream(
         .to_string();
 
     // Log the request
-    log::info!(
-        "[trace_id: {}] Received values HTTP/2 stream request for org_id: {}",
-        trace_id,
-        org_id
+    log::debug!(
+        "[HTTP2_STREAM trace_id {trace_id}] Received values HTTP/2 stream request for org_id: {org_id}"
     );
 
     // Get query params
@@ -663,11 +656,7 @@ pub async fn values_http2_stream(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!(
-                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
-                    trace_id,
-                    err
-                );
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in values stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         let message = code.get_message();

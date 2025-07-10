@@ -40,10 +40,8 @@ pub async fn get_cached_results(
     let is_cached = r.get(&query_key).cloned();
     drop(r);
     if is_cached.is_none() {
-        log::info!(
-            "[CACHE RESULT {trace_id}] No cache found during get_cached_results for query key: {}, cache_query: {:?}",
-            query_key,
-            cache_req
+        log::debug!(
+            "[CACHE RESULT {trace_id}] No cache found during get_cached_results for query key: {query_key}, cache_query: {cache_req:?}"
         );
         return res;
     }
@@ -75,10 +73,8 @@ async fn recursive_process_multiple_metas(
 ) -> Result<(), anyhow::Error> {
     if cache_metas.is_empty() {
         if results.is_empty() {
-            log::info!(
-                "[CACHE RESULT {trace_id}] No cache found during recursive_process_multiple_metas for query key: {}, cached_metas: {:?}",
-                query_key,
-                cache_metas
+            log::debug!(
+                "[CACHE RESULT {trace_id}] No cache found during recursive_process_multiple_metas for query key: {query_key}, cached_metas: {cache_metas:?}"
             );
         }
 
@@ -97,10 +93,7 @@ async fn recursive_process_multiple_metas(
         .collect();
 
     if relevant_metas.is_empty() {
-        log::info!(
-            "[CACHE RESULT {trace_id}] No relevant cache found for query key: {}",
-            query_key
-        );
+        log::info!("[CACHE RESULT {trace_id}] No relevant cache found for query key: {query_key}");
         return Ok(());
     }
 

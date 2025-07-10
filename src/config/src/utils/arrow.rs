@@ -59,7 +59,7 @@ pub fn record_batches_to_json_rows(
 #[cfg(test)]
 mod tests {
     use arrow::{
-        array::{Int32Array, StringArray, UInt64Array},
+        array::{Int32Array, StringArray, record_batch},
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
@@ -67,23 +67,10 @@ mod tests {
     use super::*;
 
     fn create_test_batch() -> RecordBatch {
-        let schema = Schema::new(vec![
-            Field::new("id", DataType::Int32, false),
-            Field::new("name", DataType::Utf8, false),
-            Field::new("value", DataType::UInt64, false),
-        ]);
-
-        let id_array = Int32Array::from(vec![1, 2, 3]);
-        let name_array = StringArray::from(vec!["Alice", "Bob", "Charlie"]);
-        let value_array = UInt64Array::from(vec![100, 200, 300]);
-
-        RecordBatch::try_new(
-            schema.into(),
-            vec![
-                std::sync::Arc::new(id_array),
-                std::sync::Arc::new(name_array),
-                std::sync::Arc::new(value_array),
-            ],
+        record_batch!(
+            ("id", Int32, [1, 2, 3]),
+            ("name", Utf8, ["Alice", "Bob", "Charlie"]),
+            ("value", UInt64, [100, 200, 300])
         )
         .unwrap()
     }

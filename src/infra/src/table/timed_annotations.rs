@@ -527,7 +527,7 @@ async fn insert_timed_annotation(
     let annotation_id: String = if use_given_id {
         timed_annotation.annotation_id.ok_or_else(|| {
             let err_msg = "Annotation ID is required when `use_given_id` is set to true";
-            log::error!("{}", err_msg);
+            log::error!("{err_msg}");
             errors::Error::Message(err_msg.to_string())
         })?
     } else {

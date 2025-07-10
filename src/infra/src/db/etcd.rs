@@ -456,7 +456,7 @@ impl super::Db for Etcd {
                     let resp = match stream.message().await {
                         Ok(resp) => resp,
                         Err(e) => {
-                            log::error!("[ETCD:watch] prefix: {}, get message error: {}", key, e);
+                            log::error!("[ETCD:watch] prefix: {key}, get message error: {e}");
                             break;
                         }
                     };
@@ -479,10 +479,7 @@ impl super::Db for Etcd {
                             };
                             if let Err(e) = ret {
                                 log::warn!(
-                                    "[ETCD:watch] prefix: {}, key: {}, send error: {}",
-                                    prefix,
-                                    item_key,
-                                    e
+                                    "[ETCD:watch] prefix: {prefix}, key: {item_key}, send error: {e}"
                                 );
                             }
                         }
@@ -576,7 +573,7 @@ where
         let (mut keeper, mut stream) = match client.lease_keep_alive(id).await {
             Ok((keeper, stream)) => (keeper, stream),
             Err(e) => {
-                log::error!("lease {:?} keep alive error: {:?}", id, e);
+                log::error!("lease {id:?} keep alive error: {e:?}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
@@ -589,7 +586,7 @@ where
             match keeper.keep_alive().await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("lease {:?} keep alive do keeper error: {:?}", id, e);
+                    log::error!("lease {id:?} keep alive do keeper error: {e:?}");
                     ttl_keep_alive = 1;
                     break;
                 }
@@ -597,7 +594,7 @@ where
             match stream.message().await {
                 Ok(v) => {
                     if v.unwrap().ttl() == 0 {
-                        log::error!("lease {:?} keep alive ttl is 0", id);
+                        log::error!("lease {id:?} keep alive ttl is 0");
                         return Err(Error::from(etcd_client::Error::LeaseKeepAliveError(
                             "lease expired or revoked".to_string(),
                         )));
@@ -605,7 +602,7 @@ where
                     ttl_keep_alive = min(10, (ttl / 2) as u64);
                 }
                 Err(e) => {
-                    log::error!("lease {:?} keep alive receive message: {:?}", id, e);
+                    log::error!("lease {id:?} keep alive receive message: {e:?}");
                     ttl_keep_alive = 1;
                     break;
                 }

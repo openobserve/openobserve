@@ -212,7 +212,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
-                log::error!("[CLUSTER] check_nodes_status failed: {}", e);
+                log::error!("[CLUSTER] check_nodes_status failed: {e}");
             }
         }
     });
@@ -293,13 +293,13 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
     let mut nodes = Vec::new();
     let client = get_coordinator().await;
     let items = client.list_values("/nodes/").await.map_err(|e| {
-        log::error!("[CLUSTER] error getting nodes: {}", e);
+        log::error!("[CLUSTER] error getting nodes: {e}");
         e
     })?;
 
     for item in items {
         let node: Node = json::from_slice(&item).map_err(|e| {
-            log::error!("[CLUSTER] error parsing node: {}, payload: {:#?}", e, item);
+            log::error!("[CLUSTER] error parsing node: {e}, payload: {item:#?}");
             e
         })?;
         nodes.push(node.to_owned());
@@ -337,7 +337,7 @@ async fn watch_node_list() -> Result<()> {
                     continue;
                 }
                 if item_value.status == NodeStatus::Offline {
-                    log::info!("[CLUSTER] offline {:?}", item_value);
+                    log::info!("[CLUSTER] offline {item_value:?}");
                     if item_value.is_interactive_querier() {
                         remove_node_from_consistent_hash(
                             &item_value,
@@ -354,9 +354,6 @@ async fn watch_node_list() -> Result<()> {
                         )
                         .await;
                     }
-                    if item_value.is_querier() && LOCAL_NODE.is_router() {
-                        crate::router::http::remove_querier_from_handler(&item_value.name).await;
-                    }
                     if item_value.is_compactor() {
                         remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
                     }
@@ -371,7 +368,7 @@ async fn watch_node_list() -> Result<()> {
                     NODES.write().await.remove(item_key);
                     continue;
                 }
-                log::info!("[CLUSTER] join {:?}", item_value);
+                log::info!("[CLUSTER] join {item_value:?}");
                 item_value.broadcasted = true;
                 // check if the same node is already in the cluster
                 if let Some(node) = get_cached_node_by_name(&item_value.name).await
@@ -411,7 +408,7 @@ async fn watch_node_list() -> Result<()> {
                         continue;
                     }
                 };
-                log::info!("[CLUSTER] leave {:?}", item_value);
+                log::info!("[CLUSTER] leave {item_value:?}");
                 if item_value.is_interactive_querier() {
                     remove_node_from_consistent_hash(
                         &item_value,
@@ -427,9 +424,6 @@ async fn watch_node_list() -> Result<()> {
                         Some(RoleGroup::Background),
                     )
                     .await;
-                }
-                if item_value.is_querier() && LOCAL_NODE.is_router() {
-                    crate::router::http::remove_querier_from_handler(&item_value.name).await;
                 }
                 if item_value.is_compactor() {
                     remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;

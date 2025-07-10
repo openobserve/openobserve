@@ -174,8 +174,7 @@ async fn handle_alert_triggers(
             }
             Err(e) => {
                 log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: {}",
-                    e
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: {e}"
                 );
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
@@ -647,10 +646,7 @@ async fn handle_report_triggers(
 
     if !report.enabled {
         log::debug!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {}, report name: {} id: {}",
-            org_id,
-            report_name,
-            report_id
+            "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {org_id}, report name: {report_name} id: {report_id}"
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
@@ -766,9 +762,7 @@ async fn handle_report_triggers(
     match report.send_subscribers().await {
         Ok(_) => {
             log::info!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Report name: {} id: {} sent to destination",
-                report_name,
-                report_id
+                "[SCHEDULER trace_id {scheduler_trace_id}] Report name: {report_name} id: {report_id} sent to destination"
             );
             // Report generation successful, update the trigger
             if run_once {
@@ -776,9 +770,7 @@ async fn handle_report_triggers(
             }
             db::scheduler::update_trigger(new_trigger).await?;
             log::debug!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {} id: {}",
-                report_name,
-                report_id
+                "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
             trigger_data_stream.end_time = now_micros();
         }
@@ -900,7 +892,7 @@ async fn handle_derived_stream_triggers(
             time_in_queue_ms: Some(time_in_queue),
         };
 
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
+        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
@@ -942,7 +934,7 @@ async fn handle_derived_stream_triggers(
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
         };
-        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {}", msg);
+        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
@@ -980,7 +972,7 @@ async fn handle_derived_stream_triggers(
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
         };
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
+        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
@@ -1270,8 +1262,7 @@ async fn handle_derived_stream_triggers(
                         match ingestion_service::ingest(req).await {
                             Ok(resp) if resp.status_code == 200 => {
                                 log::info!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {}",
-                                    records_len
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {records_len}"
                                 );
                             }
                             error => {

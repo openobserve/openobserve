@@ -69,7 +69,7 @@ impl MetadataManager {
         ) {
             Ok(_) => {}
             Err(e) => {
-                log::error!("[METADATA] error while closing: {}", e);
+                log::error!("[METADATA] error while closing: {e}");
             }
         }
 

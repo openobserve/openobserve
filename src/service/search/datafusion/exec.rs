@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{num::NonZero, str::FromStr, sync::Arc};
+use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Field;
@@ -202,12 +202,12 @@ pub async fn merge_parquet_files(
                 }
                 Ok(Some(batch)) => {
                     if let Err(e) = tx.send(batch).await {
-                        log::error!("merge_parquet_files write to channel error: {}", e);
+                        log::error!("merge_parquet_files write to channel error: {e}");
                         return Err(DataFusionError::External(Box::new(e)));
                     }
                 }
                 Err(e) => {
-                    log::error!("merge_parquet_files execute stream error: {}", e);
+                    log::error!("merge_parquet_files execute stream error: {e}");
                     return Err(e);
                 }
             }
@@ -217,7 +217,7 @@ pub async fn merge_parquet_files(
     while let Some(batch) = rx.recv().await {
         new_file_meta.records += batch.num_rows() as i64;
         if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write error: {}", e);
+            log::error!("merge_parquet_files write error: {e}");
             return Err(e.into());
         }
     }
@@ -255,7 +255,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let sql = generate_downsampling_sql(&schema, rule);
 
-    log::debug!("merge_parquet_files_with_downsampling sql: {}", sql);
+    log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -303,17 +303,13 @@ pub async fn merge_parquet_files_with_downsampling(
                 Ok(Some(batch)) => {
                     if let Err(e) = tx.send(batch).await {
                         log::error!(
-                            "merge_parquet_files_with_downsampling write to channel error: {}",
-                            e
+                            "merge_parquet_files_with_downsampling write to channel error: {e}"
                         );
                         return Err(DataFusionError::External(Box::new(e)));
                     }
                 }
                 Err(e) => {
-                    log::error!(
-                        "merge_parquet_files_with_downsampling execute stream error: {}",
-                        e
-                    );
+                    log::error!("merge_parquet_files_with_downsampling execute stream error: {e}");
                     return Err(e);
                 }
             }
@@ -347,7 +343,7 @@ pub async fn merge_parquet_files_with_downsampling(
             );
         }
         if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
+            log::error!("merge_parquet_files_with_downsampling write Error: {e}");
             return Err(e.into());
         }
     }
@@ -401,14 +397,15 @@ pub fn create_session_config(
     target_partitions: usize,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
-    let mut target_partitions = if target_partitions == 0 {
+    let target_partitions = if target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
-        std::cmp::max(cfg.limit.datafusion_min_partition_num, target_partitions)
+        target_partitions
     };
-    if target_partitions == 0 {
-        target_partitions = DATAFUSION_MIN_PARTITION;
-    }
+    let target_partitions = max(
+        DATAFUSION_MIN_PARTITION,
+        max(cfg.limit.datafusion_min_partition_num, target_partitions),
+    );
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
         .with_target_partitions(target_partitions)
@@ -499,20 +496,18 @@ pub async fn prepare_datafusion_context(
     target_partitions: usize,
 ) -> Result<SessionContext, DataFusionError> {
     let cfg = get_config();
-    #[cfg(not(feature = "enterprise"))]
-    let (memory_size, target_partition) = (cfg.memory_cache.datafusion_max_size, target_partitions);
+    let (target_partitions, memory_size) =
+        (target_partitions, cfg.memory_cache.datafusion_max_size);
     #[cfg(feature = "enterprise")]
-    let (target_partition, memory_size) = (target_partitions, cfg.memory_cache.datafusion_max_size);
-    #[cfg(feature = "enterprise")]
-    let (target_partition, memory_size) = get_cpu_and_mem_limit(
+    let (target_partitions, memory_size) = get_cpu_and_mem_limit(
         _trace_id,
         _work_group.clone(),
-        target_partition,
+        target_partitions,
         memory_size,
     )
     .await?;
 
-    let session_config = create_session_config(sorted_by_time, target_partition)?;
+    let session_config = create_session_config(sorted_by_time, target_partitions)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
     let mut builder = SessionStateBuilder::new()
         .with_config(session_config)
@@ -570,6 +565,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     #[cfg(feature = "enterprise")]
     {
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
+        ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
         ctx.register_udaf(AggregateUDF::from(
             o2_enterprise::enterprise::search::datafusion::udaf::approx_topk::ApproxTopK::new(),
@@ -639,31 +635,21 @@ pub async fn create_parquet_table(
     let target_partitions = if session.target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
-        std::cmp::max(
-            cfg.limit.datafusion_min_partition_num,
-            session.target_partitions,
-        )
+        session.target_partitions
     };
+    let target_partitions = max(
+        DATAFUSION_MIN_PARTITION,
+        max(cfg.limit.datafusion_min_partition_num, target_partitions),
+    );
 
     #[cfg(feature = "enterprise")]
     let (target_partitions, _) = get_cpu_and_mem_limit(
         &session.id,
         session.work_group.clone(),
         target_partitions,
-        0,
+        cfg.memory_cache.datafusion_max_size,
     )
     .await?;
-
-    let target_partitions = if target_partitions == 0 {
-        DATAFUSION_MIN_PARTITION
-    } else {
-        target_partitions
-    };
-
-    log::debug!(
-        "create_parquet_table: target_partitions: {}",
-        target_partitions
-    );
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -754,13 +740,24 @@ async fn get_cpu_and_mem_limit(
             DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
         })?;
         if get_o2_config().search_group.cpu_limit_enabled {
-            target_partitions = target_partitions * cpu as usize / 100;
+            target_partitions = std::cmp::max(
+                get_config().limit.datafusion_min_partition_num,
+                target_partitions * cpu as usize / 100,
+            );
         }
         memory_size = memory_size * mem as usize / 100;
     }
+
+    let target_partitions = if target_partitions == 0 {
+        DATAFUSION_MIN_PARTITION
+    } else {
+        target_partitions
+    };
+
     log::info!(
-        "[trace_id: {trace_id}] datafusion work_group: {work_group:?}, target_partition: {target_partitions}, memory_size: {memory_size}",
+        "[trace_id: {trace_id}] work_group: {work_group:?}, target_partitions: {target_partitions}, memory_size: {memory_size}"
     );
+
     Ok((target_partitions, memory_size))
 }
 

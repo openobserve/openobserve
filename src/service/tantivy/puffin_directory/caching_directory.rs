@@ -495,7 +495,7 @@ mod tests {
         let caching_directory = CachingDirectory::new(ram_directory);
 
         // Should be able to debug print
-        let debug_str = format!("{:?}", caching_directory);
+        let debug_str = format!("{caching_directory:?}");
         assert!(debug_str.contains("CachingDirectory"));
     }
 
@@ -509,7 +509,7 @@ mod tests {
         let handle = caching_directory.get_file_handle(test_path)?;
 
         // Should be able to debug print
-        let debug_str = format!("{:?}", handle);
+        let debug_str = format!("{handle:?}");
         assert!(debug_str.contains("CachingFileHandle"));
         assert!(debug_str.contains("debug_test"));
 

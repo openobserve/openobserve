@@ -189,7 +189,7 @@ pub async fn len() -> usize {
     match len {
         Ok(len) => len as usize,
         Err(e) => {
-            log::error!("organizations len error: {}", e);
+            log::error!("organizations len error: {e}");
             0
         }
     }

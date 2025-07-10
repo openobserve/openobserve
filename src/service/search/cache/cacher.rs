@@ -62,16 +62,13 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
 
     let filtered_responses = responses
         .iter()
+        .filter(|meta| meta.response_end_time >= stream_min_ts)
         .cloned()
-        .filter_map(|mut meta| {
-            if meta.response_end_time >= stream_min_ts {
-                if meta.response_start_time < stream_min_ts {
-                    meta.response_start_time = stream_min_ts;
-                }
-                Some(meta) // Keep the entry after updating
-            } else {
-                None // Remove the entry
+        .map(|mut meta| {
+            if meta.response_start_time < stream_min_ts {
+                meta.response_start_time = stream_min_ts;
             }
+            meta
         })
         .collect();
 
@@ -294,10 +291,9 @@ pub async fn check_cache(
                         // single cached query response is expected
                         cached_resp = responses[0].clone();
                     }
-                    Err(e) => log::error!(
-                        "Error invalidating cached response by stream min ts: {:?}",
-                        e
-                    ),
+                    Err(e) => {
+                        log::error!("Error invalidating cached response by stream min ts: {e:?}")
+                    }
                 }
 
                 let mut deltas = vec![];
@@ -421,8 +417,7 @@ pub async fn get_cached_results(
                             Ok(v) => v,
                             Err(e) => {
                                 log::error!(
-                                    "[trace_id {trace_id}] Error parsing cached response: {:?}",
-                                    e
+                                    "[trace_id {trace_id}] Error parsing cached response: {e:?}"
                                 );
                                 return None;
                             }
@@ -511,7 +506,7 @@ pub async fn get_cached_results(
                 }
             }
             None => {
-                log::debug!("No matching cache found for query key: {}", query_key);
+                log::debug!("No matching cache found for query key: {query_key}");
                 None
             }
         }
@@ -685,7 +680,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
             match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("Error deleting cache: {:?}", e);
+                    log::error!("Error deleting cache: {e:?}");
                     return Err(std::io::Error::other("Error deleting cache"));
                 }
             }
@@ -726,10 +721,10 @@ fn handle_histogram(
             .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
             .collect::<Vec<&str>>();
 
-        attrs.get(1).map_or_else(
-            || generate_histogram_interval(q_time_range),
-            |v| v.to_string(),
-        )
+        attrs
+            .get(1)
+            .map_or_else(|| generate_histogram_interval(q_time_range), |v| *v)
+            .to_string()
     };
 
     *origin_sql = origin_sql.replace(
@@ -846,7 +841,7 @@ mod tests {
                 total: 101,
                 from: 0,
                 size: 280,
-                file_count: 0,
+                scan_files: 0,
                 cached_ratio: 100,
                 scan_size: 0,
                 idx_scan_size: 0,
@@ -970,7 +965,7 @@ mod tests {
                     total: 1,
                     from: 0,
                     size: 10,
-                    file_count: 1,
+                    scan_files: 1,
                     cached_ratio: 100,
                     scan_size: 1000,
                     idx_scan_size: 1000,
@@ -1004,7 +999,7 @@ mod tests {
                     total: 1,
                     from: 0,
                     size: 10,
-                    file_count: 1,
+                    scan_files: 1,
                     cached_ratio: 100,
                     scan_size: 1000,
                     idx_scan_size: 1000,

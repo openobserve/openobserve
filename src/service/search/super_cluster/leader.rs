@@ -66,7 +66,7 @@ pub async fn search(
 ) -> Result<SearchResult> {
     let _start = std::time::Instant::now();
     let cfg = get_config();
-    log::info!("[trace_id {trace_id}] super cluster leader: start {}", sql);
+    log::info!("[trace_id {trace_id}] super cluster leader: start {sql}");
 
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -158,7 +158,7 @@ pub async fn search(
             match ret {
                 Ok(ret) => Ok(ret),
                 Err(err) => {
-                    log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {}", err);
+                    log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {err}");
                     Err(Error::Message(err.to_string()))
                 }
             }
@@ -307,10 +307,12 @@ async fn run_datafusion(
         };
 
         // NOTE: temporary check
-        let org_settings = crate::service::db::organization::get_org_setting(&org_id).await?;
+        let org_settings = crate::service::db::organization::get_org_setting(&org_id)
+            .await
+            .unwrap_or_default();
         let use_cache = use_cache && org_settings.aggregation_cache_enabled;
         let target_partitions = ctx.state().config().target_partitions();
-        let (plan,is_complete_cache_hit) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
+        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
             streaming_id,
             start_time,
             end_time,
@@ -323,6 +325,15 @@ async fn run_datafusion(
         // Check for aggs cache hit
         if is_complete_cache_hit {
             aggs_cache_ratio = 100;
+        }
+
+        // no need to run datafusion, return empty result
+        if is_complete_cache_hit_with_no_data {
+            let scan_stats = ScanStats {
+                aggs_cache_ratio,
+                ..Default::default()
+            };
+            return Ok((vec![], scan_stats, "".to_string()));
         }
     }
 

@@ -215,7 +215,7 @@ async fn send_to_node(
                 node_addr: LOCAL_NODE.grpc_addr.clone(),
                 ..Default::default()
             };
-            log::debug!("[broadcast] req_query created: {:?}", req_query);
+            log::debug!("[broadcast] req_query created: {req_query:?}");
             for item in items.iter() {
                 req_query.items.push(cluster_rpc::FileKey::from(item));
             }

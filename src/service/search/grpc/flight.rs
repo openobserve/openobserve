@@ -295,9 +295,7 @@ pub async fn search(
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
                 log::error!(
-                    "[trace_id {}] flight->search: search storage parquet error: {}",
-                    trace_id,
-                    e
+                    "[trace_id {trace_id}] flight->search: search storage parquet error: {e}"
                 );
                 return Err(e);
             }
@@ -323,11 +321,7 @@ pub async fn search(
             Err(e) => {
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
-                log::error!(
-                    "[trace_id {}] flight->search: search wal parquet error: {}",
-                    trace_id,
-                    e
-                );
+                log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
                 return Err(e);
             }
         };
@@ -350,9 +344,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] flight->search: search wal memtable error: {:?}",
-                    trace_id,
-                    e
+                    "[trace_id {trace_id}] flight->search: search wal memtable error: {e:?}"
                 );
                 return Err(e);
             }

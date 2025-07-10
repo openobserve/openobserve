@@ -53,8 +53,10 @@ fn read_cpu_cgroup_v1() -> usize {
         && !val.is_empty()
         && !val.to_lowercase().starts_with("max")
     {
-        let columns = val.split(' ').collect::<Vec<&str>>();
-        return columns[0].parse::<usize>().unwrap_or_default();
+        return val
+            .split_once(' ')
+            .and_then(|(v, _)| v.parse::<usize>().ok())
+            .unwrap_or_default();
     };
     0
 }

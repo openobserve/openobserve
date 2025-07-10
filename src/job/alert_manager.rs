@@ -33,7 +33,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         );
         tokio::task::spawn(async move {
             if let Err(e) = report_server::spawn_server().await {
-                log::error!("report server failed to spawn {}", e);
+                log::error!("report server failed to spawn {e}");
             }
         });
     }
@@ -49,10 +49,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 o2_enterprise::enterprise::super_cluster::kv::cluster::list_by_role_group(None)
                     .await?;
             if clusters.iter().any(|c| c.name == exist_cluster_name) {
-                log::info!(
-                    "[ALERT MANAGER] is running in cluster: {}",
-                    exist_cluster_name
-                );
+                log::info!("[ALERT MANAGER] is running in cluster: {exist_cluster_name}");
                 return Ok(());
             }
         }
@@ -90,7 +87,7 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = infra::scheduler::watch_timeout().await {
-            log::error!("[SCHEDULER] watch timeout jobs error: {}", e);
+            log::error!("[SCHEDULER] watch timeout jobs error: {e}");
         }
     }
 }
@@ -103,7 +100,7 @@ async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = service::search_jobs::run(id).await {
-            log::error!("[SEARCH JOB {id}] run search jobs error: {}", e);
+            log::error!("[SEARCH JOB {id}] run search jobs error: {e}");
         }
     }
 }
@@ -151,7 +148,7 @@ async fn run_delete_jobs() -> Result<(), anyhow::Error> {
         interval.tick().await;
         log::debug!("[SEARCH JOB] Running delete jobs");
         if let Err(e) = service::search_jobs::delete_jobs().await {
-            log::error!("[SEARCH JOB] run delete jobs error: {}", e);
+            log::error!("[SEARCH JOB] run delete jobs error: {e}");
         }
     }
 }

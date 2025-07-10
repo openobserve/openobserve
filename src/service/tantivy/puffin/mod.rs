@@ -24,11 +24,11 @@ pub mod writer;
 /// puffin specs constants
 pub const MAGIC: [u8; 4] = [0x50, 0x46, 0x41, 0x31];
 pub const MAGIC_SIZE: u64 = MAGIC.len() as u64;
-pub const MIN_FILE_SIZE: u64 = MAGIC_SIZE + MIN_FOOTER_SIZE;
+pub const MIN_FILE_SIZE: u64 = MAGIC_SIZE + MIN_DATA_SIZE;
 pub const FLAGS_SIZE: u64 = 4;
 pub const FOOTER_PAYLOAD_SIZE_SIZE: u64 = 4;
-pub const FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE;
-pub const MIN_FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
+pub const FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE;
+pub const MIN_DATA_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -173,8 +173,8 @@ mod tests {
         assert_eq!(MAGIC_SIZE, 4);
         assert_eq!(FLAGS_SIZE, 4);
         assert_eq!(FOOTER_PAYLOAD_SIZE_SIZE, 4);
-        assert_eq!(FOOTER_SIZE, 16);
-        assert_eq!(MIN_FOOTER_SIZE, 16);
+        assert_eq!(FOOTER_SIZE, 12);
+        assert_eq!(MIN_DATA_SIZE, 16);
         assert_eq!(MIN_FILE_SIZE, 20);
     }
 

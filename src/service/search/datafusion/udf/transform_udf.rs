@@ -106,7 +106,7 @@ fn get_udf_vrl(
                     }
                 }
                 Err(e) => {
-                    log::error!("Error in vrl_transform UDF: {}", e);
+                    log::error!("Error in vrl_transform UDF: {e}");
                     res_data_vec.insert(i, "".to_string());
                 }
             }
@@ -134,7 +134,7 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> j
     match result {
         Ok(res) => res.try_into().unwrap(),
         Err(err) => {
-            log::error!("vrl_transform execute error: {}", err);
+            log::error!("vrl_transform execute error: {err}");
             json::Value::Null
         }
     }

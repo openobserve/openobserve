@@ -152,11 +152,7 @@ pub async fn generate_job_by_stream(
     }
 
     log::debug!(
-        "[COMPACTOR] generate_job_by_stream [{}/{}/{}] offset: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        offset
+        "[COMPACTOR] generate_job_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
     // generate merging job
@@ -270,12 +266,7 @@ pub async fn generate_old_data_job_by_stream(
         .with_timezone(&Utc);
         let offset = offset.timestamp_micros();
         log::debug!(
-            "[COMPACTOR] generate_old_data_job_by_stream [{}/{}/{}] hours: {}, offset: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            hour,
-            offset
+            "[COMPACTOR] generate_old_data_job_by_stream [{org_id}/{stream_type}/{stream_name}] hours: {hour}, offset: {offset}"
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
@@ -372,12 +363,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     }
 
     log::debug!(
-        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?}, offset: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        rule,
-        offset
+        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{org_id}/{stream_type}/{stream_name}] rule: {rule:?}, offset: {offset}"
     );
 
     // generate downsampling job
@@ -441,11 +427,7 @@ pub async fn merge_by_stream(
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] offset: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        offset
+        "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
     // check offset
@@ -598,7 +580,7 @@ pub async fn merge_by_stream(
             let (inner_tx, mut inner_rx) = mpsc::channel(batch_group_len);
             for batch in batch_groups.iter() {
                 if let Err(e) = worker_tx.send((inner_tx.clone(), batch.clone())).await {
-                    log::error!("[COMPACTOR] send batch to worker failed: {}", e);
+                    log::error!("[COMPACTOR] send batch to worker failed: {e}");
                     return Err(anyhow::Error::msg("send batch to worker failed"));
                 }
             }
@@ -614,7 +596,7 @@ pub async fn merge_by_stream(
                 let (batch_id, new_files) = match ret {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!("[COMPACTOR] merge files failed: {}", e);
+                        log::error!("[COMPACTOR] merge files failed: {e}");
                         last_error = Some(e);
                         continue;
                     }
@@ -622,11 +604,7 @@ pub async fn merge_by_stream(
 
                 if check_guard.contains(&batch_id) {
                     log::warn!(
-                        "[COMPACTOR] merge files for stream: [{}/{}/{}] found error files, batch_id: {} duplicate",
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        batch_id
+                        "[COMPACTOR] merge files for stream: [{org_id}/{stream_type}/{stream_name}] found error files, batch_id: {batch_id} duplicate"
                     );
                     continue;
                 }
@@ -652,7 +630,7 @@ pub async fn merge_by_stream(
 
                 // write file list to storage
                 if let Err(e) = write_file_list(&org_id, &events).await {
-                    log::error!("[COMPACTOR] write file list failed: {}", e);
+                    log::error!("[COMPACTOR] write file list failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
@@ -883,12 +861,7 @@ pub async fn merge_files(
         {
             Ok(v) => v,
             Err(e) => {
-                log::error!(
-                    "create_parquet_table err: {}, files: {:?}, schema: {:?}",
-                    e,
-                    files,
-                    schema
-                );
+                log::error!("create_parquet_table err: {e}, files: {files:?}, schema: {schema:?}");
                 return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
             }
         };
@@ -923,9 +896,7 @@ pub async fn merge_files(
         Ok(v) => v,
         Err(e) => {
             log::error!(
-                "merge_parquet_files err: {e}, files: {:?}, schema: {:?}",
-                files,
-                latest_schema
+                "merge_parquet_files err: {e}, files: {files:?}, schema: {latest_schema:?}"
             );
             return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
         }
@@ -941,12 +912,7 @@ pub async fn merge_files(
         .chain(index_fields.iter())
         .any(|f| latest_schema_fields.contains(f));
     if !need_index {
-        log::debug!(
-            "skip index generation for stream: {}/{}/{}",
-            org_id,
-            stream_type,
-            stream_name
-        );
+        log::debug!("skip index generation for stream: {org_id}/{stream_type}/{stream_name}");
     }
 
     let mut new_files = Vec::new();
@@ -1251,10 +1217,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                 Ok(data_len) => {
                     if data_len > 0 && data_len != file_size {
                         log::warn!(
-                            "[COMPACT] download file {} found size mismatch, expected: {}, actual: {}, will skip it",
-                            file_name,
-                            file_size,
-                            data_len,
+                            "[COMPACT] download file {file_name} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
                         );
                         // update database
                         // if let Err(e) =
@@ -1277,10 +1240,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                         || e.to_string().to_lowercase().contains("data size is zero")
                     {
                         // delete file from file list
-                        log::error!(
-                            "[COMPACT] found invalid file: {}, will delete it",
-                            file_name
-                        );
+                        log::error!("[COMPACT] found invalid file: {file_name}, will delete it");
                         if let Err(e) =
                             file_list::delete_parquet_file(&file_account, &file_name, true).await
                         {
@@ -1310,7 +1270,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                 }
             }
             Err(e) => {
-                log::error!("[COMPACTOR] load file task err: {}", e);
+                log::error!("[COMPACTOR] load file task err: {e}");
             }
         }
     }

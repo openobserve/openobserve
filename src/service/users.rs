@@ -90,7 +90,7 @@ pub async fn post_user(
                     }
                 }
                 Err(e) => {
-                    log::error!("Error fetching custom roles during post user: {}", e);
+                    log::error!("Error fetching custom roles during post user: {e}");
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                         http::StatusCode::BAD_REQUEST,
                         "Custom role not found",
@@ -198,7 +198,7 @@ pub async fn post_user(
                             log::info!("User saved successfully in openfga");
                         }
                         Err(e) => {
-                            log::error!("Error creating user in openfga: {}", e);
+                            log::error!("Error creating user in openfga: {e}");
                         }
                     }
                 }
@@ -341,7 +341,7 @@ pub async fn update_user(
 
                         new_user.password = get_hash(&new_pass, &local_user.salt);
                         new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                        log::info!("Password self updated for user: {}", email);
+                        log::info!("Password self updated for user: {email}");
                         is_updated = true;
                     } else {
                         message = "Existing/old password mismatch, please provide valid existing password";
@@ -362,7 +362,7 @@ pub async fn update_user(
 
                     new_user.password = get_hash(&new_pass, &local_user.salt);
                     new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                    log::info!("Password by root updated for user: {}", email);
+                    log::info!("Password by root updated for user: {email}");
 
                     is_updated = true;
                 } else if user.new_password.is_some() {
@@ -454,7 +454,7 @@ pub async fn update_user(
                         )
                         .await
                         {
-                            log::error!("Error updating org user relation: {}", e);
+                            log::error!("Error updating org user relation: {e}");
                             return Ok(HttpResponse::InternalServerError().json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -471,7 +471,7 @@ pub async fn update_user(
                     )
                     .await
                     {
-                        log::error!("Error adding org user relation: {}", e);
+                        log::error!("Error adding org user relation: {e}");
                         return Ok(HttpResponse::InternalServerError().json(
                             MetaHttpResponse::error(
                                 http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -530,8 +530,7 @@ pub async fn update_user(
                                 });
                                 if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
                                     log::error!(
-                                        "Error updating custom roles for user {email} in {org_id} org : {}",
-                                        e
+                                        "Error updating custom roles for user {email} in {org_id} org : {e}"
                                     );
                                     return Ok(HttpResponse::InternalServerError().json(
                                         MetaHttpResponse::error(
@@ -595,7 +594,7 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
                         log::info!("User added to org successfully in openfga");
                     }
                     Err(e) => {
-                        log::error!("Error adding user to the org in openfga: {}", e);
+                        log::error!("Error adding user to the org in openfga: {e}");
                     }
                 }
             }
@@ -629,7 +628,7 @@ pub async fn add_user_to_org(
             match db::user::get(Some(org_id), initiator_id).await {
                 Ok(user) => user.unwrap(),
                 Err(e) => {
-                    log::error!("Error fetching user: {}", e);
+                    log::error!("Error fetching user: {e}");
                     return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                         http::StatusCode::NOT_FOUND,
                         "User not found",
@@ -691,7 +690,7 @@ pub async fn add_user_to_org(
                             log::info!("User added to org successfully in openfga");
                         }
                         Err(e) => {
-                            log::error!("Error adding user to the org in openfga: {}", e);
+                            log::error!("Error adding user to the org in openfga: {e}");
                         }
                     }
                 }
@@ -766,11 +765,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
         }
         Some(user_from_db)
     } else {
-        log::info!(
-            "get_user_by_token: User not found even in db {} {}",
-            org_id,
-            token
-        );
+        log::info!("get_user_by_token: User not found even in db {org_id} {token}");
         None
     }
 }
@@ -785,7 +780,7 @@ pub async fn list_users(
     let mut user_list: Vec<UserResponse> = vec![];
     let is_list_all = list_all & org_id.eq(META_ORG_ID);
     let mut user_orgs: HashMap<String, Vec<OrgRoleMapping>> = HashMap::new();
-    log::debug!("Listing users for org: {}", org_id);
+    log::debug!("Listing users for org: {org_id}");
 
     #[cfg(feature = "enterprise")]
     if get_openfga_config().enabled && role.is_none() && permitted.is_none() {
@@ -810,12 +805,14 @@ pub async fn list_users(
         if is_list_all {
             let (org, id) = org_user.key().split_once('/').unwrap();
             if let Some(org_record) = organization::get_org(org).await {
-                let user_org = user_orgs.entry(id.to_string()).or_insert(vec![]);
-                user_org.push(OrgRoleMapping {
-                    org_id: org.to_string(),
-                    role: org_user.value().role.clone(),
-                    org_name: org_record.name,
-                });
+                user_orgs
+                    .entry(id.to_string())
+                    .or_default()
+                    .push(OrgRoleMapping {
+                        org_id: org.to_string(),
+                        role: org_user.value().role.clone(),
+                        org_name: org_record.name,
+                    });
             }
         } else if org_user.key().starts_with(&format!("{org_id}/"))
             && let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await
@@ -935,7 +932,7 @@ pub async fn remove_user_from_org(
                 }
 
                 if !user.organizations.is_empty() {
-                    let mut orgs = user.clone().organizations;
+                    let orgs = &mut user.organizations;
                     if orgs.len() == 1 {
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
@@ -978,7 +975,7 @@ pub async fn remove_user_from_org(
                                     ),
                                 ));
                             }
-                            if org.name.eq(&org_id.to_string()) {
+                            if org.name.eq(org_id) {
                                 let user_role = &org.role;
                                 is_service_account = user_role.eq(&UserRole::ServiceAccount);
                                 _user_fga_role =
@@ -989,8 +986,7 @@ pub async fn remove_user_from_org(
                                     };
                             }
                         }
-                        orgs.retain(|x| !x.name.eq(&org_id.to_string()));
-                        user.organizations = orgs;
+                        orgs.retain(|x| !x.name.eq(org_id));
                         let resp = db::org_users::remove(org_id, &email_id).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
@@ -1069,7 +1065,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
         (false, get_default_user_org())
     } else {
         let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
+        local_orgs.retain(|org| !org.name.eq(org_id));
         if local_orgs.is_empty() {
             (false, get_default_user_org())
         } else {
@@ -1136,7 +1132,7 @@ pub(crate) async fn create_root_user(
             if db::user::root_user_exists().await {
                 Ok(())
             } else {
-                log::error!("Error creating root user: {}", e);
+                log::error!("Error creating root user: {e}");
                 Err(e)
             }
         }

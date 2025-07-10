@@ -88,11 +88,7 @@ pub(crate) async fn create_tantivy_index(
             );
         }
         Err(e) => {
-            log::error!(
-                "{} generated tantivy index file error: {}",
-                caller,
-                e.to_string()
-            );
+            log::error!("{caller} generated tantivy index file error: {e}");
             return Err(e.into());
         }
     }
@@ -253,10 +249,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     while let Some(docs) = rx.recv().await {
         for doc in docs {
             if let Err(e) = index_writer.add_document(doc) {
-                log::error!(
-                    "generate_tantivy_index: Failed to add document to index: {}",
-                    e
-                );
+                log::error!("generate_tantivy_index: Failed to add document to index: {e}");
                 return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
             }
             tokio::task::coop::consume_budget().await;
@@ -271,10 +264,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
     let index = tokio::task::spawn_blocking(move || {
         index_writer.finalize().map_err(|e| {
-            log::error!(
-                "generate_tantivy_index: Failed to finalize the index writer: {}",
-                e
-            );
+            log::error!("generate_tantivy_index: Failed to finalize the index writer: {e}");
             anyhow::anyhow!("Failed to finalize the index writer: {}", e)
         })
     })
@@ -320,7 +310,7 @@ mod tests {
         if include_fts_field {
             fields.push(Field::new("content", DataType::Utf8, false));
             let content: Vec<String> = (0..num_rows)
-                .map(|i| format!("Test content number {}", i))
+                .map(|i| format!("Test content number {i}"))
                 .collect();
             columns.push(Arc::new(StringArray::from(content)));
         }

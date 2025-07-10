@@ -25,10 +25,6 @@ export const login = async (page) => {
     await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
       waitUntil: "networkidle",
     });
-    await page
-      .locator('[data-test="navbar-organizations-select"]')
-      .getByText("arrow_drop_down")
-      .click();
-    await page.getByRole("option", { name: "default", exact: true }).click();
+    
   }
     

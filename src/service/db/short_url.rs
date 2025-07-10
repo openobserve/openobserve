@@ -43,7 +43,7 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
 
 pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<(), anyhow::Error> {
     if let Err(e) = short_urls::add(short_id, &entry.original_url).await {
-        log::error!("Failed to add short URL to DB : {}", e);
+        log::error!("Failed to add short URL to DB : {e}");
         return Err(e).context("Failed to add short URL to DB");
     }
 
@@ -85,7 +85,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_value = match short_urls::get(item_key).await {
                     Ok(val) => val,
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };
@@ -121,7 +121,7 @@ async fn run_gc_task(gc_interval_minutes: i64, retention_period_minutes: i64) {
         interval.tick().await;
 
         if let Err(e) = gc_cache(retention_period_minutes).await {
-            log::error!("Error during garbage collection: {}", e);
+            log::error!("Error during garbage collection: {e}");
         }
     }
 }
