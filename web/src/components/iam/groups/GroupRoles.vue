@@ -20,12 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex justify-start bordered q-px-md q-py-sm"
       style="position: sticky; top: 0px; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px 4px 7px 0px'
-            : 'rgb(240 240 240) 0px 4px 7px 0px',
-      }"
     >
       <div class="q-mr-md">
         <div

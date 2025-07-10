@@ -148,6 +148,7 @@ const columns: any = [
     label: "#",
     field: "#",
     align: "left",
+    style: "width: 67px;",
   },
   {
     name: "group_name",

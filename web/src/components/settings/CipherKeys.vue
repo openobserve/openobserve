@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 filled
                 dense
-                class="q-ml-none q-mb-xs"
+                class="q-ml-none"
                 style="width: 400px"
                 :placeholder="t('cipherKey.search')"
                 clearable
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </q-input>
               <q-btn
-                class="q-mb-xs text-bold no-border q-ml-md"
+                class="text-bold no-border q-ml-md"
                 padding="sm lg"
                 color="secondary"
                 no-caps
@@ -60,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="pagination"
         :filter="filterQuery"
         :filter-method="filterData"
-        :loading="loading"
         class="o2-quasar-table"
         :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
       >
@@ -96,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #top="scope">
           <div class="row full-width">
             <QTablePagination
-              v-if="resultTotal > 0"
               :scope="scope"
               :pageTitle="t('cipherKey.header')"
               :resultTotal="resultTotal"
