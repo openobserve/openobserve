@@ -55,7 +55,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("zin*")`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('zin*')`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
@@ -70,7 +70,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T1*")`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T1*')`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
@@ -85,7 +85,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl") limit 10`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit 10`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
@@ -100,7 +100,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
@@ -118,7 +118,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("zin*")`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('zin*')`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
@@ -136,7 +136,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T1*")`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T1*')`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
@@ -154,7 +154,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:2*")`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:2*')`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
@@ -172,7 +172,7 @@ test.describe("Pagination for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
-        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl") limit 10`);
+        await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit 10`);
         await page.waitForTimeout(2000);
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
