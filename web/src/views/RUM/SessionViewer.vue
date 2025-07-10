@@ -178,7 +178,6 @@ const getSession = () => {
           Number(router.currentRoute.value.query.end_time) + 86400000000,
         from: 0,
         size: 10,
-        sql_mode: "full",
       },
     };
 

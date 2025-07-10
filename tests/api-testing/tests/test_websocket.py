@@ -198,8 +198,7 @@
 #                 "sql": hist_query,
 #                 "start_time": ten_min_ago,
 #                 "end_time": end_time,
-#                 "size": -1,
-#                 "sql_mode": "full"
+#                 "size": -1
 #         }
 #     }
 
@@ -516,8 +515,7 @@
 #         "end_time": end_time,
 #         "from": 0,
 #         "size": sql_size,
-#         "quick_mode": False,
-#         "sql_mode": "full"
+#         "quick_mode": False
 #     },
 #     "regions": [],
 #     "clusters": []
@@ -625,8 +623,7 @@
 #                     "sql": hist_query,
 #                     "start_time": ten_min_ago,
 #                     "end_time": end_time,
-#                     "size": -1,
-#                     "sql_mode": "full"
+#                     "size": -1
 #                 },
 #                 "regions": [],
 #                 "clusters": []
@@ -695,8 +692,7 @@
 #                     "sql": hist_query,
 #                     "start_time": ten_min_ago,
 #                     "end_time": end_time,
-#                     "size": -1,
-#                     "sql_mode": "full"
+#                     "size": -1
 #                 },
 #                 "regions": [],
 #                 "clusters": []
@@ -782,8 +778,7 @@
 #                     "end_time": end_time,
 #                     "from": 0,
 #                     "size": sql_size,
-#                     "quick_mode": False,
-#                     "sql_mode": "full"
+#                     "quick_mode": False
 #                 },
 #                 "regions": [],
 #                 "clusters": []
@@ -847,8 +842,7 @@
 #                     "end_time": end_time,
 #                     "from": 0,
 #                     "size": sql_size,
-#                     "quick_mode": False,
-#                     "sql_mode": "full"
+#                     "quick_mode": False
 #                 },
 #                 "regions": [],
 #                 "clusters": []

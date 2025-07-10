@@ -429,7 +429,6 @@ const getSessions = () => {
       ? " where " + sessionState.data.editorValue.trim()
       : ""
   } group by session_id order by zo_sql_timestamp DESC`;
-  req.query.sql_mode = "full";
   delete req.aggs;
   isLoading.value.push(true);
 

@@ -360,7 +360,6 @@ const getErrorLogs = () => {
   } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
 
   req.query.sql.replace("\n", " ");
-  req.query.sql_mode = "full";
   delete req.aggs;
   isLoading.value.push(true);
 

@@ -390,7 +390,6 @@ export const usePanelDataLoader = (
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
-      sql_mode: "full",
       // if i == 0 ? then do gap of 7 days
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
@@ -433,7 +432,6 @@ export const usePanelDataLoader = (
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
-              sql_mode: "full",
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
               size: -1,
@@ -1386,7 +1384,6 @@ export const usePanelDataLoader = (
                               query_fn: it.vrlFunctionQuery
                                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                                 : null,
-                              sql_mode: "full",
                               start_time: startISOTimestamp,
                               end_time: endISOTimestamp,
                               per_query_response: true,
