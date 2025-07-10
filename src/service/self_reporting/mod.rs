@@ -40,7 +40,7 @@ use tokio::sync::oneshot;
 pub mod cloud_events;
 mod ingestion;
 mod queues;
-#[cfg(feature = "cloud")]
+#[cfg(any(feature = "cloud", feature = "marketplace"))]
 pub mod search;
 
 pub async fn run() {
@@ -314,16 +314,6 @@ async fn publish_audit(
     crate::service::ingestion::ingestion_service::ingest(req)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))
-}
-
-/// `marketplace` feature flag must report usage
-/// or enabled by env for other feature flags
-/// &
-/// Only ingester or querier nodes report usage
-#[inline]
-fn should_report_usage() -> bool {
-    (cfg!(feature = "marketplace") || get_config().common.usage_enabled)
-        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier())
 }
 
 /// `marketplace` feature flag must report usage

@@ -191,7 +191,7 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
         // First try to find non-numeric columns
         for (key, value) in obj {
             if !value.is_number() {
-                log::debug!("Using string column for sorting: {}", key);
+                log::debug!("Using string column for sorting: {key}");
                 return Some((key.clone(), true)); // (column, is_string)
             }
         }
@@ -199,7 +199,7 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
         // If no non-numeric column found, take first numeric column
         for (key, value) in obj {
             if value.is_number() {
-                log::debug!("Using numeric column for sorting: {}", key);
+                log::debug!("Using numeric column for sorting: {key}");
                 return Some((key.clone(), false)); // (column, is_string)
             }
         }
