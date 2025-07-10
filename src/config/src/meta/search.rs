@@ -273,7 +273,10 @@ impl ResponseChunkIterator {
         let chunk_size = chunk_size.unwrap_or_else(|| {
             // Get from config, convert from MB to bytes
             let mb = 1024 * 1024;
-            crate::get_config().websocket.streaming_response_chunk_size * mb
+            crate::get_config()
+                .http_streaming
+                .streaming_response_chunk_size
+                * mb
         });
 
         let hits = response.hits.drain(..).collect::<Vec<_>>();
@@ -1584,7 +1587,7 @@ impl StreamResponses {
                 // Add a log message to show the chunk size being used
                 log::info!(
                     "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
-                    get_config().websocket.streaming_response_chunk_size
+                    get_config().http_streaming.streaming_response_chunk_size
                 );
 
                 // Capture needed values for the closure

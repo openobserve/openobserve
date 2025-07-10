@@ -663,11 +663,6 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    // Check if the ws request is using internal grpc token
-    if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
-        return validate_http_internal(req).await;
-    }
-
     if auth_info.auth.starts_with("Basic") {
         let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
             Ok(val) => val,

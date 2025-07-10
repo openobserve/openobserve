@@ -354,9 +354,6 @@ async fn watch_node_list() -> Result<()> {
                         )
                         .await;
                     }
-                    if item_value.is_querier() && LOCAL_NODE.is_router() {
-                        crate::router::http::remove_querier_from_handler(&item_value.name).await;
-                    }
                     if item_value.is_compactor() {
                         remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
                     }
@@ -427,9 +424,6 @@ async fn watch_node_list() -> Result<()> {
                         Some(RoleGroup::Background),
                     )
                     .await;
-                }
-                if item_value.is_querier() && LOCAL_NODE.is_router() {
-                    crate::router::http::remove_querier_from_handler(&item_value.name).await;
                 }
                 if item_value.is_compactor() {
                     remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
