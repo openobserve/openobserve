@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                 v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
                     :ripple="false"
-                    @click.stop="sendToAiChat(JSON.stringify(cell.row.original))"
+                    @click.stop="sendToAiChat(JSON.stringify(cell.row.original),true)"
                     data-test="menu-link-ai-item"
                     no-caps
                     :borderless="true"
@@ -852,9 +852,44 @@ const getBtnLogo = computed(() => {
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
-const sendToAiChat = (value: any) => {
-  emits("sendToAiChat", value);
+const sendToAiChat = (value: any,isEntireRow: boolean = false) => {
+  if(isEntireRow){
+    //here we will get the original value of the row
+    //and we need to filter the row if props.columns have any filtered cols that user applied
+    //the format of the props.columns is like this:
+    //if user have not applied any filter then the props.columns will be like this:
+    //it contains _timestamp column and source column 
+    //else we get _timestamp column and other filter columns so if user have applied any filter then we need to filter the row based on the filter columns
+    const row = JSON.parse(value);
+    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row 
+    //otherwise we need to filter the row based on the columns that user have applied
+    if(checkIfSourceColumnPresent(props.columns)){
+      emits("sendToAiChat", JSON.stringify(row));
+    }else{
+      //we need to filter the row based on the columns that user have applied
+      const filteredRow = filterRowBasedOnColumns(row,props.columns);
+      emits("sendToAiChat", JSON.stringify(filteredRow));
+    }
+  }else{
+    emits("sendToAiChat", value);
+  }
 };
+
+const checkIfSourceColumnPresent = (columns: any) => {
+  //we need to check if source column is present in the columns
+  //if present then we need to return true else false
+  return columns.some((column: any) => column.id === 'source');
+}
+
+const filterRowBasedOnColumns = (row: any,columns: any) => {
+  //we need to filter the row based on the columns that user have applied
+  //here we need to filter row not columns based on the columns that user have applied
+  const columnsToFilter = columns.filter((column: any) => column.id !== 'source');
+  return columnsToFilter.reduce((acc: any, column: any) => {
+    acc[column.id] = row[column.id];
+    return acc;
+  }, {});
+}
 
 
 defineExpose({
