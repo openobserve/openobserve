@@ -334,7 +334,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
-        streaming_enabled: cfg.websocket.streaming_enabled,
+        streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
