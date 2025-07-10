@@ -156,10 +156,7 @@ pub async fn do_partitioned_search(
             total_hits = search_res.total as i64;
             *hits_to_skip -= skip_hits;
             log::info!(
-                "[HTTP2_STREAM trace_id {trace_id}] Skipped {skip_hits} hits, remaining hits to skip: {}, total hits for partition {}: {}",
-                *hits_to_skip,
-                idx,
-                total_hits
+                "[HTTP2_STREAM trace_id {trace_id}] Skipped {skip_hits} hits, remaining hits to skip: {hits_to_skip}, total hits for partition {idx}: {total_hits}",
             );
         }
 
@@ -505,8 +502,7 @@ pub async fn process_delta(
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
 
-            if req.search_type == Some(SearchEventType::Values)
-                && let Some(values_ctx) = values_ctx.as_ref()
+            if let Some(values_ctx) = values_ctx.as_ref() && req.search_type.is_some_and(|search_type| search_type == SearchEventType::Values)
             {
                 let search_stream_span = tracing::info_span!(
                     "src::service::search::stream_execution::process_delta::get_top_k_values",

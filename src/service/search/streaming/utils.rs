@@ -63,8 +63,6 @@ pub fn get_top_k_values(
         return Err(infra::errors::Error::Message("field is empty".to_string()));
     }
 
-    let k_limit = top_k;
-
     let mut search_result_hits = Vec::new();
     for hit in hits {
         let key: String = hit
@@ -83,7 +81,7 @@ pub fn get_top_k_values(
         // For alphabetical sorting, collect all entries first
         let mut all_entries: Vec<_> = search_result_hits;
         all_entries.sort_by(|a, b| a.0.cmp(&b.0));
-        all_entries.truncate(k_limit as usize);
+        all_entries.truncate(top_k as usize);
 
         let top_hits = all_entries
             .into_iter()
@@ -103,12 +101,12 @@ pub fn get_top_k_values(
     } else {
         // For value-based sorting, use a min heap to get top k elements
         let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
-            BinaryHeap::with_capacity(k_limit as usize);
+            BinaryHeap::with_capacity(top_k as usize);
         for (k, v) in search_result_hits {
-            if min_heap.len() < k_limit as usize {
+            if min_heap.len() < top_k as usize {
                 // If heap not full, just add
                 min_heap.push(Reverse((v, k)));
-            } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
+            } else if (v > min_heap.peek().unwrap().0.0) {
                 // If current value is larger than smallest in heap, replace it
                 min_heap.pop();
                 min_heap.push(Reverse((v, k)));

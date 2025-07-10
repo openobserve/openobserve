@@ -81,7 +81,7 @@ pub async fn process_search_stream_request(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
     );
 
-    // Send a progress: 0 event as an indiciator of search initiation
+    // Send a progress: 0 event as an indicator of search initiation
     if sender
         .send(Ok(StreamResponses::Progress { percent: 0 }))
         .await
@@ -126,7 +126,7 @@ pub async fn process_search_stream_request(
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
 
-    // HACK: always search from the first partition, this is becuase to support pagination in http2
+    // HACK: always search from the first partition, this is because to support pagination in http2
     // streaming we need context of no of hits per partition, which currently is not available.
     // Hence we start from the first partition everytime and skip the hits. The following is a
     // global variable to keep track of how many hits to skip across all partitions.

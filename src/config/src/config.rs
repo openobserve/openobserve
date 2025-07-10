@@ -601,18 +601,6 @@ pub struct Http {
         help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
     )]
     pub tls_root_certificates: String,
-    #[env_config(
-        name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
-        default = 1,
-        help = "Size in MB for each chunk when streaming search responses"
-    )]
-    pub streaming_response_chunk_size: usize,
-    #[env_config(
-        name = "ZO_STREAMING_ENABLED",
-        default = true,
-        help = "Enable streaming"
-    )]
-    pub streaming_enabled: bool,
 }
 
 #[derive(EnvConfig)]
