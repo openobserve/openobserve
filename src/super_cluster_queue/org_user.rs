@@ -90,6 +90,18 @@ async fn add(msg: Message) -> Result<()> {
 
 async fn update(msg: Message) -> Result<()> {
     let org_user: OrgUserPut = json::from_slice(&msg.value.unwrap())?;
+    if db_org_users::get(&org_user.org_id, &org_user.email)
+        .await
+        .is_err()
+    {
+        // User not found, ignore
+        log::warn!(
+            "[SUPER_CLUSTER:sync] User not found, ignore update org user: {}/{}, ignore",
+            org_user.org_id,
+            org_user.email
+        );
+        return Ok(());
+    }
     if let Err(e) = org_users::update(
         &org_user.org_id,
         &org_user.email,
@@ -122,6 +134,13 @@ async fn update_token(msg: Message) -> Result<()> {
     }
     let org_id = keys[2];
     let user_email = keys[3];
+    if db_org_users::get(&org_id, &user_email).await.is_err() {
+        // User not found, ignore
+        log::warn!(
+            "[SUPER_CLUSTER:sync] User not found, ignore update token org user: {org_id}/{user_email}, ignore",
+        );
+        return Ok(());
+    }
     if let Err(e) = org_users::update_token(org_id, user_email, &token).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to update token for org user: {org_id}/{user_email}, error: {e}"
@@ -143,6 +162,13 @@ async fn update_rum_token(msg: Message) -> Result<()> {
     }
     let org_id = keys[2];
     let user_email = keys[3];
+    if db_org_users::get(&org_id, &user_email).await.is_err() {
+        // User not found, ignore
+        log::warn!(
+            "[SUPER_CLUSTER:sync] User not found, ignore update RUM token org user: {org_id}/{user_email}, ignore",
+        );
+        return Ok(());
+    }
     if let Err(e) = org_users::update_rum_token(org_id, user_email, &rum_token).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to update RUM token for org user: {org_id}/{user_email}, error: {e}"
