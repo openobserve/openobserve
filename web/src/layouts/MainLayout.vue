@@ -455,11 +455,11 @@ class="padding-none" />
         <router-view v-slot="{ Component }">
           <template v-if="$route.meta.keepAlive">
             <keep-alive>
-              <component :is="Component" />
+              <component :is="Component"  @sendToAiChat="sendToAiChat" />
             </keep-alive>
           </template>
           <template v-else>
-            <component :is="Component" />
+            <component :is="Component"  @sendToAiChat="sendToAiChat" />
           </template>
         </router-view>
       </q-page-container>
@@ -473,7 +473,7 @@ class="padding-none" />
       style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
-      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" />
+      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" :aiChatInputContext="aiChatInputContext" />
     </div>
   </div>
   </q-layout>
@@ -647,6 +647,7 @@ export default defineComponent({
 
     const isMonacoEditorLoaded = ref(false);
     const isHovered = ref(false);
+    const aiChatInputContext = ref("");
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -1283,6 +1284,15 @@ export default defineComponent({
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
+    const sendToAiChat = (value: any) => {
+      store.dispatch("setIsAiChatEnabled", true);
+      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
+      //so to force trigger we do this
+      aiChatInputContext.value = '';
+      nextTick(() => {
+        aiChatInputContext.value = value;
+      });
+    }
 
     return {
       t,
@@ -1316,6 +1326,8 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
+      sendToAiChat,
+      aiChatInputContext
     };
   },
   computed: {

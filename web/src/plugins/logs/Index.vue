@@ -247,6 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:scroll="getMoreData"
                     @update:recordsPerPage="getMoreDataRecordsPerPage"
                     @expandlog="toggleExpandLog"
+                    @send-to-ai-chat="sendToAiChat"
                   />
                 </div>
                 <div class="text-center col-10 q-ma-none">
@@ -373,6 +374,7 @@ import config from "@/aws-exports";
 import {
   verifyOrganizationStatus,
   useLocalInterestingFields,
+  deepCopy,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -410,6 +412,7 @@ export default defineComponent({
     SearchHistory,
   },
   mixins: [MainLayoutCloudMixin],
+  emits: ["sendToAiChat"],
   methods: {
     setHistogramDate(date: any) {
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
@@ -533,7 +536,7 @@ export default defineComponent({
       this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
     },
   },
-  setup() {
+  setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
@@ -1606,11 +1609,27 @@ export default defineComponent({
           }
 
           for (let i = 0; i < streams.length; i++) {
-            const schema = await getStream(streams[i], streamType, true);
 
+            const schema = await getStream(streams[i], streamType, true);
+            //here we are deep copying the schema before assiging it to schemaData so that we dont mutatat the orginial data 
+            //if we do this we dont get duplicate fields in the schema
+            let schemaData = deepCopy(schema.uds_schema || schema.schema || []);
+            let isUdsEnabled = schema.uds_schema?.length > 0;
+            //we only push the timestamp and all fields name in the schema if uds is enabled for that stream
+            if(isUdsEnabled){
+              let timestampColumn = store.state.zoConfig.timestamp_column;
+              let allFieldsName = store.state.zoConfig.all_fields_name;
+              schemaData.push({
+                name:timestampColumn,
+                type:'Int64'
+              })
+                schemaData.push({
+                  name:allFieldsName,
+                  type:'Utf8'
+                })
+              }
             payload["stream_name_" + (i + 1)] = streams[i];
-            payload["schema_" + (i + 1)] =
-              schema.uds_schema || schema.schema || [];
+            payload["schema_" + (i + 1)] = schemaData;
           }
 
           resolve(payload);
@@ -1626,6 +1645,10 @@ export default defineComponent({
     };
 
     // [END] O2 AI Context Handler
+
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
 
     return {
       t,
@@ -1684,6 +1707,7 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
+      sendToAiChat,
     };
   },
   computed: {
