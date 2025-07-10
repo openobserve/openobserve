@@ -147,7 +147,6 @@ describe("Alert List", async () => {
                       size: 100,
                       start_time: 0,
                       end_time: 0,
-                      sql_mode: "full",
                       query_type: "",
                       track_total_hits: false,
                     },

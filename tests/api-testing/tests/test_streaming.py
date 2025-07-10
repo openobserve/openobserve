@@ -209,8 +209,7 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_tot
             "sql": hist_query,
             "start_time": ten_min_ago,
             "end_time": end_time,
-            "size": -1,
-            "sql_mode": "full"
+            "size": -1
         }
     }
 
@@ -622,8 +621,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_s
             "end_time": end_time,
             "from": sql_from,
             "size": sql_size,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         },
         "regions": [],
         "clusters": []
@@ -712,8 +710,7 @@ def test_sql_query_range(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 50,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         },
     }
 
@@ -772,7 +769,6 @@ def test_search_partition(create_session, base_url):
         "sql": f"SELECT * FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox')",
         "start_time": ten_min_ago,
         "end_time": end_time,
-        "sql_mode": "full",
         "streaming_output": True
     }
 
@@ -901,8 +897,7 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
             "sql": hist_query,
             "start_time": ten_min_ago,
             "end_time": end_time,
-            "size": -1,
-            "sql_mode": "full"
+            "size": -1
         }
     }
 
@@ -989,8 +984,7 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_f
             "end_time": end_time,
             "from": sql_from,
             "size": sql_size,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         },
         "regions": [],
         "clusters": []
@@ -1171,8 +1165,7 @@ def test_streaming_sql_query_range(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 50,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         },
     }
 

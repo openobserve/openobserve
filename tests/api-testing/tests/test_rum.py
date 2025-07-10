@@ -148,8 +148,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
                     "start_time": five_min_ago,
                     "end_time": end_time,
                     "from": 0,
-                    "size": 150,
-                    "sql_mode": "full",
+                    "size": 150
                 },
             }
 
@@ -276,8 +275,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
 #                     "start_time": five_min_ago,
 #                     "end_time": end_time,
 #                     "from": 0,
-#                     "size": 150,
-#                     "sql_mode": "full",
+#                     "size": 150
 #                 },
 #             }
 
@@ -373,8 +371,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
 #                     "start_time": one_min_ago,
 #                     "end_time": end_time,
 #                     "from": 0,
-#                     "size": 150,
-#                     "sql_mode": "full",
+#                     "size": 150
 #                 },
 #             }
 

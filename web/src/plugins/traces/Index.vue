@@ -491,8 +491,6 @@ function buildSearch() {
     req.query.start_time = timestamps.startTime;
     req.query.end_time = timestamps.endTime;
 
-    req.query["sql_mode"] = "full";
-
     let parseQuery = query.split("|");
     let queryFunctions = "";
     let whereClause = "";
