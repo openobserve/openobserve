@@ -62,6 +62,37 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecVisitor {
     }
 }
 
+pub struct NewEmptyExecCountVisitor {
+    count: usize,
+}
+
+impl NewEmptyExecCountVisitor {
+    pub fn new() -> Self {
+        Self { count: 0 }
+    }
+
+    pub fn get_count(&self) -> usize {
+        self.count
+    }
+}
+
+impl Default for NewEmptyExecCountVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "NewEmptyExec" {
+            self.count += 1;
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
+}
+
 pub struct EmptyExecVisitor {
     data: Option<Arc<dyn ExecutionPlan>>,
 }
