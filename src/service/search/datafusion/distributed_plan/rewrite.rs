@@ -75,6 +75,9 @@ impl TreeNodeRewriter for RemoteScanRewriter {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        if config::cluster::LOCAL_NODE.is_single_node() {
+            return Ok(Transformed::no(node));
+        }
         if node.name() == "RepartitionExec" || node.name() == "CoalescePartitionsExec" {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
