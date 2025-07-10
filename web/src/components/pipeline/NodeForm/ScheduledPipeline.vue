@@ -2154,16 +2154,22 @@ const getBtnLogo = computed(() => {
           })
 
           //if uds is enabled we need to push the timestamp and all fields name in the schema
-            if(userDefinedFields.value.length > 0){
+          const hasTimestampColumn = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.timestamp_column);
+          const hasAllFieldsName = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.all_fields_name);
+            if(userDefinedFields.value.length > 0){ 
+              if(!hasTimestampColumn){
               userDefinedFields.value.push({
                 name:store.state.zoConfig.timestamp_column,
                 type:'Int64'
               })
+            }
+            if(!hasAllFieldsName){
               userDefinedFields.value.push({
                 name:store.state.zoConfig.all_fields_name,
                 type:'Utf8'
               })
             }
+          }
 
           payload["stream_name"] = selectedStreamName.value;
           payload["schema_"] = userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
