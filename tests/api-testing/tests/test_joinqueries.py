@@ -57,8 +57,7 @@ def test_e2e_join_queries(create_session, base_url, test_name, sql_query):
             "end_time": end_time,
             "from": 0,
             "size": 100,  # Adjust the size according to your needs
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
     }
 
