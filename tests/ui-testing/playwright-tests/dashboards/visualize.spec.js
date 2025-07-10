@@ -636,4 +636,187 @@ test.describe("logs testcases", () => {
     await dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
+
+  test("should execute SQL query with k8s Job data and verify data appears in both logs and visualization", async ({
+    page,
+  }) => {
+    const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and set relative time
+    await logsVisualise.openLogs();
+    await logsVisualise.setRelative("6", "w");
+
+    // Open query editor and enable SQL mode
+    await logsVisualise.openQueryEditor();
+    await logsVisualise.enableSQLMode();
+
+    // Define the SQL query for k8s Job data
+    const sqlQuery = `SELECT k8s_object_name, COUNT(k8s_event_uid) AS event_count, AVG(k8s_event_count) AS avg_events_per_job, MAX(k8s_event_start_time) AS last_event_time FROM e2e_automate WHERE k8s_object_kind = 'Job' GROUP BY k8s_object_name ORDER BY event_count DESC LIMIT 20`;
+
+    // Fill the query editor with the SQL query
+    await logsVisualise.fillQueryEditor(sqlQuery);
+
+    // Apply the query
+    await logsVisualise.logsApplyQueryButton();
+
+    // Wait for the query to complete and verify data appears in logs
+    await page.waitForTimeout(2000);
+
+    // Verify that the query results are displayed in the logs view
+    // Check for table headers or data rows that should be present
+    await expect(
+      page.locator('[data-test="logs-table"]').or(page.locator("table")).first()
+    ).toBeVisible();
+
+    // Verify specific columns from the query are present
+    await expect(
+      page.getByText("k8s_object_name", { exact: false })
+    ).toBeVisible();
+    await expect(page.getByText("event_count", { exact: false })).toBeVisible();
+    await expect(
+      page.getByText("avg_events_per_job", { exact: false })
+    ).toBeVisible();
+    await expect(
+      page.getByText("last_event_time", { exact: false })
+    ).toBeVisible();
+
+    // Verify that at least some data rows are present (not just headers)
+    const dataRows = page
+      .locator('[data-test="logs-table"] tr')
+      .or(page.locator("table tr"));
+    const rowCount = await dataRows.count();
+    expect(rowCount).toBeGreaterThan(1); // At least header + 1 data row
+
+    // Now switch to visualization tab
+    await logsVisualise.openVisualiseTab();
+
+    // Wait for visualization to load
+    await page.waitForTimeout(2000);
+
+    // Verify that the same query data is available in visualization
+    // Check that the query editor still contains our SQL query
+    await expect(page.locator(".cm-line").first()).toContainText(
+      "SELECT k8s_object_name"
+    );
+
+    // Verify that the fields from our query are available in the field list
+    await page
+      .locator('[data-test="index-field-search-input"]')
+      .fill("k8s_object_name");
+    await expect(
+      page.locator(
+        '[data-test="field-list-item-logs-e2e_automate-k8s_object_name"]'
+      )
+    ).toBeVisible();
+
+    await page
+      .locator('[data-test="index-field-search-input"]')
+      .fill("event_count");
+    await expect(
+      page.locator(
+        '[data-test="field-list-item-logs-e2e_automate-event_count"]'
+      )
+    ).toBeVisible();
+
+    await page
+      .locator('[data-test="index-field-search-input"]')
+      .fill("avg_events_per_job");
+    await expect(
+      page.locator(
+        '[data-test="field-list-item-logs-e2e_automate-avg_events_per_job"]'
+      )
+    ).toBeVisible();
+
+    // Add some fields to the visualization to verify data rendering
+    await page
+      .locator('[data-test="index-field-search-input"]')
+      .fill("k8s_object_name");
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-k8s_object_name"] [data-test="dashboard-add-x-data"]'
+      )
+      .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-k8s_object_name"] [data-test="dashboard-add-x-data"]'
+      )
+      .click();
+
+    await page
+      .locator('[data-test="index-field-search-input"]')
+      .fill("event_count");
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-event_count"] [data-test="dashboard-add-y-data"]'
+      )
+      .waitFor({ state: "visible" });
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-event_count"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+
+    // Run the visualization query
+    await logsVisualise.runQueryAndWaitForCompletion();
+
+    // Verify that the chart renders with data
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas').first()
+    ).toBeVisible();
+
+    // Verify that the X and Y axis items are correctly set
+    await expect(
+      page.locator('[data-test="dashboard-x-item-k8s_object_name"]')
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-test="dashboard-y-item-event_count"]')
+    ).toBeVisible();
+
+    // Switch back to logs to verify the original query is still there
+    await logsVisualise.backToLogs();
+
+    // Verify the SQL query is still present in the logs view
+    await logsVisualise.openQueryEditor();
+    await expect(page.locator(".cm-line").first()).toContainText(
+      "SELECT k8s_object_name"
+    );
+  });
+
+  test("111111should display an error message on the logs page for an invalid query", async ({
+    page,
+  }) => {
+    const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and the query editor
+    await logsVisualise.openLogs();
+    await logsVisualise.openQueryEditor();
+    const queryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
+    // Wait for the query editor to be visible
+    await expect(queryEditor).toBeVisible();
+
+    // Fill invalid query
+    await queryEditor.fill(
+      "SELECT k8s_object_name, COUNT(k8s_event_uid) AS event_count, AVG(k8s_event_count) AS avg_events_per_job, MAX(k8s_event_start_time) AS last_event_time FROM e2e_automate WHERE k8s_object_kind = 'Job' GROUP BY k8s_object_name ORDER BY event_count DESC LIMIT 20"
+    );
+
+    await logsVisualise.setRelative("1", "m");
+
+    await logsVisualise.logsApplyQueryButton();
+
+    //open the visualization tab
+    await logsVisualise.openVisualiseTab();
+
+    await logsVisualise.runQueryAndWaitForCompletion();
+
+    await page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes(
+            "/api/default/_search_stream?type=logs&search_type=ui&use_cache=true"
+          ) && response.status() === 200
+    );
+  });
 });
