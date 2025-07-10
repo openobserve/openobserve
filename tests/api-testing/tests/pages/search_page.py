@@ -40,8 +40,7 @@ class SearchPage:
         payload = {
             "sql": f"SELECT * FROM \"{stream_name}\"",
             "start_time": self.two_hours_ago,
-            "end_time": end_time,
-            "sql_mode": "full"
+            "end_time": end_time
         }
         response = session.post(f"{base_url}api/{org_id}/_search_partition?type=logs", headers=headers, json=payload)
         assert response.status_code == 200, f"Failed to search logs: {response.content}"
@@ -64,8 +63,7 @@ class SearchPage:
                 "end_time": end_time,
                 "from": 0,
                 "size": 50,
-                "quick_mode": False,
-                "sql_mode": "full"
+                "quick_mode": False
             }
         }
 
@@ -89,7 +87,6 @@ class SearchPage:
                 "sql": f"SELECT histogram(_timestamp, '1 minute') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
                 "start_time": self.two_hours_ago,
                 "end_time": end_time,
-                "sql_mode": "full",
                 "size": -1
             }
         }

@@ -229,7 +229,6 @@ export default defineComponent({
               queryData.value.pagination.rowsPerPage.toString(),
               10
             ),
-            sql_mode: "full",
           },
         };
 
