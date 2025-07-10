@@ -33,6 +33,12 @@ use o2_enterprise::enterprise::common::{
 use tokio::sync::mpsc;
 use tracing::Span;
 
+#[cfg(feature = "enterprise")]
+use crate::{
+    common::meta::search::AuditContext,
+    handler::http::request::search::utils::check_stream_permissions,
+    service::self_reporting::audit,
+};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -46,12 +52,6 @@ use crate::{
         build_search_request_per_field, error_utils::map_error_to_http_response,
     },
     service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
-};
-#[cfg(feature = "enterprise")]
-use crate::{
-    common::meta::search::AuditContext,
-    handler::http::request::search::utils::check_stream_permissions,
-    service::self_reporting::audit,
 };
 /// Search HTTP2 streaming endpoint
 ///

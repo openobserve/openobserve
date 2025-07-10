@@ -15,31 +15,34 @@
 
 use std::time::Instant;
 
-use config::{
-    meta::{
-        search::{
-            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-            SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
-        },
-        sql::OrderBy,
-        stream::StreamType,
+use config::meta::{
+    search::{
+        PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+        SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
     },
+    sql::OrderBy,
+    stream::StreamType,
 };
 use log;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
-
-use crate::common::meta::search::{QueryDelta, SearchResultType};
-use crate::service::search::{self as SearchService};
-
-use super::sorting::order_search_results;
-use super::utils::{calculate_progress_percentage, get_top_k_values};
+use super::{
+    sorting::order_search_results,
+    utils::{calculate_progress_percentage, get_top_k_values},
+};
+use crate::{
+    common::meta::search::{QueryDelta, SearchResultType},
+    service::search::{self as SearchService},
+};
 
 /// Do partitioned search without cache
-#[tracing::instrument(name = "service:search:stream_execution:do_partitioned_search", skip_all)]
+#[tracing::instrument(
+    name = "service:search:stream_execution:do_partitioned_search",
+    skip_all
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn do_partitioned_search(
     req: &mut config::meta::search::Request,
@@ -464,11 +467,8 @@ pub async fn process_delta(
 
         if !search_res.hits.is_empty() {
             // for every partition, compute the queried range omitting the result cache ratio
-            let queried_range = calc_queried_range(
-                start_time,
-                end_time,
-                search_res.result_cache_ratio,
-            );
+            let queried_range =
+                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
             *remaining_query_range -= queried_range;
 
             // set took
@@ -502,7 +502,10 @@ pub async fn process_delta(
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
 
-            if let Some(values_ctx) = values_ctx.as_ref() && req.search_type.is_some_and(|search_type| search_type == SearchEventType::Values)
+            if let Some(values_ctx) = values_ctx.as_ref()
+                && req
+                    .search_type
+                    .is_some_and(|search_type| search_type == SearchEventType::Values)
             {
                 let search_stream_span = tracing::info_span!(
                     "src::service::search::stream_execution::process_delta::get_top_k_values",
@@ -698,4 +701,4 @@ async fn send_partial_search_resp(
     }
 
     Ok(())
-} 
+}

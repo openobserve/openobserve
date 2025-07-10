@@ -101,8 +101,6 @@ pub fn is_fixed_querier_route(path: &str) -> bool {
     FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
 }
 
-
-
 #[inline]
 fn remove_base_uri(path: &str) -> &str {
     let base_uri = &crate::get_config().common.base_uri;
@@ -162,6 +160,4 @@ mod tests {
         assert!(!is_fixed_querier_route("/other_route"));
         assert!(is_fixed_querier_route("/summary_other"));
     }
-
-
 }

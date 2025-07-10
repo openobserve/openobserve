@@ -448,7 +448,6 @@ pub struct HttpStreaming {
     pub streaming_enabled: bool,
 }
 
-
 #[derive(EnvConfig)]
 pub struct ReportServer {
     #[env_config(name = "ZO_ENABLE_EMBEDDED_REPORT_SERVER", default = false)]

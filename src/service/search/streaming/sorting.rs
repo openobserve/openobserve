@@ -206,4 +206,4 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
     }
     log::warn!("No suitable sort column found in results");
     None
-} 
+}

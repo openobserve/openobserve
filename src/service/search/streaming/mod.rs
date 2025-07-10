@@ -14,18 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Streaming search functionality
-//! 
+//!
 //! This module contains all the components for handling streaming search requests,
 //! including caching, execution, sorting, and utility functions.
 
 use std::time::Instant;
 
-use config::{
-    meta::{
-        search::{StreamResponses, ValuesEventContext},
-        sql::OrderBy,
-        stream::StreamType,
-    },
+use config::meta::{
+    search::{StreamResponses, ValuesEventContext},
+    sql::OrderBy,
+    stream::StreamType,
 };
 use log;
 use tokio::sync::mpsc;
@@ -39,9 +37,13 @@ use {
     o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
 };
 
-use crate::common::meta::search::{AuditContext, SearchResultType};
-use crate::common::utils::stream::get_max_query_range;
-use crate::service::search::cache as search_cache;
+use crate::{
+    common::{
+        meta::search::{AuditContext, SearchResultType},
+        utils::stream::get_max_query_range,
+    },
+    service::search::cache as search_cache,
+};
 #[cfg(feature = "enterprise")]
 use crate::{
     handler::http::request::search::error_utils::map_error_to_http_response,
@@ -54,12 +56,11 @@ pub mod sorting;
 pub mod utils;
 
 // Re-export commonly used functions for easier access
+#[cfg(feature = "enterprise")]
+pub use cache::write_partial_results_to_cache;
 pub use cache::{handle_cache_responses_and_deltas, write_results_to_cache};
 pub use execution::do_partitioned_search;
 pub use sorting::order_search_results;
-
-#[cfg(feature = "enterprise")]
-pub use cache::write_partial_results_to_cache;
 
 /// Main function to process search stream requests
 #[allow(clippy::too_many_arguments)]
@@ -136,9 +137,15 @@ pub async fn process_search_stream_request(
 
     if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
-        let c_resp = match search_cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
-            .instrument(search_span.clone())
-            .await
+        let c_resp = match search_cache::check_cache_v2(
+            &trace_id,
+            &org_id,
+            stream_type,
+            &req,
+            use_cache,
+        )
+        .instrument(search_span.clone())
+        .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -532,4 +539,4 @@ pub async fn process_search_stream_request(
             "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending completion message to client",
         );
     }
-} 
+}

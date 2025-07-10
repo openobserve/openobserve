@@ -15,35 +15,25 @@
 
 use std::time::Instant;
 
-use config::{
-    meta::{
-        search::{
-            SearchEventType, StreamResponses, TimeOffset,
-            ValuesEventContext,
-        },
-        self_reporting::usage::{RequestStats, UsageType},
-        sql::OrderBy,
-        stream::StreamType,
-    },
+use config::meta::{
+    search::{SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
+    self_reporting::usage::{RequestStats, UsageType},
+    sql::OrderBy,
+    stream::StreamType,
 };
 use log;
 use tokio::sync::mpsc;
 
-use crate::common::meta::search::{
-    CachedQueryResponse, MultiCachedQueryResponse, QueryDelta, SearchResultType,
-};
-use crate::service::{
-    search::cache,
-    self_reporting::report_request_usage_stats,
-};
-
 use super::sorting::order_search_results;
+use crate::{
+    common::meta::search::{
+        CachedQueryResponse, MultiCachedQueryResponse, QueryDelta, SearchResultType,
+    },
+    service::{search::cache, self_reporting::report_request_usage_stats},
+};
 
 /// Write accumulated search results to cache
-#[tracing::instrument(
-    name = "service:search:stream_cache:write_results_to_cache",
-    skip_all
-)]
+#[tracing::instrument(name = "service:search:stream_cache:write_results_to_cache", skip_all)]
 pub async fn write_results_to_cache(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,
@@ -482,4 +472,4 @@ pub async fn write_partial_results_to_cache(
         }
         _ => {}
     }
-} 
+}

@@ -106,7 +106,7 @@ pub fn get_top_k_values(
             if min_heap.len() < top_k as usize {
                 // If heap not full, just add
                 min_heap.push(Reverse((v, k)));
-            } else if (v > min_heap.peek().unwrap().0.0) {
+            } else if v > min_heap.peek().unwrap().0.0 {
                 // If current value is larger than smallest in heap, replace it
                 min_heap.pop();
                 min_heap.push(Reverse((v, k)));
@@ -135,4 +135,4 @@ pub fn get_top_k_values(
     }
 
     Ok((top_k_values, result_count as u64))
-} 
+}
