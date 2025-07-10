@@ -27,6 +27,7 @@ import cronParser from "cron-parser";
 let moment: any;
 let momentInitialized = false;
 const organizationDataLocal: any = ref({});
+export const trialPeriodAllowedPath = ["iam", "users", "organizations"];
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -386,15 +387,15 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       const trialDueDays = getDueDays(
         store.state.organizationData?.organizationSettings?.free_trial_expiry,
       );
-      if (trialDueDays <= 0 && to.path.indexOf("/iam") == -1) {
-        next({ path: "/billings/plans" });
+      if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) == -1) {
+        next({ name: "plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
       }
     }
   }
 
   if (
     to.path.indexOf("/ingestion") == -1 &&
-    to.path.indexOf("/iam") == -1 &&
+    trialPeriodAllowedPath.indexOf(to.name) == -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data == true &&
     store.state.organizationData.isDataIngested == false

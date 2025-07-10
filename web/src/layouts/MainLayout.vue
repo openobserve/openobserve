@@ -485,6 +485,7 @@ import {
   getImageURL,
   invlidateLoginData,
   getDueDays,
+  trialPeriodAllowedPath,
 } from "../utils/zincutils";
 
 import {
@@ -1172,7 +1173,7 @@ export default defineComponent({
 
         if(orgSettings?.data?.data?.free_trial_expiry != null && orgSettings?.data?.data?.free_trial_expiry != "") {
           const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if(trialDueDays <= 0) {
+          if(trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1) {
             router.push({name: "plans", query: {
               org_identifier: selectedOrg.value.identifier,
             },})
