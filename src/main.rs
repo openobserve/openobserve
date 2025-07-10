@@ -1180,12 +1180,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
             .await?;
     }
 
-    #[cfg(feature = "marketplace")]
-    {
-        use crate::self_reporting::search::get_usage;
-        o2_enterprise::enterprise::metering::init(get_usage).await?;
-    }
-
     Ok(())
 }
 
