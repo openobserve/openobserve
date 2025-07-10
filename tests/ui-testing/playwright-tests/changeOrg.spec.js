@@ -1,6 +1,6 @@
 import { test, expect } from "./baseFixtures.js";
 import { LoginPage } from '../pages/loginPage.js';
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 import { IngestionPage } from '../pages/ingestionPage.js';
 import { HomePage } from "../pages/homePage.js";
 import { MetricsPage } from "../pages/metricsPage.js";
@@ -91,10 +91,8 @@ test.describe("Change Organisation", () => {
         multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
         await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
         await homePage.homePageOrg(newOrgName);
-        await logsPage.navigateToLogs();
+        await logsPage.navigateToLogs(multiOrgIdentifier);
         await homePage.homeURLContains(multiOrgIdentifier);
-     
-
     });
 
     test("Metrics Page default validation", async ({ page }) => {
