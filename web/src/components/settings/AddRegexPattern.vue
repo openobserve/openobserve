@@ -173,6 +173,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="regex-pattern-test-string-label">
                             Test Regex Pattern
                         </span>
+                        <div class="tw-h-[19px] tw-flex tw-items-center tw-justify-center tw-font-[600]" style="border-radius: 3px;">
+                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw-px-2 tw-bg-[#5960B2] tw-text-[11px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
+                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
+                        <span>
+                            Test Input
+                        </span>
+                    </q-btn>
+                        </div>
                     </div>
                 </div>
                 <div class="regex-pattern-test-string-container q-mb-sm">
@@ -184,14 +192,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
                     <template #right>
-                        <div class="tw-h-[19px] tw-flex tw-items-center tw-mt-[1px] tw-justify-center">
-                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw-px-2 tw-h-[19px] tw-min-h-[19px] tw-mr-1 tw-bg-[#5960B2] tw-text-white tw-flex tw-items-center tw-justify-center"
-                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
-                        <span>
-                            Test Input
-                        </span>
-                    </q-btn>
-                        </div>
 
                     </template>
                 </FullViewContainer>

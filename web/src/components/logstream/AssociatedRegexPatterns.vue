@@ -221,6 +221,14 @@
                     {{ userClickedPattern.pattern }}
                   </span>
                 </div>
+                <div class="tw-h-[19px] -tw-mb-1 tw-flex tw-items-center tw-justify-end tw-font-[600] " style="border-radius: 3px;">
+                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-bg-[#5960B2] tw-text-[11px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
+                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
+                        <span>
+                            Test Input
+                        </span>
+                    </q-btn>
+                        </div>
                 <div class="regex-pattern-test-string-container">
                     <FullViewContainer
                         name="query"
@@ -229,17 +237,6 @@
                         class="tw-mt-1 tw-py-md tw-h-[24px]"
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
-                    <template #right>
-                        <div class="tw-h-[19px] tw-flex tw-items-center tw-mt-[1px] tw-justify-center tw-cursor-pointer">
-                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-h-[19px] tw-min-h-[19px] tw-mr-1 tw-bg-[#5960B2] tw-text-white tw-flex tw-items-center tw-justify-center"
-                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
-                        <span>
-                            Test Input
-                        </span>
-                    </q-btn>
-                        </div>
-
-                    </template>
                 </FullViewContainer>
                     <div v-if="expandState.regexTestString" class="regex-pattern-input" >
                         <q-input
@@ -824,6 +821,9 @@ export default defineComponent({
       font-size: 12px;
       font-weight: 400;
       line-height: 24px;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
     }
 
 
