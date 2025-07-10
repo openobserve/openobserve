@@ -29,8 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="filterQuery"
               filled
               dense
-             class="col-6 q-pr-sm"
-              style="width: 400px"
+             class="col-6"
               :placeholder="t('organization.search')"
             >
               <template #prepend>
