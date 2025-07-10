@@ -36,7 +36,7 @@ test.describe("Pagination for logs", () => {
     test("HTTP Pagination for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", async ({ page }) => {
 
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
         await page.waitForTimeout(3000); // Wait for query preparation
@@ -53,7 +53,7 @@ test.describe("Pagination for logs", () => {
     test("HTTP Pagination for running query to validate WHERE match_all('zin*')", async ({ page }) => {
 
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("zin*")`);
         await page.waitForTimeout(2000);
@@ -68,7 +68,7 @@ test.describe("Pagination for logs", () => {
     test("HTTP Pagination for running query to validate WHERE match_all('2022-12-27T1*')", async ({ page }) => {
 
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T1*")`);
         await page.waitForTimeout(2000);
@@ -83,7 +83,7 @@ test.describe("Pagination for logs", () => {
     test("HTTP for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", async ({ page }) => {
         
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl") limit 10`);
         await page.waitForTimeout(2000);
@@ -98,7 +98,7 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(5000);
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
         await page.waitForTimeout(2000);
@@ -116,7 +116,7 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(5000);
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("zin*")`);
         await page.waitForTimeout(2000);
@@ -134,7 +134,7 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(5000);
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T1*")`);
         await page.waitForTimeout(2000);
@@ -152,7 +152,7 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(5000);
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:2*")`);
         await page.waitForTimeout(2000);
@@ -170,7 +170,7 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(5000);
         await managementPage.checkStreaming();
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexStreamOld(streamName);
+        await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl") limit 10`);
         await page.waitForTimeout(2000);
