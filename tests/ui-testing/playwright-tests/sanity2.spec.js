@@ -2,7 +2,7 @@ import { test, expect } from './baseFixtures';
 import logData from "../cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 import { toZonedTime } from "date-fns-tz";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
@@ -89,7 +89,7 @@ test.describe("Sanity testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
+    await logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });

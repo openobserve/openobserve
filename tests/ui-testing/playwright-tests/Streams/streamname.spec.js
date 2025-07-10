@@ -26,7 +26,9 @@ test.describe("Stream name casing preservation tests", () => {
     await page.waitForTimeout(5000);
   });
 
-  test("should preserve stream name casing after ingestion and show in stream explorer", async ({ page }) => {
+  test("should preserve stream name casing after ingestion and show in stream explorer", {
+    tag: ['@streamName', '@casing', '@all', '@streams']
+  }, async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const headers = getHeaders();
 

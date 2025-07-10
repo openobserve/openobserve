@@ -17,8 +17,8 @@ const randomDashboardName =
 
 test.describe.configure({ mode: "parallel" });
 
-// Refactored test cases using Page Object Model
 
+// Refactored test cases using Page Object Model
 test.describe("dashboard UI testcases", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);

@@ -89,7 +89,7 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
+const selectStream = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
@@ -243,7 +243,7 @@ test.describe("Pipeline testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await selectStream(page, logData.Stream);
     await applyQueryButton(page);
     //this only be called when no authorization token is present so that the remote will destination will be the same as the environment
     if (AuthorizationToken.length == 0) {

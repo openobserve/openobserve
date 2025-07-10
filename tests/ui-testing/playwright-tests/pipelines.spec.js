@@ -3,7 +3,7 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 
 test.describe.configure({ mode: "parallel" });
@@ -176,7 +176,7 @@ test.describe("Pipeline testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
+    await logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
   });
 
