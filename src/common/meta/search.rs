@@ -93,6 +93,32 @@ impl FromStr for ResultCacheSelectionStrategy {
     }
 }
 
+/// Represents the type of search result (cached or search)
+#[derive(Debug, Clone)]
+pub enum SearchResultType {
+    Cached(Response),
+    Search(Response),
+}
+
+/// Audit context for search operations
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct AuditContext {
+    pub method: String,
+    pub path: String,
+    pub query_params: String,
+    pub body: String,
+}
+
+/// Strategy for sorting search results
+#[derive(Debug, Clone)]
+pub enum SortStrategy {
+    SqlOrderBy,
+    FallbackColumn(String, OrderBy),
+    AutoDetermine(String, bool), // (column, is_string)
+    NoSort,
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::search::Response;

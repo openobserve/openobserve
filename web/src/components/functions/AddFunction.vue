@@ -141,6 +141,7 @@ import {
   watch,
   onUnmounted,
   defineAsyncComponent,
+  nextTick,
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
@@ -466,7 +467,12 @@ end`;
 
     const sendToAiChat = (value: any) => {
       //this is for when user in pipeline add function page and click on ai chat button
-      aiChatInputContext.value = value;
+      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
+      //so to force trigger we do this
+      aiChatInputContext.value = '';
+      nextTick(() => {
+        aiChatInputContext.value = value;
+      });
       store.dispatch("setIsAiChatEnabled", true);
       //this is for when user in functions page and click on ai chat button
       emit("sendToAiChat", value);
