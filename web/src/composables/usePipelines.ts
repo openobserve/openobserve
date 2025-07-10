@@ -22,7 +22,7 @@ export const usePipelines = () => {
           timeout: 2000,
         });
         }
-       
+       return [];
       }
     }
     const getPipelineDestinations = async () => {

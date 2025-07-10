@@ -1535,8 +1535,18 @@ export default defineComponent({
       });
       let streamList = [];
       if(!streams.value[jsonPayload.stream_type]){
-        const response: any = await getStreams(jsonPayload.stream_type,false);
-        streams.value[jsonPayload.stream_type] = response.list;
+        try{
+          const response: any = await getStreams(jsonPayload.stream_type,false);
+          streams.value[jsonPayload.stream_type] = response.list;
+        }catch(err: any){
+          if(err.response.status !== 403){
+            q.notify({
+              type: "negative",
+              message: err.response?.data?.message || "Error fetching streams",
+              timeout: 3000,
+            });
+          }
+        }
       }
       streams.value[jsonPayload.stream_type].forEach((stream: any) => {
         streamList.push(stream.name);
@@ -1606,7 +1616,7 @@ export default defineComponent({
       if(!isAggregationEnabled.value){
         payload.query_condition.aggregation = null;
       }
-      if(payload.context_attributes.length == 0){
+      if(Array.isArray(payload.context_attributes) && payload.context_attributes.length == 0){
         payload.context_attributes = {};
       }
       

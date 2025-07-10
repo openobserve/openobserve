@@ -175,7 +175,7 @@ interface QueryCondition {
   
           // Validate multi_time_range for custom type
           if (alert.query_condition.multi_time_range !== null && 
-              (!Array.isArray(alert.query_condition.multi_time_range) || alert.query_condition.multi_time_range.length > 0)) {
+              (!Array.isArray(alert.query_condition.multi_time_range) || alert.query_condition.multi_time_range.length !== 0)) {
             result.errors.push('Multi Time Range should be an empty array or null');
           }
   

@@ -912,7 +912,6 @@ const findMissingEdges = () => {
   });
 
   if (unconnectedNodes.length > 0) {
-    console.log(unconnectedNodes, "unconnectedNodes");
     return true; // There are unconnected nodes
   }
 
@@ -1012,7 +1011,6 @@ const savePipelineJson = async (json: string) => {
     
     // Only save if validation passes
     pipelineObj.currentSelectedPipeline = parsedPipeline;
-    console.log('pipelineObj.currentSelectedPipeline', pipelineObj.currentSelectedPipeline)
     savePipeline();
   } catch (error) {
     console.log(error, 'error')
