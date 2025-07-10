@@ -188,13 +188,26 @@ export class LogsPage {
     }
 
     async selectIndexStream(streamName) {
-        await this.page.locator(this.indexDropDown).click();
-        await this.page.locator(this.streamToggle).click();
+        try {
+            await this.page.locator(this.indexDropDown).click();
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.streamToggle).click();
+        } catch (error) {
+            console.log(`[DEBUG] Failed to select stream with default method, trying alternative approach`);
+            // Fallback to the old method
+            await this.selectIndexStreamOld(streamName);
+        }
     }
 
     async selectStream(stream) {
         await this.page.locator(this.indexDropDown).click();
         await this.page.getByText(stream, { exact: true }).first().click();
+    }
+
+    async selectIndexStreamOld(streamName) {
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await this.page.waitForTimeout(3000);
+        await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first().click();
     }
 
     // Helper method to ensure query editor is ready
