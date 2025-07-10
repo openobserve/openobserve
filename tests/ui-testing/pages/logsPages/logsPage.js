@@ -188,12 +188,18 @@ export class LogsPage {
     }
 
     async selectIndexStream(streamName) {
+        console.log(`[DEBUG] selectIndexStream: Starting selection for stream: ${streamName}`);
         try {
+            await this.page.locator(this.indexDropDown).waitFor({ timeout: 10000 });
             await this.page.locator(this.indexDropDown).click();
+            console.log(`[DEBUG] selectIndexStream: Clicked dropdown`);
             await this.page.waitForTimeout(2000);
+            
+            await this.page.locator(this.streamToggle).waitFor({ timeout: 10000 });
             await this.page.locator(this.streamToggle).click();
+            console.log(`[DEBUG] selectIndexStream: Successfully selected stream with default method`);
         } catch (error) {
-            console.log(`[DEBUG] Failed to select stream with default method, trying alternative approach`);
+            console.log(`[DEBUG] Failed to select stream with default method, trying alternative approach: ${error.message}`);
             // Fallback to the old method
             await this.selectIndexStreamOld(streamName);
         }
@@ -205,9 +211,22 @@ export class LogsPage {
     }
 
     async selectIndexStreamOld(streamName) {
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-        await this.page.waitForTimeout(3000);
-        await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first().click();
+        console.log(`[DEBUG] selectIndexStreamOld: Starting selection for stream: ${streamName}`);
+        try {
+            await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+            console.log(`[DEBUG] selectIndexStreamOld: Clicked dropdown`);
+            await this.page.waitForTimeout(2000);
+            
+            const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${streamName}"] div`;
+            console.log(`[DEBUG] selectIndexStreamOld: Looking for selector: ${streamToggleSelector}`);
+            
+            await this.page.waitForSelector(streamToggleSelector, { timeout: 10000 });
+            await this.page.locator(streamToggleSelector).first().click();
+            console.log(`[DEBUG] selectIndexStreamOld: Successfully selected stream: ${streamName}`);
+        } catch (error) {
+            console.log(`[DEBUG] selectIndexStreamOld: Failed to select stream ${streamName}: ${error.message}`);
+            throw error;
+        }
     }
 
     // Helper method to ensure query editor is ready
