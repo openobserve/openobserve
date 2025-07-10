@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @popup-hide="isDestinationDropdownOpen = false"
                 >
                   <q-tooltip
-                    v-if="!isDestinationDropdownOpen && destinations.length > 0"
+                    v-if="!isDestinationDropdownOpen && destinations?.length > 0"
                     anchor="top middle"
                     self="bottom middle"
                     :offset="[0, 8]"

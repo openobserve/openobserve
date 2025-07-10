@@ -1656,6 +1656,10 @@ export default defineComponent({
       cancelTraceId,
       cancelFilterCreator,
       selectedStream,
+      getFilterExpressionByFieldType,
+      addTraceId,
+      removeTraceId,
+      traceIdMapper,
     };
   },
 });

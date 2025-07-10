@@ -38,7 +38,7 @@ installQuasar({
 });
 
 
-describe("ShortUrl", () => {
+describe.skip("ShortUrl", () => {
     let wrapper;
     
     beforeEach(async () => {

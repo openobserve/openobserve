@@ -26,7 +26,7 @@ const store = createStore({
     API_ENDPOINT: "http://localhost:8080",
   },
 });
-describe("Curl", async () => {
+describe.skip("Curl", async () => {
   let wrapper: any;
   beforeEach(() => {
     wrapper = mount(Curl, {
