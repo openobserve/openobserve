@@ -17,7 +17,10 @@
           :class="store.state.theme === 'dark' ? 'dark-theme-regex-pattern-list' : 'light-theme-regex-pattern-list'"
         >
         <template #no-data>
-          <NoRegexPatterns v-if="!listLoading" @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
+          <NoRegexPatterns v-if="!listLoading && filterQuery == ''" @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
+          <div v-else-if="!listLoading && filterQuery != ''" class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
+            <NoData />
+          </div>
           <div v-else class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
             <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
 
@@ -175,6 +178,7 @@
     import AddRegexPattern from "./AddRegexPattern.vue";
     import ImportRegexPattern from "./ImportRegexPattern.vue";
     import config from "@/aws-exports";
+    import NoData from "@/components/shared/grid/NoData.vue";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -183,7 +187,8 @@
             NoRegexPatterns,
             ConfirmDialog,
             AddRegexPattern,
-            ImportRegexPattern
+            ImportRegexPattern,
+            NoData
         },
     setup() {
 
