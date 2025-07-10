@@ -28,13 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("reports.header") }}
       </div>
 
-      <div class="tw-flex tw-items-center report-list-tabs">
+      <div class="tw-flex tw-items-center">
+        <div class="app-tabs-container q-mr-md">
         <app-tabs
-          class="q-mr-md"
+          class="tabs-selection-container"
           :tabs="tabs"
+          :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
           v-model:active-tab="activeTab"
           @update:active-tab="filterReports"
         />
+        </div>
         <q-input
           data-test="report-list-search-input"
           v-model="filterQuery"
