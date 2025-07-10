@@ -728,13 +728,12 @@ fn handle_histogram(
     q_time_range: Option<(i64, i64)>,
     histogram_interval: i64,
 ) {
-    let caps = match RE_HISTOGRAM.captures(origin_sql.as_str()) {
-        Some(caps) => caps,
-        None => {
-            log::warn!("No histogram found in query");
-            return;
-        }
+    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
+        caps
+    } else {
+        return;
     };
+
     let interval = if histogram_interval > 0 {
         format!("{} seconds", histogram_interval)
     } else {
