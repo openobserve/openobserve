@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 24] = [
+const QUERIER_ROUTES: [(&str, usize); 23] = [
     ("config", 0),                            // /config
     ("summary", 2),                           // /api/{org_id}/summary
     ("organizations", 1),                     // /api/organizations
@@ -24,7 +24,6 @@ const QUERIER_ROUTES: [(&str, usize); 24] = [
     ("traces/latest", 3),                     // /api/{org_id}/{stream_name}/traces/latest
     ("clusters", 1),                          // /api/clusters
     ("query_manager", 2),                     // /api/{org_id}/query_manager/...
-    ("ws", 2),                                // /api/{org_id}/ws
     ("_search", 2),                           // /api/{org_id}/_search
     ("_search_stream", 2),                    // /api/{org_id}/_search_stream
     ("_values_stream", 2),                    // /api/{org_id}/_values_stream
@@ -103,22 +102,6 @@ pub fn is_fixed_querier_route(path: &str) -> bool {
 }
 
 #[inline]
-pub fn is_ws_route(path: &str) -> bool {
-    let path = remove_base_uri(path);
-    let mut segments = path.split('/').filter(|s| !s.is_empty());
-    // Skip first 3 segments
-    for _ in 0..3 {
-        if segments.next().is_none() {
-            return false;
-        }
-    }
-    segments.next() == Some("ws")
-        && INGESTER_ROUTES
-            .iter()
-            .all(|ingest_route| !path.ends_with(ingest_route))
-}
-
-#[inline]
 fn remove_base_uri(path: &str) -> &str {
     let base_uri = &crate::get_config().common.base_uri;
     if base_uri.is_empty() {
@@ -176,17 +159,5 @@ mod tests {
 
         assert!(!is_fixed_querier_route("/other_route"));
         assert!(is_fixed_querier_route("/summary_other"));
-    }
-
-    #[test]
-    fn test_is_ws_route() {
-        // Valid WS routes
-        assert!(is_ws_route("/api/org1/stream1/ws"));
-        assert!(is_ws_route("/api/org1/stream1/ws/"));
-
-        // Invalid WS routes
-        assert!(!is_ws_route("/ws")); // Missing org and stream
-        assert!(!is_ws_route("/api/org1/ws")); // Missing stream
-        assert!(!is_ws_route("/api/org1/stream1/ws/_json")); // Contains ingester route
     }
 }

@@ -2675,25 +2675,6 @@ mod tests {
         .await
     }
 
-    // Tests for routes defined in handler::http::request::websocket.
-
-    #[tokio::test]
-    async fn websocket() {
-        test_auth(
-            Method::GET,
-            format!("api{ORG_ID}/ws/{WS_REQUEST_ID}"),
-            AuthExtractor {
-                auth: AUTH_HEADER_VAL.to_string(),
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
     // Tests for routes defined in handler::http::request::actions.
 
     #[tokio::test]
@@ -3000,16 +2981,6 @@ mod tests {
                 tls_cert_path: String::default(),
                 tls_key_path: String::default(),
             },
-            websocket: config::WebSocket {
-                enabled: bool::default(),
-                session_idle_timeout_secs: i64::default(),
-                ping_interval_secs: i64::default(),
-                max_frame_size: usize::default(),
-                max_continuation_size: usize::default(),
-                max_channel_buffer_size: usize::default(),
-                streaming_response_chunk_size: usize::default(),
-                streaming_enabled: bool::default(),
-            },
             route: config::Route {
                 timeout: u64::default(),
                 max_connections: usize::default(),
@@ -3139,8 +3110,6 @@ mod tests {
                 feature_ingester_none_compression: bool::default(),
                 meta_ddl_dsn: Default::default(),
                 format_stream_name_to_lower: Default::default(),
-                websocket_enabled: Default::default(),
-                websocket_close_frame_delay: Default::default(),
                 file_list_dump_enabled: Default::default(),
                 file_list_dump_dual_write: Default::default(),
                 file_list_dump_min_hour: Default::default(),
