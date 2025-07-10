@@ -404,7 +404,7 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
-    pub websocket: WebSocket,
+    pub http_streaming: HttpStreaming,
     pub report_server: ReportServer,
     pub http: Http,
     pub grpc: Grpc,
@@ -433,31 +433,7 @@ pub struct Config {
 }
 
 #[derive(EnvConfig)]
-pub struct WebSocket {
-    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
-    pub enabled: bool,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_IDLE_TIMEOUT_SECS", default = 300)]
-    pub session_idle_timeout_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
-    pub ping_interval_secs: i64,
-    #[env_config(
-        name = "ZO_WEBSOCKET_MAX_FRAME_SIZE",
-        default = 1,
-        help = "Maximum allowed frame size in MB"
-    )]
-    pub max_frame_size: usize,
-    #[env_config(
-        name = "ZO_WEBSOCKET_MAX_CONTINUATION_SIZE",
-        default = 256,
-        help = "Maximum allowed continuation size in MB"
-    )]
-    pub max_continuation_size: usize,
-    #[env_config(
-        name = "ZO_WEBSOCKET_CHANNEL_BUFFER_SIZE",
-        default = 100,
-        help = "Maximum allowed number of messages in buffer"
-    )]
-    pub max_channel_buffer_size: usize,
+pub struct HttpStreaming {
     #[env_config(
         name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
         default = 1,
@@ -1077,8 +1053,6 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
-    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
-    pub websocket_enabled: bool,
     #[env_config(name = "ZO_ES_VERSION", default = "")]
     pub es_version: String,
     #[env_config(
@@ -1093,8 +1067,6 @@ pub struct Common {
         help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
     )]
     pub org_invite_expiry: u32,
-    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
-    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,

@@ -1282,7 +1282,12 @@ export default defineComponent({
 
     const sendToAiChat = (value: any) => {
       store.dispatch("setIsAiChatEnabled", true);
-      aiChatInputContext.value = value;
+      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
+      //so to force trigger we do this
+      aiChatInputContext.value = '';
+      nextTick(() => {
+        aiChatInputContext.value = value;
+      });
     }
 
     return {

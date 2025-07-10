@@ -425,7 +425,6 @@ export default {
                 start_time: props.value._timestamp - 10 * 60 * 1000,
                 sql: `SELECT _original FROM "${props.streamName ? props.streamName : searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
                 end_time: props.value._timestamp + 10 * 60 * 1000,
-                sql_mode: "full",
                 size: 1,
                 from: 0,
                 quick_mode: false,
@@ -505,9 +504,9 @@ export default {
       return t("common.addFieldToTable");
     };
 
-    const sendToAiChat = (key: string, value: string) => {
+    const sendToAiChat = (value: string) => {
       emit("closeTable");
-      emit("sendToAiChat", key, value);
+      emit("sendToAiChat", value);
     };
 
     const getBtnLogo = computed(() => {
