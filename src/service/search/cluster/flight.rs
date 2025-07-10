@@ -55,7 +55,8 @@ use crate::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
                 distributed_plan::{
-                    EmptyExecVisitor, remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter,
+                    EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
+                    rewrite::RemoteScanRewriter,
                 },
                 exec::{prepare_datafusion_context, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
@@ -462,6 +463,8 @@ pub async fn run_datafusion(
     let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
+
+    // rewrite physical plan
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes.into_arc_vec(),
@@ -474,10 +477,20 @@ pub async fn run_datafusion(
         false, // for super cluster
         context,
     );
-    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+
+    // if there is only one table and single node, we can skip the remote scan rewrite
+    let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
+    physical_plan.visit(&mut empty_exec_count_visitor)?;
+    let empty_exec_count = empty_exec_count_visitor.get_count();
+    let is_changed = if empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node() {
+        false
+    } else {
+        physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+        rewrite.is_changed
+    };
 
     // add remote scan exec to top if physical plan is not changed
-    if !rewrite.is_changed {
+    if !is_changed {
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
