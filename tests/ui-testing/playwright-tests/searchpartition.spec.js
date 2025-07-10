@@ -63,28 +63,11 @@ test.describe("Search Partition Tests", () => {
 
   test.beforeEach(async ({ page }) => {
     logsPage = await setupTest(page);
-    console.log("[DEBUG] Login complete");
     await ingestTestData(page);
-    console.log("[DEBUG] Ingestion complete");
     await page.waitForTimeout(2000);
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    console.log("[DEBUG] Navigation to logs page complete");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
-    console.log("[DEBUG] Stream selected"); 
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQuery(page);
-    console.log("[DEBUG] Initial query applied");
-
-    // Add network request/response logging
-    page.on('request', request => {
-      if (request.url().includes('/api/e2e_automate/_search') || request.url().includes('/api/default/_search_partition')) {
-        console.log('[DEBUG] Request sent:', request.method(), request.url());
-      }
-    });
-    page.on('response', response => {
-      if (response.url().includes('/api/e2e_automate/_search') || response.url().includes('/api/default/_search_partition')) {
-        console.log('[DEBUG] Response received:', response.status(), response.url());
-      }
-    });
   });
 
   test("should verify search partition and search API calls for histogram query", async ({ page }) => {
@@ -93,17 +76,11 @@ test.describe("Search Partition Tests", () => {
     
     // Setup and execute query
     await logsPage.executeHistogramQuery(histogramQuery);
-    console.log("[DEBUG] Histogram query executed");
     await logsPage.toggleHistogramAndExecute();
-    console.log("[DEBUG] Histogram toggled and executed");
 
     if (!isStreamingEnabled) {
-      // Verify search partition response using robust pattern
-      console.log("[DEBUG] About to wait for /api/default/_search_partition and click Run Query");
-      const partitionPromise = logsPage.verifySearchPartitionResponse();
-      await logsPage.clickRunQueryButton();
-      const searchPartitionData = await partitionPromise;
-      console.log("[DEBUG] Partition response received");
+      // Verify search partition response
+      const searchPartitionData = await logsPage.verifySearchPartitionResponse();
       const searchCalls = await logsPage.captureSearchCalls();
       
       expect(searchCalls.length).toBe(searchPartitionData.partitions.length);
@@ -118,45 +95,12 @@ test.describe("Search Partition Tests", () => {
         expect(matchingCall.sql).toContain('SELECT histogram(_timestamp');
       }
     } else {
-      // Log streaming toggle state
-      const streamingToggleSelector = '[data-test="general-settings-enable-streaming"] input[type="checkbox"]';
-      const toggleExists = await page.locator(streamingToggleSelector).count();
-      if (toggleExists) {
-        const streamingEnabled = await page.isChecked(streamingToggleSelector);
-        console.log("[DEBUG] Streaming toggle checked:", streamingEnabled);
-      } else {
-        console.log("[DEBUG] Streaming toggle not found on page.");
-      }
-
-      // Log selected stream
-      const streamSelector = '[data-test="log-search-index-list-select-stream"]';
-      let selectedStream = "";
-      try {
-        selectedStream = await page.locator(streamSelector).inputValue();
-      } catch (e) {
-        selectedStream = await page.locator(streamSelector).textContent();
-      }
-      console.log("[DEBUG] Selected stream:", selectedStream);
-
-      // Log query editor value
-      const queryEditorSelector = '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar-query-editor"] input';
-      let queryValue = "";
-      try {
-        queryValue = await page.locator(queryEditorSelector).inputValue();
-      } catch (e) {
-        queryValue = await page.locator('[data-test="logs-search-bar-query-editor"]').textContent();
-      }
-      console.log("[DEBUG] Query editor value:", queryValue);
-
-      console.log("[DEBUG] About to click Run Query and wait for /api/e2e_automate/_search");
       await logsPage.clickRunQueryButton();
       await logsPage.verifyStreamingModeResponse();
-      console.log("[DEBUG] Streaming mode response received");
     }
 
     // Verify histogram state
     await logsPage.verifyHistogramState();
-    console.log("[DEBUG] Histogram state verified");
   });
 });
 

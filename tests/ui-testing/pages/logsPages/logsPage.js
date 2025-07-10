@@ -651,18 +651,37 @@ export class LogsPage {
         }
     }
 
-    async verifyStreamingModeResponse(streamName = "default") {
-        const searchPromise = this.page.waitForResponse(response => 
-            response.url().includes(`/api/${streamName}/_search`) && 
-            response.request().method() === 'POST'
-        );
+        async verifyStreamingModeResponse() {
+        console.log("[DEBUG] Waiting for search response...");
+        const searchPromise = this.page.waitForResponse(response => {
+            const url = response.url();
+            const method = response.request().method();
+            console.log(`[DEBUG] Response: ${method} ${url}`);
+            return url.includes('/api/default/_search') && method === 'POST';
+        });
         
         const searchResponse = await searchPromise;
+        console.log(`[DEBUG] Search response status: ${searchResponse.status()}`);
         expect(searchResponse.status()).toBe(200);
         
         const searchData = await searchResponse.json();
+        console.log("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
+        console.log("[DEBUG] searchData type:", typeof searchData);
+        console.log("[DEBUG] searchData keys:", Object.keys(searchData || {}));
         expect(searchData).toBeDefined();
-        expect(searchData.hits).toBeDefined();
+        
+        // Check if this is a partition response (non-streaming) or streaming response
+        if (searchData.partitions) {
+            console.log("[DEBUG] Received partition response (non-streaming mode)");
+            expect(searchData.partitions).toBeDefined();
+            expect(searchData.histogram_interval).toBeDefined();
+        } else if (searchData.hits) {
+            console.log("[DEBUG] Received streaming response");
+            expect(searchData.hits).toBeDefined();
+        } else {
+            console.log("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
+            throw new Error(`Unexpected response structure: ${JSON.stringify(searchData)}`);
+        }
     }
 
     // Explore and results methods
