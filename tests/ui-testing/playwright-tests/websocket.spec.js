@@ -1,6 +1,6 @@
 import { test, expect } from "./baseFixtures";
 import { LoginPage } from '../pages/loginPage';
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 import { IngestionPage } from '../pages/ingestionPage';
 import { ManagementPage } from '../pages/managementPage';
 

@@ -1,6 +1,6 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -97,7 +97,7 @@ test.describe("Stream multiselect testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
+    await logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
     await logsPage.clickQuickModeToggle();
 
