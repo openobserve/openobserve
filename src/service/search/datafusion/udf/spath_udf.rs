@@ -66,11 +66,10 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
                 // in arrow, any value can be null.
                 // Here we decide to make our UDF to return null when either argument is null.
                 (Some(field), Some(path)) => {
-                    if field.is_empty() {
-                        return None;
-                    }
-                    let mut field: json::Value =
-                        json::from_str(field).expect("Failed to deserialize spath field1");
+                    let mut field: json::Value = match json::from_str(field) {
+                        Ok(value) => value,
+                        Err(_) => return None,
+                    };
                     let mut found = true;
                     let paths = path.split('.').collect::<Vec<&str>>();
                     for path in paths.into_iter() {
