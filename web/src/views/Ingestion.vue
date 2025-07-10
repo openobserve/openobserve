@@ -329,8 +329,8 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (
-        !store.state.organizationData.organizationPasscode ||
-        !store.state.organizationData.rumToken.rum_token
+        (!store.state.organizationData.organizationPasscode ||
+        !store.state.organizationData.rumToken.rum_token) && store.state.selectedOrganization.identifier != undefined
       ) {
         getOrganizationPasscode();
         getRUMToken();

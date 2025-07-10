@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
-            v-if="props.row.enableEdit && props.row.status != 'pending'"
+            v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -524,7 +524,20 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
+
       if (isEnterprise.value) {
+      //for cloud
+      //should allow delete for all users when it is root and also when the row user is not root 
+      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if(config.isCloud == 'true'){
+          return (
+            user.role !== "root" &&
+            (currentUserRole.value == "root" ||
+              currentUserRole.value == "admin") &&
+              store.state.userInfo.email !== user.email
+
+          );
+        }
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
