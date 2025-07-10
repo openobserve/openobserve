@@ -14,18 +14,22 @@ test.describe("Streaming for logs", () => {
         await streamsPage.ingestion();
         await streamsPage.ingestionJoin();
         await streamsPage.goToManagement();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(3000); // Reduced from 5000
         await streamsPage.checkStreaming();
     });
 
-    test("Run query after selecting two streams after enabling streaming", async ({ page }) => {
+    test("Run query after selecting two streams after enabling streaming", {
+        tag: ['@streaming', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.displayTwoStreams();
         await streamsPage.selectRunQuery();
     });
 
-    test("Enable Streaming for running query after selecting two streams and SQL Mode On", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams and SQL Mode On", {
+        tag: ['@streaming', '@sqlMode', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
        // await streamsPage.enableSQLMode();
@@ -33,7 +37,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.displayTwoStreams();
     });
 
-    test("Enable Streaming for running query after selecting two streams, selecting field and SQL Mode On", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams, selecting field and SQL Mode On", {
+        tag: ['@streaming', '@sqlMode', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.kubernetesContainerName();
@@ -42,26 +48,35 @@ test.describe("Streaming for logs", () => {
         await streamsPage.validateResult();
     });
 
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join queries", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join queries", {
+        tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.kubernetesContainerNameJoin();
        // await streamsPage.enableSQLMode();
         await streamsPage.selectRunQuery();
+        await page.waitForTimeout(3000); // Wait for query results
         await streamsPage.displayCountQuery();
+        await page.waitForTimeout(3000); // Wait for query results
         await streamsPage.validateResult();
     });
 
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join limit", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join limit", {
+        tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.kubernetesContainerNameJoinLimit();
        // await streamsPage.enableSQLMode();
         await streamsPage.selectRunQuery();
+        await page.waitForTimeout(3000); // Wait for query results
         await streamsPage.validateResult();
     });
 
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join like", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join like", {
+        tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.kubernetesContainerNameJoinLike();
@@ -70,7 +85,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.validateResult();
     });
 
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Left join queries", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Left join queries", {
+        tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.kubernetesContainerNameLeftJoin();
@@ -79,7 +96,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.validateResult();
     });
 
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Right join queries", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Right join queries", {
+        tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.kubernetesContainerNameRightJoin();
@@ -88,7 +107,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.validateResult();
     });
 
-    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Full join queries", async ({ page }) => {
+    test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Full join queries", {
+        tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.kubernetesContainerNameFullJoin();
@@ -97,7 +118,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.validateResult();
     });
 
-    test("Enable Streaming for clicking on interesting field icon and display field in editor", async ({ page }) => {
+    test("Enable Streaming for clicking on interesting field icon and display field in editor", {
+        tag: ['@streaming', '@interestingFields', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.enableSQLMode();
@@ -107,7 +130,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.validateInterestingFields();
     });
 
-    test("Enable Streaming for clicking on interesting field icon and display query in editor", async ({ page }) => {
+    test("Enable Streaming for clicking on interesting field icon and display query in editor", {
+        tag: ['@streaming', '@interestingFields', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
         await streamsPage.enableSQLMode();
@@ -117,7 +142,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.validateInterestingFieldsQuery();
     });
 
-    test("Enable Streaming for Adding or removing interesting field removes it from editor and results too", async ({ page }) => {
+    test("Enable Streaming for Adding or removing interesting field removes it from editor and results too", {
+        tag: ['@streaming', '@interestingFields', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexAndStreamJoin();
        // await streamsPage.enableSQLMode();
@@ -127,7 +154,9 @@ test.describe("Streaming for logs", () => {
         await streamsPage.addRemoveInteresting();
     });
 
-    test("Streaming enabled histogram is disabled and run query, results appear and then user switches on Histogram, getting error", async ({ page }) => {
+    test("Streaming enabled histogram is disabled and run query, results appear and then user switches on Histogram, getting error", {
+        tag: ['@streaming', '@histogram', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexStreamDefault();
         await streamsPage.selectRunQuery();
@@ -145,13 +174,15 @@ test.describe("Streaming for logs", () => {
         await expect(errorDetailsButton).not.toBeVisible();
     });
 
-    test("No Histogram should be displayed if Data is not available", async ({ page }) => {
+    test("No Histogram should be displayed if Data is not available", {
+        tag: ['@streaming', '@histogram', '@all', '@streams']
+    }, async ({ page }) => {
         await streamsPage.navigateToLogs();
         await streamsPage.selectIndexStreamDefault();
         await streamsPage.enableSQLMode();
         await streamsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 201');
         await page.waitForTimeout(1000);
         await streamsPage.selectRunQuery();
-        await streamsPage.waitForSearchResultAndCheckText('warning No data found for histogram.');
+        await streamsPage.expectNoDataFoundForHistogram();
     });
 }); 

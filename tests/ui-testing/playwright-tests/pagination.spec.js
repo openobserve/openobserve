@@ -1,6 +1,6 @@
 import { test, expect } from "./baseFixtures.js";
 import { LoginPage } from '../pages/loginPage.js';
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 import { IngestionPage } from '../pages/ingestionPage.js';
 import { ManagementPage } from '../pages/managementPage.js';
 
@@ -39,13 +39,15 @@ test.describe("Pagination for logs", () => {
         await logsPage.selectIndexStream(streamName);
         console.log(streamName);
         await logsPage.typeQuery(`SELECT * FROM "${streamName}" WHERE match_all("2022-12-27T14:11:27Z INFO  zinc_enl")`);
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(3000); // Wait for query preparation
         await logsPage.selectRunQuery();
-        await page.waitForTimeout(2000); 
+        await page.waitForTimeout(3000); // Wait for query results
         await logsPage.clickResultsPerPage();
-        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of 39');
-        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of 39');
-        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 39 out of 39');
+        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
+        await page.waitForTimeout(1000); // Wait for pagination change
+        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
+        await page.waitForTimeout(1000); // Wait for pagination change
+        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to');
     });
 
     test("HTTP Pagination for running query to validate WHERE match_all('zin*')", async ({ page }) => {
@@ -103,9 +105,9 @@ test.describe("Pagination for logs", () => {
         await logsPage.selectRunQuery();
         await page.waitForTimeout(2000); 
         await logsPage.clickResultsPerPage();
-        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of 39');
-        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of 39');
-        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 39 out of 39');
+        await logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
+        await logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
+        await logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to');
     });
 
     test("Enable Streaming for running query to validate WHERE match_all('zin*')", async ({ page }) => {

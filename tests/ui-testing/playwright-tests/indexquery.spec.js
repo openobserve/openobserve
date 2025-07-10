@@ -16,7 +16,7 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
+const selectStream = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page.locator('[data-test="log-search-index-list-select-stream"]').click({ force: true });
   await page.locator("div.q-item").getByText(`${stream}`).first().click({ force: true });
@@ -91,7 +91,7 @@ test.describe("Compare SQL query execution times", () => {
     console.log(response);
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await selectStream(page, logData.Stream);
     await applyQueryButton(page);
   });
 
