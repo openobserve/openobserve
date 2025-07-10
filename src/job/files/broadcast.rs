@@ -30,8 +30,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
             q.drain(..).collect::<Vec<_>>()
         };
-        if let Err(e) = broadcast::send(&files, None).await {
-            log::error!("[broadcast] local queue to nodes error: {}", e);
+        if let Err(e) = broadcast::send(&files).await {
+            log::error!("[broadcast] local queue to nodes error: {e}");
         }
     }
     log::info!("job::files::broadcast is stopped");

@@ -24,7 +24,7 @@ use {
     crate::service::search_jobs::{get_result, merge_response},
     crate::{
         common::{
-            meta::{self, http::HttpResponse as MetaHttpResponse},
+            meta::http::HttpResponse as MetaHttpResponse,
             utils::http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_stream_type_from_request, get_use_cache_from_request,
@@ -46,6 +46,11 @@ use {
     infra::table::entity::search_jobs::Model as JobModel,
     tracing::Span,
 };
+
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::error_utils::map_error_to_http_response;
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 
 // 1. submit
 /// SearchSQL
@@ -101,13 +106,31 @@ pub async fn submit_job(
             .unwrap_or("")
             .to_string();
 
+        #[cfg(feature = "cloud")]
+        {
+            match is_org_in_free_trial_period(&org_id).await {
+                Ok(false) => {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        format!("org {org_id} has expired its trial period"),
+                    )));
+                }
+                Err(e) => {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        e.to_string(),
+                    )));
+                }
+                _ => {}
+            }
+        }
+
         let query = match web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) {
             Ok(q) => q,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
         let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-        let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
         // handle encoding for query and aggs
         let mut req: config::meta::search::Request = match json::from_slice(&body) {
             Ok(v) => v,
@@ -116,7 +139,14 @@ pub async fn submit_job(
         if let Err(e) = req.decode() {
             return Ok(MetaHttpResponse::bad_request(e));
         }
-        req.use_cache = Some(use_cache);
+
+        if let Ok(sql) =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
+        {
+            req.query.sql = sql;
+        };
+
+        req.use_cache = get_use_cache_from_request(&query);
 
         // update timeout
         if req.timeout == 0 {
@@ -136,12 +166,7 @@ pub async fn submit_job(
         let stream_names = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
-                return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        e.to_string(),
-                    ),
-                ));
+                return Ok(map_error_to_http_response(&e.into(), Some(trace_id)));
             }
         };
 
@@ -175,7 +200,7 @@ pub async fn submit_job(
                 "[Job_Id: {job_id}] Search Job submitted successfully."
             ))),
             Err(err) => {
-                log::error!("[trace_id {trace_id}] sumbit query error: {}", err);
+                log::error!("[trace_id {trace_id}] sumbit query error: {err}");
                 Ok(MetaHttpResponse::internal_error(err.to_string()))
             }
         }
@@ -432,10 +457,9 @@ pub async fn get_job_result(
             return Ok(res);
         }
 
-        if model.error_message.is_some() {
+        if let Some(msg) = model.error_message {
             Ok(MetaHttpResponse::ok(format!(
-                "job_id: {job_id} error: {}",
-                model.error_message.unwrap()
+                "job_id: {job_id} error: {msg}",
             )))
         } else if model.status == 1 && model.partition_num != Some(1) {
             let response = get_partition_result(&model, from, size).await;
@@ -445,8 +469,8 @@ pub async fn get_job_result(
                 "[Job_Id: {job_id}] don't have result_path or cluster"
             )))
         } else {
-            let path = model.result_path.clone().unwrap();
-            let cluster = model.cluster.clone().unwrap();
+            let path = model.result_path.unwrap();
+            let cluster = model.cluster.unwrap();
             let response = get_result(&path, &cluster, from, size).await;
             if let Err(e) = response {
                 return Ok(MetaHttpResponse::internal_error(e));
@@ -640,10 +664,10 @@ async fn cancel_job_inner(
 
     // 3. use job_id to make background_partition_job cancel
     let status = status.unwrap();
-    if status == 1 {
-        if let Err(e) = cancel_partition_job(job_id).await {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
+    if status == 1
+        && let Err(e) = cancel_partition_job(job_id).await
+    {
+        return Ok(MetaHttpResponse::bad_request(e));
     }
 
     // 4. use cancel query function to cancel the query

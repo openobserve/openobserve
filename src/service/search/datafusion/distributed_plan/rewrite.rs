@@ -15,26 +15,24 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
+use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode};
 use datafusion::{
     common::{
         Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
-    physical_expr::LexOrdering,
+    physical_expr::{LexOrdering, utils::collect_columns},
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        aggregates::AggregateExec,
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use proto::cluster_rpc::KvItem;
 
-use super::{
-    empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
-    streaming_aggs_exec,
-};
+use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
 use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
@@ -49,11 +47,10 @@ impl RemoteScanRewriter {
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-        idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimizer_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -62,11 +59,10 @@ impl RemoteScanRewriter {
                 req,
                 nodes,
                 file_id_lists,
-                idx_file_list,
                 equal_keys,
                 match_all_keys,
                 index_condition,
-                index_optimizer_mode,
+                index_optimize_mode,
                 is_leader,
                 opentelemetry_context,
             ),
@@ -191,44 +187,43 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
     }
 }
 
-pub struct StreamingAggsRewriter {
-    id: String,
-    start_time: i64,
-    end_time: i64,
+pub struct GroupByFieldVisitor {
+    group_by_fields: HashSet<String>,
 }
 
-impl StreamingAggsRewriter {
-    pub fn new(id: String, start_time: i64, end_time: i64) -> Self {
+impl GroupByFieldVisitor {
+    pub fn new() -> Self {
         Self {
-            id,
-            start_time,
-            end_time,
+            group_by_fields: HashSet::new(),
         }
+    }
+
+    pub fn get_group_by_fields(&self) -> Vec<String> {
+        self.group_by_fields.iter().cloned().collect()
     }
 }
 
-impl TreeNodeRewriter for StreamingAggsRewriter {
+impl<'n> TreeNodeVisitor<'n> for GroupByFieldVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
-    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RemoteScanExec"
-            && !node.children().is_empty()
-            && node.children().first().unwrap().name() == "AggregateExec"
-            && config::get_config().common.feature_query_streaming_aggs
-        {
-            let cached_data = streaming_aggs_exec::GLOBAL_CACHE
-                .get(&self.id)
-                .unwrap_or_default();
-            let streaming_node: Arc<dyn ExecutionPlan> =
-                Arc::new(streaming_aggs_exec::StreamingAggsExec::new(
-                    self.id.clone(),
-                    self.start_time,
-                    self.end_time,
-                    cached_data,
-                    node,
-                )) as _;
-            return Ok(Transformed::yes(streaming_node));
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let name = node.name();
+        if name == "AggregateExec" {
+            let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+            let group_by = aggregate.group_expr();
+            let fields = group_by
+                .expr()
+                .iter()
+                .flat_map(|(expr, _)| {
+                    collect_columns(expr)
+                        .into_iter()
+                        .map(|field| field.name().to_string())
+                })
+                .collect::<HashSet<_>>();
+            self.group_by_fields.extend(fields);
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
         }
-        Ok(Transformed::no(node))
     }
 }

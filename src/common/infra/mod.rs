@@ -15,7 +15,7 @@
 
 use ::config::{cache_instance_id, ider};
 
-use crate::service::db::instance;
+use crate::service::db::metas;
 
 pub mod cluster;
 pub mod config;
@@ -25,12 +25,12 @@ pub mod wal;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     // set instance id
-    let instance_id = match instance::get().await {
+    let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {
             log::info!("Generating new instance id");
             let id = ider::generate();
-            let _ = instance::set(&id).await;
+            let _ = metas::instance::set(&id).await;
             id
         }
     };

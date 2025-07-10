@@ -13,11 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::VecDeque;
+
+use bytes::Bytes as BytesImpl;
+use hashbrown::HashMap;
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
+    config::get_config,
     meta::{sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
@@ -25,11 +30,17 @@ use crate::{
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
 
+/// To represent the query start and end time based of partition or cache
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeOffset {
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
     Memory,
     Wal,
-    Tmpfs,
 }
 
 #[derive(Clone, Debug)]
@@ -59,12 +70,15 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub use_cache: Option<bool>, // used for search job
+    #[serde(default = "default_use_cache")]
+    pub use_cache: bool,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local_mode: Option<bool>,
+}
+
+pub fn default_use_cache() -> bool {
+    get_config().common.result_cache_enabled
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -125,6 +139,8 @@ pub struct Query {
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub histogram_interval: i64,
 }
 
 fn default_size() -> i64 {
@@ -148,6 +164,7 @@ impl Default for Query {
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         }
     }
 }
@@ -158,7 +175,17 @@ impl Request {
         match self.encoding {
             RequestEncoding::Base64 => {
                 self.query.sql = match base64::decode_url(&self.query.sql) {
-                    Ok(v) => v,
+                    Ok(v) => {
+                        match crate::utils::query_select_utils::replace_o2_custom_patterns(&v) {
+                            Ok(sql) => sql,
+                            Err(e) => {
+                                log::error!(
+                                    "Error replacing o2 custom patterns , returning original sql: {e}"
+                                );
+                                v
+                            }
+                        }
+                    }
                     Err(e) => {
                         return Err(e);
                     }
@@ -185,10 +212,10 @@ pub struct Response {
     pub total: usize,
     pub from: i64,
     pub size: i64,
+    pub cached_ratio: usize,
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub file_count: usize,
-    pub cached_ratio: usize,
+    pub scan_files: usize,
     pub scan_size: usize,
     pub idx_scan_size: usize,
     pub scan_records: usize,
@@ -216,6 +243,123 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+}
+
+/// Iterator for Streaming response of search `Response`
+///
+/// This is used to split the search response to smaller chunks based on
+/// env variable
+/// The format of the iterator is as follows:
+/// - Chunk 1: Response Metadata
+/// - Chunk 2: Hits (1MB)
+/// - Chunk 3: Hits (1MB)
+pub struct ResponseChunkIterator {
+    // Original response (will be split into chunks)
+    response: Response,
+    // Target size for each chunk in bytes
+    chunk_size: usize,
+    // Hits waiting to be processed
+    remaining_hits: VecDeque<crate::utils::json::Value>,
+    // Whether metadata has been sent
+    metadata_sent: bool,
+    // Current position in the iteration
+    position: usize,
+}
+
+impl ResponseChunkIterator {
+    /// Create a new response chunk iterator
+    pub fn new(mut response: Response, chunk_size: Option<usize>) -> Self {
+        // Get the configured chunk size or use the provided one or default
+        let chunk_size = chunk_size.unwrap_or_else(|| {
+            // Get from config, convert from MB to bytes
+            let mb = 1024 * 1024;
+            crate::get_config()
+                .http_streaming
+                .streaming_response_chunk_size
+                * mb
+        });
+
+        let hits = response.hits.drain(..).collect::<Vec<_>>();
+
+        Self {
+            response,
+            chunk_size,
+            remaining_hits: VecDeque::from(hits),
+            metadata_sent: false,
+            position: 0,
+        }
+    }
+}
+
+// Define the possible chunk types
+#[derive(Debug, Clone)]
+pub enum ResponseChunk {
+    Metadata {
+        response: Box<Response>,
+    },
+    Hits {
+        hits: Vec<crate::utils::json::Value>,
+    },
+}
+
+impl Iterator for ResponseChunkIterator {
+    type Item = ResponseChunk;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // First send metadata
+        if !self.metadata_sent {
+            self.metadata_sent = true;
+            self.position += 1;
+
+            // Clone response but remove hits
+            let mut metadata_response = self.response.clone();
+            metadata_response.hits = vec![];
+
+            return Some(ResponseChunk::Metadata {
+                response: Box::new(metadata_response),
+            });
+        }
+
+        // If we have no hits left, we're done
+        if self.remaining_hits.is_empty() {
+            return None;
+        }
+
+        // Create the next chunk of hits
+        let mut current_chunk: Vec<crate::utils::json::Value> = Vec::new();
+        let mut current_chunk_size: usize = 0;
+
+        // Keep adding hits until we reach the target chunk size
+        while !self.remaining_hits.is_empty() {
+            // Peek at the front hit
+            let hit = &self.remaining_hits[0];
+            let hit_size = crate::utils::json::estimate_json_bytes(hit);
+
+            if hit_size > self.chunk_size {
+                return Some(ResponseChunk::Hits {
+                    hits: vec![hit.to_owned()],
+                });
+            }
+
+            // If adding this hit would exceed target size, break
+            if !current_chunk.is_empty() && current_chunk_size + hit_size > self.chunk_size {
+                break;
+            }
+
+            // Add hit to current chunk - using pop_front() for O(1) complexity
+            if let Some(hit) = self.remaining_hits.pop_front() {
+                current_chunk.push(hit);
+                current_chunk_size += hit_size;
+            }
+        }
+
+        self.position += 1;
+
+        // Return the hits chunk
+        Some(ResponseChunk::Hits {
+            hits: current_chunk,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -246,7 +390,7 @@ impl Response {
             total: 0,
             from,
             size,
-            file_count: 0,
+            scan_files: 0,
             cached_ratio: 0,
             scan_size: 0,
             idx_scan_size: 0,
@@ -313,8 +457,8 @@ impl Response {
         self.total = val;
     }
 
-    pub fn set_file_count(&mut self, val: usize) {
-        self.file_count = val;
+    pub fn set_scan_files(&mut self, val: usize) {
+        self.scan_files = val;
     }
 
     pub fn set_cached_ratio(&mut self, val: usize) {
@@ -359,6 +503,10 @@ impl Response {
     pub fn set_order_by(&mut self, val: Option<OrderBy>) {
         self.order_by = val;
     }
+
+    pub fn set_result_cache_ratio(&mut self, val: usize) {
+        self.result_cache_ratio = val;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -376,6 +524,8 @@ pub struct SearchPartitionRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub streaming_output: bool,
+    #[serde(default)]
+    pub histogram_interval: i64,
 }
 
 impl SearchPartitionRequest {
@@ -408,6 +558,7 @@ impl From<&Request> for SearchPartitionRequest {
             clusters: req.clusters.clone(),
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
+            histogram_interval: req.query.histogram_interval,
         }
     }
 }
@@ -486,6 +637,7 @@ impl SearchHistoryRequest {
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
+                histogram_interval: 0,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -493,7 +645,7 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
-            use_cache: None,
+            use_cache: default_use_cache(),
             local_mode: None,
         };
         Ok(search_req)
@@ -645,6 +797,7 @@ pub struct ScanStats {
     pub idx_scan_size: i64,
     pub idx_took: i64,
     pub file_list_took: i64,
+    pub aggs_cache_ratio: i64,
 }
 
 impl ScanStats {
@@ -663,6 +816,13 @@ impl ScanStats {
         self.idx_scan_size += other.idx_scan_size;
         self.idx_took = std::cmp::max(self.idx_took, other.idx_took);
         self.file_list_took = std::cmp::max(self.file_list_took, other.file_list_took);
+        self.aggs_cache_ratio = if self.aggs_cache_ratio == 0 {
+            other.aggs_cache_ratio
+        } else if other.aggs_cache_ratio == 0 {
+            self.aggs_cache_ratio
+        } else {
+            std::cmp::min(self.aggs_cache_ratio, other.aggs_cache_ratio)
+        };
     }
 
     pub fn format_to_mb(&mut self) {
@@ -687,6 +847,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             query_fn: query.query_fn.unwrap_or_default(),
             action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
+            histogram_interval: query.histogram_interval,
         }
     }
 }
@@ -704,6 +865,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
             file_list_took: req.file_list_took,
+            aggs_cache_ratio: req.aggs_cache_ratio,
         }
     }
 }
@@ -721,6 +883,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             idx_scan_size: req.idx_scan_size,
             idx_took: req.idx_took,
             file_list_took: req.file_list_took,
+            aggs_cache_ratio: req.aggs_cache_ratio,
         }
     }
 }
@@ -903,6 +1066,8 @@ pub struct MultiSearchPartitionRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub streaming_output: bool,
+    #[serde(default)]
+    pub histogram_interval: i64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -1014,9 +1179,16 @@ impl MultiStreamRequest {
                     .as_ref()
                     .and_then(|v| base64::decode_url(v).ok())
             };
+            let sql = if let Ok(sql) =
+                crate::utils::query_select_utils::replace_o2_custom_patterns(&query.sql)
+            {
+                sql
+            } else {
+                query.sql.clone()
+            };
             res.push(Request {
                 query: Query {
-                    sql: query.sql.clone(),
+                    sql,
                     from: self.from,
                     size: self.size,
                     start_time: query.start_time.unwrap_or(self.start_time),
@@ -1030,6 +1202,7 @@ impl MultiStreamRequest {
                     skip_wal: self.skip_wal,
                     streaming_output: false,
                     streaming_id: None,
+                    histogram_interval: 0,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
@@ -1037,7 +1210,7 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
-                use_cache: None,
+                use_cache: default_use_cache(),
                 local_mode: None,
             });
         }
@@ -1079,6 +1252,16 @@ pub struct ValuesRequest {
     pub sql: String,
 }
 
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct HashFileRequest {
+    pub files: Vec<String>,
+}
+
+#[derive(Debug, Default, Deserialize, Clone, Serialize)]
+pub struct HashFileResponse {
+    pub files: HashMap<String, HashMap<String, String>>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1087,7 +1270,7 @@ mod tests {
     fn test_response() {
         let mut res = Response::default();
         res.set_total(10);
-        res.set_file_count(5);
+        res.set_scan_files(5);
         let hit = json::json!({"num":12});
         let mut val_map = json::Map::new();
         val_map.insert("id".to_string(), json::json!({"id":1}));
@@ -1183,32 +1366,32 @@ mod search_history_utils {
 
         // Method to build the SQL query
         pub fn build(self, search_stream_name: &str) -> String {
-            let mut query = format!("SELECT * FROM {} WHERE event='Search'", search_stream_name);
+            let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
 
-            if let Some(org_id) = self.org_id {
-                if !org_id.is_empty() {
-                    query.push_str(&format!(" AND org_id = '{}'", org_id));
-                }
+            if let Some(org_id) = self.org_id
+                && !org_id.is_empty()
+            {
+                query.push_str(&format!(" AND org_id = '{org_id}'"));
             }
-            if let Some(stream_type) = self.stream_type {
-                if !stream_type.is_empty() {
-                    query.push_str(&format!(" AND stream_type = '{}'", stream_type));
-                }
+            if let Some(stream_type) = self.stream_type
+                && !stream_type.is_empty()
+            {
+                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
             }
-            if let Some(stream_name) = self.stream_name {
-                if !stream_name.is_empty() {
-                    query.push_str(&format!(" AND stream_name = '{}'", stream_name));
-                }
+            if let Some(stream_name) = self.stream_name
+                && !stream_name.is_empty()
+            {
+                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
             }
-            if let Some(user_email) = self.user_email {
-                if !user_email.is_empty() {
-                    query.push_str(&format!(" AND user_email = '{}'", user_email));
-                }
+            if let Some(user_email) = self.user_email
+                && !user_email.is_empty()
+            {
+                query.push_str(&format!(" AND user_email = '{user_email}'"));
             }
-            if let Some(trace_id) = self.trace_id {
-                if !trace_id.is_empty() {
-                    query.push_str(&format!(" AND trace_id = '{}'", trace_id));
-                }
+            if let Some(trace_id) = self.trace_id
+                && !trace_id.is_empty()
+            {
+                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
             }
 
             query
@@ -1313,6 +1496,192 @@ mod search_history_utils {
             AND user_email = 'user123@gmail.com'";
 
             assert_eq!(query, expected_query);
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum StreamResponses {
+    // Original variant - to be deprecated but kept for backward compatibility
+    SearchResponse {
+        results: Response,
+        streaming_aggs: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        streaming_id: Option<String>,
+        time_offset: TimeOffset,
+    },
+    // New focused variants
+    SearchResponseMetadata {
+        results: Response,
+        streaming_aggs: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        streaming_id: Option<String>,
+        time_offset: TimeOffset,
+    },
+    SearchResponseHits {
+        hits: Vec<json::Value>,
+    },
+    Progress {
+        percent: usize,
+    },
+    Error {
+        code: u16,
+        message: String,
+        error_detail: Option<String>,
+    },
+    Done,
+    Cancelled,
+}
+
+/// An iterator that yields formatted chunks from a StreamResponse
+pub struct StreamResponseChunks {
+    /// The inner iterator for search responses with multiple chunks
+    chunks_iter: Option<Box<dyn Iterator<Item = Result<BytesImpl, std::io::Error>> + Send>>,
+    /// Single chunk for simple responses
+    single_chunk: Option<Result<BytesImpl, std::io::Error>>,
+}
+
+impl Iterator for StreamResponseChunks {
+    type Item = Result<BytesImpl, std::io::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(iter) = &mut self.chunks_iter {
+            iter.next()
+        } else {
+            self.single_chunk.take()
+        }
+    }
+}
+
+impl StreamResponses {
+    /// Convert a response to an iterator of formatted chunks
+    /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
+    /// chunks For other response types, this will return an iterator with a single chunk
+    pub fn to_chunks(&self) -> StreamResponseChunks {
+        // Helper function to format event data
+        let format_event = |event_type: &str, data: &str| -> BytesImpl {
+            let formatted = format!("event: {event_type}\ndata: {data}\n\n");
+            BytesImpl::from(formatted.into_bytes())
+        };
+
+        match self {
+            // Handle search responses with chunking
+            StreamResponses::SearchResponse {
+                results,
+                streaming_aggs,
+                time_offset,
+                streaming_id,
+            } => {
+                log::info!(
+                    "[HTTP2_STREAM] Chunking search response with {} hits using ResponseChunkIterator",
+                    results.hits.len()
+                );
+
+                // Create the iterator
+                let iterator = ResponseChunkIterator::new(
+                    results.clone(),
+                    None, // Use configured chunk size from environment
+                );
+
+                // Add a log message to show the chunk size being used
+                log::info!(
+                    "[HTTP2_STREAM] Using chunk size of {}MB from configuration",
+                    get_config().http_streaming.streaming_response_chunk_size
+                );
+
+                // Capture needed values for the closure
+                let streaming_aggs = *streaming_aggs;
+                let time_offset = time_offset.clone();
+                let streaming_id = streaming_id.clone();
+
+                // Create an iterator that maps each chunk to a formatted BytesImpl
+                let chunks_iter = iterator.map(move |chunk| {
+                    let (event_type, data) = match chunk {
+                        ResponseChunk::Metadata { response } => {
+                            // Add streaming_aggs and time_offset from the original response
+                            let metadata = StreamResponses::SearchResponseMetadata {
+                                results: *response,
+                                streaming_aggs,
+                                streaming_id: streaming_id.clone(),
+                                time_offset: time_offset.clone(),
+                            };
+                            let data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
+                                log::error!("Failed to serialize metadata: {metadata:?}");
+                                String::new()
+                            });
+                            ("search_response_metadata", data)
+                        }
+                        ResponseChunk::Hits { hits } => {
+                            let data =
+                                serde_json::to_string(&StreamResponses::SearchResponseHits {
+                                    hits,
+                                })
+                                .unwrap_or_else(|e| {
+                                    log::error!("Failed to serialize hits: {e}");
+                                    String::new()
+                                });
+                            ("search_response_hits", data)
+                        }
+                    };
+
+                    // Format and encode the chunk
+                    Ok(format_event(event_type, &data))
+                });
+
+                StreamResponseChunks {
+                    chunks_iter: Some(Box::new(chunks_iter)),
+                    single_chunk: None,
+                }
+            }
+
+            // Handle other response types with a single chunk
+            StreamResponses::SearchResponseMetadata { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_metadata", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::SearchResponseHits { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("search_response_hits", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Progress { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("progress", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Error { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("error", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Done => {
+                let bytes = BytesImpl::from("data: [[DONE]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::Cancelled => {
+                let bytes = BytesImpl::from("data: [[CANCELLED]]\n\n");
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
         }
     }
 }

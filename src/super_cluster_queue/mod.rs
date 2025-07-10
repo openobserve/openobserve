@@ -21,19 +21,23 @@ mod destinations;
 mod distinct_values;
 mod folders;
 mod meta;
+mod org_user;
+mod organization;
 mod pipelines;
 mod ratelimit;
+mod reports;
 mod scheduler;
 mod schemas;
 mod search_job;
 mod short_urls;
 mod templates;
+mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
-    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
-    TemplatesQueue,
+    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
+    SuperClusterQueueTrait, TemplatesQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -67,6 +71,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
     let dashboards_queue = DashboardsQueue {
         on_dashboard_msg: dashboards::process,
+        on_report_msg: reports::process,
     };
     let pipelines_queue = PipelinesQueue {
         on_pipeline_msg: pipelines::process,
@@ -83,6 +88,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let action_scripts_queue = ActionScriptsQueue {
         on_action_script_msg: action_scripts::process,
     };
+    let org_users_queue = OrgUsersQueue {
+        on_org_users_msg: org_user::process,
+        on_user_msg: user::process,
+        on_meta_msg: meta::process,
+        on_orgs_msg: organization::process,
+    };
 
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
@@ -96,6 +107,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(destinations_queue),
         Box::new(action_scripts_queue),
         Box::new(scheduler_queue),
+        Box::new(org_users_queue),
     ];
 
     for queue in queues {
@@ -108,7 +120,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         break;
                     }
                     if let Err(e) = queue.subscribe().await {
-                        log::error!("[SUPER_CLUSTER:sync] failed to subscribe: {}", e);
+                        log::error!("[SUPER_CLUSTER:sync] failed to subscribe: {e}");
                     }
                 }
             });

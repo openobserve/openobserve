@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component" id="searchBarComponent">
-    <div class="row q-my-xs">
+    <div class="row q-py-xs">
       <div class="float-right col flex items-center">
         <syntax-guide
           class="q-mr-sm"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="border-top: 1px solid #dbdbdb"
     >
       <div class="col">
-        <query-editor
+        <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
           class="monaco-editor"
@@ -136,8 +136,8 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue"),
+    CodeQueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
     AppTabs,
@@ -346,8 +346,6 @@ export default defineComponent({
           page: "Search Logs",
         });
       }
-
-      if (value.valueType === "relative") emit("searchdata");
     };
 
     const updateQuery = () => {

@@ -2675,25 +2675,6 @@ mod tests {
         .await
     }
 
-    // Tests for routes defined in handler::http::request::websocket.
-
-    #[tokio::test]
-    async fn websocket() {
-        test_auth(
-            Method::GET,
-            format!("api{ORG_ID}/ws/{WS_REQUEST_ID}"),
-            AuthExtractor {
-                auth: AUTH_HEADER_VAL.to_string(),
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
     // Tests for routes defined in handler::http::request::actions.
 
     #[tokio::test]
@@ -3000,15 +2981,6 @@ mod tests {
                 tls_cert_path: String::default(),
                 tls_key_path: String::default(),
             },
-            websocket: config::WebSocket {
-                enabled: bool::default(),
-                session_idle_timeout_secs: i64::default(),
-                session_max_lifetime_secs: i64::default(),
-                session_gc_interval_secs: i64::default(),
-                ping_interval_secs: i64::default(),
-                max_frame_size: usize::default(),
-                max_continuation_size: usize::default(),
-            },
             route: config::Route {
                 timeout: u64::default(),
                 max_connections: usize::default(),
@@ -3097,16 +3069,12 @@ mod tests {
                 mmdb_geolite_citydb_sha256_url: String::default(),
                 mmdb_geolite_asndb_sha256_url: String::default(),
                 default_scrape_interval: u32::default(),
-                memory_circuit_breaker_enable: bool::default(),
+                memory_circuit_breaker_enabled: bool::default(),
                 memory_circuit_breaker_ratio: usize::default(),
                 restricted_routes_on_empty_data: bool::default(),
                 inverted_index_enabled: bool::default(),
                 inverted_index_cache_enabled: bool::default(),
-                inverted_index_split_chars: String::default(),
                 inverted_index_old_format: bool::default(),
-                inverted_index_store_format: String::default(),
-                inverted_index_search_format: String::default(),
-                inverted_index_tantivy_mode: String::default(),
                 inverted_index_count_optimizer_enabled: bool::default(),
                 inverted_index_camel_case_tokenizer_disabled: bool::default(),
                 full_text_search_type: String::default(),
@@ -3135,8 +3103,23 @@ mod tests {
                 swagger_enabled: bool::default(),
                 fake_es_version: String::default(),
                 min_auto_refresh_interval: u32::default(),
-                feature_ingester_none_compression: bool::default(),
+                create_org_through_ingestion: bool::default(),
+                es_version: String::default(),
                 ingestion_url: String::default(),
+                org_invite_expiry: u32::default(),
+                feature_ingester_none_compression: bool::default(),
+                meta_ddl_dsn: Default::default(),
+                format_stream_name_to_lower: Default::default(),
+                file_list_dump_enabled: Default::default(),
+                file_list_dump_dual_write: Default::default(),
+                file_list_dump_min_hour: Default::default(),
+                file_list_dump_debug_check: Default::default(),
+                aggregation_cache_enabled: bool::default(),
+                use_stream_settings_for_partitions_enabled: Default::default(),
+                dashboard_placeholder: Default::default(),
+                search_inspector_enabled: bool::default(),
+                utf8_view_enabled: bool::default(),
+                dashboard_show_symbol_enabled: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3174,10 +3157,6 @@ mod tests {
                 http_keep_alive_disabled: bool::default(),
                 default_max_query_range_days: i64::default(),
                 max_dashboard_series: usize::default(),
-                circuit_breaker_enabled: bool::default(),
-                circuit_breaker_watching_window: i64::default(),
-                circuit_breaker_reset_window_num: i64::default(),
-                circuit_breaker_slow_request_threshold: u64::default(),
                 ingest_allowed_upto: i64::default(),
                 ingest_allowed_in_future: i64::default(),
                 ingest_flatten_level: u32::default(),
@@ -3249,6 +3228,11 @@ mod tests {
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
                 search_mini_partition_duration_secs: u64::default(),
+                file_download_priority_queue_thread_num: usize::default(),
+                file_download_priority_queue_window_secs: i64::default(),
+                file_download_enable_priority_queue: bool::default(),
+                calculate_stats_step_limit: i64::default(),
+                histogram_enabled: bool::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
@@ -3271,12 +3255,15 @@ mod tests {
                 job_clean_wait_time: i64::default(),
                 pending_jobs_metric_interval: u64::default(),
                 max_group_files: usize::default(),
+                old_data_streams: String::default(),
             },
             cache_latest_files: config::CacheLatestFiles {
                 enabled: bool::default(),
                 cache_parquet: bool::default(),
                 cache_index: bool::default(),
                 delete_merge_files: bool::default(),
+                download_from_node: Default::default(),
+                download_node_size: Default::default(),
             },
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),
@@ -3302,6 +3289,9 @@ mod tests {
                 gc_size: usize::default(),
                 gc_interval: u64::default(),
                 multi_dir: String::default(),
+                aggregation_max_size: usize::default(),
+                delay_window_mins: i64::default(),
+                aggregation_cache_enabled: bool::default(),
             },
             log: config::Log {
                 level: String::default(),
@@ -3362,6 +3352,9 @@ mod tests {
                 max_idle_per_host: usize::default(),
                 keepalive_timeout: u64::default(),
                 multi_part_upload_size: usize::default(),
+                feature_bulk_delete: bool::default(),
+                accounts: Default::default(),
+                stream_strategy: Default::default(),
             },
             sns: config::Sns {
                 endpoint: String::default(),
@@ -3371,6 +3364,10 @@ mod tests {
             tcp: config::TCP {
                 tcp_port: u16::default(),
                 udp_port: u16::default(),
+                tcp_tls_enabled: bool::default(),
+                tcp_tls_cert_path: String::default(),
+                tcp_tls_key_path: String::default(),
+                tcp_tls_ca_cert_path: String::default(),
             },
             prom: config::Prometheus {
                 ha_cluster_label: String::default(),
@@ -3436,14 +3433,15 @@ mod tests {
                 remote_request_max_retry_time: u64::default(),
                 max_connections: usize::default(),
                 wal_size_limit: u64::default(),
+                batch_size: usize::default(),
+                batch_enabled: bool::default(),
+                batch_size_bytes: usize::default(),
+                batch_timeout_ms: u64::default(),
+                use_shared_http_client: bool::default(),
             },
             encryption: config::Encryption {
                 algorithm: String::default(),
                 master_key: String::default(),
-            },
-            ratelimit: config::RateLimit {
-                ratelimit_rule_refresh_interval: 0,
-                ratelimit_enabled: false,
             },
         }
     }

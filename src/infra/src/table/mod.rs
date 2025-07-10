@@ -18,7 +18,7 @@ use migration::Migrator;
 use sea_orm_migration::MigratorTrait;
 
 use crate::{
-    db::{ORM_CLIENT, SQLITE_STORE, connect_to_orm, sqlite::CLIENT_RW},
+    db::{ORM_CLIENT_DDL, SQLITE_STORE, connect_to_orm_ddl, sqlite::CLIENT_RW},
     dist_lock,
 };
 
@@ -28,17 +28,20 @@ pub mod cipher;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
-#[allow(unused_imports)]
 pub mod entity;
 pub mod folders;
 mod migration;
+pub mod org_users;
+pub mod organizations;
 pub mod ratelimit;
+pub mod reports;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+pub mod users;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
@@ -48,7 +51,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/database/migration", 0).await?;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.
     // Otherwise, the `m20250109_092400_recreate_tables_with_ksuids` migration will fail.
@@ -62,7 +65,7 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
 /// Get the index of the migration that populates the alerts table.
 /// This index is used as the first stage of the migration process.
 async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     let migrations = Migrator::get_pending_migrations(client).await?;
     let mut index: u32 = 0;
     for (i, migration) in migrations.iter().enumerate() {
@@ -73,15 +76,22 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
     }
     // If the migration is not found, it is already applied so return 0
     log::debug!(
-        "Migration m20241217_155000_populate_alerts_table at step {} (0 means already applied)",
-        index
+        "Migration m20241217_155000_populate_alerts_table at step {index} (0 means already applied)"
     );
     Ok(index)
 }
 
 pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     Migrator::down(client, steps).await?;
+    Ok(())
+}
+
+pub async fn create_user_tables() -> Result<(), anyhow::Error> {
+    organizations::create_table().await?;
+    users::create_table().await?;
+    org_users::create_table().await?;
+
     Ok(())
 }
 

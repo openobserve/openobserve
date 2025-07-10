@@ -15,9 +15,9 @@
 
 use std::{
     fs::{File, Metadata, OpenOptions, create_dir_all, remove_file},
-    io,
-    io::{BufWriter, Seek, SeekFrom, Write},
-    path::PathBuf,
+    io::{self, BufWriter, Seek, SeekFrom, Write},
+    ops::Deref,
+    path::{Path, PathBuf},
 };
 
 use byteorder::{BigEndian, WriteBytesExt};
@@ -37,35 +37,15 @@ pub struct Writer {
 
 impl Writer {
     pub fn new(
-        root_dir: impl Into<PathBuf>,
-        org_id: &str,
-        stream_type: &str,
-        id: String,
-        init_size: u64,
-        buffer_size: usize,
-    ) -> Result<Self> {
-        Self::build(
-            root_dir,
-            org_id,
-            stream_type,
-            id,
-            init_size,
-            buffer_size,
-            None,
-        )
-    }
-
-    pub fn build(
-        root_dir: impl Into<PathBuf>,
-        org_id: &str,
-        stream_type: &str,
-        id: String,
+        path: impl Into<PathBuf> + Clone + Deref<Target = Path> + AsRef<Path>,
         init_size: u64,
         buffer_size: usize,
         header: Option<FileHeader>,
-    ) -> Result<Self> {
-        let path = super::build_file_path(root_dir, org_id, stream_type, id);
-        create_dir_all(path.parent().unwrap()).context(FileOpenSnafu { path: path.clone() })?;
+    ) -> Result<(Self, usize)> {
+        create_dir_all(path.parent().ok_or_else(|| Error::NoParentDir {
+            path: path.clone().into(),
+        })?)
+        .context(FileOpenSnafu { path: path.clone() })?;
         let mut f = OpenOptions::new()
             .write(true)
             .create(true)
@@ -87,10 +67,11 @@ impl Writer {
 
         let bytes_written = super::FILE_TYPE_IDENTIFIER.len();
 
+        let header_len;
         if let Some(header) = header {
             let header_bytes = Self::serialize_header(&header);
             // write header len, 4 bytes
-            let header_len = header_bytes.len() as u32;
+            header_len = header_bytes.len() as u32;
             f.write_all(&header_len.to_be_bytes())
                 .context(FileWriteSnafu { path: path.clone() })?;
             // write header value
@@ -98,7 +79,7 @@ impl Writer {
                 .context(FileWriteSnafu { path: path.clone() })?;
         } else {
             // write header len, 4 bytes
-            let header_len = 0u32;
+            header_len = 0u32;
             f.write_all(&header_len.to_be_bytes())
                 .context(FileWriteSnafu { path: path.clone() })?;
         }
@@ -108,14 +89,17 @@ impl Writer {
             return Err(Error::WriteFileType { source: e });
         }
 
-        Ok(Self {
-            path,
-            f: BufWriter::with_capacity(buffer_size, f),
-            bytes_written,
-            uncompressed_bytes_written: bytes_written,
-            buffer: Vec::with_capacity(buffer_size),
-            synced: true,
-        })
+        Ok((
+            Self {
+                path: path.to_path_buf(),
+                f: BufWriter::with_capacity(buffer_size, f),
+                bytes_written,
+                uncompressed_bytes_written: bytes_written,
+                buffer: Vec::with_capacity(buffer_size),
+                synced: true,
+            },
+            header_len as usize,
+        ))
     }
 
     pub fn path(&self) -> &PathBuf {
@@ -241,7 +225,7 @@ impl Writer {
 impl Drop for Writer {
     fn drop(&mut self) {
         if let Err(e) = self.close() {
-            log::error!("failed to close wal file: {}", e);
+            log::error!("failed to close wal file: {e}");
         }
     }
 }

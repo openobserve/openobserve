@@ -63,10 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    :key="
-                      searchObj.data.stream.selectedStream.join(',') ||
-                      'default'
-                    "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
@@ -247,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:scroll="getMoreData"
                     @update:recordsPerPage="getMoreDataRecordsPerPage"
                     @expandlog="toggleExpandLog"
+                    @send-to-ai-chat="sendToAiChat"
                   />
                 </div>
                 <div class="text-center col-10 q-ma-none">
@@ -353,6 +350,7 @@ import {
   defineComponent,
   ref,
   onActivated,
+  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -372,6 +370,7 @@ import config from "@/aws-exports";
 import {
   verifyOrganizationStatus,
   useLocalInterestingFields,
+  deepCopy,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -387,7 +386,8 @@ import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
-import { isWebSocketEnabled } from "@/utils/zincutils";
+import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import useAiChat from "@/composables/useAiChat";
 
 export default defineComponent({
   name: "PageSearch",
@@ -408,6 +408,7 @@ export default defineComponent({
     SearchHistory,
   },
   mixins: [MainLayoutCloudMixin],
+  emits: ["sendToAiChat"],
   methods: {
     setHistogramDate(date: any) {
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
@@ -531,7 +532,7 @@ export default defineComponent({
       this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
     },
   },
-  setup() {
+  setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
@@ -565,18 +566,22 @@ export default defineComponent({
       isLimitQuery,
       enableRefreshInterval,
       buildWebSocketPayload,
-      initializeWebSocketConnection,
-      addRequestId,
+      initializeSearchConnection,
+      addTraceId,
       sendCancelSearchMessage,
       isDistinctQuery,
       isWithQuery,
+      getStream,
+      fnUnparsedSQL,
+      initialLogsState,
+      clearSearchObj,
+      setCommunicationMethod,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
-    let parser: any;
 
     const isLogsMounted = ref(false);
 
@@ -596,6 +601,8 @@ export default defineComponent({
     const visualizeErrorData: any = reactive({
       errors: [],
     });
+
+    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 
     // function restoreUrlQueryParams() {
     //   const queryParams = router.currentRoute.value.query;
@@ -655,11 +662,31 @@ export default defineComponent({
           router.back();
         }
       }
+
+      registerAiContextHandler();
     });
 
-    onBeforeUnmount(() => {
+    onBeforeUnmount(async () => {
       // Cancel all the search queries
+      if (store.state.refreshIntervalID)
+        clearInterval(store.state.refreshIntervalID);
+
       cancelOnGoingSearchQueries();
+      removeAiContextHandler();
+
+      try {
+        if (searchObj)
+          await store.dispatch(
+            "logs/setLogs",
+            JSON.parse(JSON.stringify(searchObj)),
+          );
+      } catch (error) {
+        console.error("Failed to set logs:", error.message);
+      }
+
+      clearSearchObj();
+      searchBarRef.value = null;
+      searchResultRef.value = null;
     });
 
     onActivated(() => {
@@ -778,12 +805,6 @@ export default defineComponent({
       },
     );
 
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
@@ -801,7 +822,7 @@ export default defineComponent({
       if (isLogsTab()) {
         await setupLogsTab();
       } else {
-        await importSqlParser();
+        handleVisualizeTab();
       }
     }
 
@@ -810,35 +831,67 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
+    const isRouteChanged = () => {
+      if (
+        !Object.hasOwn(router.currentRoute.value.query, "stream") ||
+        !Object.hasOwn(router.currentRoute.value.query, "org_identifier")
+      ) {
+        return;
+      }
+
+      if (
+        Object.hasOwn(router.currentRoute.value.query, "stream") &&
+        Object.hasOwn(router.currentRoute.value.query, "org_identifier") &&
+        store.state.logs.logs.data != undefined &&
+        Object.hasOwn(store.state.logs.logs.data, "stream") &&
+        Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
+        (!store.state.logs.logs.data.stream.selectedStream.includes(
+          router.currentRoute.value.query.stream,
+        ) ||
+          router.currentRoute.value.query.org_identifier !==
+            store.state.logs.logs.organizationIdentifier)
+      ) {
+        store.dispatch("logs/setIsInitialized", false);
+      }
+      return;
+    };
+
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
-        searchObj.organizationIdentifier =
-          store.state.selectedOrganization.identifier;
+        isRouteChanged();
+        if (!store.state.logs.isInitialized) {
+          searchObj.organizationIdentifier =
+            store.state.selectedOrganization.identifier;
 
-        searchObj.meta.pageType = "logs";
-        searchObj.meta.refreshHistogram = true;
-        searchObj.loading = true;
+          searchObj.meta.pageType = "logs";
+          searchObj.meta.refreshHistogram = true;
+          searchObj.loading = true;
 
-        resetSearchObj();
+          resetSearchObj();
 
-        resetStreamData();
+          resetStreamData();
 
-        restoreUrlQueryParams();
+          searchObj.meta.quickMode = isQuickModeEnabled();
 
-        await importSqlParser();
+          searchObj.meta.showHistogram = isHistogramEnabled();
 
-        if (isEnterpriseClusterEnabled()) {
-          await getRegionInfo();
+          restoreUrlQueryParams();
+
+          if (isEnterpriseClusterEnabled()) {
+            await getRegionInfo();
+          }
+
+          loadLogsData();
+
+          store.dispatch("logs/setIsInitialized", true);
+        } else {
+          await initialLogsState();
         }
-
-        loadLogsData();
 
         if (isCloudEnvironment()) {
           setupCloudSpecificThreshold();
         }
-
-        searchObj.meta.quickMode = isQuickModeEnabled();
 
         isLogsMounted.value = true;
       } catch (error) {
@@ -860,14 +913,14 @@ export default defineComponent({
       return config.isCloud === "true";
     }
 
-    // Setup cloud-specific organization threshold
-    function setupCloudSpecificThreshold() {
-      MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
-    }
-
     // Helper function to check if quick mode is enabled
     function isQuickModeEnabled() {
       return store.state.zoConfig.quick_mode_enabled;
+    }
+
+    // Helper function to check if histogram is enabled
+    function isHistogramEnabled() {
+      return store.state.zoConfig.histogram_enabled;
     }
 
     const handleActivation = async () => {
@@ -1039,58 +1092,62 @@ export default defineComponent({
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
 
-            if (searchObj.data.stream.selectedStreamFields.length == 0) {
+            if (
+              !searchObj.data.stream?.selectedStreamFields?.length &&
+              searchObj.data?.stream?.selectedStream?.[0]
+            ) {
               const streamData: any = getStream(
                 searchObj.data.stream.selectedStream[0],
                 searchObj.data.stream.streamType || "logs",
                 true,
               );
-              searchObj.data.stream.selectedStreamFields = streamData.schema;
+              if (streamData.schema)
+                searchObj.data.stream.selectedStreamFields = streamData.schema;
             }
 
-            const streamFieldNames: any =
-              searchObj.data.stream.selectedStreamFields.map(
-                (item: any) => item.name,
-              );
+            if (searchObj.data.stream?.selectedStreamFields?.length > 0) {
+              const streamFieldNames: any =
+                searchObj.data.stream.selectedStreamFields.map(
+                  (item: any) => item.name,
+                );
 
-            for (
-              let i = searchObj.data.stream.interestingFieldList.length - 1;
-              i >= 0;
-              i--
-            ) {
-              const fieldName = searchObj.data.stream.interestingFieldList[i];
-              if (!streamFieldNames.includes(fieldName)) {
-                searchObj.data.stream.interestingFieldList.splice(i, 1);
+              for (
+                let i = searchObj.data.stream.interestingFieldList.length - 1;
+                i >= 0;
+                i--
+              ) {
+                const fieldName = searchObj.data.stream.interestingFieldList[i];
+                if (!streamFieldNames.includes(fieldName)) {
+                  searchObj.data.stream.interestingFieldList.splice(i, 1);
+                }
               }
-            }
 
-            if (
-              searchObj.data.stream.interestingFieldList.length > 0 &&
-              searchObj.meta.quickMode
-            ) {
-              searchObj.data.query = searchObj.data.query.replace(
-                /\[FIELD_LIST\]/g,
-                searchObj.data.stream.interestingFieldList.join(","),
-              );
-            } else {
-              searchObj.data.query = searchObj.data.query.replace(
-                /\[FIELD_LIST\]/g,
-                "*",
-              );
+              if (
+                searchObj.data.stream.interestingFieldList.length > 0 &&
+                searchObj.meta.quickMode
+              ) {
+                searchObj.data.query = searchObj.data.query.replace(
+                  /\[FIELD_LIST\]/g,
+                  searchObj.data.stream.interestingFieldList.join(","),
+                );
+              } else {
+                searchObj.data.query = searchObj.data.query.replace(
+                  /\[FIELD_LIST\]/g,
+                  "*",
+                );
+              }
             }
           }
 
           searchObj.data.editorValue = searchObj.data.query;
 
           searchBarRef.value.updateQuery();
-
-          searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
         } else {
           searchObj.data.query = "";
           searchBarRef.value.updateQuery();
         }
       } catch (e) {
-        console.log("Logs : Error in setQuery");
+        console.log("Logs : Error in setQuery ", e);
       }
     };
 
@@ -1187,8 +1244,7 @@ export default defineComponent({
         /[.*+?^${}()|[\]\\]/g,
         "\\$&",
       );
-      const newQuery = parser
-        .sqlify(parsedSQL)
+      const newQuery = fnUnparsedSQL(parsedSQL)
         .replace(/`/g, "")
         .replace(
           new RegExp(`\\b${streamName}\\b`, "g"),
@@ -1198,7 +1254,6 @@ export default defineComponent({
       searchObj.data.query = newQuery;
       searchObj.data.editorValue = newQuery;
       searchBarRef.value.updateQuery();
-      searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
     };
 
     const processInterestingFiledInSQLQuery = (
@@ -1327,8 +1382,8 @@ export default defineComponent({
 
     watch(
       () => [
-        searchObj.data.tempFunctionContent,
-        searchObj.meta.logsVisualizeToggle,
+        searchObj?.data?.tempFunctionContent,
+        searchObj?.meta?.logsVisualizeToggle,
       ],
       () => {
         if (
@@ -1436,7 +1491,7 @@ export default defineComponent({
     // watch for changes in the visualize toggle
     // if it is in visualize mode, then set the query and stream name in the dashboard panel
     watch(
-      () => [searchObj.meta.logsVisualizeToggle],
+      () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         // emit resize event
         // this will rerender/call resize method of already rendered chart to resize
@@ -1536,16 +1591,107 @@ export default defineComponent({
     // [END] cancel running queries
 
     const cancelOnGoingSearchQueries = () => {
-      sendCancelSearchMessage(
-        searchObj.data.searchWebSocketRequestIdsAndTraceIds,
-      );
+      sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
+    };
+
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const isLogsPage = router.currentRoute.value.name === "logs";
+
+          const isStreamSelectedInLogsPage =
+            searchObj.meta.logsVisualizeToggle === "logs" &&
+            searchObj.data.stream.selectedStream.length;
+
+          const isStreamSelectedInDashboardPage =
+            searchObj.meta.logsVisualizeToggle === "visualize" &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          if (
+            !isLogsPage ||
+            !(isStreamSelectedInLogsPage || isStreamSelectedInDashboardPage)
+          ) {
+            resolve("");
+            return;
+          }
+
+          const payload = {};
+
+          const streams =
+            searchObj.meta.logsVisualizeToggle === "logs"
+              ? searchObj.data.stream.selectedStream
+              : [
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.stream,
+                ];
+
+          const streamType =
+            searchObj.meta.logsVisualizeToggle === "logs"
+              ? searchObj.data.stream.streamType
+              : dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream_type;
+
+          if (!streamType || !streams?.length) {
+            resolve("");
+            return;
+          }
+
+          for (let i = 0; i < streams.length; i++) {
+
+            const schema = await getStream(streams[i], streamType, true);
+            //here we are deep copying the schema before assiging it to schemaData so that we dont mutatat the orginial data 
+            //if we do this we dont get duplicate fields in the schema
+            let schemaData = deepCopy(schema.uds_schema || schema.schema || []);
+            let isUdsEnabled = schema.uds_schema?.length > 0;
+            //we only push the timestamp and all fields name in the schema if uds is enabled for that stream
+            if(isUdsEnabled){
+              let timestampColumn = store.state.zoConfig.timestamp_column;
+              let allFieldsName = store.state.zoConfig.all_fields_name;
+              schemaData.push({
+                name:timestampColumn,
+                type:'Int64'
+              })
+                schemaData.push({
+                  name:allFieldsName,
+                  type:'Utf8'
+                })
+              }
+            payload["stream_name_" + (i + 1)] = streams[i];
+            payload["schema_" + (i + 1)] = schemaData;
+          }
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for logs page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
     };
 
     return {
       t,
       store,
       router,
-      parser,
       searchObj,
       searchBarRef,
       splitterModel,
@@ -1589,14 +1735,17 @@ export default defineComponent({
       fnParsedSQL,
       isLimitQuery,
       buildWebSocketPayload,
-      initializeWebSocketConnection,
-      addRequestId,
+      initializeSearchConnection,
+      addTraceId,
       isWebSocketEnabled,
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
       isDistinctQuery,
       isWithQuery,
+      isStreamingEnabled,
+      setCommunicationMethod,
+      sendToAiChat,
     };
   },
   computed: {
@@ -1662,27 +1811,40 @@ export default defineComponent({
         ? this.searchObj.config.lastSplitterPosition
         : 0;
     },
-    async showHistogram() {
+    async showHistogram(newVal, oldVal) {
+      if (
+        newVal == true &&
+        oldVal == false &&
+        this.searchObj.meta?.histogramDirtyFlag == true &&
+        this.searchObj.data.queryResults?.hits?.length > 0
+      ) {
+        this.searchObj.meta.resetPlotChart = true;
+        this.searchObj.data.queryResults.aggs = [];
+      }
+
       let parsedSQL = null;
 
       if (this.searchObj.meta.sqlMode) parsedSQL = this.fnParsedSQL();
 
       if (
-        this.searchObj.meta.showHistogram &&
-        !this.searchObj.shouldIgnoreWatcher
+        this.searchObj.meta?.showHistogram &&
+        !this.searchObj?.shouldIgnoreWatcher
       ) {
         this.searchObj.data.queryResults.aggs = [];
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",-1
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } 
-        else if (this.searchObj.meta.sqlMode && (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))) {
+        } else if (
+          this.searchObj.meta.sqlMode &&
+          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
+        ) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1
+            -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (this.searchObj.data.stream.selectedStream.length > 1) {
@@ -1698,12 +1860,15 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          const shouldUseWebSocket = this.isWebSocketEnabled();
+          this.setCommunicationMethod();
 
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (shouldUseWebSocket) {
+          if (
+            this.searchObj.communicationMethod === "ws" ||
+            this.searchObj.communicationMethod === "streaming"
+          ) {
             // Use WebSocket for histogram data
             const payload = this.buildWebSocketPayload(
               this.searchObj.data.histogramQuery,
@@ -1713,10 +1878,10 @@ export default defineComponent({
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
               },
             );
-            const requestId = this.initializeWebSocketConnection(payload);
+            const requestId = this.initializeSearchConnection(payload);
 
             if (requestId) {
-              this.addRequestId(requestId, payload.traceId);
+              this.addTraceId(payload.traceId);
             }
 
             return;
@@ -1781,8 +1946,12 @@ export default defineComponent({
     async fullSQLMode(newVal) {
       if (newVal) {
         await nextTick();
-        this.setQuery(newVal);
-        this.updateUrlQueryParams();
+        if (this.searchObj.meta.sqlModeManualTrigger) {
+          this.searchObj.meta.sqlModeManualTrigger = false;
+        } else {
+          this.setQuery(newVal);
+          this.updateUrlQueryParams();
+        }
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
@@ -1812,7 +1981,7 @@ export default defineComponent({
       this.refreshHistogramChart();
     },
   },
-});
+}) as any;
 </script>
 
 <style lang="scss">

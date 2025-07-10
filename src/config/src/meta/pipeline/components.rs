@@ -26,6 +26,7 @@ use crate::meta::{
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "source_type")]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum PipelineSource {
     Realtime(StreamParams),
     Scheduled(DerivedStream),
@@ -52,6 +53,20 @@ pub struct DerivedStream {
     /// The negative secs means the Western Hemisphere
     #[serde(default)]
     pub tz_offset: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delay: Option<i32>,
+    /// The datetime from when the pipeline should check for ingested data
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_at: Option<i64>,
+}
+
+impl DerivedStream {
+    pub fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String {
+        format!(
+            "{}/{}/{}/{}",
+            self.stream_type, self.org_id, pipeline_name, pipeline_id
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,6 +134,7 @@ impl Edge {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "node_type")]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum NodeData {
     RemoteStream(RemoteStreamParams),
     Stream(StreamParams),

@@ -15,8 +15,9 @@
 
 use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
 use infra::errors::Result;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+
 pub mod alerts;
-pub mod circuit_breaker;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
@@ -25,6 +26,7 @@ pub mod enrichment;
 pub mod enrichment_table;
 pub mod exporter;
 pub mod file_list;
+pub mod file_list_dump;
 pub mod folders;
 pub mod functions;
 pub mod grpc;
@@ -34,6 +36,8 @@ pub mod logs;
 pub mod metadata;
 pub mod metrics;
 pub mod node;
+#[cfg(feature = "cloud")]
+pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;
@@ -41,7 +45,7 @@ pub mod promql;
 pub mod ratelimit;
 pub mod schema;
 pub mod search;
-pub mod websocket_events;
+pub mod tantivy;
 
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
@@ -63,4 +67,19 @@ pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
     } else {
         stream_name
     })
+}
+
+/// Setup tracing with a trace ID
+pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
+    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let traceparent = format!(
+        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
+                        * recorded/exported */
+        trace_id,
+        config::ider::generate_span_id()
+    );
+    headers.insert("traceparent".to_string(), traceparent);
+    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
+    span.set_parent(parent_ctx);
+    span
 }

@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="header-item">#</div>
           <div class="header-item">{{ t("dashboard.name") }}</div>
           <div class="header-item">{{ t("dashboard.type") }}</div>
+          <div class="header-item">{{ t("dashboard.selectType") }}</div>
           <div class="header-item q-ml-lg q-pl-lg">
             {{ t("dashboard.actions") }}
           </div>
@@ -92,6 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="item-name">{{ variable.name }}</div>
               <div>
                 {{ getVariableTypeLabel(variable.type) }}
+              </div>
+              <div>
+                {{
+                  variable.multiSelect
+                    ? t("dashboard.isMultiSelect")
+                    : t("dashboard.isSingleSelect")
+                }}
               </div>
               <div class="item-actions">
                 <q-btn
@@ -177,7 +185,7 @@ import { VueDraggableNext } from "vue-draggable-next";
 export default defineComponent({
   name: "VariableSettings",
   components: {
-    draggable: VueDraggableNext,
+    draggable: VueDraggableNext as any,
     AddSettingVariable,
     NoData,
     ConfirmDialog,
@@ -377,7 +385,7 @@ export default defineComponent({
 
 .variables-list-header {
   display: grid;
-  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 120px;
+  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 120px;
   padding: 8px 0;
   font-weight: 900;
   border-bottom: 1px solid #cccccc70;
@@ -411,12 +419,12 @@ export default defineComponent({
 
 .draggable-content {
   display: grid;
-  grid-template-columns: 80px minmax(200px, 1fr) 150px 120px;
+  grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 120px;
   align-items: center;
 
-  .item-name {
-    padding-right: 16px;
-  }
+  // .item-name {
+  //   padding-right: 16px;
+  // }
 
   .item-actions {
     display: flex;

@@ -16,7 +16,7 @@ jobs:
         id-token: write
         contents: read
       if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
-      runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-4' }}
+      runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-8' }}
       steps:
         - name: Remove unused tools
           run: |
@@ -57,9 +57,9 @@ jobs:
           
         - name: Build and run binary
           run: |
-            cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu
+            cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
             mkdir -p bin
-            mv target/x86_64-unknown-linux-gnu/release/openobserve bin/openobserve
+            mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
      
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
@@ -144,9 +144,9 @@ jobs:
           
         - name: Build and run binary
           run: |
-            cargo build --release --features mimalloc --target aarch64-unknown-linux-gnu
+            cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
             mkdir -p bin
-            mv target/aarch64-unknown-linux-gnu/release/openobserve bin/openobserve
+            mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
      
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4

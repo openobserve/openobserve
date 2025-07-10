@@ -18,7 +18,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Result, anyhow};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
@@ -35,7 +34,10 @@ use config::{
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
 };
-use infra::schema::STREAM_RECORD_ID_GENERATOR;
+use infra::{
+    errors::{Error, Result},
+    schema::STREAM_RECORD_ID_GENERATOR,
+};
 use proto::cluster_rpc::IngestionType;
 use vrl::{
     compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
@@ -67,10 +69,7 @@ pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "get_env_var is not supported",
-        ));
+        return Err(std::io::Error::other("get_env_var is not supported"));
     }
 
     let external = state::ExternalEnv::default();
@@ -90,8 +89,7 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
             config,
             fields: vec![],
         }),
-        Err(e) => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        Err(e) => Err(std::io::Error::other(
             vrl::diagnostic::Formatter::new(func, e).to_string(),
         )),
     }
@@ -134,13 +132,12 @@ pub fn apply_vrl_fn(
                     .with_label_values(&[
                         org_id,
                         StreamType::Logs.as_str(),
-                        &format!("{:?}", stream_name),
+                        &format!("{stream_name:?}"),
                         TRANSFORM_FAILED,
                     ])
                     .inc();
                 let err_msg = format!(
-                    "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
-                    org_id, stream_name, err, row
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row.",
                 );
                 log::warn!("{err_msg}");
                 (row, Some(err_msg))
@@ -151,13 +148,12 @@ pub fn apply_vrl_fn(
                 .with_label_values(&[
                     org_id,
                     StreamType::Logs.as_str(),
-                    &format!("{:?}", stream_name),
+                    &format!("{stream_name:?}"),
                     TRANSFORM_FAILED,
                 ])
                 .inc();
             let err_msg = format!(
-                "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
-                org_id, stream_name, err, row
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row.",
             );
             log::warn!("{err_msg}");
             (row, Some(err_msg))
@@ -233,7 +229,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     if triggers.is_empty() {
         return;
     }
-    log::debug!("Evaluating triggers: {:?}", triggers);
+    log::debug!("Evaluating triggers: {triggers:?}");
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
@@ -262,7 +258,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
-                log::error!("Failed to send notification: {}", e);
+                log::error!("Failed to send notification: {e}");
                 trigger_data_stream.status = TriggerDataStatus::Failed;
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
@@ -303,7 +299,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                     })
                     .await
                     {
-                        log::error!("Failed to update trigger: {}", e);
+                        log::error!("Failed to update trigger: {e}");
                     }
                     trigger_data_stream.next_run_at = next_run_at;
                 }
@@ -397,7 +393,7 @@ pub async fn write_file(
             stream_name,
             e
         );
-        return Err(e.into());
+        return Err(Error::IngestionError(e.to_string()));
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;
@@ -405,27 +401,47 @@ pub async fn write_file(
     Ok(req_stats)
 }
 
-pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
+pub async fn check_ingestion_allowed(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: Option<&str>,
+) -> Result<()> {
     if !LOCAL_NODE.is_ingester() {
-        return Err(anyhow!("not an ingester"));
+        return Err(Error::IngestionError("not an ingester".to_string()));
     }
 
     // check if the org is blocked
     if !db::file_list::BLOCKED_ORGS.is_empty()
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
-        return Err(anyhow!("Quota exceeded for this organization [{}]", org_id));
+        return Err(Error::IngestionError(format!(
+            "Quota exceeded for this organization [{org_id}]"
+        )));
     }
 
     // check if we are allowed to ingest
-    if let Some(stream_name) = stream_name {
-        if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, stream_name, None) {
-            return Err(anyhow!("stream [{stream_name}] is being deleted"));
+    if let Some(stream_name) = stream_name
+        && db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None)
+    {
+        return Err(Error::IngestionError(format!(
+            "stream [{stream_name}] is being deleted"
+        )));
+    }
+
+    #[cfg(feature = "cloud")]
+    {
+        if !super::organization::is_org_in_free_trial_period(org_id).await? {
+            return Err(Error::IngestionError(format!(
+                "org {org_id} has expired its trial period"
+            )));
         }
-    };
+    }
+
+    // check memory circuit breaker
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // check memtable
-    ingester::check_memtable_size()?;
+    ingester::check_memtable_size().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     Ok(())
 }
@@ -549,7 +565,7 @@ pub async fn get_uds_and_original_data_streams(
 
 /// Calls the SnowflakeIdGenerator instance associated with this stream to generate a new i64 ID.
 pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamType) -> i64 {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     STREAM_RECORD_ID_GENERATOR
         .entry(key)
         .or_insert_with(|| SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }))
@@ -565,7 +581,9 @@ pub fn create_log_ingestion_req(
         Ok(IngestionType::Multi) => Ok(IngestionRequest::Multi(data)),
         Ok(IngestionType::Usage) => Ok(IngestionRequest::Usage(data)),
         Ok(IngestionType::Rum) => Ok(IngestionRequest::RUM(data)),
-        _ => Err(anyhow::anyhow!("Not yet supported")),
+        _ => Err(Error::IngestionError(
+            "Ingestion type not yet supported".to_string(),
+        )),
     }
 }
 

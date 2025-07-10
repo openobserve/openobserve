@@ -16,17 +16,19 @@
 use std::fmt::Debug;
 
 use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
-use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use base64::Engine;
-use config::utils::json;
+use config::{
+    meta::user::UserRole,
+    utils::{hash::get_passcode_hash, json},
+};
 use futures::future::{Ready, ready};
 use once_cell::sync::Lazy;
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::{
-        infra::config::USER_SESSIONS,
-        {meta, meta::ingestion::INGESTION_EP},
+    crate::{
+        common::{infra::config::USER_SESSIONS, meta::ingestion::INGESTION_EP},
+        service::users::get_user,
     },
     jsonwebtoken::TokenData,
     o2_dex::service::auth::get_dex_jwks,
@@ -37,11 +39,11 @@ use {
 };
 
 use crate::common::{
-    infra::config::{PASSWORD_HASH, USERS},
+    infra::config::{ORG_USERS, PASSWORD_HASH},
     meta::{
         authz::Authz,
         organization::DEFAULT_ORG,
-        user::{AuthTokens, UserRole},
+        user::{AuthTokens, UserOrgRole},
     },
 };
 
@@ -54,6 +56,17 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
     let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
     Regex::new(&pattern).unwrap()
 });
+
+pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+.-]*[a-zA-Z0-9_+])?)@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
+    )
+    .unwrap()
+});
+
+pub fn is_valid_email(email: &str) -> bool {
+    EMAIL_REGEX.is_match(email)
+}
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
@@ -79,17 +92,7 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     match hash {
         Some(ret_hash) => ret_hash.value().to_string(),
         None => {
-            let t_cost = 4;
-            let m_cost = 2048;
-            let p_cost = 2;
-            let params = Params::new(m_cost, t_cost, p_cost, None).unwrap();
-            let ctx = Argon2::new(Algorithm::Argon2d, Version::V0x10, params);
-            let password = pass.as_bytes();
-            let salt_string = SaltString::encode_b64(salt.as_bytes()).unwrap();
-            let password_hash = ctx
-                .hash_password(password, &salt_string)
-                .unwrap()
-                .to_string();
+            let password_hash = get_passcode_hash(pass, salt);
             PASSWORD_HASH.insert(key, password_hash.clone());
             password_hash
         }
@@ -97,22 +100,46 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
 }
 
 pub(crate) fn is_root_user(user_id: &str) -> bool {
-    match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
+    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
 }
 
 #[cfg(feature = "enterprise")]
-pub fn get_role(role: UserRole) -> UserRole {
+pub async fn save_org_tuples(org_id: &str) {
+    use o2_openfga::config::get_config as get_openfga_config;
+
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::save_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn save_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
+pub async fn delete_org_tuples(org_id: &str) {
+    use o2_openfga::config::get_config as get_openfga_config;
+
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn delete_org_tuples(_org_id: &str) {}
+
+#[cfg(feature = "enterprise")]
+pub fn get_role(role: &UserOrgRole) -> UserRole {
     use std::str::FromStr;
 
-    let role = o2_openfga::authorizer::roles::get_role(format!("{role}"));
+    let role = o2_openfga::authorizer::roles::get_role(format!("{}", role.base_role));
     UserRole::from_str(&role).unwrap()
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub fn get_role(_role: UserRole) -> UserRole {
+pub fn get_role(_role: &UserOrgRole) -> UserRole {
     UserRole::Admin
 }
 
@@ -179,12 +206,12 @@ impl FromRequest for UserEmail {
     type Future = Ready<Result<Self, Error>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(auth_header) = req.headers().get("user_id") {
-            if let Ok(user_str) = auth_header.to_str() {
-                return ready(Ok(UserEmail {
-                    user_id: user_str.to_owned(),
-                }));
-            }
+        if let Some(auth_header) = req.headers().get("user_id")
+            && let Ok(user_str) = auth_header.to_str()
+        {
+            return ready(Ok(UserEmail {
+                user_id: user_str.to_lowercase(),
+            }));
         }
         ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
     }
@@ -240,17 +267,17 @@ impl FromRequest for AuthExtractor {
         // This is case for ingestion endpoints where we need to check
         // permissions on the stream
         if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
+            if let Some(auth_header) = req.headers().get("Authorization")
+                && let Ok(auth_str) = auth_header.to_str()
+            {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: format!("stream:{org_id}"),
+                    org_id,
+                    bypass_check: true,
+                    parent_id: folder,
+                }));
             }
             return ready(Err(actix_web::error::ErrorUnauthorized(
                 "Unauthorized Access",
@@ -262,7 +289,7 @@ impl FromRequest for AuthExtractor {
         let object_type = if url_len == 1 {
             // for organization entity itself, get requires the list
             // permissions, and the object is a special format string
-            if method.eq("GET") && path_columns[0].eq("organizations") {
+            if path_columns[0].eq("organizations") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 };
@@ -284,12 +311,28 @@ impl FromRequest for AuthExtractor {
                 method = "LIST".to_string();
             }
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
+            let key = if path_columns[1].eq("invites") {
+                "users"
+            } else if (path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
+                && method.eq("PUT")
+            {
+                "organizations"
+            } else {
+                path_columns[1]
+            };
+
+            // for organization api changes we need perms on _all_{org}
+            let entity = match (key, path_columns[1]) {
+                ("organizations", "extend_trial_period") => "_all__meta".to_string(),
+                ("organizations", "organizations") => path_columns[0].to_string(),
+                ("organizations", _) => format!("_all_{}", path_columns[0]),
+                _ => path_columns[0].to_string(),
+            };
+
             format!(
                 "{}:{}",
-                OFGA_MODELS
-                    .get(path_columns[1])
-                    .map_or(path_columns[1], |model| model.key),
-                path_columns[0]
+                OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                entity
             )
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
@@ -351,12 +394,23 @@ impl FromRequest for AuthExtractor {
             } else if path_columns[2].starts_with("_values")
                 || path_columns[2].starts_with("_around")
             {
+                if method.eq("POST") {
+                    // For _around search, the rbac check will be "GET"
+                    method = "GET".to_string();
+                }
                 // special case of _values/_around , where we need permission on that stream,
                 // as it is part of search, but still 3-part route
                 format!(
                     "{}:{}",
                     OFGA_MODELS.get("streams").unwrap().key,
                     path_columns[1]
+                )
+            } else if path_columns[1].starts_with("rename") {
+                // Org rename
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("organizations").unwrap().key,
+                    org_id
                 )
             } else if (method.eq("PUT") && !path_columns[1].starts_with("ratelimit"))
                 || method.eq("DELETE")
@@ -585,23 +639,22 @@ impl FromRequest for AuthExtractor {
         };
 
         // Check if the ws request is using internal grpc token
-        if method.eq("GET") && path.contains("/ws") {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if auth_header
-                    .to_str()
-                    .unwrap()
-                    .eq(&get_config().grpc.internal_grpc_token)
-                {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_header.to_str().unwrap().to_string(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
-            }
+        if method.eq("GET")
+            && path.contains("/ws")
+            && let Some(auth_header) = req.headers().get("Authorization")
+            && auth_header
+                .to_str()
+                .unwrap()
+                .eq(&get_config().grpc.internal_grpc_token)
+        {
+            return ready(Ok(AuthExtractor {
+                auth: auth_header.to_str().unwrap().to_string(),
+                method,
+                o2_type: format!("stream:{org_id}"),
+                org_id,
+                bypass_check: true,
+                parent_id: folder,
+            }));
         }
 
         let auth_str = extract_auth_str(req);
@@ -619,6 +672,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("query_manager")
                 || path.contains("/short")
                 || path.contains("/ws")
+                || path.contains("/_values_stream")
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
@@ -647,7 +701,7 @@ impl FromRequest for AuthExtractor {
                                 .as_str(),
                             )
                         } else {
-                            object_type.replace("stream:", format!("{}:", stream_type).as_str())
+                            object_type.replace("stream:", format!("{stream_type}:").as_str())
                         }
                     }
                     None => object_type,
@@ -717,7 +771,6 @@ impl FromRequest for AuthExtractor {
                 parent_id: folder,
             }));
         }
-        //}
         log::info!(
             "AuthExtractor::from_request took {} ms",
             start.elapsed().as_millis()
@@ -730,12 +783,14 @@ impl FromRequest for AuthExtractor {
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
-            let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+            let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+            let auth_tokens: AuthTokens =
+                json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
-                format!("Bearer {}", access_token)
+                format!("Bearer {access_token}")
             }
         } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
@@ -769,12 +824,17 @@ impl FromRequest for AuthExtractor {
 pub fn extract_auth_str(req: &HttpRequest) -> String {
     let auth_ext_cookie = |req: &HttpRequest| -> String {
         req.cookie("auth_ext")
-            .map(|cookie| cookie.value().to_string())
+            .map(|cookie| {
+                let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+                std::str::from_utf8(&val).unwrap_or_default().to_string()
+            })
             .unwrap_or_default()
     };
 
     if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
         if access_token.is_empty() {
             // If cookie was set but access token is still empty
@@ -791,10 +851,11 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
                 None => access_token,
             }
         } else {
-            format!("Bearer {}", access_token)
+            format!("Bearer {access_token}")
         }
     } else if let Some(cookie) = req.cookie("auth_ext") {
-        cookie.value().to_string()
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        std::str::from_utf8(&val).unwrap_or_default().to_string()
     } else if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             auth_str.to_owned()
@@ -831,13 +892,10 @@ pub fn generate_presigned_url(
     let stage2 = get_hash(&format!("{}{}", &stage1, time), salt);
     let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
 
-    let user_pass = format!("{}:{}", username, stage3);
+    let user_pass = format!("{username}:{stage3}");
     let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
 
-    format!(
-        "{}/auth/login?request_time={}&exp_in={}&auth={}",
-        base_url, time, exp_in, auth
-    )
+    format!("{base_url}/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}")
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -862,7 +920,7 @@ pub async fn check_permissions(
     parent_id: &str,
 ) -> bool {
     if !is_root_user(user_id) {
-        let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+        let user: config::meta::user::User = match get_user(Some(org_id), user_id).await {
             Some(user) => user.clone(),
             None => return false,
         }
@@ -910,7 +968,7 @@ pub async fn extract_auth_expiry_and_user_id(
             .and_then(|exp| exp.as_i64())
             .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0)),
         Err(e) => {
-            log::error!("Error verifying token: {}", e);
+            log::error!("Error verifying token: {e}");
             None
         }
     };
@@ -931,12 +989,12 @@ pub async fn extract_auth_expiry_and_user_id(
         let stripped_bearer_token = match crate::service::db::session::get(session_key).await {
             Ok(bearer_token) => bearer_token,
             Err(e) => {
-                log::error!("Error getting session: {}", e);
+                log::error!("Error getting session: {e}");
                 return (None, None);
             }
         };
         let exp = decode(&stripped_bearer_token).await;
-        let bearer_full_token = format!("Bearer {}", stripped_bearer_token);
+        let bearer_full_token = format!("Bearer {stripped_bearer_token}");
         let user_id = get_user_email_from_auth_str(&bearer_full_token).await;
         return (exp, user_id);
     }
@@ -986,10 +1044,46 @@ async fn decode_expiry(token: &str) -> Result<TokenData<HashMap<String, Value>>,
 
 #[cfg(test)]
 mod tests {
-    use infra::db as infra_db;
+    use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{
+        common::meta::user::UserRequest,
+        service::{self, organization, users},
+    };
+
+    #[test]
+    fn test_valid_emails() {
+        assert!(is_valid_email("user@example.com"));
+        assert!(is_valid_email("john.doe+123@mail.co.in"));
+        assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        assert!(!is_valid_email("no-at-symbol.com"));
+        assert!(!is_valid_email("@missing-user.com"));
+        assert!(!is_valid_email("user@.com"));
+        assert!(!is_valid_email("user@com"));
+        assert!(!is_valid_email("user@domain..com"));
+    }
+
+    #[test]
+    fn test_is_ofga_unsupported() {
+        assert!(is_ofga_unsupported("abc:123"));
+        assert!(is_ofga_unsupported("name with space"));
+        assert!(is_ofga_unsupported("foo&bar"));
+        assert!(!is_ofga_unsupported("valid_name"));
+        assert!(!is_ofga_unsupported("name_with_underscores"));
+    }
+
+    #[test]
+    fn test_into_ofga_supported_format() {
+        assert_eq!(into_ofga_supported_format("foo:bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo#bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo : bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format(" a  & b "), "_a_b_");
+        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a:b#c?d e"), "a_b_c_d_e");
+        assert_eq!(into_ofga_supported_format("foo & bar % baz"), "foo_bar_baz");
+    }
 
     #[test]
     fn test_generate_presigned_url() {
@@ -1020,14 +1114,22 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
-        let _ = users::create_root_user(
+        infra_table::create_user_tables().await.unwrap();
+        organization::check_and_create_org_without_ofga(DEFAULT_ORG)
+            .await
+            .unwrap();
+        let _ = users::create_root_user_if_not_exists(
             DEFAULT_ORG,
             UserRequest {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: UserOrgRole {
+                    base_role: config::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
@@ -1035,6 +1137,9 @@ mod tests {
             },
         )
         .await;
+        service::db::user::cache().await.unwrap();
+        service::db::organization::cache().await.unwrap();
+        service::db::org_users::cache().await.unwrap();
         assert!(is_root_user("root@example.com"));
         assert!(!is_root_user("root2@example.com"));
     }
@@ -1053,14 +1158,13 @@ mod tests {
         let pass2 = get_hash(&format!("{}{}", &pass1, time), "openobserve");
         let exp_in = 600;
         let pass3 = get_hash(&format!("{}{}", &pass2, exp_in), "openobserve");
-        println!("time: {}", time);
-        println!("pass3: {}", pass3);
+        println!("time: {time}");
+        println!("pass3: {pass3}");
 
         let user_pass = format!("{}:{}", "b@b.com", pass3);
         let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
         println!(
-            "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
-            time, exp_in, auth
+            "http://localhost:5080/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
         );
     }
 }

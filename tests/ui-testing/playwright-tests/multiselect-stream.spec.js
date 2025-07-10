@@ -1,6 +1,6 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -97,7 +97,7 @@ test.describe("Stream multiselect testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
+    await logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
     await logsPage.clickQuickModeToggle();
 
@@ -112,7 +112,7 @@ async function multistreamselect(page) {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click();
     await page.waitForTimeout(4000);
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines').click()
+    await page.locator('#fnEditor').getByRole('textbox').click()
 //   await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click({force:true});
     const cell = await page.getByRole('cell', { name: /Common Group Fields/ });
 
@@ -134,7 +134,7 @@ async function multistreamselect(page) {
 
   test("should add a function and display it in streams", async ({ page }) => {
 await multistreamselect(page);
-await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
 await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page

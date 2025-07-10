@@ -18,7 +18,8 @@ use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
-        QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
+        ConditionList, QueryCondition as MetaQueryCondition,
+        TriggerCondition as MetaTriggerCondition,
         alert::{Alert as MetaAlert, ListAlertsParams},
     },
     folder::{Folder as MetaFolder, FolderType},
@@ -73,7 +74,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .context_attributes
             .map(serde_json::from_value)
             .transpose()?;
-        let query_conditions: Option<Vec<intermediate::QueryCondition>> = value
+        let query_conditions: Option<ConditionList> = value
             .query_conditions
             .map(serde_json::from_value)
             .transpose()?;
@@ -95,7 +96,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         let updated_at_utc: Option<DateTime<FixedOffset>> = value
             .updated_at
             .and_then(|secs| Utc.timestamp_opt(secs, 0).single())
-            .map(|dt| dt.into());
+            .map(|dt: DateTime<Utc>| dt.into());
 
         let mut alert: MetaAlert = Default::default();
         alert.id = Some(id);
@@ -115,7 +116,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.updated_at = updated_at_utc;
         alert.query_condition = MetaQueryCondition {
             query_type: query_type.into(),
-            conditions: query_conditions.map(|cs| cs.into_iter().map(|c| c.into()).collect()),
+            conditions: query_conditions,
             sql: value.query_sql,
             promql: value.query_promql,
             promql_condition: query_promql_condition.map(|c| c.into()),
@@ -126,6 +127,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
                 .map(|ds| ds.into_iter().map(|d| d.into()).collect()),
         };
         alert.trigger_condition = MetaTriggerCondition {
+            align_time: value.align_time,
             // DB model stores period in seconds, but service layer stores
             // minutes.
             period: value.trigger_period_seconds / 60,
@@ -311,7 +313,7 @@ pub async fn create<C: TransactionTrait>(
     let alert_m: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
     let alert = alert_m.try_into()?;
     txn.commit().await?;
-    log::debug!("Alert created: {:?}", alert);
+    log::debug!("Alert created: {alert:?}");
     Ok(alert)
 }
 
@@ -592,11 +594,6 @@ fn update_mutable_fields(
     let query_conditions = alert
         .query_condition
         .conditions
-        .map(|cs| {
-            cs.into_iter()
-                .map(intermediate::QueryCondition::from)
-                .collect_vec()
-        })
         .map(serde_json::to_value)
         .transpose()?;
     let query_sql = alert.query_condition.sql.filter(|s| !s.is_empty());
@@ -649,7 +646,8 @@ fn update_mutable_fields(
     let trigger_tolerance_seconds = alert.trigger_condition.tolerance_in_secs;
     let owner = alert.owner.filter(|s| !s.is_empty());
     let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
-    let updated_at: i64 = chrono::Utc::now().timestamp();
+    let align_time = alert.trigger_condition.align_time;
+    let updated_at: i64 = chrono::Utc::now().timestamp_micros();
 
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
@@ -681,7 +679,7 @@ fn update_mutable_fields(
     alert_am.owner = Set(owner);
     alert_am.last_edited_by = Set(last_edited_by);
     alert_am.updated_at = Set(Some(updated_at));
-
+    alert_am.align_time = Set(align_time);
     Ok(())
 }
 

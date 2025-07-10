@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed, watch, onBeforeMount } from "vue";
+import { reactive, computed, watch, onBeforeMount, onUnmounted } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
+import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 
 const colors = [
   "#5960b2",
@@ -37,7 +38,7 @@ const colors = [
 ];
 let parser: any;
 
-const getDefaultDashboardPanelData: any = () => ({
+const getDefaultDashboardPanelData: any = (store: any) => ({
   data: {
     version: 5,
     id: "",
@@ -48,6 +49,7 @@ const getDefaultDashboardPanelData: any = () => ({
       trellis: {
         layout: null,
         num_of_columns: 1,
+        group_by_y_axis: false,
       },
       show_legends: true,
       legends_position: null,
@@ -66,7 +68,8 @@ const getDefaultDashboardPanelData: any = () => ({
         position: null,
         rotate: 0,
       },
-      show_symbol: true,
+      show_symbol:
+        store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
       line_interpolation: "smooth",
       legend_width: {
         value: null,
@@ -154,7 +157,7 @@ const getDefaultDashboardPanelData: any = () => ({
   layout: {
     splitter: 20,
     querySplitter: 41,
-    showQueryBar: false,
+    showQueryBar: true,
     isConfigPanelOpen: false,
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
@@ -192,9 +195,7 @@ const getDefaultDashboardPanelData: any = () => ({
   },
 });
 
-const dashboardPanelDataObj: any = {
-  dashboard: reactive({ ...getDefaultDashboardPanelData() }),
-};
+const dashboardPanelDataObj: any = {};
 
 const getDefaultCustomChartText = () => {
   return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
@@ -204,11 +205,12 @@ const getDefaultCustomChartText = () => {
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
+  const valuesWebSocket = useValuesWebSocket();
 
   // Initialize the state for this page key if it doesn't already exist
   if (!dashboardPanelDataObj[pageKey]) {
     dashboardPanelDataObj[pageKey] = reactive({
-      ...getDefaultDashboardPanelData(),
+      ...getDefaultDashboardPanelData(store),
     });
   }
 
@@ -224,7 +226,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   // get default queries
   const getDefaultQueries = () => {
-    return getDefaultDashboardPanelData().data.queries;
+    return getDefaultDashboardPanelData(store).data.queries;
   };
 
   const addQuery = () => {
@@ -275,7 +277,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetDashboardPanelData = () => {
-    Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
+    Object.assign(dashboardPanelData, getDefaultDashboardPanelData(store));
   };
 
   const resetDashboardPanelDataAndAddTimeField = () => {
@@ -1248,7 +1250,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
 
     try {
-      const res = await StreamService.fieldValues({
+      const queryReq = {
         org_identifier: store.state.selectedOrganization.identifier,
         stream_name: currentQuery.fields.stream,
         start_time: new Date(
@@ -1261,14 +1263,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         size: 100,
         type: currentQuery.fields.stream_type,
         no_count: true,
-      });
+      };
 
-      dashboardPanelData.meta.filterValue.push({
-        column: name,
-        value: res?.data?.hits?.[0]?.values
-          .map((it: any) => it.zo_sql_key)
-          .filter((it: any) => it),
-      });
+      const res = await valuesWebSocket.fetchFieldValues(
+        queryReq,
+        dashboardPanelData,
+        name,
+      );
     } catch (error: any) {
       const errorDetailValue =
         error.response?.data.error_detail ||
@@ -1283,53 +1284,44 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  const loadFilterItem = (name: any) => {
-    StreamService.fieldValues({
-      org_identifier: store.state.selectedOrganization.identifier,
-      stream_name:
-        dashboardPanelData.data.queries[
+  const loadFilterItem = async (name: any) => {
+    try {
+      const queryReq = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        stream_name:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+        start_time: new Date(
+          dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
+        ).getTime(),
+        end_time: new Date(
+          dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
+        ).getTime(),
+        fields: [name],
+        size: 100,
+        type: dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-      start_time: new Date(
-        dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
-      ).getTime(),
-      end_time: new Date(
-        dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
-      ).getTime(),
-      fields: [name],
-      size: 100,
-      type: dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream_type,
-      no_count: true,
-    })
-      .then((res: any) => {
-        const find = dashboardPanelData.meta.filterValue.findIndex(
-          (it: any) => it.column == name,
-        );
-        if (find >= 0) {
-          dashboardPanelData.meta.filterValue.splice(find, 1);
-        }
-        dashboardPanelData.meta.filterValue.push({
-          column: name,
-          value: res?.data?.hits?.[0]?.values
-            .map((it: any) => it.zo_sql_key)
-            .filter((it: any) => it)
-            .map((it: any) => String(it)),
-        });
-      })
-      .catch((error: any) => {
-        const errorDetailValue =
-          error.response?.data.error_detail ||
-          error.response?.data.message ||
-          "Something went wrong!";
-        const trimmedErrorMessage =
-          errorDetailValue.length > 300
-            ? errorDetailValue.slice(0, 300) + " ..."
-            : errorDetailValue;
+        ].fields.stream_type,
+        no_count: true,
+      };
 
-        showErrorNotification(trimmedErrorMessage);
-      });
+      const response = await valuesWebSocket.fetchFieldValues(
+        queryReq,
+        dashboardPanelData,
+        name,
+      );
+    } catch (error: any) {
+      const errorDetailValue =
+        error.response?.data.error_detail ||
+        error.response?.data.message ||
+        "Something went wrong!";
+      const trimmedErrorMessage =
+        errorDetailValue.length > 300
+          ? errorDetailValue.slice(0, 300) + " ..."
+          : errorDetailValue;
+      showErrorNotification(trimmedErrorMessage);
+    }
   };
 
   const removeXYFilters = () => {
@@ -1906,6 +1898,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     await importSqlParser();
   });
 
+  onUnmounted(async () => {
+    parser = null;
+  });
+
   const importSqlParser = async () => {
     const useSqlParser: any = await import("@/composables/useParser");
     const { sqlParser }: any = useSqlParser.default();
@@ -1937,7 +1933,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // escape any single quotes in the value
     tempValue = escapeSingleQuotes(tempValue);
     // add double quotes around the value
-    tempValue = columnType == "Utf8" ? `'${tempValue}'` : `${tempValue}`;
+    tempValue =
+      columnType == "Utf8" || columnType === undefined
+        ? `'${tempValue}'`
+        : `${tempValue}`;
+
     return tempValue;
   };
 
@@ -1959,7 +1959,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
       return value;
     } else {
-      return splitQuotedString(value)
+      return splitQuotedString(value ?? "")
         ?.map((it: any) => {
           return `'${escapeSingleQuotes(it)}'`;
         })
@@ -2028,13 +2028,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           )})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "match_all_raw") {
-          selectFilter += `match_all_raw(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "match_all_raw_ignore_case") {
-          selectFilter += `match_all_raw_ignore_case(${formatValue(
-            condition.value,
-            condition.column,
-          )})`;
         } else if (condition.operator === "str_match") {
           selectFilter += `str_match(${condition.column}, ${formatValue(
             condition.value,

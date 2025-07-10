@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod actions;
+#[cfg(feature = "enterprise")]
+pub mod ai;
 pub mod alerts;
 pub mod authz;
+#[cfg(feature = "cloud")]
+pub mod cloud;
 pub mod clusters;
 pub mod dashboards;
 pub mod enrichment_table;
@@ -41,7 +45,6 @@ pub mod stream;
 pub mod syslog;
 pub mod traces;
 pub mod users;
-pub mod ws_v2;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

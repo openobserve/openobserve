@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
 use config::meta::timed_annotations::{
     ListTimedAnnotationsQuery, TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq,
 };
@@ -65,11 +65,11 @@ pub async fn create_annotations(
     match timed_annotations::create_timed_annotations(&dashboard_id, req).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
-            log::error!("Error creating timed annotations: {}", e);
+            log::error!("Error creating timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500,
-                    "Failed to create timed annotations".to_string(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to create timed annotations",
                 )),
             )
         }
@@ -125,11 +125,11 @@ pub async fn get_annotations(
     {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => {
-            log::error!("Error getting timed annotations: {}", e);
+            log::error!("Error getting timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500,
-                    "Failed to get timed annotations".to_string(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to get timed annotations",
                 )),
             )
         }
@@ -175,11 +175,11 @@ pub async fn delete_annotations(
     match timed_annotations::delete_timed_annotations(&dashboard_id, req).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
-            log::error!("Error deleting timed annotations: {}", e);
+            log::error!("Error deleting timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500,
-                    "Failed to delete timed annotations".to_string(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to delete timed annotations",
                 )),
             )
         }
@@ -229,11 +229,11 @@ pub async fn update_annotations(
     {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
-            log::error!("Error updating timed annotations: {}", e);
+            log::error!("Error updating timed annotations: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500,
-                    "Failed to update timed annotations".to_string(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to update timed annotations",
                 )),
             )
         }
@@ -280,11 +280,11 @@ pub async fn delete_annotation_panels(
     match timed_annotations::delete_timed_annotation_panels(&timed_annotation_id, panels).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
-            log::error!("Error deleting timed annotation panels: {}", e);
+            log::error!("Error deleting timed annotation panels: {e}");
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500,
-                    "Failed to delete timed annotation panels".to_string(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to delete timed annotation panels",
                 )),
             )
         }

@@ -21,9 +21,8 @@ use config::{
         cluster::{IntoArcVec, RoleGroup},
         search::{ScanStats, SearchEventType},
         sql::TableReferenceExt,
-        stream::{FileKey, StreamType},
+        stream::StreamType,
     },
-    utils::time::BASE_TIME,
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
@@ -34,30 +33,27 @@ use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
     errors::{Error, Result},
     file_list::FileId,
-    schema::get_stream_setting_index_fields,
 };
-use proto::cluster_rpc::{KvItem, SearchQuery};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::search::{
-    cluster::flight::{
-        check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
-        partition_filt_list,
-    },
-    datafusion::{
-        distributed_plan::{
-            NewEmptyExecVisitor,
-            codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-            empty_exec::NewEmptyExec,
-            node::{RemoteScanNode, SearchInfos},
-            remote_scan::RemoteScanExec,
+use crate::service::{
+    db::enrichment_table,
+    search::{
+        cluster::flight::{check_work_group, get_online_querier_nodes, partition_filt_list},
+        datafusion::{
+            distributed_plan::{
+                NewEmptyExecVisitor,
+                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                empty_exec::NewEmptyExec,
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan::RemoteScanExec,
+            },
+            exec::{prepare_datafusion_context, register_udf},
         },
-        exec::{prepare_datafusion_context, register_udf},
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        request::{FlightSearchRequest, Request},
+        utils::AsyncDefer,
     },
-    generate_filter_from_equal_items,
-    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    request::{FlightSearchRequest, Request},
-    utils::AsyncDefer,
 };
 
 /// in cluster search function only single stream take part in
@@ -84,6 +80,7 @@ pub async fn search(
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx = prepare_datafusion_context(
+        &trace_id,
         req.work_group.clone(),
         vec![],
         vec![],
@@ -123,52 +120,37 @@ pub async fn search(
 
     // get stream name
     let stream = TableReference::from(empty_exec.name());
-    let stream_name = stream.stream_name();
     let stream_type = stream.get_stream_type(req.stream_type);
 
     // 1. get file id list
-    let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
-
+    let file_id_list =
+        get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
+    let file_id_list_num = file_id_list_vec.len();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
-                req.time_range,
-                file_id_list_vec.len(),
-                file_id_list_took,
+                req.time_range, file_id_list_num, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("super:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_vec.len(),))
+                .desc(format!("get files {file_id_list_num} ids"))
                 .build()
         )
     );
 
     let mut scan_stats = ScanStats {
-        files: file_id_list_vec.len() as i64,
+        files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
         file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
-
-    // 2. get inverted index file list
-    let (use_ttv_inverted_index, idx_file_list, idx_scan_size, _idx_took) =
-        get_inverted_index_file_lists(
-            &trace_id,
-            &req,
-            &stream_name, // for inverted index search, only have on stream
-            &flight_request.index_info.equal_keys,
-            &flight_request.index_info.match_all_keys,
-        )
-        .await?;
-    scan_stats.idx_scan_size = idx_scan_size as i64;
-    req.set_use_inverted_index(use_ttv_inverted_index);
 
     // get nodes
     let get_node_start = std::time::Instant::now();
@@ -180,7 +162,7 @@ pub async fn search(
                 .ok()
                 .map(RoleGroup::from)
         })
-        .unwrap_or(None);
+        .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
@@ -198,7 +180,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] super->follower_leader: get nodes num: {}, querier num: {}",
+                "[trace_id {trace_id}] flight->follower_leader: get nodes num: {}, querier num: {}",
                 nodes.len(),
                 querier_num,
             ),
@@ -252,6 +234,28 @@ pub async fn search(
 
     // partition file list
     let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
+    let mut need_ingesters = 0;
+    let mut need_queriers = 0;
+    for (i, node) in nodes.iter().enumerate() {
+        if node.is_ingester() {
+            need_ingesters += 1;
+            continue;
+        }
+        if node.is_querier()
+            && partition_file_lists
+                .get(i)
+                .map(|v| !v.is_empty())
+                .unwrap_or_default()
+        {
+            need_queriers += 1;
+        }
+    }
+    log::info!(
+        "[trace_id {trace_id}] flight->follower_leader: get files num: {}, need ingester num: {}, need querier num: {}",
+        file_id_list_num,
+        need_ingesters,
+        need_queriers,
+    );
 
     // update search session scan stats
     super::super::SEARCH_SERVER
@@ -267,10 +271,11 @@ pub async fn search(
     let search_infos = SearchInfos {
         plan: vec![],
         file_id_list: partition_file_lists.clone(),
-        idx_file_list,
         start_time: req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
         end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
         timeout: req.timeout as u64,
+        use_cache: req.use_cache,
+        histogram_interval: req.histogram_interval,
     };
 
     let context = tracing::Span::current().context();
@@ -291,7 +296,14 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
     }
 
-    log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish",);
+    log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish");
+
+    // we should collect scan state by `collect_stats`, here need to reutrn empty for super cluster
+    // follower
+    scan_stats.files = 0;
+    scan_stats.records = 0;
+    scan_stats.original_size = 0;
+    scan_stats.compressed_size = 0;
 
     Ok((ctx, physical_plan, defer, scan_stats))
 }
@@ -301,6 +313,7 @@ pub async fn search(
     skip_all
 )]
 pub async fn get_file_id_lists(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream: &TableReference,
@@ -309,83 +322,20 @@ pub async fn get_file_id_lists(
     let stream_name = stream.stream_name();
     let stream_type = stream.get_stream_type(stream_type);
     // if stream is enrich, rewrite the time_range
-    if let Some(schema) = stream.schema() {
-        if schema == "enrich" || schema == "enrichment_tables" {
-            let start = BASE_TIME.timestamp_micros();
-            let end = config::utils::time::now_micros();
-            time_range = Some((start, end));
-        }
+    if let Some(schema) = stream.schema()
+        && (schema == "enrich" || schema == "enrichment_tables")
+    {
+        let start = enrichment_table::get_start_time(org_id, &stream_name).await;
+        let end = config::utils::time::now_micros();
+        time_range = Some((start, end));
     }
-    let file_id_list =
-        crate::service::file_list::query_ids(org_id, stream_type, &stream_name, time_range).await?;
+    let file_id_list = crate::service::file_list::query_ids(
+        trace_id,
+        org_id,
+        stream_type,
+        &stream_name,
+        time_range,
+    )
+    .await?;
     Ok(file_id_list)
-}
-
-#[tracing::instrument(
-    name = "service:search:super_cluster:follower:get_inverted_index_file_lists",
-    skip_all
-)]
-async fn get_inverted_index_file_lists(
-    trace_id: &str,
-    req: &Request,
-    stream_name: &str,
-    equal_terms: &[KvItem],
-    match_terms: &[String],
-) -> Result<(bool, Vec<FileKey>, usize, usize)> {
-    let cfg = config::get_config();
-    #[allow(deprecated)]
-    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
-    let use_inverted_index = req.use_inverted_index;
-    let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
-    let use_ttv_inverted_index = use_inverted_index && inverted_index_type == "tantivy";
-    log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: use_inverted_index with parquet format {}",
-        use_parquet_inverted_index
-    );
-
-    if !use_parquet_inverted_index {
-        return Ok((use_ttv_inverted_index, vec![], 0, 0));
-    }
-
-    // construct partition filters
-    let equal_terms: Vec<(String, String)> = equal_terms
-        .iter()
-        .map(|v| (v.key.to_string(), v.value.to_string()))
-        .collect::<Vec<_>>();
-    // filter equal_items with index_fields
-    let schema = infra::schema::get(&req.org_id, stream_name, req.stream_type).await?;
-    let stream_settings = infra::schema::unwrap_stream_settings(&schema);
-    let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let index_terms = super::super::filter_index_fields(&equal_terms, &index_fields);
-
-    // construct SearchQuery for inverted index search
-    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
-    let query = SearchQuery {
-        start_time,
-        end_time,
-        ..Default::default()
-    };
-
-    // use inverted index to filter file list
-    let index_terms = generate_filter_from_equal_items(&index_terms);
-    let mut index_req = req.clone();
-    index_req.trace_id = trace_id.to_string(); // reset trace_id for follower
-    let (idx_file_list, idx_scan_size, idx_took) =
-        get_inverted_index_file_list(index_req, query, stream_name, match_terms, &index_terms)
-            .await?;
-
-    log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
-        req.time_range,
-        idx_file_list.len(),
-        idx_scan_size,
-        idx_took,
-    );
-
-    Ok((
-        use_ttv_inverted_index,
-        idx_file_list,
-        idx_scan_size,
-        idx_took,
-    ))
 }

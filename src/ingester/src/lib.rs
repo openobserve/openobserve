@@ -32,7 +32,10 @@ pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
-pub use writer::{Writer, check_memtable_size, flush_all, get_writer, read_from_memtable};
+pub use writer::{
+    Writer, check_memory_circuit_breaker, check_memtable_size, flush_all, get_writer,
+    read_from_memtable,
+};
 
 use crate::errors::OpenDirSnafu;
 
@@ -64,7 +67,7 @@ pub async fn init() -> errors::Result<()> {
         .unwrap_or_default();
     tokio::task::spawn(async move {
         if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
-            log::error!("replay wal files error: {}", e);
+            log::error!("replay wal files error: {e}");
         }
     });
 
@@ -77,7 +80,7 @@ pub async fn init() -> errors::Result<()> {
             .await;
             // check memtable ttl
             if let Err(e) = writer::check_ttl().await {
-                log::error!("memtable check ttl error: {}", e);
+                log::error!("memtable check ttl error: {e}");
             }
         }
     });
@@ -85,7 +88,7 @@ pub async fn init() -> errors::Result<()> {
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
         if let Err(e) = run().await {
-            log::error!("immutable persist error: {}", e);
+            log::error!("immutable persist error: {e}");
         }
     });
     Ok(())
@@ -128,7 +131,7 @@ async fn run() -> errors::Result<()> {
         interval.tick().await;
         // persist immutable data to disk
         if let Err(e) = immutable::persist(tx.clone()).await {
-            log::error!("immutable persist error: {}", e);
+            log::error!("immutable persist error: {e}");
         }
         // shrink metadata cache
         WAL_PARQUET_METADATA.write().await.shrink_to_fit();
@@ -162,56 +165,41 @@ mod tests {
 
     #[test]
     fn test_is_wal_file_wal_file() {
-        assert_eq!(
-            is_wal_file(
-                true,
-                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
-            ),
-            true
-        );
-        assert_eq!(
-            is_wal_file(
-                true,
-                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/a=b/file.parquet"
-            ),
-            true
-        );
+        assert!(is_wal_file(
+            true,
+            "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+        ));
+        assert!(is_wal_file(
+            true,
+            "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/a=b/file.parquet"
+        ));
     }
 
     #[test]
     fn test_is_wal_file_storage_file() {
-        assert_eq!(
-            is_wal_file(true, "files/org/stype/stream/2025/03/24/00/file.parquet"),
-            false
-        );
-        assert_eq!(
-            is_wal_file(
-                true,
-                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
-            ),
-            false
-        );
+        assert!(!is_wal_file(
+            true,
+            "files/org/stype/stream/2025/03/24/00/file.parquet"
+        ));
+        assert!(!is_wal_file(
+            true,
+            "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+        ));
     }
 
     #[test]
     fn test_is_wal_file_not_local_mode() {
-        assert_eq!(
-            is_wal_file(
-                false,
-                "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
-            ),
-            false
-        );
-        assert_eq!(
-            is_wal_file(false, "files/org/stype/stream/2025/03/24/00/file.parquet"),
-            false
-        );
-        assert_eq!(
-            is_wal_file(
-                false,
-                "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
-            ),
-            false
-        );
+        assert!(!is_wal_file(
+            false,
+            "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
+        ));
+        assert!(!is_wal_file(
+            false,
+            "files/org/stype/stream/2025/03/24/00/file.parquet"
+        ));
+        assert!(!is_wal_file(
+            false,
+            "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
+        ));
     }
 }

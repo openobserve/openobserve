@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
       style="width: 100%"
     >
-      <div class="row">
+      <div class="row tw-min-h-[44px]">
         <div
-          class="col-6 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -33,34 +33,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-9 text-left q-pl-lg q-mt-xs warning flex items-center">
+        <div
+          v-else
+          class="col-7 text-left q-pl-lg q-mt-xs warning flex items-center"
+        >
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
-            color="primary"
-            size="25px"
-            style="margin: 0 auto; display: block"
-          />
-          <q-tooltip
+              color="primary"
+              size="25px"
+              style="margin: 0 auto; display: block"
+            />
+            <q-tooltip
               anchor="center right"
               self="center left"
               max-width="300px"
             >
-              <span style="font-size: 14px"
-                >Fetching the search events</span
-              >
+              <span style="font-size: 14px">Fetching the search events</span>
             </q-tooltip>
-
           </span>
-          <span v-else-if="searchObj.data.histogram.errorCode == -1 && !searchObj.loadingCounter && searchObj.meta.showHistogram" class="q-ml-md " 
-          :class="store.state.theme == 'dark' ? 'histogram-unavailable-text' : 'histogram-unavailable-text-light'"
+          <div
+            v-else-if="
+              searchObj.data.histogram.errorCode == -1 &&
+              !searchObj.loadingCounter &&
+              searchObj.meta.showHistogram
+            "
+            class="q-ml-md tw-cursor-pointer"
+            :class="
+              store.state.theme == 'dark'
+                ? 'histogram-unavailable-text'
+                : 'histogram-unavailable-text-light'
+            "
           >
-            {{ searchObj.data.histogram.errorMsg }}
-          </span>
+            <!-- {{ searchObj.data.histogram.errorMsg }} -->
+            <q-icon name="info" color="warning" size="sm"> </q-icon>
+            <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold">
+              {{ searchObj.data.histogram.errorMsg }}
+            </q-tooltip>
+          </div>
         </div>
 
-        <div class="col-3 text-right q-pr-md q-gutter-xs pagination-block">
-          
+        <div class="col-5 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
             :disable="searchObj.loading == true"
@@ -74,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Math.max(
                 1,
                 (searchObj.communicationMethod === 'ws' ||
+                searchObj.communicationMethod === 'streaming' ||
                 searchObj.meta.jobId != ''
                   ? searchObj.data.queryResults?.pagination?.length
                   : searchObj.data.queryResults?.partitionDetail?.paginations
@@ -110,28 +124,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div v-if="searchObj.data?.histogram?.errorMsg == '' && searchObj.data.histogram.errorCode != -1">
+      <div
+        :style="{
+          height: searchObj.meta.showHistogram ? '100px' : '0px',
+        }"
+        v-if="
+          searchObj.data?.histogram?.errorMsg == '' &&
+          searchObj.data.histogram.errorCode != -1
+        "
+      >
         <ChartRenderer
-          v-if="searchObj.meta.showHistogram && (searchObj.data?.queryResults?.aggs?.length > 0 || ( plotChart && Object.keys(plotChart)?.length > 0))"
+          v-if="
+            searchObj.meta.showHistogram &&
+            (searchObj.data?.queryResults?.aggs?.length > 0 ||
+              (plotChart && Object.keys(plotChart)?.length > 0))
+          "
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
           style="max-height: 100px"
           @updated:dataZoom="onChartUpdate"
         />
-        
-        <div v-else-if="searchObj.meta.showHistogram && (Object.keys(plotChart)?.length == 0) && searchObj.loadingHistogram == false && searchObj.loading == false">
-          <h3
-            class="text-center"
-            style="margin: 30px 0px"
-          >
-            <q-icon name="warning" color="warning" size="xs"></q-icon> No data found for histogram.
+
+        <div
+          style="height: 100px"
+          v-else-if="
+            searchObj.meta.showHistogram &&
+            Object.keys(plotChart)?.length == 0 &&
+            searchObj.loadingHistogram == false &&
+            searchObj.loading == false
+          "
+        >
+          <h3 class="text-center">
+            <span style="min-height: 50px">
+              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
+              found for histogram.</span
+            >
           </h3>
         </div>
+
+        <div
+          style="height: 100px"
+          v-else-if="
+            searchObj.meta.showHistogram && Object.keys(plotChart)?.length == 0
+          "
+        >
+          <h3 class="text-center">
+            <span style="min-height: 50px; color: transparent">.</span>
+          </h3>
+        </div>
+
         <div
           class="q-pb-lg"
-          style=" left: 45%; margin: 30px 0px"
+          style="top: 50px; position: absolute; left: 50%"
           v-if="histogramLoader"
-          
         >
           <q-spinner-hourglass
             color="primary"
@@ -143,17 +188,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else-if="
           searchObj.data.histogram?.errorMsg != '' &&
-          searchObj.meta.showHistogram
-          && searchObj.data.histogram.errorCode != -1
+          searchObj.meta.showHistogram &&
+          searchObj.data.histogram.errorCode != -1
         "
       >
         <h6
           class="text-center"
           style="margin: 30px 0px"
-          v-if="searchObj.data.histogram.errorCode != 0 && searchObj.data.histogram.errorCode != -1"
+          v-if="
+            searchObj.data.histogram.errorCode != 0 &&
+            searchObj.data.histogram.errorCode != -1
+          "
         >
-          <q-icon name="warning" color="warning" size="xs"></q-icon> Error
-          while fetching histogram data.
+          <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
+          fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
             size="sm"
@@ -161,11 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
-            {{ searchObj.data.histogram?.errorMsg }}
+            <SanitizedHtmlRenderer
+              data-test="logs-search-histogram-error-message"
+              :htmlContent="searchObj.data?.histogram?.errorMsg"
+            />
           </span>
         </h6>
-        <h6 class="text-center" v-else-if="searchObj.data.histogram.errorCode != -1">
-          {{ searchObj.data.histogram?.errorMsg }}
+        <h6
+          class="text-center"
+          v-else-if="searchObj.data.histogram.errorCode != -1"
+        >
+          <SanitizedHtmlRenderer
+            data-test="logs-search-histogram-error-message"
+            :htmlContent="searchObj.data?.histogram?.errorMsg"
+          />
         </h6>
       </div>
       <tenstack-table
@@ -179,12 +236,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :functionErrorMsg="searchObj?.data?.functionError"
         :expandedRows="expandedLogs"
         :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+        :highlight-query="
+          searchObj.meta.sqlMode
+            ? searchObj.data.query.toLowerCase().split('where')[1]
+            : searchObj.data.query.toLowerCase()
+        "
         :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
         :style="{
-          height: !searchObj.meta.showHistogram || (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
-            ? 'calc(100% - 40px)'
-            : 'calc(100% - 140px)',
+          height:
+            !searchObj.meta.showHistogram ||
+            (searchObj.meta.showHistogram &&
+              searchObj.data.histogram.errorCode == -1)
+              ? 'calc(100% - 40px)'
+              : 'calc(100% - 140px)',
         }"
         @update:columnSizes="handleColumnSizesUpdate"
         @update:columnOrder="handleColumnOrderUpdate"
@@ -194,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
+        @send-to-ai-chat="sendToAiChat"
         @view-trace="redirectToTraces"
       />
 
@@ -234,6 +300,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ],
             )
           "
+          @sendToAiChat="sendToAiChat"
+          @closeTable="closeTable"
         />
       </q-dialog>
     </div>
@@ -281,6 +349,7 @@ export default defineComponent({
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
+    "sendToAiChat",
   ],
   props: {
     expandedLogs: {
@@ -346,33 +415,43 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        if (this.searchObj.communicationMethod === "ws") {
-            if (this.searchObj.meta.jobId == "") {
-              this.refreshPagination();
-            } else {
-              this.refreshJobPagination();
-            }
+        if (
+          this.searchObj.communicationMethod === "ws" ||
+          this.searchObj.communicationMethod === "streaming"
+        ) {
+          if (this.searchObj.meta.jobId == "") {
+            this.refreshPagination();
           } else {
-            if (this.searchObj.meta.jobId !== "") {
-              this.refreshJobPagination();
-            } else {
-              this.refreshPartitionPagination(true);
-            }
+            this.refreshJobPagination();
           }
+        } else {
+          if (this.searchObj.meta.jobId !== "") {
+            this.refreshJobPagination();
+          } else {
+            this.refreshPartitionPagination(true);
+          }
+        }
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-      //here at first the queryResults is undefined so we are checking if it is undefined then we are setting it to empty array
-        if(this.searchObj.meta.jobId != "" && this.searchObj.data.queryResults.paginations == undefined){
+        //here at first the queryResults is undefined so we are checking if it is undefined then we are setting it to empty array
+        if (
+          this.searchObj.meta.jobId != "" &&
+          this.searchObj.data.queryResults.paginations == undefined
+        ) {
           this.searchObj.data.queryResults.pagination = [];
         }
         const maxPages =
           this.searchObj.communicationMethod === "ws" ||
+          this.searchObj.communicationMethod === "streaming" ||
           this.searchObj.meta.jobId != ""
             ? this.searchObj.data.queryResults.pagination.length
             : this.searchObj.data.queryResults?.partitionDetail?.paginations
                 .length;
-        if (this.pageNumberInput > Math.ceil(maxPages) && this.searchObj.meta.jobId == "") {
+        if (
+          this.pageNumberInput > Math.ceil(maxPages) &&
+          this.searchObj.meta.jobId == ""
+        ) {
           this.$q.notify({
             type: "negative",
             message:
@@ -623,9 +702,17 @@ export default defineComponent({
       }
     });
     //this is used to show the histogram loader when the histogram is loading
-    const histogramLoader = computed(()=>{
-      return (searchObj.meta.showHistogram) && (searchObj.loadingHistogram == true ||  searchObj.loading == true) && ( plotChart.value && Object.keys(plotChart.value)?.length == 0) 
-    })
+    const histogramLoader = computed(() => {
+      return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
+    });
+
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
+    const closeTable = () => {
+      searchObj.meta.showDetailTab = false;
+    }
 
     return {
       t,
@@ -665,7 +752,9 @@ export default defineComponent({
       getPaginations,
       refreshPagination,
       refreshJobPagination,
-      histogramLoader
+      histogramLoader,
+      sendToAiChat,
+      closeTable
     };
   },
   computed: {
@@ -696,7 +785,7 @@ export default defineComponent({
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
     },
     resetPlotChart(newVal: boolean) {
-      if(newVal) {
+      if (newVal) {
         this.plotChart = {};
         this.searchObj.meta.resetPlotChart = false;
       }
@@ -956,10 +1045,10 @@ export default defineComponent({
     height: 30px;
   }
 }
-.histogram-unavailable-text{
-  color: #F5A623;
+.histogram-unavailable-text {
+  color: #f5a623;
 }
-.histogram-unavailable-text-light{
+.histogram-unavailable-text-light {
   color: #ff8800;
 }
 </style>

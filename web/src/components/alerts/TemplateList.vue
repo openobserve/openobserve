@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <div v-if=" !showImportTemplate  && !showTemplateEditor">
+    <div v-if="!showImportTemplate && !showTemplateEditor">
       <q-table
         data-test="alert-templates-list-table"
-        ref="q-table"
+        ref="qTableRef"
         :rows="templates"
         :columns="columns"
         row-key="id"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </q-td>
         </template>
-        <template #top>
+        <template #top="scope">
           <div class="q-table__title" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
@@ -107,6 +107,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t(`alert_templates.add`)"
             @click="editTemplate(null)"
           />
+          <QTablePagination
+            :scope="scope"
+            :pageTitle="t('alert_templates.header')"
+            :position="'top'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </template>
+        <template #bottom="scope">
+          <q-table-pagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </template>
       </q-table>
     </div>
@@ -118,13 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-else>
-      <ImportTemplate
-      :templates="templates"
-      @update:templates="getTemplates"
-       />
+      <ImportTemplate :templates="templates" @update:templates="getTemplates" />
     </div>
-
-
 
     <ConfirmDialog
       title="Delete Template"
@@ -148,9 +160,10 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
 const AddTemplate = defineAsyncComponent(
-  () => import("@/components/alerts/AddTemplate.vue")
+  () => import("@/components/alerts/AddTemplate.vue"),
 );
 
 const store = useStore();
@@ -184,13 +197,29 @@ const columns: any = ref<QTableProps["columns"]>([
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
+  const perPageOptions: any = [
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 }
+];
+const resultTotal = ref<number>(0);
+const selectedPerPage = ref<number>(20);
+const qTableRef = ref<any>(null);
+
 const confirmDelete: Ref<{
   visible: boolean;
   data: any;
 }> = ref({ visible: false, data: null });
-const pagination = {
+const pagination: any = ref({
   page: 1,
-  rowsPerPage: 0, // 0 means all rows
+  rowsPerPage: 20, // 0 means all rows
+});
+const changePagination = (val: { label: string; value: any }) => {
+  selectedPerPage.value = val.value;
+  pagination.value.rowsPerPage = val.value;
+  qTableRef.value?.setPagination(pagination.value);
 };
 const filterQuery = ref("");
 onActivated(() => {
@@ -203,11 +232,11 @@ onMounted(() => {
 watch(
   () => router.currentRoute.value.query.action,
   (action) => {
-    if (!action){ 
+    if (!action) {
       showTemplateEditor.value = false;
       showImportTemplate.value = false;
-    };
-  }
+    }
+  },
 );
 
 const getTemplates = () => {
@@ -215,11 +244,13 @@ const getTemplates = () => {
     spinner: true,
     message: "Please wait while loading templates...",
   });
+
   templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then((res) => {
+      resultTotal.value = res.data.length;
       templates.value = res.data.map((data: any, index: number) => ({
         ...data,
         "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
@@ -228,7 +259,7 @@ const getTemplates = () => {
     })
     .catch((err) => {
       dismiss();
-      if(err.response.status != 403){
+      if (err.response.status !== 403) {
         q.notify({
           type: "negative",
           message: "Error while pulling templates.",
@@ -244,10 +275,10 @@ const updateRoute = () => {
   if (router.currentRoute.value.query.action === "add") editTemplate();
   if (router.currentRoute.value.query.action === "update")
     editTemplate(
-      getTemplateByName(router.currentRoute.value.query.name as string)
+      getTemplateByName(router.currentRoute.value.query.name as string),
     );
-  if(router.currentRoute.value.query.action === "import") {
-    showImportTemplate.value = true
+  if (router.currentRoute.value.query.action === "import") {
+    showImportTemplate.value = true;
   }
 };
 const getTemplateByName = (name: string) => {
@@ -317,13 +348,13 @@ const deleteTemplate = () => {
 const importTemplate = () => {
   showImportTemplate.value = true;
   router.push({
-        name: "alertTemplates",
-        query: {
-          action: "import",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-}
+    name: "alertTemplates",
+    query: {
+      action: "import",
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
 const conformDeleteDestination = (destination: any) => {
   confirmDelete.value.visible = true;
   confirmDelete.value.data = destination;
@@ -350,28 +381,28 @@ const filterData = (rows: any, terms: any) => {
       filtered.push(rows[i]);
     }
   }
+  resultTotal.value = filtered.length;
   return filtered;
 };
 const exportTemplate = (row: any) => {
   const findTemplate: any = getTemplateByName(row.name);
-      const templateByName = {...findTemplate}
-      if(templateByName.hasOwnProperty("#")) delete templateByName["#"];
-      const templateJson = JSON.stringify(templateByName,null,2);
-      const blob = new Blob([templateJson], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        // Create an anchor element to trigger the download
-        const link = document.createElement('a');
-        link.href = url;
+  const templateByName = { ...findTemplate };
+  if (templateByName.hasOwnProperty("#")) delete templateByName["#"];
+  const templateJson = JSON.stringify(templateByName, null, 2);
+  const blob = new Blob([templateJson], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  // Create an anchor element to trigger the download
+  const link = document.createElement("a");
+  link.href = url;
 
-        // Set the filename of the download
-        link.download = `${templateByName.name}.json`;
+  // Set the filename of the download
+  link.download = `${templateByName.name}.json`;
 
-        // Trigger the download by simulating a click
-        link.click();
+  // Trigger the download by simulating a click
+  link.click();
 
-        // Clean up the URL object after download
-        URL.revokeObjectURL(url);
-
-}
+  // Clean up the URL object after download
+  URL.revokeObjectURL(url);
+};
 </script>
 <style lang=""></style>

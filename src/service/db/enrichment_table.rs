@@ -15,10 +15,12 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use config::{
-    meta::stream::StreamType,
-    utils::{json, time::BASE_TIME},
+    meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
+    utils::{
+        json,
+        time::{BASE_TIME, now_micros},
+    },
 };
 use infra::{cache::stats, db as infra_db};
 use vrl::prelude::NotNan;
@@ -28,21 +30,19 @@ use crate::{
     service::{db as db_service, enrichment::StreamTable, search as SearchService},
 };
 
+/// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
+pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
-
-    let rec_num = if stats.doc_num == 0 {
-        100000
-    } else {
-        stats.doc_num
-    };
+    let start_time = get_start_time(org_id, name).await;
+    let end_time = now_micros();
 
     let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\" limit {rec_num}"),
-        start_time: BASE_TIME.timestamp_micros(),
-        end_time: Utc::now().timestamp_micros(),
+        sql: format!("SELECT * FROM \"{name}\""),
+        start_time,
+        end_time,
+        size: -1, // -1 means no limit, enrichment table should not be limited
         ..Default::default()
     };
 
@@ -54,9 +54,10 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: false,
         local_mode: Some(true),
     };
+    log::debug!("get enrichment table {name} data req start time: {start_time}");
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
@@ -67,7 +68,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
             }
         }
         Err(err) => {
-            log::error!("get enrichment table data error: {:?}", err);
+            log::error!("get enrichment table data error: {err:?}");
             Ok(vec![])
         }
     }
@@ -98,21 +99,6 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     }
 }
 
-/// Update the size of the enrichment table in bytes
-pub async fn update_table_size(
-    org_id: &str,
-    name: &str,
-    size: usize,
-) -> Result<(), infra::errors::Error> {
-    db_service::put(
-        &format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}"),
-        size.to_string().into(),
-        false,
-        None,
-    )
-    .await
-}
-
 /// Delete the size of the enrichment table in bytes
 pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
     db_service::delete(
@@ -125,17 +111,82 @@ pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::er
 }
 
 /// Get the size of the enrichment table in bytes
-pub async fn get_table_size(org_id: &str, name: &str) -> usize {
-    let size = match db_service::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await
+pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
+    match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) if meta_stats.size > 0 => meta_stats.size as f64,
+        _ => match db_service::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await {
+            Ok(size) => {
+                let size = String::from_utf8_lossy(&size);
+                size.parse::<f64>().unwrap_or(0.0)
+            }
+            Err(_) => {
+                // log::error!("get_table_size error: {e}");
+                stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
+            }
+        },
+    }
+}
+
+/// Get the start time of the enrichment table
+pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
+    match get_meta_table_stats(org_id, name).await {
+        Some(meta_stats) => meta_stats.start_time,
+        None => {
+            let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+            if stats.doc_time_min > 0 {
+                stats.doc_time_min
+            } else {
+                BASE_TIME.timestamp_micros()
+            }
+        }
+    }
+}
+
+pub async fn get_meta_table_stats(
+    org_id: &str,
+    name: &str,
+) -> Option<EnrichmentTableMetaStreamStats> {
+    let size = match db_service::get(&format!(
+        "{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"
+    ))
+    .await
     {
         Ok(size) => size,
-        Err(e) => {
-            log::error!("get_table_size error: {:?}", e);
-            return 0;
+        Err(_) => {
+            // log::error!("get_table_size error: {e}");
+            return None;
         }
     };
-    let size = String::from_utf8_lossy(&size);
-    size.parse::<usize>().unwrap_or(0)
+    let stream_meta_stats: EnrichmentTableMetaStreamStats = serde_json::from_slice(&size)
+        .map_err(|e| {
+            log::error!("Failed to parse meta stream stats: {e}");
+        })
+        .ok()?;
+    Some(stream_meta_stats)
+}
+
+pub async fn update_meta_table_stats(
+    org_id: &str,
+    name: &str,
+    stats: EnrichmentTableMetaStreamStats,
+) -> Result<(), infra::errors::Error> {
+    db_service::put(
+        &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
+        serde_json::to_string(&stats).unwrap().into(),
+        false,
+        None,
+    )
+    .await
+}
+
+pub async fn delete_meta_table_stats(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
+    db_service::delete(
+        &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
+        false,
+        false,
+        None,
+    )
+    .await
 }
 
 pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
@@ -182,6 +233,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let data = super::enrichment_table::get(org_id, stream_name)
                     .await
                     .unwrap();
+                log::debug!(
+                    "enrichment table: {} cache data length: {}",
+                    item_key,
+                    data.len()
+                );
                 ENRICHMENT_TABLES.insert(
                     item_key.to_owned(),
                     StreamTable {
@@ -194,11 +250,24 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 if let Some((key, _)) = ENRICHMENT_TABLES.remove(item_key) {
-                    log::info!("deleted enrichment table: {}", key);
+                    log::info!("deleted enrichment table: {key}");
                 }
             }
             infra_db::Event::Empty => {}
         }
     }
     Ok(())
+}
+
+// write test for convert_to_vrl
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_convert_to_vrl() {
+        let value = json::Value::String("123".to_string());
+        let vrl_value = convert_to_vrl(&value);
+        assert_eq!(vrl_value, vrl::value::Value::Bytes(b"123".to_vec().into()));
+    }
 }

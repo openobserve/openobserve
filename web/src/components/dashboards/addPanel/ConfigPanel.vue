@@ -195,6 +195,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
       </template>
+
+      <div class="space"></div>
+
+      <div
+        v-if="
+          dashboardPanelData.data.config.trellis?.layout &&
+          !(isBreakdownFieldEmpty || hasTimeShifts)
+        "
+        class="row items-center"
+      >
+        <q-toggle
+          v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
+          label="Group multi Y-axis for trellis"
+          data-test="dashboard-config-trellis-group-by-y-axis"
+        />
+        <div>
+          <q-icon
+            class="q-ml-xs"
+            size="20px"
+            name="info"
+            data-test="dashboard-config-trellis-group-by-y-axis-info"
+          />
+          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+            <div>
+              <b>Group multi Y-axis for trellis</b>
+              <br /><br />
+              When you have multiple Y-axis fields and a breakdown field:
+              <br /><br />
+              <b>Enabled:</b> Groups all Y-axis metrics for the same breakdown
+              value into a single trellis chart <br /><br />
+              <b>Disabled:</b> Creates separate trellis charts for each Y-axis
+              metric and breakdown value combination <br /><br />
+              <i
+                >Example: With Y-axis fields [CPU, Memory] and breakdown by
+                [Server A, Server B]:</i
+              >
+              <br />
+              • Enabled: 2 charts (Server A chart with CPU+Memory, Server B
+              chart with CPU+Memory)
+              <br />
+              • Disabled: 4 charts (Server A CPU, Server A Memory, Server B CPU,
+              Server B Memory)
+            </div>
+          </q-tooltip>
+        </div>
+      </div>
     </div>
 
     <q-toggle
@@ -1522,6 +1568,8 @@ import Smooth from "@/components/icons/dashboards/Smooth.vue";
 import StepBefore from "@/components/icons/dashboards/StepBefore.vue";
 import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
+import { useStore } from "vuex";
+
 import { markRaw } from "vue";
 
 export default defineComponent({
@@ -1551,6 +1599,7 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
+    const store = useStore();
 
     const basemapTypeOptions = [
       {
@@ -1578,6 +1627,7 @@ export default defineComponent({
         dashboardPanelData.data.config.trellis = {
           layout: null,
           num_of_columns: 1,
+          group_by_y_axis: false,
         };
       }
 
@@ -1638,7 +1688,9 @@ export default defineComponent({
       // by default, set show_symbol as false
       if (dashboardPanelData.data.config.show_symbol === undefined) {
         const isNewPanel = !dashboardPanelData.data.id;
-        dashboardPanelData.data.config.show_symbol = isNewPanel;
+        // if new panel, use config env
+        // else always false
+        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
       }
 
       // by default, set line interpolation as smooth
@@ -1654,6 +1706,10 @@ export default defineComponent({
       // If no step value is set, set it to 0
       if (!dashboardPanelData.data.config.step_value) {
         dashboardPanelData.data.config.step_value = "0";
+      }
+
+      if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
+        dashboardPanelData.data.config.trellis.group_by_y_axis = false;
       }
     });
 
@@ -1832,8 +1888,28 @@ export default defineComponent({
         value: "top",
       },
       {
+        label: t("dashboard.left"),
+        value: "left",
+      },
+      {
+        label: t("dashboard.right"),
+        value: "right",
+      },
+      {
+        label: t("dashboard.bottom"),
+        value: "bottom",
+      },
+      {
         label: t("dashboard.inside"),
         value: "inside",
+      },
+      {
+        label: t("dashboard.insideLeft"),
+        value: "insideLeft",
+      },
+      {
+        label: t("dashboard.insideRight"),
+        value: "insideRight",
       },
       {
         label: t("dashboard.insideTop"),
@@ -1842,6 +1918,26 @@ export default defineComponent({
       {
         label: t("dashboard.insideBottom"),
         value: "insideBottom",
+      },
+      {
+        label: t("dashboard.insideTopLeft"),
+        value: "insideTopLeft",
+      },
+      {
+        label: t("dashboard.insideBottomLeft"),
+        value: "insideBottomLeft",
+      },
+      {
+        label: t("dashboard.insideTopRight"),
+        value: "insideTopRight",
+      },
+      {
+        label: t("dashboard.insideBottomRight"),
+        value: "insideBottomRight",
+      },
+      {
+        label: t("dashboard.outside"),
+        value: "outside",
       },
     ];
 

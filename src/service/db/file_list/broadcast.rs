@@ -41,25 +41,16 @@ static EVENTS: Lazy<RwLock<HashMap<String, EventChannel>>> =
 type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 
 /// send an event to broadcast, will create a new channel for each nodes
-pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), anyhow::Error> {
+pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     if cfg.common.local_mode || items.is_empty() {
         return Ok(());
     }
-    let nodes = if let Some(node_uuid) = node_uuid {
-        cluster::get_node_by_uuid(&node_uuid)
-            .await
-            .map(|node| vec![node])
-            .unwrap_or_default()
-    } else {
-        cluster::get_cached_nodes(|node| {
-            node.scheduled
-                && (node.is_querier())
-                && (node.status == NodeStatus::Prepare || node.status == NodeStatus::Online)
-        })
-        .await
-        .unwrap_or_default()
-    };
+    let nodes = cluster::get_cached_nodes(|node| {
+        node.scheduled && node.is_querier() && node.status == NodeStatus::Online
+    })
+    .await
+    .unwrap_or_default();
     let mut events = EVENTS.write().await;
     for node in nodes {
         if node.uuid.eq(&LOCAL_NODE.uuid) {
@@ -74,29 +65,27 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
             }
             // check if the item is for interactive node
             if let Some(node_name) = cluster::get_node_from_consistent_hash(
-                &item.key,
+                &item.id.to_string(),
                 &Role::Querier,
                 Some(RoleGroup::Interactive),
             )
             .await
+                && node_name.eq(&node.name)
             {
-                if node_name.eq(&node.name) {
-                    node_items.push(item.clone());
-                    continue;
-                }
+                node_items.push(item.clone());
+                continue;
             }
             // check if the item is for background node
             if let Some(node_name) = cluster::get_node_from_consistent_hash(
-                &item.key,
+                &item.id.to_string(),
                 &Role::Querier,
                 Some(RoleGroup::Background),
             )
             .await
+                && node_name.eq(&node.name)
             {
-                if node_name.eq(&node.name) {
-                    node_items.push(item.clone());
-                    continue;
-                }
+                node_items.push(item.clone());
+                continue;
             }
         }
         if node_items.is_empty() {
@@ -222,7 +211,11 @@ async fn send_to_node(
                     return Ok(());
                 }
             };
-            let mut req_query = cluster_rpc::FileList::default();
+            let mut req_query = proto::cluster_rpc::FileList {
+                node_addr: LOCAL_NODE.grpc_addr.clone(),
+                ..Default::default()
+            };
+            log::debug!("[broadcast] req_query created: {req_query:?}");
             for item in items.iter() {
                 req_query.items.push(cluster_rpc::FileKey::from(item));
             }
@@ -264,5 +257,17 @@ async fn send_to_node(
                 }
             }
         }
+    }
+}
+
+// write test for parse_item_key
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_send() {
+        let items: Vec<FileKey> = vec![];
+        assert!(send(&items).await.is_ok());
     }
 }

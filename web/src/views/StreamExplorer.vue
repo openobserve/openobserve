@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <q-page>
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -31,7 +31,7 @@
         />
       </template>
     </div>
-  </div>
+  </q-page>
 </template>
 
 <script lang="ts">
@@ -229,7 +229,6 @@ export default defineComponent({
               queryData.value.pagination.rowsPerPage.toString(),
               10
             ),
-            sql_mode: "full",
           },
         };
 

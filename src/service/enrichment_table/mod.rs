@@ -30,7 +30,7 @@ use config::{
         self_reporting::usage::UsageType,
         stream::{PartitionTimeLevel, StreamType},
     },
-    utils::{flatten::format_key, json, schema_ext::SchemaExt},
+    utils::{flatten::format_key, json, schema_ext::SchemaExt, time::now_micros},
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashSet;
@@ -44,10 +44,9 @@ use infra::{
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    handler::http::router::ERROR_HEADER,
     service::{
-        compact::retention,
-        db::{self, enrichment_table},
-        format_stream_name,
+        db, format_stream_name,
         ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
@@ -72,12 +71,12 @@ pub async fn save_enrichment_data(
     let stream_name = &format_stream_name(table_name);
 
     if !LOCAL_NODE.is_ingester() {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, "not an ingester".to_string()))
+            .json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                "not an ingester",
+            )));
     }
 
     // check if we are allowed to ingest
@@ -87,12 +86,15 @@ pub async fn save_enrichment_data(
         stream_name,
         None,
     ) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+        return Ok(HttpResponse::BadRequest()
+            .append_header((
+                ERROR_HEADER,
                 format!("enrichment table [{stream_name}] is being deleted"),
-            )),
-        );
+            ))
+            .json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                format!("enrichment table [{stream_name}] is being deleted"),
+            )));
     }
 
     // Estimate the size of the payload in json format in bytes
@@ -102,38 +104,25 @@ pub async fn save_enrichment_data(
             Ok(v) => bytes_in_payload += json::estimate_json_bytes(&v),
             Err(_) => {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Invalid JSON payload: Could not convert file data into valid JSON object"
-                        .to_string(),
+                    http::StatusCode::BAD_REQUEST,
+                    "Invalid JSON payload: Could not convert file data into valid JSON object",
                 )));
             }
         }
     }
 
     let current_size_in_bytes = if append_data {
-        let size = enrichment_table::get_table_size(org_id, stream_name).await;
-        if size > 0 {
-            size as f64
-        } else {
-            stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables).storage_size
-        }
+        db::enrichment_table::get_table_size(org_id, stream_name).await
     } else {
         // If we are not appending data, we do not need to check the current size
         // we will simply use the payload size to check if it exceeds the max size
         0.0
     };
     let enrichment_table_max_size = cfg.limit.enrichment_table_max_size as f64;
-    log::info!(
-        "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
-        current_size_in_bytes,
-        enrichment_table_max_size
-    );
     let total_expected_size_in_bytes = current_size_in_bytes + bytes_in_payload as f64;
     let total_expected_size_in_mb = total_expected_size_in_bytes / SIZE_IN_MB;
-    log::debug!(
-        "enrichment table [{stream_name}] total expected storage size in mb: {} and max storage size in mb: {}",
-        total_expected_size_in_mb,
-        enrichment_table_max_size
+    log::info!(
+        "enrichment table [{stream_name}] current stats in bytes: {current_size_in_bytes:?} vs total expected size in mb: {total_expected_size_in_mb} vs max_table_size in mb: {enrichment_table_max_size}"
     );
 
     // we need to check if the storage size exceeds the max size
@@ -142,10 +131,9 @@ pub async fn save_enrichment_data(
     if total_expected_size_in_mb > enrichment_table_max_size {
         return Ok(
             HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!(
-                    "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
-                    total_expected_size_in_mb, enrichment_table_max_size
+                    "enrichment table [{stream_name}] total expected storage size {total_expected_size_in_mb} exceeds max storage size {enrichment_table_max_size}"
                 ),
             )),
         );
@@ -214,8 +202,8 @@ pub async fn save_enrichment_data(
 
     if records.is_empty() {
         return Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
-            StatusCode::OK.into(),
-            "Saved enrichment table".to_string(),
+            StatusCode::OK,
+            "Saved enrichment table",
         )));
     }
 
@@ -250,29 +238,43 @@ pub async fn save_enrichment_data(
         match write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await {
             Ok(stats) => stats,
             Err(e) => {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        format!("Error writing enrichment table: {}", e),
-                    )),
-                );
+                return Ok(HttpResponse::InternalServerError()
+                    .append_header((ERROR_HEADER, format!("Error writing enrichment table: {e}")))
+                    .json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Error writing enrichment table: {e}"),
+                    )));
             }
         };
 
+    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
+        .await
+        .unwrap_or_default();
+
+    if !append_data {
+        enrich_meta_stats.start_time = started_at;
+    }
+    if enrich_meta_stats.start_time == 0 {
+        enrich_meta_stats.start_time =
+            db::enrichment_table::get_start_time(org_id, stream_name).await;
+    }
+    enrich_meta_stats.end_time = now_micros();
+    enrich_meta_stats.size = total_expected_size_in_bytes as i64;
+    // The stream_stats table takes some time to update, so we need to update the enrichment table
+    // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
+    let _ =
+        db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
+
     // notify update
-    if !schema.fields().is_empty() {
-        if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
-            log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
-        };
+    if !schema.fields().is_empty()
+        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await
+    {
+        log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     log::info!(
-        "save enrichment data to: {}/{}/{} success with stats {:?}",
-        org_id,
-        table_name,
-        append_data,
-        req_stats
+        "save enrichment data to: {org_id}/{table_name}/{append_data} success with stats {req_stats:?}"
     );
 
     // metric + data usage
@@ -287,18 +289,9 @@ pub async fn save_enrichment_data(
     )
     .await;
 
-    // The stream_stats table takes some time to update, so we need to update the enrichment table
-    // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
-    let _ = enrichment_table::update_table_size(
-        org_id,
-        stream_name,
-        total_expected_size_in_bytes as usize,
-    )
-    .await;
-
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
-        StatusCode::OK.into(),
-        "Saved enrichment table".to_string(),
+        StatusCode::OK,
+        "Saved enrichment table",
     )))
 }
 
@@ -306,11 +299,14 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        log::error!("Error deleting stream schema: {}", e);
+        log::error!("Error deleting stream schema: {e}");
     }
 
-    if let Err(e) = retention::delete_all(org_id, stream_type, stream_name).await {
-        log::error!("Error deleting stream {}", e);
+    // create delete for compactor
+    if let Err(e) =
+        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    {
+        log::error!("Error creating stream retention job: {e}");
     }
 
     // delete stream schema cache
@@ -334,8 +330,8 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     }
 
     // delete stream key
-    if let Err(e) = enrichment_table::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table: {}", e);
+    if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table: {e}");
     }
 
     // delete stream stats cache

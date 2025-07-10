@@ -52,7 +52,7 @@ impl std::fmt::Display for Module {
             Module::Alert { .. } => "alert",
             Module::Pipeline { .. } => "pipeline",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -81,6 +81,8 @@ pub struct Endpoint {
     pub headers: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<HTTPOutputFormat>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -98,6 +100,15 @@ pub enum HTTPType {
     PUT,
     #[serde(rename = "get")]
     GET,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub enum HTTPOutputFormat {
+    #[default]
+    #[serde(rename = "json")]
+    JSON,
+    #[serde(rename = "ndjson")]
+    NDJSON,
 }
 
 impl fmt::Display for HTTPType {

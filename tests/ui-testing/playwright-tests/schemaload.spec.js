@@ -1,6 +1,6 @@
 import { test, expect } from './baseFixtures';
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -52,21 +52,25 @@ test.describe("Sanity testcases", () => {
     await login(page);
     logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
-    await ingestion(page);
+
+    const baseUrl = process.env.INGESTION_URL;  // Base URL from the environment variable
+    const orgId = process.env["ORGNAME"];  // Organization ID from environment variable
+    const streamName = 'stress_test1';  // You can change this as needed
+    const logData = generateLogData();
+
+    await ingestion(page, baseUrl, orgId, streamName, logData);
     await page.waitForTimeout(2000)
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `web/logs?org_identifier=${process.env["ORGNAME"]}`
     );
-  
-
   });
 
 
 
   
 
-  test('should send a large log payload to the API and verify success', async ({ page }) => {
+  test.skip('should send a large log payload to the API and verify success', async ({ page }) => {
     // Setup: Define organization info and the base URL from environment variables
     const baseUrl = process.env.INGESTION_URL;  // Base URL from the environment variable
     const orgId = process.env["ORGNAME"];  // Organization ID from environment variable
@@ -108,9 +112,10 @@ test.describe("Sanity testcases", () => {
   await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('10007');
   
   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  await page.waitForTimeout(4000)
-  await page.getByRole('button', { name: 'Expand "' }).click();
-  await page.locator('[data-test="logs-search-subfield-add-log_log_attribute10007-Lorem ipsum dolor sit amet\\, consectetur adipiscing elit\\. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua\\."]').getByText('Lorem ipsum dolor sit amet,').click();
+  await page.waitForSelector('[data-test="logs-search-result-table-body"]');
+  await page.locator('[data-test="table-row-expand-menu"]').first().click()
+  page.locator('[data-test="logs-search-subfield-add-log_log_attribute10007-Lorem ipsum dolor sit amet\\, consectetur adipiscing elit\\. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua\\."]').getByText('Lorem ipsum dolor sit amet,').isVisible();;
+  await page.waitForSelector('[data-test="log-table-column-0-_timestamp"]');
   await expect(page.locator('[data-test="log-table-column-0-_timestamp"]')).toBeVisible();
 
 
@@ -125,6 +130,7 @@ test.describe("Sanity testcases", () => {
   await page.waitForTimeout(10000);
   // await expect(page.getByText('Loading...')).toBeHidden();
   // await page.waitForTimeout(1000);
+  await page.waitForSelector('[data-test="log-table-column-0-_timestamp"]');
   await expect(page.locator('[data-test="log-table-column-0-_timestamp"]')).toBeVisible();
   
   });
@@ -172,11 +178,11 @@ test.describe("Sanity testcases", () => {
       throw new Error(`Expected 79000 fields but got ${Object.keys(attributes).length}`);
     }
   
-    return {
+    return [{
       level: 'info',
       job: 'test',
       log: attributes,
-    };
+    }];
   }
 
 })

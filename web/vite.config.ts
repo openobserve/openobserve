@@ -24,8 +24,7 @@ import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfil
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs-extra";
-import monacoEditorPlugin from "vite-plugin-monaco-editor";
-import visualizer from "rollup-plugin-visualizer";
+import {visualizer} from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
@@ -39,11 +38,9 @@ if (process.env.NODE_ENV === "production") {
   dotenv.config();
 }
 
-const isTesting = process.env.NODE_ENV === "test";
-
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
-  async resolveId(source) {
+  async resolveId(source: string) {
     if (source.startsWith("@zo/")) {
       const fileName = source.replace("@zo/", "");
 
@@ -64,21 +61,6 @@ const enterpriseResolverPlugin = {
     }
   },
 };
-
-function monacoEditorTestResolver() {
-  return {
-    name: "monaco-editor-test-resolver",
-    enforce: "post",
-    resolveId(id) {
-      if (id === "monaco-editor") {
-        return {
-          id: "monaco-editor/esm/vs/editor/editor.api",
-        };
-      }
-      return null;
-    },
-  };
-}
 
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
@@ -116,21 +98,17 @@ export default defineConfig({
     process.env.VITE_COVERAGE === "true" &&
       istanbul({
         include: "src/**/*",
-        exclude: ["node_modules", "test/"],
+        exclude: ["node_modules", "test/", "src/**/*.spec.{ts,js}"],
         extension: [".js", ".ts", ".vue"],
         requireEnv: false,
         forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    monacoEditorPlugin.default({
-      customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
-    }),
-    isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": fileURLToPath(new URL('./src', import.meta.url)),
       "@enterprise": fileURLToPath(
         new URL("./src/enterprise", import.meta.url),
       ),
@@ -148,8 +126,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
       plugins: [
-        nodePolyfills(),
-        visualizer.default({
+        nodePolyfills() as any,
+        visualizer({
           open: true,
           gzipSize: true,
           brotliSize: true,
@@ -163,7 +141,17 @@ export default defineConfig({
             "@openobserve/browser-rum",
           ],
           "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          "editor.api": ["monaco-editor"],
+          "codemirror": ["codemirror", "@codemirror/state", "@codemirror/lang-sql", "@codemirror/lang-json", "@codemirror/lang-javascript", "@codemirror/lang-markdown", "@codemirror/autocomplete", "@codemirror/view", "@codemirror/commands", "@codemirror/language", "@codemirror/search", "@replit/codemirror-indentation-markers", "js-beautify", "sql-formatter", "acorn", "escodegen"],
+          "moment": ["moment", "moment-timezone"],
+          "lodash": ["lodash-es"],
+          "echarts": ["echarts/core", "echarts/renderers", "echarts/components", "echarts/features", "echarts/charts"],
+          "luxon": ["luxon"],
+          "marked": ["marked"],
+          "jszip": ["jszip"],
+          "leaflet": ["leaflet"],
+          "gridstack": ["gridstack"],
+          "flag-icons": ["flag-icons"],
+          "highlight.js": ["highlight.js"],
         },
         chunkFileNames: ({ name }) => {
           if (name.startsWith("o2cs-")) {
@@ -171,6 +159,14 @@ export default defineConfig({
           }
 
           if (name.includes("editor.api")) {
+            return `assets/${name}.v1.js`;
+          }
+
+          if (name.includes("codemirror")) {
+            return `assets/${name}.v1.js`;
+          }
+
+          if (name.includes("moment")) {
             return `assets/${name}.v1.js`;
           }
 
@@ -185,43 +181,5 @@ export default defineConfig({
       plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
       target: "es2020",
     },
-  },
-  test: {
-    enable: true,
-    global: true,
-    setupFiles: "test/unit/helpers/setupTests.ts",
-    deps: {
-      inline: ["monaco-editor", "vitest-canvas-mock"],
-    },
-    coverage: {
-      reporter: ["text", "json", "html"],
-      all: true,
-      exclude: [
-        "coverage/**",
-        "dist/**",
-        "packages/*/test{,s}/**",
-        "cypress/**",
-        "src/test/**",
-        "test{,s}/**",
-        "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
-        "**/__tests__/**",
-        "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
-        "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
-        "quasar.conf.js",
-        "env.d.ts",
-      ],
-    },
-    threads: false,
-    environment: "jsdom",
-    cache: false,
-    maxConcurrency: 20,
-    update: false,
-    environmentOptions: {
-      jsdom: {
-        resources: "usable",
-      },
-    },
-  },
+  }
 });

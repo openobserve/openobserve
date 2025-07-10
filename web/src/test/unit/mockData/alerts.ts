@@ -1,3 +1,18 @@
+// Copyright 2023 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 export default {
   alerts: {
     get: {
@@ -11,7 +26,6 @@ export default {
             size: -1,
             start_time: 0,
             end_time: 0,
-            sql_mode: "full",
             query_type: "logs",
             track_total_hits: false,
           },
@@ -37,7 +51,6 @@ export default {
             size: 100,
             start_time: 0,
             end_time: 0,
-            sql_mode: "full",
             query_type: "",
             track_total_hits: false,
           },

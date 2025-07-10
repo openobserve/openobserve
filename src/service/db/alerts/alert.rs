@@ -93,7 +93,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                 match db::scheduler::push(trigger).await {
                     Ok(_) => Ok(alert),
                     Err(e) => {
-                        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                        log::error!("Failed to save trigger for alert {schedule_key}: {e}");
                         Err(e)
                     }
                 }
@@ -108,8 +108,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                             Ok(_) => Ok(alert),
                             Err(e) => {
                                 log::error!(
-                                    "Failed to update trigger for alert {schedule_key}: {}",
-                                    e
+                                    "Failed to update trigger for alert {schedule_key}: {e}"
                                 );
                                 Ok(alert)
                             }
@@ -118,7 +117,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
                     Err(_) => match db::scheduler::push(trigger).await {
                         Ok(_) => Ok(alert),
                         Err(e) => {
-                            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
                             Ok(alert)
                         }
                     },
@@ -169,7 +168,7 @@ pub async fn create<C: TransactionTrait>(
     };
 
     let _ = db::scheduler::push(trigger).await.map_err(|e| {
-        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+        log::error!("Failed to save trigger for alert {schedule_key}: {e}");
         e
     });
 
@@ -204,11 +203,11 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         trigger.data = job.data;
         trigger.start_time = job.start_time;
         let _ = db::scheduler::update_trigger(trigger).await.map_err(|e| {
-            log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
+            log::error!("Failed to update trigger for alert {schedule_key}: {e}");
         });
     } else {
         let _ = db::scheduler::push(trigger).await.map_err(|e| {
-            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
             e
         });
     }
@@ -241,7 +240,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     if let Err(e) =
         db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
-        log::error!("Failed to delete trigger: {}", e);
+        log::error!("Failed to delete trigger: {e}");
     };
     Ok(())
 }
@@ -272,7 +271,7 @@ pub async fn delete_by_name(
     if let Err(e) =
         db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
-        log::error!("Failed to delete trigger: {}", e);
+        log::error!("Failed to delete trigger: {e}");
     };
     Ok(())
 }
@@ -367,7 +366,7 @@ async fn put_into_cache(
             return Ok(());
         }
         Err(e) => {
-            log::error!("Error getting value: {}", e);
+            log::error!("Error getting value: {e}");
             return Ok(());
         }
     };
@@ -446,7 +445,7 @@ pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
 mod super_cluster {
     use config::meta::{alerts::alert::Alert, stream::StreamType};
     use infra::errors::Error;
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     use svix_ksuid::Ksuid;
 
     /// Sends event to the super cluster queue indicating that an alert has been
@@ -459,7 +458,7 @@ mod super_cluster {
         if get_o2_config().super_cluster.enabled {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
-            log::debug!("Sending super cluster alert creation event: {:?}", alert);
+            log::debug!("Sending super cluster alert creation event: {alert:?}");
             // o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
             //     .await
             //     .map_err(|e| Error::Message(e.to_string()))?;
@@ -480,7 +479,7 @@ mod super_cluster {
         if get_o2_config().super_cluster.enabled {
             // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
             // let value = json::to_vec(&alert)?.into();
-            log::debug!("Sending super cluster alert update event: {:?}", alert);
+            log::debug!("Sending super cluster alert update event: {alert:?}");
             // o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
             //     .await
             //     .map_err(|e| Error::Message(e.to_string()))?;
@@ -502,7 +501,7 @@ mod super_cluster {
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
             let key = alert_key(org, stream_type, stream_name, alert_name);
-            log::debug!("Sending super cluster alert delete event: {:?}", key);
+            log::debug!("Sending super cluster alert delete event: {key:?}");
             // o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
             //     .await
             //     .map_err(|e| Error::Message(e.to_string()))?;

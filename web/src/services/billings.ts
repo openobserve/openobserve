@@ -40,6 +40,11 @@ const billings = {
       `/api/${org_identifier}/billings/hosted_subscription_url?plan=${plan_name}`
     );
   },
+  get_session_url: (org_identifier: string, customer_id: string) => {
+    return http().get(
+      `/api/${org_identifier}/billings/billing_portal?customer_id=${customer_id}`
+    );
+  },
   retrieve_hosted_page: (org_identifier: string, hosted_page_id: string) => {
     return http().get(
       `/api/${org_identifier}/billings/hosted_page_status/${hosted_page_id}`
@@ -53,11 +58,14 @@ const billings = {
   list_invoice_history: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billings/invoices`);
   },
-  get_data_usage: (org_identifier: string, usage_date: string) => {
+  get_data_usage: (org_identifier: string, usage_date: string, data_type: string) => {
     return http().get(
-      `/api/${org_identifier}/billings/data_usage/${usage_date}`
+      `/api/${org_identifier}/billings/data_usage/${usage_date}?data_type=${data_type}`
     );
   },
+  submit_new_user_info: async ( org_identifier: string, payload: any,) => {
+    return http().post(`/api/${org_identifier}/billings/new_user_attrition`, payload);
+  }
 };
 
 export default billings;

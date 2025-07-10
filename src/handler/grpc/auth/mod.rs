@@ -17,9 +17,12 @@ use config::meta::cluster::get_internal_grpc_token;
 use http_auth_basic::Credentials;
 use tonic::{Request, Status, metadata::MetadataValue};
 
-use crate::common::{
-    infra::config::{ROOT_USER, USERS},
-    utils::auth::{get_hash, is_root_user},
+use crate::{
+    common::{
+        infra::config::ROOT_USER,
+        utils::auth::{get_hash, is_root_user},
+    },
+    service::db::org_users::get_cached_user_org,
 };
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
@@ -66,19 +69,16 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,
             Err(err) => {
-                log::error!("Err authenticating {}", err);
+                log::error!("Err authenticating {err}");
                 return Err(Status::unauthenticated("No valid auth token[3]"));
             }
         };
 
         let user_id = credentials.user_id;
         let user = if is_root_user(&user_id) {
-            ROOT_USER.get("root").unwrap()
-        } else if let Some(user) = USERS.get(&format!(
-            "{}/{}",
-            org_id.unwrap().to_str().unwrap(),
-            &user_id
-        )) {
+            ROOT_USER.get("root").unwrap().to_owned()
+        } else if let Some(user) = get_cached_user_org(org_id.unwrap().to_str().unwrap(), &user_id)
+        {
             user
         } else {
             return Err(Status::unauthenticated("No valid auth token[4]"));
@@ -104,10 +104,14 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-    use config::{cache_instance_id, get_config};
+    use config::{
+        cache_instance_id, get_config,
+        meta::user::{User, UserRole},
+    };
+    use infra::table::org_users::OrgUserRecord;
 
     use super::*;
-    use crate::common::meta::user::User;
+    use crate::common::infra::config::ORG_USERS;
 
     #[tokio::test]
     async fn test_check_no_auth() {
@@ -117,7 +121,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -150,15 +154,27 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
-                org: "dummy".to_owned(),
+                org: "default".to_owned(),
                 is_external: false,
                 password_ext: Some("Complexpass#123".to_string()),
+            },
+        );
+
+        ORG_USERS.insert(
+            "default/root@example.com".to_string(),
+            OrgUserRecord {
+                role: UserRole::Root,
+                token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
+                org_id: "default".to_string(),
+                email: "root@example.com".to_string(),
+                created_at: 0,
             },
         );
 
@@ -166,11 +182,14 @@ mod tests {
         request.set_timeout(std::time::Duration::from_secs(
             get_config().limit.query_timeout,
         ));
-        let token: MetadataValue<_> = "instance".parse().unwrap();
+        let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
+            .parse()
+            .unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
+        meta.insert("organization", "default".parse().unwrap());
 
-        assert!(check_auth(request).is_ok())
+        assert!(check_auth(request).is_ok());
     }
 
     #[tokio::test]
@@ -181,7 +200,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),

@@ -79,7 +79,7 @@ async alertsURLValidation() {
     await this.page.locator('[data-test="add-template-name-input"]').fill(templateName);
     
     const jsonString = '{"text": "{alert_name} is active"}';
-    await this.page.locator(".view-line").click();
+    await this.page.locator(".cm-line").click();
     await this.page.keyboard.type(jsonString);
     await this.page.waitForTimeout(500);
     

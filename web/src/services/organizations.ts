@@ -45,11 +45,11 @@ const organizations = {
     return http().post("/api/organizations", data);
   },
   add_members: (data: any, orgIdentifier: string) => {
-    return http().post(`api/${orgIdentifier}/organizations/members`, data);
+    return http().post(`api/${orgIdentifier}/invites`, data);
   },
-  process_subscription: (s: string, action: string) => {
-    return http().get(
-      `api/organizations/member_subscription/${s}?action=${action}`
+  process_subscription: (s: string, action: string, orgIdentifier: string) => {
+    return http().put(
+      `api/${orgIdentifier}/member_subscription/${s}?action=${action}`, {}
     );
   },
   get_associated_members: (orgIdentifier: string) => {
@@ -76,6 +76,12 @@ const organizations = {
   post_organization_settings: (orgIdentifier: string, data: any) => {
     return http().post(`/api/${orgIdentifier}/settings`, data);
   },
+  get_admin_org: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/organizations?page_size=1000000`);
+  },
+  extend_trial_period: (orgIdentifier: string, data: any) => {
+    return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
+  }
 };
 
 export default organizations;

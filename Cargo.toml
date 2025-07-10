@@ -17,13 +17,14 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.14.6"
+version = "0.15.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 default = []
 enterprise = []
+cloud = []
 marketplace = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
@@ -102,8 +103,9 @@ etcd-client.workspace = true
 faststr.workspace = true
 flate2.workspace = true
 futures.workspace = true
-hex.workspace = true
+hashlink.workspace = true
 hashbrown.workspace = true
+hex.workspace = true
 http-auth-basic = "0.3"
 ipnetwork.workspace = true
 itertools.workspace = true
@@ -121,6 +123,7 @@ parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser = "0.4"
 prost.workspace = true
+prost-wkt-types.workspace = true
 proto.workspace = true
 prettytable-rs = "0.10.0"
 pyroscope = { version = "0.5.8", optional = true }
@@ -162,6 +165,7 @@ utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
 vector-enrichment.workspace = true
+x509-parser = "0.17.0"
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -172,6 +176,7 @@ report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
+tantivy-fst.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
@@ -180,12 +185,22 @@ pprof = { version = "0.14", features = [
     "flamegraph",
     "prost-codec",
 ], optional = true }
+tokio-stream.workspace = true
+mime = "0.3.17"
+pin-project-lite = "0.2.16"
+futures-core = "0.3.31"
+actix-service = "2.0.3"
+actix-utils = "3.0.1"
+derive_more = { version = "2.0.1", features = ["full"] }
+brotli = "8.0.1"
+tokio-rustls.workspace = true
 
 [dev-dependencies]
 async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
+rcgen = "0.13"
 
 [workspace]
 members = [
@@ -240,18 +255,18 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "45.0.0"
-datafusion-proto = "45.0.0"
-datafusion-functions-aggregate-common = "45.0.0"
-datafusion-functions-json = "0.45.0"
+datafusion = "47.0.0"
+datafusion-proto = "47.0.0"
+datafusion-functions-aggregate-common = "47.0.0"
+datafusion-functions-json = "0.47.0"
 expect-test = "1.4"
-arrow = { version = "54.1.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "54.1.0"
-arrow-json = "54.1.0"
-arrow-schema = { version = "54.1.0", features = ["serde"] }
-parquet = { version = "54.1.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.11.2", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.53.0", features = ["serde", "visitor"] }
+arrow = { version = "55.0.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "55.0.0"
+arrow-json = "55.0.0"
+arrow-schema = { version = "55.0.0", features = ["serde"] }
+parquet = { version = "55.0.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.12.0", features = ["aws", "azure", "gcp"] }
+sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"
@@ -285,6 +300,7 @@ ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
 prometheus = { version = "0.13", features = ["process"] }
 prost = "0.13.1"
+prost-wkt-types = "0.6"
 rand = "0.8"
 rayon = "1.10"
 regex = "1.11"
@@ -327,10 +343,15 @@ strum = { version = "0.26", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.33"
 tantivy = { version = "0.22.0", features = ["quickwit"] }
+tantivy-fst = "0.5"
 tempfile = "3"
 thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
+tokio-rustls = { version = "0.26", default-features = false, features = [
+    "logging",
+    "tls12",
+] }
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.12.3", features = ["gzip", "prost", "tls"] }
@@ -369,5 +390,5 @@ utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "063cabbbf4bc6f75794fa0ccd3b0bd5c074f0e35" }
 vrl = { version = "0.22", features = ["value", "compiler", "test"] }
+zip = "3.0.0"
 zstd = "0.13"
-zip = "2.5.0"

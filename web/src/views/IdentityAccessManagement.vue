@@ -49,7 +49,7 @@ const tabs = ref([
         org_identifier: store.state.selectedOrganization.identifier,
       },
     },
-    label: t("iam.users"),
+    label: t("iam.basicUsers"),
     class: "tab_content",
   },
   {
@@ -153,17 +153,22 @@ watch(
 );
 
 function setTabs() {
-  const cloud = ["users", "organizations", "serviceAccounts"];
+  const cloud = ["users", "organizations"];
 
   const rbac = ["groups", "roles"];
 
-  const os = ["users", "serviceAccounts"];
+  const os = ["users", "serviceAccounts", "organizations"];
 
 
   const isEnterprise =
     config.isEnterprise == "true" || config.isCloud == "true";
 
   if (isEnterprise) {
+  //for cloud version we dont want service accounts and for enterprise version we need service accounts 
+  //so it will be available for entrerprise version
+    if(config.isCloud == "false"){
+      cloud.push("serviceAccounts")
+    }
     let filteredTabs = tabs.value.filter((tab) => cloud.includes(tab.name));
 
     if (store.state.zoConfig.rbac_enabled) {

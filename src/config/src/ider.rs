@@ -25,7 +25,7 @@ use svix_ksuid::{Ksuid, KsuidLike};
 
 static IDER: Lazy<Mutex<SnowflakeIdGenerator>> = Lazy::new(|| {
     let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
-    log::info!("init ider with machine_id: {}", machine_id);
+    log::info!("init ider with machine_id: {machine_id}");
     Mutex::new(SnowflakeIdGenerator::new(machine_id))
 });
 
@@ -35,7 +35,7 @@ pub fn init() {
 
 /// Generate a distributed unique id with snowflake.
 pub fn generate() -> String {
-    IDER.lock().generate().to_string()
+    IDER.lock().real_time_generate().to_string()
 }
 
 /// Generate a unique id like uuid.
@@ -152,10 +152,7 @@ impl SnowflakeIdGenerator {
             if now_millis == self.last_time_millis {
                 now_millis = biding_time_conditions(self.last_time_millis, self.epoch);
                 if now_millis == self.last_time_millis {
-                    panic!(
-                        "Clock is moving backwards.  Rejecting requests until {}.",
-                        now_millis
-                    );
+                    panic!("Clock is moving backwards.  Rejecting requests until {now_millis}.");
                 }
             }
 
@@ -273,5 +270,91 @@ mod tests {
             let td = t.format("%Y-%m-%d").to_string();
             assert_eq!(td, ts.to_string());
         }
+    }
+
+    #[test]
+    fn test_generate() {
+        let id1 = generate();
+        let id2 = generate();
+        assert_ne!(id1, id2, "Generated IDs should be unique");
+        assert!(
+            id1.parse::<i64>().is_ok(),
+            "Generated ID should be a valid i64"
+        );
+    }
+
+    #[test]
+    fn test_uuid() {
+        let uuid1 = uuid();
+        let uuid2 = uuid();
+        assert_ne!(uuid1, uuid2, "Generated UUIDs should be unique");
+        assert_eq!(uuid1.len(), 27, "KSUID should be 27 characters long");
+    }
+
+    #[test]
+    fn test_generate_span_id() {
+        let span_id1 = generate_span_id();
+        let span_id2 = generate_span_id();
+        assert_ne!(span_id1, span_id2, "Generated span IDs should be unique");
+        assert_eq!(
+            span_id1.len(),
+            16,
+            "Span ID should be 16 characters long (8 bytes in hex)"
+        );
+        assert_ne!(
+            span_id1, "0000000000000000",
+            "Span ID should not be all zeros"
+        );
+    }
+
+    #[test]
+    fn test_snowflake_id_generator() {
+        let mut generator = SnowflakeIdGenerator::new(1);
+        let id1 = generator.real_time_generate();
+        let id2 = generator.real_time_generate();
+        assert_ne!(id1, id2, "Generated snowflake IDs should be unique");
+
+        // Test timestamp extraction
+        let timestamp = to_timestamp_millis(id1);
+        assert!(timestamp > 0, "Timestamp should be positive");
+    }
+
+    #[test]
+    fn test_snowflake_id_bucket() {
+        let mut bucket = SnowflakeIdBucket::new(1);
+        let id1 = bucket.get_id();
+        let id2 = bucket.get_id();
+        assert_ne!(id1, id2, "IDs from bucket should be unique");
+    }
+
+    #[test]
+    fn test_concurrent_id_generation() {
+        use std::{
+            sync::{
+                Arc,
+                atomic::{AtomicUsize, Ordering},
+            },
+            thread,
+        };
+
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut handles = vec![];
+        let iterations = 1000;
+
+        for _ in 0..4 {
+            let count = Arc::clone(&count);
+            handles.push(thread::spawn(move || {
+                for _ in 0..iterations {
+                    let _id = generate();
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert_eq!(count.load(Ordering::SeqCst), 4 * iterations);
     }
 }

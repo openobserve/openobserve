@@ -23,7 +23,7 @@ use config::{
 };
 
 use crate::{
-    db::mysql::{CLIENT, CLIENT_RO},
+    db::mysql::{CLIENT, CLIENT_DDL, CLIENT_RO},
     errors::{DbError, Error, Result},
 };
 
@@ -44,7 +44,7 @@ impl Default for MySqlPipelineTable {
 #[async_trait]
 impl super::PipelineTable for MySqlPipelineTable {
     async fn create_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         sqlx::query(
             r#"
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         let queries = vec![
             "CREATE INDEX pipeline_org_idx ON pipeline (org);",
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS pipeline
                     // index already exists
                     continue;
                 }
-                log::error!("[MYSQL] create index for pipeline table error: {}", e);
+                log::error!("[MYSQL] create index for pipeline table error: {e}");
                 return Err(e.into());
             }
         }
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn drop_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         sqlx::query("DROP TABLE IF EXISTS pipeline;")
             .execute(&pool)
@@ -164,13 +164,13 @@ INSERT IGNORE INTO pipeline (id, version, enabled, name, description, org, sourc
             }
         } {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback push pipeline error: {}", e);
+                log::error!("[MYSQL] rollback push pipeline error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit push pipeline error: {}", e);
+            log::error!("[MYSQL] commit push pipeline error: {e}");
             return Err(e.into());
         }
 
@@ -239,13 +239,13 @@ UPDATE pipeline
             }
         } {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback push pipeline error: {}", e);
+                log::error!("[MYSQL] rollback push pipeline error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit push pipeline error: {}", e);
+            log::error!("[MYSQL] commit push pipeline error: {e}");
             return Err(e.into());
         }
 
@@ -310,7 +310,7 @@ SELECT * FROM pipeline
         match sqlx::query_as::<_, Pipeline>(query).fetch_all(&pool).await {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[MYSQL] list all pipelines error: {}", e);
+                log::debug!("[MYSQL] list all pipelines error: {e}");
                 Ok(vec![])
             }
         }
@@ -326,7 +326,7 @@ SELECT * FROM pipeline
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[MYSQL] list pipelines by org error: {}", e);
+                log::debug!("[MYSQL] list pipelines by org error: {e}");
                 Ok(vec![])
             }
         }
@@ -345,7 +345,7 @@ SELECT * FROM pipeline WHERE org = ? AND source_type = ? ORDER BY id;
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[MYSQL] list streams with pipelines error: {}", e);
+                log::debug!("[MYSQL] list streams with pipelines error: {e}");
                 Ok(vec![])
             }
         }

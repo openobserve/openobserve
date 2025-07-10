@@ -104,8 +104,12 @@ impl ScalarUDFImpl for RegexpMatchesFunc {
         })
     }
 
-    fn invoke(&self, args: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::common::Result<ColumnarValue> {
         let len = args
+            .args
             .iter()
             .fold(Option::<usize>::None, |acc, arg| match arg {
                 ColumnarValue::Scalar(_) => acc,
@@ -115,6 +119,7 @@ impl ScalarUDFImpl for RegexpMatchesFunc {
         let is_scalar = len.is_none();
         let inferred_length = len.unwrap_or(1);
         let args = args
+            .args
             .iter()
             .map(|arg| arg.clone().into_array(inferred_length))
             .collect::<Result<Vec<_>>>()?;
@@ -153,7 +158,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let scalar_regex = if is_scalar_pattern {
         Some(
             Regex::new(regex.value(0))
-                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?,
+                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {e}")))?,
         )
     } else {
         None
@@ -174,7 +179,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
             scalar_regex.clone().unwrap()
         } else {
             Regex::new(regex.value(i))
-                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?
+                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {e}")))?
         };
 
         let mut has_match = false;
@@ -265,7 +270,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",
@@ -323,7 +328,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",
@@ -375,7 +380,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+----------------------------------+",
             "| matches                          |",
             "+----------------------------------+",
@@ -420,7 +425,7 @@ mod tests {
         let results = df.collect().await.unwrap();
 
         // Expected output
-        let expected = vec![
+        let expected = [
             "+------------+",
             "| matches    |",
             "+------------+",

@@ -70,6 +70,9 @@ pub struct ScanStats {
     /// unit: ms
     #[prost(int64, tag = "10")]
     pub file_list_took: i64,
+    /// unit: %
+    #[prost(int64, tag = "11")]
+    pub aggs_cache_ratio: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -78,29 +81,48 @@ pub struct ScanStats {
 pub struct FileList {
     #[prost(message, repeated, tag = "1")]
     pub items: ::prost::alloc::vec::Vec<FileKey>,
+    #[prost(string, tag = "2")]
+    pub node_addr: ::prost::alloc::string::String,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileKey {
-    #[prost(string, tag = "1")]
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    #[prost(string, tag = "2")]
+    pub account: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
     pub key: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag = "4")]
     pub meta: ::core::option::Option<FileMeta>,
-    #[prost(bool, tag = "3")]
+    #[prost(bool, tag = "5")]
     pub deleted: bool,
-    #[prost(bytes = "vec", optional, tag = "4")]
+    #[prost(bytes = "vec", optional, tag = "6")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
-#[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IdxFileName {
-    #[prost(string, tag = "1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", optional, tag = "2")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+pub struct SimpleFileList {
+    #[prost(string, repeated, tag = "1")]
+    pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileContentResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub entries: ::prost::alloc::vec::Vec<FileContent>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileContent {
+    /// The actual parquet file content
+    #[prost(bytes = "vec", tag = "1")]
+    pub content: ::prost::alloc::vec::Vec<u8>,
+    /// The name of the file
+    #[prost(string, tag = "2")]
+    pub filename: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
 pub mod event_client {
@@ -209,6 +231,28 @@ pub mod event_client {
                 .insert(GrpcMethod::new("cluster.Event", "SendFileList"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_files(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SimpleFileList>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::FileContentResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Event/GetFiles");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Event", "GetFiles"));
+            self.inner.server_streaming(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -222,6 +266,16 @@ pub mod event_server {
             &self,
             request: tonic::Request<super::FileList>,
         ) -> std::result::Result<tonic::Response<super::EmptyResponse>, tonic::Status>;
+        /// Server streaming response type for the GetFiles method.
+        type GetFilesStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::FileContentResponse, tonic::Status>,
+            >
+            + Send
+            + 'static;
+        async fn get_files(
+            &self,
+            request: tonic::Request<super::SimpleFileList>,
+        ) -> std::result::Result<tonic::Response<Self::GetFilesStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct EventServer<T: Event> {
@@ -342,6 +396,53 @@ pub mod event_server {
                                 max_encoding_message_size,
                             );
                         let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Event/GetFiles" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetFilesSvc<T: Event>(pub Arc<T>);
+                    impl<
+                        T: Event,
+                    > tonic::server::ServerStreamingService<super::SimpleFileList>
+                    for GetFilesSvc<T> {
+                        type Response = super::FileContentResponse;
+                        type ResponseStream = T::GetFilesStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SimpleFileList>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Event>::get_files(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetFilesSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
@@ -867,6 +968,20 @@ pub struct GetResultResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub response: ::prost::alloc::vec::Vec<u8>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetScanStatsRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub is_leader: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ScanStatsResponse {
+    #[prost(message, optional, tag = "1")]
+    pub stats: ::core::option::Option<ScanStats>,
+}
 /// Search request query
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -896,6 +1011,8 @@ pub struct SearchQuery {
     pub skip_wal: bool,
     #[prost(string, tag = "15")]
     pub action_id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "16")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1232,6 +1349,31 @@ pub mod search_client {
                 .insert(GrpcMethod::new("cluster.Search", "DeleteResult"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_scan_stats(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetScanStatsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ScanStatsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/GetScanStats",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "GetScanStats"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1289,6 +1431,13 @@ pub mod search_server {
             request: tonic::Request<super::DeleteResultRequest>,
         ) -> std::result::Result<
             tonic::Response<super::DeleteResultResponse>,
+            tonic::Status,
+        >;
+        async fn get_scan_stats(
+            &self,
+            request: tonic::Request<super::GetScanStatsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ScanStatsResponse>,
             tonic::Status,
         >;
     }
@@ -1718,6 +1867,52 @@ pub mod search_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DeleteResultSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/GetScanStats" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetScanStatsSvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::GetScanStatsRequest>
+                    for GetScanStatsSvc<T> {
+                        type Response = super::ScanStatsResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetScanStatsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::get_scan_stats(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetScanStatsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -2727,14 +2922,16 @@ pub struct SearchInfo {
     pub plan: ::prost::alloc::vec::Vec<u8>,
     #[prost(int64, repeated, tag = "2")]
     pub file_id_list: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "3")]
-    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
     #[prost(int64, tag = "4")]
     pub start_time: i64,
     #[prost(int64, tag = "5")]
     pub end_time: i64,
     #[prost(int64, tag = "6")]
     pub timeout: i64,
+    #[prost(bool, tag = "7")]
+    pub use_cache: bool,
+    #[prost(int64, tag = "8")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2769,7 +2966,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2781,6 +2978,8 @@ pub mod idx_optimize_mode {
         SimpleSelect(super::SimpleSelect),
         #[prost(message, tag = "2")]
         SimpleCount(super::SimpleCount),
+        #[prost(message, tag = "3")]
+        SimpleHistogram(super::SimpleHistogram),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2794,6 +2993,16 @@ pub struct SimpleSelect {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SimpleCount {}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleHistogram {
+    #[prost(int64, tag = "1")]
+    pub min_value: i64,
+    #[prost(uint64, tag = "2")]
+    pub bucket_width: u64,
+    #[prost(uint32, tag = "3")]
+    pub num_buckets: u32,
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KvItem {

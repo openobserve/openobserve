@@ -18,7 +18,9 @@ use config::{
     META_ORG_ID, ider,
     meta::{
         cluster::RoleGroup,
-        search::{Query, Request as SearchRequest, RequestEncoding, SearchEventType},
+        search::{
+            Query, Request as SearchRequest, RequestEncoding, SearchEventType, default_use_cache,
+        },
         stream::StreamType,
     },
     utils::json,
@@ -43,6 +45,7 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
@@ -50,7 +53,7 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
         timeout: 0,
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
 

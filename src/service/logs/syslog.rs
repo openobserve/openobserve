@@ -19,7 +19,6 @@ use std::{
 };
 
 use actix_web::{HttpResponse, http};
-use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
@@ -28,8 +27,12 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+    },
 };
+use infra::errors::Result;
 use syslog_loose::{Message, ProcId, Protocol, Variant};
 
 use super::{
@@ -43,6 +46,9 @@ use crate::{
             ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
             syslog::SyslogRoute,
         },
+    },
+    handler::http::{
+        request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
     },
     service::{
         format_stream_name, ingestion::check_ingestion_allowed, logs::bulk::TRANSFORM_FAILED,
@@ -58,13 +64,16 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let route = match matching_route {
         Some(matching_route) => matching_route,
         None => {
-            log::warn!("Syslogs from the IP {} are not allowed", ip);
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            log::warn!("Syslogs from the IP {ip} are not allowed");
+            return Ok(HttpResponse::InternalServerError()
+                .append_header((
+                    ERROR_HEADER,
                     "Syslogs from the IP are not allowed".to_string(),
-                )),
-            );
+                ))
+                .json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Syslogs from the IP are not allowed",
+                )));
         }
     };
 
@@ -74,13 +83,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);
-    if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                e.to_string(),
-            )),
-        );
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await {
+        log::error!("Syslogs ingestion error: {e}");
+        return Ok(map_error_to_http_response(&e, None));
     };
 
     let cfg = get_config();
@@ -125,6 +130,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
 
     // parse msg to json::Value
     let parsed_msg = syslog_loose::parse_message(msg, Variant::Either);
@@ -139,11 +145,11 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             streams_need_original_map
                 .get(&stream_name)
                 .is_some_and(|v| *v)
-                .then_some(value.to_string())
+                .then(|| value.to_string())
         } else {
             // 3. with pipeline, storing original as long as streams_need_original_set is not empty
             // because not sure the pipeline destinations
-            store_original_when_pipeline_exists.then_some(value.to_string())
+            store_original_when_pipeline_exists.then(|| value.to_string())
         }
     } else {
         None // `item` won't be flattened, no need to store original
@@ -154,6 +160,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         pipeline_inputs.push(value);
         original_options.push(original_data);
     } else {
+        let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+        *_size += estimate_json_bytes(&value);
         // JSON Flattening
         value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
@@ -193,12 +201,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         if streams_need_original_map
             .get(&stream_name)
             .is_some_and(|v| *v)
-            && original_data.is_some()
+            && let Some(original_data) = original_data
         {
-            local_val.insert(
-                ORIGINAL_DATA_COL_NAME.to_string(),
-                original_data.unwrap().into(),
-            );
+            local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
             let record_id = crate::service::ingestion::generate_record_id(
                 org_id,
                 &stream_name,
@@ -251,13 +256,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         {
             Err(e) => {
                 log::error!(
-                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                    org_id,
-                    stream_name,
-                    e
+                    "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}.",
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -310,6 +312,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             ))); // just return
                         };
 
+                        // we calculate original size BEFORE applying uds
+                        let original_size = estimate_json_bytes(&res);
+
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(val) => val,
@@ -322,9 +327,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_map
-                            .get(&destination_stream)
-                            .is_some_and(|v| *v)
+                        if idx != usize::MAX
+                            && streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(
@@ -390,6 +396,11 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                             continue;
                         };
 
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
+
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
                             .or_insert_with(|| (Vec::new(), None));
@@ -425,6 +436,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             UsageType::Syslog,
             &mut status,
             json_data_by_stream,
+            size_by_stream,
         )
         .await;
         stream_status.status = match status {
@@ -434,7 +446,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         match write_result {
             Ok(_) => ("200", stream_status),
             Err(e) => {
-                log::error!("Error while writing logs: {}", e);
+                log::error!("Error while writing logs: {e}");
                 ("500", stream_status)
             }
         }

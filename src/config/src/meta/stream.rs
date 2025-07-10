@@ -168,6 +168,8 @@ pub struct ListStreamParams {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileKey {
+    pub id: i64,
+    pub account: String,
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
@@ -175,8 +177,10 @@ pub struct FileKey {
 }
 
 impl FileKey {
-    pub fn new(key: String, meta: FileMeta, deleted: bool) -> Self {
+    pub fn new(id: i64, account: String, key: String, meta: FileMeta, deleted: bool) -> Self {
         Self {
+            id,
+            account,
             key,
             meta,
             deleted,
@@ -186,6 +190,8 @@ impl FileKey {
 
     pub fn from_file_name(file: &str) -> Self {
         Self {
+            id: 0,
+            account: String::default(),
             key: file.to_string(),
             meta: FileMeta::default(),
             deleted: false,
@@ -236,6 +242,8 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
 
 #[derive(Clone, Debug, Default)]
 pub struct FileListDeleted {
+    pub id: i64,
+    pub account: String,
     pub file: String,
     pub index_file: bool,
     pub flattened: bool,
@@ -419,6 +427,27 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
     }
 }
 
+impl std::ops::Add<&StreamStats> for &StreamStats {
+    type Output = StreamStats;
+
+    fn add(self, rhs: &StreamStats) -> Self::Output {
+        let mut ret = StreamStats {
+            created_at: self.created_at,
+            file_num: self.file_num + rhs.file_num,
+            doc_num: self.doc_num + rhs.doc_num,
+            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
+            storage_size: self.storage_size + rhs.storage_size,
+            compressed_size: self.compressed_size + rhs.compressed_size,
+            index_size: self.index_size + rhs.index_size,
+        };
+        if ret.doc_time_min == 0 {
+            ret.doc_time_min = rhs.doc_time_min;
+        }
+        ret
+    }
+}
+
 impl From<&FileMeta> for cluster_rpc::FileMeta {
     fn from(req: &FileMeta) -> Self {
         cluster_rpc::FileMeta {
@@ -449,6 +478,8 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
 impl From<&FileKey> for cluster_rpc::FileKey {
     fn from(req: &FileKey) -> Self {
         cluster_rpc::FileKey {
+            id: req.id,
+            account: req.account.clone(),
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
             deleted: req.deleted,
@@ -460,6 +491,8 @@ impl From<&FileKey> for cluster_rpc::FileKey {
 impl From<&cluster_rpc::FileKey> for FileKey {
     fn from(req: &cluster_rpc::FileKey) -> Self {
         FileKey {
+            id: req.id,
+            account: req.account.clone(),
             key: req.key.clone(),
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
@@ -580,7 +613,7 @@ impl Display for TimeRange {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let time_range_start: DateTime<Utc> = Utc.timestamp_nanos(self.start * 1000);
         let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(self.end * 1000);
-        write!(f, "{} to {}", time_range_start, time_range_end)
+        write!(f, "{time_range_start} to {time_range_end}")
     }
 }
 impl TimeRange {
@@ -644,7 +677,7 @@ impl TimeRange {
         result
     }
 }
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
@@ -829,7 +862,11 @@ impl From<&str> for StreamSettings {
         let approx_partition = settings
             .get("approx_partition")
             .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .unwrap_or(
+                get_config()
+                    .common
+                    .use_stream_settings_for_partitions_enabled,
+            );
 
         let mut distinct_value_fields = Vec::new();
         let fields = settings.get("distinct_value_fields");
@@ -1099,6 +1136,13 @@ impl std::fmt::Display for Operator {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EnrichmentTableMetaStreamStats {
+    pub start_time: i64,
+    pub end_time: i64,
+    pub size: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1120,6 +1164,107 @@ mod tests {
         assert_eq!(file_meta, resp);
     }
 
+    #[test]
+    fn test_stream_stats_add_file_meta() {
+        let mut stats = StreamStats::default();
+        let meta = FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 100,
+            original_size: 1000,
+            compressed_size: 500,
+            index_size: 50,
+            flattened: false,
+        };
+
+        stats.add_file_meta(&meta);
+        assert_eq!(stats.file_num, 1);
+        assert_eq!(stats.doc_num, 100);
+        assert_eq!(stats.doc_time_min, 1000);
+        assert_eq!(stats.doc_time_max, 2000);
+        assert_eq!(stats.storage_size, 1000.0);
+        assert_eq!(stats.compressed_size, 500.0);
+
+        // Test with negative values (should be clamped to 0)
+        let negative_meta = FileMeta {
+            original_size: -100,
+            compressed_size: -50,
+            index_size: -10,
+            ..meta
+        };
+        let mut negative_stats = StreamStats {
+            storage_size: 50.0,
+            compressed_size: 25.0,
+            index_size: 5.0,
+            ..Default::default()
+        };
+        negative_stats.add_file_meta(&negative_meta);
+        assert_eq!(negative_stats.storage_size, 0.0);
+        assert_eq!(negative_stats.compressed_size, 0.0);
+        assert_eq!(negative_stats.index_size, 0.0);
+    }
+
+    #[test]
+    fn test_stream_stats_operations() {
+        let stats1 = StreamStats {
+            file_num: 5,
+            doc_num: 100,
+            storage_size: 1000.0,
+            compressed_size: 500.0,
+            doc_time_min: 1000,
+            doc_time_max: 2000,
+            ..Default::default()
+        };
+
+        let stats2 = StreamStats {
+            file_num: 3,
+            doc_num: 50,
+            storage_size: 300.0,
+            compressed_size: 150.0,
+            doc_time_min: 1500,
+            doc_time_max: 2500,
+            ..Default::default()
+        };
+
+        // Test addition
+        let sum = &stats1 + &stats2;
+        assert_eq!(sum.file_num, 8);
+        assert_eq!(sum.doc_num, 150);
+        assert_eq!(sum.storage_size, 1300.0);
+        assert_eq!(sum.doc_time_min, 1000);
+        assert_eq!(sum.doc_time_max, 2500);
+
+        // Test subtraction
+        let diff = &stats1 - &stats2;
+        assert_eq!(diff.file_num, 2);
+        assert_eq!(diff.doc_num, 50);
+        assert_eq!(diff.storage_size, 700.0);
+    }
+
+    #[test]
+    fn test_stream_partition_types() {
+        // Test prefix partition
+        let prefix_part = StreamPartition::new_prefix("field");
+        assert_eq!(prefix_part.types, StreamPartitionType::Prefix);
+        assert_eq!(prefix_part.get_partition_value("Hello"), "h");
+        assert_eq!(prefix_part.get_partition_value(""), "_");
+        assert_eq!(prefix_part.get_partition_value("123"), "1");
+
+        // Test value partition
+        let value_part = StreamPartition::new("field");
+        assert_eq!(value_part.get_partition_value("test_value"), "test_value");
+
+        // Test non-ASCII encoding
+        let non_ascii_part = StreamPartition::new("field");
+        let encoded = non_ascii_part.get_partition_value("测试");
+        assert!(encoded.contains("%"));
+
+        // Test Display for StreamPartitionType
+        assert_eq!(format!("{}", StreamPartitionType::Value), "value");
+        assert_eq!(format!("{}", StreamPartitionType::Hash(32)), "hash");
+        assert_eq!(format!("{}", StreamPartitionType::Prefix), "prefix");
+    }
+
     #[cfg(feature = "gxhash")]
     #[test]
     fn test_hash_partition() {
@@ -1134,11 +1279,6 @@ mod tests {
             r#"{"field":"field","types":{"hash":32},"disabled":false}"#
         );
 
-        for key in &[
-            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
-        ] {
-            println!("{}: {}", key, part.get_partition_key(key));
-        }
         assert_eq!(part.get_partition_key("hello"), "field=20");
         assert_eq!(part.get_partition_key("world"), "field=13");
         assert_eq!(part.get_partition_key("foo"), "field=21");

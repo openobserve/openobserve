@@ -148,14 +148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        v-if="loading"
         class="row"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
-        <q-spinner-dots
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; z-index: 999"
+        <LoadingProgress
+          :loading="loading"
+          :loadingProgressPercentage="loadingProgressPercentage"
         />
       </div>
       <div
@@ -282,6 +280,7 @@ import {
   nextTick,
   defineAsyncComponent,
   onMounted,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
@@ -292,8 +291,7 @@ import {
   getFoldersList,
 } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
-import { onUnmounted } from "vue";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -302,6 +300,7 @@ import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitVal
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -345,6 +344,7 @@ export default defineComponent({
     MarkdownRenderer,
     AddAnnotation,
     CustomChartRenderer,
+    LoadingProgress,
   },
   props: {
     selectedTimeObj: {
@@ -400,6 +400,7 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "is-partial-data-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -449,6 +450,8 @@ export default defineComponent({
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
+      loadingProgressPercentage,
+      isPartialData,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -573,6 +576,14 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
+      
+      // Clear all refs to prevent memory leaks
+      chartPanelRef.value = null;
+      drilldownPopUpRef.value = null;
+      annotationPopupRef.value = null;
+      tableRendererRef.value = null;
+      parser = null;
+      
     });
     watch(
       [data, store?.state],
@@ -1104,11 +1115,15 @@ export default defineComponent({
       const queryType = panelSchema?.value?.queryType;
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
+        const variableNameWithBrackets = `\${${variable.name}}`;
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value = variable.value
-            .map((value: any) => `'${value}'`)
+            .map(
+              (value: any) =>
+                `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
+            )
             .join(",");
           const possibleVariablesPlaceHolderTypes = [
             {
@@ -1151,7 +1166,10 @@ export default defineComponent({
             );
           });
         } else {
-          variableValue = variable.value === null ? "" : variable.value;
+          variableValue =
+            variable.value === null
+              ? ""
+              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
@@ -1159,6 +1177,7 @@ export default defineComponent({
           //     value: variable.value,
           //   });
           // }
+          query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }
       });
@@ -1391,6 +1410,8 @@ export default defineComponent({
             if (drilldownData.targetBlank) {
               window.open(logsUrl.toString(), "_blank");
             } else {
+              await store.dispatch("logs/setIsInitialized", false);
+              await nextTick();
               await router.push({
                 path: "/logs",
                 query: Object.fromEntries(logsUrl.searchParams.entries()),
@@ -1483,6 +1504,8 @@ export default defineComponent({
             __value: Array.isArray(drilldownParams[0].value)
               ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
               : drilldownParams[0].value,
+            __axisValue:
+              drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
           };
         }
 
@@ -1855,6 +1878,11 @@ export default defineComponent({
       }
     };
 
+    // Watch isPartialData changes and emit them
+    watch(isPartialData, (newValue) => {
+      emit("is-partial-data-update", newValue);
+    });
+
     return {
       store,
       chartPanelRef,
@@ -1888,6 +1916,8 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
+      loadingProgressPercentage,
+      isPartialData,
     };
   },
 });

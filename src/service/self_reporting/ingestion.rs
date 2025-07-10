@@ -45,28 +45,22 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         if usage_data.event == UsageEvent::Search {
             // enrich dashboard search usage with more context if `usage_data` only has id's, but
             // not names
-            if matches!(usage_data.search_type, Some(SearchEventType::Dashboards)) {
-                if let Some((Some(dashboard_id), None)) = usage_data
+            if matches!(usage_data.search_type, Some(SearchEventType::Dashboards))
+                && let Some((Some(dashboard_id), None)) = usage_data
                     .search_event_context
                     .as_ref()
                     .map(|ctx| (&ctx.dashboard_id, &ctx.dashboard_name))
-                {
-                    if let Ok((folder, dashboard)) = service::dashboards::get_folder_and_dashboard(
-                        &usage_data.org_id,
-                        dashboard_id,
-                    )
-                    .await
-                    {
-                        if let Some(ctx) = usage_data.search_event_context.as_mut() {
-                            ctx.enrich_for_dashboard(
-                                dashboard.title().unwrap().to_string(),
-                                folder.name,
-                                folder.folder_id,
-                            )
-                        };
-                    }
-                }
-            }
+                && let Ok((folder, dashboard)) =
+                    service::dashboards::get_folder_and_dashboard(&usage_data.org_id, dashboard_id)
+                        .await
+                && let Some(ctx) = usage_data.search_event_context.as_mut()
+            {
+                ctx.enrich_for_dashboard(
+                    dashboard.title().unwrap().to_string(),
+                    folder.name,
+                    folder.folder_id,
+                )
+            };
             search_events.push(usage_data.clone());
             continue;
         }
@@ -155,10 +149,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 }
             }
             Err(e) => {
-                log::error!(
-                    "[SELF-REPORTING] Error in ingesting usage data to external URL {:?}",
-                    e
-                );
+                log::error!("[SELF-REPORTING] Error in ingesting usage data to external URL {e:?}");
                 if &cfg.common.usage_reporting_mode != "both" {
                     // on error in ingesting usage data, push back the data
                     let curr_usages = curr_usages.clone();

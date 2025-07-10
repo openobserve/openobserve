@@ -28,7 +28,10 @@ use arrow_flight::{
 };
 use arrow_schema::{Schema, SchemaRef};
 use config::{
-    meta::search::{ScanStats, SearchEventType},
+    meta::{
+        cluster::NodeInfo,
+        search::{ScanStats, SearchEventType},
+    },
     utils::{rand::generate_random_string, size::bytes_to_human_readable},
 };
 use datafusion::{
@@ -57,14 +60,11 @@ use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
 };
-use crate::{
-    common::infra::cluster::get_node_by_addr,
-    service::{
-        grpc::get_cached_channel,
-        search::{
-            MetadataMap,
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        },
+use crate::service::{
+    grpc::get_cached_channel,
+    search::{
+        MetadataMap,
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
 };
 
@@ -127,16 +127,12 @@ impl RemoteScanExec {
 }
 
 impl DisplayAs for RemoteScanExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(
-                    f,
-                    "RemoteScanExec: input_partitions=output_partitions={}",
-                    self.partitions,
-                )
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "RemoteScanExec: input_partitions=output_partitions={}",
+            self.partitions,
+        )
     }
 }
 
@@ -206,6 +202,7 @@ async fn get_remote_batch(
     let org_id = remote_scan_node.query_identifier.org_id.clone();
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
+    let is_super = remote_scan_node.super_cluster_info.is_super_cluster;
     let is_querier = node.is_querier();
     let is_ingester = node.is_ingester();
     let search_type = remote_scan_node
@@ -224,11 +221,7 @@ async fn get_remote_batch(
     }
 
     // fast return for empty file list querier node
-    if !remote_scan_node.super_cluster_info.is_super_cluster
-        && is_querier
-        && !is_ingester
-        && remote_scan_node.is_file_list_empty(partition)
-    {
+    if !is_super && is_querier && !is_ingester && remote_scan_node.is_file_list_empty(partition) {
         return Ok(get_empty_record_batch_stream(
             trace_id,
             schema,
@@ -246,14 +239,14 @@ async fn get_remote_batch(
     request.search_info.timeout = timeout as i64;
 
     log::info!(
-        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_querier: {}, timeout: {}, files: {}, idx_files: {}",
+        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}",
         trace_id,
         &node.get_grpc_addr(),
         search_type.unwrap_or(SearchEventType::UI),
+        is_super,
         is_querier,
         timeout,
         request.search_info.file_id_list.len(),
-        request.search_info.idx_file_list.len(),
     );
 
     let request: cluster_rpc::FlightSearchRequest = request.into();
@@ -319,9 +312,10 @@ async fn get_remote_batch(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
     log::info!(
-        "[trace_id {}] flight->search: prepare to request node: {}, is_querier: {}",
+        "[trace_id {}] flight->search: prepare to request node: {}, is_super: {}, is_querier: {}",
         trace_id,
         &node.get_grpc_addr(),
+        is_super,
         is_querier,
     );
 
@@ -339,22 +333,43 @@ async fn get_remote_batch(
                     start,
                 ));
             }
+            log::error!(
+                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                trace_id,
+                node.get_grpc_addr(),
+                is_super,
+                is_querier,
+                e,
+                start.elapsed().as_millis(),
+            );
             return Err(DataFusionError::Execution(e.to_string()));
         }
     }
     .into_inner();
 
     log::info!(
-        "[trace_id {}] flight->search: prepare to receive response from node: {}, is_querier: {}",
+        "[trace_id {}] flight->search: prepare to response node: {}, is_super: {}, is_querier: {}",
         trace_id,
         &node.get_grpc_addr(),
+        is_super,
         is_querier,
     );
 
     // the schema should be the first message returned, else client should error
     let flight_data = match stream.message().await {
         Ok(Some(flight_data)) => flight_data,
-        Ok(None) => return Err(DataFusionError::Execution("No schema returned".to_string())),
+        Ok(None) => {
+            log::error!(
+                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {}, took: {} ms",
+                trace_id,
+                node.get_grpc_addr(),
+                is_super,
+                is_querier,
+                "No schema returned",
+                start.elapsed().as_millis(),
+            );
+            return Err(DataFusionError::Execution("No schema returned".to_string()));
+        }
         Err(e) => {
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded {
                 return Ok(get_empty_record_batch_stream(
@@ -367,11 +382,35 @@ async fn get_remote_batch(
                     start,
                 ));
             }
+            log::error!(
+                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                trace_id,
+                node.get_grpc_addr(),
+                is_super,
+                is_querier,
+                e,
+                start.elapsed().as_millis(),
+            );
             return Err(DataFusionError::Execution(e.to_string()));
         }
     };
+
     // convert FlightData to a stream
-    let schema = Arc::new(Schema::try_from(&flight_data)?);
+    let schema = match Schema::try_from(&flight_data) {
+        Ok(schema) => Arc::new(schema),
+        Err(e) => {
+            log::error!(
+                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                trace_id,
+                node.get_grpc_addr(),
+                is_super,
+                is_querier,
+                e,
+                start.elapsed().as_millis(),
+            );
+            return Err(DataFusionError::Execution("No schema returned".to_string()));
+        }
+    };
 
     let mut files = 0;
     let mut scan_size = 0;
@@ -382,20 +421,14 @@ async fn get_remote_batch(
         scan_stats.lock().add(&stats);
     }
 
-    let node_name = match get_node_by_addr(&node.get_grpc_addr()).await {
-        None => node.get_grpc_addr(),
-        Some(node) => node.name,
-    };
-
     Ok(Box::pin(FlightStream::new(
         trace_id,
         context,
         schema,
         stream,
-        node.get_grpc_addr(),
-        node_name,
+        node,
+        is_super,
         is_querier,
-        remote_scan_node.super_cluster_info.is_super_cluster,
         files,
         scan_size,
         partial_err,
@@ -415,7 +448,7 @@ fn get_empty_record_batch_stream(
 ) -> SendableRecordBatchStream {
     if e.code() != tonic::Code::Ok {
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {:?}, took: {} ms",
             trace_id,
             node_addr,
             is_querier,
@@ -434,7 +467,7 @@ fn process_partial_err(partial_err: Arc<Mutex<String>>, e: tonic::Status) {
     if partial_err.is_empty() {
         guard.push_str(e.to_string().as_str());
     } else {
-        guard.push_str(format!(" \n {}", e).as_str());
+        guard.push_str(format!(" \n {e}").as_str());
     }
 }
 
@@ -443,8 +476,7 @@ struct FlightStream {
     parent_cx: opentelemetry::Context,
     schema: SchemaRef,
     stream: Streaming<FlightData>,
-    node_addr: String,
-    node_name: String,
+    node: Arc<dyn NodeInfo>,
     is_super: bool,
     is_querier: bool,
     files: i64,
@@ -462,8 +494,7 @@ impl FlightStream {
         parent_cx: opentelemetry::Context,
         schema: SchemaRef,
         stream: Streaming<FlightData>,
-        node_addr: String,
-        node_name: String,
+        node: Arc<dyn NodeInfo>,
         is_super: bool,
         is_querier: bool,
         files: i64,
@@ -477,8 +508,7 @@ impl FlightStream {
             parent_cx,
             schema,
             stream,
-            node_addr,
-            node_name,
+            node,
             is_super,
             is_querier,
             files,
@@ -524,9 +554,10 @@ impl FlightStream {
                 };
                 let event = search_inspector_fields(
                     format!(
-                        "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+                        "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
                         self.trace_id,
-                        self.node_addr,
+                        self.node.get_grpc_addr(),
+                        self.is_super,
                         self.is_querier,
                         self.files,
                         self.scan_size / 1024 / 1024,
@@ -534,7 +565,9 @@ impl FlightStream {
                         self.start.elapsed().as_millis(),
                     ),
                     SearchInspectorFieldsBuilder::new()
-                        .node_name(self.node_name.clone())
+                        .node_name(self.node.get_name())
+                        .region(self.node.get_region())
+                        .cluster(self.node.get_cluster())
                         .component("remote scan streaming".to_string())
                         .search_role(search_role)
                         .duration(self.start.elapsed().as_millis() as usize)
@@ -569,12 +602,13 @@ impl Stream for FlightStream {
         if self.start.elapsed().as_secs() > self.timeout {
             let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
             log::error!(
-                "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, err: {}",
+                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                 self.trace_id,
-                self.node_addr,
+                self.node.get_grpc_addr(),
+                self.is_super,
                 self.is_querier,
+                e,
                 self.start.elapsed().as_millis(),
-                e
             );
             process_partial_err(self.partial_err.clone(), e);
             return Poll::Ready(None);
@@ -595,9 +629,10 @@ impl Stream for FlightStream {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
                 log::error!(
-                    "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
+                    "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                     self.trace_id,
-                    self.node_addr,
+                    self.node.get_grpc_addr(),
+                    self.is_super,
                     self.is_querier,
                     e,
                     self.start.elapsed().as_millis(),
@@ -612,15 +647,16 @@ impl Stream for FlightStream {
 impl Drop for FlightStream {
     fn drop(&mut self) {
         let cfg = config::get_config();
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            if let Err(e) = self.create_stream_end_span() {
-                log::error!("error creating stream span: {}", e);
-            }
+        if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
+            && let Err(e) = self.create_stream_end_span()
+        {
+            log::error!("error creating stream span: {e}");
         }
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+            "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
             self.trace_id,
-            self.node_addr,
+            self.node.get_grpc_addr(),
+            self.is_super,
             self.is_querier,
             self.files,
             self.scan_size / 1024 / 1024,

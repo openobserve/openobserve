@@ -8,6 +8,7 @@ class PipelinePage {
     this.pipelineMenuLink = page.locator(
       '[data-test="menu-link-\\/pipeline-item"]'
     );
+    this.pipelineTab = page.locator('[data-test="stream-pipelines-tab"]');
     this.addPipelineButton = page.locator(
       '[data-test="pipeline-list-add-pipeline-btn"]'
     );
@@ -52,7 +53,7 @@ class PipelinePage {
     this.confirmDeleteButton = page.locator('[data-test="confirm-button"]');
     this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
     this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
-    this.sqlQueryInput = page.locator('.view-lines');
+    this.sqlQueryInput = page.locator('.cm-lines');
     this.frequencyUnit = page.locator('[data-test="scheduled-pipeline-frequency-unit"]');
     this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
     this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
@@ -84,17 +85,35 @@ class PipelinePage {
     this.headerKeyInput = page.locator('[data-test="add-destination-header--key-input"]');
     this.headerValueInput = page.locator('[data-test="add-destination-header-Authorization-value-input"]');
     this.submitButton = page.locator('[data-test="add-destination-submit-btn"]');
-
-
-
+    this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
+    this.refreshStatsButton = page.locator('[data-test="log-stream-refresh-stats-btn"]');
+    this.searchStreamInput = page.getByPlaceholder('Search Stream');
+    this.exploreButton = page.getByRole('button', { name: 'Explore' });
+    this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+    this.nameCell = page.getByRole('cell', { name: 'Name' });
+    this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
+    this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
+    this.containsOption = page.getByText("Contains", { exact: true });
+    this.valueInput = page.getByPlaceholder("Value");
+    this.kubernetesContainerNameOption = page.getByRole("option", { name: "kubernetes_container_name" });
+    this.conditionText = page.getByText('kubernetes_container_name');
+    this.pipelineSavedMessage = page.getByText('Pipeline saved successfully');
+    this.addEnrichmentTableText = page.getByText("Add Enrichment Table");
+    this.deletedSuccessfullyText = page.getByText('deleted successfully');
+    this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
+    this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
   }
 
   async openPipelineMenu() {
     await this.pipelineMenuLink.click();
+    await this.page.waitForTimeout(1000);
+    await this.pipelineTab.click();
+    await this.page.waitForTimeout(2000);
   }
 
   async addPipeline() {
-    await this.addPipelineButton.waitFor({ state: 'visible' });
+    // Wait for the add pipeline button to be visible
+    await this.addPipelineButton.waitFor({ state: 'visible', timeout: 30000 });
     await this.addPipelineButton.click();
   }
 
@@ -298,26 +317,26 @@ async verifyFieldRequiredError() {
 async navigateToAddEnrichmentTable() {
   await this.page.locator(this.pipelineMenu).click();
   await this.page.click(this.enrichmentTableTab, { force: true });
-  await this.page.getByText("Add Enrichment Table").click();
+  await this.addEnrichmentTableText.click();
 }
 
 async uploadEnrichmentTable(fileName, fileContentPath) {
   // Set the file to be uploaded
-  const inputFile = await this.page.locator(this.fileInput);
+  const inputFile = await this.page.locator('input[type="file"]');
   await inputFile.setInputFiles(fileContentPath);
 
   // Enter the file name
-  await this.page.fill(this.fileNameInput, fileName);
+  await this.page.getByLabel('File Name').fill(fileName);
 
   // Click on 'Save'
-  await this.page.getByText(this.saveButton).click({ force: true });
+  await this.saveButton.click({ force: true });
 
   // Wait for the process to complete
   await this.page.reload();
   await this.page.waitForTimeout(3000);
 
   // Search for the uploaded file
-  await this.page.getByPlaceholder(this.searchPlaceholder).fill(fileName);
+  await this.page.getByPlaceholder('Search').fill(fileName);
   await this.page.waitForTimeout(3000);
 }
 async deleteEnrichmentTableByName(fileName) {
@@ -367,7 +386,7 @@ async deleteDestination(randomNodeName) {
   await deleteButton.click();
   await this.confirmButton.click();
   
-  await expect(this.page.getByText('deleted successfully')).toBeVisible();
+  await expect(this.deletedSuccessfullyText).toBeVisible();
 }
 
 async createRemoteDestination(randomNodeName, AuthorizationToken) {
@@ -403,6 +422,135 @@ async createRemoteDestination(randomNodeName, AuthorizationToken) {
   await this.submitButton.click();
 }
 
+async navigateToStreams() {
+  await this.streamsMenuItem.click();
+  await this.page.waitForTimeout(1000);
+}
+
+async refreshStreamStats() {
+  await this.refreshStatsButton.click();
+  await this.page.waitForTimeout(1000);
+}
+
+async searchStream(streamName) {
+  await this.searchStreamInput.click();
+  await this.searchStreamInput.fill(streamName);
+  await this.page.waitForTimeout(1000);
+}
+
+async clickExplore() {
+  await this.nameCell.click();
+  await this.exploreButton.first().click();
+  await this.page.waitForTimeout(3000);
+}
+
+async openTimestampMenu() {
+  await this.timestampColumnMenu.click();
+}
+
+async navigateToPipeline() {
+  await this.pipelineMenuLink.click();
+}
+
+async setupContainerNameCondition() {
+  await this.editButton.hover();
+  await this.streamIcon.click();
+  await this.columnInput.click();
+  await this.columnInput.fill("container_name");
+  await this.page.waitForTimeout(1000);
+  await this.kubernetesContainerNameOption.click();
+  await this.conditionDropdown.click();
+  await this.containsOption.click();
+  await this.valueInput.click();
+  await this.valueInput.fill("ziox");
+  await this.saveCondition();
+  await this.page.waitForTimeout(2000);
+  await this.conditionText.hover();
+}
+
+async setupDestinationStream(dynamicDestinationName) {
+  await this.outputStreamIcon.click();
+  await this.streamNameInput.click();
+  await this.page.waitForTimeout(1000);
+  await this.streamNameInput.fill(dynamicDestinationName);
+  await this.page.waitForTimeout(1000);
+  await this.clickInputNodeStreamSave();
+}
+
+async waitForPipelineSaved() {
+  await this.pipelineSavedMessage.waitFor({ state: "visible" });
+}
+
+async exploreStreamAndNavigateToPipeline(streamName) {
+  // Ingestion for the specific stream
+  const orgId = process.env["ORGNAME"];
+  const headers = {
+    "Authorization": `Basic ${Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString('base64')}`,
+    "Content-Type": "application/json",
+  };
+  
+  const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  await this.page.evaluate(async ({ url, headers, logsdata }) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(logsdata)
+    });
+    return await response.json();
+  }, {
+    url: url,
+    headers: headers,
+    logsdata: require('../../test-data/logs_data.json')
+  });
+  await this.page.waitForTimeout(2000);
+
+  // Navigate and explore
+  await this.navigateToStreams();
+  await this.refreshStreamStats();
+  await this.searchStream(streamName);
+  await this.clickExplore();
+  await this.openTimestampMenu();
+  await this.navigateToPipeline();
+}
+
+async setupPipelineWithSourceStream(sourceStream) {
+  await this.openPipelineMenu();
+  await this.page.waitForTimeout(1000);
+  await this.addPipeline();
+  await this.selectStream();
+  await this.dragStreamToTarget(this.streamButton);
+  await this.selectLogs();
+  await this.enterStreamName(sourceStream);
+  await this.page.waitForTimeout(2000);
+  await this.page.getByRole("option", { name: sourceStream, exact: true }).click();
+  await this.saveInputNodeStream();
+  await this.page.waitForTimeout(2000);
+  await this.deleteButtonNth1.click();
+  await this.confirmDeleteButton.click();
+}
+
+async createAndVerifyPipeline(expectedStreamName, sourceStream) {
+  const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
+  await this.enterPipelineName(pipelineName);
+  await this.savePipeline();
+  await this.waitForPipelineSaved();
+
+  // Verify the dynamic destination stream exists
+  await this.exploreStreamAndNavigateToPipeline(expectedStreamName);
+
+  // Verify pipeline creation and cleanup
+  await this.searchPipeline(pipelineName);
+  await this.page.waitForTimeout(1000);
+  const deletePipelineButton = this.page.locator(
+    `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+  );
+  await deletePipelineButton.waitFor({ state: "visible" });
+  await deletePipelineButton.click();
+  await this.confirmDeletePipeline();
+  await this.verifyPipelineDeleted();
+}
 }
 
 export default PipelinePage;

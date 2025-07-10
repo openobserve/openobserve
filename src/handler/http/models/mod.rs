@@ -17,7 +17,12 @@
 //! for HTTP responses and requests.
 
 pub mod action;
+#[cfg(feature = "enterprise")]
+pub mod ai;
 pub mod alerts;
+#[cfg(feature = "cloud")]
+pub mod billings;
 pub mod dashboards;
 pub mod destinations;
 pub mod folders;
+pub mod reports;

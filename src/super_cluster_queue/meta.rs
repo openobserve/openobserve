@@ -16,12 +16,25 @@
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
+use crate::service::db::enrichment_table::{ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update};
+
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let db = infra::db::get_db().await;
     match msg.message_type {
         MessageType::Put => {
             db.put(&msg.key, msg.value.unwrap(), msg.need_watch, None)
                 .await?;
+            // hack: notify the nodes to update the meta table stats
+            if msg.key.starts_with(ENRICHMENT_TABLE_META_STREAM_STATS_KEY) {
+                let key_parts = msg.key.split('/').collect::<Vec<&str>>();
+                let org_id = key_parts[1];
+                let name = key_parts[2];
+                if let Err(e) = notify_update(org_id, name).await {
+                    log::error!(
+                        "super cluster meta queue enrichment table notify_update error: {e:?}"
+                    );
+                }
+            }
         }
         MessageType::Delete(with_prefix) => {
             db.delete(&msg.key, with_prefix, msg.need_watch, None)

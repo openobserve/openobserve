@@ -20,6 +20,8 @@ use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
+use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
+
 type SegmentData = HashMap<String, BitVec>;
 
 static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
@@ -34,16 +36,23 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
 }
 
 pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
-    let key = format!("{}/schema={}", trace_id, schema_key);
+    let key = format!("{trace_id}/schema={schema_key}");
     let mut values = Vec::with_capacity(files.len());
     let mut segment_data = HashMap::new();
     for file in files {
         let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
-        let file_name = format!("/{}/$$/{}", key, file.key);
+        let file_name = if file.account.is_empty() {
+            format!("/{}/{}/{}", key, TRACE_ID_SEPARATOR, file.key)
+        } else {
+            format!(
+                "/{}/{}/{}/{}/{}",
+                key, TRACE_ID_SEPARATOR, file.account, ACCOUNT_SEPARATOR, file.key
+            )
+        };
         values.push(ObjectMeta {
             location: file_name.into(),
             last_modified: modified,
-            size: file.meta.compressed_size as usize,
+            size: file.meta.compressed_size as u64,
             e_tag: None,
             version: None,
         });

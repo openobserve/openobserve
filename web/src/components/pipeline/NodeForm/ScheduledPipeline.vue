@@ -23,7 +23,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline.query") }}
                 </div>
         </div>
+        
           <div class="flex items-center">
+            <q-btn
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            dense
+            class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%;"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
+
+          >
+            <div class="row items-center no-wrap tw-gap-2  ">
+              <img  :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
             <div class="flex items-center">
               <q-tabs
                 data-test="scheduled-pipeline-tabs"
@@ -91,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <q-separator />
 
-    <div  class="q-mb-sm stepper-header" >
-            <div  class="" style="height: 100% !important;">
+    <div  class="q-mb-sm stepper-header tw-w-full tw-flex tw-h-full" >
+            <div  :class="store.state.isAiChatEnabled ? 'tw-w-[75%]' : 'tw-w-[100%]'" style="height: 100% !important;">
   
            
   
@@ -854,8 +875,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Note: The period should be the same as frequency.
                   </div>
+                  
+
+
           
               </div>
+              <div class="flex items-center q-mr-sm q-mt-lg">
+                <div
+                  data-test="scheduled-pipeline-delay-title"
+                  class="text-bold flex items-center q-pb-sm"
+                  style="width: 130px"
+                >
+                  {{ t("pipeline.delay") + " *" }}
+                  <q-icon
+                    :name="outlinedInfo"
+                    size="17px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                    "
+                  >
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                    >
+                      <span style="font-size: 14px"
+                        >Delay for which the pipeline is scheduled to run.<br />
+                        e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.</span 
+                      >
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div style="min-height: 58px">
+                  <div
+                    class="flex items-center q-mr-sm"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+                  >
+                    <div
+                      data-test="scheduled-pipeline-delay-input"
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        v-model="delayCondition"
+                        type="number"
+                        dense
+                        filled
+                        min="0"
+                        style="background: none"
+                        @update:model-value="updateDelay"
+                      />
+                    </div>
+                    <div
+                      data-test="scheduled-pipeline-delay-unit"
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        height: 40px;
+                        font-weight: normal;
+                      "
+                      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              </div>
+
+              <div>
+                
               </div>
 
                 <div
@@ -895,8 +988,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ></q-btn>
             </template>
             <template #after>
-             
-              <div class="full-width" style="height: calc(100vh - 140px) !important;" >
+             <div class="full-width tw-flex ">
+
+              <div :style="{
+              }" style="height: calc(100vh - 140px) !important; width: 100%;" >
               <div class="query-editor-container scheduled-pipelines">
                 <span @click.stop="expandState.query = !expandState.query">
                 <FullViewContainer
@@ -943,8 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :expandedRows="expandedLogs"
                     @expand-row="expandLog"
                     @copy="copyLogToClipboard"
-
-
+                    @sendToAiChat="sendToAiChat"
                   />
                   <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
                     <q-spinner-hourglass color="primary" size="lg" />
@@ -987,6 +1081,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
              
             </div>
+
+          </div>
+
             <div class="flex justify-end q-mt-md">
 
           <q-btn
@@ -1034,7 +1131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
           </div>
 
+          <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width: 25%; max-width: 100%; min-width: 75px; height: calc(100vh - 70px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+              <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
 
+            </div>
 
 
 
@@ -1079,6 +1179,7 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import { split } from "postcss/lib/list";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
+import O2AIChat from "@/components/O2AIChat.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1092,8 +1193,14 @@ import useStreams from "@/composables/useStreams";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 
+import config from "../../../aws-exports";
+
+import useAiChat from "@/composables/useAiChat";
+import { onBeforeUnmount } from "vue";
+
+
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -1115,7 +1222,8 @@ const props = defineProps([
   "disableQueryTypeSelection",
   "showTimezoneWarning",
   "streamType",
-  "validatingSqlQuery"
+  "validatingSqlQuery",
+  "delay"
 ]);
 
 const emits = defineEmits([
@@ -1139,15 +1247,18 @@ const emits = defineEmits([
   "delete:node",
   "update:fullscreen",
   "update:stream_type",
+  "update:delay"
 ]);
 const {  pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
 const { getStream, getStreams } = useStreams ();
+const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
 
 const selectedStreamName = ref("");
 
 const streamOptions = ref([]);
+
 
 const getColumns = computed(() => {
   return [
@@ -1174,7 +1285,7 @@ const getColumns = computed(() => {
         showWrap: false,
         wrapContent: true
       },
-      size: 200
+      size: 260
     },
     {
       name: "source",
@@ -1197,6 +1308,8 @@ const getColumns = computed(() => {
 
 
 
+
+
 const { t } = useI18n();
 
 const triggerData = ref(props.trigger);
@@ -1204,6 +1317,8 @@ const triggerData = ref(props.trigger);
 const query = ref(props.sql);
 
 const promqlQuery = ref(props.promql);
+
+const delayCondition = ref(props.delay);
 
 const tab = ref(props.query_type || "custom");
 const stream_type = ref(props.streamType || "logs");
@@ -1229,8 +1344,13 @@ const dateTime  = ref({
 });
 const streamFields: any = ref([]);
 const previewPromqlQueryRef : any = ref(null);
-
+const isHovered = ref(false);
 const loading = ref(false);
+
+const aiChatInputContext = ref("");
+
+const userDefinedFields = ref<any[]>([]);
+
 
 const selectedStreamType = ref(props.streamType || "logs");
 
@@ -1287,7 +1407,13 @@ onMounted(async ()=>{
     getStreamFields();
   }
   }, 200);
+
+  registerAiContextHandler();
   
+})
+
+onBeforeUnmount(()=>{
+  removeAiContextHandler();
 })
 
 const importSqlParser = async () => {
@@ -1778,12 +1904,18 @@ const getStreamFields = () => {
     getStream(selectedStreamName.value, selectedStreamType.value, true)
       .then((stream: any) => {
         streamFields.value = [];
+        userDefinedFields.value = [];
         stream.schema?.forEach((field: any) => {
             streamFields.value.push({
               ...field,
               showValues: true,
             });
           
+        });
+        stream.uds_schema?.forEach((field: any) => {
+          userDefinedFields.value.push({
+            ...field,
+          });
         });
       })
       .finally(() => {
@@ -1795,7 +1927,6 @@ const getStreamFields = () => {
         }
         expandState.value.query = true;
         expandState.value.output = false;
-
         resolve(true);
       });
   });
@@ -1977,6 +2108,92 @@ const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   );
 };
 
+const updateDelay = (val: any) => {
+  emits("update:delay",val)
+}
+
+const toggleAIChat = () => {
+  const isEnabled = !store.state.isAiChatEnabled;
+  store.dispatch("setIsAiChatEnabled", isEnabled);
+}
+
+
+const getBtnLogo = computed(() => {
+      if (isHovered.value || store.state.isAiChatEnabled) {
+        return getImageURL('images/common/ai_icon_dark.svg')
+      }
+
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+
+
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const payload : any = {};
+
+
+          if (!selectedStreamType.value || !selectedStreamName.value) {
+            resolve("");
+            return;
+          }
+
+          const schema = streamFields.value.map((field: any) => {
+            return {
+              name: field.name,
+              type: field.type
+            }
+          })
+
+          //if uds is enabled we need to push the timestamp and all fields name in the schema
+          const hasTimestampColumn = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.timestamp_column);
+          const hasAllFieldsName = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.all_fields_name);
+            if(userDefinedFields.value.length > 0){ 
+              if(!hasTimestampColumn){
+              userDefinedFields.value.push({
+                name:store.state.zoConfig.timestamp_column,
+                type:'Int64'
+              })
+            }
+            if(!hasAllFieldsName){
+              userDefinedFields.value.push({
+                name:store.state.zoConfig.all_fields_name,
+                type:'Utf8'
+              })
+            }
+          }
+
+          payload["stream_name"] = selectedStreamName.value;
+          payload["schema_"] = userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for logs page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
+    const sendToAiChat = (value: any) => {
+      aiChatInputContext.value = value;
+      store.dispatch("setIsAiChatEnabled", true);
+    };
+
+
 defineExpose({
   tab,
   validateInputs,
@@ -2006,6 +2223,13 @@ defineExpose({
   expandedLogs,
   copyLogToClipboard,
   copyToClipboard,
+  updateDelay,
+  delayCondition,
+  toggleAIChat,
+  isHovered,
+  getBtnLogo,
+  sendToAiChat,
+  aiChatInputContext
 });
 
 </script>

@@ -35,7 +35,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
             return Err(anyhow::anyhow!("Key with given name already exists"));
         }
         Err(e) => {
-            log::info!("error while saving cipher key to db : {}", e);
+            log::info!("error while saving cipher key to db : {e}");
             return Err(anyhow::anyhow!(e));
         }
     }
@@ -54,7 +54,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
 
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_put(entry.clone()).await
                 {
@@ -97,7 +97,7 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
             .await?;
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_update(entry.clone())
                     .await
@@ -132,7 +132,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
         let cluster_coordinator = get_coordinator().await;
         cluster_coordinator
             .delete(
-                &format!("{CIPHER_KEY_PREFIX}{}/{}", org, name),
+                &format!("{CIPHER_KEY_PREFIX}{org}/{name}"),
                 false,
                 true,
                 None,
@@ -141,7 +141,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
 
         #[cfg(feature = "enterprise")]
         {
-            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await
                 {
@@ -196,7 +196,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };

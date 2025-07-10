@@ -1,0 +1,10 @@
+{
+  "name": "",
+  "url": "DEMO",
+  "method": "post",
+  "skip_tls_verify": false,
+  "headers": {},
+  "template": "",
+  "emails": [],
+  "type": "http"
+}

@@ -13,173 +13,258 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use config::meta::{
+    dashboards::reports::{ListReportsParams, Report},
+    folder::{DEFAULT_FOLDER, Folder, FolderType},
+};
+use infra::table;
+use sea_orm::{ConnectionTrait, TransactionTrait};
 
-use config::{meta::dashboards::reports::Report, utils::json};
+use crate::service::{dashboards::reports::ReportError, db, folders};
 
-use crate::{common::infra::config::DASHBOARD_REPORTS, service::db};
-
-pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
-    let report_key = format!("{org_id}/{name}");
-    if let Some(v) = DASHBOARD_REPORTS.get(&report_key) {
-        Ok(v.value().clone())
-    } else {
-        let key = format!("/reports/{org_id}/{name}");
-        match db::get(&key).await {
-            Ok(val) => Ok(json::from_slice(&val)?),
-            Err(_) => Err(anyhow::anyhow!("Report not found")),
-        }
+pub async fn get<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_snowflake_id: &str,
+    name: &str,
+) -> Result<Report, anyhow::Error> {
+    match table::reports::get_by_name(conn, org_id, folder_snowflake_id, name).await? {
+        Some((_, report)) => Ok(report),
+        _ => Err(anyhow::anyhow!("Report not found")),
     }
 }
 
-pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyhow::Error> {
-    match set_without_updating_trigger(org_id, report).await {
-        Ok(schedule_key) => {
-            let trigger = db::scheduler::Trigger {
-                org: org_id.to_string(),
-                module: db::scheduler::TriggerModule::Report,
-                module_key: schedule_key.clone(),
-                next_run_at: report.start,
-                ..Default::default()
-            };
-            if create {
-                match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to save trigger: {}", e);
-                        Ok(())
-                    }
-                }
-            } else if db::scheduler::exists(
-                org_id,
-                db::scheduler::TriggerModule::Report,
-                &schedule_key,
+pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Report, anyhow::Error> {
+    match table::reports::get_by_id(conn, id).await? {
+        Some((_, report)) => Ok(report),
+        _ => Err(anyhow::anyhow!("Report not found")),
+    }
+}
+
+pub async fn create<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    report: Report,
+) -> Result<(), anyhow::Error> {
+    let org = report.org_id.clone();
+    let next_run_at = report.start;
+
+    let report_id = create_without_updating_trigger(conn, folder_snowflake_id, report).await?;
+    let trigger = db::scheduler::Trigger {
+        org,
+        module: db::scheduler::TriggerModule::Report,
+        module_key: report_id,
+        next_run_at,
+        ..Default::default()
+    };
+    db::scheduler::push(trigger)
+        .await
+        .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
+    Ok(())
+}
+
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: Report,
+) -> Result<(), anyhow::Error> {
+    let org_id = report.org_id.clone();
+    let next_run_at = report.start;
+
+    let report_id =
+        update_without_updating_trigger(conn, folder_snowflake_id, new_folder_snowflake_id, report)
+            .await?;
+    let scheduler_exists =
+        db::scheduler::exists(&org_id, db::scheduler::TriggerModule::Report, &report_id).await;
+
+    let trigger = db::scheduler::Trigger {
+        org: org_id.clone(),
+        module: db::scheduler::TriggerModule::Report,
+        module_key: report_id,
+        next_run_at,
+        ..Default::default()
+    };
+    if scheduler_exists {
+        db::scheduler::update_trigger(trigger)
+            .await
+            .inspect_err(|e| log::error!("Failed to update trigger: {e}"))?;
+    } else {
+        db::scheduler::push(trigger)
+            .await
+            .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
+    }
+
+    Ok(())
+}
+
+pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    report: Report,
+) -> Result<String, anyhow::Error> {
+    // Check if the folder_id is default and if it already exists.
+    if folder_snowflake_id == DEFAULT_FOLDER
+        && !table::folders::exists(&report.org_id, DEFAULT_FOLDER, FolderType::Reports).await?
+    {
+        create_default_reports_folder(&report.org_id).await?;
+    }
+    let (report_id, _) =
+        table::reports::create_report(conn, folder_snowflake_id, report.clone(), None).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_create_event(
+        &report.org_id.clone(),
+        folder_snowflake_id,
+        &report_id,
+        report,
+    )
+    .await?;
+    Ok(report_id)
+}
+
+async fn create_default_reports_folder(org_id: &str) -> Result<Folder, ReportError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: "default".to_owned(),
+        description: "default".to_owned(),
+    };
+    folders::save_folder(org_id, default_folder, FolderType::Reports, true)
+        .await
+        .map_err(|_| ReportError::CreateDefaultFolderError)
+}
+
+pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: Report,
+) -> Result<String, anyhow::Error> {
+    let report_id = table::reports::update_report(
+        conn,
+        folder_snowflake_id,
+        new_folder_snowflake_id,
+        report.clone(),
+    )
+    .await?;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_update_event(
+        &report.org_id.clone(),
+        folder_snowflake_id,
+        new_folder_snowflake_id,
+        report,
+    )
+    .await?;
+    Ok(report_id)
+}
+
+pub async fn delete<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_snowflake_id: &str,
+    name: &str,
+) -> Result<(), anyhow::Error> {
+    let report_id = table::reports::delete_by_name(conn, org_id, folder_snowflake_id, name)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
+    let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, &report_id)
+        .await
+        .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_delete_event(org_id, folder_snowflake_id, name).await?;
+    Ok(())
+}
+
+pub async fn list<C: ConnectionTrait>(
+    conn: &C,
+    params: &ListReportsParams,
+) -> Result<Vec<table::reports::ListReportsQueryResult>, anyhow::Error> {
+    let reports = table::reports::list_reports(conn, params).await?;
+    Ok(reports)
+}
+
+pub async fn reset<C: ConnectionTrait>(conn: &C) -> Result<(), anyhow::Error> {
+    table::reports::delete_all(conn).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::reset().await?;
+    Ok(())
+}
+
+/// Helper functions for sending events to the super cluster queue.
+#[cfg(feature = "enterprise")]
+mod super_cluster {
+    use config::meta::dashboards::reports::Report;
+    use infra::errors::Error;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+    /// Sends event to the super cluster queue indicating that an report has been
+    /// created in the database.
+    pub async fn emit_create_event(
+        org_id: &str,
+        folder_id: &str,
+        report_id: &str,
+        report: Report,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            log::debug!("Sending super cluster report creation event: {report:?}");
+            o2_enterprise::enterprise::super_cluster::queue::reports_create(
+                org_id, folder_id, report_id, report,
             )
             .await
-            {
-                match db::scheduler::update_trigger(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to update trigger: {}", e);
-                        Ok(())
-                    }
-                }
-            } else {
-                match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to save trigger: {}", e);
-                        Ok(())
-                    }
-                }
-            }
+            .map_err(|e| Error::Message(e.to_string()))?;
         }
-        Err(e) => Err(anyhow::anyhow!("Error saving report: {}", e)),
+        Ok(())
     }
-}
 
-pub async fn set_without_updating_trigger(
-    org_id: &str,
-    report: &Report,
-) -> Result<String, anyhow::Error> {
-    let schedule_key = report.name.to_string();
-    let key = format!("/reports/{org_id}/{}", &schedule_key);
-    match db::put(
-        &key,
-        json::to_vec(report).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await
-    {
-        Ok(_) => Ok(schedule_key),
-        Err(e) => Err(anyhow::anyhow!("{e}")),
-    }
-}
-
-pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let key = format!("/reports/{org_id}/{name}");
-    match db::delete(&key, false, db::NEED_WATCH, None).await {
-        Ok(_) => {
-            match db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, name).await {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    log::error!("Failed to delete trigger: {}", e);
-                    Ok(())
-                }
-            }
+    /// Sends event to the super cluster queue indicating that an report has been
+    /// updated in the database.
+    pub async fn emit_update_event(
+        org: &str,
+        folder_snowflake_id: &str,
+        new_folder_snowflake_id: Option<&str>,
+        report: Report,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            log::debug!("Sending super cluster report update event: {report:?}");
+            o2_enterprise::enterprise::super_cluster::queue::reports_update(
+                org,
+                folder_snowflake_id,
+                new_folder_snowflake_id,
+                report,
+            )
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         }
-        Err(e) => Err(anyhow::anyhow!("Error deleting report: {}", e)),
+        Ok(())
     }
-}
 
-pub async fn list(org_id: &str) -> Result<Vec<Report>, anyhow::Error> {
-    let key = format!("/reports/{org_id}");
-    let ret = db::list_values(&key).await?;
-    let mut items: Vec<Report> = Vec::with_capacity(ret.len());
-    for item_value in ret {
-        let json_val = json::from_slice(&item_value)?;
-        items.push(json_val)
-    }
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(items)
-}
-
-pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/reports/";
-    let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
-    let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching reports");
-    loop {
-        let ev = match events.recv().await {
-            Some(ev) => ev,
-            None => {
-                log::error!("watch_reports: event channel closed");
-                break;
-            }
-        };
-        match ev {
-            db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Report = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                DASHBOARD_REPORTS.insert(item_key.to_owned(), item_value);
-            }
-            db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                DASHBOARD_REPORTS.remove(item_key);
-            }
-            db::Event::Empty => {}
+    /// Sends event to the super cluster queue indicating that an report has been
+    /// deleted from the database.
+    pub async fn emit_delete_event(
+        org: &str,
+        folder_id: &str,
+        name: &str,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            log::debug!("Sending super cluster report delete event: {name:?}");
+            o2_enterprise::enterprise::super_cluster::queue::reports_delete(org, folder_id, name)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
         }
+        Ok(())
     }
-    Ok(())
-}
 
-pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = "/reports/";
-    let ret = db::list(key).await?;
-    for (item_key, item_value) in ret {
-        let key = item_key.strip_prefix(key).unwrap();
-        let json_val: Report = json::from_slice(&item_value).unwrap();
-        DASHBOARD_REPORTS.insert(key.to_owned(), json_val);
+    /// Sends event to the super cluster queue indicating that all reports have
+    /// been deleted from the database.
+    pub async fn reset() -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::reports_reset()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
     }
-    log::info!("Reports Cached");
-    Ok(())
-}
-
-pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = "/reports/";
-    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }

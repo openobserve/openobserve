@@ -27,7 +27,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use {
     config::cluster::LOCAL_NODE, infra::table::search_job::search_jobs::JobOperator,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::super_cluster,
 };
 
@@ -89,8 +89,10 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
 
     // TODO: need other call to set the get job's status
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled && res.is_some() {
-        let job_id = res.as_ref().unwrap().clone();
+    if get_o2_config().super_cluster.enabled
+        && let Some(res) = res.clone()
+    {
+        let job_id = res.clone();
         super_cluster::queue::search_job_operator(JobOperator::GetJob {
             job_id: job_id.id.clone(),
             updated_at,

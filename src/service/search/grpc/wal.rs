@@ -16,6 +16,7 @@
 use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
+use arrow_schema::{DataType, Field};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -46,6 +47,7 @@ use crate::{
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
+            grpc::utils,
             index::IndexCondition,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             match_source,
@@ -118,23 +120,23 @@ pub async fn search_parquet(
         .await;
     for file in files_metadata {
         if file.meta.is_empty() {
-            wal::release_files(&[file.key.clone()]);
+            wal::release_files(std::slice::from_ref(&file.key));
             lock_files.retain(|f| f != &file.key);
             continue;
         }
-        if let Some((min_ts, max_ts)) = query.time_range {
-            if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
-                log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
-                    query.trace_id,
-                    &file.key,
-                    file.meta.min_ts,
-                    file.meta.max_ts
-                );
-                wal::release_files(&[file.key.clone()]);
-                lock_files.retain(|f| f != &file.key);
-                continue;
-            }
+        if let Some((min_ts, max_ts)) = query.time_range
+            && (file.meta.min_ts > max_ts || file.meta.max_ts < min_ts)
+        {
+            log::debug!(
+                "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
+                query.trace_id,
+                &file.key,
+                file.meta.min_ts,
+                file.meta.max_ts
+            );
+            wal::release_files(std::slice::from_ref(&file.key));
+            lock_files.retain(|f| f != &file.key);
+            continue;
         }
         new_files.push(file);
     }
@@ -252,21 +254,15 @@ pub async fn search_parquet(
         )
     );
 
-    if cfg.common.memory_circuit_breaker_enable {
-        if let Err(e) = super::check_memory_circuit_breaker(&query.trace_id, &scan_stats) {
-            // release all files
-            wal::release_files(&lock_files);
-            return Err(e);
-        }
+    // check memory circuit breaker
+    if let Err(e) = ingester::check_memory_circuit_breaker() {
+        // release all files
+        wal::release_files(&lock_files);
+        return Err(Error::ResourceError(e.to_string()));
     }
 
     // construct latest schema map
-    let latest_schema = Arc::new(
-        schema
-            .as_ref()
-            .clone()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -278,12 +274,10 @@ pub async fn search_parquet(
         if files.is_empty() {
             continue;
         }
-        if files.is_empty() {
-            continue;
-        }
         let schema = schema_versions[ver]
             .clone()
-            .with_metadata(std::collections::HashMap::new());
+            .with_metadata(Default::default());
+        let schema = utils::change_schema_to_utf8_view(schema);
         let session = config::meta::search::Session {
             id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
@@ -430,18 +424,11 @@ pub async fn search_memtable(
         )
     );
 
-    let cfg = get_config();
-    if cfg.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
-    }
+    // check memory circuit breaker
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     // construct latest schema map
-    let latest_schema = Arc::new(
-        schema
-            .as_ref()
-            .clone()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
     let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
         latest_schema_map.insert(field.name(), field);
@@ -449,16 +436,22 @@ pub async fn search_memtable(
 
     let mut tables = Vec::new();
     let start = std::time::Instant::now();
-    for (schema, mut record_batches) in batch_groups {
+    for (schema, record_batches) in batch_groups {
         if record_batches.is_empty() {
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-
-        for batch in record_batches.iter_mut() {
-            *batch = adapt_batch(latest_schema.clone(), batch);
+        // the field in latest_schema_map, but not in schema,
+        // so not in the diff_fields, result in Utf8View issue
+        // so we need to add it to the diff_fields
+        let mut diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
+        let mut adapt_batches = Vec::with_capacity(record_batches.len());
+        for batch in record_batches {
+            adapt_batches.push(adapt_batch(latest_schema.clone(), batch, &mut diff_fields));
         }
+        let record_batches = adapt_batches;
+
+        tokio::task::coop::consume_budget().await;
 
         // merge small batches into big batches
         let mut merge_groupes = Vec::new();
@@ -479,8 +472,16 @@ pub async fn search_memtable(
         }
         let record_batches = merge_groupes
             .into_iter()
-            .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
+            .map(|mut group| {
+                if group.len() == 1 {
+                    group.remove(0)
+                } else {
+                    concat_batches(group[0].schema().clone(), group).unwrap()
+                }
+            })
             .collect::<Vec<_>>();
+
+        tokio::task::coop::consume_budget().await;
 
         let table = match NewMemTable::try_new(
             record_batches[0].schema().clone(),
@@ -564,14 +565,31 @@ async fn get_file_list_inner(
         })
         .collect::<Vec<_>>();
 
+    // use same lock to combine the operations of filter by pending delete and lock files
+    let wal_lock = infra::local_lock::lock("wal").await?;
+    let lock_guard = wal_lock.lock().await;
+
     // filter by pending delete
-    let files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
+    let mut files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
         return Ok(vec![]);
     }
 
+    let files_num = files.len();
+    files.sort_unstable();
+    files.dedup();
+    if files_num != files.len() {
+        log::warn!(
+            "[trace_id {}] wal->parquet->search: found duplicate files from {} to {}",
+            query.trace_id,
+            files_num,
+            files.len()
+        );
+    }
+
     // lock theses files
     wal::lock_files(&files);
+    drop(lock_guard);
 
     let stream_params = Arc::new(StreamParams::new(
         &query.org_id,
@@ -605,14 +623,14 @@ async fn get_file_list_inner(
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(&[file.clone()]);
+                wal::release_files(std::slice::from_ref(file));
                 continue;
             }
         }
         if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {
-            wal::release_files(&[file.clone()]);
+            wal::release_files(std::slice::from_ref(file));
         }
     }
     Ok(result)
@@ -638,7 +656,11 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(latest_schema: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
+fn adapt_batch(
+    latest_schema: Arc<Schema>,
+    batch: RecordBatch,
+    diff_fields: &mut HashMap<String, DataType>,
+) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
@@ -648,6 +670,15 @@ pub fn adapt_batch(latest_schema: Arc<Schema>, batch: &RecordBatch) -> RecordBat
         if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
             cols.push(Arc::clone(&batch_cols[idx]));
             fields.push(field.clone());
+        } else if *field_latest.data_type() == DataType::Utf8View {
+            // in memtable, the schema should be utf8
+            cols.push(new_null_array(&DataType::Utf8, batch.num_rows()));
+            fields.push(Field::new(
+                field_latest.name(),
+                DataType::Utf8,
+                field_latest.is_nullable(),
+            ));
+            diff_fields.insert(field_latest.name().to_string(), DataType::Utf8View);
         } else {
             cols.push(new_null_array(field_latest.data_type(), batch.num_rows()));
             fields.push(field_latest.as_ref().clone());

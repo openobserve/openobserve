@@ -31,6 +31,13 @@ mod m20241217_155000_populate_alerts_table;
 mod m20241222_085111_search_jobs;
 mod m20241222_085135_search_job_partitions;
 mod m20241222_085148_search_job_results;
+mod m20241227_000001_create_organizations_table;
+mod m20241227_000100_populate_organizations_table;
+mod m20241227_000200_create_users_table;
+mod m20241227_000300_create_org_users_table;
+mod m20241227_000400_populate_users_table;
+mod m20241227_000500_delete_meta_users_table;
+mod m20250107_160900_delete_bad_dashboards;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
 mod m20250121_120000_create_cipher_table;
@@ -46,6 +53,12 @@ mod m20250125_172300_delete_metas_templates;
 mod m20250213_000001_add_dashboard_updated_at;
 mod m20250217_115548_ratelimit_table;
 mod m20250320_000001_remove_alert_name_unique_constraint;
+mod m20250422_000001_add_alert_align_time;
+#[cfg(feature = "cloud")]
+mod m20250520_000001_add_trial_end_col;
+mod m20250611_000001_create_reports_table;
+mod m20250611_000002_populate_reports_table;
+mod m20250611_000003_populate_reports_scheduled_jobs;
 
 pub struct Migrator;
 
@@ -68,6 +81,14 @@ impl MigratorTrait for Migrator {
             Box::new(m20241222_085111_search_jobs::Migration),
             Box::new(m20241222_085135_search_job_partitions::Migration),
             Box::new(m20241222_085148_search_job_results::Migration),
+            Box::new(m20241227_000001_create_organizations_table::Migration),
+            Box::new(m20241227_000100_populate_organizations_table::Migration),
+            Box::new(m20241227_000200_create_users_table::Migration),
+            Box::new(m20241227_000300_create_org_users_table::Migration),
+            Box::new(m20241227_000400_populate_users_table::Migration),
+            // TODO: Include this in a future pr
+            // Box::new(m20241227_000500_delete_meta_users_table::Migration),
+            Box::new(m20250107_160900_delete_bad_dashboards::Migration),
             Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
             Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
             Box::new(m20250121_120000_create_cipher_table::Migration),
@@ -83,6 +104,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20250213_000001_add_dashboard_updated_at::Migration),
             Box::new(m20250217_115548_ratelimit_table::Migration),
             Box::new(m20250320_000001_remove_alert_name_unique_constraint::Migration),
+            Box::new(m20250422_000001_add_alert_align_time::Migration),
+            #[cfg(feature = "cloud")]
+            Box::new(m20250520_000001_add_trial_end_col::Migration),
+            Box::new(m20250611_000001_create_reports_table::Migration),
+            Box::new(m20250611_000002_populate_reports_table::Migration),
+            Box::new(m20250611_000003_populate_reports_scheduled_jobs::Migration),
         ]
     }
 }

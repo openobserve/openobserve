@@ -52,12 +52,13 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
 pub trait FileList: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<()>;
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()>;
+    async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64>;
+    async fn add_history(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
-    async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
+    async fn batch_add_with_id(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
+    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()>;
     async fn batch_process(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
@@ -65,12 +66,12 @@ pub trait FileList: Sync + Send + 'static {
         created_at: i64,
         files: &[FileListDeleted],
     ) -> Result<()>;
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
-    async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
+    async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
         org_id: &str,
@@ -79,15 +80,15 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
-    ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_by_date(
+    ) -> Result<Vec<FileKey>>;
+    async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
         date_range: Option<(String, String)>,
-    ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
+    ) -> Result<Vec<FileKey>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -95,6 +96,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<FileId>>;
+    async fn query_ids_by_files(&self, files: &[FileKey]) -> Result<stdHashMap<String, i64>>;
     async fn query_old_data_hours(
         &self,
         org_id: &str,
@@ -170,6 +172,16 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
+    async fn get_entries_in_range(
+        &self,
+        org: &str,
+        stream: Option<&str>,
+        start_time: i64,
+        end_time: i64,
+        min_id: Option<i64>,
+    ) -> Result<Vec<FileRecord>>;
+    async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>>;
+    async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -181,13 +193,13 @@ pub async fn create_table_index() -> Result<()> {
 }
 
 #[inline]
-pub async fn add(file: &str, meta: &FileMeta) -> Result<()> {
-    CLIENT.add(file, meta).await
+pub async fn add(account: &str, file: &str, meta: &FileMeta) -> Result<i64> {
+    CLIENT.add(account, file, meta).await
 }
 
 #[inline]
-pub async fn add_history(file: &str, meta: &FileMeta) -> Result<()> {
-    CLIENT.add_history(file, meta).await
+pub async fn add_history(account: &str, file: &str, meta: &FileMeta) -> Result<i64> {
+    CLIENT.add_history(account, file, meta).await
 }
 
 #[inline]
@@ -211,6 +223,11 @@ pub async fn batch_process(files: &[FileKey]) -> Result<()> {
 }
 
 #[inline]
+pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+    CLIENT.update_dump_records(dump_file, dumped_ids).await
+}
+
+#[inline]
 pub async fn batch_add_deleted(
     org_id: &str,
     created_at: i64,
@@ -220,7 +237,7 @@ pub async fn batch_add_deleted(
 }
 
 #[inline]
-pub async fn batch_remove_deleted(files: &[String]) -> Result<()> {
+pub async fn batch_remove_deleted(files: &[FileKey]) -> Result<()> {
     CLIENT.batch_remove_deleted(files).await
 }
 
@@ -245,7 +262,7 @@ pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
 }
 
 #[inline]
-pub async fn list() -> Result<Vec<(String, FileMeta)>> {
+pub async fn list() -> Result<Vec<FileKey>> {
     CLIENT.list().await
 }
 
@@ -258,7 +275,7 @@ pub async fn query(
     time_level: PartitionTimeLevel,
     time_range: Option<(i64, i64)>,
     flattened: Option<bool>,
-) -> Result<Vec<(String, FileMeta)>> {
+) -> Result<Vec<FileKey>> {
     validate_time_range(time_range)?;
     CLIENT
         .query(
@@ -273,21 +290,21 @@ pub async fn query(
 }
 
 #[inline]
-#[tracing::instrument(name = "infra:file_list:db:query_by_date")]
-pub async fn query_by_date(
+#[tracing::instrument(name = "infra:file_list:db:query_for_merge")]
+pub async fn query_for_merge(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: Option<(String, String)>,
-) -> Result<Vec<(String, FileMeta)>> {
+) -> Result<Vec<FileKey>> {
     CLIENT
-        .query_by_date(org_id, stream_type, stream_name, date_range)
+        .query_for_merge(org_id, stream_type, stream_name, date_range)
         .await
 }
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
     CLIENT.query_by_ids(ids).await
 }
 
@@ -303,6 +320,12 @@ pub async fn query_ids(
     CLIENT
         .query_ids(org_id, stream_type, stream_name, time_range)
         .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_ids_by_files")]
+pub async fn query_ids_by_files(files: &[FileKey]) -> Result<stdHashMap<String, i64>> {
+    CLIENT.query_ids_by_files(files).await
 }
 
 #[inline]
@@ -464,6 +487,29 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
     CLIENT.clean_done_jobs(before_date).await
 }
 
+#[inline]
+pub async fn get_entries_in_range(
+    org: &str,
+    stream: Option<&str>,
+    start_time: i64,
+    end_time: i64,
+    min_id: Option<i64>,
+) -> Result<Vec<FileRecord>> {
+    CLIENT
+        .get_entries_in_range(org, stream, start_time, end_time, min_id)
+        .await
+}
+
+#[inline]
+pub async fn get_pending_dump_jobs() -> Result<Vec<(i64, String, String, i64)>> {
+    CLIENT.get_pending_dump_jobs().await
+}
+
+#[inline]
+pub async fn set_job_dumped_status(id: i64, dumped: bool) -> Result<()> {
+    CLIENT.set_job_dumped_status(id, dumped).await
+}
+
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = config::get_config();
@@ -475,12 +521,12 @@ pub async fn local_cache_gc() -> Result<()> {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
         interval.tick().await; // the first tick is immediate
         loop {
-            if let Ok(min_id) = get_min_pk_value().await {
-                if min_id > 0 {
-                    match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
-                        Ok(_) => log::info!("[file_list] local cache gc done"),
-                        Err(e) => log::error!("[file_list] local cache gc failed: {}", e),
-                    }
+            if let Ok(min_id) = get_min_pk_value().await
+                && min_id > 0
+            {
+                match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                    Ok(_) => log::info!("[file_list] local cache gc done"),
+                    Err(e) => log::error!("[file_list] local cache gc failed: {e}"),
                 }
             }
             interval.tick().await;
@@ -491,15 +537,15 @@ pub async fn local_cache_gc() -> Result<()> {
 }
 
 fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
+    if let Some((start, end)) = time_range
+        && (start > end || start == 0 || end == 0)
+    {
+        return Err(Error::Message("[file_list] invalid time range".to_string()));
     }
     Ok(())
 }
 
-fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
+pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
     let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
     if ts > 0 {
         time_end + second_micros(ts)
@@ -512,6 +558,10 @@ fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
 pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
+    #[sqlx(default)]
+    pub account: String,
+    #[sqlx(default)]
+    pub org: String,
     #[sqlx(default)]
     pub stream: String,
     pub date: String,
@@ -529,16 +579,29 @@ pub struct FileRecord {
     pub flattened: bool,
 }
 
-impl From<&FileRecord> for FileMeta {
-    fn from(record: &FileRecord) -> Self {
+impl From<&FileRecord> for FileKey {
+    fn from(r: &FileRecord) -> Self {
         Self {
-            min_ts: record.min_ts,
-            max_ts: record.max_ts,
-            records: record.records,
-            original_size: record.original_size,
-            compressed_size: record.compressed_size,
-            index_size: record.index_size,
-            flattened: record.flattened,
+            id: r.id,
+            account: r.account.to_string(),
+            key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+            meta: r.into(),
+            deleted: r.deleted,
+            segment_ids: None,
+        }
+    }
+}
+
+impl From<&FileRecord> for FileMeta {
+    fn from(r: &FileRecord) -> Self {
+        Self {
+            min_ts: r.min_ts,
+            max_ts: r.max_ts,
+            records: r.records,
+            original_size: r.original_size,
+            compressed_size: r.compressed_size,
+            index_size: r.index_size,
+            flattened: r.flattened,
         }
     }
 }
@@ -572,6 +635,10 @@ impl From<&StatsRecord> for StreamStats {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileDeletedRecord {
+    #[sqlx(default)]
+    pub id: i64,
+    #[sqlx(default)]
+    pub account: String,
     pub stream: String,
     pub date: String,
     pub file: String,
@@ -594,12 +661,23 @@ pub struct MergeJobPendingRecord {
 }
 
 #[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
-#[repr(i32)]
+#[repr(i64)]
 pub enum FileListJobStatus {
     #[default]
     Pending,
     Running,
     Done,
+}
+
+impl From<i64> for FileListJobStatus {
+    fn from(status: i64) -> Self {
+        match status {
+            0 => Self::Pending,
+            1 => Self::Running,
+            2 => Self::Done,
+            _ => Self::Pending,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, sqlx::FromRow)]
@@ -609,4 +687,10 @@ pub struct FileId {
     pub original_size: i64,
     #[sqlx(default)]
     pub deleted: bool,
+}
+
+#[derive(Clone, Debug, Default, sqlx::FromRow)]
+pub struct FileIdWithFile {
+    pub id: i64,
+    pub file: String,
 }

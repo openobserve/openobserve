@@ -22,7 +22,7 @@ use infra::{
     table::distinct_values::{DistinctFieldRecord, OriginType},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config;
+use o2_enterprise::enterprise::common::config::get_config;
 
 pub async fn add(record: DistinctFieldRecord) -> Result<(), errors::Error> {
     #[cfg(feature = "enterprise")]
@@ -82,7 +82,7 @@ pub async fn emit_batch_delete_event(
             id: id.to_owned(),
         })?
         .into();
-        let key = format!("/distinct_values/{}", id);
+        let key = format!("/distinct_values/{id}");
         o2_enterprise::enterprise::super_cluster::queue::distinct_values_delete(
             &key, value, true, true,
         )

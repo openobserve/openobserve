@@ -28,7 +28,7 @@ use infra::{
     table::entity::{search_job_partitions::Model as PartitionJob, search_jobs::Model as Job},
 };
 use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
+    common::config::get_config as get_o2_config,
     super_cluster::{
         kv::cluster::get_grpc_addr,
         search::{get_cluster_node_by_name, get_cluster_nodes},
@@ -78,7 +78,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             }
 
             if let Err(e) = update_running_job(&job_id).await {
-                log::error!("[SEARCH JOB {id}] job_id: {job_id}, update_job_status failed: {e}",);
+                log::error!("[SEARCH JOB {id}] job_id: {job_id}, update_job_status failed: {e}");
             }
         }
     });
@@ -143,7 +143,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     response.set_trace_id(job.trace_id.clone());
     let buf = json::to_vec(&response)?;
     let path = generate_result_path(job.created_at, &job.trace_id, None);
-    storage::put(&path, buf.into()).await?;
+    storage::put("", &path, buf.into()).await?;
 
     // 6. update `search_jobs` table
     set_job_finish(&job.id, &job.trace_id, &path).await?;
@@ -233,7 +233,7 @@ async fn run_partition_job(
     let hits = result.total;
     let buf = json::to_vec(&result)?;
     let path = generate_result_path(job.created_at, &job.trace_id, Some(partition_id));
-    storage::put(&path, buf.into()).await?;
+    storage::put("", &path, buf.into()).await?;
 
     // 5. set the partition status to finish
     set_partition_job_finish(&job.id, partition_id, path.as_str()).await?;
@@ -259,7 +259,7 @@ async fn filter_partition_job(
         // if the result_path is not none, means the partition job is done
         if partition_job.result_path.is_some() {
             let path = partition_job.result_path.as_ref().unwrap();
-            let buf = storage::get(path).await?;
+            let buf = storage::get_bytes("", path).await?;
             let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
             need -= res.total as i64;
         } else {
@@ -329,7 +329,7 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
 
         // delete all files
         if let Err(e) = delete_result(deleted_files).await {
-            log::warn!("[SEARCH JOB] delete_jobs failed to delete files error: {e}",);
+            log::warn!("[SEARCH JOB] delete_jobs failed to delete files error: {e}");
         }
 
         // 3. delete the partition jobs from database
@@ -353,7 +353,7 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
             job.id, job.status
         );
         set_job_error_message(&job.id, &job.trace_id, message.as_str()).await?;
-        log::error!("{}", message);
+        log::error!("{message}");
         return Err(anyhow::anyhow!(message));
     }
     Ok(())
@@ -401,7 +401,7 @@ pub async fn merge_response(
         resp.took_detail.add(&r.took_detail);
         resp.hits.extend(r.hits);
         resp.total += r.total;
-        resp.file_count += r.file_count;
+        resp.scan_files += r.scan_files;
         resp.scan_size += r.scan_size;
         resp.idx_scan_size += r.idx_scan_size;
         resp.scan_records += r.scan_records;
@@ -432,7 +432,7 @@ pub async fn get_result(
     size: i64,
 ) -> Result<Response, anyhow::Error> {
     if *cluster == config::get_cluster_name() {
-        let buf = storage::get(path).await?;
+        let buf = storage::get_bytes("", path).await?;
         let mut res: Response = json::from_slice::<Response>(&buf)?;
         res.pagination(from, size);
         return Ok(res);
@@ -476,8 +476,8 @@ pub async fn get_result(
 }
 
 pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
-    let local_paths: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
-    storage::del(&local_paths).await?;
+    let local_paths = paths.iter().map(|s| ("", s.as_str())).collect();
+    storage::del(local_paths).await?;
 
     if get_o2_config().super_cluster.enabled {
         let trace_id = config::ider::generate_trace_id();

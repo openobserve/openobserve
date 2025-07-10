@@ -10,6 +10,12 @@ export default class DashboardactionPage {
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
   }
 
+  // Generate a unique panel name
+  generateUniquePanelName(prefix = "panel") {
+    const randomStr = Math.random().toString(36).substr(2, 5);
+    return `${prefix}_${Date.now()}_${randomStr}`;
+  }
+
   // Add panel name
   async addPanelName(panelName) {
     await this.panelNameInput.click();
@@ -18,6 +24,7 @@ export default class DashboardactionPage {
 
   // Save panel button
   async savePanel() {
+    await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
   }
 
@@ -34,5 +41,26 @@ export default class DashboardactionPage {
       const btn = document.querySelector('[data-test="dashboard-apply"]');
       return btn && btn.classList.contains("bg-secondary");
     });
+  }
+
+  //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
+
+  async selectPanelAction(panelName, action) {
+    const actionDataTestIds = {
+      Edit: "dashboard-edit-panel",
+      Layout: "dashboard-edit-layout",
+      Duplicate: "dashboard-duplicate-panel",
+      Inspector: "dashboard-query-inspector-panel",
+      Move: "dashboard-move-to-another-panel",
+      Delete: "dashboard-delete-panel",
+    };
+
+    const actionTestId = actionDataTestIds[action];
+    if (!actionTestId) throw new Error(`Unknown action: ${action}`);
+
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.page.locator(`[data-test="${actionTestId}"]`).click();
   }
 }

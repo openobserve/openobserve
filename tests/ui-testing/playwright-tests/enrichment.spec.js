@@ -3,7 +3,7 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -59,7 +59,7 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
+const selectStream = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
@@ -116,7 +116,7 @@ test.describe("Enrichment data testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
+    await logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
 
@@ -215,7 +215,8 @@ test.describe("Enrichment data testcases", () => {
 
     // Explore the file
     await page.getByRole("button", { name: "Explore" }).click();
-    await page.locator("#fnEditor").getByLabel("Editor content;Press Alt+F1")
+    await page.waitForTimeout(3000);
+    await page.locator('#fnEditor').getByRole('textbox')
       .fill(`
 abc, err = get_enrichment_table_record("${fileName}", {
   "protocol_number": to_string!(.protocol_number)

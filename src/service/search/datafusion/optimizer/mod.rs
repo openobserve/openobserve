@@ -33,7 +33,6 @@ use datafusion::optimizer::{
     push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
     scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
     single_distinct_to_groupby::SingleDistinctToGroupBy,
-    unwrap_cast_in_comparison::UnwrapCastInComparison,
 };
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
@@ -101,7 +100,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
 
     rules.push(Arc::new(EliminateNestedUnion::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
-    rules.push(Arc::new(UnwrapCastInComparison::new()));
     rules.push(Arc::new(ReplaceDistinctWithAggregate::new()));
     rules.push(Arc::new(EliminateJoin::new()));
     rules.push(Arc::new(DecorrelatePredicateSubquery::new()));
@@ -123,7 +121,11 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(EliminateOuterJoin::new()));
 
     // *********** custom rules ***********
-    rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
+    rules.push(Arc::new(RewriteHistogram::new(
+        start_time,
+        end_time,
+        sql.histogram_interval.unwrap_or_default(),
+    )));
     if let Some(limit) = limit {
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
@@ -132,15 +134,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(RewriteCipherCall::new()));
     #[cfg(feature = "enterprise")]
     rules.push(Arc::new(RewriteCipherKey::new(&sql.org_id)));
-
-    // should after ExtractEquijoinPredicate, because LimitJoinRightSide will
-    // require the join's on columns
-    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
-    {
-        rules.push(Arc::new(LimitJoinRightSide::new(
-            cfg.common.feature_join_right_side_max_rows,
-        )));
-    }
     // ************************************
 
     // Filters can't be pushed down past Limits, we should do PushDownFilter after
@@ -151,10 +144,20 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     // The previous optimizations added expressions and projections,
     // that might benefit from the following rules
     rules.push(Arc::new(SimplifyExpressions::new()));
-    rules.push(Arc::new(UnwrapCastInComparison::new()));
     rules.push(Arc::new(CommonSubexprEliminate::new()));
     rules.push(Arc::new(EliminateGroupByConstant::new()));
     rules.push(Arc::new(OptimizeProjections::new()));
+
+    // *********** custom rules ***********
+    // should after ExtractEquijoinPredicate and PushDownFilter, because LimitJoinRightSide will
+    // require the join's on columns, and if filter have join keys, it should be pushed down
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
+    {
+        rules.push(Arc::new(LimitJoinRightSide::new(
+            cfg.common.feature_join_right_side_max_rows,
+        )));
+    }
+    // ************************************
 
     rules
 }

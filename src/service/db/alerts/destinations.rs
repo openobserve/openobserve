@@ -84,20 +84,18 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
     infra::cluster_coordinator::destinations::emit_put_event(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_put(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_put(
             &event_key,
             saved.clone(),
         )
         .await
-        {
-            log::error!(
-                "[Destination] error triggering super cluster event to add destination to cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Destination] error triggering super cluster event to add destination to cache: {e}"
+        );
     }
 
     Ok(saved)
@@ -110,24 +108,22 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     table::destinations::delete(org_id, name).await?;
 
     // trigger watch event to update in-memory cache
-    let event_key = format!("{DESTINATION_WATCHER_PREFIX}{}/{}", org_id, name);
+    let event_key = format!("{DESTINATION_WATCHER_PREFIX}{org_id}/{name}");
     // in-cluster
     infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
     // super cluster
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_delete(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_delete(
             &event_key, org_id, name,
         )
         .await
-        {
-            log::error!(
-                "[Destination] error triggering super cluster event to remove destination from cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Destination] error triggering super cluster event to remove destination from cache: {e}"
+        );
     }
 
     Ok(())
@@ -194,7 +190,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting from db: {}", e);
+                        log::error!("Error getting from db: {e}");
                         continue;
                     }
                 };

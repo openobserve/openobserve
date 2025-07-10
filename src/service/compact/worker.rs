@@ -183,16 +183,10 @@ impl MergeWorker {
                             )
                             .await
                             {
-                                Ok((file, meta, _)) => {
-                                    let mut new_file_keys = Vec::with_capacity(file.len());
-                                    for (file, meta) in file.into_iter().zip(meta.into_iter()) {
-                                        new_file_keys.push(FileKey::new(file, meta, false));
-                                    }
-                                    if let Err(e) = tx.send(Ok((msg.batch_id, new_file_keys))).await
-                                    {
+                                Ok((new_files, _)) => {
+                                    if let Err(e) = tx.send(Ok((msg.batch_id, new_files))).await {
                                         log::error!(
-                                            "[COMPACTOR:WORKER:{thread_id}] Error sending file to merge_job: {}",
-                                            e
+                                            "[COMPACTOR:WORKER:{thread_id}] Error sending file to merge_job: {e}"
                                         );
                                     }
                                 }
@@ -206,8 +200,7 @@ impl MergeWorker {
                                     );
                                     if let Err(e) = tx.send(Err(e)).await {
                                         log::error!(
-                                            "[COMPACTOR:WORKER:{thread_id}] Error sending error to merge_job: {}",
-                                            e
+                                            "[COMPACTOR:WORKER:{thread_id}] Error sending error to merge_job: {e}"
                                         );
                                     }
                                 }

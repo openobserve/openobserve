@@ -44,10 +44,9 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
         let jobs = match infra_file_list::get_pending_jobs_count().await {
             Ok(jobs) => jobs,
             Err(e) => {
-                log::error!("Failed to get pending jobs count: {:?}", e);
+                log::error!("Failed to get pending jobs count: {e}");
                 return Err(Status::internal(format!(
-                    "Failed to get pending jobs count: {:?}",
-                    e
+                    "Failed to get pending jobs count: {e}"
                 )));
             }
         };
@@ -71,19 +70,49 @@ pub async fn get_super_cluster_info(
     let mut client =
         super::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node).await?;
     let response = match client.get_cluster_info(Request::new(empty_request)).await {
-        Ok(response) => convert_response_to_cluster_info(response.into_inner()),
-        Err(err) => {
+        Ok(r) => convert_response_to_cluster_info(r.into_inner()),
+        Err(e) => {
             log::error!(
                 "Failed to get cluster info from cluster node {}: {:?}",
                 node.get_grpc_addr(),
-                err
+                e
             );
             return Err(anyhow::anyhow!(
-                "Error getting cluster info from cluster node: {:?}",
-                err
+                "Error getting cluster info from cluster node: {e}"
             ));
         }
     };
 
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use proto::cluster_rpc::CompactionInfo;
+
+    use super::*;
+
+    #[test]
+    fn test_convert_response_to_cluster_info() {
+        let response = GetClusterInfoResponse {
+            compaction_info: Some(CompactionInfo {
+                pending_jobs: 5,
+                completed_jobs: 10,
+                in_progress_jobs: 2,
+            }),
+        };
+
+        let cluster_info = convert_response_to_cluster_info(response);
+        assert_eq!(cluster_info.pending_jobs, 5);
+    }
+
+    #[test]
+    fn test_convert_response_to_cluster_info_no_compaction_info() {
+        let response = GetClusterInfoResponse {
+            compaction_info: None,
+        };
+
+        let cluster_info = convert_response_to_cluster_info(response);
+        assert_eq!(cluster_info.pending_jobs, 0);
+    }
 }

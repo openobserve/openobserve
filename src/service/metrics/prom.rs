@@ -24,6 +24,7 @@ use config::{
     meta::{
         alerts::alert,
         promql::*,
+        search::default_use_cache,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -53,7 +54,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{TriggerAlertData, evaluate_trigger, write_file},
+        ingestion::{TriggerAlertData, check_ingestion_allowed, evaluate_trigger, write_file},
         metrics::format_label_name,
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
@@ -66,25 +67,11 @@ pub async fn remote_write(
     org_id: &str,
     body: web::Bytes,
 ) -> std::result::Result<(), anyhow::Error> {
+    // check system resource
+    check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
+
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    if !LOCAL_NODE.is_ingester() {
-        return Err(anyhow::anyhow!("not an ingester"));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Err(anyhow::anyhow!(
-            "Quota exceeded for this organization [{}]",
-            org_id
-        ));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Err(anyhow::Error::msg(e.to_string()));
-    }
 
     let cfg = get_config();
     let dedup_enabled = cfg.common.metrics_dedup_enabled;
@@ -143,21 +130,16 @@ pub async fn remote_write(
             need_update = true;
             break;
         }
-        if need_update {
-            if let Err(e) = db::schema::update_setting(
+        if need_update
+            && let Err(e) = db::schema::update_setting(
                 org_id,
                 &metric_name,
                 StreamType::Metrics,
                 extra_metadata,
             )
             .await
-            {
-                log::error!(
-                    "Error updating metadata for stream: {}, err: {}",
-                    metric_name,
-                    e
-                );
-            }
+        {
+            log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
         }
     }
 
@@ -369,8 +351,7 @@ pub async fn remote_write(
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 log::error!(
-                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
-                    stream_name
+                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
                 );
                 continue;
             };
@@ -382,9 +363,7 @@ pub async fn remote_write(
             {
                 Err(e) => {
                     log::error!(
-                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
-                        stream_name,
-                        e,
+                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
                     );
                     continue;
                 }
@@ -504,24 +483,17 @@ pub async fn remote_write(
             let need_trigger = !stream_trigger_map.contains_key(&stream_name);
             if need_trigger && !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!(
-                    "{}/{}/{}",
-                    &org_id,
-                    StreamType::Metrics,
-                    stream_name.clone()
-                );
+                let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, stream_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert
+                        if let Ok(Some(data)) = alert
                             .evaluate(Some(val_map), (None, alert_end_time), None)
                             .await
+                            .map(|res| res.data)
                         {
-                            Ok(res) if res.data.is_some() => {
-                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
-                            }
-                            _ => {}
+                            trigger_alerts.push((alert.clone(), data));
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
@@ -657,9 +629,9 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
                 .collect::<Vec<_>>();
             let mut histogram_summary_sub = Vec::with_capacity(histogram_summary.len() * 3);
             for name in histogram_summary.iter() {
-                histogram_summary_sub.push(format!("{}_bucket", name));
-                histogram_summary_sub.push(format!("{}_count", name));
-                histogram_summary_sub.push(format!("{}_sum", name));
+                histogram_summary_sub.push(format!("{name}_bucket"));
+                histogram_summary_sub.push(format!("{name}_count"));
+                histogram_summary_sub.push(format!("{name}_sum"));
             }
             let metric_names = stream_schemas.into_iter().filter_map(|schema| {
                 if histogram_summary_sub.contains(&schema.stream_name) {
@@ -769,7 +741,7 @@ pub(crate) async fn get_series(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
@@ -804,12 +776,12 @@ pub(crate) async fn get_labels(
     };
     let mut label_names = hashbrown::HashSet::new();
     for schema in stream_schemas {
-        if let Some(ref metric_name) = opt_metric_name {
-            if *metric_name != schema.stream_name {
-                // Client has requested a particular metric name, but this stream is
-                // not it.
-                continue;
-            }
+        if let Some(ref metric_name) = opt_metric_name
+            && *metric_name != schema.stream_name
+        {
+            // Client has requested a particular metric name, but this stream is
+            // not it.
+            continue;
         }
         let stats = stats::get_stream_stats(org_id, &schema.stream_name, StreamType::Metrics);
         if stats.time_range_intersects(start, end) {
@@ -848,12 +820,12 @@ pub(crate) async fn get_label_values(
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
         for schema in stream_schemas {
-            if let Some(ref metric_name) = opt_metric_name {
-                if *metric_name != schema.stream_name {
-                    // Client has requested a particular metric name, but this stream is
-                    // not it.
-                    continue;
-                }
+            if let Some(ref metric_name) = opt_metric_name
+                && *metric_name != schema.stream_name
+            {
+                // Client has requested a particular metric name, but this stream is
+                // not it.
+                continue;
             }
             let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
                 None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),
@@ -913,7 +885,7 @@ pub(crate) async fn get_label_values(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
@@ -924,7 +896,7 @@ pub(crate) async fn get_label_values(
             .map(|v| v.as_str().unwrap().to_string())
             .collect::<Vec<_>>(),
         Err(err) => {
-            log::error!("search values error: {:?}", err);
+            log::error!("search values error: {err:?}");
             return Err(err);
         }
     };
@@ -967,7 +939,7 @@ async fn prom_ha_handler(
             .write()
             .await
             .insert(cluster_name.to_owned(), vec![]);
-        log::info!("Making {} leader for {} ", replica_label, cluster_name);
+        log::info!("Making {replica_label} leader for {cluster_name} ");
         METRIC_CLUSTER_LEADER.write().await.insert(
             cluster_name.to_owned(),
             ClusterLeader {

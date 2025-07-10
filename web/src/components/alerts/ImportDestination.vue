@@ -513,14 +513,13 @@ import {
   reactive,
   computed,
   watch,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
 import { useQuasar } from "quasar";
-
-import QueryEditor from "../QueryEditor.vue";
 
 import destinationService from "@/services/alert_destination";
 
@@ -1007,9 +1006,10 @@ export default defineComponent({
 
       // Check if 'name' is required for both webhook and email
       if (!input.name || typeof input.name !== "string") {
-        destinationErrors.push(
-          `Destination - ${index} 'name' is required and should be a string`,
-        );
+        destinationErrors.push({
+          message: `Destination - ${index} 'name' is required and should be a string`,
+          field: "destination_name",
+        });
       }
 
       if (input.type === "action" && !isActionsEnabled.value) {
@@ -1146,7 +1146,9 @@ export default defineComponent({
     };
   },
   components: {
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
+    ),
     AppTabs,
   },
 });

@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::triggers::Trigger, utils::json};
+use config::{
+    meta::triggers::{Trigger, TriggerModule},
+    utils::json,
+};
 use infra::{
     errors::{Error, Result},
     scheduler,
@@ -49,7 +52,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
 async fn push(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
-    trigger_modify_module_key(&mut trigger).await?;
+    if trigger.module == TriggerModule::Alert {
+        trigger_modify_module_key(&mut trigger).await?;
+    }
     if let Err(e) = scheduler::push(trigger.clone()).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
@@ -65,7 +70,9 @@ async fn push(msg: Message) -> Result<()> {
 
 async fn update(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
-    trigger_modify_module_key(&mut trigger).await?;
+    if trigger.module == TriggerModule::Alert {
+        trigger_modify_module_key(&mut trigger).await?;
+    }
     // Update trigger in super cluster with clone = true, so that it copies everything
     if let Err(e) = scheduler::update_trigger(trigger.clone(), true).await {
         log::error!(
@@ -82,7 +89,9 @@ async fn update(msg: Message) -> Result<()> {
 
 async fn update_status(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
-    trigger_modify_module_key(&mut trigger).await?;
+    if trigger.module == TriggerModule::Alert {
+        trigger_modify_module_key(&mut trigger).await?;
+    }
     if let Err(e) = scheduler::update_status(
         &trigger.org,
         trigger.module.clone(),
@@ -112,7 +121,9 @@ async fn update_status(msg: Message) -> Result<()> {
 
 async fn delete(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
-    trigger_modify_module_key(&mut trigger).await?;
+    if trigger.module == TriggerModule::Alert {
+        trigger_modify_module_key(&mut trigger).await?;
+    }
     if let Err(e) =
         scheduler::delete(&trigger.org, trigger.module.clone(), &trigger.module_key).await
     {
@@ -130,7 +141,7 @@ async fn delete(msg: Message) -> Result<()> {
 
 async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
     // Return if the module_key is in new format (alert_id only)
-    if !trigger.module_key.contains("/") {
+    if !trigger.module_key.contains("/") || trigger.module != TriggerModule::Alert {
         return Ok(());
     }
     let parts = trigger.module_key.split("/").collect::<Vec<&str>>();

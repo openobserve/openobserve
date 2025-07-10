@@ -88,7 +88,6 @@ const getErrorLogs = () => {
       end_time: getTimestamp.value + 1,
       from: 0,
       size: 150,
-      sql_mode: "full",
     },
   };
 
@@ -141,7 +140,6 @@ const getError = () => {
         end_time: getTimestamp.value + 1,
         from: 0,
         size: 10,
-        sql_mode: "full",
       },
     };
 

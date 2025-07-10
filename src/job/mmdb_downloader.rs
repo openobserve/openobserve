@@ -20,7 +20,7 @@ use config::{
     utils::download_utils::{download_file, is_digest_different},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use once_cell::sync::Lazy;
 use tokio::{sync::Notify, time};
 
@@ -97,14 +97,14 @@ async fn run_download_files() {
     if download_city_files {
         match download_file(&client, &cfg.common.mmdb_geolite_citydb_url, &city_fname).await {
             Ok(()) => {}
-            Err(e) => log::error!("failed to download the files {}", e),
+            Err(e) => log::error!("failed to download the files {e}"),
         }
     }
 
     if download_asn_files {
         match download_file(&client, &cfg.common.mmdb_geolite_asndb_url, &asn_fname).await {
             Ok(()) => {}
-            Err(e) => log::error!("failed to download the files {}", e),
+            Err(e) => log::error!("failed to download the files {e}"),
         }
     }
 
@@ -150,11 +150,7 @@ async fn update_maxmind_client() {
             let mut client = MAXMIND_DB_CLIENT.write().await;
             *client = Some(maxminddb_client);
         }
-        Err(e) => log::warn!(
-            "Failed to update maxmind client with path: {}, {}",
-            city_fname,
-            e
-        ),
+        Err(e) => log::warn!("Failed to update maxmind client with path: {city_fname}, {e}"),
     }
 }
 
@@ -181,6 +177,6 @@ async fn update_maxmind_table(fname: &str) {
                 *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
             };
         }
-        Err(e) => log::warn!("Failed to update maxmind table with path: {}, {}", fname, e),
+        Err(e) => log::warn!("Failed to update maxmind table with path: {fname}, {e}"),
     }
 }

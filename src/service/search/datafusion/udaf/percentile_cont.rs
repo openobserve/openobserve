@@ -25,7 +25,7 @@ use datafusion::{
         array::{ArrayRef, Float64Array},
         datatypes::DataType,
     },
-    common::{DataFusionError, downcast_value, internal_err, not_impl_err, plan_err},
+    common::{downcast_value, internal_err, not_impl_err, plan_err},
     error::Result,
     logical_expr::{
         Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
@@ -422,9 +422,8 @@ mod test {
     async fn test_percentile_cont_udaf() {
         let ctx = create_context();
         let percentile = 0.75;
-        let sql_float_field =
-            &format!("select percentile_cont(value_float, {}) from t", percentile);
-        let sql_uint_field = &format!("select percentile_cont(value_uint, {}) from t", percentile);
+        let sql_float_field = &format!("select percentile_cont(value_float, {percentile}) from t");
+        let sql_uint_field = &format!("select percentile_cont(value_uint, {percentile}) from t");
         let acc_udaf = AggregateUDF::from(PercentileCont::new());
         ctx.register_udaf(acc_udaf);
 

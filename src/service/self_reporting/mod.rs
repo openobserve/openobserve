@@ -36,9 +36,11 @@ use o2_enterprise::enterprise::common::auditor;
 use proto::cluster_rpc;
 use tokio::sync::oneshot;
 
+#[cfg(feature = "cloud")]
+pub mod cloud_events;
 mod ingestion;
 mod queues;
-#[cfg(feature = "marketplace")]
+#[cfg(feature = "cloud")]
 pub mod search;
 
 pub async fn run() {
@@ -121,6 +123,7 @@ pub async fn report_request_usage_stats(
             request_body: request_body.to_owned(),
             function: None,
             size: stats.size,
+            scan_files: stats.scan_files,
             unit: "MB".to_owned(),
             user_email: user_email.to_owned(),
             response_time: stats.response_time,
@@ -160,6 +163,7 @@ pub async fn report_request_usage_stats(
         org_id: org_id.to_owned(),
         request_body: request_body.to_owned(),
         size: stats.size,
+        scan_files: stats.scan_files,
         unit: "MB".to_owned(),
         user_email,
         response_time: stats.response_time,
@@ -273,10 +277,11 @@ pub async fn flush() {
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
 pub async fn run_audit_publish() {
-    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
     if !o2cfg.common.audit_enabled {
         return;
     }
+
     let mut audit_interval = tokio::time::interval(tokio::time::Duration::from_secs(
         o2cfg.common.audit_publish_interval.try_into().unwrap(),
     ));
@@ -306,7 +311,19 @@ pub async fn flush_audit() {
 async fn publish_audit(
     req: cluster_rpc::IngestionRequest,
 ) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
-    crate::service::ingestion::ingestion_service::ingest(req).await
+    crate::service::ingestion::ingestion_service::ingest(req)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+/// `marketplace` feature flag must report usage
+/// or enabled by env for other feature flags
+/// &
+/// Only ingester or querier nodes report usage
+#[inline]
+fn should_report_usage() -> bool {
+    (cfg!(feature = "marketplace") || get_config().common.usage_enabled)
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier())
 }
 
 /// `marketplace` feature flag must report usage
@@ -330,7 +347,7 @@ pub fn http_report_metrics(
     search_group: &str,
 ) {
     let time = start.elapsed().as_secs_f64();
-    let uri = format!("/api/org/{}", uri);
+    let uri = format!("/api/org/{uri}");
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             &uri,

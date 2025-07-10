@@ -70,17 +70,16 @@ async fn handle_rule_operation(
     db_operation.await.map_err(RatelimitError::DbError)?;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::infra::config::get_config()
+    if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
+        && let Err(e) = sync_to_super_cluster(&rule, &operation).await
     {
-        if let Err(e) = sync_to_super_cluster(&rule, &operation).await {
-            log::error!(
-                "[Ratelimit] error triggering super cluster event to {} rule: {}",
-                operation.as_str(),
-                e
-            );
-        }
+        log::error!(
+            "[Ratelimit] error triggering super cluster event to {} rule: {}",
+            operation.as_str(),
+            e
+        );
     }
 
     Ok(())

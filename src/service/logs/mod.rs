@@ -20,11 +20,10 @@ use std::{
     time::Instant,
 };
 
-use anyhow::Result;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
-    DISTINCT_FIELDS, get_config,
+    DISTINCT_FIELDS, SIZE_IN_MB, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -37,7 +36,10 @@ use config::{
         time::now_micros,
     },
 };
-use infra::schema::{SchemaCache, unwrap_partition_time_level};
+use infra::{
+    errors::{Error, Result},
+    schema::{SchemaCache, unwrap_partition_time_level},
+};
 
 use super::{
     db::organization::get_org_setting,
@@ -58,9 +60,10 @@ use crate::{
 };
 
 pub mod bulk;
+pub mod hec;
 pub mod ingest;
-pub mod otlp_grpc;
-pub mod otlp_http;
+pub mod loki;
+pub mod otlp;
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
@@ -72,7 +75,7 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     for action in BULK_OPERATORS {
         if let Some(val) = local_val.get(action) {
             let Some(local_val) = val.as_object() else {
-                log::warn!("Invalid bulk index action: {}", action);
+                log::warn!("Invalid bulk index action: {action}");
                 continue;
             };
             let Some(index) = local_val
@@ -196,6 +199,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
     org_id: &str,
@@ -204,6 +208,7 @@ async fn write_logs_by_stream(
     usage_type: UsageType,
     status: &mut IngestionStatus,
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    byte_size_by_stream: HashMap<String, usize>,
 ) -> Result<()> {
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
@@ -231,8 +236,8 @@ async fn write_logs_by_stream(
                     s.items
                         .iter()
                         .map(|i| {
-                            i.iter()
-                                .map(|(_, res)| if res.error.is_some() { 1 } else { 0 })
+                            i.values()
+                                .map(|res| if res.error.is_some() { 1 } else { 0 })
                                 .sum::<i64>()
                         })
                         .sum()
@@ -243,6 +248,14 @@ async fn write_logs_by_stream(
         };
 
         if let Some(fns_length) = fn_num {
+            // the issue here is req_stats.size calculates size after flattening and
+            // adding _timestamp col etc ; which inflates the size compared to the actual
+            // data sent by user. So when reporting we check if the calling function has provided us
+            // an "actual" size of the input, and is so use that instead of the req_stats
+            if let Some(size) = byte_size_by_stream.get(&stream_name) {
+                // req_stats already divides the size in mb
+                req_stats.size = *size as f64 / SIZE_IN_MB;
+            }
             report_request_usage_stats(
                 req_stats,
                 org_id,
@@ -280,10 +293,9 @@ async fn write_logs(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            return Err(anyhow::anyhow!(
-                "Schema not found for stream: {}",
-                stream_name
-            ));
+            return Err(Error::IngestionError(format!(
+                "Schema not found for stream: {stream_name}"
+            )));
         }
     };
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
@@ -416,32 +428,32 @@ async fn write_logs(
         }
 
         // start check for alert trigger
-        if let Some(alerts) = cur_stream_alerts {
-            if triggers.len() < alerts.len() {
-                let end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Logs,
-                        alert.stream_name,
-                        alert.get_unique_key()
-                    );
-                    // For one alert, only one trigger per request
-                    // Trigger for this alert is already added.
-                    if evaluated_alerts.contains(&key) {
-                        continue;
+        if let Some(alerts) = cur_stream_alerts
+            && triggers.len() < alerts.len()
+        {
+            let end_time = now_micros();
+            for alert in alerts {
+                let key = format!(
+                    "{}/{}/{}/{}",
+                    org_id,
+                    StreamType::Logs,
+                    alert.stream_name,
+                    alert.get_unique_key()
+                );
+                // For one alert, only one trigger per request
+                // Trigger for this alert is already added.
+                if evaluated_alerts.contains(&key) {
+                    continue;
+                }
+                match alert
+                    .evaluate(Some(&record_val), (None, end_time), None)
+                    .await
+                {
+                    Ok(trigger_results) if trigger_results.data.is_some() => {
+                        triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                        evaluated_alerts.insert(key);
                     }
-                    match alert
-                        .evaluate(Some(&record_val), (None, end_time), None)
-                        .await
-                    {
-                        Ok(trigger_results) if trigger_results.data.is_some() => {
-                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                            evaluated_alerts.insert(key);
-                        }
-                        _ => {}
-                    }
+                    _ => {}
                 }
             }
         }
@@ -520,10 +532,11 @@ async fn write_logs(
     .await?;
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
+    if !distinct_values.is_empty()
+        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
+    {
+        log::error!("Error while writing distinct values: {e}");
     }
 
     // only one trigger per request
@@ -583,11 +596,7 @@ fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str)
     if !enabled {
         return;
     }
-    log::warn!(
-        "failed to process record with error {} : {:?} ",
-        error,
-        record
-    );
+    log::warn!("failed to process record with error {error} : {record:?} ");
 }
 
 #[cfg(test)]

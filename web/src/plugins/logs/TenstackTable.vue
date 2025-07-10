@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
     <table
+      v-if="table"
       data-test="logs-search-result-logs-table"
       class="tw-w-full tw-table-auto"
       :style="{
@@ -248,14 +249,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'tw-bg-zinc-700'
                   : 'tw-bg-zinc-300'
                 : '',
+              'table-row-hover'
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
                 ?.isExpandedRow &&
-                handleDataRowClick(
-                  tableRows[virtualRow.index],
-                  virtualRow.index,
-                )
+              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
             "
           >
             <td
@@ -277,9 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add-search-term="addSearchTerm"
                 @view-trace="
                   viewTrace(formattedRows[virtualRow.index]?.original)
-                
                 "
                 :streamName="jsonpreviewStreamName"
+                @send-to-ai-chat="sendToAiChat"
               />
             </td>
             <template v-else>
@@ -337,9 +336,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
+                    @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
-                {{ cell.renderValue() }}
+
+                <HighLight
+                  :content="cell.renderValue()"
+                  :query-string="
+                    highlightQuery
+                  "
+                />
+                <!-- Add copy button floating between columns -->
+                <q-btn
+                v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
+                    :ripple="false"
+                    @click.stop="sendToAiChat(JSON.stringify(cell.row.original),true)"
+                    data-test="menu-link-ai-item"
+                    no-caps
+                    :borderless="true"
+                    flat
+                    size="xs"
+                    dense
+                    class="tw-absolute tw-right-[16px] tw-top-1/2 tw-transform tw--translate-y-1/2"
+                    :class="[
+                      'tw-invisible ai-btn'
+                    ]"
+                    style="border-radius: 100%;"
+                  >
+                    <div class="row items-center no-wrap">
+                      <img height="20px" width="20px"  :src="getBtnLogo" class="header-icon ai-icon" />
+                    </div>
+                  </q-btn>
               </td>
             </template>
           </tr>
@@ -350,8 +377,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, watch, nextTick, onMounted } from "vue";
+import {
+  ref,
+  computed,
+  defineEmits,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
+import HighLight from "@/components/HighLight.vue";
 import {
   FlexRender,
   type ColumnDef,
@@ -366,6 +402,7 @@ import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
+import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps({
   rows: {
@@ -408,7 +445,12 @@ const props = defineProps({
     type: Boolean,
     default: () => true,
   },
-  jsonpreviewStreamName:{
+  jsonpreviewStreamName: {
+    type: String,
+    default: "",
+    required: false,
+  },
+  highlightQuery:{
     type: String,
     default: "",
     required: false,
@@ -427,6 +469,7 @@ const emits = defineEmits([
   "update:columnOrder",
   "expandRow",
   "view-trace",
+  "sendToAiChat",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -457,6 +500,10 @@ const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
 
+const highlightQuery = computed(() => {
+  return props.highlightQuery;
+});
+
 watch(
   () => props.columns,
   async (newVal) => {
@@ -468,6 +515,7 @@ watch(
   },
   {
     deep: true,
+    immediate: true,
   },
 );
 
@@ -497,7 +545,7 @@ watch(
   },
 );
 
-const table = useVueTable({
+let table: any = useVueTable({
   get data() {
     return tableRows.value || [];
   },
@@ -525,7 +573,7 @@ const table = useVueTable({
 });
 
 const columnSizeVars = computed(() => {
-  const headers = table.getFlatHeaders();
+  const headers = table?.getFlatHeaders();
   const colSizes: { [key: string]: number } = {};
   for (let i = 0; i < headers.length; i++) {
     const header = headers[i]!;
@@ -541,6 +589,14 @@ watch(columnSizeVars, (newColSizes) => {
 
 onMounted(() => {
   setExpandedRows();
+});
+
+onBeforeUnmount(() => {
+  tableRows.value.length = 0;
+  tableRows.value = [];
+  tableBodyRef.value = null;
+  parentRef.value = null;
+  table = null;
 });
 
 const hasDefaultSourceColumn = computed(
@@ -587,19 +643,19 @@ const debouncedUpdate = debounce((newColSizes) => {
 }, 500);
 
 const formattedRows = computed(() => {
-  return table.getRowModel().rows;
+  return table?.getRowModel().rows;
 });
 
 const isResizingHeader = ref(false);
 
-const headerGroups = computed(() => table.getHeaderGroups()[0]);
+const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 
 const headers = computed(() => headerGroups.value.headers);
 
 watch(
   () => headers.value,
   (newVal) => {
-    isResizingHeader.value = newVal.some((header) =>
+    isResizingHeader.value = newVal.some((header: any) =>
       header.column.getIsResizing(),
     );
   },
@@ -622,16 +678,14 @@ const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 20, 
+    estimateSize: () => 20,
     overscan: 80,
     measureElement:
-      typeof window !== "undefined" &&
-      !isFirefox.value
+      typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => element?.getBoundingClientRect().height
         : undefined,
   };
 });
-
 
 const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
@@ -793,9 +847,56 @@ const handleCellMouseLeave = () => {
 const viewTrace = (row: any) => {
   emits("view-trace", row);
 };
+const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+const sendToAiChat = (value: any,isEntireRow: boolean = false) => {
+  if(isEntireRow){
+    //here we will get the original value of the row
+    //and we need to filter the row if props.columns have any filtered cols that user applied
+    //the format of the props.columns is like this:
+    //if user have not applied any filter then the props.columns will be like this:
+    //it contains _timestamp column and source column 
+    //else we get _timestamp column and other filter columns so if user have applied any filter then we need to filter the row based on the filter columns
+    const row = JSON.parse(value);
+    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row 
+    //otherwise we need to filter the row based on the columns that user have applied
+    if(checkIfSourceColumnPresent(props.columns)){
+      emits("sendToAiChat", JSON.stringify(row));
+    }else{
+      //we need to filter the row based on the columns that user have applied
+      const filteredRow = filterRowBasedOnColumns(row,props.columns);
+      emits("sendToAiChat", JSON.stringify(filteredRow));
+    }
+  }else{
+    emits("sendToAiChat", value);
+  }
+};
+
+const checkIfSourceColumnPresent = (columns: any) => {
+  //we need to check if source column is present in the columns
+  //if present then we need to return true else false
+  return columns.some((column: any) => column.id === 'source');
+}
+
+const filterRowBasedOnColumns = (row: any,columns: any) => {
+  //we need to filter the row based on the columns that user have applied
+  //here we need to filter row not columns based on the columns that user have applied
+  const columnsToFilter = columns.filter((column: any) => column.id !== 'source');
+  return columnsToFilter.reduce((acc: any, column: any) => {
+    acc[column.id] = row[column.id];
+    return acc;
+  }, {});
+}
+
 
 defineExpose({
   parentRef,
+  virtualRows,
+  getBtnLogo,
+  sendToAiChat
 });
 </script>
 <style scoped lang="scss">
@@ -886,6 +987,16 @@ td {
   &:hover {
     .table-cell-actions {
       display: block !important;
+    }
+  }
+}
+
+
+.table-row-hover {
+  &:hover {
+    .ai-btn {
+      visibility: visible !important;
+      z-index: 2;
     }
   }
 }

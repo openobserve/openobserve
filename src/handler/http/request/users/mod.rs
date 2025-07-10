@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, sync::Arc};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{
     HttpRequest, HttpResponse, cookie, delete, get,
@@ -23,10 +23,10 @@ use actix_web::{
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     Config, get_config,
+    meta::user::UserRole,
     utils::{base64, json},
 };
 use serde::Serialize;
-use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
@@ -42,8 +42,8 @@ use crate::{
         meta::{
             self,
             user::{
-                AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
-                UserRequest, UserRole,
+                AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
+                UserOrgRole, UserRequest, UserRoleRequest, get_roles,
             },
         },
         utils::auth::{UserEmail, generate_presigned_url},
@@ -71,15 +71,25 @@ pub mod service_accounts;
     )
 )]
 #[get("/{org_id}/users")]
-pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<HttpResponse, Error> {
+pub async fn list(
+    org_id: web::Path<String>,
+    user_email: UserEmail,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let list_all = match query.get("list_all") {
+        Some(v) => v.parse::<bool>().unwrap_or(false),
+        None => false,
+    };
+
     let mut _user_list_from_rbac = None;
 
     #[cfg(feature = "enterprise")]
     // Check if user has access to get users
     if get_openfga_config().enabled
         && check_permissions(
-            Some(format!("_all_{}", org_id)),
+            Some(format!("_all_{org_id}")),
             &org_id,
             &user_email.user_id,
             "users",
@@ -90,7 +100,15 @@ pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<Ht
     {
         _user_list_from_rbac = Some(vec![]);
     }
-    users::list_users(&user_email.user_id, &org_id, None, _user_list_from_rbac).await
+
+    users::list_users(
+        &user_email.user_id,
+        &org_id,
+        None,
+        _user_list_from_rbac,
+        list_all,
+    )
+    .await
 }
 
 /// CreateUser
@@ -106,7 +124,7 @@ pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<Ht
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserRequest, description = "User data", content_type = "application/json"),
+    request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -114,25 +132,25 @@ pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<Ht
 #[post("/{org_id}/users")]
 pub async fn save(
     org_id: web::Path<String>,
-    user: web::Json<UserRequest>,
+    user: web::Json<PostUserRequest>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let initiator_id = user_email.user_id;
-    let mut user = user.into_inner();
-    user.email = user.email.trim().to_string();
+    let mut user = UserRequest::from(&user.into_inner());
+    user.email = user.email.trim().to_lowercase();
 
-    if user.role.eq(&meta::user::UserRole::Root) {
+    if user.role.base_role.eq(&config::meta::user::UserRole::Root) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Not allowed".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Not allowed",
             )),
         );
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role = meta::user::UserRole::Admin;
+        user.role.base_role = config::meta::user::UserRole::Admin;
     }
     users::post_user(&org_id, user, &initiator_id).await
 }
@@ -163,7 +181,7 @@ pub async fn update(
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    let email_id = email_id.trim().to_string();
+    let email_id = email_id.trim().to_lowercase();
     #[cfg(not(feature = "enterprise"))]
     let mut user = user.into_inner();
     #[cfg(feature = "enterprise")]
@@ -171,14 +189,17 @@ pub async fn update(
     if user.eq(&UpdateUser::default()) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Please specify appropriate fields to update user".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "Please specify appropriate fields to update user",
             )),
         );
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role = Some(meta::user::UserRole::Admin);
+        user.role = Some(UserRoleRequest {
+            role: config::meta::user::UserRole::Admin.to_string(),
+            custom: None,
+        });
     }
     let initiator_id = &user_email.user_id;
     let self_update = user_email.user_id.eq(&email_id);
@@ -199,7 +220,7 @@ pub async fn update(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "User's email id"),
     ),
-    request_body(content = UserOrgRole, description = "User role", content_type = "application/json"),
+    request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -207,12 +228,12 @@ pub async fn update(
 #[post("/{org_id}/users/{email_id}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
-    role: web::Json<UserOrgRole>,
+    role: web::Json<UserRoleRequest>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let initiator_id = user_email.user_id;
-    let role = role.into_inner().role;
+    let role = UserOrgRole::from(&role.into_inner());
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 
@@ -223,6 +244,7 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     cookie_expiry: E,
 ) -> cookie::Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
+    let tokens = base64::encode(&tokens);
     let mut auth_cookie = cookie::Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(cookie_expiry.into());
     auth_cookie.set_http_only(true);
@@ -268,7 +290,7 @@ pub async fn delete(
 ///
 /// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
-    context_path = "/auth",
+context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
@@ -310,16 +332,19 @@ pub async fn authentication(
 
     let mut resp = SignInResponse::default();
     let auth = match auth {
-        Some(auth) => auth.into_inner(),
+        Some(auth) => {
+            let mut auth = auth.into_inner();
+            auth.name = auth.name.to_lowercase();
+            auth
+        }
         None => {
             // get Authorization header from request
             #[cfg(feature = "enterprise")]
             {
                 let auth_header = _req.headers().get("Authorization");
-                if auth_header.is_some() {
-                    let auth_header = auth_header.unwrap().to_str().unwrap();
+                if let Some(auth_header) = auth_header {
                     if let Some((name, password)) =
-                        o2_dex::service::auth::get_user_from_token(auth_header)
+                        o2_dex::service::auth::get_user_from_token(auth_header.to_str().unwrap())
                     {
                         SignInUser { name, password }
                     } else {
@@ -351,7 +376,6 @@ pub async fn authentication(
             return unauthorized_error(resp);
         }
     }
-
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
@@ -381,6 +405,7 @@ pub async fn authentication(
         })
         .unwrap();
 
+        let tokens = base64::encode(&tokens);
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
@@ -533,9 +558,8 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
-                format!("q_auth {}", s)
+                format!("q_auth {s}")
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
-                log::debug!("get_auth: auth header found: {:?}", auth_header);
                 match auth_header.to_str() {
                     Ok(auth_header_str) => auth_header_str.to_string(),
                     Err(_) => {
@@ -610,7 +634,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {name} - {cookie_name}");
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
@@ -629,7 +653,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(req_ts);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {name} - {cookie_name}");
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
@@ -677,23 +701,27 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 )]
 #[get("/{org_id}/users/roles")]
 pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let roles = UserRole::iter()
-        .filter_map(|role| {
-            if role.eq(&UserRole::Root)
-                || role.eq(&UserRole::Member)
-                || role.eq(&UserRole::ServiceAccount)
-            {
-                None
-            } else {
-                Some(RolesResponse {
-                    label: role.get_label(),
-                    value: role.to_string(),
-                })
-            }
-        })
+    let roles = get_roles()
+        .iter()
+        .filter_map(check_role_available)
         .collect::<Vec<RolesResponse>>();
 
     Ok(HttpResponse::Ok().json(roles))
+}
+
+fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
+    if role.eq(&UserRole::Root) || role.eq(&UserRole::ServiceAccount) {
+        None
+    } else {
+        #[cfg(feature = "enterprise")]
+        if !get_openfga_config().enabled && role.ne(&UserRole::Admin) {
+            return None;
+        }
+        Some(RolesResponse {
+            label: role.get_label(),
+            value: role.to_string(),
+        })
+    }
 }
 
 fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
@@ -712,6 +740,34 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     audit(audit_message).await;
 }
 
+/// ListUserInvitations
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserInvitations",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+    )
+)]
+#[get("/invites")]
+pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
+    let user_id = user_email.user_id.as_str();
+    users::list_user_invites(user_id).await
+}
+
+#[cfg(not(feature = "cloud"))]
+#[get("/invites")]
+pub async fn list_invitations(_user_email: UserEmail) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
 #[cfg(test)]
 mod tests {
     use actix_web::{App, test};
@@ -721,14 +777,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_presigned_url() {
-        let mut app = test::init_service(App::new().service(get_presigned_url)).await;
+        let app = test::init_service(App::new().service(get_presigned_url)).await;
 
         let auth = Basic::new("username", Some("password"));
         let req = test::TestRequest::get()
             .uri("/presigned-url")
             .append_header((actix_web::http::header::AUTHORIZATION, auth))
             .to_request();
-        let resp = test::call_service(&mut app, req).await;
+        let resp = test::call_service(&app, req).await;
 
         assert_eq!(resp.status(), http::StatusCode::OK);
 

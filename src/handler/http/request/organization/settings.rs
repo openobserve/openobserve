@@ -16,7 +16,6 @@
 use std::io::Error as StdErr;
 
 use actix_web::{HttpResponse, delete, get, post, web};
-use config::get_config;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
@@ -95,18 +94,30 @@ async fn create(
         data.toggle_ingestion_logs = toggle_ingestion_logs;
     }
 
-    if let Some(enable_websocket_search) = settings.enable_websocket_search {
-        // allow only if websocket is enabled
-        if get_config().websocket.enabled {
-            field_found = true;
-            data.enable_websocket_search = enable_websocket_search;
-        }
+    #[cfg(feature = "enterprise")]
+    if let Some(aggregation_cache_enabled) = settings.aggregation_cache_enabled
+        && config::get_config().disk_cache.aggregation_cache_enabled
+    {
+        field_found = true;
+        data.aggregation_cache_enabled = aggregation_cache_enabled;
+    }
+
+    if let Some(enable_streaming_search) = settings.enable_streaming_search {
+        field_found = true;
+        data.enable_streaming_search = enable_streaming_search;
+    }
+
+    if let Some(enable_streaming_search) = settings.enable_streaming_search {
+        field_found = true;
+        data.enable_streaming_search = enable_streaming_search;
     }
 
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }
 
+    // this will always be taken from orgs table, never from settings
+    data.free_trial_expiry = None;
     match set_org_setting(&org_id, &data).await {
         Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),

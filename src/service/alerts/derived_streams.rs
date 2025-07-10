@@ -142,25 +142,35 @@ pub async fn save(
         };
     }
 
+    let next_run_at = chrono::Utc::now().timestamp_micros();
     // Save the trigger to db
-    let next_run_at = Utc::now().timestamp_micros();
-    let trigger = db::scheduler::Trigger {
-        org: derived_stream.org_id.to_string(),
-        module: db::scheduler::TriggerModule::DerivedStream,
-        module_key: trigger_module_key,
-        next_run_at,
-        is_realtime: false,
-        is_silenced: false,
-        ..Default::default()
-    };
-
-    match db::scheduler::get(&trigger.org, trigger.module.clone(), &trigger.module_key).await {
-        Ok(_) => db::scheduler::update_trigger(trigger)
-            .await
-            .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update")),
-        Err(_) => db::scheduler::push(trigger)
-            .await
-            .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e)),
+    match db::scheduler::get(
+        &derived_stream.org_id,
+        db::scheduler::TriggerModule::DerivedStream,
+        &trigger_module_key,
+    )
+    .await
+    {
+        Ok(mut existing_trigger) => {
+            existing_trigger.next_run_at = next_run_at;
+            db::scheduler::update_trigger(existing_trigger)
+                .await
+                .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update"))
+        }
+        Err(_) => {
+            let trigger = db::scheduler::Trigger {
+                org: derived_stream.org_id.to_string(),
+                module: db::scheduler::TriggerModule::DerivedStream,
+                module_key: trigger_module_key,
+                next_run_at,
+                is_realtime: false,
+                is_silenced: false,
+                ..Default::default()
+            };
+            db::scheduler::push(trigger)
+                .await
+                .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e))
+        }
     }
 }
 
@@ -180,7 +190,6 @@ pub async fn delete(
 
 #[async_trait]
 pub trait DerivedStreamExt: Sync + Send + 'static {
-    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String;
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),
@@ -191,13 +200,6 @@ pub trait DerivedStreamExt: Sync + Send + 'static {
 
 #[async_trait]
 impl DerivedStreamExt for DerivedStream {
-    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            self.stream_type, self.org_id, pipeline_name, pipeline_id
-        )
-    }
-
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),

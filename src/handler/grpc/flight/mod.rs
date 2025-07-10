@@ -36,14 +36,16 @@ use datafusion::{
     physical_plan::{displayable, execute_stream},
 };
 use futures::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::TaskStatus;
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-
 #[cfg(feature = "enterprise")]
-use crate::service::search::SEARCH_SERVER;
+use {
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::search::TaskStatus,
+};
+
 use crate::{
     handler::grpc::MetadataMap,
     service::search::{
@@ -67,7 +69,7 @@ impl FlightService for FlightServiceImpl {
     type ListActionsStream = BoxStream<'static, Result<ActionType, Status>>;
     type DoExchangeStream = BoxStream<'static, Result<FlightData, Status>>;
 
-    #[tracing::instrument(name = "service:search:flight::do_get", skip_all)]
+    #[tracing::instrument(name = "grpc:search:flight:do_get", skip_all)]
     async fn do_get(
         &self,
         request: Request<Ticket>,
@@ -134,12 +136,9 @@ impl FlightService for FlightServiceImpl {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
-                crate::service::search::datafusion::storage::file_list::clear(&trace_id);
-                // release wal lock files
-                crate::common::infra::wal::release_request(&trace_id);
+                clear_session_data(&trace_id);
                 log::error!(
-                    "[trace_id {}] flight->search: do_get physical plan generate error: {e:?}",
-                    trace_id,
+                    "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
                 );
                 return Err(Status::internal(e.to_string()));
             }
@@ -158,33 +157,49 @@ impl FlightService for FlightServiceImpl {
                 .indent(false)
                 .to_string();
             println!("+---------------------------+--------------------------+");
-            println!(
-                "follow physical plan, is_super_cluster_follower_leader: {}",
-                is_super_cluster
-            );
+            println!("follow physical plan, is_super_cluster_follower_leader: {is_super_cluster}");
             println!("+---------------------------+--------------------------+");
-            println!("{}", plan);
+            println!("{plan}");
         }
 
         schema = add_scan_stats_to_schema(schema, scan_stats);
+        #[cfg(feature = "enterprise")]
+        if get_o2_config().super_cluster.enabled && !req.super_cluster_info.is_super_cluster {
+            // we only set for non-follow leaders
+            // split will always have atleast one element even if the string is empty
+            // or the split char is not in string, so we can safely unwrap here
+            let main_trace_id = trace_id.split("-").next().unwrap();
+            SEARCH_SERVER
+                .set_scan_stats(main_trace_id, (&scan_stats).into())
+                .await;
+        }
 
         let start = std::time::Instant::now();
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
             .try_with_compression(Some(CompressionType::ZSTD))
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                // clear session data
+                clear_session_data(&trace_id);
+                log::error!(
+                    "[trace_id {trace_id}] flight->search: do_get create IPC write options error: {e:?}",
+                );
+                Status::internal(e.to_string())
+            })?;
+        let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
+            // clear session data
+            clear_session_data(&trace_id);
+            log::error!(
+                "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
+            );
+            Status::internal(e.to_string())
+        })?;
         let flight_data_stream = FlightDataEncoderBuilder::new()
             .with_schema(schema)
             .with_max_flight_data_size(33554432) // 32MB
             .with_options(write_options)
             .build(FlightSenderStream::new(
                 trace_id.to_string(),
-                execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-                    log::error!(
-                        "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
-                        trace_id,
-                    );
-                    Status::internal(e.to_string())
-                })?,
+                stream,
                 defer,
                 start,
                 timeout,
@@ -307,9 +322,9 @@ impl Stream for FlightSenderStream {
                     e,
                     self.start.elapsed().as_millis()
                 );
-                Poll::Ready(Some(Err(FlightError::Tonic(Status::internal(
-                    e.to_string(),
-                )))))
+                Poll::Ready(Some(Err(FlightError::Tonic(
+                    Status::internal(e.to_string()).into(),
+                ))))
             }
         }
     }
@@ -341,9 +356,7 @@ impl Drop for FlightSenderStream {
                 self.trace_id
             );
             // clear session data
-            crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
-            // release wal lock files
-            crate::common::infra::wal::release_request(&self.trace_id);
+            clear_session_data(&self.trace_id);
         }
     }
 }
@@ -386,4 +399,11 @@ fn add_scan_stats_to_schema(schema: Arc<Schema>, scan_stats: ScanStats) -> Arc<S
     let stats_string = serde_json::to_string(&scan_stats).unwrap_or_default();
     metadata.insert("scan_stats".to_string(), stats_string);
     Arc::new(schema.as_ref().clone().with_metadata(metadata))
+}
+
+fn clear_session_data(trace_id: &str) {
+    // clear session data
+    crate::service::search::datafusion::storage::file_list::clear(trace_id);
+    // release wal lock files
+    crate::common::infra::wal::release_request(trace_id);
 }

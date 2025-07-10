@@ -28,7 +28,7 @@ use config::{
     utils::time::{now_micros, second_micros},
 };
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
-use infra::{cache::tmpfs, errors::Result};
+use infra::errors::Result;
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
@@ -114,7 +114,7 @@ pub async fn search(
     } else {
         // 1. get max records stream
         let start_time = std::time::Instant::now();
-        let file_list = match get_max_file_list(org_id, &query.query, start, end).await {
+        let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -141,10 +141,7 @@ pub async fn search(
             }
         };
         if group.len() > 1 {
-            log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: get groups {:?}",
-                group
-            );
+            log::info!("[trace_id {trace_id}] promql->search->grpc: get groups {group:?}");
         }
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",
@@ -234,14 +231,13 @@ pub async fn search_inner(
 
     // clear session
     search::datafusion::storage::file_list::clear(&trace_id);
-    // clear tmpfs
-    tmpfs::delete(&trace_id, true).unwrap();
 
     scan_stats.format_to_mb();
     Ok((value, result_type, scan_stats))
 }
 
 async fn get_max_file_list(
+    trace_id: &str,
     org_id: &str,
     query: &str,
     start: i64,
@@ -258,6 +254,7 @@ async fn get_max_file_list(
     let mut max_records = 0;
     for stream_name in metrics_name {
         let stream_file_list = crate::service::file_list::query(
+            trace_id,
             org_id,
             &stream_name,
             StreamType::Metrics,
@@ -408,7 +405,7 @@ mod tests {
     #[tokio::test]
     async fn test_promql_generate_search_group() {
         // test case 1: normal case
-        let memory_limit = 200 as usize;
+        let memory_limit = 200_usize;
         let file_list = vec![
             FileKey {
                 meta: FileMeta {
@@ -474,7 +471,7 @@ mod tests {
         assert_eq!(resp.unwrap(), expected);
 
         // test case 4, the last group is greater than step * 5
-        let memory_limit = 100 as usize;
+        let memory_limit = 100_usize;
         let resp = generate_search_group(memory_limit, file_list.clone(), 0, 430, 5).await;
         let expected = vec![(0, 200), (205, 300), (305, 400), (405, 430)];
         assert!(resp.is_ok());
