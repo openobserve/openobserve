@@ -183,7 +183,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
             Ok(Some(k)) => k,
             Ok(None) => {
                 return Ok(MetaHttpResponse::not_found(format!(
-                    "pattern with id {id} not found"
+                    "Pattern with id {id} not found"
                 )));
             }
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
@@ -283,16 +283,26 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("cannot get pattern manager : {:?}", e),
+                        format!("Cannot get pattern manager : {e:?}"),
                     )),
                 );
             }
         };
         let pattern_usage = mgr.get_pattern_usage(&id);
+        let (pattern_streams, extra) = if pattern_usage.len() > 5 {
+            (
+                &pattern_usage[0..5],
+                format!(" and {} more", pattern_usage.len() - 5),
+            )
+        } else {
+            (&pattern_usage[0..], "".to_string())
+        };
         if !pattern_usage.is_empty() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("cannot delete pattern, associated with {:?}", pattern_usage),
+                format!(
+                    "Cannot delete pattern, associated with {pattern_streams:?}{extra}",
+                ),
             )));
         }
         match crate::service::db::re_pattern::remove(&id).await {
@@ -432,7 +442,7 @@ pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
                 }
                 Err(e) => {
                     return Ok(MetaHttpResponse::bad_request(format!(
-                        "error in testing pattern for input : {e}"
+                        "Error in testing pattern for input : {e}"
                     )));
                 }
             }

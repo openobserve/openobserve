@@ -259,10 +259,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { db::keys::watch().await });
         tokio::task::spawn(async move { db::re_pattern::watch_patterns().await });
         tokio::task::spawn(async move { db::re_pattern::watch_pattern_associations().await });
-        // we do this call here so the pattern manager gets init-ed at the very start instead at first use
-        // helpful for stream settings case, where if not already init-ed, it returns empty array for associations
-        // because it is a sync fn and cannot init manager itself
-        tokio::task::spawn(async move { o2_enterprise::enterprise::re_patterns::get_pattern_manager().await });
+        // we do this call here so the pattern manager gets init-ed at the very start instead at
+        // first use helpful for stream settings case, where if not already init-ed, it
+        // returns empty array for associations because it is a sync fn and cannot init
+        // manager itself
+        tokio::task::spawn(async move {
+            o2_enterprise::enterprise::re_patterns::get_pattern_manager().await
+        });
     }
 
     // additional for cloud
