@@ -52,7 +52,7 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search as SearchService,
+        search::{self as SearchService, streaming_aggs},
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -346,6 +346,35 @@ pub async fn search(
                     }
                     // Check permissions on key ends
                 }
+            }
+        }
+    }
+
+    // Aggregate cache check start
+    let can_use_streaming_aggs =
+        streaming_aggs::check_eligibility_for_streaming_aggs_cache(&req.query.sql)
+            && req.use_cache
+            && req.query.streaming_id.is_none()
+            && !req.query.streaming_output;
+    if can_use_streaming_aggs {
+        let res = streaming_aggs::do_partitioned_search_for_streaming_aggs(
+            &trace_id,
+            &org_id,
+            stream_type,
+            &req,
+            Some(user_id),
+            req.use_cache,
+        )
+        .await;
+
+        match res {
+            Ok(mut res) => {
+                res.set_took(start.elapsed().as_millis() as usize);
+                return Ok(HttpResponse::Ok().json(res));
+            }
+            Err(e) => {
+                log::error!("[trace_id {trace_id}] search error: {}", e);
+                return Ok(error_utils::map_error_to_http_response(&e, Some(trace_id)));
             }
         }
     }
