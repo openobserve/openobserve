@@ -300,7 +300,9 @@
     }
   }
 }
-
+//this is used to add a border to the tabs container 
+//so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
+//and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
   border: 1px solid #cacaca;
   padding: 4px;
