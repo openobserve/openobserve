@@ -116,6 +116,8 @@ async fn create(
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }
 
+    // this will always be taken from orgs table, never from settings
+    data.free_trial_expiry = None;
     match set_org_setting(&org_id, &data).await {
         Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),

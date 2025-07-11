@@ -913,11 +913,6 @@ export default defineComponent({
       return config.isCloud === "true";
     }
 
-    // Setup cloud-specific organization threshold
-    function setupCloudSpecificThreshold() {
-      MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
-    }
-
     // Helper function to check if quick mode is enabled
     function isQuickModeEnabled() {
       return store.state.zoConfig.quick_mode_enabled;

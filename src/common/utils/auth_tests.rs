@@ -3255,6 +3255,7 @@ mod tests {
                 job_clean_wait_time: i64::default(),
                 pending_jobs_metric_interval: u64::default(),
                 max_group_files: usize::default(),
+                old_data_streams: String::default(),
             },
             cache_latest_files: config::CacheLatestFiles {
                 enabled: bool::default(),
