@@ -124,8 +124,7 @@ pub struct BulkResponseItem {
     pub status: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<BulkResponseError>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "originalRecord")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "originalRecord")]
     #[schema(value_type = Object)]
     pub original_record: Option<json::Value>,
 }

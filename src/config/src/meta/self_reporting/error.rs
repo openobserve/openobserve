@@ -48,8 +48,10 @@ pub struct PipelineError {
     pub pipeline_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    #[serde(serialize_with = "serialize_values_only")]
+    #[serde(
+        skip_serializing_if = "HashMap::is_empty",
+        serialize_with = "serialize_values_only"
+    )]
     pub node_errors: HashMap<String, NodeErrors>,
 }
 

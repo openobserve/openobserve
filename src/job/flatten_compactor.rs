@@ -58,7 +58,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
-    tokio::task::spawn(async move { run_generate(tx).await });
+    tokio::task::spawn(run_generate(tx));
     Ok(())
 }
 

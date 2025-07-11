@@ -40,9 +40,7 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
     .run();
 
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
     log::info!("Report server stopped");
     Ok(())

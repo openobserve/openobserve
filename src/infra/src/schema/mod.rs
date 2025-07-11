@@ -270,7 +270,7 @@ pub fn unwrap_partition_time_level(
 pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     settings
         .as_ref()
-        .map(|settings| settings.defined_schema_fields.clone().unwrap_or_default())
+        .map(|settings| settings.defined_schema_fields.clone())
         .unwrap_or_default()
 }
 
@@ -575,23 +575,10 @@ pub async fn delete_fields(
 
             let mut settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
 
-            if let Some(schema_fields) = settings.defined_schema_fields {
-                let defined_schema_fields = schema_fields
-                    .iter()
-                    .filter_map(|f| {
-                        if deleted_fields.contains(f) {
-                            None
-                        } else {
-                            Some(f.clone())
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                if defined_schema_fields.is_empty() {
-                    settings.defined_schema_fields = None;
-                } else {
-                    settings.defined_schema_fields = Some(defined_schema_fields);
-                }
-            };
+            settings
+                .defined_schema_fields
+                .retain(|f| !deleted_fields.contains(f));
+
             new_metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
             let new_schema = vec![Schema::new_with_metadata(fields, new_metadata)];
             Ok(Some((

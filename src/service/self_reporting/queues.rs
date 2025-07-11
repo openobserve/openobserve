@@ -56,9 +56,12 @@ fn initialize_usage_queue() -> ReportingQueue {
 
     for thread_id in 0..cfg.limit.usage_reporting_thread_num {
         let msg_receiver = msg_receiver.clone();
-        tokio::task::spawn(async move {
-            self_reporting_ingest_job(thread_id, msg_receiver, batch_size, timeout).await
-        });
+        tokio::task::spawn(self_reporting_ingest_job(
+            thread_id,
+            msg_receiver,
+            batch_size,
+            timeout,
+        ));
     }
 
     ReportingQueue::new(msg_sender)
@@ -81,9 +84,12 @@ fn initialize_error_queue() -> ReportingQueue {
 
     for thread_id in 0..cfg.limit.usage_reporting_thread_num {
         let msg_receiver = msg_receiver.clone();
-        tokio::task::spawn(async move {
-            self_reporting_ingest_job(thread_id, msg_receiver, batch_size, timeout).await
-        });
+        tokio::task::spawn(self_reporting_ingest_job(
+            thread_id,
+            msg_receiver,
+            batch_size,
+            timeout,
+        ));
     }
 
     ReportingQueue::new(msg_sender)

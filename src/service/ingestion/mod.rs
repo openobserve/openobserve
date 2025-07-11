@@ -549,16 +549,15 @@ pub async fn get_uds_and_original_data_streams(
             stream.stream_name.to_string(),
             stream_settings.index_all_values,
         );
-        if let Some(fields) = &stream_settings.defined_schema_fields {
-            if !fields.is_empty() {
-                let mut fields: HashSet<_> = fields.iter().cloned().collect();
-                if !fields.contains(TIMESTAMP_COL_NAME) {
-                    fields.insert(TIMESTAMP_COL_NAME.to_string());
-                }
-                user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
-            } else {
-                user_defined_schema_map.insert(stream.stream_name.to_string(), None);
+
+        if !stream_settings.defined_schema_fields.is_empty() {
+            let mut fields = HashSet::<_>::from_iter(stream_settings.defined_schema_fields);
+            if !fields.contains(TIMESTAMP_COL_NAME) {
+                fields.insert(TIMESTAMP_COL_NAME.to_string());
             }
+            user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
+        } else {
+            user_defined_schema_map.insert(stream.stream_name.to_string(), None);
         }
     }
 }

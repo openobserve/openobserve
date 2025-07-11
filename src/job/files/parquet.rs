@@ -666,7 +666,7 @@ async fn merge_files(
     let (defined_schema_fields, need_original, index_original_data, index_all_values) =
         match stream_settings {
             Some(s) => (
-                s.defined_schema_fields.unwrap_or_default(),
+                s.defined_schema_fields,
                 s.store_original_data,
                 s.index_original_data,
                 s.index_all_values,

@@ -120,7 +120,7 @@ pub async fn check_for_schema(
             let (defined_schema_fields, need_original, index_original_data, index_all_values) =
                 match stream_setting {
                     Some(s) => (
-                        s.defined_schema_fields.unwrap_or_default(),
+                        s.defined_schema_fields,
                         s.store_original_data,
                         s.index_original_data,
                         s.index_all_values,
@@ -324,10 +324,7 @@ async fn handle_diff_schema(
 
     // check defined_schema_fields
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
-    let mut defined_schema_fields = stream_setting
-        .defined_schema_fields
-        .clone()
-        .unwrap_or_default();
+    let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
     // Automatically enable User-defined schema when
     // 1. allow_user_defined_schemas is enabled
@@ -390,7 +387,7 @@ async fn handle_diff_schema(
         }
 
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
-        stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
+        stream_setting.defined_schema_fields = defined_schema_fields.clone();
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
@@ -512,7 +509,7 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
 
     let stream_setting = unwrap_stream_settings(schema.schema());
     let defined_schema_fields = stream_setting
-        .and_then(|s| s.defined_schema_fields)
+        .map(|s| s.defined_schema_fields)
         .unwrap_or_default();
 
     for item in inferred_schema.fields.iter() {

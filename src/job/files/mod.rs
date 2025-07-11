@@ -31,9 +31,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load pending delete files to memory cache
     crate::service::db::file_list::local::load_pending_delete().await?;
 
-    tokio::task::spawn(async move { parquet::run().await });
-    tokio::task::spawn(async move { broadcast::run().await });
-    tokio::task::spawn(async move { clean_empty_dirs().await });
+    tokio::task::spawn(parquet::run());
+    tokio::task::spawn(broadcast::run());
+    tokio::task::spawn(clean_empty_dirs());
 
     Ok(())
 }

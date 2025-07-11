@@ -222,8 +222,7 @@ pub struct PanelConfig {
 pub struct DrillDown {
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
     type_field: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     target_blank: Option<bool>,
