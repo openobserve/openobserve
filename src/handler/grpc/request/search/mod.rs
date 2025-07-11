@@ -15,7 +15,7 @@
 
 use config::{
     meta::{
-        search::{self, SearchEventType},
+        search::{self},
         stream::StreamType,
     },
     utils::json,
@@ -233,7 +233,6 @@ impl Search for Searcher {
             &req.org_id,
             None,
             stream_type,
-            SearchEventType::Other,
             &request,
             req.skip_max_query_range,
             true,

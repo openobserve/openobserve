@@ -606,7 +606,6 @@ pub async fn search_partition(
     org_id: &str,
     user_id: Option<&str>,
     stream_type: StreamType,
-    search_type: SearchEventType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
     is_http_req: bool,
@@ -915,7 +914,9 @@ pub async fn search_partition(
         if hist_int > 0 {
             min_step *= hist_int;
         }
-    } else if search_type.eq(&SearchEventType::UI) {
+    }
+    // Only for UI search, we need to generate histogram interval
+    else if req.search_type.eq(&Some(SearchEventType::UI)) {
         let time_range = (req.start_time, req.end_time);
         let interval = generate_histogram_interval(Some(time_range), 0);
         match convert_histogram_interval_to_seconds(&interval) {
@@ -982,7 +983,7 @@ pub async fn search_partition(
     // Set this to true to generate partitions aligned with interval
     // only for logs page when query is non-histogram, so that logs can reuse the same partitions
     // for histogram query
-    if !is_histogram && search_type.eq(&SearchEventType::UI) {
+    if !is_histogram && req.search_type.eq(&Some(SearchEventType::UI)) {
         is_histogram = true;
     }
 
@@ -1028,7 +1029,7 @@ pub async fn search_partition(
     }
 
     resp.partitions = partitions;
-    if search_type.eq(&SearchEventType::UI) {
+    if req.search_type.eq(&Some(SearchEventType::UI)) {
         let min_step_secs = min_step / 1_000_000;
         resp.histogram_interval = Some(min_step_secs);
     }
@@ -1367,7 +1368,6 @@ pub async fn search_partition_multi(
             org_id,
             Some(user_id),
             stream_type,
-            search_type,
             &search::SearchPartitionRequest {
                 start_time: req.start_time,
                 end_time: req.end_time,
@@ -1378,6 +1378,7 @@ pub async fn search_partition_multi(
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
                 histogram_interval: req.histogram_interval,
+                search_type: Some(search_type),
             },
             false,
             true,

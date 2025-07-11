@@ -1342,6 +1342,7 @@ pub async fn search_partition(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
         req.sql = sql;
     }
+    req.search_type = Some(search_type);
 
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
@@ -1352,7 +1353,6 @@ pub async fn search_partition(
         &org_id,
         Some(&user_id),
         stream_type,
-        search_type,
         &req,
         false,
         true,
