@@ -779,7 +779,7 @@ export class LogsPage {
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
         await this.page.getByText(resultsPerPage, { exact: true }).click();
-        await this.page.waitForTimeout(3000); // Increased wait time for UI update
+        await expect(this.page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
         
         // Use flexible assertions based on the results per page
         let expectedPattern;
@@ -798,7 +798,7 @@ export class LogsPage {
         }
         
         // Use a more flexible assertion that checks for the pattern rather than exact text
-        // await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedPattern);
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedPattern);
     }
 
     async pageNotVisible() {
