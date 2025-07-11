@@ -1,14 +1,9 @@
 import { test, expect } from "../baseFixtures";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import DashboardSetting from "../../pages/dashboardPages/dashboard-settings";
+import PageManager from "../../pages/dashboardPages/page-manager.js";
 import { time } from "console";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "./utils/dashCreation.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -33,16 +28,15 @@ test.describe("dashboard general setting", () => {
   test("should verify that adding a default duration time and add tab on dashboard settings", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const dashboardList = new DashboardListPage(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     const newDashboardName =
-      dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
-    const newTabName = dashboardSetting.generateUniqueTabnewName("new-tab");
+      pm.dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
+    const newTabName = pm.dashboardSetting.generateUniqueTabnewName("new-tab");
 
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -50,37 +44,36 @@ test.describe("dashboard general setting", () => {
       });
     // Open dashboard settings
 
-    await dashboardSetting.openSetting();
-    await dashboardSetting.dashboardNameChange(newDashboardName);
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.dashboardNameChange(newDashboardName);
 
-    // Fix: Use relativeTimeSelection from DashboardSetting POM
-    await dashboardSetting.relativeTimeSelection("3", "h");
-    await dashboardSetting.saveSetting();
+    // Fix: Use relativeTimeSelection from pm.dashboardSetting POM
+    await pm.dashboardSetting.relativeTimeSelection("3", "h");
+    await pm.dashboardSetting.saveSetting();
     await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });
     // add tab in dashboard
-    await dashboardSetting.addTabSetting(newTabName);
-    await dashboardSetting.saveTabSetting();
-    await dashboardSetting.closeSettingDashboard();
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardSetting.addTabSetting(newTabName);
+    await pm.dashboardSetting.saveTabSetting();
+    await pm.dashboardSetting.closeSettingDashboard();
+    await pm.dashboardCreate.backToDashboardList();
 
     //delete the dashboard
     await deleteDashboard(page, newDashboardName);
   });
 
   test("should verify that dynamic toggle is disabled", async ({ page }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const dashboardList = new DashboardListPage(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     const newDashboardName =
-      dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
+      pm.dashboardSetting.generateUniqueDashboardnewName("new-dashboard");
 
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -88,19 +81,19 @@ test.describe("dashboard general setting", () => {
       });
 
     // Open dashboard settings
-    await dashboardSetting.openSetting(); // Ensure settings are opened
-    await dashboardSetting.dashboardNameChange(newDashboardName);
+    await pm.dashboardSetting.openSetting(); // Ensure settings are opened
+    await pm.dashboardSetting.dashboardNameChange(newDashboardName);
 
     //verify that dynamic toggle is disabled
-    await dashboardSetting.showDynamicFilter();
-    await dashboardSetting.saveSetting();
+    await pm.dashboardSetting.showDynamicFilter();
+    await pm.dashboardSetting.saveSetting();
     await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });
-    await dashboardSetting.closeSettingDashboard();
+    await pm.dashboardSetting.closeSettingDashboard();
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, newDashboardName);
   });
 });
