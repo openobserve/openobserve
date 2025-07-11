@@ -41,7 +41,14 @@ pub struct NodeMetrics {
 /// Get the node running metrics
 pub fn get_node_metrics() -> NodeMetrics {
     let cpu_total = get_cpu_limit();
-    let cpu_usage = get_cpu_usage() / cpu_total as f32;
+    let mut cpu_usage = get_cpu_usage() / cpu_total as f32;
+    if cpu_usage.is_infinite() || cpu_usage.is_nan() {
+        log::warn!(
+            "CPU usage is infinite or NaN, setting to 0. {}, {cpu_total}",
+            get_cpu_usage()
+        );
+        cpu_usage = 0.0;
+    }
     let memory_total = get_memory_limit();
     let memory_usage = get_memory_usage();
     let tcp_conns = get_tcp_connections();
