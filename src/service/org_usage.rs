@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,94 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    META_ORG_ID, ider,
-    meta::{
-        search::{Query, Request, SearchEventType},
-        self_reporting::usage::UsageEvent,
-        stream::StreamType,
-    },
-    utils::json,
+use config::utils::json;
+use o2_enterprise::enterprise::cloud::billings::{
+    self,
+    org_usage::{self, OrgUsageQueryResult},
 };
-use o2_enterprise::enterprise::cloud::billings::{self, org_usage};
 
-use super::search as SearchService;
+use crate::service::self_reporting::search::get_usage;
 
 pub async fn get_org_usage(
     org_id: &str,
-    usage_range: org_usage::UsageRange,
-) -> Result<org_usage::OrgUsage, billings::BillingError> {
+    usage_range: &org_usage::UsageRange,
+) -> Result<Vec<OrgUsageQueryResult>, billings::BillingError> {
     // fire the query
-    let trace_id = ider::uuid();
     let (sql, start_time, end_time) =
-        org_usage::create_usage_query_sql_and_time_range(org_id, &usage_range);
-    let req = Request {
-        query: Query {
-            sql,
-            from: 0,
-            size: -1,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            action_id: None,
-            skip_wal: false,
-            streaming_output: false,
-            streaming_id: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: Some(SearchEventType::Other),
-        search_event_context: None,
-        use_cache: None,
-        local_mode: None,
-    };
-    let resp = SearchService::search(&trace_id, META_ORG_ID, StreamType::Logs, None, &req).await?;
+        org_usage::create_usage_query_sql_and_time_range(org_id, usage_range);
 
-    if resp.is_partial {
-        return Err(billings::BillingError::PartialUsageResults(
-            resp.function_error.join(", "),
-        ));
-    }
-
-    // parse the results
-    let mut org_total_usage = org_usage::OrgUsage::default();
-    for hit in resp.hits {
-        match json::from_value::<org_usage::OrgUsageQueryResult>(hit) {
-            Ok(usage_result) => match usage_result.event {
-                UsageEvent::Search => org_total_usage.search += usage_result.total_size,
-                UsageEvent::Ingestion => org_total_usage.ingestion += usage_result.total_size,
-                UsageEvent::Functions => org_total_usage.functions += usage_result.total_size,
-                UsageEvent::Other => org_total_usage.other += usage_result.total_size,
-            },
-            Err(e) => {
-                log::debug!(
-                    "[CLOUD:USAGE]: found aggregated usage data but failed to parse into results: {e}"
-                );
-            }
-        }
-    }
-
-    Ok(org_total_usage)
-}
-
-pub async fn get_organization_usage_threshold(
-    org_id: &str,
-    user_email: &str,
-) -> Result<org_usage::OrgUsageThreshold, billings::BillingError> {
-    let subscription_type = billings::get_org_subscription_type(org_id, user_email)
+    let query_result = get_usage(sql, start_time, end_time)
         .await
-        .unwrap_or_default();
+        .map_err(|e| billings::BillingError::PartialUsageResults(e.to_string()))?
+        .into_iter()
+        .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
+        .collect::<Vec<_>>();
 
-    if subscription_type.is_free_sub() {
-        let org_sage = get_org_usage(org_id, org_usage::UsageRange::default()).await?;
-        Ok(org_sage.into())
-    } else {
-        Ok(org_usage::OrgUsageThreshold::default())
-    }
+    Ok(query_result)
 }

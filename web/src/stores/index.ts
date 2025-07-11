@@ -54,6 +54,7 @@ const organizationObj = {
     scrape_interval: 15,
     trace_id_field_name: "trace_id",
     span_id_field_name: "span_id",
+    free_trial_expiry: "",
   },
   isDataIngested: false,
 };
@@ -177,9 +178,6 @@ export default createStore({
     // setCurrentPanelsData(state, payload) {
     //   state.currentPanelsData = payload;
     // },
-    setQuotaThresholdMsg(state, payload) {
-      state.organizationData.quotaThresholdMsg = payload;
-    },
     setConfig(state, payload) {
       state.zoConfig = payload;
     },
@@ -326,9 +324,6 @@ export default createStore({
     // setCurrentPanelsData(context, payload) {
     //   context.commit('setCurrentPanelsData', payload);
     // },
-    setQuotaThresholdMsg(context, payload) {
-      context.commit("setQuotaThresholdMsg", payload);
-    },
     setConfig(context, payload) {
       context.commit("setConfig", payload);
     },

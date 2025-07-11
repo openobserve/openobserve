@@ -19,7 +19,7 @@ pub mod ai;
 pub mod alerts;
 pub mod authz;
 #[cfg(feature = "cloud")]
-pub mod billings;
+pub mod cloud;
 pub mod clusters;
 pub mod dashboards;
 pub mod enrichment_table;

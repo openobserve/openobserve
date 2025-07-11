@@ -1,7 +1,7 @@
 import { test, expect } from './baseFixtures.js';
 import logData from "../cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
-import { LogsPage } from '../pages/logsPage.js';
+import { LogsPage } from '../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -95,6 +95,7 @@ test.describe("Search Partition Tests", () => {
         expect(matchingCall.sql).toContain('SELECT histogram(_timestamp');
       }
     } else {
+      await logsPage.clickRunQueryButton();
       await logsPage.verifyStreamingModeResponse();
     }
 

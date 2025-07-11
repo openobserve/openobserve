@@ -33,6 +33,8 @@ use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
+#[cfg(feature = "cloud")]
+use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::get_cipher_key_names;
@@ -206,6 +208,26 @@ pub async fn search(
 
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
+
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
+
     let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
@@ -1328,6 +1350,25 @@ pub async fn search_partition(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
 
     let mut req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,

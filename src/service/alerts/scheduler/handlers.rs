@@ -42,6 +42,8 @@ use infra::{
 };
 use proto::cluster_rpc;
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
     alerts::{
         alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
@@ -189,6 +191,19 @@ async fn handle_alert_triggers(
             trigger.module_key
         ));
     };
+
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            log::info!(
+                "skipping alert {} id {} in org {} because free trial expiry",
+                alert.name,
+                trigger.module_key,
+                trigger.org
+            );
+            return Ok(());
+        }
+    }
 
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
@@ -644,6 +659,18 @@ async fn handle_report_triggers(
         ..trigger.clone()
     };
 
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            log::info!(
+                "skipping report {}  in org {} because free trial expiry",
+                report_name,
+                trigger.org
+            );
+            return Ok(());
+        }
+    }
+
     if !report.enabled {
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {org_id}, report name: {report_name} id: {report_id}"
@@ -902,6 +929,19 @@ async fn handle_derived_stream_triggers(
             err_msg
         ));
     };
+
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            log::info!(
+                "skipping pipeline {} id {} in org {} because free trial expiry",
+                pipeline.name,
+                pipeline_id,
+                trigger.org
+            );
+            return Ok(());
+        }
+    }
 
     if !pipeline.enabled {
         // Pipeline not enabled, check again in 5 mins
