@@ -143,31 +143,6 @@ pub async fn add(entry: PatternAssociationEntry) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn remove(
-    org: &str,
-    stream: &str,
-    stype: StreamType,
-    field: &str,
-    pattern_id: &str,
-) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    Entity::delete_many()
-        .filter(Column::Org.eq(org))
-        .filter(Column::Stream.eq(stream))
-        .filter(Column::StreamType.eq(stype.to_string()))
-        .filter(Column::Field.eq(field))
-        .filter(Column::PatternId.eq(pattern_id))
-        .filter(Column::Id.eq(pattern_id))
-        .exec(client)
-        .await?;
-
-    drop(_lock);
-
-    Ok(())
-}
-
 pub async fn batch_process(
     added: Vec<PatternAssociationEntry>,
     removed: Vec<PatternAssociationEntry>,
@@ -250,6 +225,26 @@ pub async fn list_all() -> Result<Vec<PatternAssociationEntry>, errors::Error> {
         .map(<Model as Into<PatternAssociationEntry>>::into)
         .collect::<Vec<_>>();
     Ok(records)
+}
+
+pub async fn remove_associations_by_stream(
+    org: &str,
+    stream: &str,
+    stype: StreamType,
+) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Stream.eq(stream))
+        .filter(Column::StreamType.eq(stype.to_string()))
+        .exec(client)
+        .await?;
+
+    drop(_lock);
+
+    Ok(())
 }
 
 pub async fn clear() -> Result<(), errors::Error> {

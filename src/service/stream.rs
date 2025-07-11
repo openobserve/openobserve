@@ -716,6 +716,12 @@ pub async fn stream_delete_inner(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use super::db::re_pattern::remove_stream_associations_after_deletion;
+        remove_stream_associations_after_deletion(org_id, stream_name, stream_type).await?;
+    }
+
     // create delete for compactor
     if let Err(e) =
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await

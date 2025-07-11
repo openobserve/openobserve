@@ -186,6 +186,15 @@ pub async fn process_association_changes(
         }
     }
 
+    // update the node itself
+    mgr.update_associations(
+        org,
+        stype,
+        stream,
+        update.remove.clone(),
+        update.add.clone(),
+    )?;
+
     let serialized = serde_json::to_vec(&update)?;
     let added = update
         .add
@@ -251,6 +260,31 @@ pub async fn process_association_changes(
             }
         }
     }
+    Ok(())
+}
+
+pub async fn remove_stream_associations_after_deletion(
+    org: &str,
+    stream: &str,
+    stype: StreamType,
+) -> Result<(), anyhow::Error> {
+    let mgr = get_pattern_manager().await?;
+    mgr.remove_stream_associations(org, stype, stream);
+
+    infra::table::re_pattern_stream_map::remove_associations_by_stream(org, stream, stype).await?;
+
+    // trigger watch event by putting value to cluster coordinator
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .delete(
+            &format!("{RE_PATTERN_ASSOCIATIONS_PREFIX}{org}/{stype}/{stream}",),
+            false,
+            true,
+            None,
+        )
+        .await?;
+    // we do not need to trigger for super cluster, because the stream deletion handler
+    // for super cluster takes care of calling this function
     Ok(())
 }
 
@@ -320,18 +354,31 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
         // there is no separate delete event for associations,
         // everything is notified via put event only
 
-        if let Event::Put(ev) = ev {
-            let combo = ev.key.strip_prefix(prefix).unwrap();
-            let splits = combo.split('/').collect::<Vec<_>>();
-            let org = splits[0];
-            let stype = StreamType::from(splits[1]);
-            let stream = splits[2];
+        match ev {
+            Event::Put(ev) => {
+                let combo = ev.key.strip_prefix(prefix).unwrap();
+                let splits = combo.split('/').collect::<Vec<_>>();
+                let org = splits[0];
+                let stype = StreamType::from(splits[1]);
+                let stream = splits[2];
 
-            let updates: UpdateSettingsWrapper<PatternAssociation> =
-                serde_json::from_slice(&ev.value.unwrap()).unwrap();
+                let updates: UpdateSettingsWrapper<PatternAssociation> =
+                    serde_json::from_slice(&ev.value.unwrap()).unwrap();
 
-            let mgr = get_pattern_manager().await?;
-            mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;
+                let mgr = get_pattern_manager().await?;
+                mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;
+            }
+            Event::Delete(ev) => {
+                let combo = ev.key.strip_prefix(prefix).unwrap();
+                let splits = combo.split('/').collect::<Vec<_>>();
+                let org = splits[0];
+                let stype = StreamType::from(splits[1]);
+                let stream = splits[2];
+
+                let mgr = get_pattern_manager().await?;
+                mgr.remove_stream_associations(org, stype, stream);
+            }
+            _ => {}
         }
     }
 }
