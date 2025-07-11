@@ -1,8 +1,8 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
-import { login } from "../utils/dashLogin";
-import { ingestion } from "../utils/dashIngestion";
-import { waitForDashboardPage } from "../utils/dashCreation";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
+import { waitForDashboardPage } from "./utils/dashCreation.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardImport from "../../pages/dashboardPages/dashboard.import.js";
 

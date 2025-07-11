@@ -2,6 +2,11 @@ import { expect } from "@playwright/test";
 
 //methods : setRelativeTimeRange
 
+// Utility function to wait for date-time button to be enabled
+export async function waitForDateTimeButtonToBeEnabled(page) {
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 15000 });
+}
+
 export default class DateTimeHelper {
   constructor(page) {
     this.page = page;
