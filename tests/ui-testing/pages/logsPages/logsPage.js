@@ -350,7 +350,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).press('ControlOrMeta+a');
+        await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.type(query);
     }
 
