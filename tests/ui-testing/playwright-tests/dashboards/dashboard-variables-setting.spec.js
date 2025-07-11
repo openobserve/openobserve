@@ -1,13 +1,9 @@
 import { test, expect } from "../baseFixtures";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import DashboardSetting from "../../pages/dashboardPages/dashboard-settings";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "./utils/dashCreation.js";
+import PageManager from "../../pages/dashboardPages/page-manager";
+
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 const dashboardName = `Dashboard_${Date.now()}`;
 
 test.describe.configure({ mode: "parallel" });
@@ -22,19 +18,18 @@ test.describe("dashboard variables settings", () => {
   test("should try to open variables, click add variable, and without saving close it ", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardSetting = new DashboardSetting(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Get the variable name
-    const variableName = dashboardSetting.variableName();
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
 
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
@@ -42,9 +37,9 @@ test.describe("dashboard variables settings", () => {
         state: "visible",
       });
     // Open the setting and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
-    await dashboardSetting.addVariable(
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await pm.dashboardSetting.addVariable(
       "Query Values",
       variableName,
       "logs",
@@ -52,40 +47,40 @@ test.describe("dashboard variables settings", () => {
       "kubernetes_container_name"
     );
     // Cancel the variable
-    await dashboardSetting.cancelVariable();
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.cancelVariable();
+    await pm.dashboardSetting.closeSettingWindow();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
   // query values test cases
 
   test("should add query_values to dashboard and save it", async ({ page }) => {
+    // Initialize page objects
+    const pm = new PageManager(page);
     // const dashboardName = generateDashboardName();
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboard page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
     // Open the setting and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Add a query values variable
-    await dashboardSetting.addVariable(
+    await pm.dashboardSetting.addVariable(
       "Query Values",
       variableName,
       "logs",
@@ -94,11 +89,11 @@ test.describe("dashboard variables settings", () => {
     );
 
     // Save the variable
-    await dashboardSetting.saveVariable();
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.saveVariable();
+    await pm.dashboardSetting.closeSettingWindow();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -106,17 +101,15 @@ test.describe("dashboard variables settings", () => {
     page,
   }) => {
     // Initialize page objects
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    const pm = new PageManager(page);
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
 
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
@@ -125,9 +118,9 @@ test.describe("dashboard variables settings", () => {
       });
 
     // Open the setting and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
-    await dashboardSetting.addVariable(
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await pm.dashboardSetting.addVariable(
       "Query Values",
       variableName,
       "logs",
@@ -137,29 +130,28 @@ test.describe("dashboard variables settings", () => {
       "kubernetes_namespace_name"
     );
     // Set max records size and enable multi-select
-    await dashboardSetting.addMaxRecord("2");
-    await dashboardSetting.enableMultiSelect();
-    await dashboardSetting.saveVariable();
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.addMaxRecord("2");
+    await pm.dashboardSetting.enableMultiSelect();
+    await pm.dashboardSetting.saveVariable();
+    await pm.dashboardSetting.closeSettingWindow();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
   test("should verify that by default select is working", async ({ page }) => {
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    // Initialize page manager
+    const pm = new PageManager(page);
+    const variableName = pm.dashboardSetting.variableName();
     const defaultValue = "ingress-nginx";
 
     // Navigate to the dashboard page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -167,11 +159,11 @@ test.describe("dashboard variables settings", () => {
       });
 
     // Open the setting and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Add a query values variable
-    await dashboardSetting.addVariable(
+    await pm.dashboardSetting.addVariable(
       "Query Values",
       variableName,
       "logs",
@@ -179,31 +171,30 @@ test.describe("dashboard variables settings", () => {
       "kubernetes_namespace_name"
     );
     // Set the default value
-    await dashboardSetting.addMaxRecord("2");
-    await dashboardSetting.addCustomValue(defaultValue);
+    await pm.dashboardSetting.addMaxRecord("2");
+    await pm.dashboardSetting.addCustomValue(defaultValue);
     // Save the variable
-    await dashboardSetting.saveVariable();
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.saveVariable();
+    await pm.dashboardSetting.closeSettingWindow();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
   test("should verify that hide on query_values variable dashboard is working", async ({
     page,
   }) => {
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    // Initialize page objects
+    const pm = new PageManager(page);
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboard page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
 
     // Wait for the add panel button to be visible
     await page
@@ -213,11 +204,11 @@ test.describe("dashboard variables settings", () => {
       });
 
     // Open the setting and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Add a query values variable
-    await dashboardSetting.addVariable(
+    await pm.dashboardSetting.addVariable(
       "Query Values",
       variableName,
       "logs",
@@ -226,34 +217,34 @@ test.describe("dashboard variables settings", () => {
     );
 
     // Set max records size to 2
-    await dashboardSetting.addMaxRecord("2");
+    await pm.dashboardSetting.addMaxRecord("2");
 
     // Hide the variable
-    await dashboardSetting.hideVariable();
+    await pm.dashboardSetting.hideVariable();
 
     // Save the variable
-    await dashboardSetting.saveVariable();
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.saveVariable();
+    await pm.dashboardSetting.closeSettingWindow();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
   test("should verify constant variable by adding and verify that its visible on dashboard", async ({
     page,
   }) => {
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    // Initialize page objects
+    const pm = new PageManager(page);
+
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
 
     // Wait for the add panel button to be visible
     await page
@@ -263,37 +254,36 @@ test.describe("dashboard variables settings", () => {
       });
 
     // Open the setting and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Select constant type
-    await dashboardSetting.selectConstantType(
+    await pm.dashboardSetting.selectConstantType(
       "Constant",
       variableName,
       "ingress-nginx"
     );
 
     // Save the variable
-    await dashboardSetting.saveVariable();
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.saveVariable();
+    await pm.dashboardSetting.closeSettingWindow();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
   test("should verify that hide on constant variable dashboard is working", async ({
     page,
   }) => {
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    //Initialize page manager
+    const pm = new PageManager(page);
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -301,51 +291,51 @@ test.describe("dashboard variables settings", () => {
       });
 
     // Open the setting and save variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
-    await dashboardSetting.selectConstantType(
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await pm.dashboardSetting.selectConstantType(
       "Constant",
       variableName,
       "ingress-nginx"
     );
-    await dashboardSetting.hideVariable();
-    await dashboardSetting.saveVariable();
+    await pm.dashboardSetting.hideVariable();
+    await pm.dashboardSetting.saveVariable();
     await page
       .locator('[data-test="dashboard-variable-add-btn"]')
       .waitFor({ state: "visible" });
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.closeSettingWindow();
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
   test("should verify textbox variable by adding and verify that its visible on dashboard", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    // Initialize page objects
+    const pm = new PageManager(page);
+
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({ state: "visible" });
 
     // Open dashboard settings and variables section
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Select and add a textbox variable
-    await dashboardSetting.selectTextType("TextBox", variableName);
+    await pm.dashboardSetting.selectTextType("TextBox", variableName);
 
     // Save the added variable
-    await dashboardSetting.saveVariable();
+    await pm.dashboardSetting.saveVariable();
 
     // Ensure the add variable button is visible
     await page
@@ -353,10 +343,10 @@ test.describe("dashboard variables settings", () => {
       .waitFor({ state: "visible" });
 
     // Close the settings window
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.closeSettingWindow();
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -364,27 +354,25 @@ test.describe("dashboard variables settings", () => {
     page,
   }) => {
     // Initialize page objects
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    const pm = new PageManager(page);
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({ state: "visible" });
 
     // Open the settings and variables section and save variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
-    await dashboardSetting.selectTextType("TextBox", variableName);
-    await dashboardSetting.hideVariable();
-    await dashboardSetting.saveVariable();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await pm.dashboardSetting.selectTextType("TextBox", variableName);
+    await pm.dashboardSetting.hideVariable();
+    await pm.dashboardSetting.saveVariable();
 
     // Ensure the add variable button is visible
     await page
@@ -392,13 +380,13 @@ test.describe("dashboard variables settings", () => {
       .waitFor({ state: "visible" });
 
     // Close the settings window
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -406,17 +394,15 @@ test.describe("dashboard variables settings", () => {
     page,
   }) => {
     // Initialize page objects
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    const pm = new PageManager(page);
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -424,9 +410,9 @@ test.describe("dashboard variables settings", () => {
       });
 
     // Open the settings and variables section and save variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
-    await dashboardSetting.selectCustomType(
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await pm.dashboardSetting.selectCustomType(
       "Custom",
       variableName,
       "ingress-nginx",
@@ -434,19 +420,19 @@ test.describe("dashboard variables settings", () => {
     );
 
     // Save the added variable
-    await dashboardSetting.saveVariable();
+    await pm.dashboardSetting.saveVariable();
 
     // await page
     //   .locator('[data-test="dashboard-variable-add-btn"]')
     //   .waitFor({ state: "visible" });
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.closeSettingWindow();
 
     // Ensure the panel is visible
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -454,44 +440,43 @@ test.describe("dashboard variables settings", () => {
     page,
   }) => {
     // Initialize page objects
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    const pm = new PageManager(page);
+
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({ state: "visible" });
 
     // Open settings and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Select custom type and enable multi-select
-    await dashboardSetting.selectCustomType(
+    await pm.dashboardSetting.selectCustomType(
       "Custom",
       variableName,
       "ingress-nginx",
       "ingress-nginx"
     );
-    await dashboardSetting.enableMultiSelect();
+    await pm.dashboardSetting.enableMultiSelect();
 
     // Save the variable
-    await dashboardSetting.saveVariable();
+    await pm.dashboardSetting.saveVariable();
 
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -499,45 +484,43 @@ test.describe("dashboard variables settings", () => {
     page,
   }) => {
     // Initialize page objects
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = dashboardSetting.variableName();
+    const pm = new PageManager(page);
+    const variableName = pm.dashboardSetting.variableName();
 
     // Navigate to the dashboards page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
     // Open settings and variables
-    await dashboardSetting.openSetting();
-    await dashboardSetting.openVariables();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Select custom type and enable multi-select
-    await dashboardSetting.selectCustomType(
+    await pm.dashboardSetting.selectCustomType(
       "Custom",
       variableName,
       "ingress-nginx",
       "ingress-nginx"
     );
-    await dashboardSetting.hideVariable();
+    await pm.dashboardSetting.hideVariable();
 
     // Save the variable
-    await dashboardSetting.saveVariable();
+    await pm.dashboardSetting.saveVariable();
 
-    await dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.closeSettingWindow();
     await expect(
       page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
     ).toBeVisible();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
 });
