@@ -4,9 +4,9 @@ import logsdata from "../../../test-data/logs_data.json";
 import {
   waitForDashboardPage,
   deleteDashboard,
-} from "../utils/dashCreation.js";
-import { login } from "../utils/dashLogin.js";
-import { ingestion } from "../utils/dashIngestion.js";
+} from "./utils/dashCreation.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";

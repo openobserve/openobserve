@@ -1,6 +1,6 @@
 // ingestion.js
-import logsdata from "../../../test-data/logs_data.json";
-import geoMapdata from "../../../test-data/geo_map.json";
+import logsdata from "../../../../test-data/logs_data.json";
+import geoMapdata from "../../../../test-data/geo_map.json";
 
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {

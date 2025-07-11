@@ -1,11 +1,11 @@
 import { test, expect } from "../baseFixtures.js";
-import { login } from "../utils/dashLogin.js";
-import { ingestionForMaps } from "../utils/dashIngestion.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestionForMaps } from "./utils/dashIngestion.js";
 
 import {
   waitForDashboardPage,
   deleteDashboard,
-} from "../utils/dashCreation.js";
+} from "./utils/dashCreation.js";
 
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";

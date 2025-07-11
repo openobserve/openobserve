@@ -1,8 +1,8 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { login } from "../utils/dashLogin.js";
-import { ingestion } from "../utils/dashIngestion.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
@@ -11,7 +11,7 @@ import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 import {
   waitForDashboardPage,
   deleteDashboard,
-} from "../utils/dashCreation.js";
+} from "./utils/dashCreation.js";
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
