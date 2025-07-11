@@ -220,7 +220,7 @@ impl ExecutablePipeline {
         }
 
         // Spawn tasks for each node
-        let mut node_tasks = Vec::new();
+        let mut node_tasks = Vec::with_capacity(self.sorted_nodes.len());
         for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
             let pl_id_cp = self.id.to_string();
             let org_id_cp = org_id.to_string();
@@ -239,22 +239,19 @@ impl ExecutablePipeline {
 
             // WARN: Do not change. Processing node can only be done in a task, as the internals of
             // remote wal writer depends on the task id.
-            let task = tokio::spawn(async move {
-                process_node(
-                    pl_id_cp,
-                    idx,
-                    org_id_cp,
-                    node,
-                    node_receiver,
-                    child_senders,
-                    vrl_runtime,
-                    result_sender_cp,
-                    error_sender_cp,
-                    pipeline_name,
-                    stream_name,
-                )
-                .await
-            });
+            let task = tokio::spawn(process_node(
+                pl_id_cp,
+                idx,
+                org_id_cp,
+                node,
+                node_receiver,
+                child_senders,
+                vrl_runtime,
+                result_sender_cp,
+                error_sender_cp,
+                pipeline_name,
+                stream_name,
+            ));
             node_tasks.push(task);
         }
 
