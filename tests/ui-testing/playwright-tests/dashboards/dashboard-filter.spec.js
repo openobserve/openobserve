@@ -2,17 +2,9 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
+import PageManager from "../../pages/dashboardPages/page-manager";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
-import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
-import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
-import DashboardVariables from "../../pages/dashboardPages/dashboard-variables.js";
-import Dashboardfilter from "../../pages/dashboardPages/dashboard-filter.js";
-
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
@@ -35,25 +27,18 @@ test.describe("dashboard filter testcases", () => {
   test("should successfully apply filter conditions using both AND and OR operators", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardVariables = new DashboardVariables(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const dashboardFilter = new Dashboardfilter(page);
-
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
-
-    const dashboardRefresh = new DashboardTimeRefresh(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
@@ -62,9 +47,9 @@ test.describe("dashboard filter testcases", () => {
       });
 
     // Open dashboard settings and add a variable
-    await dashboardSetting.openSetting();
+    await pm.dashboardSetting.openSetting();
 
-    await dashboardVariables.addDashboardVariable(
+    await pm.dashboardVariables.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
@@ -72,42 +57,42 @@ test.describe("dashboard filter testcases", () => {
     );
 
     // Add a panel to the dashboard
-    await dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanel();
 
-    await dashboardActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.addPanelName(panelName);
 
-    await chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectChartType("line");
 
-    await chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStreamType("logs");
 
-    await chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await dashboardRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "filter"
     );
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_image",
       "filter"
     );
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Select variable value
-    await dashboardVariables.selectValueFromVariableDropDown(
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
 
     // Add filter conditions
-    await dashboardFilter.addFilterCondition(
+    await pm.dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
@@ -115,7 +100,7 @@ test.describe("dashboard filter testcases", () => {
       "$variablename"
     );
 
-    await dashboardFilter.addFilterCondition(
+    await pm.dashboardFilter.addFilterCondition(
       1,
       "kubernetes_container_image",
       "",
@@ -123,9 +108,9 @@ test.describe("dashboard filter testcases", () => {
       "$variablename"
     );
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify query inspector for AND operator
     await page
@@ -146,9 +131,9 @@ test.describe("dashboard filter testcases", () => {
 
     await page.getByRole("option", { name: "OR" }).click();
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     await page.waitForTimeout(2000);
 
@@ -166,71 +151,70 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = new DashboardVariables(page);
-    const dashboardFilter = new Dashboardfilter(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
-    await dashboardSetting.openSetting();
+    await pm.dashboardSetting.openSetting();
 
-    await variableName.addDashboardVariable(
+    await pm.dashboardVariables.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
       "kubernetes_container_name"
     );
     // Add a panel to the dashboard
-    await dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanel();
 
-    await dashboardActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.addPanelName(panelName);
 
-    await chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectChartType("line");
 
-    await chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStreamType("logs");
 
-    await chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "filter"
     );
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-    await variableName.selectValueFromVariableDropDown("variablename", "ziox");
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
+      "variablename",
+      "ziox"
+    );
 
     // Add filter conditions
-    await dashboardFilter.addFilterCondition(
+    await pm.dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
@@ -238,9 +222,9 @@ test.describe("dashboard filter testcases", () => {
       "$variablename"
     );
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify query inspector
     await page
@@ -258,40 +242,33 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("Should apply the filter group inside group", async ({ page }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = new DashboardVariables(page);
-    const dashboardRefresh = new DashboardTimeRefresh(page);
-    const dashboardVariables = new DashboardVariables(page);
-    const dashboardFilter = new Dashboardfilter(page);
-
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
-    await dashboardSetting.openSetting();
+    await pm.dashboardSetting.openSetting();
 
-    await variableName.addDashboardVariable(
+    await pm.dashboardVariables.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
@@ -300,26 +277,26 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(1000);
     // Add a panel to the dashboard
-    await dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanel();
 
-    await dashboardActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // await chartTypeSelector.selectChartType("line");
+    // await pm.chartTypeSelector.selectChartType("line");
 
-    await chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStreamType("logs");
 
-    await chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await dashboardRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
-    await dashboardVariables.selectValueFromVariableDropDown(
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
@@ -329,7 +306,7 @@ test.describe("dashboard filter testcases", () => {
 
     await page.getByText("Add Group").click();
 
-    await dashboardFilter.addGroupFilterCondition(
+    await pm.dashboardFilter.addGroupFilterCondition(
       0,
       "kubernetes_container_name",
       "=",
@@ -343,15 +320,15 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator("div").filter({ hasText: "Add Group" }).nth(3).click();
 
-    await dashboardFilter.addGroupFilterCondition(
+    await pm.dashboardFilter.addGroupFilterCondition(
       0,
       "kubernetes_container_image",
       "<>",
       "$variablename"
     );
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
 
@@ -370,40 +347,34 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     // Save the dashboard panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("Should apply the add group filter with apply the list of value successfully", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = new DashboardVariables(page);
-    const dashboardRefresh = new DashboardTimeRefresh(page);
-    const dashboardFilter = new Dashboardfilter(page);
-
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
-    await dashboardSetting.openSetting();
-    await variableName.addDashboardVariable(
+    await pm.dashboardSetting.openSetting();
+    await pm.variableName.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
@@ -412,37 +383,40 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(3000);
 
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
     await page
       .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
       .click();
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "x"
+    );
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_image",
       "y"
     );
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_namespace_name",
       "filter"
     );
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await dashboardRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-    await dashboardFilter.selectListFilterItems(
+    await pm.dashboardFilter.selectListFilterItems(
       0,
       "kubernetes_namespace_name",
       ["ingress-nginx", "kube-system"]
     );
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
@@ -462,60 +436,55 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     // Save the dashboard panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("Should  apply the  filter using the field button", async ({ page }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const variableName = new DashboardVariables(page);
-    const dashboardRefresh = new DashboardTimeRefresh(page);
-
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
         state: "visible",
       });
-    await dashboardSetting.openSetting();
-    await variableName.addDashboardVariable(
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardVariables.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
       "kubernetes_container_name"
     );
 
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await dashboardRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
 
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_namespace_name",
       "filter"
     );
@@ -527,80 +496,73 @@ test.describe("dashboard filter testcases", () => {
     ).toBeVisible();
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Save the dashboard panel
 
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("Should display an error message if added the invalid operator", async ({
     page,
   }) => {
-    // Page object instances
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const dashboardVariables = new DashboardVariables(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardRefresh = new DashboardTimeRefresh(page);
-    const dashboardFilter = new Dashboardfilter(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Go to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Open settings and add variable
     await page.waitForTimeout(3000);
-    await dashboardSetting.openSetting();
-    await dashboardVariables.addDashboardVariable(
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardVariables.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
       "kubernetes_container_name"
     );
-    // await dashboardSetting.closeSettingDashboard();
+    // await pm.dashboardSetting.closeSettingDashboard();
 
     // Add panel
-    await dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanel();
 
     // Select stream and add Y field
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("_timestamp", "y");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await dashboardRefresh.setRelative("6", "w");
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add filter field
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "filter"
     );
 
     // Add invalid filter condition (IN operator with only one value)
-    await dashboardFilter.addFilterCondition(
+    await pm.dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
       "IN",
       "$variablename"
     );
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Expect error message
     await expect(
@@ -608,49 +570,45 @@ test.describe("dashboard filter testcases", () => {
     ).toBeVisible();
 
     // Fix filter condition (change to "=" operator)
-    await dashboardFilter.addFilterCondition(
+    await pm.dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
       "=",
       "$variablename"
     );
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save panel
-    await dashboardActions.addPanelName("Dashboard_test");
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.addPanelName("Dashboard_test");
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete dashboard
-    await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("Should Filter work correctly if Added the breakdown field", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const dashboardVariables = new DashboardVariables(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const dashboardRefresh = new DashboardTimeRefresh(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page.waitForTimeout(3000);
 
     // Open settings and add variable
-    await dashboardSetting.openSetting();
-    await dashboardVariables.addDashboardVariable(
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardVariables.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
@@ -658,45 +616,48 @@ test.describe("dashboard filter testcases", () => {
     );
 
     // Add a panel
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Select stream and add fields
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("_timestamp", "y");
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "b");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "b"
+    );
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Set date range
     await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
       timeout: 5000,
     });
-    await dashboardRefresh.setRelative("6", "w");
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add filter field and set value
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "filter"
     );
-    await dashboardVariables.selectValueFromVariableDropDown(
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
 
     // Add filter condition
-    const dashboardFilter = new Dashboardfilter(page);
-    await dashboardFilter.addFilterCondition(
+
+    await pm.dashboardFilter.addFilterCondition(
       0,
       "kubernetes_container_name",
       "",
       "=",
       "$variablename"
     );
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector and verify
     await page
@@ -711,11 +672,11 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
-    await dashboardCreate.searchDashboard(randomDashboardName);
-    await dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
 });
