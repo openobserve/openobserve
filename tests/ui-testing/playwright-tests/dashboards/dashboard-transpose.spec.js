@@ -1,4 +1,5 @@
 import { test, expect } from "../baseFixtures";
+import PageManager from "../../pages/dashboardPages/page-manager.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
@@ -23,68 +24,75 @@ test.describe("dashboard UI testcases", () => {
   test("should verify that the transpose toggle button is working correctly", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    // const pm.dashboardCreate = new DashboardCreate(page);
+    // const pm.dashboardList = new DashboardListPage(page);
+    // const pm.chartTypeSelector = new ChartTypeSelector(page);
+    // const pm.dashboardPanelActions = new DashboardactionPage(page);
+    // const pm.dashboardPanelConfigs = new DashboardPanelConfigs(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to the dashboards list
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard and add a panel
-    await dashboardCreate.createDashboard(randomDashboardName);
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
-    await chartTypeSelector.selectChartType("table");
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "y"
+    );
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Open the configuration panel and toggle the transpose button
-    await dashboardPanelConfigs.openConfigPanel();
-    await dashboardPanelConfigs.selectTranspose();
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelConfigs.openConfigPanel();
+    await pm.dashboardPanelConfigs.selectTranspose();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the created dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
   test("should display the correct data before and after transposing in the table chart", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const pm = new PageManager(page);
+
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to the dashboards list
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard and add a panel
-    await dashboardCreate.createDashboard(randomDashboardName);
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
-    await chartTypeSelector.selectChartType("table");
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "y"
+    );
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Open the configuration panel and toggle the transpose button
-    await dashboardPanelConfigs.openConfigPanel();
-    await dashboardPanelConfigs.selectTranspose();
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelConfigs.openConfigPanel();
+    await pm.dashboardPanelConfigs.selectTranspose();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     await page.waitForTimeout(2000);
     // Validate data consistency before and after transpose
@@ -153,59 +161,59 @@ test.describe("dashboard UI testcases", () => {
     }
 
     // Save the panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the created dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
   test("should verify that when dynamic columns are enabled, the VRL function should display correctly", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to the dashboards list
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard and add a panel
-    await dashboardCreate.createDashboard(randomDashboardName);
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
-    await chartTypeSelector.selectChartType("table");
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
-    await chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "x"
+    );
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
     // Open the configuration panel and enable dynamic columns
-    await dashboardPanelConfigs.openConfigPanel();
-    await dashboardPanelConfigs.selectDynamicColumns();
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelConfigs.openConfigPanel();
+    await pm.dashboardPanelConfigs.selectDynamicColumns();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the created dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
   test("should not show an error when both the Transpose and Dynamic Column toggle buttons are enabled", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+     // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Set up listener to catch console errors
     let errorMessage = "";
@@ -216,35 +224,38 @@ test.describe("dashboard UI testcases", () => {
     });
 
     // Navigate to the dashboards list
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Create a new dashboard and add a panel
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
-    await chartTypeSelector.selectChartType("table");
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
-    await chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "x"
+    );
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
     // Open the configuration panel and enable both the Transpose and Dynamic Column toggle buttons
-    await dashboardPanelConfigs.openConfigPanel();
-    await dashboardPanelConfigs.selectTranspose();
-    await dashboardPanelConfigs.selectDynamicColumns();
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelConfigs.openConfigPanel();
+    await pm.dashboardPanelConfigs.selectTranspose();
+    await pm.dashboardPanelConfigs.selectDynamicColumns();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Assert no error occurred
     expect(errorMessage).toBe("");
 
     // Delete the created dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });
