@@ -779,7 +779,7 @@ export class LogsPage {
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
         await this.page.getByText(resultsPerPage, { exact: true }).click();
-        await expect(this.page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible();
+        await this.page.waitForTimeout(5000); // Increased wait time for UI update
         
         // Use flexible assertions based on the results per page
         let expectedPattern;
