@@ -44,7 +44,7 @@ pub fn get_node_metrics() -> NodeMetrics {
     let mut cpu_usage = get_cpu_usage() / cpu_total as f32;
     if cpu_usage.is_infinite() || cpu_usage.is_nan() {
         log::warn!(
-            "CPU usage is infinite or NaN, setting to 0. {}, {cpu_total}",
+            "CPU usage is infinite or NaN, setting to 0. cpu_usage: {}, cpu_total: {cpu_total}",
             get_cpu_usage()
         );
         cpu_usage = 0.0;
