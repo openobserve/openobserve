@@ -21,6 +21,7 @@ import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
+import { extractTimestampAndGroupBy } from "@/utils/query/extractFields";
 
 const colors = [
   "#5960b2",
@@ -3026,6 +3027,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     (newVal, oldVal) => {
+      console.log(
+        "query",
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query,
+        "customQuery",
+      );
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
 
@@ -3067,6 +3075,90 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ? "X-Axis"
         : "Y-Axis";
   });
+
+  const resetFields = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields = {
+      stream: "",
+      stream_type: "logs",
+      x: [],
+      y: [],
+      z: [],
+      breakdown: [],
+      filter: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      },
+      latitude: null,
+      longitude: null,
+      weight: null,
+      name: null,
+      value_for_maps: null,
+      source: null,
+      target: null,
+      value: null,
+    };
+  };
+
+  // TODO: will need to select custom fields from query to x axis, y axis and breakdown
+  // logic will be take timestamp field as x axis if available, else first group by field will go to x axis
+  // 2nd group by field will go to breakdown
+  // all other fields will go to y axis
+  const setCustomQueryFields = () => {
+    resetFields();
+    const extractedFields = extractTimestampAndGroupBy(
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query,
+    );
+    console.log("extractedFields", extractedFields);
+    //  extractedFields = {
+    //     "timestamp": "x_axis_1",
+    //     "groupBy": [
+    //         "breakdown_1"
+    //     ],
+    //     "yAxisFields": [
+    //         "y_axis_1"
+    //     ]
+    // }
+    // based on extractedFields, we will set the custom query fields
+    // if timestamp is available and group by length is less than 2, then set timestamp as x axis and group by as breakdown and select line chart as default
+    // else select table chart as default
+
+    if (extractedFields.timestamp && extractedFields.groupBy.length < 2) {
+      // select line chart as default
+      dashboardPanelData.data.type = "line";
+
+      // add timestamp as x axis
+      addXAxisItem({ name: extractedFields.timestamp });
+      // here upto 1 group by will be available, add group by as breakdown
+      extractedFields.groupBy.forEach((field: any) => {
+        addBreakDownAxisItem({ name: field });
+      });
+      // add all y axis fields
+      extractedFields.yAxisFields.forEach((field: any) => {
+        addYAxisItem({ name: field });
+      });
+    } else {
+      // select table chart as default
+      dashboardPanelData.data.type = "table";
+      // add timestamp as x axis if available
+      if (extractedFields.timestamp) {
+        addXAxisItem({ name: extractedFields.timestamp });
+      }
+
+      // add all group by fields as x axis
+      extractedFields.groupBy.forEach((field: any) => {
+        addXAxisItem({ name: field });
+      });
+      // add all y axis fields
+      extractedFields.yAxisFields.forEach((field: any) => {
+        addYAxisItem({ name: field });
+      });
+    }
+  };
 
   return {
     dashboardPanelData,
@@ -3118,6 +3210,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentYLabel,
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
+    setCustomQueryFields,
   };
 };
 export default useDashboardPanelData;
