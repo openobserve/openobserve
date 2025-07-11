@@ -455,7 +455,7 @@ pub async fn run_datafusion(
     // TODO: if there is only one table and single node, we can skip the remote scan rewrite
     let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
     physical_plan.visit(&mut empty_exec_count_visitor)?;
-    let empty_exec_count = empty_exec_count_visitor.get_count();
+    let _empty_exec_count = empty_exec_count_visitor.get_count();
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
     // add remote scan exec to top if physical plan is not changed
