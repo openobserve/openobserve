@@ -1045,15 +1045,17 @@ const useLogs = () => {
 
           whereClause = parsedSQL.join(" ");
 
-          req.query.sql = req.query.sql.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
-          );
+          // req.query.sql = req.query.sql.replace(
+          //   "[WHERE_CLAUSE]",
+          //   " WHERE " + whereClause,
+          // );
+          req.query.sql = req.query.sql.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
 
-          req.aggs.histogram = req.aggs.histogram.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
-          );
+          // req.aggs.histogram = req.aggs.histogram.replace(
+          //   "[WHERE_CLAUSE]",
+          //   " WHERE " + whereClause,
+          // );
+          req.aggs.histogram = req.aggs.histogram.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
           req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
