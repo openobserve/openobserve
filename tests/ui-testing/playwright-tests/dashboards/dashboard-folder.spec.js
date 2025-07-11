@@ -46,7 +46,7 @@ test.describe("dashboard folder testcases", () => {
     const pm = new PageManager(page);
 
     // Navigate to dashboards
-    await pm.dashboardPage.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Define folderName first
