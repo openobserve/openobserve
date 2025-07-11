@@ -62,8 +62,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
                     infra::schema::get_settings(&org_id, &stream_name, stream_type)
                         .await
                         .unwrap_or_default();
-                let defined_schema_fields =
-                    stream_setting.defined_schema_fields;
+                let defined_schema_fields = stream_setting.defined_schema_fields;
                 if defined_schema_fields.is_empty() {
                     continue;
                 }
