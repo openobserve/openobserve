@@ -15,6 +15,9 @@ import DashboardShareExportPage from "./dashboard-share-export";
 import DashboardTimeRefresh from "./dashboard-refresh";
 import DateTimeHelper from "./dashboard-time";
 import LogsVisualise from "./visualise";
+import { DashboardPage } from "../../pages/dashboardPage.js";
+import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
+
 
 /**
  * PageManager provides a single access point for all dashboard page objects.
@@ -48,6 +51,9 @@ class PageManager {
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
     this.dateTimeHelper = new DateTimeHelper(page);
     this.logsVisualise = new LogsVisualise(page);
+    this.dashboardPage = new DashboardPage(page);
+    this.alertsPage = new AlertsPage(page);
+    
   }
 }
 

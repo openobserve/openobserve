@@ -5,18 +5,8 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
-import DashboardDrilldownPage from "../../pages/dashboardPages/dashboard-drilldown";
-import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
-import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
-import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import DashboardShareExportPage from "../../pages/dashboardPages/dashboard-share-export.js";
-import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
-import DashboardFilter from "../../pages/dashboardPages/dashboard-filter.js";
+import PageManager from "../../pages/dashboardPages/page-manager.js";
+
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
