@@ -94,6 +94,7 @@ impl From<AlertError> for HttpResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if alert folder is not the default folder)"),
       ),
     request_body(content = CreateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
@@ -142,6 +143,7 @@ pub async fn create_alert(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
@@ -179,6 +181,7 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     request_body(content = UpdateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
@@ -219,6 +222,7 @@ pub async fn update_alert(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
@@ -351,6 +355,7 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
@@ -381,6 +386,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "From Folder ID (Required if RBAC enabled)"),
     ),
     request_body(content = MoveAlertsRequestBody, description = "Identifies alerts and the destination folder", content_type = "application/json"),    
     responses(
