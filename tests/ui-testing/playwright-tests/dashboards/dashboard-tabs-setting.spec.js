@@ -1,13 +1,8 @@
 import { test, expect } from "../baseFixtures";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import DashboardSetting from "../../pages/dashboardPages/dashboard-settings";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "./utils/dashCreation.js";
+import PageManager from "../../pages/dashboardPages/page-manager.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -24,18 +19,18 @@ test.describe("dashboard tabs setting", () => {
   test("should try to open tabs, click add tabs, and without saving close it", async ({
     page,
   }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const newTabName = dashboardSetting.generateUniqueTabnewName("updated-tab");
+    const newTabName =
+      pm.dashboardSetting.generateUniqueTabnewName("updated-tab");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -43,33 +38,33 @@ test.describe("dashboard tabs setting", () => {
       });
 
     // Open dashboard settings and add a tab
-    await dashboardSetting.openSetting();
-    await dashboardSetting.addTabSetting(newTabName);
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting(newTabName);
 
     // Cancel the tab without saving
-    await dashboardSetting.cancelTabwithoutSave();
-    await dashboardSetting.closeSettingDashboard();
+    await pm.dashboardSetting.cancelTabwithoutSave();
+    await pm.dashboardSetting.closeSettingDashboard();
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
   test("should go to tabs, click on add tab, add its name and save it", async ({
     page,
   }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const newTabName = dashboardSetting.generateUniqueTabnewName("updated-tab");
+    const newTabName =
+      pm.dashboardSetting.generateUniqueTabnewName("updated-tab");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -77,10 +72,10 @@ test.describe("dashboard tabs setting", () => {
       });
 
     // Open dashboard settings and add a tab
-    await dashboardSetting.openSetting();
-    await dashboardSetting.addTabSetting(newTabName);
-    await dashboardSetting.saveTabSetting();
-    await dashboardSetting.closeSettingDashboard();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting(newTabName);
+    await pm.dashboardSetting.saveTabSetting();
+    await pm.dashboardSetting.closeSettingDashboard();
     // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
     //   timeout: 3000,
     // });
@@ -89,25 +84,24 @@ test.describe("dashboard tabs setting", () => {
     });
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
   test("should edit tab name and save it", async ({ page }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const newTabName = dashboardSetting.generateUniqueTabnewName("New-tab");
+    const newTabName = pm.dashboardSetting.generateUniqueTabnewName("New-tab");
     const updatedTabName =
-      dashboardSetting.generateUniqueTabnewName("Updated-tab");
+      pm.dashboardSetting.generateUniqueTabnewName("Updated-tab");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -115,9 +109,9 @@ test.describe("dashboard tabs setting", () => {
       });
 
     // Open dashboard settings and add a tab
-    await dashboardSetting.openSetting();
-    await dashboardSetting.addTabSetting(newTabName);
-    await dashboardSetting.saveTabSetting();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting(newTabName);
+    await pm.dashboardSetting.saveTabSetting();
     // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
     //   timeout: 3000,
     // });
@@ -126,36 +120,38 @@ test.describe("dashboard tabs setting", () => {
     });
 
     // Edit the tab name and save it
-    await dashboardSetting.updateDashboardTabName(newTabName, updatedTabName);
+    await pm.dashboardSetting.updateDashboardTabName(
+      newTabName,
+      updatedTabName
+    );
 
-    await dashboardSetting.saveEditedtab();
+    await pm.dashboardSetting.saveEditedtab();
     // await expect(page.getByText("Tab added successfully")).toBeVisible({
     //   timeout: 2000,
     // });
     await expect(page.getByText("Tab updated successfully")).toBeVisible({
       timeout: 2000,
     });
-    await dashboardSetting.closeSettingDashboard();
+    await pm.dashboardSetting.closeSettingDashboard();
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
   test("should edit tab name and cancel it", async ({ page }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const newTabName = dashboardSetting.generateUniqueTabnewName("New-tab");
+    const newTabName = pm.dashboardSetting.generateUniqueTabnewName("New-tab");
     const updatedTabName =
-      dashboardSetting.generateUniqueTabnewName("Updated-tab");
+      pm.dashboardSetting.generateUniqueTabnewName("Updated-tab");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -163,39 +159,41 @@ test.describe("dashboard tabs setting", () => {
       });
 
     // Open dashboard settings and add a tab
-    await dashboardSetting.openSetting();
-    await dashboardSetting.addTabSetting(newTabName);
-    await dashboardSetting.saveTabSetting();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting(newTabName);
+    await pm.dashboardSetting.saveTabSetting();
 
     // Edit the tab name and cancel it
-    await dashboardSetting.updateDashboardTabName(newTabName, updatedTabName);
-    await dashboardSetting.cancelEditedtab();
+    await pm.dashboardSetting.updateDashboardTabName(
+      newTabName,
+      updatedTabName
+    );
+    await pm.dashboardSetting.cancelEditedtab();
     // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
     //   timeout: 3000,
     // });
     await expect(page.getByText("Tab added successfully")).toBeVisible({
       timeout: 2000,
     });
-    await dashboardSetting.closeSettingDashboard();
+    await pm.dashboardSetting.closeSettingDashboard();
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
   test("should delete tab, click delete and confirm it", async ({ page }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     const randomDashboardName = generateDashboardName();
-    const dashboardList = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardSetting = new DashboardSetting(page);
-    const newTabName = dashboardSetting.generateUniqueTabnewName("New-tab");
+    const newTabName = pm.dashboardSetting.generateUniqueTabnewName("New-tab");
 
     // Navigate to dashboards
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .waitFor({
@@ -203,9 +201,9 @@ test.describe("dashboard tabs setting", () => {
       });
 
     // Open dashboard settings, add a tab, and delete it
-    await dashboardSetting.openSetting();
-    await dashboardSetting.addTabSetting(newTabName);
-    await dashboardSetting.saveTabSetting();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting(newTabName);
+    await pm.dashboardSetting.saveTabSetting();
 
     // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
     //   timeout: 3000,
@@ -215,14 +213,14 @@ test.describe("dashboard tabs setting", () => {
     });
 
     // Delete the tab
-    await dashboardSetting.deleteTab(newTabName);
+    await pm.dashboardSetting.deleteTab(newTabName);
     await expect(page.getByText("Tab deleted successfully")).toBeVisible({
       timeout: 2000,
     });
-    await dashboardSetting.closeSettingDashboard();
+    await pm.dashboardSetting.closeSettingDashboard();
 
     //delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });
