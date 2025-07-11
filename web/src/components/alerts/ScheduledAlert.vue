@@ -1118,10 +1118,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw-h-full tw-w-full tw-px-6 tw-py-2 "
       >
-      <div class="tw-h-16 tw-flex tw-items-center tw-justify-between" style="font-size: 20px ;">
+      <div class="tw-h-8 tw-flex tw-items-center tw-justify-between" style="font-size: 20px ;">
         <div class="tw-flex tw-items-center tw-gap-2">
-          <q-icon name="close" size="20px" class="tw-cursor-pointer" @click="viewSqlEditor = false" />
-          <span>Add Conditions</span>
+          <div
+          data-test="add-alert-back-btn"
+          class="flex justify-center items-center cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="viewSqlEditor = false"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+          <span class="tw-text-[18px] tw-font-[400]">Add Conditions</span>
         </div>
         <div class="tw-flex tw-items-center">
 
@@ -1157,15 +1170,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       </div>
+      <q-separator class="tw-my-2"/>
       <div class="tw-h-[calc(100vh-100px)]">
-        <div class="row tw-gap-4 tw-h-[100%] ">
+        <div class="row tw-gap-2 tw-h-[100%] ">
                   <!-- first section -->
         <div class=" tw-w-[60%]  tw-h-[100%]    ">
           <div  class="tw-flex tw-flex-col tw-h-full scheduled-alerts">
             <!-- first sub section -->
-            <div  class="tw-h-[100%] container-for-editors ">
+            <div  class="tw-h-[100%]">
               <div class="tw-w-full tw-h-full " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-                <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm q-px-md editor-title">
+                <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm">
   
                     <span class="editor-text-title">{{  tab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                     <div class="tw-flex tw-gap-2 tw-items-center tw-h-6 ">
@@ -1188,7 +1202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               (val: string, update: any) => filterFields(val, update)
                             "
                           @update:modelValue="onColumnSelect"
-                          input-style="width: 200px;  "
+                          input-style="width: 200px; "
                           class="mini-select"
                     >
                         <template #no-option>
@@ -1203,18 +1217,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div>
                         <q-btn
                           data-test="alert-variables-add-btn"
-                          label="Run Query"
                           size="sm"
+                          no-caps
                           class="text-bold add-variable no-border q-py-sm"
                           color="primary"
-                          style="width: 120px;"
                           @click="tab === 'sql' ? runSqlQuery() : runPromqlQuery()"
                           :disable="tab == 'sql' ? query == '' : promqlQuery == ''"
-                        />
+                        >
+                          <q-icon name="search" size="20px" />
+                          <span class="tw-text-[11px] tw-font-[400]">Run Query</span>
+                      </q-btn>
                       </div>
                     </div>
                   </div>
-  
+                  <FullViewContainer
+                    name="Input"
+                    label="Input"
+                    :isExpanded="true"
+                    :showExpandIcon="false"
+                    :label-class="'tw-ml-2'"
+                    class="tw-mt-1"
+                  >
+                  <template #right>
+                    <div v-if="alertData.stream_name" class="tw-text-[12px] tw-font-semibold tw-mr-2">
+                      on <span class="tw-text-[14px] tw-font-bold">{{ alertData.stream_name }}</span> stream
+                    </div>
+                    <div v-else class="tw-text-[12px] tw-font-semibold tw-mr-2">
+                      No Stream Selected                    </div>
+                  </template>
+                </FullViewContainer>
                     <query-editor
                       v-if="tab === 'sql'"
                       data-test="scheduled-alert-sql-editor"
@@ -1226,7 +1257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         query === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
-                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-100px)]' : 'tw-h-[calc(100%-70px)]'
+                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-120px)]' : 'tw-h-[calc(100%-82px)]'
                       ]"
                       @update:query="updateQueryValue"
                       @focus="queryEditorPlaceholderFlag = false"
@@ -1239,7 +1270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Error: {{ sqlQueryErrorMsg }}</span
                     >
                   </div>
-                    <!-- come here as well -->
+                  <!-- this is promql editor -->
                     <query-editor
                         v-if="tab === 'promql'"
                         v data-test="scheduled-alert-promql-editor"
@@ -1252,7 +1283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         promqlQuery === '' ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
-                        'tw-h-[calc(100%-50px)]'
+                        'tw-h-[calc(100%-70px)]'
                       ]"
                       @blur="onBlurQueryEditor"
                       style="min-height: 10rem;"
@@ -1260,37 +1291,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   
             </div>
-            <div v-if="tab !== 'promql'"  class="tw-h-[40%] container-for-editors">
+            <div v-if="tab !== 'promql'"  class="tw-h-[40%]">
               <div class="tw-w-full tw-h-full scheduled-alerts " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-                <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm q-px-md editor-title">
+                <div  class="tw-flex tw-items-center tw-justify-between tw-pb-">
                       
                       <span class="editor-text-title">VRL Editor</span>
                       <div class="tw-flex tw-gap-2 tw-items-center">
                         <div>
                           <q-select
-                      v-model="selectedFunction"
-                      label="Saved functions"
-                      :options="functionOptions"
-                      data-test="dashboard-use-saved-vrl-function"
-                      input-debounce="0"
-                      behavior="menu"
-                      use-input
-                      filled
-                      borderless
-                      dense
-                      hide-selected
-                      menu-anchor="top left"
-                      fill-input
-                      option-label="name"
-                      option-value="name"
-                      @filter="filterFunctionOptions"
-                      @update:modelValue="onFunctionSelect"
-                      class="mini-select"
-                      clearable
-                      @clear="onFunctionClear"
-                      input-style="height: 8px; min-height: 8px; margin: 0px; width: 200px;  "
-                                            >
-                      <template #no-option>
+                          v-model="selectedFunction"
+                          label="Saved functions"
+                          :options="functionOptions"
+                          data-test="dashboard-use-saved-vrl-function"
+                          input-debounce="0"
+                          behavior="menu"
+                          use-input
+                          filled
+                          borderless
+                          dense
+                          hide-selected
+                          menu-anchor="top left"
+                          fill-input
+                          option-label="name"
+                          option-value="name"
+                          @filter="filterFunctionOptions"
+                          @update:modelValue="onFunctionSelect"
+                          class="mini-select"
+                          clearable
+                          @clear="onFunctionClear"
+                          input-style="height: 8px; min-height: 8px; margin: 0px; width: 200px;  "
+                                                >
+                          <template #no-option>
                         <q-item>
                           <q-item-section> {{ t("search.noResult") }}</q-item-section>
                         </q-item>
@@ -1300,22 +1331,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div>
                           <q-btn
                             data-test="alert-variables-add-btn"
-                            label="Test Function"
                             size="sm"
                             class="text-bold add-variable no-border q-py-sm"
                             color="primary"
+                            no-caps
                             style="width: 120px;"
                             @click="runTestFunction"
                             :disable="vrlFunctionContent == ''"
-                          />
+                          >
+                            <q-icon name="search" size="20px" />
+                            <span class="tw-text-[11px] tw-font-[400]">Apply VRL</span>
+                        </q-btn>
                         </div>
                       </div>
                     </div>
+                    <FullViewContainer
+                    name="Input"
+                    label="Input"
+                    :isExpanded="true"
+                    :showExpandIcon="false"
+                    :label-class="'tw-ml-2'"
+                    class="tw-mt-1"
+                  ></FullViewContainer>
                     <query-editor
                       data-test="scheduled-alert-vrl-function-editor"
                       ref="fnEditorRef"
                       editor-id="fnEditor-dialog"
-                      class="tw-w-full tw-h-[80%]  "
+                      class="tw-w-full tw-h-[60%]  "
                       :debounceTime="300"
                       v-model:query="vrlFunctionContent"
                       :class="[
@@ -1335,51 +1377,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <!-- second section -->
-        <div class="  tw-flex tw-flex-col tw-h-[100%] tw-w-[38%] tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-          <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit q-py-sm q-px-md editor-title">
-            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-gap-2">
-              <span class="editor-text-title"> {{ tab === 'sql' ? 'SQL' : 'PromQL' }} Output</span>
-              <q-btn :icon="expandSqlOutput ? 'expand_more' : 'expand_less'" size="16px"  dense flat border-less class="tw-cursor-pointer" @click="handleExpandSqlOutput"  ></q-btn>
+          <!-- new section section  -->
+          <div class=" tw-bg-[#F4F4F5] tw-w-[40%] tw-px-2 tw-py-2 tw-flex tw-flex-col tw-h-[100%] tw-flex-1"
+          :class="store.state.theme === 'dark' ? 'tw-bg-[#374151]' : 'tw-bg-[#F4F4F5]'"
+          >
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-[100%] tw-gap-2">
+              <FullViewContainer
+                name="Output"
+                label="Output"
+                :isExpanded="expandSqlOutput"
+                class="tw-flex tw-w-full tw-flex tw-justify-between tw-pl-2"
+                @update:isExpanded="expandSqlOutput = $event"
+                
+              >
+            </FullViewContainer>
             </div>
-                    <!-- this is the time of trigger -->
-                <div v-if="expandSqlOutput" class="tw-flex tw-gap-2 tw-flex-wrap tw-w-full]">
-
-                <!-- this is for multi time range to select -->
-                <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
-                    <div class="tw-text-sm tw-text-black tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
-                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff] tw-cursor-pointer' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
-                    >
-                  {{triggerData.period  }} minute(s) ago
-                </div>
-                  <div v-for="picker in dateTimePicker" :key="picker.uuid"> 
-                    <div class="tw-text-sm  tw-rounded-sm tw-px-2 tw-py-1 " 
-                    @click="handleMultiWindowOffsetClick(picker.uuid)" 
-                    :class="[
-                      checkIfMultiWindowOffsetIsSelected(picker.uuid) ? store.state.theme === 'dark' ? 'tw-bg-white tw-text-black tw-cursor-pointer' : 'tw-bg-[#e9eaff] tw-text-black tw-cursor-pointer' : '',
-                      'tw-border tw-border-gray-300'
-                    ]">
-                      {{getDisplayValue(picker.offSet)}}ago
-                      <span v-if="checkIfMultiWindowOffsetIsSelected(picker.uuid)" class="tw-text-xs tw-text-gray-500" @click.stop="handleRemoveMultiWindowOffset(picker.uuid)">
-                        <q-icon name="close" size="16px" />
-                      </span>
-                    </div>
-                  </div>
-                  </div>
-                </div>
- 
-          </div>
-          <div v-if="expandSqlOutput" class="sql-output-section tw-h-[calc(100%-50px)] " >
+          <div v-if="expandSqlOutput" class="sql-output-section tw-h-[calc(100%-50px)] tw-mb-2 " >
             <!-- no output before run query section -->
-            <div v-if="!tempRunQuery && outputEvents == '' "  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
+            <div v-if="!tempRunQuery && outputEvents == '' "  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-full tw-w-full  no-output-before-run-query">
               <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                 <q-icon
                   :name="outlinedLightbulb"
                   size="40px"
-                  :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-sky-500'"
+                  :class="store.state.theme === 'dark' ? 'tw-text-[#FB923C]' : 'tw-text-[#FB923C]'"
                 />
                 <div>
-                  <span>Please run the query to see the output</span>
+                  <span>Please click Run Query to see the output</span>
                 </div>
               </div>
             </div>
@@ -1416,49 +1439,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
             </div>
           </div>
-          <div v-if="tab !== 'promql'" class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit q-py-sm q-px-md editor-title">
-            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-gap-2">
-              <span class="editor-text-title">Combined Output (SQL and VRL)</span>
-              <q-btn :icon="expandCombinedOutput ? 'expand_more' : 'expand_less'" size="16px"  dense flat border-less class="tw-cursor-pointer" @click="handleExpandCombinedOutput"  ></q-btn>
-            </div>
-                    <!-- this is the time of trigger -->
-                <div v-if="expandCombinedOutput" class="tw-flex tw-gap-2 tw-flex-wrap tw-w-full]">
-
-                <!-- this is for multi time range to select -->
-                <div class="tw-flex tw-flex-wrap tw-gap-2 q-py-sm">
-                    <div class="tw-text-sm tw-rounded-sm tw-px-2 tw-py-1 tw-cursor-pointer"
-                    :class="store.state.theme === 'light' ? 'tw-border tw-border-gray-300 tw-bg-[#e9eaff] tw-cursor-pointer' : 'tw-bg-white tw-text-black tw-cursor-pointer'"
-                    >
-                  {{triggerData.period  }} minute(s) ago
-                </div>
-                  <div v-for="picker in dateTimePicker" :key="picker.uuid"> 
-                    <div class="tw-text-sm  tw-rounded-sm tw-px-2 tw-py-1 " 
-                    @click="handleMultiWindowOffsetClick(picker.uuid)" 
-                    :class="[
-                      checkIfMultiWindowOffsetIsSelected(picker.uuid) ? store.state.theme === 'dark' ? 'tw-bg-white tw-text-black tw-cursor-pointer' : 'tw-bg-[#e9eaff] tw-text-black tw-cursor-pointer' : '',
-                      'tw-border tw-border-gray-300'
-                    ]">
-                      {{getDisplayValue(picker.offSet)}}ago
-                      <span v-if="checkIfMultiWindowOffsetIsSelected(picker.uuid)" class="tw-text-xs tw-text-gray-500" @click.stop="handleRemoveMultiWindowOffset(picker.uuid)">
-                        <q-icon name="close" size="16px" />
-                      </span>
-                    </div>
-                  </div>
-                  </div>
-                </div>
+          <div v-if="tab !== 'promql'" class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit">
+            <FullViewContainer
+              name="Combined Output"
+              label="Combined Output"
+              :isExpanded="expandCombinedOutput"
+                class="tw-flex tw-w-full tw-pl-2"
+              @update:isExpanded="expandCombinedOutput = $event"
+            ></FullViewContainer>
  
           </div>
           <div v-if="expandCombinedOutput" class="sql-output-section tw-h-[calc(100%-50px)] " >
 
-            <div v-if="!tempTestFunction && !runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[200px] q-mx-lg q-my-lg  no-output-before-run-query">
+            <div v-if="!tempTestFunction && !runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-full tw-w-full  no-output-before-run-query">
               <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                 <q-icon
                   :name="outlinedLightbulb"
                   size="40px"
-                  :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-sky-500'"
+                  :class="store.state.theme === 'dark' ? 'tw-text-[#FB923C]' : 'tw-text-[#FB923C]'"
                 />
                 <div>
-                  <span>Please test the function to see the output</span>
+                  <span>Please click Apply VRL to see the combined output</span>
                 </div>
               </div>
             </div>
@@ -1500,12 +1501,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       </div>
-
     </q-card>
     <div  class="q-ml-sm " v-if="store.state.isAiChatEnabled " style="width: 24.5vw; max-width: 100%; min-width: 75px;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-              <O2AIChat :header-height="60" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 0px) !important;" />
-
-            </div>
+      <O2AIChat :header-height="60" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 0px) !important;" />
+    </div>
 
   </div>
 
@@ -1547,6 +1546,8 @@ import useQuery from "@/composables/useQuery";
 import { pick } from "lodash-es";
 import config from "@/aws-exports";
 import O2AIChat from "../O2AIChat.vue";
+
+import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -1664,7 +1665,7 @@ const viewVrlFunction = ref(false);
 
 const expandSqlOutput = ref(true);
 
-const expandCombinedOutput = ref(false);
+const expandCombinedOutput = ref(true);
 
 const filteredDestinations = ref(props.formattedDestinations)
 
@@ -2333,7 +2334,6 @@ const routeToCreateDestination = () => {
   const runSqlQuery = async () => {
     runPromqlError.value = "";
     tempRunQuery.value = true;
-    expandCombinedOutput.value = false;
     expandSqlOutput.value = true;
     await triggerQuery();
   };
@@ -2342,7 +2342,6 @@ const routeToCreateDestination = () => {
     runPromqlError.value = "";
     tempTestFunction.value = true;
     expandCombinedOutput.value = true;
-    expandSqlOutput.value = false;
     await triggerQuery(true);
   }
 
@@ -2387,7 +2386,6 @@ const routeToCreateDestination = () => {
   const runPromqlQuery = async () => {
     runPromqlError.value = "";
     tempRunQuery.value = true;
-    expandCombinedOutput.value = false;
     expandSqlOutput.value = true;
     await triggerPromqlQuery();
   }
@@ -2780,17 +2778,18 @@ defineExpose({
 
 .dark-mode .editor-text-title{
   font-size: 16px;
-  font-weight: 600;
+  font-weight: bold;
   color: #FFFFFF;
 }
 .light-mode .editor-text-title{
   font-size: 16px;
-  font-weight: 600;
-  color: #3d3d3d;
+  font-weight: bold;
+  color: #6b7280;
 }
 
 .dark-mode .mini-select .q-field__control {
   background-color: #181a1b !important;
+  border: 1px solid #7c7b7b !important;
 }
 .light-mode .mini-select .q-field__control {
   background-color: #ffffff !important;
@@ -2816,7 +2815,7 @@ defineExpose({
   font-size: 16px;
 }
 .light-mode .no-output-before-run-query{
-  background-color: #e1e1e1;
+  background-color: #fafafa;
   border: 1px solid #e9e9e9;
   min-height: 10rem;
   color: #a7abaa;
