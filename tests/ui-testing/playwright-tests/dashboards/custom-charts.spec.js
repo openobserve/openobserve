@@ -24,10 +24,7 @@ test.describe("Custom Charts Tests", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    pm.dashboaedPanelEdit = new pm.dashboaedPanelEdit(page);
-    pm.dashboardPage = new pm.dashboardPage(page);
-    pm.dashboardPanelActions = new DashboardactionPage(page);
-
+  
     await login(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
