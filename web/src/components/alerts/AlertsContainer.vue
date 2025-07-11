@@ -3,7 +3,7 @@
       class="tw-py-[2px]"
     >
       <div class="tw-flex tw-justify-between">
-        <div class="tw-flex tw-items-start tw-justify-between full-width q-pl-md ">
+        <div class="tw-flex tw-items-start tw-justify-between full-width ">
         
           <div
             class="tw-text-[20px] tw-flex tw-items-start" 

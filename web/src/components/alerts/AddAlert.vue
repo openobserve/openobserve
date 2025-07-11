@@ -59,9 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div
       ref="addAlertFormRef"
-      class="q-px-lg q-my-md"
+      class="q-px-lg"
       style="
-        max-height: calc(100vh - 195px);
+        max-height: calc(100vh - 165px);
         overflow: auto;
         scroll-behavior: smooth;
       "
@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
             <div
-              class="flex q-mt-lg justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
+              class="flex tw-mt-2 justify-start items-center q-col-gutter-md flex-wrap "
             >
-            <div class="  q-px-lg tw-w-full row alert-setup-container" style="width: calc(100vw - 600px);">
+            <div class=" tw-w-full row alert-setup-container" style="width: calc(100vw - 600px);">
               <AlertsContainer 
                 name="query"
                 v-model:is-expanded="expandState.alertSetup"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              <div v-show="expandState.alertSetup" class="tw-w-full ">
 
               <div
-                class="alert-name-input o2-input flex justify-between items-center q-px-lg tw-gap-10"
+                class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
                 style="padding-top: 12px;"
                 data-test="add-alert-name-input-container"
               >
@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   filled
                   dense
+                  hide-bottom-space
                   v-bind:readonly="beingUpdated"
                   v-bind:disable="beingUpdated"
                   :rules="[
@@ -111,13 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                   tabindex="0"
                 />
-                <div class="col">
+                <div class="col" style="height: 62px;">
                   <SelectFolderDropDown
                     :disableDropdown="beingUpdated"
                     :type="'alerts'"
+                    :style="'height: 30px'"
                     @folder-selected="updateActiveFolderId"
                     :activeFolderId="activeFolderId"
-                    :style="'height: 30px'"
                     :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                 />
                 </div>
@@ -126,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              </div>
 
              <div
-                class="flex q-px-lg tw-w-full items-center justify-between row tw-gap-10"
+                class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
                 style="padding-top: 0px"
                 v-show="expandState.alertSetup"
                 data-test="add-alert-stream-type-select-container"
@@ -188,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div  v-if="expandState.alertSetup" class="q-gutter-sm q-px-lg q-py-sm">
+              <div   v-if="expandState.alertSetup" class="tw-flex tw-items-center tw-gap-5">
               <q-radio
                 data-test="add-alert-scheduled-alert-radio"
                 v-bind:readonly="beingUpdated"
@@ -196,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.is_real_time"
                 :checked="formData.is_real_time"
                 val="false"
+                dense
                 :label="t('alerts.scheduled')"
                 class="q-ml-none"
               />
@@ -206,13 +208,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.is_real_time"
                 :checked="!formData.is_real_time"
                 val="true"
+                dense
                 :label="t('alerts.realTime')"
                 class="q-ml-none"
               />
             </div>
             </div>
-           
-
             </div>
             
 
@@ -285,9 +286,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- additional setup starts here -->
             <div
-              class="flex q-mt-md justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
+              class="flex tw-mt-2 justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
             >
-            <div class="  q-px-lg tw-w-full row alert-setup-container" >
+            <div class=" tw-w-full row alert-setup-container" >
 
               <AlertsContainer 
                 name="advanced"
@@ -297,8 +298,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 subLabel="Go deeper with custom options"
                 class="tw-mt-1 tw-w-full col-12"
             />
-            <div class="tw-w-full row q-px-lg" >
-              <div v-if="expandState.advancedSetup" class="q-mt-md tw-w-full">
+            <div class="tw-w-full row" >
+              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full">
               <variables-input
                 class="o2-input"
                 :variables="formData.context_attributes"
@@ -398,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center q-px-lg tw-w-full " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: sticky;  bottom: 0 !important; top: 0; height: 70px !important;">
+    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; right: 0; height: 70px !important; z-index: 100;">
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
@@ -2078,7 +2079,7 @@ export default defineComponent({
 .dark-mode{
   .alert-setup-container{
   background-color: #212121;
-  padding: 12px 12px 24px 12px;
+  padding: 16px 16px 16px 16px;
   margin-left: 24px;
   border-radius: 4px;
   border: 1px solid #343434;
@@ -2098,7 +2099,7 @@ export default defineComponent({
 .light-mode{
   .alert-setup-container{
     background-color: #ffffff;
-    padding: 12px 12px 24px 12px;
+    padding: 16px 16px 16px 16px;
     margin-left: 24px;
     border-radius: 4px;
     border: 1px solid #e6e6e6;
@@ -2152,7 +2153,7 @@ export default defineComponent({
   background-color: #ffffff !important;
 }
 .input-border-dark .q-field__control{
-  border: 1px solid red !important;
+  border: 1px solid #181a1b !important;
 }
 .input-border-light .q-field__control{
   border: 1px solid #d4d4d4 !important;

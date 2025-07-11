@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- first section -->
 
-    <div class= " q-mt-sm tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+    <div class= " tw-mt-2 tw-w-full row alert-setup-container " style=" margin-left: 8px;">
     <AlertsContainer 
       name="Alert Settings"
       v-model:is-expanded="expandState.thresholds"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-mt-1 tw-w-full col-12"
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
-    <div v-if="expandState.thresholds" class="q-px-lg">
+    <div v-if="expandState.thresholds">
     <div class="col-12 flex justify-start items-center q-mt-xs">
               <div
                 class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
     </div>
-    <div class="o2-input flex justify-start items-start q-mt-sm">
+    <div class="o2-input flex justify-start items-start">
               <div
                 data-test="add-alert-destination-title"
                 class="text-bold q-pb-sm"
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
    <!-- second section -->
 
-   <div class=" q-mt-md tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+   <div class=" tw-mt-2 tw-w-full row alert-setup-container " style=" margin-left: 8px;">
     <AlertsContainer 
       name="query"
       v-model:is-expanded="expandState.realTimeMode"

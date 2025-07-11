@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-mt-1 tw-w-full col-12"
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
-     <div v-if="expandState.thresholds" class="q-px-lg">
+     <div v-if="expandState.thresholds">
       <div class="q-mt-sm">
       <div
         v-if="
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tab === 'promql' &&
           promqlCondition
         "
-        class="flex justify-start items-center text-bold q-mb-lg o2-input"
+        class="flex justify-start items-center text-bold tw-pb-1 o2-input"
       >
         <div style="width: 190px">Trigger if the value is</div>
         <div class="flex justify-start items-center">
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="tab === 'custom'"
-        class="flex justify-start items-center text-bold q-mb-lg"
+        class="flex justify-start items-center text-bold tw-pb-1"
       >
         <div data-test="scheduled-alert-aggregation-title" style="width: 172px">
           Aggregation
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="_isAggregationEnabled && aggregationData"
-        class="flex items-center no-wrap q-mr-sm q-mb-sm"
+        class="flex items-center no-wrap q-mr-sm tw-pb-1"
       >
         <div
           data-test="scheduled-alert-group-by-title"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="filteredFields"
                   color="input-border"
                   :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                  class="no-case q-py-none q-mb-sm"
+                  class="no-case q-py-none tw-pb-1"
                   filled
                   borderless
                   dense
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="!disableThreshold"
-        class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
+        class="flex justify-start items-center q-mb-xs no-wrap tw-pb-1"
       >
         <div
           data-test="scheduled-alert-threshold-title"
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center q-mt-sm">
                 <div
                 data-test="scheduled-alert-threshold-operator-select"
-                class="monaco-editor-test q-mr-xs o2-input q-mt-sm"
+                class="monaco-editor-test q-mr-xs o2-input tw-pb-1"
               >
                 <q-select
                   v-model="aggregationData.having.operator"
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="updateAggregation"
                 />
               </div>
-              <div class="flex items-center q-mt-sm">
+              <div class="flex items-center tw-pb-1">
                 <div
                   data-test="scheduled-alert-threshold-value-input"
                   style="width: 250px; margin-left: 0 !important"
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 !aggregationData.having.operator ||
                 !aggregationData.having.value.toString().trim().length
               "
-              class="text-red-8 q-pt-xs absolute"
+              class="text-red-8"
               style="font-size: 11px; line-height: 12px"
             >
               Field is required!
@@ -408,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div style="min-height: 58px">
+        <div>
           <div
             class="flex items-center q-mr-sm"
             style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           data-test="scheduled-alert-cron-toggle-title"
           class="text-bold flex items-center"
-          style="width: 190px"
+          style="width: 172px"
         >
           {{ t("alerts.crontitle") + " *" }}
           <q-icon
@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div style="min-height: 58px">
+        <div class="tw-pb-2">
           <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-alert-cron-input"
@@ -494,21 +494,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-toggle
                 data-test="scheduled-alert-cron-toggle-btn"
-                class="q-mt-sm"
                 v-model="triggerData.frequency_type"
                 :true-value="'cron'"
+                class="q-mt-sm"
                 :false-value="'minutes'"
                 @update:model-value="updateTrigger"
+                size="sm"
               />
             </div>
           </div>
         </div>
       </div>
-      <div class="flex items-center q-mr-sm">
+      <div class="flex items-center q-mr-sm " style="min-height: 78px;">
         <div
           data-test="scheduled-alert-frequency-title"
           class="text-bold flex items-center"
-          style="width: 190px"
+          style="width: 190px;"
         >
           {{ t("alerts.frequency") + " *" }}
           <q-icon
@@ -571,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </template>
         </div>
-        <div style="min-height: 78px">
+        <div>
           <div class="flex items-center" style="width: fit-content">
             <div
               data-test="scheduled-alert-frequency-input"
@@ -580,12 +581,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'width: 87px; margin-left: 0 !important'
                   : 'width: fit-content !important'
               "
-              class=""
             >
               <q-input
                 data-test="scheduled-alert-frequency-input-field"
                 v-if="triggerData.frequency_type == 'minutes'"
-                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                 v-model="triggerData.frequency"
                 type="number"
                 dense
@@ -595,9 +595,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state?.zoConfig?.min_auto_refresh_interval / 60,
                   ) || 1
                 "
-                style="background: none"
+                style="background: none; width: 100%;"
                 debounce="300"
+                class="tw-flex"
                 @update:model-value="updateTrigger"
+                :style="store.state.theme === 'dark' ? '' : 'border: 1px solid rgba(0, 0, 0, 0.05)'"
               />
               <div v-else class="tw-flex tw-items-center o2-input">
                 <q-input
@@ -678,9 +680,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
     </div>
-    <div class="col-12 flex justify-start items-center q-mt-xs">
+    <div class="col-12 flex justify-start items-center tw-pb-1">
               <div
-                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
+                class="q-py-sm showLabelOnTop text-bold text-h7  flex items-center"
                 data-test="add-alert-delay-title"
                 style="width: 190px"
               >
@@ -711,7 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </q-icon>
               </div>
-              <div style="min-height: 58px">
+              <div>
                 <div class="col-8 row justify-left align-center q-gutter-sm">
                   <div
                     class="flex items-center"
@@ -763,10 +765,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
     </div>
-    <div class="o2-input flex justify-start items-start q-mt-sm q-pb-none">
+    <div class="o2-input flex justify-start q-mt-xs items-start">
               <div
                 data-test="add-alert-destination-title"
-                class="text-bold q-pb-sm"
+                class="text-bold"
                 style="width: 190px"
               >
                 {{ t("alerts.destination") + " *" }}
@@ -791,6 +793,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) =>{
                     return val.length > 0 || 'Field is required!'
                   }]"
+                  hide-bottom-space
                   :required="true"
                   style="width: 200px"
                   @filter="filterDestinations"
@@ -859,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    </div>
 
    <!-- second section multi window selection -->
-   <div class=" q-mt-md tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+   <div class=" tw-mt-2 tw-w-full row alert-setup-container " style=" margin-left: 8px;">
     <AlertsContainer 
       name="Multi Window"
       v-model:is-expanded="expandState.multiWindowSelection"
@@ -875,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'"
   >
 
-    <div class="  q-px-lg q-mt-sm tw-w-full">
+    <div class=" q-mt-sm tw-w-full">
 
       <!-- current window -->
       <div class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-md">
@@ -913,7 +916,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class=" q-px-lg q-mt-sm tw-w-full ">
+      <div class=" q-mt-sm tw-w-full ">
         <!-- current multi time range comparision window -->
           <div v-if="dateTimePicker.length > 0"  class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-sm">
             <span>Comparing with</span>
@@ -921,7 +924,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div  v-for="(picker, index) in dateTimePicker" 
             :key="index" 
-            class="tw-flex  tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start reference-window-container q-mb-md  q-px-md q-py-sm  ">
+            class="tw-flex  tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start reference-window-container tw-mt-2  q-px-md q-py-sm  ">
             <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
               Reference Window {{ index + 1 }}
             </div>
@@ -1000,7 +1003,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    <!-- third section -->
 
 
-   <div class=" q-mt-md  tw-w-full row alert-setup-container " style=" margin-left: 8px;">
+   <div class=" tw-mt-2  tw-w-full row alert-setup-container " style=" margin-left: 8px;">
     <AlertsContainer 
       name="query"
       v-model:is-expanded="expandState.queryMode"
@@ -1011,7 +1014,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
     <!-- query mode section -->
-    <div v-if="expandState.queryMode" class="q-px-lg tw-w-full" style="">
+    <div v-if="expandState.queryMode" class="tw-w-full" style="">
       <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-my-lg"
       :style="{
         width: alertData.stream_type === 'metrics' ? '400px' : '200px'
@@ -1071,7 +1074,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw-flex tw-flex-col">
               <span style="font-size: 16px;">Editor</span>
-              <span style="font-size: 14px;">SQL and VRL Functions</span>
+              <span style="font-size: 14px;">Create SQL and VRL triggers with specific conditions.</span>
             </div>
 
           </div>
@@ -1080,7 +1083,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-variables-add-btn"
               label="View Editor"
               size="sm"
-              class="text-bold add-variable no-border q-py-sm xl:tw-w-[130px] tw-w-[100px]"
+              class="text-bold add-variable no-border q-py-sm xl:tw-w-[130px] tw-w-[85px]"
               color="primary"
               style="
                 border-radius: 4px;
