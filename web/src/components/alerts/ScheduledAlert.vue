@@ -1729,8 +1729,6 @@ const addConditionGroup = (groupId: string) => {
 
 const updateDateTimePicker = (data: any) => {
   emits("update:multi_time_range", dateTimePicker.value);
-
-
 };
 
 const removeTimeShift = (index: any) => {
@@ -1992,7 +1990,6 @@ const filterColumns = (options: string[], val: string, update: Function) => {
       filteredOptions = [...options];
     });
   }
-
 
   update(() => {
     const value = val.toLowerCase();

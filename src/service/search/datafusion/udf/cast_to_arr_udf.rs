@@ -74,6 +74,8 @@ pub fn cast_to_arr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Col
                 });
                 list_builder.append(true);
             }
+        } else {
+            list_builder.append_null();
         }
     });
 

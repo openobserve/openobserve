@@ -1,5 +1,5 @@
 import { expect } from "playwright/test";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../../cypress/fixtures/log.json";
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {

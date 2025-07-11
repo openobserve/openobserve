@@ -1,8 +1,8 @@
 import { test as base, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
-import { login } from "../utils/dashLogin.js";
-import { ingestion } from "../utils/dashIngestion.js";
-import { waitForDashboardPage } from "../utils/dashCreation.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
+import { waitForDashboardPage } from "./utils/dashCreation.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
@@ -39,7 +39,7 @@ test.describe("dashboard folder testcases", () => {
     await orgNavigation;
   });
 
-  test.skip("Should create and delete a unique folder, and verify it's deleted", async ({
+  test("Should create and delete a unique folder, and verify it's deleted" ,async ({
     page,
   }) => {
     const dashboardPage = new DashboardListPage(page);

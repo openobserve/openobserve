@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { LoginPage } from '../loginPage.js';
-import { LogsPage } from '../logsPage.js';
+import { LogsPage } from '../logsPages/logsPage.js';
 import { IngestionPage } from '../ingestionPage.js';
 import { ManagementPage } from '../managementPage.js';
 import { StreamPage } from '../streamPage.js';
@@ -193,5 +193,10 @@ export class StreamsPage {
         await expect(errorHeading).not.toBeVisible();
         const errorDetailsButton = this.page.locator('[data-test="logs-page-histogram-error-details-btn"]');
         await expect(errorDetailsButton).not.toBeVisible();
+    }
+
+    // Validation method for 'No data found for histogram.'
+    async expectNoDataFoundForHistogram() {
+        await expect(this.page.getByText('warning No data found for histogram.')).toBeVisible();
     }
 } 

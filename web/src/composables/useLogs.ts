@@ -1045,15 +1045,18 @@ const useLogs = () => {
 
           whereClause = parsedSQL.join(" ");
 
-          req.query.sql = req.query.sql.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
-          );
+          // req.query.sql = req.query.sql.replace(
+          //   "[WHERE_CLAUSE]",
+          //   " WHERE " + whereClause,
+          // );
+          req.query.sql = req.query.sql.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
 
-          req.aggs.histogram = req.aggs.histogram.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
-          );
+
+          // req.aggs.histogram = req.aggs.histogram.replace(
+          //   "[WHERE_CLAUSE]",
+          //   " WHERE " + whereClause,
+          // );
+          req.aggs.histogram = req.aggs.histogram.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
           req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
@@ -1704,16 +1707,12 @@ const useLogs = () => {
       }
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
-      searchObj.data.searchRequestTraceIds = [];
-      searchObj.data.searchWebSocketTraceIds = [];
 
       // get websocket enable config from store
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
       searchObj.meta.jobId = "";
-      const shouldUseWebSocket = isWebSocketEnabled(store.state);
-      const shouldUseStreaming = isStreamingEnabled(store.state);
 
       setCommunicationMethod();
 
@@ -4518,6 +4517,8 @@ const useLogs = () => {
     try {
       searchObj.loadingStream = true;
 
+      await cancelQuery();
+
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
 
@@ -4536,6 +4537,7 @@ const useLogs = () => {
 
       const streamDataResults = await Promise.all(streamDataPromises);
 
+      // TODO : We can optimize filter + flatMap using a single reducer function
       // Collect all schema fields
       const allStreamFields = streamDataResults
         .filter((data) => data?.schema)
@@ -4545,8 +4547,7 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields = allStreamFields;
       //check if allStreamFields is empty or not 
       //if empty then we are displaying no events found... message on the UI instead of throwing in an error format
-      if (allStreamFields.length === 0) {
-
+      if (!allStreamFields.length) {
         // searchObj.data.errorMsg = t("search.noFieldFound");
         return;
       }
@@ -4676,55 +4677,70 @@ const useLogs = () => {
     }
   };
 
-  const cancelQuery = () => {
-    if (searchObj.communicationMethod === "ws") {
-      sendCancelSearchMessage([
-        ...searchObj.data.searchWebSocketTraceIds,
-      ]);
-      return;
-    }
-
-    const tracesIds = [...searchObj.data.searchRequestTraceIds];
-
-    if (!searchObj.data.searchRequestTraceIds.length) {
-      searchObj.data.isOperationCancelled = false;
-      return;
-    }
-
-    searchObj.data.isOperationCancelled = true;
-
-    searchService
-      .delete_running_queries(
-        store.state.selectedOrganization.identifier,
-        searchObj.data.searchRequestTraceIds,
-      )
-      .then((res) => {
-        const isCancelled = res.data.some((item: any) => item.is_success);
-        if (isCancelled) {
-          searchObj.data.isOperationCancelled = false;
-          $q.notify({
-            message: "Running query cancelled successfully",
-            color: "positive",
-            position: "bottom",
-            timeout: 4000,
-          });
+  const cancelQuery = async () : Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      try {
+        if (searchObj.communicationMethod === "ws") {
+          sendCancelSearchMessage([
+            ...searchObj.data.searchWebSocketTraceIds,
+          ]);
+          resolve(true);
+          return;
         }
-      })
-      .catch((error: any) => {
+
+        const tracesIds = [...searchObj.data.searchRequestTraceIds];
+
+        if (!searchObj.data.searchRequestTraceIds.length) {
+          searchObj.data.isOperationCancelled = false;
+          resolve(true);
+          return;
+        }
+
+        searchObj.data.isOperationCancelled = true;
+
+        searchService
+          .delete_running_queries(
+            store.state.selectedOrganization.identifier,
+            searchObj.data.searchRequestTraceIds,
+          )
+          .then((res) => {
+            const isCancelled = res.data.some((item: any) => item.is_success);
+            if (isCancelled) {
+              searchObj.data.isOperationCancelled = false;
+              $q.notify({
+                message: "Running query cancelled successfully",
+                color: "positive",
+                position: "bottom",
+                timeout: 4000,
+              });
+            }
+          })
+          .catch((error: any) => {
+            $q.notify({
+              message:
+                error.response?.data?.message || "Failed to cancel running query",
+              color: "negative",
+              position: "bottom",
+              timeout: 1500,
+            });
+          })
+          .finally(() => {
+            searchObj.data.searchRequestTraceIds =
+              searchObj.data.searchRequestTraceIds.filter(
+                (id: string) => !tracesIds.includes(id),
+              );
+            resolve(true);
+          });
+      } catch (error) {
         $q.notify({
-          message:
-            error.response?.data?.message || "Failed to cancel running query",
+          message: "Failed to cancel running query",
           color: "negative",
           position: "bottom",
           timeout: 1500,
         });
-      })
-      .finally(() => {
-        searchObj.data.searchRequestTraceIds =
-          searchObj.data.searchRequestTraceIds.filter(
-            (id: string) => !tracesIds.includes(id),
-          );
-      });
+        resolve(true);
+      }
+    });
   };
 
   const reorderArrayByReference = (arr1: string[], arr2: string[]) => {
@@ -6310,9 +6326,15 @@ const useLogs = () => {
       errorMsg = message;
     }
 
-    searchObj.data.errorDetail = error_detail || "";
-    searchObj.data.errorMsg = errorMsg;
-    notificationMsg.value = errorMsg;
+    if(request.type === 'pageCount') {
+      searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+      if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
+      notificationMsg.value = searchObj.data.countErrorMsg;
+    } else {
+      searchObj.data.errorDetail = error_detail || "";
+      searchObj.data.errorMsg = errorMsg;
+      notificationMsg.value = errorMsg;
+    }
   };
 
   const constructErrorMessage = ({

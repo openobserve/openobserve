@@ -227,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
               <q-toggle
+                v-if="showStoreOriginalDataToggle"
                 data-test="log-stream-store-original-data-toggle-btn"
                 v-model="storeOriginalData"
                 :label="t('logStream.storeOriginalData')"
@@ -237,61 +238,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="q-mb-md">
               <div class="flex justify-between items-center full-width">
-              <div class="flex items-center">
-                <app-tabs
-                  v-if="isSchemaUDSEnabled"
-                  class="schema-fields-tabs"
-                  style="
-                    border: 1px solid #8a8a8a;
-                    border-radius: 4px;
-                    overflow: hidden;
-                  "
-                  data-test="schema-fields-tabs"
-                  :tabs="tabs"
-                  :active-tab="activeTab"
-                  @update:active-tab="updateActiveTab"
-                />
-                <div v-if="hasUserDefinedSchema" class="q-ml-sm">
-                  <q-icon name="info" class="q-mr-xs " size="16px" style="color: #F5A623; cursor: pointer;">
-                    <q-tooltip 
-                    style="font-size: 14px; width: 250px;"
+                <div class="flex items-center">
+                  <app-tabs
+                    v-if="isSchemaUDSEnabled"
+                    class="schema-fields-tabs"
+                    style="
+                      border: 1px solid #8a8a8a;
+                      border-radius: 4px;
+                      overflow: hidden;
+                    "
+                    data-test="schema-fields-tabs"
+                    :tabs="tabs"
+                    :active-tab="activeTab"
+                    @update:active-tab="updateActiveTab"
+                  />
+                  <div v-if="hasUserDefinedSchema" class="q-ml-sm">
+                    <q-icon
+                      name="info"
+                      class="q-mr-xs"
+                      size="16px"
+                      style="color: #f5a623; cursor: pointer"
                     >
-                    Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.
-                    </q-tooltip>
-                  </q-icon>
+                      <q-tooltip style="font-size: 14px; width: 250px">
+                        Other fields show only the schema fields that existed
+                        before the stream was configured to use a user-defined
+                        schema.
+                      </q-tooltip>
+                    </q-icon>
+                  </div>
+                </div>
+
+                <div class="flex items-center tw-gap-4">
+                  <q-input
+                    data-test="schema-field-search-input"
+                    v-model="filterField"
+                    data-cy="schema-index-field-search-input"
+                    filled
+                    borderless
+                    dense
+                    debounce="1"
+                    :placeholder="t('search.searchField')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" />
+                    </template>
+                  </q-input>
+                  <q-btn
+                    v-if="isSchemaUDSEnabled"
+                    color="primary"
+                    data-test="schema-add-fields-title"
+                    @click="openDialog"
+                    class="q-my-sm text-bold no-border"
+                    padding="sm md"
+                    no-caps
+                    dense
+                    :disable="isDialogOpen"
+                  >
+                    Add Field(s)
+                  </q-btn>
                 </div>
               </div>
-
-              <div class="flex items-center tw-gap-4">
-                <q-input
-                  data-test="schema-field-search-input"
-                  v-model="filterField"
-                  data-cy="schema-index-field-search-input"
-                  filled
-                  borderless
-                  dense
-                  debounce="1"
-                  :placeholder="t('search.searchField')"
-                >
-                  <template #prepend>
-                    <q-icon name="search" />
-                  </template>
-                </q-input>
-                <q-btn
-                  v-if="isSchemaUDSEnabled"
-                  color="primary"
-                  data-test="schema-add-fields-title"
-                  @click="openDialog"
-                  class="q-my-sm text-bold no-border"
-                  padding="sm md"
-                  no-caps
-                  dense
-                  :disable="isDialogOpen"
-                >
-                  Add Field(s)
-                </q-btn>
-              </div>
-            </div>
             </div>
 
             <div class="q-mb-md" v-if="isDialogOpen">
@@ -572,7 +578,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- floating footer for the table -->
 
           <div
-            :class="store.state.theme === 'dark' ? 'dark-theme-floating-buttons' : 'light-theme-floating-buttons'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'dark-theme-floating-buttons'
+                : 'light-theme-floating-buttons'
+            "
             class="floating-buttons q-px-md q-py-xs"
           >
             <div
@@ -828,11 +838,12 @@ export default defineComponent({
     //here we are setting the active tab based on the user defined schema
     //1. if there is UDS then it should be schemaFields
     //2. if there is no UDS then it should be allFields
-    const activeTab = ref(hasUserDefinedSchema.value ? "schemaFields" : "allFields");
-
+    const activeTab = ref(
+      hasUserDefinedSchema.value ? "schemaFields" : "allFields",
+    );
 
     const tabs = computed(() => [
-    {
+      {
         value: "schemaFields",
         label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
         disabled: !hasUserDefinedSchema.value,
@@ -843,8 +854,7 @@ export default defineComponent({
         label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
         disabled: false,
         hide: false,
-      }
-
+      },
     ]);
     const mainTabs = computed(() => [
       {
@@ -858,15 +868,15 @@ export default defineComponent({
         disabled: false,
       },
     ]);
-    //here we are making the schema field name dynamic based on the user defined schema 
-    //1. if there is UDS the it should be other fields 
+    //here we are making the schema field name dynamic based on the user defined schema
+    //1. if there is UDS the it should be other fields
     //2. if there is no UDS then it should be all fields
-    const computedSchemaFieldsName = computed(()=>{
-      if(!hasUserDefinedSchema.value){
-        return 'All Fields'
+    const computedSchemaFieldsName = computed(() => {
+      if (!hasUserDefinedSchema.value) {
+        return "All Fields";
       }
-      return 'Other Fields'
-    })
+      return "Other Fields";
+    });
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -889,13 +899,17 @@ export default defineComponent({
       storeOriginalData.value = false;
       approxPartition.value = false;
     });
-    //here we added a watcher to 
+
+    const showStoreOriginalDataToggle = computed(() => {
+      return modelValue.stream_type !== "traces";
+    });
+    //here we added a watcher to
     //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
     //2. if user defined schema is disabled then we need to show the all fields tab and also need to make sure that it would be the active tab
     watch(hasUserDefinedSchema, (newVal) => {
-      if(newVal){
+      if (newVal) {
         activeTab.value = "schemaFields";
-      }else{
+      } else {
         activeTab.value = "allFields";
       }
     });
@@ -1287,10 +1301,14 @@ export default defineComponent({
           modifiedSettings,
         )
         .then(async (res) => {
-          if(store.state.logs.logs.data?.stream?.selectedStream?.includes(indexData.value.name)) {
+          if (
+            store.state.logs.logs.data.stream.selectedStream.includes(
+              indexData.value.name,
+            )
+          ) {
             store.dispatch("logs/setIsInitialized", false);
           }
-          
+
           await getStream(
             indexData.value.name,
             indexData.value.stream_type,
@@ -1803,6 +1821,7 @@ export default defineComponent({
       redDaysList,
       deleteDates,
       IsdeleteBtnVisible,
+      showStoreOriginalDataToggle,
       patternAssociations,
       patternAssociationDialog,
       openPatternAssociationDialog,

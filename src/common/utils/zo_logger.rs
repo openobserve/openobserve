@@ -13,21 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
 use config::{get_config, ider, utils::json};
 use log::{Metadata, Record};
-use once_cell::sync::Lazy;
 use reqwest::Client;
 use tokio::sync::{RwLock, broadcast};
 
-pub static EVENT_SENDER: Lazy<broadcast::Sender<Event>> = Lazy::new(|| {
+pub static EVENT_SENDER: LazyLock<broadcast::Sender<Event>> = LazyLock::new(|| {
     let (tx, _) = broadcast::channel(1024);
     tx
 });
 
-pub static LOGS: Lazy<Arc<RwLock<Vec<Event>>>> = Lazy::new(|| Arc::new(RwLock::new(vec![])));
+pub static LOGS: LazyLock<Arc<RwLock<Vec<Event>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(vec![])));
 
 pub struct ZoLogger {
     pub sender: broadcast::Sender<Event>,

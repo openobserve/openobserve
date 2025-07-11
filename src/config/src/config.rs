@@ -845,6 +845,7 @@ pub struct Common {
     pub print_key_event: bool,
     #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
     pub print_key_sql: bool,
+    // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
     #[env_config(
@@ -869,6 +870,7 @@ pub struct Common {
     )]
     // in seconds
     pub usage_publish_interval: i64,
+    // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
     #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]

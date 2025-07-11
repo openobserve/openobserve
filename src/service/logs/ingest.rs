@@ -85,7 +85,7 @@ pub async fn ingest(
     };
 
     // check system resource
-    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name))?;
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();

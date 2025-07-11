@@ -730,7 +730,6 @@ export default defineComponent({
           }
 
           // Remove deleted streams from the list
-          console.log(selectedItems, "after deleting streams");
           selectedItems.forEach((stream: any) => {
             removeStream(stream.name, stream.stream_type);
             selected.value = selected.value.filter(

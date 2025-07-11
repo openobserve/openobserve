@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 import LogsVisualise from "../../pages/dashboardPages/visualise";
-import { login } from "../utils/dashLogin";
-import { ingestion } from "../utils/dashIngestion";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../cypress/fixtures/log.json";
 import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import {
   waitForDashboardPage,
   deleteDashboard,
-} from "../utils/dashCreation.js";
+} from "./utils/dashCreation.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 

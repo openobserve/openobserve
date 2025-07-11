@@ -1092,7 +1092,7 @@ pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
             Ok(HttpResponse::Ok().json(UserInviteList { data: result }))
         }
         Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
+            http::StatusCode::NOT_FOUND,
             e.to_string(),
         ))),
     }
