@@ -1108,10 +1108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-  <div class="tw-flex tw-h-full">
+  <div class="tw-flex tw-h-full editor-dialog-card">
 
 
-    <q-card  class="tw-h-full  editor-dialog-card tw-flex "
+    <div  class="tw-h-full  tw-flex "
     :style="{
       width: isFullScreen  ? '100vw' : store.state.isAiChatEnabled ? '65vw' : '90vw'
     }"
@@ -1257,7 +1257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         query === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
-                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-120px)]' : 'tw-h-[calc(100%-82px)]'
+                        !!sqlQueryErrorMsg ? 'tw-h-[calc(98%-120px)]' : 'tw-h-[calc(98%-82px)]'
                       ]"
                       @update:query="updateQueryValue"
                       @focus="queryEditorPlaceholderFlag = false"
@@ -1283,7 +1283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         promqlQuery === '' ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
-                        'tw-h-[calc(100%-70px)]'
+                        'tw-h-[calc(98%-70px)]'
                       ]"
                       @blur="onBlurQueryEditor"
                       style="min-height: 10rem;"
@@ -1291,7 +1291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   
             </div>
-            <div v-if="tab !== 'promql'"  class="tw-h-[40%]">
+            <div v-if="tab !== 'promql'"  class="tw-h-[50%]">
               <div class="tw-w-full tw-h-full scheduled-alerts " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
                 <div  class="tw-flex tw-items-center tw-justify-between tw-pb-">
                       
@@ -1369,7 +1369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                       @focus="functionEditorPlaceholderFlag = false"
                       @blur="onBlurFunctionEditor"
-                      style="min-height: 10rem;"
+                      style="min-height: 15rem;"
                     />
 
                   </div>
@@ -1501,7 +1501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       </div>
-    </q-card>
+    </div>
     <div  class="q-ml-sm " v-if="store.state.isAiChatEnabled " style="width: 24.5vw; max-width: 100%; min-width: 75px;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
       <O2AIChat :header-height="60" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" style="height: calc(100vh - 0px) !important;" />
     </div>
