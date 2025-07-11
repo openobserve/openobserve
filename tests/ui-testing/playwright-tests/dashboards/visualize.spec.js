@@ -641,4 +641,110 @@ test.describe("logs testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
+  test("Should not call the API after toggling to the Visualization view.", async ({
+    page,
+  }) => {
+    const logsVisualise = new LogsVisualise(page);
+
+    // Open the logs page and the query editor
+    await logsVisualise.openLogs();
+    await logsVisualise.openQueryEditor();
+    const queryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
+    // Wait for the query editor to be visible
+    await expect(queryEditor).toBeVisible();
+
+    // Fill query in the query editor
+    await queryEditor.fill(
+      "SELECT k8s_object_name, COUNT(k8s_event_uid) AS event_count, AVG(k8s_event_count) AS avg_events_per_job, MAX(k8s_event_start_time) AS last_event_time FROM e2e_automate WHERE k8s_object_kind = 'Job' GROUP BY k8s_object_name ORDER BY event_count DESC LIMIT 20"
+    );
+
+    await logsVisualise.setRelative("1", "m");
+
+    await logsVisualise.logsApplyQueryButton();
+    await page.waitForTimeout(5000);
+
+    //open the visualization tab
+    await logsVisualise.openVisualiseTab();
+
+    // Assert that the event-streaming search API call is **not** fired
+    const apiCallHappened = await page
+      .waitForResponse(
+        (response) =>
+          response
+            .url()
+            .includes(
+              "/api/default/_search_stream?type=logs&search_type=dashboards"
+            ),
+        { timeout: 5000 }
+      )
+      .then(() => true)
+      .catch(() => false); // timeout ⇒ call not made
+
+    expect(apiCallHappened).toBe(false);
+  });
+
+  test("Should update the field name after updating the query.", async ({
+    page,
+  }) => {
+    const logsVisualise = new LogsVisualise(page);
+
+    const initialQuery = `
+      SELECT k8s_object_name, COUNT(k8s_event_uid) AS event_count, 
+             AVG(k8s_event_count) AS avg_events_per_job, 
+             MAX(k8s_event_start_time) AS last_event_time 
+      FROM e2e_automate 
+      WHERE k8s_object_kind = 'Job' 
+      GROUP BY k8s_object_name 
+      ORDER BY event_count DESC 
+      LIMIT 20
+    `;
+
+    const updatedQuery = `
+      SELECT k8s_object_testname, COUNT(k8s_event_uid) AS event_count, 
+             AVG(k8s_event_count) AS avg_events_per_job, 
+             MAX(k8s_event_start_time) AS last_event_time 
+      FROM e2e_automate 
+      WHERE k8s_object_kind = 'Job' 
+      GROUP BY k8s_object_name 
+      ORDER BY event_count DESC 
+      LIMIT 20
+    `;
+
+    // Step 1: Open Logs page and query editor
+    await logsVisualise.openLogs();
+    await logsVisualise.openQueryEditor();
+
+    const queryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
+    await expect(queryEditor).toBeVisible();
+
+    // Step 2: Fill and apply the initial query
+    await queryEditor.fill(initialQuery.trim());
+    await logsVisualise.setRelative("1", "m");
+    await logsVisualise.logsApplyQueryButton();
+    await page.waitForTimeout(3000); // Optional: Replace with proper wait if possible
+
+    // Step 3: Open the Visualization tab
+    await logsVisualise.openVisualiseTab();
+
+    await expect(
+      page.locator('[data-test="dashboard-y-item-k8s_object_name"]')
+    ).toBeVisible();
+
+    // Step 4: Update the query
+    await queryEditor.click();
+    await queryEditor.press("Control+a");
+    await queryEditor.fill(updatedQuery.trim());
+
+    // Activate the function editor to trigger reprocessing
+    await page.locator("#fnEditor").getByRole("textbox").click();
+
+    // Step 5: Assert updated field is visible
+    await expect(
+      page.locator('[data-test="dashboard-y-item-k8s_object_testname"]')
+    ).toBeVisible();
+  });
 });
