@@ -4,19 +4,16 @@ import logsdata from "../../../test-data/logs_data.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
+import PageManager from "../../pages/dashboardPages/page-manager";
+// import pm.dashboardCreate from "../../pages/dashboardPages/dashboard-create";
+// import pm.dashboardListPage from "../../pages/dashboardPages/dashboard-list";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "./utils/dashCreation.js";
+// import pm.chartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
-
 
 // Refactored test cases using Page Object Model
 test.describe("dashboard UI testcases", () => {
@@ -34,30 +31,31 @@ test.describe("dashboard UI testcases", () => {
   test("should create, compare area type chart image and delete dashboard", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardList = new DashboardListPage(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const pm = new PageManager(page);
+    // const pm.dashboardList = new pm.dashboardListPage(page);
+    // const pm.dashboardPanelActions = new DashboardactionPage(page);
+    // const pm.chartTypeSelector = new pm.chartTypeSelector(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     const dashboardName = randomDashboardName;
 
     // Navigate to the dashboard list page
-    await dashboardList.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
     // Create a dashboard
-    await dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
 
     // Add a panel to the dashboard
-    await dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Select the stream and chart type
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.selectChartType("area");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectChartType("area");
 
     // Add a field to the chart
-    await chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubectl_kubernetes_io_default_container",
       "y"
     );
@@ -66,7 +64,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').waitFor({
       state: "visible",
     });
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForDateTimeButtonToBeEnabled(page);
 
     // Save the chart image
@@ -79,14 +77,13 @@ test.describe("dashboard UI testcases", () => {
     });
 
     // Save the panel
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
       state: "visible",
     });
     await deleteDashboard(page, dashboardName);
   });
 });
-

@@ -1,16 +1,10 @@
 import { test, expect } from "@playwright/test";
-import LogsVisualise from "../../pages/dashboardPages/visualise";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../cypress/fixtures/log.json";
-import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "./utils/dashCreation.js";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
+import PageManager from "../../pages/dashboardPages/page-manager";
+
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -32,40 +26,43 @@ test.describe("logs testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
   });
 
   test("should create logs when queries are ingested into the search field", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and enable SQL mode
-    await logsVisualise.openLogs();
-    await logsVisualise.enableSQLMode();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.enableSQLMode();
 
     //set relative time
-    await logsVisualise.logsSelectStream("e2e_automate");
-    await logsVisualise.setRelative("4", "d");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsSelectStream("e2e_automate");
+    await pm.logsVisualise.setRelative("4", "d");
+    await pm.logsVisualise.logsApplyQueryButton();
   });
 
   test("should set the default chart type and default X and Y axes to automatic after clicking the Visualize button", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and select stream
-    await logsVisualise.openLogs();
-    await logsVisualise.streamIndexList();
-    await logsVisualise.logsToggle();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.streamIndexList();
+    await pm.logsVisualise.logsToggle();
 
     //open the Visualize tab and check the default chart type and axes
-    await logsVisualise.openVisualiseTab();
-    await logsVisualise.selectChartType("bar");
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.selectChartType("bar");
     await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
@@ -78,19 +75,21 @@ test.describe("logs testcases", () => {
   test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
-    await logsVisualise.openLogs();
-    await logsVisualise.logsApplyQueryButton();
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
 
     // Remove the _timestamp field from the X-axis
-    await logsVisualise.removeField("_timestamp", "x");
+    await pm.logsVisualise.removeField("_timestamp", "x");
     await page.getByText("Chart configuration has been").click();
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
 
     // Apply the changes
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await expect(page.getByText("There are some errors, please")).toBeVisible();
     await page
       .locator(
@@ -104,10 +103,10 @@ test.describe("logs testcases", () => {
       .click();
 
     // Apply the changes
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Remove the _timestamp field from the Y-axis
-    await logsVisualise.removeField("_timestamp", "y");
+    await pm.logsVisualise.removeField("_timestamp", "y");
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
@@ -122,23 +121,24 @@ test.describe("logs testcases", () => {
     // Apply the changes
     const search = page.waitForResponse(logData.applyQuery);
 
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await expect
       .poll(async () => (await search).status(), { timeout: 15000 })
       .toBe(200);
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
-    await logsVisualise.chartRender(470, 13);
+    await pm.logsVisualise.chartRender(470, 13);
   });
 
   test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and visualize tab
-    await logsVisualise.openLogs();
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Add a field to the chart
     await page
@@ -153,63 +153,64 @@ test.describe("logs testcases", () => {
       )
       .click();
 
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Change the chart types
-    await logsVisualise.selectChartType("line");
+    await pm.logsVisualise.selectChartType("line");
 
     await expect(
       page.locator('[data-test="chart-renderer"] canvas').last()
     ).toBeVisible();
 
     //set relative time
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.chartRender(457, 135);
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.chartRender(457, 135);
 
     // Change the chart type to area
-    await logsVisualise.selectChartType("area");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.chartRender(590, 127);
+    await pm.logsVisualise.selectChartType("area");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.chartRender(590, 127);
 
     // Change the chart type to area-stacked
-    await logsVisualise.selectChartType("area-stacked");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.chartRender(475, 45);
+    await pm.logsVisualise.selectChartType("area-stacked");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.chartRender(475, 45);
 
     // Change the chart type to horizontal bar
-    await logsVisualise.selectChartType("h-bar");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.chartRender(722, 52);
+    await pm.logsVisualise.selectChartType("h-bar");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.chartRender(722, 52);
 
     // Change the chart type to scatter and apply
-    await logsVisualise.selectChartType("scatter");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.chartRender(362, 30);
+    await pm.logsVisualise.selectChartType("scatter");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.chartRender(362, 30);
 
     // Change the chart type to pie and apply
-    await logsVisualise.selectChartType("pie");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.chartRender(650, 85);
+    await pm.logsVisualise.selectChartType("pie");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.chartRender(650, 85);
 
     // Change the chart type to donut and apply
-    await logsVisualise.selectChartType("donut");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.chartRender(216, 53);
+    await pm.logsVisualise.selectChartType("donut");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.chartRender(216, 53);
 
     // Change the chart type to gauge and apply
-    await logsVisualise.selectChartType("gauge");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.chartRender(423, 127);
+    await pm.logsVisualise.selectChartType("gauge");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.chartRender(423, 127);
   });
 
   test("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and set relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.setRelative("6", "w");
 
     // Add kubernetes_container_image field to the search query
     await page.getByLabel('Expand "kubernetes_container_image"').click();
@@ -239,10 +240,10 @@ test.describe("logs testcases", () => {
       .click();
 
     // Apply the changes
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Add kubernetes_annotations_kubernetes_io_psp field to the visualization
     await page
@@ -258,25 +259,26 @@ test.describe("logs testcases", () => {
       .click();
 
     // Apply the changes in the visualization
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Go back to the logs page
-    await logsVisualise.backToLogs();
+    await pm.logsVisualise.backToLogs();
   });
 
   test("should handle an empty query in visualization without displaying an error.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and the query editor and apply a relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.openQueryEditor();
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
     await expect(page.locator(".cm-line").first()).toBeVisible();
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
@@ -289,12 +291,13 @@ test.describe("logs testcases", () => {
   test("should display an error message on the logs page for an invalid query", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and the query editor
-    await logsVisualise.openLogs();
-    await logsVisualise.openQueryEditor();
-    await logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
+    await pm.logsVisualise.setRelative("6", "w");
     const queryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]')
       .getByRole("textbox");
@@ -305,12 +308,12 @@ test.describe("logs testcases", () => {
     await queryEditor.fill("select from user whare ID =1");
 
     // Refresh the search
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     await page.getByText("Search field not found: as");
 
     //open the visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Verify that X and Y axis items are visible and apply
     await expect(
@@ -325,20 +328,21 @@ test.describe("logs testcases", () => {
       .locator("i")
       .click();
 
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and set relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Add the kubernetes_container_hash field to the search query
     await page.getByLabel('Expand "kubernetes_container_hash"').click();
@@ -353,11 +357,11 @@ test.describe("logs testcases", () => {
         '[data-test="logs-search-subfield-add-kubernetes_container_hash-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\@sha256\\:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589"] [data-test="log-search-subfield-list-equal-kubernetes_container_hash-field-btn"]'
       )
       .click();
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the visualization tab
-    await logsVisualise.openVisualiseTab();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     let exceptionBefore = null;
     let exceptionAfter = null;
 
@@ -373,11 +377,11 @@ test.describe("logs testcases", () => {
     }
 
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.backToLogs();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.backToLogs();
 
-    await logsVisualise.logsApplyQueryButton();
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openVisualiseTab();
 
     try {
       await expect(
@@ -389,20 +393,21 @@ test.describe("logs testcases", () => {
       exceptionAfter = e;
     }
     expect(exceptionBefore).toBe(exceptionAfter);
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and set relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.setRelative("6", "w");
 
     //open the visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Add a field to the Y-axis
     await page
@@ -437,7 +442,7 @@ test.describe("logs testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Reload the page
     await page.reload();
@@ -448,10 +453,11 @@ test.describe("logs testcases", () => {
   test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page, fill the query editor, and apply a relative time and Apply the query
-    await logsVisualise.openLogs();
+    await pm.logsVisualise.openLogs();
 
     const sqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
     count(kubernetes_container_hash) as "y_axis_1", 
@@ -467,16 +473,16 @@ test.describe("logs testcases", () => {
     WHERE kubernetes_namespace_name IS NOT NULL 
     GROUP BY x_axis_1, breakdown_1`;
 
-    await logsVisualise.fillQueryEditor(sqlQuery);
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.fillQueryEditor(sqlQuery);
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Enable SQL mode
-    await logsVisualise.enableSQLMode();
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.enableSQLMode();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Check for any error messages or indicators
     const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
@@ -489,19 +495,20 @@ test.describe("logs testcases", () => {
   test("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and set relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.setRelative("6", "w");
 
     // Apply query and switch to the visualise tab
-    await logsVisualise.logsApplyQueryButton();
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Switch back to logs and again to visualise
-    await logsVisualise.backToLogs();
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.backToLogs();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Open the dropdown to check its state
     await page.locator('[data-test="index-dropdown-stream"]').click();
@@ -534,20 +541,21 @@ test.describe("logs testcases", () => {
   test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and set relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.setRelative("4", "d");
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.setRelative("4", "d");
 
     // Open the visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Remove a field from the y-axis
-    await logsVisualise.removeField("_timestamp", "y");
+    await pm.logsVisualise.removeField("_timestamp", "y");
 
     // Switch back to logs
-    await logsVisualise.backToLogs();
+    await pm.logsVisualise.backToLogs();
   });
 
   test("should create dashboard from the visualization chart sucessfully", async ({
@@ -557,27 +565,24 @@ test.describe("logs testcases", () => {
       "Dashboard_" + Math.random().toString(36).substr(2, 9);
     const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
 
-    const logsVisualise = new LogsVisualise(page);
-    const dashboardPanel = new DashboardPanel(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Open the logs page and set relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.setRelative("4", "d");
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.setRelative("4", "d");
 
     // Open the visualization tab and add fields
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "b"
     );
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Change the chart types
-    await logsVisualise.selectChartType("line");
+    await pm.logsVisualise.selectChartType("line");
 
     await expect(
       page.locator('[data-test="chart-renderer"] canvas').last()
@@ -613,7 +618,7 @@ test.describe("logs testcases", () => {
 
     //redirecting to the dashboard and edit panel and save it
 
-    await dashboardPanel.editPanel(panelName);
+    awaitpm.dashboardPanelEdit.editPanel(panelName);
     await page
       .locator('[data-test="dashboard-panel-name"]')
       .waitFor({ state: "visible" });
@@ -633,7 +638,7 @@ test.describe("logs testcases", () => {
     await dashboardActions.savePanel();
 
     // Return to dashboards list and delete the dashboard
-    await dashboardCreate.backToDashboardList();
+    awaitpm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });
