@@ -707,7 +707,7 @@ test.describe("logs testcases", () => {
              MAX(k8s_event_start_time) AS last_event_time 
       FROM e2e_automate 
       WHERE k8s_object_kind = 'Job' 
-      GROUP BY k8s_object_name 
+      GROUP BY k8s_object_testname 
       ORDER BY event_count DESC 
       LIMIT 20
     `;
@@ -731,7 +731,7 @@ test.describe("logs testcases", () => {
     await logsVisualise.openVisualiseTab();
 
     await expect(
-      page.locator('[data-test="dashboard-y-item-k8s_object_name"]')
+      page.locator('[data-test="dashboard-x-item-k8s_object_name"]')
     ).toBeVisible();
 
     // Step 4: Update the query
@@ -744,7 +744,7 @@ test.describe("logs testcases", () => {
 
     // Step 5: Assert updated field is visible
     await expect(
-      page.locator('[data-test="dashboard-y-item-k8s_object_testname"]')
+      page.locator('[data-test="dashboard-x-item-k8s_object_testname"]')
     ).toBeVisible();
   });
 });
