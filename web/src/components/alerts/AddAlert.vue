@@ -59,21 +59,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div
       ref="addAlertFormRef"
-      class="q-px-lg"
       style="
         max-height: calc(100vh - 165px);
         overflow: auto;
         scroll-behavior: smooth;
       "
     >
-      <div class="row flex tw-gap-5 items-start" style="width: 100%">
+      <div class="row flex tw-gap-2 items-start" style="width: 100%">
         <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
             <div
               class="flex tw-mt-2 justify-start items-center q-col-gutter-md flex-wrap "
             >
-            <div class=" tw-w-full row alert-setup-container" style="width: calc(100vw - 600px);">
+            <div class=" tw-w-full row alert-setup-container">
               <AlertsContainer 
                 name="query"
                 v-model:is-expanded="expandState.alertSetup"
@@ -382,11 +381,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 440px; height: 300px; position: sticky; top: 0 "
+          style="width: 420px; height: 300px; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
-            style="border: 1px solid #ececec; height: 300px; width: 440px;"
+            style="border: 1px solid #ececec; height: 300px; width: 412px;"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"

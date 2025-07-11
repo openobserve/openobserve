@@ -1064,7 +1064,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <!-- view section -->
         <div class="tw-w-full tw-flex lg:tw-flex-col tw-flex-col tw-gap-2" :class="store.state.theme === 'dark' ? 'dark-mode-view' : 'light-mode-view'">
-          <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container q-px-md q-py-sm tw-h-16">
+          <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container tw-px-2 q-py-sm tw-h-16">
           <div class="tw-flex tw-items-start">
             <div :class="[
               store.state.theme === 'dark' ? 'tw-bg-gray-600' : 'tw-bg-gray-200'
