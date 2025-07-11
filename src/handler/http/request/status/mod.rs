@@ -269,7 +269,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
-    #[cfg(feature = "cloud")]
+    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
@@ -568,13 +568,16 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
+                    let is_new_usr = process_token(res)
+                        .await
+                        .map(|new_user| format!("&new_user_login={new_user}"));
                     login_url = format!(
-                        "{}#id_token={}.{}",
+                        "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
-                        base64::encode(&id_token)
+                        base64::encode(&id_token),
+                        is_new_usr.unwrap_or_default()
                     );
-                    process_token(res).await
                 }
                 Err(e) => {
                     audit_message.response_meta.http_response_code = 400;
