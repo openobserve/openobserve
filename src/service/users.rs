@@ -545,7 +545,7 @@ pub async fn update_user(
                 }
 
                 #[cfg(not(feature = "enterprise"))]
-                log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
+                log::debug!("Role changed from {old_role:?} to {new_role:?}");
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK,
                     "User updated successfully",
