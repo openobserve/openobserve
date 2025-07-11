@@ -6,7 +6,7 @@
         <div class="tw-flex tw-items-start tw-justify-between full-width ">
         
           <div
-            class="tw-text-[20px] tw-flex tw-items-start" 
+            class="tw-text-[16px] tw-flex tw-items-start" 
 
           >
           <q-icon

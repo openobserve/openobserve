@@ -1108,7 +1108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-  <div class="tw-flex tw-h-full editor-dialog-card">
+  <div class="tw-flex tw-h-full editor-dialog-card tw-px-4">
 
 
     <div  class="tw-h-full  tw-flex "
@@ -1116,7 +1116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       width: isFullScreen  ? '100vw' : store.state.isAiChatEnabled ? '65vw' : '90vw'
     }"
     >
-      <div class="tw-h-full tw-w-full tw-px-6 tw-py-2 "
+      <div class="tw-h-full tw-w-full tw-px-2 tw-py-2 "
       >
       <div class="tw-h-8 tw-flex tw-items-center tw-justify-between" style="font-size: 20px ;">
         <div class="tw-flex tw-items-center tw-gap-2">
@@ -1183,6 +1183,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
                     <span class="editor-text-title">{{  tab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                     <div class="tw-flex tw-gap-2 tw-items-center tw-h-6 ">
+                      <div style="border: 1px solid #7980cc; border-radius: 4px;">
+                        <q-btn
+                          data-test="alert-variables-add-btn"
+                          size="sm"
+                          no-caps
+                          dense
+                          flat
+                          class="text-bold no-border"
+                            @click="toggleAIChat"
+                        >
+                          <img :src="getBtnO2Logo" />
+                          <span  
+                          class="tw-text-[12px] tw-font-[400] tw-pl-[4px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]">Generate With AI</span>
+                      </q-btn>
+                      </div>
                        <div class="tw-h-full tw-flex tw-justify-center tw-items-center">
                         <q-select
                           v-model="selectedColumn"
@@ -1225,7 +1240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :disable="tab == 'sql' ? query == '' : promqlQuery == ''"
                         >
                           <q-icon name="search" size="20px" />
-                          <span class="tw-text-[11px] tw-font-[400]">Run Query</span>
+                          <span class="tw-text-[12px] tw-font-[400]">Run Query</span>
                       </q-btn>
                       </div>
                     </div>
@@ -1257,7 +1272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         query === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
-                        !!sqlQueryErrorMsg ? 'tw-h-[calc(98%-120px)]' : 'tw-h-[calc(98%-82px)]'
+                        !!sqlQueryErrorMsg ? 'tw-h-[calc(99%-120px)]' : 'tw-h-[calc(99%-82px)]'
                       ]"
                       @update:query="updateQueryValue"
                       @focus="queryEditorPlaceholderFlag = false"
@@ -1283,7 +1298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         promqlQuery === '' ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
-                        'tw-h-[calc(98%-70px)]'
+                        'tw-h-[calc(99%-70px)]'
                       ]"
                       @blur="onBlurQueryEditor"
                       style="min-height: 10rem;"
@@ -1293,10 +1308,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-if="tab !== 'promql'"  class="tw-h-[50%]">
               <div class="tw-w-full tw-h-full scheduled-alerts " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-                <div  class="tw-flex tw-items-center tw-justify-between tw-pb-">
+                <div  class="tw-flex tw-items-center tw-justify-between tw-pb-1">
                       
                       <span class="editor-text-title">VRL Editor</span>
                       <div class="tw-flex tw-gap-2 tw-items-center">
+                        <div style="border: 1px solid #7980cc; border-radius: 4px;">
+                        <q-btn
+                          data-test="alert-variables-add-btn"
+                          size="sm"
+                          no-caps
+                          dense
+                          flat
+                          class="text-bold no-border"
+                            @click="toggleAIChat"
+                        >
+                          <img :src="getBtnO2Logo" />
+                          <span  
+                          class="tw-text-[12px] tw-font-[400] tw-pl-[4px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]">Generate With AI</span>
+                      </q-btn>
+                      </div>
                         <div>
                           <q-select
                           v-model="selectedFunction"
@@ -1340,7 +1370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :disable="vrlFunctionContent == ''"
                           >
                             <q-icon name="search" size="20px" />
-                            <span class="tw-text-[11px] tw-font-[400]">Apply VRL</span>
+                            <span class="tw-text-[12px] tw-font-[400]">Apply VRL</span>
                         </q-btn>
                         </div>
                       </div>
@@ -2429,16 +2459,18 @@ const routeToCreateDestination = () => {
     }
 
 
+    const getBtnO2Logo = computed(() => {
+      return getImageURL('images/common/ai_icon_blue.svg')
+    })
     const getBtnLogo = computed(() => {
-          if (isHovered.value || store.state.isAiChatEnabled) {
-            return getImageURL('images/common/ai_icon_dark.svg')
-          }
+      if (isHovered.value || store.state.isAiChatEnabled) {
+        return getImageURL('images/common/ai_icon_dark.svg')
+      }
 
-          return store.state.theme === 'dark'
-            ? getImageURL('images/common/ai_icon_dark.svg')
-            : getImageURL('images/common/ai_icon.svg')
-        })
-
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
     const convertMinutesToDisplayValue = (value: number) => {
       if (!value || value < 0) return '0 minutes';
       
@@ -2555,7 +2587,8 @@ defineExpose({
   scheduledAlertRef,
   filterDestinations,
   filteredDestinations,
-  destinationSelectRef
+  destinationSelectRef,
+  getBtnO2Logo
 });
 </script>
 
