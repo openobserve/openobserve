@@ -712,6 +712,9 @@ export default defineComponent({
           !type
         ) {
           searchObj.meta.pageType = "logs";
+          if(prev === "stream_explorer" && (type == undefined || type !== "stream_explorer")) {
+            searchObj.meta.refreshHistogram = true;
+          }
           loadLogsData();
         }
       },
