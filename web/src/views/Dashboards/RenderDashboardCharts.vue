@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           v-for="item in panels"
-          :key="item.id"
+          :key="item.id + selectedTabId"
           :gs-id="item.id"
           :gs-x="getPanelLayout(item, 'x')"
           :gs-y="getPanelLayout(item, 'y')"
@@ -193,6 +193,7 @@ import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
+import { s } from "msw/lib/core/HttpResponse-CCdkF1fJ";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -490,7 +491,10 @@ export default defineComponent({
           tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,
         },
       });
-    };    // GridStack initialization and methods
+    };    
+    // GridStack initialization and methods
+    
+    let gridStackUpdateInProgress = false;
     const initGridStack = () => {
       console.log("GridStack layout changed: Initializing GridStack...");
 
@@ -527,8 +531,17 @@ export default defineComponent({
       );
 
       // Handle layout changes (drag/resize) - only update layout data, don't save during operations
-      gridStackInstance.on("change", (event, items) => {
+      gridStackInstance.on("change", async (event, items) => {
         console.log("GridStack layout changed: Items changed:", items);
+        // console.log(
+        //   "GridStack layout changed: dashboard Details:",
+        //   JSON.stringify(props.dashboardData, null, 2),
+        // );
+
+        if(gridStackUpdateInProgress) {
+          console.log("GridStack layout changed: Update in progress, skipping update");
+          return;
+        }
 
         if (items && items.length > 0) {
           console.log("GridStack layout changed:", items);
@@ -544,7 +557,11 @@ export default defineComponent({
       });
     }; // Update panel layout data from GridStack items
     const updatePanelLayouts = (items) => {
+      // console.log("Updating panel layouts with items:", JSON.stringify(items, null, 2));
       items.forEach((item) => {
+        console.log(
+          `Panel layout before update: ${item}, ${panels.value.length} panels`,
+        );
         const panelId = item.id;
         const panel = panels.value.find((p) => p.id === panelId);
         if (panel && panel.layout) {
@@ -563,6 +580,8 @@ export default defineComponent({
         );
         return;
       }
+
+      gridStackUpdateInProgress = true;
 
       console.log("refreshGridStack: Starting refresh operation");
       // Wait for Vue to finish DOM updates
@@ -584,12 +603,12 @@ export default defineComponent({
         `refreshGridStack: Removing ${existingElements.length} existing widgets`,
         existingElements,
       );
-      existingElements.forEach((element) => {
-        console.log(
-          `refreshGridStack: Removing widget with gs-id=${element.getAttribute("gs-id")}`,
-        );
-        grid.removeWidget(element, false);
-      });
+      // existingElements.forEach((element) => {
+      //   console.log(
+      //     `refreshGridStack: Removing widget with gs-id=${element.getAttribute("gs-id")}`,
+      //   );
+      //   grid.removeWidget(element, false);
+      // });
 
       console.log(
         "refreshGridStack: All existing widgets removed, proceeding with reconstruction",
@@ -671,6 +690,8 @@ export default defineComponent({
       console.log(
         "refreshGridStack: Triggering window resize to ensure charts render correctly",
       );
+
+      gridStackUpdateInProgress = false;
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -753,6 +774,7 @@ export default defineComponent({
       () => [selectedTabId.value],
       async (newPanels, oldPanels) => {
         // Only refresh if the number of tab changes
+        await nextTick();
         await refreshGridStack();
       },
       { deep: true }, // Deep watch to catch layout changes within panels
