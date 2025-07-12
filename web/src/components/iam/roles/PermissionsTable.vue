@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="edit-role-permissions-table-title"
     v-if="!level"
-    class="q-mb-md text-bold"
+    class="tw-py-[19px] tw-px-[16px] tw-font-bold tw-text-[14px]"
   >
      {{ visibleResourceCount }} Permissions
   </div>
@@ -380,8 +380,14 @@ defineExpose({
 <style scoped></style>
 <style lang="scss">
 .iam-permissions-table {
+  th{
+    height: 48px !important;
+  }
   .q-table--bordered {
     border: none;
+  }
+  .q-table__card{
+    border-radius: 0px !important;
   }
 
   .q-virtual-scroll__padding {
