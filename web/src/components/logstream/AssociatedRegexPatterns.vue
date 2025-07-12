@@ -222,7 +222,7 @@
                   </span>
                 </div>
                 <div class="tw-h-[19px] -tw-mb-1 tw-flex tw-items-center tw-justify-end tw-font-[600] " style="border-radius: 3px;">
-                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-bg-[#5960B2] tw-text-[11px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
+                            <q-btn :disable="testString.length === 0 || testLoading" class="tw-px-2 tw-bg-[#5960B2] tw-text-[12px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
                         style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
                         <span>
                             Test Input

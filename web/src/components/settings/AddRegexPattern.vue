@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             Test Regex Pattern
                         </span>
                         <div class="tw-h-[19px] tw-flex tw-items-center tw-justify-center tw-font-[600]" style="border-radius: 3px;">
-                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw-px-2 tw-bg-[#5960B2] tw-text-[11px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
+                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw-px-2 tw-bg-[#5960B2] tw-text-[12px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
                         style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
                         <span>
                             Test Input
