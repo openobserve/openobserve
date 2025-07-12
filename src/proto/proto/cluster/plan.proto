@@ -20,6 +20,12 @@ message NewEmptyExecNode {
     datafusion_common.Schema        full_schema = 7;
 }
 
+message AggregateTopkExecNode {
+    string  sort_field = 1;
+    bool    descending = 2;
+    uint64       limit = 3;
+}
+
 // Search request
 message FlightSearchRequest {
     QueryIdentifier         query_identifier = 1;
