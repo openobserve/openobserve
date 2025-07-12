@@ -57,6 +57,18 @@ const organizationObj = {
     free_trial_expiry: "",
   },
   isDataIngested: false,
+  regexPatterns: [],
+  regexPatternFromLogs:{
+    key: "",
+    value: "",
+    stream: "",
+  },
+  customRegexPatternFromLogs:{
+    key: "",
+    value: "",
+    stream: "",
+    type: "",
+  }
 };
 
 export default createStore({
@@ -235,6 +247,9 @@ export default createStore({
     setChatUpdated(state, payload) {
       state.chatUpdated = payload;
     },
+    setRegexPatterns(state, payload) {
+      state.organizationData.regexPatterns = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -374,6 +389,9 @@ export default createStore({
     },
     setChatUpdated(context, payload) {
       context.commit("setChatUpdated", payload);
+    },
+    setRegexPatterns(context, payload) {
+      context.commit("setRegexPatterns", payload);
     },
   },
   modules: {

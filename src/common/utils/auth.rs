@@ -355,6 +355,17 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS.get("alert_folders").unwrap().key,
                     folder
                 )
+            } else if path_columns[1] == "re_patterns" && path_columns[2] == "test" {
+                // specifically for testing re_patterns we need get permissions
+                // on re patterns
+                method = "LIST".to_string();
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
+                )
             }
             // these are cases where the entity is "sub-entity" of some other entity,
             // for example, alerts are on route /org/stream/alerts

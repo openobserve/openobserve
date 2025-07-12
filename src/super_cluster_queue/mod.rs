@@ -25,6 +25,7 @@ mod org_user;
 mod organization;
 mod pipelines;
 mod ratelimit;
+mod re_pattern;
 mod reports;
 mod scheduler;
 mod schemas;
@@ -55,6 +56,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_pipeline_msg: pipelines::process,
         on_cipher_key_msg: cipher_keys::process,
         on_rate_limit_msg: ratelimit::process,
+        on_re_patterns_msg: re_pattern::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
