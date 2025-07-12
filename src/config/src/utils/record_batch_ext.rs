@@ -575,7 +575,7 @@ pub fn merge_record_batches(
 
     // 4. sort concatenated record batch by timestamp col in desc order
     let sorted_batch = sort_record_batch_by_column(
-        &concated_record_batch,
+        concated_record_batch,
         TIMESTAMP_COL_NAME,
         true,
         None,
@@ -590,11 +590,15 @@ pub fn merge_record_batches(
 }
 
 pub fn sort_record_batch_by_column(
-    batch: &RecordBatch,
+    batch: RecordBatch,
     column_name: &str,
     descending: bool,
     limit: Option<usize>,
 ) -> Result<RecordBatch, DataFusionError> {
+    if batch.num_rows() == 0 {
+        return Ok(batch);
+    }
+
     // Create sort options
     let sort_options = arrow::compute::SortOptions {
         descending,
@@ -806,7 +810,7 @@ mod test {
         .unwrap();
 
         // Sort by name column in ascending order
-        let sorted_batch = sort_record_batch_by_column(&record_batch, "name", false, None).unwrap();
+        let sorted_batch = sort_record_batch_by_column(record_batch, "name", false, None).unwrap();
 
         // Assert that the batch is sorted by name
         assert_eq!(
@@ -845,7 +849,7 @@ mod test {
         .unwrap();
 
         // Sort by name column in descending order
-        let sorted_batch = sort_record_batch_by_column(&record_batch, "name", true, None).unwrap();
+        let sorted_batch = sort_record_batch_by_column(record_batch, "name", true, None).unwrap();
 
         // Assert that the batch is sorted by name in descending order
         assert_eq!(
@@ -884,7 +888,7 @@ mod test {
         .unwrap();
 
         // Sort by age column in ascending order
-        let sorted_batch = sort_record_batch_by_column(&record_batch, "age", false, None).unwrap();
+        let sorted_batch = sort_record_batch_by_column(record_batch, "age", false, None).unwrap();
 
         // Assert that the batch is sorted by age
         assert_eq!(
@@ -923,7 +927,7 @@ mod test {
         .unwrap();
 
         // Sort by score column in descending order
-        let sorted_batch = sort_record_batch_by_column(&record_batch, "score", true, None).unwrap();
+        let sorted_batch = sort_record_batch_by_column(record_batch, "score", true, None).unwrap();
 
         // Assert that the batch is sorted by score in descending order
         assert_eq!(
@@ -956,7 +960,7 @@ mod test {
         .unwrap();
 
         // Try to sort by a non-existent column
-        let result = sort_record_batch_by_column(&record_batch, "nonexistent", false, None);
+        let result = sort_record_batch_by_column(record_batch, "nonexistent", false, None);
 
         // Assert that it returns an error
         assert!(result.is_err());
@@ -986,7 +990,7 @@ mod test {
         .unwrap();
 
         // Sort by name column
-        let sorted_batch = sort_record_batch_by_column(&record_batch, "name", false, None).unwrap();
+        let sorted_batch = sort_record_batch_by_column(record_batch, "name", false, None).unwrap();
 
         // Assert that the batch is still empty
         assert_eq!(sorted_batch.num_rows(), 0);
@@ -1011,7 +1015,7 @@ mod test {
         .unwrap();
 
         // Sort by name column in ascending order (nulls should be last due to nulls_first: false)
-        let sorted_batch = sort_record_batch_by_column(&record_batch, "name", false, None).unwrap();
+        let sorted_batch = sort_record_batch_by_column(record_batch, "name", false, None).unwrap();
 
         // Assert that the batch is sorted correctly with nulls at the end
         assert_eq!(
@@ -1046,7 +1050,7 @@ mod test {
 
         // Sort by name column in ascending order with limit of 3
         let sorted_batch =
-            sort_record_batch_by_column(&record_batch, "name", false, Some(3)).unwrap();
+            sort_record_batch_by_column(record_batch, "name", false, Some(3)).unwrap();
 
         // Assert that the batch is sorted by name and limited to 3 rows
         assert_eq!(sorted_batch.num_rows(), 3);
@@ -1081,7 +1085,7 @@ mod test {
 
         // Sort by name column in ascending order with limit larger than data size
         let sorted_batch =
-            sort_record_batch_by_column(&record_batch, "name", false, Some(10)).unwrap();
+            sort_record_batch_by_column(record_batch, "name", false, Some(10)).unwrap();
 
         // Assert that the batch is sorted by name and contains all rows (not limited)
         assert_eq!(sorted_batch.num_rows(), 2);
