@@ -553,6 +553,18 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                                 .json("Service accounts are not allowed to login".to_string()));
                         }
                     }
+                    // get domain from email
+                    let domain = res.0.user_email.split('@').nth(1).unwrap_or_default();
+                    if !get_dex_config().allowed_domains.is_empty()
+                        && !get_dex_config().allowed_domains.contains(domain)
+                    {
+                        audit_message.response_meta.http_response_code = 400;
+                        audit_message._timestamp = now_micros();
+                        audit(audit_message).await;
+                        return Ok(
+                            HttpResponse::Unauthorized().json("Unauthorized access".to_string())
+                        );
+                    }
 
                     audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
