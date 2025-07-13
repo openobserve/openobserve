@@ -188,6 +188,7 @@ import { ref, reactive, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import domainManagement from "@/services/domainManagement";
 
 interface Domain {
@@ -200,6 +201,7 @@ interface Domain {
 const { t } = useI18n();
 const q = useQuasar();
 const store = useStore();
+const router = useRouter();
 
 const newDomain = ref("");
 const domains = reactive<Domain[]>([]);
@@ -208,7 +210,16 @@ const saving = ref(false);
 const emit = defineEmits(["cancel", "saved"]);
 
 onMounted(() => {
-  loadDomainSettings();
+  if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+    loadDomainSettings();
+  } else {
+    router.replace({
+      name: "general",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    })
+  }
 });
 
 const loadDomainSettings = async () => {
