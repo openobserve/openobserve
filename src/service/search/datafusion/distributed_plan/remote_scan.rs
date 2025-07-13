@@ -56,14 +56,12 @@ use tonic::{
     metadata::{MetadataKey, MetadataValue},
 };
 
-use super::{
-    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-    node::RemoteScanNode,
-};
+use super::node::RemoteScanNode;
 use crate::service::{
     grpc::get_cached_channel,
     search::{
         MetadataMap,
+        datafusion::distributed_plan::codec::get_physical_extension_codec,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
 };
@@ -89,9 +87,7 @@ impl RemoteScanExec {
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 
         // serialize the input plan and set it as the plan for the remote scan node
-        let proto = ComposedPhysicalExtensionCodec {
-            codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-        };
+        let proto = get_physical_extension_codec();
         let physical_plan_bytes =
             physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
         remote_scan_node.set_plan(physical_plan_bytes.to_vec());
@@ -160,9 +156,15 @@ impl ExecutionPlan for RemoteScanExec {
 
     fn with_new_children(
         self: Arc<Self>,
-        _: Vec<Arc<dyn ExecutionPlan>>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(self)
+        if children.is_empty() {
+            return Ok(self);
+        }
+        Ok(Arc::new(Self::new(
+            children[0].clone(),
+            self.remote_scan_node.clone(),
+        )?))
     }
 
     fn execute(

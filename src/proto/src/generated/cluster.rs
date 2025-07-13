@@ -2886,6 +2886,16 @@ pub struct NewEmptyExecNode {
     #[prost(message, optional, tag = "7")]
     pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AggregateTopkExecNode {
+    #[prost(string, tag = "1")]
+    pub sort_field: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub descending: bool,
+    #[prost(uint64, tag = "3")]
+    pub limit: u64,
+}
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
