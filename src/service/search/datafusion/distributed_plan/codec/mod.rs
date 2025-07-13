@@ -70,10 +70,10 @@ impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
         Err(last_err.unwrap())
     }
 
-    fn try_decode_udf(&self, name: &str, _buf: &[u8]) -> Result<Arc<ScalarUDF>> {
+    fn try_decode_udf(&self, name: &str, buf: &[u8]) -> Result<Arc<ScalarUDF>> {
         let mut last_err = None;
         for codec in &self.codecs {
-            match codec.try_decode_udf(name, _buf) {
+            match codec.try_decode_udf(name, buf) {
                 Ok(plan) => return Ok(plan),
                 Err(e) => last_err = Some(e),
             }
@@ -81,10 +81,10 @@ impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
         Err(last_err.unwrap())
     }
 
-    fn try_encode_udf(&self, _node: &ScalarUDF, _buf: &mut Vec<u8>) -> Result<()> {
+    fn try_encode_udf(&self, _node: &ScalarUDF, buf: &mut Vec<u8>) -> Result<()> {
         let mut last_err = None;
         for codec in &self.codecs {
-            match codec.try_encode_udf(_node, _buf) {
+            match codec.try_encode_udf(_node, buf) {
                 Ok(_) => return Ok(()),
                 Err(e) => last_err = Some(e),
             }
